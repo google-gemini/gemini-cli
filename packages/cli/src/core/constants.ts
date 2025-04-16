@@ -1,0 +1,1 @@
+export const MEMORY_FILE_NAME = 'GEMINI.md';

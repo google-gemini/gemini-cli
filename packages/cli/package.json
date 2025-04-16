@@ -1,0 +1,38 @@
+{
+    "name": "gemini-code-cli",
+    "version": "1.0.0",
+    "description": "Gemini Code CLI",
+    "type": "module",
+    "main": "dist/gemini.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/gemini.js",
+        "debug": "node --inspect-brk dist/gemini.js"
+    },
+    "files": [
+        "dist"
+    ],
+    "dependencies": {
+        "@google/genai": "^0.8.0",
+        "diff": "^7.0.0",
+        "dotenv": "^16.4.7",
+        "fast-glob": "^3.3.3",
+        "ink": "^5.2.0",
+        "ink-select-input": "^6.0.0",
+        "ink-spinner": "^5.0.0",
+        "ink-text-input": "^6.0.0",
+        "react": "^18.3.1",
+        "yargs": "^17.7.2"
+    },
+    "devDependencies": {
+        "@types/diff": "^7.0.2",
+        "@types/dotenv": "^6.1.1",
+        "@types/node": "^20.11.24",
+        "@types/react": "^19.1.0",
+        "@types/yargs": "^17.0.32",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}

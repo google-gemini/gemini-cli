@@ -1,0 +1,306 @@
+import fs from 'fs';
+import path from 'path';
+import { BaseTool } from './BaseTool.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
+import { ToolResult } from './ToolResult.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
+
+/**
+ * Parameters for the LS tool
+ */
+export interface LSToolParams {
+  /**
+   * The absolute path to the directory to list
+   */
+  path: string;
+  
+  /**
+   * List of glob patterns to ignore
+   */
+  ignore?: string[];
+}
+
+/**
+ * File entry returned by LS tool
+ */
+export interface FileEntry {
+  /**
+   * Name of the file or directory
+   */
+  name: string;
+  
+  /**
+   * Absolute path to the file or directory
+   */
+  path: string;
+  
+  /**
+   * Whether this entry is a directory
+   */
+  isDirectory: boolean;
+  
+  /**
+   * Size of the file in bytes (0 for directories)
+   */
+  size: number;
+  
+  /**
+   * Last modified timestamp
+   */
+  modifiedTime: Date;
+}
+
+/**
+ * Result from the LS tool
+ */
+export interface LSToolResult extends ToolResult {
+  /**
+   * List of file entries
+   */
+  entries: FileEntry[];
+  
+  /**
+   * The directory that was listed
+   */
+  listedPath: string;
+  
+  /**
+   * Total number of entries found
+   */
+  totalEntries: number;
+}
+
+/**
+ * Implementation of the LS tool that lists directory contents
+ */
+export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
+  /**
+   * The root directory that this tool is grounded in.
+   * All path operations will be restricted to this directory.
+   */
+  private rootDirectory: string;
+
+  /**
+   * Creates a new instance of the LSTool
+   * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
+   */
+  constructor(rootDirectory: string) {
+    super(
+      'list_directory',
+      'ReadFolder',
+      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+      {
+        properties: {
+          path: {
+            description: 'The absolute path to the directory to list (must be absolute, not relative)',
+            type: 'string'
+          },
+          ignore: {
+            description: 'List of glob patterns to ignore',
+            items: {
+              type: 'string'
+            },
+            type: 'array'
+          }
+        },
+        required: ['path'],
+        type: 'object'
+      }
+    );
+
+    // Set the root directory
+    this.rootDirectory = path.resolve(rootDirectory);
+  }
+
+  /**
+   * Checks if a path is within the root directory
+   * @param pathToCheck The path to check
+   * @returns True if the path is within the root directory, false otherwise
+   */
+  private isWithinRoot(pathToCheck: string): boolean {
+    const normalizedPath = path.normalize(pathToCheck);
+    const normalizedRoot = path.normalize(this.rootDirectory);
+    
+    // Ensure the normalizedRoot ends with a path separator for proper path comparison
+    const rootWithSep = normalizedRoot.endsWith(path.sep) 
+      ? normalizedRoot 
+      : normalizedRoot + path.sep;
+    
+    return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
+  }
+  
+  /**
+   * Validates the parameters for the tool
+   * @param params Parameters to validate
+   * @returns An error message string if invalid, null otherwise
+   */
+  invalidParams(params: LSToolParams): string | null {
+    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
+      return "Parameters failed schema validation.";
+    }
+    
+    // Ensure path is absolute
+    if (!path.isAbsolute(params.path)) {
+      return `Path must be absolute: ${params.path}`;
+    }
+
+    // Ensure path is within the root directory
+    if (!this.isWithinRoot(params.path)) {
+      return `Path must be within the root directory (${this.rootDirectory}): ${params.path}`;
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Checks if a filename matches any of the ignore patterns
+   * @param filename Filename to check
+   * @param patterns Array of glob patterns to check against
+   * @returns True if the filename should be ignored
+   */
+  private shouldIgnore(filename: string, patterns?: string[]): boolean {
+    if (!patterns || patterns.length === 0) {
+      return false;
+    }
+    
+    for (const pattern of patterns) {
+      // Convert glob pattern to RegExp
+      const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      
+      const regex = new RegExp(`^${regexPattern}$`);
+      
+      if (regex.test(filename)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Gets a description of the file reading operation 
+   * @param params Parameters for the file reading
+   * @returns A string describing the file being read
+   */
+  getDescription(params: LSToolParams): string {
+    const relativePath = makeRelative(params.path, this.rootDirectory);
+    return shortenPath(relativePath);
+  }
+  
+  /**
+   * Executes the LS operation with the given parameters
+   * @param params Parameters for the LS operation
+   * @returns Result of the LS operation
+   */
+  async execute(params: LSToolParams): Promise<LSToolResult> {
+    const validationError = this.invalidParams(params);
+    if (validationError) {
+      return {
+        entries: [],
+        listedPath: params.path,
+        totalEntries: 0,
+        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        returnDisplay: "**Error:** Failed to execute tool."
+      };
+    }
+    
+    try {
+      // Check if path exists
+      if (!fs.existsSync(params.path)) {
+        return {
+          entries: [],
+          listedPath: params.path,
+          totalEntries: 0,
+          llmContent: `Directory does not exist: ${params.path}`,
+          returnDisplay: `Directory does not exist`
+        };
+      }
+      
+      // Check if path is a directory
+      const stats = fs.statSync(params.path);
+      if (!stats.isDirectory()) {
+        return {
+          entries: [],
+          listedPath: params.path,
+          totalEntries: 0,
+          llmContent: `Path is not a directory: ${params.path}`,
+          returnDisplay: `Path is not a directory`
+        };
+      }
+      
+      // Read directory contents
+      const files = fs.readdirSync(params.path);
+      const entries: FileEntry[] = [];
+      
+      if (files.length === 0) {
+        return {
+          entries: [],
+          listedPath: params.path,
+          totalEntries: 0,
+          llmContent: `Directory is empty: ${params.path}`,
+          returnDisplay: `Directory is empty.`
+        };
+      }
+      
+      // Process each entry
+      for (const file of files) {
+        // Skip if the file matches ignore patterns
+        if (this.shouldIgnore(file, params.ignore)) {
+          continue;
+        }
+        
+        const fullPath = path.join(params.path, file);
+        
+        try {
+          const stats = fs.statSync(fullPath);
+          const isDir = stats.isDirectory();
+          
+          entries.push({
+            name: file,
+            path: fullPath,
+            isDirectory: isDir,
+            size: isDir ? 0 : stats.size,
+            modifiedTime: stats.mtime
+          });
+        } catch (error) {
+          // Skip entries that can't be accessed
+          console.error(`Error accessing ${fullPath}: ${error}`);
+        }
+      }
+      
+      // Sort entries (directories first, then alphabetically)
+      entries.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      // Create formatted content for display
+      const directoryContent = entries.map(entry => {
+        const typeIndicator = entry.isDirectory ? 'd' : '-';
+        const sizeInfo = entry.isDirectory ? '' : ` (${entry.size} bytes)`;
+        return `${typeIndicator} ${entry.name}${sizeInfo}`;
+      }).join('\n');
+      
+      return {
+        entries,
+        listedPath: params.path,
+        totalEntries: entries.length,
+        llmContent: `Directory listing for ${params.path}:\n${directoryContent}`,
+        returnDisplay: `Found ${entries.length} item(s).`
+      };
+    } catch (error) {
+      const errorMessage = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
+      return {
+        entries: [],
+        listedPath: params.path,
+        totalEntries: 0,
+        llmContent: errorMessage,
+        returnDisplay: `**Error:** ${errorMessage}`
+      };
+    }
+  }
+}
