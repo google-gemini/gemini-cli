@@ -26,6 +26,39 @@ async function main() {
     render(React.createElement(App, { directory: targetDir }));
 }
 
+// --- Global Unhandled Rejection Handler ---
+process.on('unhandledRejection', (reason, promise) => {
+    // Check if this is the known 429 ClientError that sometimes escapes
+    // this is a workaround for a specific issue with the way we are calling gemini
+    // where a 429 error is thrown but not caught, causing an unhandled rejection
+    // TODO(adh): Remove this when the race condition is fixed
+    const isKnownEscaped429 = 
+        reason instanceof Error &&
+        reason.name === 'ClientError' &&
+        reason.message.includes('got status: 429');
+
+    if (isKnownEscaped429) {
+        // Log it differently and DON'T exit, as it's likely already handled visually
+        console.warn('-----------------------------------------');
+        console.warn('WORKAROUND: Suppressed known escaped 429 Unhandled Rejection.');
+        console.warn('-----------------------------------------');
+        console.warn('Reason:', reason);
+        // No process.exit(1);
+    } else {
+        // Log other unexpected unhandled rejections as critical errors
+        console.error('=========================================');
+        console.error('CRITICAL: Unhandled Promise Rejection!');
+        console.error('=========================================');
+        console.error('Reason:', reason);
+        console.error('Stack trace may follow:');
+        if (!(reason instanceof Error)) {
+            console.error(reason);
+        }
+        // Exit for genuinely unhandled errors
+        process.exit(1);
+    }
+});
+
 // --- Global Entry Point ---
 main().catch((error) => {
     console.error('An unexpected critical error occurred:');
