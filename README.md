@@ -1,3 +1,49 @@
 # Gemini Code
 
-TBD
+**Disclaimer:** This README.md was created by gemini-code and this project was developed rapidly and currently lacks comprehensive testing, CI/CD pipelines, and other quality-of-life features common in mature projects.
+
+This repository contains the Gemini Code CLI tool.
+
+## Cloning and Contribution
+
+This project uses Gerrit for version control. For details on the development workflow, including how to clone the repository and contribute changes, please refer to the [Gerrit Dev Workflows](http://go/gerrit-dev-workflows).
+
+## Building
+
+To build the entire project, including the CLI package, run the following command from the root directory:
+
+```bash
+npm install
+npm run build
+```
+
+This command installs dependencies and then runs the build script defined in the root `package.json`, which in turn executes the build scripts in all workspaces (including `packages/cli`).
+
+## Running
+
+To start the Gemini Code CLI, run the following command from the root directory:
+
+```bash
+npm start
+```
+
+This command executes the `start` script defined in the root `package.json`, which specifically targets and runs the `start` script within the `gemini-code-cli` workspace.
+
+## Debugging
+
+To debug the CLI application using VS Code:
+
+1.  Start the CLI in debug mode from the root directory:
+    ```bash
+    npm run debug --workspace=gemini-code-cli
+    ```
+    This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches.
+2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`). This configuration is set up to attach to the Node.js process listening on port 9229, which is the default port used by `--inspect-brk`.
+
+Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
+
+## Related
+
+- [Document](http://go/gemini-code-cli)
+- [Video Walkthrough](https://screencast.googleplex.com/cast/NDkwMjUwMzMxMjI2MTEyMHwwOWZkMjQzYy03Mw)
+
