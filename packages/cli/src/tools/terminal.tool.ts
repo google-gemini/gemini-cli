@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { promises as fs } from 'fs';
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolExecuteConfirmationDetails } from '../ui/types.js'; // Adjust path as needed
 import { BackgroundTerminalAnalyzer } from '../utils/BackgroundTerminalAnalyzer.js';

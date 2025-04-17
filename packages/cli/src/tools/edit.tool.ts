@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolEditConfirmationDetails } from '../ui/types.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { ReadFileTool } from './read-file.tool.js';

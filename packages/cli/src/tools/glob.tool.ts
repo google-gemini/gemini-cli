@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import fg from 'fast-glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 
 /**

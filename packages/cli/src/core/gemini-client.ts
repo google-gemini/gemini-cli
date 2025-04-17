@@ -10,7 +10,7 @@ import { CoreSystemPrompt } from './prompts.js';
 import { type ToolCallEvent, type ToolCallConfirmationDetails, ToolCallStatus } from '../ui/types.js';
 import process from 'node:process';
 import { toolRegistry } from '../tools/tool-registry.js';
-import { ToolResult } from '../tools/tool.js';
+import { ToolResult } from '../tools/tools.js';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { GeminiEventType, GeminiStream } from './gemini-stream.js';
 

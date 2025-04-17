@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 
 /**
  * Parameters for the ReadFile tool

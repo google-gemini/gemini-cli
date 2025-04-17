@@ -4,7 +4,7 @@ import path from 'path';
 import { EOL } from 'os'; // Used for parsing grep output lines
 import { spawn } from 'child_process'; // Used for git grep and system grep
 import fastGlob from 'fast-glob'; // Used for JS fallback file searching
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 

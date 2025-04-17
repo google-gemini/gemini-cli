@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { BaseTool, ToolResult } from './tool.js';
+import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolEditConfirmationDetails } from '../ui/types.js';

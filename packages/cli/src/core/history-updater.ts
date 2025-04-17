@@ -1,7 +1,7 @@
 import { Part } from "@google/genai";
 import { toolRegistry } from "../tools/tool-registry.js";
 import { HistoryItem, IndividualToolCallDisplay, ToolCallEvent, ToolCallStatus, ToolConfirmationOutcome, ToolEditConfirmationDetails, ToolExecuteConfirmationDetails } from "../ui/types.js";
-import { ToolResultDisplay } from "../tools/tool.js";
+import { ToolResultDisplay } from "../tools/tools.js";
 
 /**
  * Processes a tool call chunk and updates the history state accordingly.
