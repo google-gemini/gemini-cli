@@ -7,7 +7,9 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/gemini.js",
-        "debug": "node --inspect-brk dist/gemini.js"
+    "debug": "node --inspect-brk dist/gemini.js",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write ."
     },
     "files": [
         "dist"
