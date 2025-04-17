@@ -66,7 +66,7 @@ export class EditTool extends BaseTool<EditToolParams, EditToolResult> {
             `Replaces a SINGLE, UNIQUE occurrence of text within a file. Requires providing significant context around the change to ensure uniqueness. For moving/renaming files, use the Bash tool with \`mv\`. For replacing entire file contents or creating new files use the ${WriteFileTool.Name} tool. Always use the ${ReadFileTool.Name} tool to examine the file before using this tool.`,
             {
                 properties: {
-                    filePath: {
+                    file_path: {
                         description: 'The absolute path to the file to modify. Must start with /. When creating a new file, ensure the parent directory exists (use the `LS` tool to verify).',
                         type: 'string'
                     },
