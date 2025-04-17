@@ -9,7 +9,7 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "start": "npm run start --workspace=gemini-code-cli",
+    "start": "npm run start --workspace=gemini-code-cli -- \"$@\"",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
