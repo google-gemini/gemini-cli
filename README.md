@@ -4,10 +4,6 @@
 
 This repository contains the Gemini Code CLI tool.
 
-## Cloning and Contribution
-
-This project uses Gerrit for version control. For details on the development workflow, including how to clone the repository and contribute changes, please refer to the [Gerrit Dev Workflows](http://go/gerrit-dev-workflows).
-
 ## Setup
 
 1.  **Get a Gemini API Key:** Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
@@ -55,9 +51,3 @@ To debug the CLI application using VS Code:
 2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`). This configuration is set up to attach to the Node.js process listening on port 9229, which is the default port used by `--inspect-brk`.
 
 Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
-
-## Related
-
-- [Document](http://go/gemini-code-cli)
-- [Video Walkthrough](https://screencast.googleplex.com/cast/NDkwMjUwMzMxMjI2MTEyMHwwOWZkMjQzYy03Mw)
-
