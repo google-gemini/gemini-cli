@@ -3,7 +3,11 @@ import path from 'path';
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolEditConfirmationDetails } from '../ui/types.js';
+import {
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolEditConfirmationDetails,
+} from '../ui/types.js';
 import * as Diff from 'diff';
 
 /**
@@ -24,13 +28,15 @@ export interface WriteFileToolParams {
 /**
  * Standardized result from the WriteFile tool
  */
-export interface WriteFileToolResult extends ToolResult {
-}
+export interface WriteFileToolResult extends ToolResult {}
 
 /**
  * Implementation of the WriteFile tool that writes files to the filesystem
  */
-export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolResult> {
+export class WriteFileTool extends BaseTool<
+  WriteFileToolParams,
+  WriteFileToolResult
+> {
   public static readonly Name: string = 'write_file';
   private shouldAlwaysWrite = false;
 
@@ -52,17 +58,18 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
       {
         properties: {
           filePath: {
-            description: 'The absolute path to the file to write to (e.g., \'/home/user/project/file.txt\'). Relative paths are not supported.',
-            type: 'string'
+            description:
+              "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+            type: 'string',
           },
           content: {
             description: 'The content to write to the file.',
-            type: 'string'
-          }
+            type: 'string',
+          },
         },
         required: ['filePath', 'content'],
-        type: 'object'
-      }
+        type: 'object',
+      },
     );
 
     // Set the root directory
@@ -83,7 +90,10 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
       ? normalizedRoot
       : normalizedRoot + path.sep;
 
-    return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
+    );
   }
 
   /**
@@ -92,7 +102,13 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
    * @returns True if parameters are valid, false otherwise
    */
   invalidParams(params: WriteFileToolParams): string | null {
-    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
       return 'Parameters failed schema validation.';
     }
 
@@ -114,7 +130,9 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
    * @param params Parameters for the tool execution
    * @returns Whether or not execute should be confirmed by the user.
    */
-  async shouldConfirmExecute(params: WriteFileToolParams): Promise<ToolCallConfirmationDetails | false> {
+  async shouldConfirmExecute(
+    params: WriteFileToolParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
     if (this.shouldAlwaysWrite) {
       return false;
     }
@@ -135,7 +153,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
       params.content,
       'Current',
       'Proposed',
-      { context: 3, ignoreWhitespace: true}
+      { context: 3, ignoreWhitespace: true },
     );
 
     const confirmationDetails: ToolEditConfirmationDetails = {
@@ -171,7 +189,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: '**Error:** Failed to execute tool.'
+        returnDisplay: '**Error:** Failed to execute tool.',
       };
     }
 
@@ -187,13 +205,13 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
 
       return {
         llmContent: `Successfully wrote to file: ${params.file_path}`,
-        returnDisplay: `Wrote to ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`
+        returnDisplay: `Wrote to ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
       };
     } catch (error) {
       const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
       return {
         llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
-        returnDisplay: `Failed to write to file: ${errorMsg}`
+        returnDisplay: `Failed to write to file: ${errorMsg}`,
       };
     }
   }

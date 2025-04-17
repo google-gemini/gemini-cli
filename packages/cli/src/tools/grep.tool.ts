@@ -42,8 +42,7 @@ interface GrepMatch {
 /**
  * Result from the GrepTool
  */
-export interface GrepToolResult extends ToolResult {
-}
+export interface GrepToolResult extends ToolResult {}
 
 // --- GrepTool Class ---
 
@@ -65,21 +64,24 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
       {
         properties: {
           pattern: {
-            description: 'The regular expression (regex) pattern to search for within file contents (e.g., \'function\\s+myFunction\', \'import\\s+\\{.*\\}\\s+from\\s+.*\').',
-            type: 'string'
+            description:
+              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
+            type: 'string',
           },
           path: {
-            description: 'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-            type: 'string'
+            description:
+              'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+            type: 'string',
           },
           include: {
-            description: 'Optional: A glob pattern to filter which files are searched (e.g., \'*.js\', \'*.{ts,tsx}\', \'src/**\'). If omitted, searches all files (respecting potential global ignores).',
-            type: 'string'
-          }
+            description:
+              "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
+            type: 'string',
+          },
         },
         required: ['pattern'],
-        type: 'object'
-      }
+        type: 'object',
+      },
     );
     // Ensure rootDirectory is absolute and normalized
     this.rootDirectory = path.resolve(rootDirectory);
@@ -97,8 +99,13 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
     const targetPath = path.resolve(this.rootDirectory, relativePath || '.');
 
     // Security Check: Ensure the resolved path is still within the root directory.
-    if (!targetPath.startsWith(this.rootDirectory) && targetPath !== this.rootDirectory) {
-      throw new Error(`Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.rootDirectory}".`);
+    if (
+      !targetPath.startsWith(this.rootDirectory) &&
+      targetPath !== this.rootDirectory
+    ) {
+      throw new Error(
+        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.rootDirectory}".`,
+      );
     }
 
     // Check existence and type after resolving
@@ -111,7 +118,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
       if (err.code === 'ENOENT') {
         throw new Error(`Path does not exist: ${targetPath}`);
       }
-      throw new Error(`Failed to access path stats for ${targetPath}: ${err.message}`);
+      throw new Error(
+        `Failed to access path stats for ${targetPath}: ${err.message}`,
+      );
     }
 
     return targetPath;
@@ -123,8 +132,14 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   invalidParams(params: GrepToolParams): string | null {
-    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
-      return "Parameters failed schema validation.";
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
     }
 
     try {
@@ -142,7 +157,6 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
     return null; // Parameters are valid
   }
 
-
   // --- Core Execution ---
 
   /**
@@ -156,7 +170,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
       console.error(`GrepTool Parameter Validation Failed: ${validationError}`);
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `**Error:** Failed to execute tool.`
+        returnDisplay: `**Error:** Failed to execute tool.`,
       };
     }
 
@@ -177,39 +191,48 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         return { llmContent: noMatchMsg, returnDisplay: noMatchUser };
       }
 
-      const matchesByFile = matches.reduce((acc, match) => {
-        const relativeFilePath = path.relative(searchDirAbs, path.resolve(searchDirAbs, match.filePath)) || path.basename(match.filePath);
-        if (!acc[relativeFilePath]) {
-          acc[relativeFilePath] = [];
-        }
-        acc[relativeFilePath].push(match);
-        acc[relativeFilePath].sort((a, b) => a.lineNumber - b.lineNumber);
-        return acc;
-      }, {} as Record<string, GrepMatch[]>);
+      const matchesByFile = matches.reduce(
+        (acc, match) => {
+          const relativeFilePath =
+            path.relative(
+              searchDirAbs,
+              path.resolve(searchDirAbs, match.filePath),
+            ) || path.basename(match.filePath);
+          if (!acc[relativeFilePath]) {
+            acc[relativeFilePath] = [];
+          }
+          acc[relativeFilePath].push(match);
+          acc[relativeFilePath].sort((a, b) => a.lineNumber - b.lineNumber);
+          return acc;
+        },
+        {} as Record<string, GrepMatch[]>,
+      );
 
       let llmContent = `Found ${matches.length} match(es) for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
-        matchesByFile[filePath].forEach(match => {
+        matchesByFile[filePath].forEach((match) => {
           const trimmedLine = match.line.trim();
           llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
         });
         llmContent += '---\n';
       }
 
-      return { llmContent: llmContent.trim(), returnDisplay: `Found ${matches.length} matche(s)` };
-
+      return {
+        llmContent: llmContent.trim(),
+        returnDisplay: `Found ${matches.length} matche(s)`,
+      };
     } catch (error) {
       console.error(`Error during GrepTool execution: ${error}`);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
-        returnDisplay: errorMessage
+        returnDisplay: errorMessage,
       };
     }
   }
-
 
   // --- Inlined Grep Logic and Helpers ---
 
@@ -221,9 +244,13 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
   private isCommandAvailable(command: string): Promise<boolean> {
     return new Promise((resolve) => {
       const checkCommand = process.platform === 'win32' ? 'where' : 'command';
-      const checkArgs = process.platform === 'win32' ? [command] : ['-v', command];
+      const checkArgs =
+        process.platform === 'win32' ? [command] : ['-v', command];
       try {
-        const child = spawn(checkCommand, checkArgs, { stdio: 'ignore', shell: process.platform === 'win32' });
+        const child = spawn(checkCommand, checkArgs, {
+          stdio: 'ignore',
+          shell: process.platform === 'win32',
+        });
         child.on('close', (code) => resolve(code === 0));
         child.on('error', () => resolve(false));
       } catch (e) {
@@ -252,7 +279,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
           return false;
         } catch (err: any) {
           if (err.code !== 'ENOENT') {
-            console.error(`Error checking for .git in ${currentPath}: ${err.message}`);
+            console.error(
+              `Error checking for .git in ${currentPath}: ${err.message}`,
+            );
             return false;
           }
         }
@@ -263,19 +292,21 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         currentPath = path.dirname(currentPath);
       }
     } catch (err: any) {
-      console.error(`Error traversing directory structure upwards from ${dirPath}: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(
+        `Error traversing directory structure upwards from ${dirPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
     return false;
   }
 
   /**
-     * Parses the standard output of grep-like commands (git grep, system grep).
-     * Expects format: filePath:lineNumber:lineContent
-     * Handles colons within file paths and line content correctly.
-     * @param {string} output The raw stdout string.
-     * @param {string} basePath The absolute directory the search was run from, for relative paths.
-     * @returns {GrepMatch[]} Array of match objects.
-     */
+   * Parses the standard output of grep-like commands (git grep, system grep).
+   * Expects format: filePath:lineNumber:lineContent
+   * Handles colons within file paths and line content correctly.
+   * @param {string} output The raw stdout string.
+   * @param {string} basePath The absolute directory the search was run from, for relative paths.
+   * @returns {GrepMatch[]} Array of match objects.
+   */
   private parseGrepOutput(output: string, basePath: string): GrepMatch[] {
     const results: GrepMatch[] = [];
     if (!output) return results;
@@ -302,7 +333,10 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
 
       // Extract parts based on the found colon indices
       const filePathRaw = line.substring(0, firstColonIndex);
-      const lineNumberStr = line.substring(firstColonIndex + 1, secondColonIndex);
+      const lineNumberStr = line.substring(
+        firstColonIndex + 1,
+        secondColonIndex,
+      );
       // The rest of the line, starting after the second colon, is the content.
       const lineContent = line.substring(secondColonIndex + 1);
 
@@ -327,10 +361,10 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
   }
 
   /**
- * Gets a description of the grep operation
- * @param params Parameters for the grep operation
- * @returns A string describing the grep
- */
+   * Gets a description of the grep operation
+   * @param params Parameters for the grep operation
+   * @returns A string describing the grep
+   */
   getDescription(params: GrepToolParams): string {
     let description = `'${params.pattern}'`;
 
@@ -363,37 +397,59 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
     try {
       // --- Strategy 1: git grep ---
       const isGit = await this.isGitRepository(absolutePath);
-      const gitAvailable = isGit && await this.isCommandAvailable('git');
+      const gitAvailable = isGit && (await this.isCommandAvailable('git'));
 
       if (gitAvailable) {
         strategyUsed = 'git grep';
-        const gitArgs = ['grep', '--untracked', '-n', '-E', '--ignore-case', pattern];
+        const gitArgs = [
+          'grep',
+          '--untracked',
+          '-n',
+          '-E',
+          '--ignore-case',
+          pattern,
+        ];
         if (include) {
           gitArgs.push('--', include);
         }
 
         try {
           const output = await new Promise<string>((resolve, reject) => {
-            const child = spawn('git', gitArgs, { cwd: absolutePath, windowsHide: true });
+            const child = spawn('git', gitArgs, {
+              cwd: absolutePath,
+              windowsHide: true,
+            });
             const stdoutChunks: Buffer[] = [];
             const stderrChunks: Buffer[] = [];
 
-            child.stdout.on('data', (chunk) => { stdoutChunks.push(chunk); });
-            child.stderr.on('data', (chunk) => { stderrChunks.push(chunk); });
+            child.stdout.on('data', (chunk) => {
+              stdoutChunks.push(chunk);
+            });
+            child.stderr.on('data', (chunk) => {
+              stderrChunks.push(chunk);
+            });
 
-            child.on('error', (err) => reject(new Error(`Failed to start git grep: ${err.message}`)));
+            child.on('error', (err) =>
+              reject(new Error(`Failed to start git grep: ${err.message}`)),
+            );
 
             child.on('close', (code) => {
               const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
               const stderrData = Buffer.concat(stderrChunks).toString('utf8');
               if (code === 0) resolve(stdoutData);
-              else if (code === 1) resolve(''); // No matches is not an error
-              else reject(new Error(`git grep exited with code ${code}: ${stderrData}`));
+              else if (code === 1)
+                resolve(''); // No matches is not an error
+              else
+                reject(
+                  new Error(`git grep exited with code ${code}: ${stderrData}`),
+                );
             });
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (gitError: any) {
-          console.error(`GrepTool: git grep strategy failed: ${gitError.message}. Falling back...`);
+          console.error(
+            `GrepTool: git grep strategy failed: ${gitError.message}. Falling back...`,
+          );
         }
       }
 
@@ -403,7 +459,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         strategyUsed = 'system grep';
         const grepArgs = ['-r', '-n', '-H', '-E'];
         const commonExcludes = ['.git', 'node_modules', 'bower_components'];
-        commonExcludes.forEach(dir => grepArgs.push(`--exclude-dir=${dir}`));
+        commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
         }
@@ -412,41 +468,67 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
 
         try {
           const output = await new Promise<string>((resolve, reject) => {
-            const child = spawn('grep', grepArgs, { cwd: absolutePath, windowsHide: true });
+            const child = spawn('grep', grepArgs, {
+              cwd: absolutePath,
+              windowsHide: true,
+            });
             const stdoutChunks: Buffer[] = [];
             const stderrChunks: Buffer[] = [];
 
-            child.stdout.on('data', (chunk) => { stdoutChunks.push(chunk); });
+            child.stdout.on('data', (chunk) => {
+              stdoutChunks.push(chunk);
+            });
             child.stderr.on('data', (chunk) => {
               const stderrStr = chunk.toString();
-              if (!stderrStr.includes('Permission denied') && !/grep:.*: Is a directory/i.test(stderrStr)) {
+              if (
+                !stderrStr.includes('Permission denied') &&
+                !/grep:.*: Is a directory/i.test(stderrStr)
+              ) {
                 stderrChunks.push(chunk);
               }
             });
 
-            child.on('error', (err) => reject(new Error(`Failed to start system grep: ${err.message}`)));
+            child.on('error', (err) =>
+              reject(new Error(`Failed to start system grep: ${err.message}`)),
+            );
 
             child.on('close', (code) => {
               const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
-              const stderrData = Buffer.concat(stderrChunks).toString('utf8').trim();
+              const stderrData = Buffer.concat(stderrChunks)
+                .toString('utf8')
+                .trim();
               if (code === 0) resolve(stdoutData);
-              else if (code === 1) resolve(''); // No matches
+              else if (code === 1)
+                resolve(''); // No matches
               else {
-                if (stderrData) reject(new Error(`System grep exited with code ${code}: ${stderrData}`));
+                if (stderrData)
+                  reject(
+                    new Error(
+                      `System grep exited with code ${code}: ${stderrData}`,
+                    ),
+                  );
                 else resolve('');
               }
             });
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: any) {
-          console.error(`GrepTool: System grep strategy failed: ${grepError.message}. Falling back...`);
+          console.error(
+            `GrepTool: System grep strategy failed: ${grepError.message}. Falling back...`,
+          );
         }
       }
 
       // --- Strategy 3: Pure JavaScript Fallback ---
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = ['.git', 'node_modules', 'bower_components', '.svn', '.hg'];
+      const ignorePatterns = [
+        '.git',
+        'node_modules',
+        'bower_components',
+        '.svn',
+        '.hg',
+      ];
 
       const filesStream = fastGlob.stream(globPattern, {
         cwd: absolutePath,
@@ -469,7 +551,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
           lines.forEach((line, index) => {
             if (regex.test(line)) {
               allMatches.push({
-                filePath: path.relative(absolutePath, fileAbsolutePath) || path.basename(fileAbsolutePath),
+                filePath:
+                  path.relative(absolutePath, fileAbsolutePath) ||
+                  path.basename(fileAbsolutePath),
                 lineNumber: index + 1,
                 line: line,
               });
@@ -477,15 +561,18 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
           });
         } catch (readError: any) {
           if (readError.code !== 'ENOENT') {
-            console.error(`GrepTool: Could not read or process file ${fileAbsolutePath}: ${readError.message}`);
+            console.error(
+              `GrepTool: Could not read or process file ${fileAbsolutePath}: ${readError.message}`,
+            );
           }
         }
       }
 
       return allMatches;
-
     } catch (error: any) {
-      console.error(`GrepTool: Error during performGrepSearch (Strategy: ${strategyUsed}): ${error.message}`);
+      console.error(
+        `GrepTool: Error during performGrepSearch (Strategy: ${strategyUsed}): ${error.message}`,
+      );
       throw error; // Re-throw to be caught by the execute method's handler
     }
   }

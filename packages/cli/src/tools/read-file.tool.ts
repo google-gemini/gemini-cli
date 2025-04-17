@@ -27,13 +27,15 @@ export interface ReadFileToolParams {
 /**
  * Standardized result from the ReadFile tool
  */
-export interface ReadFileToolResult extends ToolResult {
-}
+export interface ReadFileToolResult extends ToolResult {}
 
 /**
  * Implementation of the ReadFile tool that reads files from the filesystem
  */
-export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResult> {
+export class ReadFileTool extends BaseTool<
+  ReadFileToolParams,
+  ReadFileToolResult
+> {
   public static readonly Name: string = 'read_file';
 
   // Maximum number of lines to read by default
@@ -60,21 +62,24 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
       {
         properties: {
           file_path: {
-            description: 'The absolute path to the file to read (e.g., \'/home/user/project/file.txt\'). Relative paths are not supported.',
-            type: 'string'
+            description:
+              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+            type: 'string',
           },
           offset: {
-            description: 'Optional: The 0-based line number to start reading from. Requires \'limit\' to be set. Use for paginating through large files.',
-            type: 'number'
+            description:
+              "Optional: The 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+            type: 'number',
           },
           limit: {
-            description: 'Optional: Maximum number of lines to read. Use with \'offset\' to paginate through large files. If omitted, reads the entire file (if feasible).',
-            type: 'number'
-          }
+            description:
+              "Optional: Maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible).",
+            type: 'number',
+          },
         },
         required: ['file_path'],
-        type: 'object'
-      }
+        type: 'object',
+      },
     );
 
     // Set the root directory
@@ -95,7 +100,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
       ? normalizedRoot
       : normalizedRoot + path.sep;
 
-    return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
+    );
   }
 
   /**
@@ -104,8 +112,14 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
    * @returns True if parameters are valid, false otherwise
    */
   invalidParams(params: ReadFileToolParams): string | null {
-    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
-      return "Parameters failed schema validation.";
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
     }
     const filePath = params.file_path;
     if (!path.isAbsolute(filePath)) {
@@ -151,7 +165,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
       }
 
       // If more than 30% are non-printable, likely binary
-      return (nonPrintableCount / bytesRead) > 0.3;
+      return nonPrintableCount / bytesRead > 0.3;
     } catch (error) {
       return false;
     }
@@ -166,7 +180,9 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
     const ext = path.extname(filePath).toLowerCase();
 
     // Common image formats
-    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].includes(ext)) {
+    if (
+      ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].includes(ext)
+    ) {
       return 'image';
     }
 
@@ -189,8 +205,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
    * @returns A string describing the file being read
    */
   getDescription(params: ReadFileToolParams): string {
-      const relativePath = makeRelative(params.file_path, this.rootDirectory);
-      return shortenPath(relativePath);
+    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    return shortenPath(relativePath);
   }
 
   /**
@@ -204,7 +220,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: "**Error:** Failed to execute tool."
+        returnDisplay: '**Error:** Failed to execute tool.',
       };
     }
 
@@ -245,14 +261,15 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
       const formattedLines = selectedLines.map((line) => {
         let processedLine = line;
         if (line.length > ReadFileTool.MAX_LINE_LENGTH) {
-          processedLine = line.substring(0, ReadFileTool.MAX_LINE_LENGTH) + '... [truncated]';
+          processedLine =
+            line.substring(0, ReadFileTool.MAX_LINE_LENGTH) + '... [truncated]';
           truncated = true;
         }
 
         return processedLine;
       });
 
-      const contentTruncated = (endLine < lines.length) || truncated;
+      const contentTruncated = endLine < lines.length || truncated;
 
       let llmContent = '';
       if (contentTruncated) {

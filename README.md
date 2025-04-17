@@ -51,3 +51,13 @@ To debug the CLI application using VS Code:
 2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`). This configuration is set up to attach to the Node.js process listening on port 9229, which is the default port used by `--inspect-brk`.
 
 Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
+
+## Formatting
+
+To format the code in this project, run the following command from the root directory:
+
+```bash
+npm run format
+```
+
+This command uses Prettier to format the code according to the project's style guidelines.

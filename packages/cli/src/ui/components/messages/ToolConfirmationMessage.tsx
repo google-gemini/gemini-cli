@@ -1,7 +1,12 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
-import { ToolCallConfirmationDetails, ToolEditConfirmationDetails, ToolConfirmationOutcome, ToolExecuteConfirmationDetails } from '../../types.js'; // Adjust path as needed
+import {
+  ToolCallConfirmationDetails,
+  ToolEditConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolExecuteConfirmationDetails,
+} from '../../types.js'; // Adjust path as needed
 import { PartListUnion } from '@google/genai';
 import DiffRenderer from './DiffRenderer.js';
 import { UI_WIDTH } from '../../constants.js';
@@ -11,7 +16,9 @@ export interface ToolConfirmationMessageProps {
   onSubmit: (value: PartListUnion) => void;
 }
 
-function isEditDetails(props: ToolCallConfirmationDetails): props is ToolEditConfirmationDetails {
+function isEditDetails(
+  props: ToolCallConfirmationDetails,
+): props is ToolEditConfirmationDetails {
   return (props as ToolEditConfirmationDetails).fileName !== undefined;
 }
 
@@ -20,7 +27,9 @@ interface InternalOption {
   value: ToolConfirmationOutcome;
 }
 
-const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({ confirmationDetails }) => {
+const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
+  confirmationDetails,
+}) => {
   const { onConfirm } = confirmationDetails;
 
   useInput((_, key) => {
@@ -39,41 +48,53 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({ confi
   const options: InternalOption[] = [];
 
   if (isEditDetails(confirmationDetails)) {
-    title = "Edit"; // Title for the outer box
+    title = 'Edit'; // Title for the outer box
 
     // Body content is now the DiffRenderer, passing filename to it
     // The bordered box is removed from here and handled within DiffRenderer
-    bodyContent = (
-        <DiffRenderer diffContent={confirmationDetails.fileDiff} />
-    );
+    bodyContent = <DiffRenderer diffContent={confirmationDetails.fileDiff} />;
 
     question = `Apply this change?`;
     options.push(
-      { label: '1. Yes, apply change', value: ToolConfirmationOutcome.ProceedOnce },
-      { label: "2. Yes, always apply file edits", value: ToolConfirmationOutcome.ProceedAlways },
-      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel }
+      {
+        label: '1. Yes, apply change',
+        value: ToolConfirmationOutcome.ProceedOnce,
+      },
+      {
+        label: '2. Yes, always apply file edits',
+        value: ToolConfirmationOutcome.ProceedAlways,
+      },
+      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
-
   } else {
-    const executionProps = confirmationDetails as ToolExecuteConfirmationDetails;
-    title = "Execute Command"; // Title for the outer box
+    const executionProps =
+      confirmationDetails as ToolExecuteConfirmationDetails;
+    title = 'Execute Command'; // Title for the outer box
 
     // For execution, we still need context display and description
     const commandDisplay = <Text color="cyan">{executionProps.command}</Text>;
 
     // Combine command and description into bodyContent for layout consistency
     bodyContent = (
-        <Box flexDirection="column">
-            <Box paddingX={1} marginLeft={1}>{commandDisplay}</Box>
+      <Box flexDirection="column">
+        <Box paddingX={1} marginLeft={1}>
+          {commandDisplay}
         </Box>
+      </Box>
     );
 
     question = `Allow execution?`;
     const alwaysLabel = `2. Yes, always allow '${executionProps.rootCommand}' commands`;
     options.push(
-      { label: '1. Yes, allow once', value: ToolConfirmationOutcome.ProceedOnce },
-      { label: alwaysLabel, value: ToolConfirmationOutcome.ProceedAlways },
-      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel }
+      {
+        label: '1. Yes, allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+      },
+      {
+        label: alwaysLabel,
+        value: ToolConfirmationOutcome.ProceedAlways,
+      },
+      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
   }
 
@@ -82,7 +103,7 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({ confi
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
-           {bodyContent}
+        {bodyContent}
       </Box>
 
       {/* Confirmation Question */}

@@ -23,8 +23,7 @@ export interface GlobToolParams {
 /**
  * Result from the GlobTool
  */
-export interface GlobToolResult extends ToolResult {
-}
+export interface GlobToolResult extends ToolResult {}
 
 /**
  * Implementation of the GlobTool that finds files matching patterns,
@@ -49,17 +48,19 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
       {
         properties: {
           pattern: {
-            description: 'The glob pattern to match against (e.g., \'*.py\', \'src/**/*.js\', \'docs/*.md\').',
-            type: 'string'
+            description:
+              "The glob pattern to match against (e.g., '*.py', 'src/**/*.js', 'docs/*.md').",
+            type: 'string',
           },
           path: {
-            description: 'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-            type: 'string'
-          }
+            description:
+              'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
+            type: 'string',
+          },
         },
         required: ['pattern'],
-        type: 'object'
-      }
+        type: 'object',
+      },
     );
 
     // Set the root directory
@@ -84,7 +85,10 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
 
     // Check if it's the root itself or starts with the root path followed by a separator.
     // This ensures that we don't accidentally allow access to parent directories.
-    return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
+    );
   }
 
   /**
@@ -94,7 +98,13 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   invalidParams(params: GlobToolParams): string | null {
-    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
       return "Parameters failed schema validation. Ensure 'pattern' is a string and 'path' (if provided) is a string.";
     }
 
@@ -121,8 +131,12 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
     }
 
     // Validate glob pattern (basic non-empty check)
-    if (!params.pattern || typeof params.pattern !== 'string' || params.pattern.trim() === '') {
-        return "The 'pattern' parameter cannot be empty.";
+    if (
+      !params.pattern ||
+      typeof params.pattern !== 'string' ||
+      params.pattern.trim() === ''
+    ) {
+      return "The 'pattern' parameter cannot be empty.";
     }
     // Could add more sophisticated glob pattern validation if needed
 
@@ -156,7 +170,7 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `**Error:** Failed to execute tool.`
+        returnDisplay: `**Error:** Failed to execute tool.`,
       };
     }
 
@@ -168,10 +182,10 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
       // We use fast-glob because it's performant and supports glob patterns.
       const entries = await fg(params.pattern, {
         cwd: searchDirAbsolute, // Search within this absolute directory
-        absolute: true,         // Return absolute paths
-        onlyFiles: true,        // Match only files
-        stats: true,            // Include file stats object for sorting
-        dot: true,              // Include files starting with a dot
+        absolute: true, // Return absolute paths
+        onlyFiles: true, // Match only files
+        stats: true, // Include file stats object for sorting
+        dot: true, // Include files starting with a dot
         ignore: ['**/node_modules/**', '**/.git/**'], // Common sensible default, adjust as needed
         followSymbolicLinks: false, // Avoid potential issues with symlinks unless specifically needed
         suppressErrors: true, // Suppress EACCES errors for individual files (we handle dir access in validation)
@@ -181,7 +195,7 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
       if (!entries || entries.length === 0) {
         return {
           llmContent: `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`,
-          returnDisplay: `No files found`
+          returnDisplay: `No files found`,
         };
       }
 
@@ -197,30 +211,39 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
       });
 
       // 5. Format Output
-      const sortedAbsolutePaths = entries.map(entry => entry.path);
+      const sortedAbsolutePaths = entries.map((entry) => entry.path);
 
       // Convert absolute paths to relative paths (to rootDir) for clearer display
-      const sortedRelativePaths = sortedAbsolutePaths.map(absPath => makeRelative(absPath, this.rootDirectory));
+      const sortedRelativePaths = sortedAbsolutePaths.map((absPath) =>
+        makeRelative(absPath, this.rootDirectory),
+      );
 
       // Construct the result message
-      const fileListDescription = sortedRelativePaths.map(p => `  - ${shortenPath(p)}`).join('\n');
+      const fileListDescription = sortedRelativePaths
+        .map((p) => `  - ${shortenPath(p)}`)
+        .join('\n');
       const fileCount = sortedRelativePaths.length;
-      const relativeSearchDir = makeRelative(searchDirAbsolute, this.rootDirectory);
-      const displayPath = shortenPath(relativeSearchDir === '.' ? 'root directory' : relativeSearchDir);
+      const relativeSearchDir = makeRelative(
+        searchDirAbsolute,
+        this.rootDirectory,
+      );
+      const displayPath = shortenPath(
+        relativeSearchDir === '.' ? 'root directory' : relativeSearchDir,
+      );
 
       return {
         llmContent: `Found ${fileCount} file(s) matching "${params.pattern}" within ${displayPath}, sorted by modification time (newest first):\n${fileListDescription}`,
-        returnDisplay: `Found ${fileCount} matching file(s)`
+        returnDisplay: `Found ${fileCount} matching file(s)`,
       };
-
     } catch (error) {
-        // Catch unexpected errors during glob execution (less likely with suppressErrors=true, but possible)
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`GlobTool execute Error: ${errorMessage}`, error);
-        return {
-            llmContent: `Error during glob search operation: ${errorMessage}`,
-            returnDisplay: `**Error:** An unexpected error occurred.`
-        };
+      // Catch unexpected errors during glob execution (less likely with suppressErrors=true, but possible)
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`GlobTool execute Error: ${errorMessage}`, error);
+      return {
+        llmContent: `Error during glob search operation: ${errorMessage}`,
+        returnDisplay: `**Error:** An unexpected error occurred.`,
+      };
     }
   }
 }

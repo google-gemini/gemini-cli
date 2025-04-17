@@ -95,7 +95,11 @@ export default tseslint.config(
       '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
       ],
       'no-cond-assign': 'error',
       'no-debugger': 'error',
@@ -108,12 +112,14 @@ export default tseslint.config(
         },
         {
           selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
-          message: 'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
+          message:
+            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
         },
       ],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
-      '@typescript-eslint/no-unused-expressions': [ // Enable TS version
+      '@typescript-eslint/no-unused-expressions': [
+        // Enable TS version
         'error',
         { allowShortCircuit: true, allowTernary: true },
       ],

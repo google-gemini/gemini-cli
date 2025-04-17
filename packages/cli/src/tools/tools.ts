@@ -1,10 +1,13 @@
-import { FunctionDeclaration, Schema } from "@google/genai";
-import { ToolCallConfirmationDetails } from "../ui/types.js";
+import { FunctionDeclaration, Schema } from '@google/genai';
+import { ToolCallConfirmationDetails } from '../ui/types.js';
 
 /**
  * Interface representing the base Tool functionality
  */
-export interface Tool<TParams = unknown, TResult extends ToolResult = ToolResult> {
+export interface Tool<
+  TParams = unknown,
+  TResult extends ToolResult = ToolResult,
+> {
   /**
    * The internal name of the tool (used for API calls)
    */
@@ -45,7 +48,9 @@ export interface Tool<TParams = unknown, TResult extends ToolResult = ToolResult
    * @param params Parameters for the tool execution
    * @returns Whether execute should be confirmed.
    */
-  shouldConfirmExecute(params: TParams): Promise<ToolCallConfirmationDetails | false>;
+  shouldConfirmExecute(
+    params: TParams,
+  ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
    * Executes the tool with the given parameters
@@ -55,11 +60,14 @@ export interface Tool<TParams = unknown, TResult extends ToolResult = ToolResult
   execute(params: TParams): Promise<TResult>;
 }
 
-
 /**
  * Base implementation for tools with common functionality
  */
-export abstract class BaseTool<TParams = unknown, TResult extends ToolResult = ToolResult> implements Tool<TParams, TResult> {
+export abstract class BaseTool<
+  TParams = unknown,
+  TResult extends ToolResult = ToolResult,
+> implements Tool<TParams, TResult>
+{
   /**
    * Creates a new instance of BaseTool
    * @param name Internal name of the tool (used for API calls)
@@ -71,7 +79,7 @@ export abstract class BaseTool<TParams = unknown, TResult extends ToolResult = T
     public readonly name: string,
     public readonly displayName: string,
     public readonly description: string,
-    public readonly parameterSchema: Record<string, unknown>
+    public readonly parameterSchema: Record<string, unknown>,
   ) {}
 
   /**
@@ -81,7 +89,7 @@ export abstract class BaseTool<TParams = unknown, TResult extends ToolResult = T
     return {
       name: this.name,
       description: this.description,
-      parameters: this.parameterSchema as Schema
+      parameters: this.parameterSchema as Schema,
     };
   }
 
@@ -112,7 +120,9 @@ export abstract class BaseTool<TParams = unknown, TResult extends ToolResult = T
    * @param params Parameters for the tool execution
    * @returns Whether or not execute should be confirmed by the user.
    */
-  shouldConfirmExecute(params: TParams): Promise<ToolCallConfirmationDetails | false> {
+  shouldConfirmExecute(
+    params: TParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
     return Promise.resolve(false);
   }
 
@@ -124,7 +134,6 @@ export abstract class BaseTool<TParams = unknown, TResult extends ToolResult = T
    */
   abstract execute(params: TParams): Promise<TResult>;
 }
-
 
 export interface ToolResult {
   /**
@@ -143,5 +152,5 @@ export interface ToolResult {
 export type ToolResultDisplay = string | FileDiff;
 
 export interface FileDiff {
-  fileDiff: string
+  fileDiff: string;
 }

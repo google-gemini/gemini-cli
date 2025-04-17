@@ -24,7 +24,7 @@ export async function parseArguments(): Promise<CliArgs> {
   // Handle warnings for extra arguments here
   if (argv._ && argv._.length > 0) {
     console.warn(
-      `Warning: Additional arguments provided (${argv._.join(', ')}), but will be ignored.`
+      `Warning: Additional arguments provided (${argv._.join(', ')}), but will be ignored.`,
     );
   }
 

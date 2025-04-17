@@ -91,20 +91,21 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
       {
         properties: {
           path: {
-            description: 'The absolute path to the directory to list (must be absolute, not relative)',
-            type: 'string'
+            description:
+              'The absolute path to the directory to list (must be absolute, not relative)',
+            type: 'string',
           },
           ignore: {
             description: 'List of glob patterns to ignore',
             items: {
-              type: 'string'
+              type: 'string',
             },
-            type: 'array'
-          }
+            type: 'array',
+          },
         },
         required: ['path'],
-        type: 'object'
-      }
+        type: 'object',
+      },
     );
 
     // Set the root directory
@@ -123,7 +124,10 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     const rootWithSep = normalizedRoot.endsWith(path.sep)
       ? normalizedRoot
       : normalizedRoot + path.sep;
-    return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
+    );
   }
 
   /**
@@ -132,8 +136,14 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   invalidParams(params: LSToolParams): string | null {
-    if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
-      return "Parameters failed schema validation.";
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
     }
     // Ensure path is absolute
     if (!path.isAbsolute(params.path)) {
@@ -194,7 +204,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
         listedPath: params.path,
         totalEntries: 0,
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: "**Error:** Failed to execute tool."
+        returnDisplay: '**Error:** Failed to execute tool.',
       };
     }
 
@@ -206,7 +216,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           listedPath: params.path,
           totalEntries: 0,
           llmContent: `Directory does not exist: ${params.path}`,
-          returnDisplay: `Directory does not exist`
+          returnDisplay: `Directory does not exist`,
         };
       }
       // Check if path is a directory
@@ -217,7 +227,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           listedPath: params.path,
           totalEntries: 0,
           llmContent: `Path is not a directory: ${params.path}`,
-          returnDisplay: `Path is not a directory`
+          returnDisplay: `Path is not a directory`,
         };
       }
 
@@ -230,7 +240,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           listedPath: params.path,
           totalEntries: 0,
           llmContent: `Directory is empty: ${params.path}`,
-          returnDisplay: `Directory is empty.`
+          returnDisplay: `Directory is empty.`,
         };
       }
 
@@ -248,7 +258,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
             path: fullPath,
             isDirectory: isDir,
             size: isDir ? 0 : stats.size,
-            modifiedTime: stats.mtime
+            modifiedTime: stats.mtime,
           });
         } catch (error) {
           // Skip entries that can't be accessed
@@ -264,18 +274,20 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
       });
 
       // Create formatted content for display
-      const directoryContent = entries.map(entry => {
-        const typeIndicator = entry.isDirectory ? 'd' : '-';
-        const sizeInfo = entry.isDirectory ? '' : ` (${entry.size} bytes)`;
-        return `${typeIndicator} ${entry.name}${sizeInfo}`;
-      }).join('\n');
-  
+      const directoryContent = entries
+        .map((entry) => {
+          const typeIndicator = entry.isDirectory ? 'd' : '-';
+          const sizeInfo = entry.isDirectory ? '' : ` (${entry.size} bytes)`;
+          return `${typeIndicator} ${entry.name}${sizeInfo}`;
+        })
+        .join('\n');
+
       return {
         entries,
         listedPath: params.path,
         totalEntries: entries.length,
         llmContent: `Directory listing for ${params.path}:\n${directoryContent}`,
-        returnDisplay: `Found ${entries.length} item(s).`
+        returnDisplay: `Found ${entries.length} item(s).`,
       };
     } catch (error) {
       const errorMessage = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
@@ -284,7 +296,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
         listedPath: params.path,
         totalEntries: 0,
         llmContent: errorMessage,
-        returnDisplay: `**Error:** ${errorMessage}`
+        returnDisplay: `**Error:** ${errorMessage}`,
       };
     }
   }
