@@ -1,6 +1,7 @@
 import { ReadFileTool } from "../tools/read-file.tool.js";
 import { TerminalTool } from "../tools/terminal.tool.js";
-import { MEMORY_FILE_NAME } from "./constants.js";
+
+const MEMORY_FILE_NAME = 'GEMINI.md';
 
 const contactEmail = 'ntaylormullen@google.com';
 export const CoreSystemPrompt = `

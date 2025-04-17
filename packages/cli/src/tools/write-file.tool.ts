@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ToolResult } from './ToolResult.js';
-import { BaseTool } from './BaseTool.js';
+import { BaseTool, ToolResult } from './tool.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolEditConfirmationDetails } from '../ui/types.js';
@@ -52,7 +51,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
       'Writes content to a specified file in the local filesystem.',
       {
         properties: {
-          file_path: {
+          filePath: {
             description: 'The absolute path to the file to write to (e.g., \'/home/user/project/file.txt\'). Relative paths are not supported.',
             type: 'string'
           },
@@ -61,7 +60,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, WriteFileToolRe
             type: 'string'
           }
         },
-        required: ['file_path', 'content'],
+        required: ['filePath', 'content'],
         type: 'object'
       }
     );

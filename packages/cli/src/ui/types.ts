@@ -1,4 +1,4 @@
-import { ToolResultDisplay } from "../tools/ToolResult.js";
+import { ToolResultDisplay } from '../tools/tool.js';
 
 export enum ToolCallStatus {
     Pending,

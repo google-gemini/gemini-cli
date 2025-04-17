@@ -1,7 +1,33 @@
+import { ToolCallEvent } from "../ui/types.js";
 import { Part } from '@google/genai';
 import { HistoryItem } from '../ui/types.js';
-import { GeminiEventType, GeminiStream } from './GeminiStream.js';
-import { handleToolCallChunk, addErrorMessageToHistory } from './historyUpdater.js';
+import { handleToolCallChunk, addErrorMessageToHistory } from './history-updater.js';
+
+export enum GeminiEventType {
+    Content,
+    ToolCallInfo,
+}
+
+export interface GeminiContentEvent {
+    type: GeminiEventType.Content;
+    value: string;
+}
+
+export interface GeminiToolCallInfoEvent {
+    type: GeminiEventType.ToolCallInfo;
+    value: ToolCallEvent;
+}
+
+export type GeminiEvent =
+    | GeminiContentEvent
+    | GeminiToolCallInfoEvent;
+
+export type GeminiStream = AsyncIterable<GeminiEvent>;
+
+export enum StreamingState {
+    Idle,
+    Responding,
+}
 
 interface StreamProcessorParams {
     stream: GeminiStream;
@@ -104,7 +130,6 @@ export const processGeminiStream = async ({ // Renamed function for clarity
                     clearTimeout(renderTimeoutId);
                     renderTimeoutId = null;
                 }
-                
                 // Flush any text buffer content.
                 render(textBuffer);
                 currentGeminiMessageId = null; // End text message context

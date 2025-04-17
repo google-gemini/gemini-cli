@@ -1,7 +1,7 @@
 import { Part } from "@google/genai";
 import { toolRegistry } from "../tools/tool-registry.js";
 import { HistoryItem, IndividualToolCallDisplay, ToolCallEvent, ToolCallStatus, ToolConfirmationOutcome, ToolEditConfirmationDetails, ToolExecuteConfirmationDetails } from "../ui/types.js";
-import { ToolResultDisplay } from "../tools/ToolResult.js";
+import { ToolResultDisplay } from "../tools/tool.js";
 
 /**
  * Processes a tool call chunk and updates the history state accordingly.
@@ -46,13 +46,9 @@ export const handleToolCallChunk = (
                 if (!tool) {
                     throw new Error(`Tool "${chunk.name}" not found or is not registered.`);
                 }
-                
                 handleToolCallChunk({ ...chunk, status: ToolCallStatus.Invoked, resultDisplay: "Executing...", confirmationDetails: undefined }, setHistory, submitQuery, getNextMessageId, currentToolGroupIdRef);
-                
                 const result = await tool.execute(chunk.args);
-
                 handleToolCallChunk({ ...chunk, status: ToolCallStatus.Invoked, resultDisplay: result.returnDisplay, confirmationDetails: undefined }, setHistory, submitQuery, getNextMessageId, currentToolGroupIdRef);
-
                 const functionResponse: Part = {
                     functionResponse: {
                         name: chunk.name,
@@ -60,7 +56,6 @@ export const handleToolCallChunk = (
                         response: { "output": result.llmContent },
                     },
                 }
-
                 await submitQuery(functionResponse);
             }
         }

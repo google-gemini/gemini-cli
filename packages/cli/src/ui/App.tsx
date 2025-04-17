@@ -9,7 +9,7 @@ import HistoryDisplay from './components/HistoryDisplay.js';
 import LoadingIndicator from './components/LoadingIndicator.js';
 import InputPrompt from './components/InputPrompt.js';
 import Footer from './components/Footer.js';
-import { StreamingState } from '../core/StreamingState.js';
+import { StreamingState } from '../core/gemini-stream.js';
 import { PartListUnion } from '@google/genai';
 
 interface AppProps {

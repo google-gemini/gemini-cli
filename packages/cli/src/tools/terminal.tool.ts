@@ -2,13 +2,10 @@ import { spawn, SpawnOptions, ChildProcessWithoutNullStreams, exec } from 'child
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { promises as fs } from 'fs'; // Added fs.promises
-import { BaseTool } from './BaseTool.js'; // Adjust path as needed
-import { ToolResult } from './ToolResult.js'; // Adjust path as needed
-import { SchemaValidator } from '../utils/schemaValidator.js'; // Adjust path as needed
+import { promises as fs } from 'fs';
+import { BaseTool, ToolResult } from './tool.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolExecuteConfirmationDetails } from '../ui/types.js'; // Adjust path as needed
-import { GeminiClient } from '../core/GeminiClient.js';
-import { SchemaUnion, Type } from '@google/genai';
 import { BackgroundTerminalAnalyzer } from '../utils/BackgroundTerminalAnalyzer.js';
 
 // --- Interfaces ---

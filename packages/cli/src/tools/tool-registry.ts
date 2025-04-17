@@ -1,6 +1,5 @@
 import { ToolListUnion, FunctionDeclaration } from '@google/genai';
-import { Tool } from './Tool.js';
-import { ToolResult } from './ToolResult.js';
+import { Tool } from './tool.js';
 
 class ToolRegistry {
     private tools: Map<string, Tool> = new Map();

@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { ToolResult } from './ToolResult.js';
-import { BaseTool } from './BaseTool.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
+import { BaseTool, ToolResult } from './tool.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -36,7 +35,7 @@ export interface ReadFileToolResult extends ToolResult {
  */
 export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResult> {
   public static readonly Name: string = 'read_file';
-  
+
   // Maximum number of lines to read by default
   private static readonly DEFAULT_MAX_LINES = 2000;
 
@@ -108,26 +107,19 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
     if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
       return "Parameters failed schema validation.";
     }
-
-    // Ensure path is absolute
-    if (!path.isAbsolute(params.file_path)) {
-      return `File path must be absolute: ${params.file_path}`;
+    const filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
+      return `File path must be absolute: ${filePath}`;
     }
-
-    // Ensure path is within the root directory
-    if (!this.isWithinRoot(params.file_path)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
+    if (!this.isWithinRoot(filePath)) {
+      return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
     }
-
-    // Validate offset and limit if provided
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
     }
-
     if (params.limit !== undefined && params.limit <= 0) {
       return 'Limit must be a positive number';
     }
-
     return null;
   }
 
@@ -208,6 +200,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
    */
   async execute(params: ReadFileToolParams): Promise<ReadFileToolResult> {
     const validationError = this.invalidParams(params);
+    const filePath = params.file_path;
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
@@ -216,51 +209,40 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
     }
 
     try {
-      // Check if file exists
-      if (!fs.existsSync(params.file_path)) {
+      if (!fs.existsSync(filePath)) {
         return {
-          llmContent: `File not found: ${params.file_path}`,
+          llmContent: `File not found: ${filePath}`,
           returnDisplay: `File not found.`,
         };
       }
 
-      // Check if it's a directory
-      const stats = fs.statSync(params.file_path);
+      const stats = fs.statSync(filePath);
       if (stats.isDirectory()) {
         return {
-          llmContent: `Path is a directory, not a file: ${params.file_path}`,
+          llmContent: `Path is a directory, not a file: ${filePath}`,
           returnDisplay: `File is directory.`,
         };
       }
 
-      // Detect file type
-      const fileType = this.detectFileType(params.file_path);
-
-      // Handle binary files differently
+      const fileType = this.detectFileType(filePath);
       if (fileType !== 'text') {
         return {
-          llmContent: `Binary file: ${params.file_path} (${fileType})`,
+          llmContent: `Binary file: ${filePath} (${fileType})`,
           returnDisplay: ``,
         };
       }
 
-      // Read and process text file
-      const content = fs.readFileSync(params.file_path, 'utf8');
+      const content = fs.readFileSync(filePath, 'utf8');
       const lines = content.split('\n');
 
-      // Apply offset and limit
       const startLine = params.offset || 0;
-      // Use the default max lines if no limit is provided
       const endLine = params.limit
         ? startLine + params.limit
         : Math.min(startLine + ReadFileTool.DEFAULT_MAX_LINES, lines.length);
       const selectedLines = lines.slice(startLine, endLine);
 
-      // Format with line numbers and handle line truncation
       let truncated = false;
       const formattedLines = selectedLines.map((line) => {
-        // Calculate actual line number (1-based)
-        // Truncate long lines
         let processedLine = line;
         if (line.length > ReadFileTool.MAX_LINE_LENGTH) {
           processedLine = line.substring(0, ReadFileTool.MAX_LINE_LENGTH) + '... [truncated]';
@@ -270,10 +252,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
         return processedLine;
       });
 
-      // Check if content was truncated due to line limit or max lines limit
       const contentTruncated = (endLine < lines.length) || truncated;
 
-      // Create llmContent with truncation info if needed
       let llmContent = '';
       if (contentTruncated) {
         llmContent += `[File truncated: showing lines ${startLine + 1}-${endLine} of ${lines.length} total lines. Use offset parameter to view more.]\n`;
@@ -288,7 +268,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ReadFileToolResul
       const errorMsg = `Error reading file: ${error instanceof Error ? error.message : String(error)}`;
 
       return {
-        llmContent: `Error reading file ${params.file_path}: ${errorMsg}`,
+        llmContent: `Error reading file ${filePath}: ${errorMsg}`,
         returnDisplay: `Failed to read file: ${errorMsg}`,
       };
     }

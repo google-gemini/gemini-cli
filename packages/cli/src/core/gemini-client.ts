@@ -10,9 +10,9 @@ import { CoreSystemPrompt } from './prompts.js';
 import { type ToolCallEvent, type ToolCallConfirmationDetails, ToolCallStatus } from '../ui/types.js';
 import process from 'node:process';
 import { toolRegistry } from '../tools/tool-registry.js';
-import { ToolResult } from '../tools/ToolResult.js';
+import { ToolResult } from '../tools/tool.js';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { GeminiEventType, GeminiStream } from './GeminiStream.js';
+import { GeminiEventType, GeminiStream } from './gemini-stream.js';
 
 type ToolExecutionOutcome = {
     callId: string;
@@ -62,7 +62,7 @@ ${folderStructure}
 
         try {
             const chat = this.ai.chats.create({
-                model: 'gemini-2.5-pro-preview-03-25',//'gemini-2.0-flash',
+                model: 'gemini-2.0-flash',//'gemini-2.0-flash',
                 config: {
                     systemInstruction: CoreSystemPrompt,
                     ...this.defaultHyperParameters,

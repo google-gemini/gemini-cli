@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { BaseTool } from './BaseTool.js';
+import { BaseTool, ToolResult } from './tool.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { ToolResult } from './ToolResult.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 
 /**
@@ -13,7 +12,7 @@ export interface LSToolParams {
    * The absolute path to the directory to list
    */
   path: string;
-  
+
   /**
    * List of glob patterns to ignore
    */
@@ -28,22 +27,22 @@ export interface FileEntry {
    * Name of the file or directory
    */
   name: string;
-  
+
   /**
    * Absolute path to the file or directory
    */
   path: string;
-  
+
   /**
    * Whether this entry is a directory
    */
   isDirectory: boolean;
-  
+
   /**
    * Size of the file in bytes (0 for directories)
    */
   size: number;
-  
+
   /**
    * Last modified timestamp
    */
@@ -58,12 +57,12 @@ export interface LSToolResult extends ToolResult {
    * List of file entries
    */
   entries: FileEntry[];
-  
+
   /**
    * The directory that was listed
    */
   listedPath: string;
-  
+
   /**
    * Total number of entries found
    */
@@ -120,15 +119,13 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
   private isWithinRoot(pathToCheck: string): boolean {
     const normalizedPath = path.normalize(pathToCheck);
     const normalizedRoot = path.normalize(this.rootDirectory);
-    
     // Ensure the normalizedRoot ends with a path separator for proper path comparison
-    const rootWithSep = normalizedRoot.endsWith(path.sep) 
-      ? normalizedRoot 
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
       : normalizedRoot + path.sep;
-    
     return normalizedPath === normalizedRoot || normalizedPath.startsWith(rootWithSep);
   }
-  
+
   /**
    * Validates the parameters for the tool
    * @param params Parameters to validate
@@ -138,7 +135,6 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     if (this.schema.parameters && !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
       return "Parameters failed schema validation.";
     }
-    
     // Ensure path is absolute
     if (!path.isAbsolute(params.path)) {
       return `Path must be absolute: ${params.path}`;
@@ -148,10 +144,9 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     if (!this.isWithinRoot(params.path)) {
       return `Path must be within the root directory (${this.rootDirectory}): ${params.path}`;
     }
-    
     return null;
   }
-  
+
   /**
    * Checks if a filename matches any of the ignore patterns
    * @param filename Filename to check
@@ -162,26 +157,22 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     if (!patterns || patterns.length === 0) {
       return false;
     }
-    
     for (const pattern of patterns) {
       // Convert glob pattern to RegExp
       const regexPattern = pattern
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
         .replace(/\*/g, '.*')
         .replace(/\?/g, '.');
-      
       const regex = new RegExp(`^${regexPattern}$`);
-      
       if (regex.test(filename)) {
         return true;
       }
     }
-    
     return false;
   }
-  
+
   /**
-   * Gets a description of the file reading operation 
+   * Gets a description of the file reading operation
    * @param params Parameters for the file reading
    * @returns A string describing the file being read
    */
@@ -189,7 +180,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     const relativePath = makeRelative(params.path, this.rootDirectory);
     return shortenPath(relativePath);
   }
-  
+
   /**
    * Executes the LS operation with the given parameters
    * @param params Parameters for the LS operation
@@ -206,7 +197,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
         returnDisplay: "**Error:** Failed to execute tool."
       };
     }
-    
+
     try {
       // Check if path exists
       if (!fs.existsSync(params.path)) {
@@ -218,7 +209,6 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           returnDisplay: `Directory does not exist`
         };
       }
-      
       // Check if path is a directory
       const stats = fs.statSync(params.path);
       if (!stats.isDirectory()) {
@@ -230,11 +220,10 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           returnDisplay: `Path is not a directory`
         };
       }
-      
+
       // Read directory contents
       const files = fs.readdirSync(params.path);
       const entries: FileEntry[] = [];
-      
       if (files.length === 0) {
         return {
           entries: [],
@@ -244,20 +233,16 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           returnDisplay: `Directory is empty.`
         };
       }
-      
-      // Process each entry
+
       for (const file of files) {
-        // Skip if the file matches ignore patterns
         if (this.shouldIgnore(file, params.ignore)) {
           continue;
         }
-        
         const fullPath = path.join(params.path, file);
-        
+
         try {
           const stats = fs.statSync(fullPath);
           const isDir = stats.isDirectory();
-          
           entries.push({
             name: file,
             path: fullPath,
@@ -270,21 +255,21 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
           console.error(`Error accessing ${fullPath}: ${error}`);
         }
       }
-      
+
       // Sort entries (directories first, then alphabetically)
       entries.sort((a, b) => {
         if (a.isDirectory && !b.isDirectory) return -1;
         if (!a.isDirectory && b.isDirectory) return 1;
         return a.name.localeCompare(b.name);
       });
-      
+
       // Create formatted content for display
       const directoryContent = entries.map(entry => {
         const typeIndicator = entry.isDirectory ? 'd' : '-';
         const sizeInfo = entry.isDirectory ? '' : ` (${entry.size} bytes)`;
         return `${typeIndicator} ${entry.name}${sizeInfo}`;
       }).join('\n');
-      
+  
       return {
         entries,
         listedPath: params.path,

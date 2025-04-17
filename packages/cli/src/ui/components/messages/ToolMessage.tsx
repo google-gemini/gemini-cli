@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { ToolCallStatus } from '../../types.js';
-import { ToolResultDisplay } from '../../../tools/ToolResult.js';
+import { ToolResultDisplay } from '../../../tools/tool.js';
 import DiffRenderer from './DiffRenderer.js';
 import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';
 

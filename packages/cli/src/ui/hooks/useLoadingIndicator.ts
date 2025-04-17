@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { WITTY_LOADING_PHRASES, PHRASE_CHANGE_INTERVAL_MS } from '../constants.js';
-import { StreamingState } from '../../core/StreamingState.js';
+import { StreamingState } from '../../core/gemini-stream.js';
 
 export const useLoadingIndicator = (streamingState: StreamingState) => {
 	const [elapsedTime, setElapsedTime] = useState(0);

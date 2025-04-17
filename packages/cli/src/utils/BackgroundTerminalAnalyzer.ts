@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { SchemaUnion, Type } from "@google/genai"; // Assuming these types exist
-import { GeminiClient } from "../core/GeminiClient.js"; // Assuming this path
+import { GeminiClient } from "../core/gemini-client.js"; // Assuming this path
 import { exec } from 'child_process'; // Needed for Windows process check
 import { promisify } from 'util'; // To promisify exec
 
