@@ -2,6 +2,20 @@
 
 This package contains the core command-line interface for Gemini Code.
 
+## Setup
+
+1.  **Get a Gemini API Key:** Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2.  **Set Environment Variable:** Set the `GEMINI_API_KEY` environment variable to your obtained key. You can do this temporarily in your current shell session:
+    ```bash
+    export GEMINI_API_KEY="YOUR_API_KEY"
+    ```
+    Or add it to your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`) for persistence:
+    ```bash
+    echo 'export GEMINI_API_KEY="YOUR_API_KEY"' >> ~/.bashrc # Or your preferred shell config file
+    source ~/.bashrc # Reload the config
+    ```
+    Replace `"YOUR_API_KEY"` with your actual key.
+
 ## Building
 
 To build only the CLI package, navigate to this directory (`packages/cli`) and run:

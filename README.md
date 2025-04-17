@@ -8,6 +8,20 @@ This repository contains the Gemini Code CLI tool.
 
 This project uses Gerrit for version control. For details on the development workflow, including how to clone the repository and contribute changes, please refer to the [Gerrit Dev Workflows](http://go/gerrit-dev-workflows).
 
+## Setup
+
+1.  **Get a Gemini API Key:** Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2.  **Set Environment Variable:** Set the `GEMINI_API_KEY` environment variable to your obtained key. You can do this temporarily in your current shell session:
+    ```bash
+    export GEMINI_API_KEY="YOUR_API_KEY"
+    ```
+    Or add it to your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`) for persistence:
+    ```bash
+    echo 'export GEMINI_API_KEY="YOUR_API_KEY"' >> ~/.bashrc # Or your preferred shell config file
+    source ~/.bashrc # Reload the config
+    ```
+    Replace `"YOUR_API_KEY"` with your actual key.
+
 ## Building
 
 To build the entire project, including the CLI package, run the following command from the root directory:
