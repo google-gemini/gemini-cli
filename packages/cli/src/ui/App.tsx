@@ -14,6 +14,7 @@ import InputPrompt from './components/InputPrompt.js';
 import Footer from './components/Footer.js';
 import { StreamingState } from '../core/gemini-stream.js';
 import { PartListUnion } from '@google/genai';
+import ITermDetectionWarning from './utils/itermDetection.js';
 import {
   useStartupWarnings,
   useInitializationErrorEffect,
@@ -133,6 +134,7 @@ const App = ({ directory }: AppProps) => {
       )}
 
       <Footer queryLength={query.length} />
+      <ITermDetectionWarning />
     </Box>
   );
 };
