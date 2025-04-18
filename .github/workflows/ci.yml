@@ -1,0 +1,55 @@
+# .github/workflows/ci.yml
+
+name: Gemini Code CI
+
+on:
+  push:
+    branches: [ main ] # Run on pushes to the main branch
+  pull_request:
+    branches: [ main ] # Run on pull requests targeting the main branch
+
+jobs:
+  build_and_test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Specify the Node.js versions you want to test against
+        node-version: [ 20.x ] # You can add more like [18.x, 20.x]
+
+    steps:
+      # 1. Checkout Code
+      - name: Checkout repository
+        uses: actions/checkout@v4 
+
+      # 2. Setup Node.js Environment
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm' # Enable caching for npm dependencies (speeds up subsequent runs)
+
+      # 3. Install Dependencies
+      # Use 'ci' for cleaner, faster, deterministic installs based on lockfile
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Linting
+      - name: Run linter
+        run: npm run lint
+
+      # 5. Type Checking
+      - name: Run type check
+        run: npm run typecheck # Or: tsc --noEmit
+
+      # 6. Build
+      # Optional if your tests run directly on TS files (e.g., using ts-jest, ts-node)
+      # But usually good practice to ensure the build itself works.
+      - name: Build project
+        run: npm run build
+
+      # 7. Testing 
+      # Uncomment when we have tests.
+      #- name: Run tests
+      #  run: npm test
