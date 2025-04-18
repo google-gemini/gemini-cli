@@ -37,7 +37,7 @@ export class WriteFileTool extends BaseTool<
   WriteFileToolParams,
   WriteFileToolResult
 > {
-  public static readonly Name: string = 'write_file';
+  static readonly Name: string = 'write_file';
   private shouldAlwaysWrite = false;
 
   /**

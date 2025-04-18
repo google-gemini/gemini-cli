@@ -17,9 +17,9 @@ interface HistoryDisplayProps {
 const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
   history,
   onSubmit,
-}) => {
+}) => 
   // No grouping logic needed here anymore
-  return (
+   (
     <Box flexDirection="column">
       {history.map((item) => (
         <Box key={item.id} marginBottom={1}>
@@ -36,7 +36,7 @@ const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
         </Box>
       ))}
     </Box>
-  );
-};
+  )
+;
 
 export default HistoryDisplay;

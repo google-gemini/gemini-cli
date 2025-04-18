@@ -36,7 +36,7 @@ export class ReadFileTool extends BaseTool<
   ReadFileToolParams,
   ReadFileToolResult
 > {
-  public static readonly Name: string = 'read_file';
+  static readonly Name: string = 'read_file';
 
   // Maximum number of lines to read by default
   private static readonly DEFAULT_MAX_LINES = 2000;

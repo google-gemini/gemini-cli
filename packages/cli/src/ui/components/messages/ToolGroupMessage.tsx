@@ -20,8 +20,7 @@ const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
-      {toolCalls.map((tool) => {
-        return (
+      {toolCalls.map((tool) => (
           <React.Fragment key={tool.callId}>
             <ToolMessage
               key={tool.callId} // Use callId as the key
@@ -38,8 +37,7 @@ const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 ></ToolConfirmationMessage>
               )}
           </React.Fragment>
-        );
-      })}
+        ))}
       {/* Optional: Add padding below the last item if needed,
                 though ToolMessage already has some vertical space implicitly */}
       {/* {tools.length > 0 && <Box height={1} />} */}

@@ -118,7 +118,7 @@ export const handleToolCallChunk = (
     description,
     resultDisplay: chunk.resultDisplay,
     status: chunk.status,
-    confirmationDetails: confirmationDetails,
+    confirmationDetails,
   };
 
   const activeGroupId = currentToolGroupIdRef.current;

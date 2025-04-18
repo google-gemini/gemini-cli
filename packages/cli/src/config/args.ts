@@ -6,7 +6,7 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 export interface CliArgs {
   target_dir: string | undefined;
   model: string | undefined;
-  _: (string | number)[]; // Captures positional arguments
+  _: Array<string | number>; // Captures positional arguments
   // Add other expected args here if needed
   // e.g., verbose?: boolean;
 }

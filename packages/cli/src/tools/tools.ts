@@ -76,10 +76,10 @@ export abstract class BaseTool<
    * @param parameterSchema JSON Schema defining the parameters
    */
   constructor(
-    public readonly name: string,
-    public readonly displayName: string,
-    public readonly description: string,
-    public readonly parameterSchema: Record<string, unknown>,
+    readonly name: string,
+    readonly displayName: string,
+    readonly description: string,
+    readonly parameterSchema: Record<string, unknown>,
   ) {}
 
   /**

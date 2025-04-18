@@ -7,8 +7,7 @@ interface HeaderProps {
   cwd: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ cwd }) => {
-  return (
+const Header: React.FC<HeaderProps> = ({ cwd }) => (
     <>
       {/* Static Header Art */}
       <Box marginBottom={1}>
@@ -35,6 +34,5 @@ const Header: React.FC<HeaderProps> = ({ cwd }) => {
       </Box>
     </>
   );
-};
 
 export default Header;

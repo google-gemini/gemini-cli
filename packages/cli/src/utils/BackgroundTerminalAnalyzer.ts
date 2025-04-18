@@ -75,7 +75,7 @@ export class BackgroundTerminalAnalyzer {
    * @param command The command string that was executed (for context in prompts).
    * @returns A promise resolving to the final analysis outcome.
    */
-  public async analyze(
+  async analyze(
     pid: ProcessHandle,
     tempStdoutFilePath: string,
     tempStderrFilePath: string,
@@ -91,8 +91,8 @@ export class BackgroundTerminalAnalyzer {
 
     while (attempts < this.maxAttempts) {
       attempts++;
-      let currentStdout: string = '';
-      let currentStderr: string = '';
+      let currentStdout = '';
+      let currentStderr = '';
 
       // --- Robust File Reading ---
       try {

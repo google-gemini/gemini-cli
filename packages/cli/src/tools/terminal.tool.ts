@@ -127,7 +127,7 @@ export class TerminalTool extends BaseTool<
   TerminalToolParams,
   TerminalToolResult
 > {
-  public static Name: string = 'execute_bash_command';
+  static Name: string = 'execute_bash_command';
 
   private readonly rootDirectory: string;
   private readonly outputLimit: number;
@@ -387,7 +387,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       title: 'Confirm Shell Command',
       command: params.command,
-      rootCommand: rootCommand,
+      rootCommand,
       description: `Execute in '${this.currentCwd}':\n${description}`,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {

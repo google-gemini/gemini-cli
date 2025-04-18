@@ -1,6 +1,5 @@
-import { ToolCallEvent } from '../ui/types.js';
+import { ToolCallEvent , HistoryItem } from '../ui/types.js';
 import { Part } from '@google/genai';
-import { HistoryItem } from '../ui/types.js';
 import {
   handleToolCallChunk,
   addErrorMessageToHistory,

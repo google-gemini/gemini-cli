@@ -61,7 +61,7 @@ async function readFullStructure(
   const name = path.basename(folderPath);
   // Initialize with isIgnored: false
   const folderInfo: Omit<FullFolderInfo, 'totalChildren' | 'totalFiles'> = {
-    name: name,
+    name,
     path: folderPath,
     files: [],
     subFolders: [],

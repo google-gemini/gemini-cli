@@ -32,6 +32,6 @@ const InputPrompt: React.FC<InputPromptProps> = ({
       </Box>
     </Box>
   );
-};
+}
 
 export default InputPrompt;

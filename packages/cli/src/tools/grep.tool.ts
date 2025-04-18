@@ -351,7 +351,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         results.push({
           // Use relative path, or just the filename if it's in the base path itself
           filePath: relativeFilePath || path.basename(absoluteFilePath),
-          lineNumber: lineNumber,
+          lineNumber,
           line: lineContent, // Use the full extracted line content
         });
       }
@@ -555,7 +555,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
                   path.relative(absolutePath, fileAbsolutePath) ||
                   path.basename(fileAbsolutePath),
                 lineNumber: index + 1,
-                line: line,
+                line,
               });
             }
           });

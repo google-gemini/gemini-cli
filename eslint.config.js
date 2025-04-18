@@ -53,7 +53,6 @@ export default tseslint.config(
     },
     settings: {
       'import/resolver': {
-        typescript: true,
         node: true,
       },
     },

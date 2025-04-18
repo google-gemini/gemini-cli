@@ -3,8 +3,7 @@ import { useInput } from 'ink';
 import { GeminiClient } from '../../core/gemini-client.js';
 import { type Chat, type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
-import { processGeminiStream } from '../../core/gemini-stream.js';
-import { StreamingState } from '../../core/gemini-stream.js';
+import { processGeminiStream , StreamingState } from '../../core/gemini-stream.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,

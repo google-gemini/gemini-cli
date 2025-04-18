@@ -197,7 +197,7 @@ export class MarkdownRenderer {
    * @param text The full markdown string to render.
    * @returns An array of React nodes representing markdown blocks.
    */
-  public static render(text: string): React.ReactNode[] {
+  static render(text: string): React.ReactNode[] {
     if (!text) return [];
 
     const lines = text.split('\n');
