@@ -126,6 +126,12 @@ const App = ({ directory }: AppProps) => {
         />
       )}
 
+      {process.env.TERM_PROGRAM === 'iTerm.app' && (
+        <Box marginTop={1}>
+          <Text dimColor>Note: Flickering may occur in iTerm.</Text>
+        </Box>
+      )}
+
       <Footer queryLength={query.length} />
     </Box>
   );
