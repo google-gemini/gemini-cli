@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/gemini.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && touch dist/.last_build",
     "start": "node dist/gemini.js",
     "debug": "node --inspect-brk dist/gemini.js",
     "lint": "eslint . --ext .ts,.tsx",
