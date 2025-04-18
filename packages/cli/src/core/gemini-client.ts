@@ -9,7 +9,7 @@ import {
   Content,
 } from '@google/genai';
 import { getApiKey } from '../config/env.js';
-import { getModel } from '../config/globalConfig.js';  
+import { getModel } from '../config/globalConfig.js';
 import { CoreSystemPrompt } from './prompts.js';
 import {
   type ToolCallEvent,
