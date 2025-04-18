@@ -3,7 +3,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { ToolCallStatus } from '../../types.js';
 import { ToolResultDisplay } from '../../../tools/tools.js';
-import DiffRenderer from './DiffRenderer.js';
+import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';
 
 interface ToolMessageProps {
@@ -13,7 +13,7 @@ interface ToolMessageProps {
   status: ToolCallStatus;
 }
 
-const ToolMessage: React.FC<ToolMessageProps> = ({
+export const ToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
   resultDisplay,
@@ -70,5 +70,3 @@ const ToolMessage: React.FC<ToolMessageProps> = ({
     </Box>
   );
 };
-
-export default ToolMessage;

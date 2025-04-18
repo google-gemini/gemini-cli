@@ -85,7 +85,7 @@ interface DiffRendererProps {
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
 
-const DiffRenderer: React.FC<DiffRendererProps> = ({
+export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
   tabWidth = DEFAULT_TAB_WIDTH,
 }) => {
@@ -157,6 +157,9 @@ const DiffRenderer: React.FC<DiffRendererProps> = ({
             dim = true;
             prefixSymbol = ' ';
             break;
+          default:
+            throw new Error(`Unknown line type: ${line.type}`);
+            break;
         }
 
         // Render the line content *after* stripping the calculated *minimum* baseIndentation.
@@ -179,5 +182,3 @@ const DiffRenderer: React.FC<DiffRendererProps> = ({
     </Box>
   );
 };
-
-export default DiffRenderer;

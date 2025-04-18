@@ -1,6 +1,7 @@
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { ToolCallConfirmationDetails } from '../ui/types.js'; // Added for shouldConfirmExecute
+import { getErrorMessage } from '../utils/errors.js';
 
 /**
  * Parameters for the WebFetch tool
@@ -13,17 +14,9 @@ export interface WebFetchToolParams {
 }
 
 /**
- * Standardized result from the WebFetch tool
- */
-export interface WebFetchToolResult extends ToolResult {}
-
-/**
  * Implementation of the WebFetch tool that reads content from a URL.
  */
-export class WebFetchTool extends BaseTool<
-  WebFetchToolParams,
-  WebFetchToolResult
-> {
+export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
   static readonly Name: string = 'web_fetch';
 
   /**
@@ -73,7 +66,7 @@ export class WebFetchTool extends BaseTool<
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
         return `Invalid URL protocol: "${parsedUrl.protocol}". Only 'http:' and 'https:' are supported.`;
       }
-    } catch (error) {
+    } catch {
       // The URL constructor throws if the format is invalid
       return `Invalid URL format: "${params.url}". Please provide a valid absolute URL (e.g., 'https://example.com').`;
     }
@@ -101,6 +94,7 @@ export class WebFetchTool extends BaseTool<
    * @returns Whether execute should be confirmed.
    */
   async shouldConfirmExecute(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     params: WebFetchToolParams,
   ): Promise<ToolCallConfirmationDetails | false> {
     // Could add logic here to confirm based on domain, etc. if needed
@@ -112,7 +106,7 @@ export class WebFetchTool extends BaseTool<
    * @param params Parameters for the web fetch operation.
    * @returns Result with the fetched content or an error message.
    */
-  async execute(params: WebFetchToolParams): Promise<WebFetchToolResult> {
+  async execute(params: WebFetchToolParams): Promise<ToolResult> {
     const validationError = this.invalidParams(params);
     if (validationError) {
       return {
@@ -159,10 +153,10 @@ export class WebFetchTool extends BaseTool<
         llmContent,
         returnDisplay: `Fetched content from ${url}`, // Simple display message
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // This catches network errors (DNS resolution, connection refused, etc.)
       // and errors from the URL constructor if somehow bypassed validation (unlikely)
-      const errorMessage = `Failed to fetch data from ${url}. Error: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMessage = `Failed to fetch data from ${url}. Error: ${getErrorMessage(error)}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `**Error:** ${errorMessage}`,

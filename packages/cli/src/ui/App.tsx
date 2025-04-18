@@ -1,32 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import type { HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
-import Header from './components/Header.js';
-import Tips from './components/Tips.js';
-import HistoryDisplay from './components/HistoryDisplay.js';
-import LoadingIndicator from './components/LoadingIndicator.js';
-import InputPrompt from './components/InputPrompt.js';
-import Footer from './components/Footer.js';
+import { Header } from './components/Header.js';
+import { Tips } from './components/Tips.js';
+import { HistoryDisplay } from './components/HistoryDisplay.js';
+import { LoadingIndicator } from './components/LoadingIndicator.js';
+import { InputPrompt } from './components/InputPrompt.js';
+import { Footer } from './components/Footer.js';
 import { StreamingState } from '../core/gemini-stream.js';
 import { PartListUnion } from '@google/genai';
-import ITermDetectionWarning from './utils/itermDetection.js';
+import { ITermDetectionWarning } from './utils/itermDetection.js';
 import {
   useStartupWarnings,
   useInitializationErrorEffect,
 } from './hooks/useAppEffects.js';
 
-const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt');
-
 interface AppProps {
   directory: string;
 }
 
-const App = ({ directory }: AppProps) => {
+export const App = ({ directory }: AppProps) => {
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
@@ -138,5 +133,3 @@ const App = ({ directory }: AppProps) => {
     </Box>
   );
 };
-
-export default App;

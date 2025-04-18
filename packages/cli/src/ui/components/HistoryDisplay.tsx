@@ -1,12 +1,11 @@
 import React from 'react';
 import { Box } from 'ink';
 import type { HistoryItem } from '../types.js';
-import { UI_WIDTH } from '../constants.js';
-import UserMessage from './messages/UserMessage.js';
-import GeminiMessage from './messages/GeminiMessage.js';
-import InfoMessage from './messages/InfoMessage.js';
-import ErrorMessage from './messages/ErrorMessage.js';
-import ToolGroupMessage from './messages/ToolGroupMessage.js';
+import { UserMessage } from './messages/UserMessage.js';
+import { GeminiMessage } from './messages/GeminiMessage.js';
+import { InfoMessage } from './messages/InfoMessage.js';
+import { ErrorMessage } from './messages/ErrorMessage.js';
+import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { PartListUnion } from '@google/genai';
 
 interface HistoryDisplayProps {
@@ -14,7 +13,7 @@ interface HistoryDisplayProps {
   onSubmit: (value: PartListUnion) => void;
 }
 
-const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
+export const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
   history,
   onSubmit,
 }) => (
@@ -36,4 +35,3 @@ const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
     ))}
   </Box>
 );
-export default HistoryDisplay;

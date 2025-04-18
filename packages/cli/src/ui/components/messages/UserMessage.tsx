@@ -5,7 +5,7 @@ interface UserMessageProps {
   text: string;
 }
 
-const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
 
@@ -20,5 +20,3 @@ const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
     </Box>
   );
 };
-
-export default UserMessage;

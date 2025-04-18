@@ -6,9 +6,9 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
-} from '../../types.js'; // Adjust path as needed
+} from '../../types.js';
 import { PartListUnion } from '@google/genai';
-import DiffRenderer from './DiffRenderer.js';
+import { DiffRenderer } from './DiffRenderer.js';
 import { UI_WIDTH } from '../../constants.js';
 
 export interface ToolConfirmationMessageProps {
@@ -27,9 +27,9 @@ interface InternalOption {
   value: ToolConfirmationOutcome;
 }
 
-const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
-  confirmationDetails,
-}) => {
+export const ToolConfirmationMessage: React.FC<
+  ToolConfirmationMessageProps
+> = ({ confirmationDetails }) => {
   const { onConfirm } = confirmationDetails;
 
   useInput((_, key) => {
@@ -42,14 +42,11 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
     onConfirm(item.value);
   };
 
-  let title: string;
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
   const options: InternalOption[] = [];
 
   if (isEditDetails(confirmationDetails)) {
-    title = 'Edit'; // Title for the outer box
-
     // Body content is now the DiffRenderer, passing filename to it
     // The bordered box is removed from here and handled within DiffRenderer
     bodyContent = <DiffRenderer diffContent={confirmationDetails.fileDiff} />;
@@ -69,7 +66,6 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
   } else {
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
-    title = 'Execute Command'; // Title for the outer box
 
     // For execution, we still need context display and description
     const commandDisplay = <Text color="cyan">{executionProps.command}</Text>;
@@ -118,5 +114,3 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
     </Box>
   );
 };
-
-export default ToolConfirmationMessage;

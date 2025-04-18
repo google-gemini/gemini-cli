@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { HistoryItem } from '../types.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt');
 
@@ -19,17 +20,17 @@ export function useStartupWarnings(
         );
         try {
           fs.unlinkSync(warningsFilePath);
-        } catch (unlinkErr: any) {
+        } catch {
           setStartupWarnings((prev) => [
             ...prev,
             `Warning: Could not delete temporary warnings file.`,
           ]);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStartupWarnings((prev) => [
         ...prev,
-        `Error checking/reading warnings file: ${err.message}`,
+        `Error checking/reading warnings file: ${getErrorMessage(err)}`,
       ]);
     }
   }, [setStartupWarnings]); // Include setStartupWarnings in dependency array

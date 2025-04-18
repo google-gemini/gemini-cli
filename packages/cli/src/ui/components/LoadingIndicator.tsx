@@ -8,7 +8,7 @@ interface LoadingIndicatorProps {
   elapsedTime: number;
 }
 
-const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
+export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   isLoading,
   currentLoadingPhrase,
   elapsedTime,
@@ -30,5 +30,3 @@ const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     </Box>
   );
 };
-
-export default LoadingIndicator;

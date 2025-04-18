@@ -5,7 +5,7 @@ interface InfoMessageProps {
   text: string;
 }
 
-const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
+export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
   const prefix = 'ℹ ';
   const prefixWidth = prefix.length;
 
@@ -22,5 +22,3 @@ const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
     </Box>
   );
 };
-
-export default InfoMessage;

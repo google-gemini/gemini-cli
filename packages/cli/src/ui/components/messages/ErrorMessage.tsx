@@ -5,7 +5,7 @@ interface ErrorMessageProps {
   text: string;
 }
 
-const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
+export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
   const prefix = '✕ ';
   const prefixWidth = prefix.length;
 
@@ -22,5 +22,3 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
     </Box>
   );
 };
-
-export default ErrorMessage;

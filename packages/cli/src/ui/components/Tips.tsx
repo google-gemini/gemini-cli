@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { UI_WIDTH } from '../constants.js';
 
-const Tips: React.FC = () => (
+export const Tips: React.FC = () => (
   <Box flexDirection="column" marginBottom={1} width={UI_WIDTH}>
     <Text>Tips for getting started:</Text>
     <Text>
@@ -16,5 +16,3 @@ const Tips: React.FC = () => (
     <Text>4. Be specific for the best results.</Text>
   </Box>
 );
-
-export default Tips;

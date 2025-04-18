@@ -10,7 +10,7 @@ interface InputPromptProps {
   isActive: boolean;
 }
 
-const InputPrompt: React.FC<InputPromptProps> = ({
+export const InputPrompt: React.FC<InputPromptProps> = ({
   query,
   setQuery,
   onSubmit,
@@ -33,5 +33,3 @@ const InputPrompt: React.FC<InputPromptProps> = ({
     </Box>
   );
 };
-
-export default InputPrompt;

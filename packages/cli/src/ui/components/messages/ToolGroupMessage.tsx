@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
-import ToolMessage from './ToolMessage.js';
+import { ToolMessage } from './ToolMessage.js';
 import { PartListUnion } from '@google/genai';
-import ToolConfirmationMessage from './ToolConfirmationMessage.js';
+import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 
 interface ToolGroupMessageProps {
   toolCalls: IndividualToolCallDisplay[];
@@ -11,7 +11,7 @@ interface ToolGroupMessageProps {
 }
 
 // Main component renders the border and maps the tools using ToolMessage
-const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
+export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   onSubmit,
 }) => {
@@ -44,5 +44,3 @@ const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     </Box>
   );
 };
-
-export default ToolGroupMessage;

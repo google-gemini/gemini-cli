@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-const ITermDetectionWarning: React.FC = () => {
+export const ITermDetectionWarning: React.FC = () => {
   if (process.env.TERM_PROGRAM !== 'iTerm.app') {
     return null; // Don't render anything if not in iTerm
   }
@@ -12,5 +12,3 @@ const ITermDetectionWarning: React.FC = () => {
     </Box>
   );
 };
-
-export default ITermDetectionWarning;

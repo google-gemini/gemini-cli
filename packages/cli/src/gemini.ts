@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from 'ink';
-import App from './ui/App.js';
+import { App } from './ui/App.js';
 import { toolRegistry } from './tools/tool-registry.js';
 import { LSTool } from './tools/ls.tool.js';
 import { ReadFileTool } from './tools/read-file.tool.js';

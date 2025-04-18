@@ -6,7 +6,7 @@ interface GeminiMessageProps {
   text: string;
 }
 
-const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
+export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
 
@@ -40,5 +40,3 @@ const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
     </Box>
   );
 };
-
-export default GeminiMessage;
