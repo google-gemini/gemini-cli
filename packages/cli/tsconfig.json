@@ -1,13 +1,19 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist",
+    "rootDir": ".",
     "jsx": "react",
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "module": "Node16",
-    "target": "ES2020"
+    "target": "ES2020",
+    "paths": {
+      "@gemini-code/*": ["./packages/*"]
+    }
   },
   "exclude": ["node_modules", "dist"],
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "../server" },
+  ]
 }

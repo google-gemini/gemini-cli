@@ -1,9 +1,9 @@
 {
-  "name": "@google/gemini-code",
+  "name": "@gemini-code/cli",
   "version": "1.0.0",
   "description": "Gemini Code CLI",
   "type": "module",
-  "main": "gemini.js",
+  "main": "src/gemini.js",
   "scripts": {
     "build": "tsc && cp package.json README.md ../../LICENSE dist/ && touch dist/.last_build",
     "start": "node dist/gemini.js",
@@ -16,6 +16,7 @@
   ],
   "dependencies": {
     "@google/genai": "^0.8.0",
+    "@gemini-code/server": "1.0.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",

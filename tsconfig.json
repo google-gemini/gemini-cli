@@ -5,6 +5,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "composite": true,
+    // MONOREPO STUFF
+    "incremental": true,
+    "target": "ES2020",
+    "module": "Node16",
+    "declaration": true,
+    "moduleResolution": "node16",
   }
 }
