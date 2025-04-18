@@ -12,6 +12,10 @@ import { WriteFileTool } from './tools/write-file.tool.js';
 import { WebFetchTool } from './tools/web-fetch.tool.js';
 import { globalConfig } from './config/config.js';
 
+// TODO(b/411707095): remove. left here as an example of how to pull in inter-package deps
+import { helloServer } from '@gemini-code/server';
+helloServer();
+
 async function main() {
   // Configure tools
   registerTools(globalConfig.getTargetDir());
@@ -25,7 +29,7 @@ async function main() {
 }
 
 // --- Global Unhandled Rejection Handler ---
-process.on('unhandledRejection', (reason, _) => {
+process.on('unhandledRejection', (reason, promise) => {
   // Check if this is the known 429 ClientError that sometimes escapes
   // this is a workaround for a specific issue with the way we are calling gemini
   // where a 429 error is thrown but not caught, causing an unhandled rejection
