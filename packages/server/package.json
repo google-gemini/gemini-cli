@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Gemini Code Server",
   "type": "module",
-  "main": "src/index.js",
+  "main": "dist/src/index.js",
   "scripts": {
     "build": "tsc --build && cp package.json dist/",
     "clean": "rm -rf dist",
