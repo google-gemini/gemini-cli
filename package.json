@@ -11,8 +11,9 @@
     "test": "npm run test --workspaces",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
-    "start": "npm run start --workspace=gemini-code-cli -- \"$@\"",
-    "format": "prettier --write ."
+    "start": "npm run start --workspace=@google/gemini-code -- \"$@\"",
+    "format": "prettier --write .",
+    "artifactregistry-login": "npx google-artifactregistry-auth"
   },
   "devDependencies": {
     "eslint": "^9.24.0",
