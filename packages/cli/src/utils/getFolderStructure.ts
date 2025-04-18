@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { getErrorMessage, isNodeError } from './errors.js';
 
 const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';
@@ -135,8 +136,8 @@ async function readFullStructure(
       folderInfo.files.length +
       folderInfo.subFolders.length +
       folderInfo.subFolders.reduce((sum, sf) => sum + sf.totalChildren, 0);
-  } catch (error: any) {
-    if (error.code === 'EACCES' || error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (isNodeError(error) && (error.code === 'EACCES' || error.code === 'ENOENT')) {
       console.warn(
         `Warning: Could not read directory ${folderPath}: ${error.message}`,
       );
@@ -163,7 +164,6 @@ async function readFullStructure(
 function reduceStructure(
   fullInfo: FullFolderInfo,
   maxItems: number,
-  ignoredFolders: Set<string>, // Pass ignoredFolders for checking
 ): ReducedFolderNode {
   const rootReducedNode: ReducedFolderNode = {
     name: fullInfo.name,
@@ -348,7 +348,6 @@ export async function getFolderStructure(
     const reducedRoot = reduceStructure(
       fullInfo,
       mergedOptions.maxItems,
-      mergedOptions.ignoredFolders,
     );
 
     // 3. Count items in the *reduced* structure for the summary
@@ -377,8 +376,8 @@ export async function getFolderStructure(
       `Showing ${reducedItemCount} of ${totalOriginalChildren} items (files + folders). ${disclaimer}`.trim();
 
     return `${summary}\n\n${displayPath}/\n${structureLines.join('\n')}`;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error getting folder structure for ${resolvedPath}:`, error);
-    return `Error processing directory "${resolvedPath}": ${error.message}`;
+    return `Error processing directory "${resolvedPath}": ${getErrorMessage(error)}`;
   }
 }

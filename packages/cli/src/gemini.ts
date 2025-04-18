@@ -29,7 +29,7 @@ async function main() {
 }
 
 // --- Global Unhandled Rejection Handler ---
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _) => {
   // Check if this is the known 429 ClientError that sometimes escapes
   // this is a workaround for a specific issue with the way we are calling gemini
   // where a 429 error is thrown but not caught, causing an unhandled rejection

@@ -5,6 +5,7 @@ import { type Chat, type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
 import { processGeminiStream , StreamingState } from '../../core/gemini-stream.js';
 import { globalConfig } from '../../config/config.js';
+import { getErrorMessage, isNodeError } from '../../utils/errors.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -36,9 +37,9 @@ export const useGeminiStream = (
     if (!geminiClientRef.current) {
       try {
         geminiClientRef.current = new GeminiClient(globalConfig);
-      } catch (error: any) {
+      } catch (error: unknown) {
         setInitError(
-          `Failed to initialize client: ${error.message || 'Unknown error'}`,
+          `Failed to initialize client: ${getErrorMessage(error) || 'Unknown error'}`,
         );
       }
     }
@@ -136,17 +137,17 @@ export const useGeminiStream = (
           addHistoryItem: addHistoryItemFromStream,
           currentToolGroupIdRef,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         // (Error handling for stream initiation remains the same)
         console.error('Error initiating stream:', error);
-        if (error.name !== 'AbortError') {
+        if (!isNodeError(error) || error.name !== 'AbortError') {
           // Use historyUpdater's function potentially? Or keep addHistoryItem here?
           // Keeping addHistoryItem here for direct errors from this scope.
           addHistoryItem(
             setHistory,
             {
               type: 'error',
-              text: `[Error starting stream: ${error.message}]`,
+              text: `[Error starting stream: ${getErrorMessage(error)}]`,
             },
             getNextMessageId(userMessageTimestamp),
           );

@@ -214,7 +214,6 @@ export class MarkdownRenderer {
     let codeBlockContent: string[] = [];
     let codeBlockLang: string | null = null;
     let codeBlockFence = ''; // Store the type of fence used (``` or ~~~)
-    let inListType: 'ul' | 'ol' | null = null; // Track current list type to group items
 
     lines.forEach((line, index) => {
       const key = `line-${index}`;
@@ -241,7 +240,6 @@ export class MarkdownRenderer {
           codeBlockContent = [];
           codeBlockLang = null;
           codeBlockFence = '';
-          inListType = null; // Ensure list context is reset
         } else {
           // Add line to current code block content
           codeBlockContent.push(line);
@@ -261,7 +259,6 @@ export class MarkdownRenderer {
         inCodeBlock = true;
         codeBlockFence = codeFenceMatch[1];
         codeBlockLang = codeFenceMatch[2] || null;
-        inListType = null; // Starting code block breaks list
       } else if (hrMatch) {
         // Render Horizontal Rule (simple dashed line)
         // Use box with height and border character, or just Text with dashes
@@ -270,7 +267,6 @@ export class MarkdownRenderer {
             <Text dimColor>---</Text>
           </Box>,
         );
-        inListType = null; // HR breaks list
       } else if (headerMatch) {
         const level = headerMatch[1].length;
         const headerText = headerMatch[2];
@@ -301,9 +297,11 @@ export class MarkdownRenderer {
               </Text>
             );
             break;
+          default:
+            headerNode = <Text>{renderedHeaderText}</Text>;
+            break;
         }
         if (headerNode) contentBlocks.push(<Box key={key}>{headerNode}</Box>);
-        inListType = null; // Header breaks list
       } else if (ulMatch) {
         const marker = ulMatch[1]; // *, -, or +
         const itemText = ulMatch[2];
@@ -311,18 +309,14 @@ export class MarkdownRenderer {
         contentBlocks.push(
           MarkdownRenderer._renderListItem(key, itemText, 'ul', marker),
         );
-        inListType = 'ul'; // Set/maintain list context
       } else if (olMatch) {
         const marker = olMatch[1]; // The number
         const itemText = olMatch[2];
         contentBlocks.push(
           MarkdownRenderer._renderListItem(key, itemText, 'ol', marker),
         );
-        inListType = 'ol'; // Set/maintain list context
       } else {
         // --- Regular line (Paragraph or Empty line) ---
-        inListType = null; // Any non-list line breaks the list sequence
-
         // Render line content if it's not blank, applying inline styles
         const renderedLine = MarkdownRenderer._renderInline(line);
         if (renderedLine.length > 0 || line.length > 0) {
@@ -336,8 +330,6 @@ export class MarkdownRenderer {
           // Handle specifically empty lines
           // Add minimal space for blank lines between paragraphs/blocks
           if (contentBlocks.length > 0 && !inCodeBlock) {
-            // Avoid adding space inside code block state (handled above)
-            const previousBlock = contentBlocks[contentBlocks.length - 1];
             // Avoid adding multiple blank lines consecutively easily - check if previous was also blank?
             // For now, add a minimal spacer for any blank line outside code blocks.
             contentBlocks.push(<Box key={key} height={1} />);

@@ -1,9 +1,10 @@
 import { promises as fs } from 'fs';
-import { SchemaUnion, Type } from '@google/genai'; // Assuming these types exist
+import { Content, SchemaUnion, Type } from '@google/genai'; // Assuming these types exist
 import { GeminiClient } from '../core/gemini-client.js'; // Assuming this path
 import { exec } from 'child_process'; // Needed for Windows process check
 import { promisify } from 'util'; // To promisify exec
 import { globalConfig } from '../config/config.js';
+import { getErrorMessage, isNodeError } from './errors.js';
 
 // Promisify child_process.exec for easier async/await usage
 const execAsync = promisify(exec);
@@ -11,8 +12,9 @@ const execAsync = promisify(exec);
 // Define the expected interface for the AI client dependency
 export interface AiClient {
   generateJson(
-    prompt: any[], // Keep flexible or define a stricter prompt structure type
+    prompt: Content[], // Keep flexible or define a stricter prompt structure type
     schema: SchemaUnion,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any>; // Ideally, specify the expected JSON structure TAnalysisResult | TAnalysisFailure
 }
 
@@ -98,20 +100,20 @@ export class BackgroundTerminalAnalyzer {
       // --- Robust File Reading ---
       try {
         currentStdout = await fs.readFile(tempStdoutFilePath, 'utf-8');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If file doesn't exist yet or isn't readable, treat as empty, but log warning
-        if (error.code !== 'ENOENT') {
+        if (!isNodeError(error) || error.code !== 'ENOENT') {
           console.warn(
-            `Attempt ${attempts}: Failed to read stdout file ${tempStdoutFilePath}: ${error.message}`,
+            `Attempt ${attempts}: Failed to read stdout file ${tempStdoutFilePath}: ${getErrorMessage(error)}`,
           );
         }
       }
       try {
         currentStderr = await fs.readFile(tempStderrFilePath, 'utf-8');
-      } catch (error: any) {
-        if (error.code !== 'ENOENT') {
+      } catch (error: unknown) {
+        if (!isNodeError(error) || error.code !== 'ENOENT') {
           console.warn(
-            `Attempt ${attempts}: Failed to read stderr file ${tempStderrFilePath}: ${error.message}`,
+            `Attempt ${attempts}: Failed to read stderr file ${tempStderrFilePath}: ${getErrorMessage(error)}`,
           );
         }
       }
@@ -125,10 +127,10 @@ export class BackgroundTerminalAnalyzer {
           // Reread files one last time in case output was written just before exit
           try {
             currentStdout = await fs.readFile(tempStdoutFilePath, 'utf-8');
-          } catch {}
+          } catch { /* ignore */ }
           try {
             currentStderr = await fs.readFile(tempStderrFilePath, 'utf-8');
-          } catch {}
+          } catch { /* ignore */ }
 
           lastAnalysisResult = await this.analyzeOutputWithLLM(
             currentStdout,
@@ -148,10 +150,10 @@ export class BackgroundTerminalAnalyzer {
             summary: `Process ended. Final analysis summary: ${lastAnalysisResult.summary}`,
           };
         }
-      } catch (procCheckError: any) {
+      } catch (procCheckError: unknown) {
         // Log the error but allow polling to continue, as log analysis might still be useful
         console.warn(
-          `Could not check process status for PID ${pid} on attempt ${attempts}: ${procCheckError.message}`,
+          `Could not check process status for PID ${pid} on attempt ${attempts}: ${getErrorMessage(procCheckError)}`,
         );
         // Decide if you want to bail out here or continue analysis based on logs only
         // For now, we continue.
@@ -257,13 +259,13 @@ export class BackgroundTerminalAnalyzer {
         process.kill(pid, 0);
         return true; // If no error is thrown, process exists
       }
-    } catch (error: any) {
-      if (error.code === 'ESRCH') {
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code === 'ESRCH') {
         // ESRCH: Standard error code for "No such process" on Unix-like systems
         return false;
       } else if (
         process.platform === 'win32' &&
-        error.message.includes('No tasks are running')
+        getErrorMessage(error).includes('No tasks are running')
       ) {
         // tasklist specific error when PID doesn't exist
         return false;
@@ -272,7 +274,7 @@ export class BackgroundTerminalAnalyzer {
         // Re-throwing might be appropriate depending on desired behavior.
         // Here, we log it and cautiously return true, assuming it *might* still be running.
         console.warn(
-          `isProcessRunning(${pid}) encountered error: ${error.message}. Assuming process might still exist.`,
+          `isProcessRunning(${pid}) encountered error: ${getErrorMessage(error)}. Assuming process might still exist.`,
         );
         // Or you could throw the error: throw new Error(`Failed to check process status for PID ${pid}: ${error.message}`);
         return true; // Cautious assumption
@@ -402,16 +404,14 @@ Based *only* on the provided stdout and stderr:
       }
 
       return response as AnalysisResult; // Cast after validation
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         `LLM analysis call failed for command "${command}":`,
         error,
       );
       // Ensure the error message passed back is helpful
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
       return {
-        error: `LLM analysis call encountered an error: ${errorMessage}`,
+        error: `LLM analysis call encountered an error: ${getErrorMessage(error)}`,
         inferredStatus: 'AnalysisFailed',
       };
     }
