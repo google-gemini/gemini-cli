@@ -4,6 +4,7 @@ import { GeminiClient } from '../../core/gemini-client.js';
 import { type Chat, type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
 import { processGeminiStream , StreamingState } from '../../core/gemini-stream.js';
+import { globalConfig } from '../../config/config.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -34,7 +35,7 @@ export const useGeminiStream = (
     setInitError(null);
     if (!geminiClientRef.current) {
       try {
-        geminiClientRef.current = new GeminiClient();
+        geminiClientRef.current = new GeminiClient(globalConfig);
       } catch (error: any) {
         setInitError(
           `Failed to initialize client: ${error.message || 'Unknown error'}`,

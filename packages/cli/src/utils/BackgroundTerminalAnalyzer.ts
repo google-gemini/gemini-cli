@@ -3,6 +3,7 @@ import { SchemaUnion, Type } from '@google/genai'; // Assuming these types exist
 import { GeminiClient } from '../core/gemini-client.js'; // Assuming this path
 import { exec } from 'child_process'; // Needed for Windows process check
 import { promisify } from 'util'; // To promisify exec
+import { globalConfig } from '../config/config.js';
 
 // Promisify child_process.exec for easier async/await usage
 const execAsync = promisify(exec);
@@ -60,7 +61,7 @@ export class BackgroundTerminalAnalyzer {
       initialDelayMs?: number;
     } = {}, // Provide default options
   ) {
-    this.ai = aiClient || new GeminiClient(); // Call constructor without model
+    this.ai = aiClient || new GeminiClient(globalConfig); // Call constructor without model
     this.pollIntervalMs = options.pollIntervalMs ?? 5000; // Default 5 seconds
     this.maxAttempts = options.maxAttempts ?? 6; // Default 6 attempts (approx 30s total)
     this.initialDelayMs = options.initialDelayMs ?? 500; // Default 0.5s initial delay

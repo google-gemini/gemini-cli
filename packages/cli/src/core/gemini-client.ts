@@ -8,8 +8,6 @@ import {
   PartListUnion,
   Content,
 } from '@google/genai';
-import { getApiKey } from '../config/env.js';
-import { getModel } from '../config/globalConfig.js';
 import { CoreSystemPrompt } from './prompts.js';
 import {
   type ToolCallEvent,
@@ -21,6 +19,8 @@ import { toolRegistry } from '../tools/tool-registry.js';
 import { ToolResult } from '../tools/tools.js';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { GeminiEventType, GeminiStream } from './gemini-stream.js';
+import { Config } from '../config/config.js';
+
 
 type ToolExecutionOutcome = {
   callId: string;
@@ -32,6 +32,7 @@ type ToolExecutionOutcome = {
 };
 
 export class GeminiClient {
+  private config: Config;
   private ai: GoogleGenAI;
   private defaultHyperParameters: GenerateContentConfig = {
     temperature: 0,
@@ -39,14 +40,14 @@ export class GeminiClient {
   };
   private readonly MAX_TURNS = 100;
 
-  constructor() {
-    const apiKey = getApiKey();
-    this.ai = new GoogleGenAI({ apiKey });
+  constructor(config: Config) {
+    this.config = config;
+    this.ai = new GoogleGenAI({ apiKey: config.getApiKey() });
   }
 
   async startChat(): Promise<Chat> {
     const tools = toolRegistry.getToolSchemas();
-    const model = getModel();
+    const model = this.config.getModel();
 
     // --- Get environmental information ---
     const cwd = process.cwd();
@@ -446,7 +447,7 @@ Respond *only* in JSON format according to the following schema. Do not include 
     contents: Content[],
     schema: SchemaUnion,
   ): Promise<Record<string, unknown>> {
-    const model = getModel();
+    const model = this.config.getModel();
     try {
       const result = await this.ai.models.generateContent({
         model,

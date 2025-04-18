@@ -1,12 +1,4 @@
-import process from 'node:process';
 import path from 'node:path'; // Import the 'path' module
-
-/**
- * Returns the target directory, using the provided argument or the current working directory.
- */
-export function getTargetDirectory(targetDirArg: string | undefined): string {
-  return targetDirArg || process.cwd();
-}
 
 /**
  * Shortens a path string if it exceeds maxLen, prioritizing the start and end segments.
