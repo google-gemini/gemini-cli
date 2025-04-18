@@ -3,6 +3,7 @@ import { render } from 'ink';
 import App from './ui/App.js';
 import { parseArguments } from './config/args.js';
 import { loadEnvironment } from './config/env.js';
+import { initializeConfig } from './config/globalConfig.js';
 import { getTargetDirectory } from './utils/paths.js';
 import { toolRegistry } from './tools/tool-registry.js';
 import { LSTool } from './tools/ls.tool.js';
@@ -16,14 +17,19 @@ import { WriteFileTool } from './tools/write-file.tool.js';
 async function main() {
   // 1. Configuration
   loadEnvironment();
-  const argv = await parseArguments(); // Ensure args.ts imports printWarning from ui/display
+  const argv = await parseArguments();
+  initializeConfig({ model: argv.model as string });
   const targetDir = getTargetDirectory(argv.target_dir);
 
   // 2. Configure tools
   registerTools(targetDir);
 
   // 3. Render UI
-  render(React.createElement(App, { directory: targetDir }));
+  render(
+    React.createElement(App, {
+      directory: targetDir,
+    }),
+  );
 }
 
 // --- Global Unhandled Rejection Handler ---

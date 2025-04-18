@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
+import { getModel } from '../../config/globalConfig.js';
 
 interface InputPromptProps {
   query: string;
@@ -14,6 +15,8 @@ const InputPrompt: React.FC<InputPromptProps> = ({
   setQuery,
   onSubmit,
 }) => {
+  const model = getModel();
+
   return (
     <Box marginTop={1} borderStyle="round" borderColor={'white'} paddingX={1}>
       <Text color={'white'}>&gt; </Text>
@@ -24,7 +27,7 @@ const InputPrompt: React.FC<InputPromptProps> = ({
           onSubmit={onSubmit}
           showCursor={true}
           focus={true}
-          placeholder={'Ask Gemini... (try "/init" or "/help")'}
+          placeholder={`Ask Gemini (${model})... (try "/init" or "/help")`}
         />
       </Box>
     </Box>

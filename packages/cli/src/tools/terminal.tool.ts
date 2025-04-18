@@ -142,7 +142,10 @@ export class TerminalTool extends BaseTool<
   private rejectShellReady: ((reason?: any) => void) | undefined; // Definite assignment assertion
   private readonly backgroundTerminalAnalyzer: BackgroundTerminalAnalyzer;
 
-  constructor(rootDirectory: string, outputLimit: number = MAX_OUTPUT_LENGTH) {
+  constructor(
+    rootDirectory: string,
+    outputLimit: number = MAX_OUTPUT_LENGTH,
+  ) {
     const toolDisplayName = 'Terminal';
     // --- LLM-Facing Description ---
     // Updated description for background tasks to mention polling and LLM analysis

@@ -9,6 +9,7 @@ import {
   Content,
 } from '@google/genai';
 import { getApiKey } from '../config/env.js';
+import { getModel } from '../config/globalConfig.js';
 import { CoreSystemPrompt } from './prompts.js';
 import {
   type ToolCallEvent,
@@ -45,6 +46,7 @@ export class GeminiClient {
 
   public async startChat(): Promise<Chat> {
     const tools = toolRegistry.getToolSchemas();
+    const model = getModel();
 
     // --- Get environmental information ---
     const cwd = process.cwd();
@@ -73,7 +75,7 @@ ${folderStructure}
 
     try {
       const chat = this.ai.chats.create({
-        model: 'gemini-2.0-flash', //'gemini-2.0-flash',
+        model: model,
         config: {
           systemInstruction: CoreSystemPrompt,
           ...this.defaultHyperParameters,
@@ -446,9 +448,10 @@ Respond *only* in JSON format according to the following schema. Do not include 
     contents: Content[],
     schema: SchemaUnion,
   ): Promise<any> {
+    const model = getModel();
     try {
       const result = await this.ai.models.generateContent({
-        model: 'gemini-2.0-flash', // Using flash for potentially faster structured output
+        model: model,
         config: {
           ...this.defaultHyperParameters,
           systemInstruction: CoreSystemPrompt,
