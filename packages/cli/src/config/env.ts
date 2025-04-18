@@ -24,17 +24,15 @@ export function loadEnvironment(): void {
   // Start searching from the current working directory by default
   const envFilePath = findEnvFile(process.cwd());
 
-  if (!envFilePath) {
-    return;
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath });
   }
 
-  dotenv.config({ path: envFilePath });
-
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY?.length) {
     console.error(
-      'Error: GEMINI_API_KEY environment variable is not set in the loaded .env file.',
+      'Error: GEMINI_API_KEY environment variable is not set. Please visit https://ai.google.dev/gemini-api/docs/api-key to set up a new one.',
     );
-    process.exit(1);
+    process.exit(0);
   }
 }
 
@@ -43,7 +41,7 @@ export function getApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'GEMINI_API_KEY is missing. Ensure loadEnvironment() was called successfully.',
+      'GEMINI_API_KEY environment variable is not set. Please visit https://ai.google.dev/gemini-api/docs/api-key to set up a new one.',
     );
   }
   return apiKey;
