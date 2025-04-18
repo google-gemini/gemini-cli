@@ -47,4 +47,4 @@ export function getConfig(): GlobalConfig {
  */
 export function getModel(): string {
   return getConfig().model;
-}
+} 

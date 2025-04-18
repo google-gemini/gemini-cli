@@ -15,17 +15,13 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
-    "@testing-library/react": "^14.3.1",
-    "@vitejs/plugin-react": "^4.4.0",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
-    "ink-testing-library": "^4.0.0",
     "prettier": "^3.5.3",
-    "typescript-eslint": "^8.30.1",
-    "vitest": "^3.1.1"
+    "typescript-eslint": "^8.30.1"
   }
 }
