@@ -6,6 +6,7 @@
   "main": "src/gemini.js",
   "scripts": {
     "build": "tsc && cp package.json README.md ../../LICENSE dist/ && touch dist/.last_build",
+    "clean": "rm -rf dist",
     "start": "node dist/gemini.js",
     "debug": "node --inspect-brk dist/gemini.js",
     "lint": "eslint . --ext .ts,.tsx",
