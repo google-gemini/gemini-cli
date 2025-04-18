@@ -2,7 +2,6 @@ import {
   spawn,
   SpawnOptions,
   ChildProcessWithoutNullStreams,
-  exec,
 } from 'child_process'; // Added 'exec'
 import path from 'path';
 import os from 'os';
@@ -16,6 +15,7 @@ import {
   ToolExecuteConfirmationDetails,
 } from '../ui/types.js'; // Adjust path as needed
 import { BackgroundTerminalAnalyzer } from '../utils/BackgroundTerminalAnalyzer.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 
 // --- Interfaces ---
 export interface TerminalToolParams {
@@ -25,19 +25,11 @@ export interface TerminalToolParams {
   runInBackground?: boolean;
 }
 
-export interface TerminalToolResult extends ToolResult {
-  // Add specific fields if needed for structured output from polling/LLM
-  // finalStdout?: string;
-  // finalStderr?: string;
-  // llmAnalysis?: string;
-}
-
 // --- Constants ---
 const MAX_OUTPUT_LENGTH = 10000; // Default max output length
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (for foreground commands)
 const MAX_TIMEOUT_OVERRIDE_MS = 10 * 60 * 1000; // 10 minutes (max override for foreground)
 const BACKGROUND_LAUNCH_TIMEOUT_MS = 15 * 1000; // 15 seconds timeout for *launching* background tasks
-const BACKGROUND_POLL_INTERVAL_MS = 5000; // 5 seconds interval for checking background process status
 const BACKGROUND_POLL_TIMEOUT_MS = 30000; // 30 seconds total polling time for background process status
 
 const BANNED_COMMAND_ROOTS = [
@@ -115,7 +107,7 @@ const BANNED_COMMAND_ROOTS = [
 // --- Helper Type for Command Queue ---
 interface QueuedCommand {
   params: TerminalToolParams;
-  resolve: (result: TerminalToolResult) => void;
+  resolve: (result: ToolResult) => void;
   reject: (error: Error) => void;
   confirmationDetails: ToolExecuteConfirmationDetails | false; // Kept for potential future use
 }
@@ -125,7 +117,7 @@ interface QueuedCommand {
  */
 export class TerminalTool extends BaseTool<
   TerminalToolParams,
-  TerminalToolResult
+  ToolResult
 > {
   static Name: string = 'execute_bash_command';
 
@@ -139,7 +131,7 @@ export class TerminalTool extends BaseTool<
   private shouldAlwaysExecuteCommands: Map<string, boolean> = new Map(); // Track confirmation per root command
   private shellReady: Promise<void>;
   private resolveShellReady: (() => void) | undefined; // Definite assignment assertion
-  private rejectShellReady: ((reason?: any) => void) | undefined; // Definite assignment assertion
+  private rejectShellReady: ((reason?: unknown) => void) | undefined; // Definite assignment assertion
   private readonly backgroundTerminalAnalyzer: BackgroundTerminalAnalyzer;
 
   constructor(
@@ -238,7 +230,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     if (this.bashProcess) {
       try {
         this.bashProcess.kill();
-      } catch (e) {
+      } catch {
         /* Ignore */
       }
     }
@@ -306,12 +298,12 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           );
         }
       }, 1000); // Increase readiness check timeout slightly
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to spawn persistent bash:', error);
       this.rejectShellReady?.(error); // Use optional chaining
       this.bashProcess = null;
       this.clearQueue(
-        new Error(`Failed to spawn persistent bash: ${error.message}`),
+        new Error(`Failed to spawn persistent bash: ${getErrorMessage(error)}`),
       );
     }
   }
@@ -331,7 +323,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     if (!commandOriginal) {
       return 'Command cannot be empty.';
     }
-    const commandLower = commandOriginal.toLowerCase();
     const commandParts = commandOriginal.split(/[\s;&&|]+/);
 
     for (const part of commandParts) {
@@ -340,7 +331,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       const cleanPart =
         part
           .replace(/^[^a-zA-Z0-9]+/, '')
-          .split(/[\/\\]/)
+          .split(/[/\\]/)
           .pop() || part.replace(/^[^a-zA-Z0-9]+/, '');
       if (cleanPart && BANNED_COMMAND_ROOTS.includes(cleanPart.toLowerCase())) {
         return `Command contains a banned keyword: '${cleanPart}'. Banned list includes network tools, session control, etc.`;
@@ -353,12 +344,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     ) {
       return 'Timeout must be a positive number of milliseconds.';
     }
-
-    // Relax the absolute path restriction slightly if needed, but generally good practice
-    // const firstCommandPart = commandParts[0];
-    // if (firstCommandPart && (firstCommandPart.startsWith('/') || firstCommandPart.startsWith('\\'))) {
-    //     return 'Executing commands via absolute paths (starting with \'/\' or \'\\\') is restricted. Use commands available in PATH or relative paths.';
-    // }
 
     return null; // Parameters are valid
   }
@@ -375,7 +360,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       params.command
         .trim()
         .split(/[\s;&&|]+/)[0]
-        ?.split(/[\/\\]/)
+        ?.split(/[/\\]/)
         .pop() || 'unknown';
 
     if (this.shouldAlwaysExecuteCommands.get(rootCommand)) {
@@ -399,7 +384,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
   }
 
   // --- Command Execution and Queueing (unchanged structure) ---
-  async execute(params: TerminalToolParams): Promise<TerminalToolResult> {
+  async execute(params: TerminalToolParams): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -447,9 +432,14 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       // **** Core execution logic call ****
       const result = await this.executeCommandInShell(params);
       resolve(result); // Resolve the specific command's promise
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Error executing command "${params.command}":`, error);
-      reject(error); // Use the specific command's reject handler
+
+      if (error instanceof Error) {
+        reject(error);
+      } else {
+        reject(new Error('Unknown error occurred: ' + JSON.stringify(error)));
+      }
     } finally {
       this.isExecuting = false;
       // Use setImmediate to avoid potential deep recursion
@@ -460,16 +450,16 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
   // --- **** MODIFIED: Core Command Execution Logic **** ---
   private executeCommandInShell(
     params: TerminalToolParams,
-  ): Promise<TerminalToolResult> {
+  ): Promise<ToolResult> {
     // Define temp file paths here to be accessible throughout
     let tempStdoutPath: string | null = null;
     let tempStderrPath: string | null = null;
     let originalResolve: (
-      value: TerminalToolResult | PromiseLike<TerminalToolResult>,
+      value: ToolResult | PromiseLike<ToolResult>,
     ) => void; // To pass to polling
-    let originalReject: (reason?: any) => void;
+    let originalReject: (reason?: unknown) => void;
 
-    const promise = new Promise<TerminalToolResult>((resolve, reject) => {
+    const promise = new Promise<ToolResult>((resolve, reject) => {
       originalResolve = resolve; // Assign outer scope resolve
       originalReject = reject; // Assign outer scope reject
 
@@ -492,11 +482,11 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           const tempDir = os.tmpdir();
           tempStdoutPath = path.join(tempDir, `term_out_${commandUUID}.log`);
           tempStderrPath = path.join(tempDir, `term_err_${commandUUID}.log`);
-        } catch (err: any) {
+        } catch (err: unknown) {
           // If temp dir setup fails, reject immediately
           return reject(
             new Error(
-              `Failed to determine temporary directory: ${err.message}`,
+              `Failed to determine temporary directory: ${getErrorMessage(err)}`,
             ),
           );
         }
@@ -530,7 +520,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         if (!isBackgroundTask && this.bashProcess && !this.bashProcess.killed) {
           try {
             this.bashProcess.stdin.write('\x03'); // Ctrl+C for foreground timeout
-          } catch (e: any) {
+          } catch (e: unknown) {
             console.error('Error writing SIGINT on timeout:', e);
           }
         }
@@ -664,8 +654,8 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       // --- Cleanup Logic ---
       // Pass listeners to allow cleanup even if they are nullified later
       const cleanupListeners = (listeners?: {
-        onStdoutData: any;
-        onStderrData: any;
+        onStdoutData: ((data: Buffer) => void) | null;
+        onStderrData: ((data: Buffer) => void) | null;
       }) => {
         if (launchTimeoutId) clearTimeout(launchTimeoutId);
         launchTimeoutId = null;
@@ -750,10 +740,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
               if (this.currentCwd !== latestCwd) {
                 this.currentCwd = latestCwd;
               }
-            } catch (e: any) {
+            } catch (e: unknown) {
               if (exitCode === 0) {
                 // Only warn if the command itself succeeded
-                cwdUpdateError = `\nWarning: Failed to verify/update current working directory after command: ${e.message}`;
+                cwdUpdateError = `\nWarning: Failed to verify/update current working directory after command: ${getErrorMessage(e)}`;
                 console.error(
                   'Failed to update CWD after successful command:',
                   e,
@@ -916,7 +906,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             'Shell stdin is not writable or process closed when attempting to write command.',
           );
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(
           `Error writing command "${params.command}" to bash stdin (sync):`,
           e,
@@ -931,7 +921,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         }
         originalReject(
           new Error(
-            `Shell stdin write exception: ${e.message}. Command likely did not execute.`,
+            `Shell stdin write exception: ${getErrorMessage(e)}. Command likely did not execute.`,
           ),
         );
       }
@@ -950,7 +940,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     tempStdoutPath: string, // Path to redirected stdout
     tempStderrPath: string, // Path to redirected stderr
     resolve: (
-      value: TerminalToolResult | PromiseLike<TerminalToolResult>,
+      value: ToolResult | PromiseLike<ToolResult>,
     ) => void, // The original promise's resolve
   ): Promise<void> {
     // This function manages its own lifecycle but resolves the outer promise
@@ -969,21 +959,21 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       );
       if (status === 'Unknown') llmAnalysis = `LLM analysis failed: ${summary}`;
       else llmAnalysis = summary;
-    } catch (llmError: any) {
+    } catch (llmerror: unknown) {
       console.error(
         `LLM analysis failed for PID ${pid} command "${command}":`,
-        llmError,
+        llmerror,
       );
-      llmAnalysis = `LLM analysis failed: ${llmError.message}`; // Include error in analysis placeholder
+      llmAnalysis = `LLM analysis failed: ${getErrorMessage(llmerror)}`; // Include error in analysis placeholder
     }
     // --- End LLM Call ---
 
     try {
       finalStdout = await fs.readFile(tempStdoutPath, 'utf-8');
       finalStderr = await fs.readFile(tempStderrPath, 'utf-8');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Error reading temp output files for PID ${pid}:`, err);
-      fileReadError = `\nWarning: Failed to read temporary output files (${err.message}). Final output may be incomplete.`;
+      fileReadError = `\nWarning: Failed to read temporary output files (${getErrorMessage(err)}). Final output may be incomplete.`;
     }
 
     // --- Clean up temp files ---
@@ -1009,13 +999,12 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       if (!filePath) return;
       try {
         await fs.unlink(filePath);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Ignore errors like file not found (it might have been deleted already or failed to create)
-        if (err.code !== 'ENOENT') {
+        if (!isNodeError(err) || err.code !== 'ENOENT') {
           console.warn(
-            `Failed to delete temporary file '${filePath}': ${err.message}`,
+            `Failed to delete temporary file '${filePath}': ${getErrorMessage(err)}`,
           );
-        } else {
         }
       }
     };
@@ -1122,10 +1111,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         } else {
           throw new Error('Shell stdin not writable for pwd command.');
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Exception writing pwd command:', e);
         cleanupPwdListeners(
-          new Error(`Exception writing pwd command: ${e.message}`),
+          new Error(`Exception writing pwd command: ${getErrorMessage(e)}`),
         );
       }
     });
@@ -1145,7 +1134,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
 
   // --- Clear Queue (unchanged) ---
   private clearQueue(error: Error) {
-    const queuedCount = this.commandQueue.length;
     const queue = this.commandQueue;
     this.commandQueue = [];
     queue.forEach(({ resolve, params }) =>
@@ -1196,13 +1184,12 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             proc.kill('SIGKILL'); // Force kill if needed
           }
         }, 500); // 500ms grace period
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Catch errors if process already exited etc.
         console.warn(
-          `Error trying to kill bash process PID: ${pid}: ${e.message}`,
+          `Error trying to kill bash process PID: ${pid}: ${getErrorMessage(e)}`,
         );
       }
-    } else {
     }
 
     // Note: We cannot reliably clean up temp files for background tasks

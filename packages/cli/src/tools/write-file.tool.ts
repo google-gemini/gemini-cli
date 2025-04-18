@@ -26,16 +26,11 @@ export interface WriteFileToolParams {
 }
 
 /**
- * Standardized result from the WriteFile tool
- */
-export interface WriteFileToolResult extends ToolResult {}
-
-/**
  * Implementation of the WriteFile tool that writes files to the filesystem
  */
 export class WriteFileTool extends BaseTool<
   WriteFileToolParams,
-  WriteFileToolResult
+  ToolResult
 > {
   static readonly Name: string = 'write_file';
   private shouldAlwaysWrite = false;
@@ -143,7 +138,7 @@ export class WriteFileTool extends BaseTool<
     let currentContent = '';
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
-    } catch (error) {
+    } catch {
       // File may not exist, which is fine
     }
 
@@ -184,7 +179,7 @@ export class WriteFileTool extends BaseTool<
    * @param params Parameters for the file writing
    * @returns Result of the file writing operation
    */
-  async execute(params: WriteFileToolParams): Promise<WriteFileToolResult> {
+  async execute(params: WriteFileToolParams): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {

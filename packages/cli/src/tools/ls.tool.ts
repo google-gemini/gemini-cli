@@ -50,29 +50,9 @@ export interface FileEntry {
 }
 
 /**
- * Result from the LS tool
- */
-export interface LSToolResult extends ToolResult {
-  /**
-   * List of file entries
-   */
-  entries: FileEntry[];
-
-  /**
-   * The directory that was listed
-   */
-  listedPath: string;
-
-  /**
-   * Total number of entries found
-   */
-  totalEntries: number;
-}
-
-/**
  * Implementation of the LS tool that lists directory contents
  */
-export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
+export class LSTool extends BaseTool<LSToolParams, ToolResult> {
   /**
    * The root directory that this tool is grounded in.
    * All path operations will be restricted to this directory.
@@ -184,12 +164,9 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     return shortenPath(relativePath);
   }
 
-  private errorResult(params: LSToolParams, llmContent: string, returnDisplay: string): LSToolResult {
+  private errorResult(llmContent: string, returnDisplay: string): ToolResult {
     return {
-      entries: [],
-      listedPath: params.path,
-      totalEntries: 0,
-      llmContent: llmContent,
+      llmContent,
       returnDisplay: `**Error:** ${returnDisplay}`,
     };
   }
@@ -199,11 +176,10 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
    * @param params Parameters for the LS operation
    * @returns Result of the LS operation
    */
-  async execute(params: LSToolParams): Promise<LSToolResult> {
+  async execute(params: LSToolParams): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return this.errorResult(
-        params,
         `Error: Invalid parameters provided. Reason: ${validationError}`,
         `Failed to execute tool.`);
     }
@@ -212,13 +188,11 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
       const stats = fs.statSync(params.path);
       if (!stats) {
         return this.errorResult(
-          params,
           `Directory does not exist: ${params.path}`,
           `Directory does not exist.`);
       }
       if (!stats.isDirectory()) {
         return this.errorResult(
-          params,
           `Path is not a directory: ${params.path}`,
           `Path is not a directory.`);
       }
@@ -227,7 +201,6 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
       const entries: FileEntry[] = [];
       if (files.length === 0) {
         return this.errorResult(
-          params,
           `Directory is empty: ${params.path}`,
           `Directory is empty.`);
       }
@@ -270,15 +243,11 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
         .join('\n');
 
       return {
-        entries,
-        listedPath: params.path,
-        totalEntries: entries.length,
         llmContent: `Directory listing for ${params.path}:\n${directoryContent}`,
         returnDisplay: `Found ${entries.length} item(s).`,
       };
     } catch (error) {
       return this.errorResult(
-        params,
         `Error listing directory: ${error instanceof Error ? error.message : String(error)}`,
         'Failed to list directory.');
     }
