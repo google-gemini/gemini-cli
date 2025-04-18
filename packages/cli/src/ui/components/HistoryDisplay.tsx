@@ -17,26 +17,23 @@ interface HistoryDisplayProps {
 const HistoryDisplay: React.FC<HistoryDisplayProps> = ({
   history,
   onSubmit,
-}) => 
+}) => (
   // No grouping logic needed here anymore
-   (
-    <Box flexDirection="column">
-      {history.map((item) => (
-        <Box key={item.id} marginBottom={1}>
-          {/* Render standard message types */}
-          {item.type === 'user' && <UserMessage text={item.text} />}
-          {item.type === 'gemini' && <GeminiMessage text={item.text} />}
-          {item.type === 'info' && <InfoMessage text={item.text} />}
-          {item.type === 'error' && <ErrorMessage text={item.text} />}
+  <Box flexDirection="column">
+    {history.map((item) => (
+      <Box key={item.id} marginBottom={1}>
+        {/* Render standard message types */}
+        {item.type === 'user' && <UserMessage text={item.text} />}
+        {item.type === 'gemini' && <GeminiMessage text={item.text} />}
+        {item.type === 'info' && <InfoMessage text={item.text} />}
+        {item.type === 'error' && <ErrorMessage text={item.text} />}
 
-          {/* Render the tool group component */}
-          {item.type === 'tool_group' && (
-            <ToolGroupMessage toolCalls={item.tools} onSubmit={onSubmit} />
-          )}
-        </Box>
-      ))}
-    </Box>
-  )
-;
-
+        {/* Render the tool group component */}
+        {item.type === 'tool_group' && (
+          <ToolGroupMessage toolCalls={item.tools} onSubmit={onSubmit} />
+        )}
+      </Box>
+    ))}
+  </Box>
+);
 export default HistoryDisplay;

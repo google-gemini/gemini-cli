@@ -1,4 +1,4 @@
-import { ToolCallEvent , HistoryItem } from '../ui/types.js';
+import { ToolCallEvent, HistoryItem } from '../ui/types.js';
 import { Part } from '@google/genai';
 import {
   handleToolCallChunk,
@@ -161,7 +161,11 @@ export const processGeminiStream = async ({
       renderTimeoutId = null;
     }
     // Delegate history update for error message
-    addErrorMessageToHistory(error as (Error | DOMException), setHistory, getNextMessageId);
+    addErrorMessageToHistory(
+      error as Error | DOMException,
+      setHistory,
+      getNextMessageId,
+    );
   } finally {
     isStreamComplete = true; // Signal stream end for render loop completion
     if (renderTimeoutId) {

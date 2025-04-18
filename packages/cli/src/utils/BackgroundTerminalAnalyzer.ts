@@ -14,7 +14,7 @@ export interface AiClient {
   generateJson(
     prompt: Content[], // Keep flexible or define a stricter prompt structure type
     schema: SchemaUnion,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any>; // Ideally, specify the expected JSON structure TAnalysisResult | TAnalysisFailure
 }
 
@@ -127,10 +127,14 @@ export class BackgroundTerminalAnalyzer {
           // Reread files one last time in case output was written just before exit
           try {
             currentStdout = await fs.readFile(tempStdoutFilePath, 'utf-8');
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
           try {
             currentStderr = await fs.readFile(tempStderrFilePath, 'utf-8');
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
 
           lastAnalysisResult = await this.analyzeOutputWithLLM(
             currentStdout,

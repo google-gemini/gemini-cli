@@ -4,9 +4,9 @@ name: Gemini Code CI
 
 on:
   push:
-    branches: [ main ] # Run on pushes to the main branch
+    branches: [main] # Run on pushes to the main branch
   pull_request:
-    branches: [ main ] # Run on pull requests targeting the main branch
+    branches: [main] # Run on pull requests targeting the main branch
 
 jobs:
   build_and_test:
@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         # Specify the Node.js versions you want to test against
-        node-version: [ 20.x ] # You can add more like [18.x, 20.x]
+        node-version: [20.x] # You can add more like [18.x, 20.x]
 
     steps:
       # 1. Checkout Code

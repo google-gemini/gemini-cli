@@ -58,4 +58,4 @@ export function useInitializationErrorEffect(
       ]);
     }
   }, [initError, history, setHistory]); // Include setHistory in dependency array
-} 
+}

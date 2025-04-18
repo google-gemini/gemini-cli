@@ -1,13 +1,12 @@
 {
-    "extends": "../../tsconfig.json",
-    "compilerOptions": {
-        "outDir": "dist",
-        "rootDir": ".",
-        "lib": ["DOM", "DOM.Iterable", "ES2020"],
-        "module": "Node16",
-        "target": "ES2022",
-        "composite": true,
-    },
-    "exclude": ["node_modules", "dist"],
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "module": "Node16",
+    "target": "ES2022",
+    "composite": true
+  },
+  "exclude": ["node_modules", "dist"]
 }
-  

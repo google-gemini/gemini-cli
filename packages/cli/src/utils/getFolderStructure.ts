@@ -137,7 +137,10 @@ async function readFullStructure(
       folderInfo.subFolders.length +
       folderInfo.subFolders.reduce((sum, sf) => sum + sf.totalChildren, 0);
   } catch (error: unknown) {
-    if (isNodeError(error) && (error.code === 'EACCES' || error.code === 'ENOENT')) {
+    if (
+      isNodeError(error) &&
+      (error.code === 'EACCES' || error.code === 'ENOENT')
+    ) {
       console.warn(
         `Warning: Could not read directory ${folderPath}: ${error.message}`,
       );
@@ -345,10 +348,7 @@ export async function getFolderStructure(
     }
 
     // 2. Reduce the structure (handles ignored folders specifically)
-    const reducedRoot = reduceStructure(
-      fullInfo,
-      mergedOptions.maxItems,
-    );
+    const reducedRoot = reduceStructure(fullInfo, mergedOptions.maxItems);
 
     // 3. Count items in the *reduced* structure for the summary
     const rootNodeItselfCount = 0; // Don't count the root node in the items summary

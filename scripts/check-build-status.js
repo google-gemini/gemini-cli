@@ -6,7 +6,10 @@ import os from 'os'; // Import os module
 const cliPackageDir = path.resolve('packages', 'cli'); // Base directory for the CLI package
 const buildTimestampPath = path.join(cliPackageDir, 'dist', '.last_build'); // Path to the timestamp file within the CLI package
 const sourceDirs = [path.join(cliPackageDir, 'src')]; // Source directory within the CLI package
-const filesToWatch = [path.join(cliPackageDir, 'package.json'), path.join(cliPackageDir, 'tsconfig.json')]; // Specific files within the CLI package
+const filesToWatch = [
+  path.join(cliPackageDir, 'package.json'),
+  path.join(cliPackageDir, 'tsconfig.json'),
+]; // Specific files within the CLI package
 const buildDir = path.join(cliPackageDir, 'dist'); // Build output directory within the CLI package
 const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt'); // Temp file for warnings
 // ---------------------
@@ -28,7 +31,11 @@ function findSourceFiles(dir, allFiles = []) {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     // Simple check to avoid recursing into node_modules or build dir itself
-    if (entry.isDirectory() && entry.name !== 'node_modules' && fullPath !== buildDir) {
+    if (
+      entry.isDirectory() &&
+      entry.name !== 'node_modules' &&
+      fullPath !== buildDir
+    ) {
       findSourceFiles(fullPath, allFiles);
     } else if (entry.isFile()) {
       allFiles.push(fullPath);
@@ -45,7 +52,9 @@ try {
     fs.unlinkSync(warningsFilePath);
   }
 } catch (err) {
-  console.warn(`[Check Script] Warning: Could not delete previous warnings file: ${err.message}`);
+  console.warn(
+    `[Check Script] Warning: Could not delete previous warnings file: ${err.message}`,
+  );
 }
 
 const buildMtime = getMtime(buildTimestampPath);
@@ -56,7 +65,9 @@ if (!buildMtime) {
   try {
     fs.writeFileSync(warningsFilePath, errorMessage);
   } catch (writeErr) {
-     console.error(`[Check Script] Error writing missing build warning file: ${writeErr.message}`);
+    console.error(
+      `[Check Script] Error writing missing build warning file: ${writeErr.message}`,
+    );
   }
   process.exit(0); // Allow app to start and show the error
 }
@@ -67,24 +78,23 @@ const allSourceFiles = [];
 
 // Collect files from specified directories
 sourceDirs.forEach((dir) => {
-    const dirPath = path.resolve(dir);
-    if (fs.existsSync(dirPath)) {
-        findSourceFiles(dirPath, allSourceFiles);
-    } else {
-        console.warn(`Warning: Source directory "${dir}" not found.`);
-    }
+  const dirPath = path.resolve(dir);
+  if (fs.existsSync(dirPath)) {
+    findSourceFiles(dirPath, allSourceFiles);
+  } else {
+    console.warn(`Warning: Source directory "${dir}" not found.`);
+  }
 });
 
 // Add specific files
 filesToWatch.forEach((file) => {
-    const filePath = path.resolve(file);
-     if (fs.existsSync(filePath)) {
-        allSourceFiles.push(filePath);
-    } else {
-         console.warn(`Warning: Watched file "${file}" not found.`);
-    }
+  const filePath = path.resolve(file);
+  if (fs.existsSync(filePath)) {
+    allSourceFiles.push(filePath);
+  } else {
+    console.warn(`Warning: Watched file "${file}" not found.`);
+  }
 });
-
 
 // Check modification times
 for (const file of allSourceFiles) {
@@ -102,7 +112,8 @@ for (const file of allSourceFiles) {
 }
 
 if (newerSourceFileFound) {
-  const finalWarning = '\nRun "npm run build" to incorporate changes before starting.';
+  const finalWarning =
+    '\nRun "npm run build" to incorporate changes before starting.';
   warningMessages.push(finalWarning);
   console.warn(finalWarning);
 
@@ -118,12 +129,14 @@ if (newerSourceFileFound) {
   console.log('Build is up-to-date.');
   // Ensure no stale warning file exists if build is ok
   try {
-      if (fs.existsSync(warningsFilePath)) {
-          fs.unlinkSync(warningsFilePath);
-      }
+    if (fs.existsSync(warningsFilePath)) {
+      fs.unlinkSync(warningsFilePath);
+    }
   } catch (err) {
-       console.warn(`[Check Script] Warning: Could not delete previous warnings file: ${err.message}`);
+    console.warn(
+      `[Check Script] Warning: Could not delete previous warnings file: ${err.message}`,
+    );
   }
 }
 
-process.exit(0); // Always exit successfully so the app starts 
+process.exit(0); // Always exit successfully so the app starts

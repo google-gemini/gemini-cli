@@ -116,8 +116,12 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   validateToolParams(params: LSToolParams): string | null {
-    if (this.schema.parameters &&
-      !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
     ) {
       return 'Parameters failed schema validation.';
     }
@@ -181,7 +185,8 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
     if (validationError) {
       return this.errorResult(
         `Error: Invalid parameters provided. Reason: ${validationError}`,
-        `Failed to execute tool.`);
+        `Failed to execute tool.`,
+      );
     }
 
     try {
@@ -189,12 +194,14 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
       if (!stats) {
         return this.errorResult(
           `Directory does not exist: ${params.path}`,
-          `Directory does not exist.`);
+          `Directory does not exist.`,
+        );
       }
       if (!stats.isDirectory()) {
         return this.errorResult(
           `Path is not a directory: ${params.path}`,
-          `Path is not a directory.`);
+          `Path is not a directory.`,
+        );
       }
 
       const files = fs.readdirSync(params.path);
@@ -202,7 +209,8 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
       if (files.length === 0) {
         return this.errorResult(
           `Directory is empty: ${params.path}`,
-          `Directory is empty.`);
+          `Directory is empty.`,
+        );
       }
 
       for (const file of files) {
@@ -249,7 +257,8 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
     } catch (error) {
       return this.errorResult(
         `Error listing directory: ${error instanceof Error ? error.message : String(error)}`,
-        'Failed to list directory.');
+        'Failed to list directory.',
+      );
     }
   }
 }

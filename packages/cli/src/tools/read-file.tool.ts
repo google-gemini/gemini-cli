@@ -27,10 +27,7 @@ export interface ReadFileToolParams {
 /**
  * Implementation of the ReadFile tool that reads files from the filesystem
  */
-export class ReadFileTool extends BaseTool<
-  ReadFileToolParams,
-  ToolResult
-> {
+export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
 
   // Maximum number of lines to read by default

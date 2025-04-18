@@ -21,7 +21,6 @@ import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { GeminiEventType, GeminiStream } from './gemini-stream.js';
 import { Config } from '../config/config.js';
 
-
 type ToolExecutionOutcome = {
   callId: string;
   name: string;

@@ -12,6 +12,6 @@
     "target": "ES2020",
     "module": "Node16",
     "declaration": true,
-    "moduleResolution": "node16",
+    "moduleResolution": "node16"
   }
 }

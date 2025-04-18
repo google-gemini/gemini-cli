@@ -90,9 +90,7 @@ export class WebFetchTool extends BaseTool<
   getDescription(params: WebFetchToolParams): string {
     // Shorten long URLs for display
     const displayUrl =
-      params.url.length > 80
-        ? params.url.substring(0, 77) + '...'
-        : params.url;
+      params.url.length > 80 ? params.url.substring(0, 77) + '...' : params.url;
     return `Fetching content from ${displayUrl}`;
   }
 
@@ -130,7 +128,7 @@ export class WebFetchTool extends BaseTool<
         headers: {
           'User-Agent': 'GeminiCode-CLI/1.0',
         },
-        signal: AbortSignal.timeout(15000) // 15 seconds timeout
+        signal: AbortSignal.timeout(15000), // 15 seconds timeout
       });
 
       if (!response.ok) {

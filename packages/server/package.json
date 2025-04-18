@@ -1,24 +1,23 @@
 {
-    "name": "@gemini-code/server",
-    "version": "1.0.0",
-    "description": "Gemini Code Server",
-    "type": "module",
-    "main": "src/index.js",
-    "scripts": {
-      "build": "tsc && cp package.json dist/",
-      "clean": "rm -rf dist",
-      "lint": "eslint . --ext .ts,.tsx",
-      "format": "prettier --write ."
-    },
-    "files": [
-      "dist"
-    ],
-    "dependencies": {},
-    "devDependencies": {
-      "typescript": "^5.3.3"
-    },
-    "engines": {
-      "node": ">=18"
-    }
+  "name": "@gemini-code/server",
+  "version": "1.0.0",
+  "description": "Gemini Code Server",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "tsc && cp package.json dist/",
+    "clean": "rm -rf dist",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write ."
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
-  
+}

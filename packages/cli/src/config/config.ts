@@ -35,7 +35,7 @@ export function loadConfig(): Config {
   loadEnvironment();
   const argv = parseArguments();
   return new Config(
-    process.env.GEMINI_API_KEY || "",
+    process.env.GEMINI_API_KEY || '',
     argv.model || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
   );
@@ -66,14 +66,12 @@ function parseArguments(): CliArgs {
     })
     .help()
     .alias('h', 'help')
-    .strict() // Keep strict mode to error on unknown options
-    .argv;
+    .strict().argv; // Keep strict mode to error on unknown options
 
   // Cast to the interface to ensure the structure aligns with expectations
   // Use `unknown` first for safer casting if types might not perfectly match
   return argv as unknown as CliArgs;
 }
-
 
 function findEnvFile(startDir: string): string | null {
   // Start search from the provided directory (e.g., current working directory)

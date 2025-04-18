@@ -28,10 +28,7 @@ export interface WriteFileToolParams {
 /**
  * Implementation of the WriteFile tool that writes files to the filesystem
  */
-export class WriteFileTool extends BaseTool<
-  WriteFileToolParams,
-  ToolResult
-> {
+export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
   private shouldAlwaysWrite = false;
 
