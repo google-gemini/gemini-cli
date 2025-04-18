@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, Text, useInput } from 'ink';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -25,10 +25,20 @@ const App = ({ directory }: AppProps) => {
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [originalQueryBeforeNav, setOriginalQueryBeforeNav] = useState<string>('');
   const { streamingState, submitQuery, initError } =
     useGeminiStream(setHistory);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
+
+  const userMessages = useMemo(() => {
+    return history
+      .filter((item): item is HistoryItem & { type: 'user'; text: string } =>
+          item.type === 'user' && typeof item.text === 'string' && item.text.trim() !== ''
+       )
+      .map(item => item.text);
+  }, [history]);
 
   useEffect(() => {
     try {
@@ -50,6 +60,8 @@ const App = ({ directory }: AppProps) => {
   }, []);
 
   const handleInputSubmit = (value: PartListUnion) => {
+    setHistoryIndex(-1);
+    setOriginalQueryBeforeNav('');
     submitQuery(value)
       .then(() => {
         setQuery('');
@@ -83,6 +95,40 @@ const App = ({ directory }: AppProps) => {
       item.tools.some((tool) => tool.confirmationDetails !== undefined),
   );
   const isInputActive = streamingState === StreamingState.Idle && !initError;
+
+  useInput((input, key) => {
+    if (!isInputActive || isWaitingForToolConfirmation) {
+      return;
+    }
+
+    if (key.upArrow) {
+      if (userMessages.length === 0) return;
+      if (historyIndex === -1) {
+        setOriginalQueryBeforeNav(query);
+      }
+      const nextIndex = Math.min(historyIndex + 1, userMessages.length - 1);
+      if (nextIndex !== historyIndex) {
+         setHistoryIndex(nextIndex);
+         setQuery(userMessages[userMessages.length - 1 - nextIndex]);
+      }
+    } else if (key.downArrow) {
+      if (historyIndex < 0) return;
+      const nextIndex = Math.max(historyIndex - 1, -1);
+      setHistoryIndex(nextIndex);
+      if (nextIndex === -1) {
+        setQuery(originalQueryBeforeNav);
+      } else {
+        setQuery(userMessages[userMessages.length - 1 - nextIndex]);
+      }
+    } else {
+      if (input || key.backspace || key.delete || key.leftArrow || key.rightArrow) {
+        if (historyIndex !== -1) {
+           setHistoryIndex(-1);
+           setOriginalQueryBeforeNav('');
+        }
+      }
+    }
+  }, { isActive: isInputActive });
 
   return (
     <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
