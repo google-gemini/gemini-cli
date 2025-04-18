@@ -101,7 +101,7 @@ export class WriteFileTool extends BaseTool<
    * @param params Parameters to validate
    * @returns True if parameters are valid, false otherwise
    */
-  invalidParams(params: WriteFileToolParams): string | null {
+  validateToolParams(params: WriteFileToolParams): string | null {
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -185,7 +185,7 @@ export class WriteFileTool extends BaseTool<
    * @returns Result of the file writing operation
    */
   async execute(params: WriteFileToolParams): Promise<WriteFileToolResult> {
-    const validationError = this.invalidParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,

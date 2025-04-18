@@ -127,7 +127,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  invalidParams(params: GrepToolParams): string | null {
+  validateToolParams(params: GrepToolParams): string | null {
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -161,7 +161,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    * @returns Result of the grep search
    */
   async execute(params: GrepToolParams): Promise<ToolResult> {
-    const validationError = this.invalidParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       console.error(`GrepTool Parameter Validation Failed: ${validationError}`);
       return {

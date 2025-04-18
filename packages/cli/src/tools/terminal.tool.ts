@@ -317,7 +317,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
   }
 
   // --- Parameter Validation (unchanged) ---
-  invalidParams(params: TerminalToolParams): string | null {
+  validateToolParams(params: TerminalToolParams): string | null {
     if (
       !SchemaValidator.validate(
         this.parameterSchema as Record<string, unknown>,
@@ -400,7 +400,7 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
 
   // --- Command Execution and Queueing (unchanged structure) ---
   async execute(params: TerminalToolParams): Promise<TerminalToolResult> {
-    const validationError = this.invalidParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Command rejected: ${params.command}\nReason: ${validationError}`,

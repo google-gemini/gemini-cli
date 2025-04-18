@@ -92,7 +92,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  invalidParams(params: GlobToolParams): string | null {
+  validateToolParams(params: GlobToolParams): string | null {
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -161,7 +161,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
    * @returns Result of the glob search
    */
   async execute(params: GlobToolParams): Promise<ToolResult> {
-    const validationError = this.invalidParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,

@@ -106,7 +106,7 @@ export class ReadFileTool extends BaseTool<
    * @param params Parameters to validate
    * @returns True if parameters are valid, false otherwise
    */
-  invalidParams(params: ReadFileToolParams): string | null {
+  validateToolParams(params: ReadFileToolParams): string | null {
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -210,8 +210,7 @@ export class ReadFileTool extends BaseTool<
    * @returns Result with file contents
    */
   async execute(params: ReadFileToolParams): Promise<ToolResult> {
-    const validationError = this.invalidParams(params);
-    const filePath = params.file_path;
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
@@ -219,6 +218,7 @@ export class ReadFileTool extends BaseTool<
       };
     }
 
+    const filePath = params.file_path;
     try {
       if (!fs.existsSync(filePath)) {
         return {

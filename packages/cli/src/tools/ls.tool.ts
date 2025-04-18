@@ -135,9 +135,10 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  invalidParams(params: LSToolParams): string | null {
+  validateToolParams(params: LSToolParams): string | null {
     if (this.schema.parameters &&
-      !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
+      !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)
+    ) {
       return 'Parameters failed schema validation.';
     }
     if (!path.isAbsolute(params.path)) {
@@ -199,7 +200,7 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
    * @returns Result of the LS operation
    */
   async execute(params: LSToolParams): Promise<LSToolResult> {
-    const validationError = this.invalidParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return this.errorResult(
         params,
