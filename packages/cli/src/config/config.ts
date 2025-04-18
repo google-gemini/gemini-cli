@@ -11,13 +11,11 @@ export class Config {
   private apiKey: string;
   private model: string;
   private targetDir: string;
-  private extraArgs: (string | number)[]; // Captures positional arguments
 
-  constructor(apiKey: string, model: string, targetDir: string, extraArgs: (string | number)[]) {
+  constructor(apiKey: string, model: string, targetDir: string) {
     this.apiKey = apiKey;
     this.model = model;
     this.targetDir = targetDir;
-    this.extraArgs = extraArgs;
   }
 
   getApiKey(): string {
@@ -31,10 +29,6 @@ export class Config {
   getTargetDir(): string {
     return this.targetDir;
   }
-
-  getExtraArgs(): (string | number)[] {
-    return this.extraArgs;
-  }
 }
 
 export function loadConfig(): Config {
@@ -44,7 +38,6 @@ export function loadConfig(): Config {
     process.env.GEMINI_API_KEY || "",
     argv.model || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
-    argv._,
   );
 }
 
@@ -53,7 +46,6 @@ export const globalConfig = loadConfig(); // TODO(jbd): Remove global state.
 interface CliArgs {
   target_dir: string | undefined;
   model: string | undefined;
-  _: (string | number)[]; // Captures positional arguments
   // Add other expected args here if needed
   // e.g., verbose?: boolean;
 }
