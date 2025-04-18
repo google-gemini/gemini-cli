@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import type { HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -11,6 +14,12 @@ import InputPrompt from './components/InputPrompt.js';
 import Footer from './components/Footer.js';
 import { StreamingState } from '../core/gemini-stream.js';
 import { PartListUnion } from '@google/genai';
+import {
+  useStartupWarnings,
+  useInitializationErrorEffect,
+} from './hooks/useAppEffects.js';
+
+const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt');
 
 interface AppProps {
   directory: string;
@@ -19,10 +28,14 @@ interface AppProps {
 const App = ({ directory }: AppProps) => {
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const { streamingState, submitQuery, initError } =
     useGeminiStream(setHistory);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
+
+  useStartupWarnings(setStartupWarnings);
+  useInitializationErrorEffect(initError, history, setHistory);
 
   const handleInputSubmit = (value: PartListUnion) => {
     submitQuery(value)
@@ -34,24 +47,6 @@ const App = ({ directory }: AppProps) => {
       });
   };
 
-  useEffect(() => {
-    if (
-      initError &&
-      !history.some(
-        (item) => item.type === 'error' && item.text?.includes(initError),
-      )
-    ) {
-      setHistory((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          type: 'error',
-          text: `Initialization Error: ${initError}. Please check API key and configuration.`,
-        } as HistoryItem,
-      ]);
-    }
-  }, [initError, history]);
-
   const isWaitingForToolConfirmation = history.some(
     (item) =>
       item.type === 'tool_group' &&
@@ -62,6 +57,22 @@ const App = ({ directory }: AppProps) => {
   return (
     <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
       <Header cwd={directory} />
+
+      {startupWarnings.length > 0 && (
+        <Box
+          borderStyle="round"
+          borderColor="yellow"
+          paddingX={1}
+          marginY={1}
+          flexDirection="column"
+        >
+          {startupWarnings.map((warning, index) => (
+            <Text key={index} color="yellow">
+              {warning}
+            </Text>
+          ))}
+        </Box>
+      )}
 
       <Tips />
 

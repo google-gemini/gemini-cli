@@ -9,10 +9,9 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
+    "start": "node ./scripts/check-build-status.js && npm run start --workspace=@google/gemini-code -- \"$@\"",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
-    "start": "npm run start --workspace=@google/gemini-code -- \"$@\"",
-    "format": "prettier --write .",
     "artifactregistry-login": "npx google-artifactregistry-auth"
   },
   "devDependencies": {
