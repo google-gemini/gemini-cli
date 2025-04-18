@@ -11,6 +11,7 @@ import {
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { ReadFileTool } from './read-file.tool.js';
 import { WriteFileTool } from './write-file.tool.js';
+import { isNodeError } from '../utils/errors.js';
 
 /**
  * Parameters for the Edit tool
@@ -37,11 +38,6 @@ export interface EditToolParams {
   expected_replacements?: number;
 }
 
-/**
- * Result from the Edit tool
- */
-export interface EditToolResult extends ToolResult {}
-
 interface CalculatedEdit {
   currentContent: string | null;
   newContent: string;
@@ -54,7 +50,7 @@ interface CalculatedEdit {
  * Implementation of the Edit tool that modifies files.
  * This tool maintains state for the "Always Edit" confirmation preference.
  */
-export class EditTool extends BaseTool<EditToolParams, EditToolResult> {
+export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   private shouldAlwaysEdit = false;
   private readonly rootDirectory: string;
 
@@ -174,8 +170,8 @@ export class EditTool extends BaseTool<EditToolParams, EditToolResult> {
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
       fileExists = true;
-    } catch (err: any) {
-      if (err.code !== 'ENOENT') {
+    } catch (err: unknown) {
+      if (!isNodeError(err) || err.code !== 'ENOENT') {
         throw err;
       }
       fileExists = false;
@@ -300,7 +296,7 @@ export class EditTool extends BaseTool<EditToolParams, EditToolResult> {
    * @param params Parameters for the edit operation
    * @returns Result of the edit operation
    */
-  async execute(params: EditToolParams): Promise<EditToolResult> {
+  async execute(params: EditToolParams): Promise<ToolResult> {
     if (!this.validateParams(params)) {
       return {
         llmContent: 'Invalid parameters for file edit operation',

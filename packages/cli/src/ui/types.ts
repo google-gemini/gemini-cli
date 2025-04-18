@@ -12,7 +12,7 @@ export interface ToolCallEvent {
   status: ToolCallStatus;
   callId: string;
   name: string;
-  args: Record<string, any>;
+  args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
 }

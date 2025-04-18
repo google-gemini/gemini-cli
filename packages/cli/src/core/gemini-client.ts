@@ -25,9 +25,9 @@ import { GeminiEventType, GeminiStream } from './gemini-stream.js';
 type ToolExecutionOutcome = {
   callId: string;
   name: string;
-  args: Record<string, any>;
+  args: Record<string, never>;
   result?: ToolResult;
-  error?: any;
+  error?: Error;
   confirmationDetails?: ToolCallConfirmationDetails;
 };
 
@@ -126,7 +126,7 @@ ${folderStructure}
         let pendingToolCalls: Array<{
           callId: string;
           name: string;
-          args: Record<string, any>;
+          args: Record<string, never>;
         }> = [];
         let yieldedTextInTurn = false;
         const chunksForDebug = [];
@@ -148,7 +148,7 @@ ${folderStructure}
                 call.id ??
                 `${call.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
               const name = call.name || 'undefined_tool_name';
-              const args = (call.args || {}) as Record<string, any>;
+              const args = (call.args || {}) as Record<string, never>;
 
               pendingToolCalls.push({ callId, name, args });
               const evtValue: ToolCallEvent = {
@@ -281,7 +281,7 @@ ${folderStructure}
             (executedTool: ToolExecutionOutcome): Part => {
               const { name, result, error } = executedTool;
               const output = { output: result?.llmContent };
-              let toolOutcomePayload: any;
+              let toolOutcomePayload: Record<string, unknown>;
 
               if (error) {
                 const errorMessage = error?.message || String(error);
@@ -445,11 +445,11 @@ Respond *only* in JSON format according to the following schema. Do not include 
   async generateJson(
     contents: Content[],
     schema: SchemaUnion,
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     const model = getModel();
     try {
       const result = await this.ai.models.generateContent({
-        model: model,
+        model,
         config: {
           ...this.defaultHyperParameters,
           systemInstruction: CoreSystemPrompt,

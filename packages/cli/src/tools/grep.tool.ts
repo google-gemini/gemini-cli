@@ -7,6 +7,7 @@ import fastGlob from 'fast-glob'; // Used for JS fallback file searching
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 
 // --- Interfaces (kept separate for clarity) ---
 
@@ -39,17 +40,12 @@ interface GrepMatch {
   line: string;
 }
 
-/**
- * Result from the GrepTool
- */
-export interface GrepToolResult extends ToolResult {}
-
 // --- GrepTool Class ---
 
 /**
  * Implementation of the GrepTool that searches file contents using git grep, system grep, or JS fallback.
  */
-export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
+export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   private rootDirectory: string;
 
   /**
@@ -114,12 +110,12 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
       if (!stats.isDirectory()) {
         throw new Error(`Path is not a directory: ${targetPath}`);
       }
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code !== 'ENOENT') {
         throw new Error(`Path does not exist: ${targetPath}`);
       }
       throw new Error(
-        `Failed to access path stats for ${targetPath}: ${err.message}`,
+        `Failed to access path stats for ${targetPath}: ${error}`,
       );
     }
 
@@ -164,7 +160,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
    * @param params Parameters for the grep search
    * @returns Result of the grep search
    */
-  async execute(params: GrepToolParams): Promise<GrepToolResult> {
+  async execute(params: GrepToolParams): Promise<ToolResult> {
     const validationError = this.invalidParams(params);
     if (validationError) {
       console.error(`GrepTool Parameter Validation Failed: ${validationError}`);
@@ -253,7 +249,7 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         });
         child.on('close', (code) => resolve(code === 0));
         child.on('error', () => resolve(false));
-      } catch (e) {
+      } catch {
         resolve(false);
       }
     });
@@ -277,10 +273,10 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
             return true;
           }
           return false;
-        } catch (err: any) {
-          if (err.code !== 'ENOENT') {
+        } catch (error: unknown) {
+          if (!isNodeError(error) || error.code !== 'ENOENT') {
             console.error(
-              `Error checking for .git in ${currentPath}: ${err.message}`,
+              `Error checking for .git in ${currentPath}: ${error}`,
             );
             return false;
           }
@@ -291,9 +287,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
         }
         currentPath = path.dirname(currentPath);
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
       console.error(
-        `Error traversing directory structure upwards from ${dirPath}: ${err instanceof Error ? err.message : String(err)}`,
+        `Error traversing directory structure upwards from ${dirPath}: ${error instanceof Error ? error.message : error}`,
       );
     }
     return false;
@@ -446,9 +442,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
             });
           });
           return this.parseGrepOutput(output, absolutePath);
-        } catch (gitError: any) {
+        } catch (gitError: unknown) {
           console.error(
-            `GrepTool: git grep strategy failed: ${gitError.message}. Falling back...`,
+            `GrepTool: git grep strategy failed: ${getErrorMessage(gitError)}. Falling back...`,
           );
         }
       }
@@ -512,9 +508,9 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
             });
           });
           return this.parseGrepOutput(output, absolutePath);
-        } catch (grepError: any) {
+        } catch (grepError: unknown) {
           console.error(
-            `GrepTool: System grep strategy failed: ${grepError.message}. Falling back...`,
+            `GrepTool: System grep strategy failed: ${getErrorMessage(grepError)}. Falling back...`,
           );
         }
       }
@@ -559,19 +555,19 @@ export class GrepTool extends BaseTool<GrepToolParams, GrepToolResult> {
               });
             }
           });
-        } catch (readError: any) {
-          if (readError.code !== 'ENOENT') {
+        } catch (readError: unknown) {
+          if (!isNodeError(readError) || readError.code !== 'ENOENT') {
             console.error(
-              `GrepTool: Could not read or process file ${fileAbsolutePath}: ${readError.message}`,
+              `GrepTool: Could not read or process file ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
             );
           }
         }
       }
 
       return allMatches;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
-        `GrepTool: Error during performGrepSearch (Strategy: ${strategyUsed}): ${error.message}`,
+        `GrepTool: Error during performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(error)}`,
       );
       throw error; // Re-throw to be caught by the execute method's handler
     }

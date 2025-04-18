@@ -154,14 +154,14 @@ export const processGeminiStream = async ({
     if (signal.aborted) {
       throw new Error('Request cancelled by user');
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (renderTimeoutId) {
       // Ensure render loop stops on error
       clearTimeout(renderTimeoutId);
       renderTimeoutId = null;
     }
     // Delegate history update for error message
-    addErrorMessageToHistory(error, setHistory, getNextMessageId);
+    addErrorMessageToHistory(error as (Error | DOMException), setHistory, getNextMessageId);
   } finally {
     isStreamComplete = true; // Signal stream end for render loop completion
     if (renderTimeoutId) {

@@ -25,16 +25,11 @@ export interface ReadFileToolParams {
 }
 
 /**
- * Standardized result from the ReadFile tool
- */
-export interface ReadFileToolResult extends ToolResult {}
-
-/**
  * Implementation of the ReadFile tool that reads files from the filesystem
  */
 export class ReadFileTool extends BaseTool<
   ReadFileToolParams,
-  ReadFileToolResult
+  ToolResult
 > {
   static readonly Name: string = 'read_file';
 
@@ -166,7 +161,7 @@ export class ReadFileTool extends BaseTool<
 
       // If more than 30% are non-printable, likely binary
       return nonPrintableCount / bytesRead > 0.3;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -214,7 +209,7 @@ export class ReadFileTool extends BaseTool<
    * @param params Parameters for the file reading
    * @returns Result with file contents
    */
-  async execute(params: ReadFileToolParams): Promise<ReadFileToolResult> {
+  async execute(params: ReadFileToolParams): Promise<ToolResult> {
     const validationError = this.invalidParams(params);
     const filePath = params.file_path;
     if (validationError) {

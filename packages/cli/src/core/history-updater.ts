@@ -178,7 +178,7 @@ export const handleToolCallChunk = (
  * it to the last non-user message or creating a new entry.
  */
 export const addErrorMessageToHistory = (
-  error: any,
+  error: DOMException | Error,
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   getNextMessageId: () => number,
 ): void => {

@@ -21,15 +21,10 @@ export interface GlobToolParams {
 }
 
 /**
- * Result from the GlobTool
- */
-export interface GlobToolResult extends ToolResult {}
-
-/**
  * Implementation of the GlobTool that finds files matching patterns,
  * sorted by modification time (newest first).
  */
-export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
+export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   /**
    * The root directory that this tool is grounded in.
    * All file operations will be restricted to this directory.
@@ -125,9 +120,9 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
       if (!fs.statSync(searchDirAbsolute).isDirectory()) {
         return `Search path is not a directory: ${shortenPath(makeRelative(searchDirAbsolute, this.rootDirectory))} (absolute: ${searchDirAbsolute})`;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Catch potential permission errors during sync checks
-      return `Error accessing search path: ${e.message}`;
+      return `Error accessing search path: ${e}`;
     }
 
     // Validate glob pattern (basic non-empty check)
@@ -165,7 +160,7 @@ export class GlobTool extends BaseTool<GlobToolParams, GlobToolResult> {
    * @param params Parameters for the glob search
    * @returns Result of the glob search
    */
-  async execute(params: GlobToolParams): Promise<GlobToolResult> {
+  async execute(params: GlobToolParams): Promise<ToolResult> {
     const validationError = this.invalidParams(params);
     if (validationError) {
       return {
