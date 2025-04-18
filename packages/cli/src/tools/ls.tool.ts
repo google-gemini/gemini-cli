@@ -114,11 +114,11 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
 
   /**
    * Checks if a path is within the root directory
-   * @param pathToCheck The path to check
+   * @param dirpath The path to check
    * @returns True if the path is within the root directory, false otherwise
    */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const normalizedPath = path.normalize(pathToCheck);
+  private isWithinRoot(dirpath: string): boolean {
+    const normalizedPath = path.normalize(dirpath);
     const normalizedRoot = path.normalize(this.rootDirectory);
     // Ensure the normalizedRoot ends with a path separator for proper path comparison
     const rootWithSep = normalizedRoot.endsWith(path.sep)
@@ -136,21 +136,13 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   invalidParams(params: LSToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
+    if (this.schema.parameters &&
+      !SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
       return 'Parameters failed schema validation.';
     }
-    // Ensure path is absolute
     if (!path.isAbsolute(params.path)) {
       return `Path must be absolute: ${params.path}`;
     }
-
-    // Ensure path is within the root directory
     if (!this.isWithinRoot(params.path)) {
       return `Path must be within the root directory (${this.rootDirectory}): ${params.path}`;
     }
@@ -191,6 +183,16 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
     return shortenPath(relativePath);
   }
 
+  private errorResult(params: LSToolParams, llmContent: string, returnDisplay: string): LSToolResult {
+    return {
+      entries: [],
+      listedPath: params.path,
+      totalEntries: 0,
+      llmContent: llmContent,
+      returnDisplay: `**Error:** ${returnDisplay}`,
+    };
+  }
+
   /**
    * Executes the LS operation with the given parameters
    * @param params Parameters for the LS operation
@@ -199,57 +201,42 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
   async execute(params: LSToolParams): Promise<LSToolResult> {
     const validationError = this.invalidParams(params);
     if (validationError) {
-      return {
-        entries: [],
-        listedPath: params.path,
-        totalEntries: 0,
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: '**Error:** Failed to execute tool.',
-      };
+      return this.errorResult(
+        params,
+        `Error: Invalid parameters provided. Reason: ${validationError}`,
+        `Failed to execute tool.`);
     }
 
     try {
-      // Check if path exists
-      if (!fs.existsSync(params.path)) {
-        return {
-          entries: [],
-          listedPath: params.path,
-          totalEntries: 0,
-          llmContent: `Directory does not exist: ${params.path}`,
-          returnDisplay: `Directory does not exist`,
-        };
-      }
-      // Check if path is a directory
       const stats = fs.statSync(params.path);
+      if (!stats) {
+        return this.errorResult(
+          params,
+          `Directory does not exist: ${params.path}`,
+          `Directory does not exist.`);
+      }
       if (!stats.isDirectory()) {
-        return {
-          entries: [],
-          listedPath: params.path,
-          totalEntries: 0,
-          llmContent: `Path is not a directory: ${params.path}`,
-          returnDisplay: `Path is not a directory`,
-        };
+        return this.errorResult(
+          params,
+          `Path is not a directory: ${params.path}`,
+          `Path is not a directory.`);
       }
 
-      // Read directory contents
       const files = fs.readdirSync(params.path);
       const entries: FileEntry[] = [];
       if (files.length === 0) {
-        return {
-          entries: [],
-          listedPath: params.path,
-          totalEntries: 0,
-          llmContent: `Directory is empty: ${params.path}`,
-          returnDisplay: `Directory is empty.`,
-        };
+        return this.errorResult(
+          params,
+          `Directory is empty: ${params.path}`,
+          `Directory is empty.`);
       }
 
       for (const file of files) {
         if (this.shouldIgnore(file, params.ignore)) {
           continue;
         }
-        const fullPath = path.join(params.path, file);
 
+        const fullPath = path.join(params.path, file);
         try {
           const stats = fs.statSync(fullPath);
           const isDir = stats.isDirectory();
@@ -261,7 +248,6 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
             modifiedTime: stats.mtime,
           });
         } catch (error) {
-          // Skip entries that can't be accessed
           console.error(`Error accessing ${fullPath}: ${error}`);
         }
       }
@@ -290,14 +276,10 @@ export class LSTool extends BaseTool<LSToolParams, LSToolResult> {
         returnDisplay: `Found ${entries.length} item(s).`,
       };
     } catch (error) {
-      const errorMessage = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
-      return {
-        entries: [],
-        listedPath: params.path,
-        totalEntries: 0,
-        llmContent: errorMessage,
-        returnDisplay: `**Error:** ${errorMessage}`,
-      };
+      return this.errorResult(
+        params,
+        `Error listing directory: ${error instanceof Error ? error.message : String(error)}`,
+        'Failed to list directory.');
     }
   }
 }
