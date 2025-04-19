@@ -13,5 +13,8 @@ bower_components
 .DS_Store
 Thumbs.db
 
+# TypeScript build info files
+*.tsbuildinfo
+
 # Ignore built ts files
 dist
