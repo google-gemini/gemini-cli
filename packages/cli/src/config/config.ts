@@ -6,61 +6,20 @@
 
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import process from 'node:process';
+// Import server config logic
+import {
+  Config,
+  loadEnvironment,
+  createServerConfig,
+} from '@gemini-code/server';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 
-export class Config {
-  private apiKey: string;
-  private model: string;
-  private targetDir: string;
-
-  constructor(apiKey: string, model: string, targetDir: string) {
-    this.apiKey = apiKey;
-    this.model = model;
-    this.targetDir = targetDir;
-  }
-
-  getApiKey(): string {
-    return this.apiKey;
-  }
-
-  getModel(): string {
-    return this.model;
-  }
-
-  getTargetDir(): string {
-    return this.targetDir;
-  }
-}
-
-export function loadConfig(): Config {
-  loadEnvironment();
-  if (!process.env.GEMINI_API_KEY) {
-    console.log(
-      'GEMINI_API_KEY is not set. See https://ai.google.dev/gemini-api/docs/api-key to obtain one. ' +
-        'Please set it in your .env file or as an environment variable.',
-    );
-    process.exit(1);
-  }
-  const argv = parseArguments();
-  return new Config(
-    process.env.GEMINI_API_KEY,
-    argv.model || DEFAULT_GEMINI_MODEL,
-    argv.target_dir || process.cwd(),
-  );
-}
-
-export const globalConfig = loadConfig(); // TODO(jbd): Remove global state.
-
+// Keep CLI-specific argument parsing
 interface CliArgs {
   target_dir: string | undefined;
   model: string | undefined;
-  // Add other expected args here if needed
-  // e.g., verbose?: boolean;
 }
 
 function parseArguments(): CliArgs {
@@ -79,35 +38,34 @@ function parseArguments(): CliArgs {
     })
     .help()
     .alias('h', 'help')
-    .strict().argv; // Keep strict mode to error on unknown options
-
-  // Cast to the interface to ensure the structure aligns with expectations
-  // Use `unknown` first for safer casting if types might not perfectly match
+    .strict().argv;
   return argv as unknown as CliArgs;
 }
 
-function findEnvFile(startDir: string): string | null {
-  // Start search from the provided directory (e.g., current working directory)
-  let currentDir = path.resolve(startDir); // Ensure absolute path
-  while (true) {
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
-    }
+// Renamed function for clarity
+export function loadCliConfig(): Config {
+  // Load .env file using logic from server package
+  loadEnvironment();
 
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      return null;
-    }
-    currentDir = parentDir;
+  // Check API key (CLI responsibility)
+  if (!process.env.GEMINI_API_KEY) {
+    console.log(
+      'GEMINI_API_KEY is not set. See https://ai.google.dev/gemini-api/docs/api-key to obtain one. ' +
+        'Please set it in your .env file or as an environment variable.',
+    );
+    process.exit(1);
   }
+
+  // Parse CLI arguments
+  const argv = parseArguments();
+
+  // Create config using factory from server package
+  return createServerConfig(
+    process.env.GEMINI_API_KEY,
+    argv.model || DEFAULT_GEMINI_MODEL,
+    argv.target_dir || process.cwd(),
+  );
 }
 
-function loadEnvironment(): void {
-  // Start searching from the current working directory by default
-  const envFilePath = findEnvFile(process.cwd());
-  if (!envFilePath) {
-    return;
-  }
-  dotenv.config({ path: envFilePath });
-}
+// The globalConfig export is problematic, CLI entry point (gemini.ts) should call loadCliConfig
+// export const globalConfig = loadCliConfig(); // Remove or replace global export

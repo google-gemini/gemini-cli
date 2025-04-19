@@ -7,70 +7,110 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { ToolCallStatus } from '../../types.js';
-import { ToolResultDisplay } from '../../../tools/tools.js';
+import {
+  IndividualToolCallDisplay,
+  ToolCallStatus,
+  ToolCallConfirmationDetails,
+  ToolEditConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+} from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
-import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';
+import { FileDiff, ToolResultDisplay } from '../../../tools/tools.js';
 
-interface ToolMessageProps {
-  name: string;
-  description: string;
-  resultDisplay: ToolResultDisplay | undefined;
-  status: ToolCallStatus;
-}
-
-export const ToolMessage: React.FC<ToolMessageProps> = ({
+export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
+  callId,
   name,
   description,
   resultDisplay,
   status,
+  confirmationDetails,
 }) => {
-  const statusIndicatorWidth = 3;
-  const hasResult =
-    (status === ToolCallStatus.Invoked || status === ToolCallStatus.Canceled) &&
-    resultDisplay &&
-    resultDisplay.toString().trim().length > 0;
+  // Explicitly type the props to help the type checker
+  const typedConfirmationDetails = confirmationDetails as
+    | ToolCallConfirmationDetails
+    | undefined;
+  const typedResultDisplay = resultDisplay as ToolResultDisplay | undefined;
+
+  let color = 'gray';
+  let prefix = '';
+  switch (status) {
+    case ToolCallStatus.Pending:
+      prefix = 'Pending:';
+      break;
+    case ToolCallStatus.Invoked:
+      prefix = 'Executing:';
+      break;
+    case ToolCallStatus.Confirming:
+      color = 'yellow';
+      prefix = 'Confirm:';
+      break;
+    case ToolCallStatus.Success:
+      color = 'green';
+      prefix = 'Success:';
+      break;
+    case ToolCallStatus.Error:
+      color = 'red';
+      prefix = 'Error:';
+      break;
+    default:
+      // Handle unexpected status if necessary, or just break
+      break;
+  }
+
+  const title = `${prefix} ${name}`;
 
   return (
-    <Box paddingX={1} paddingY={0} flexDirection="column">
-      {/* Row for Status Indicator and Tool Info */}
-      <Box minHeight={1}>
-        {/* Status Indicator */}
-        <Box minWidth={statusIndicatorWidth}>
-          {status === ToolCallStatus.Pending && <Spinner type="dots" />}
-          {status === ToolCallStatus.Invoked && <Text color="green">✔</Text>}
-          {status === ToolCallStatus.Confirming && <Text color="blue">?</Text>}
-          {status === ToolCallStatus.Canceled && (
-            <Text color="red" bold>
-              -
+    <Box key={callId} borderStyle="round" paddingX={1} flexDirection="column">
+      <Box>
+        {status === ToolCallStatus.Invoked && (
+          <Box marginRight={1}>
+            <Text color="blue">
+              <Spinner type="dots" />
+            </Text>
+          </Box>
+        )}
+        <Text bold color={color}>
+          {title}
+        </Text>
+        <Text color={color}>
+          {status === ToolCallStatus.Error && typedResultDisplay
+            ? `: ${typedResultDisplay}`
+            : ` - ${description}`}
+        </Text>
+      </Box>
+      {status === ToolCallStatus.Confirming && typedConfirmationDetails && (
+        <Box flexDirection="column" marginLeft={2}>
+          {/* Display diff for edit/write */}
+          {'fileDiff' in typedConfirmationDetails && (
+            <DiffRenderer
+              diffContent={
+                (typedConfirmationDetails as ToolEditConfirmationDetails)
+                  .fileDiff
+              }
+            />
+          )}
+          {/* Display command for execute */}
+          {'command' in typedConfirmationDetails && (
+            <Text color="yellow">
+              Command:{' '}
+              {
+                (typedConfirmationDetails as ToolExecuteConfirmationDetails)
+                  .command
+              }
             </Text>
           )}
+          {/* <ConfirmInput onConfirm={handleConfirm} isFocused={isFocused} /> */}
         </Box>
-        <Box>
-          <Text
-            color="blue"
-            wrap="truncate-end"
-            strikethrough={status === ToolCallStatus.Canceled}
-          >
-            <Text bold>{name}</Text> <Text color="gray">{description}</Text>
-          </Text>
-        </Box>
-      </Box>
-
-      {hasResult && (
-        <Box paddingLeft={statusIndicatorWidth}>
-          <Box flexShrink={1} flexDirection="row">
-            <Text color="gray">↳ </Text>
-            {/* Use default text color (white) or gray instead of dimColor */}
-            {typeof resultDisplay === 'string' && (
-              <Box flexDirection="column">
-                {MarkdownRenderer.render(resultDisplay)}
-              </Box>
-            )}
-            {typeof resultDisplay === 'object' && (
-              <DiffRenderer diffContent={resultDisplay.fileDiff} />
-            )}
-          </Box>
+      )}
+      {status === ToolCallStatus.Success && typedResultDisplay && (
+        <Box flexDirection="column" marginLeft={2}>
+          {typeof typedResultDisplay === 'string' ? (
+            <Text>{typedResultDisplay}</Text>
+          ) : (
+            <DiffRenderer
+              diffContent={(typedResultDisplay as FileDiff).fileDiff}
+            />
+          )}
         </Box>
       )}
     </Box>

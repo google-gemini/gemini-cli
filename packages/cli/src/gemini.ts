@@ -16,20 +16,19 @@ import { EditTool } from './tools/edit.tool.js';
 import { TerminalTool } from './tools/terminal.tool.js';
 import { WriteFileTool } from './tools/write-file.tool.js';
 import { WebFetchTool } from './tools/web-fetch.tool.js';
-import { globalConfig } from './config/config.js';
-
-// TODO(b/411707095): remove. left here as an example of how to pull in inter-package deps
-import { helloServer } from '@gemini-code/server';
-helloServer();
+import { loadCliConfig } from './config/config.js';
 
 async function main() {
-  // Configure tools
-  registerTools(globalConfig.getTargetDir());
+  // Load configuration
+  const config = loadCliConfig();
 
-  // Render UI
+  // Configure tools using the loaded config
+  registerTools(config.getTargetDir());
+
+  // Render UI, passing necessary config values
   render(
     React.createElement(App, {
-      directory: globalConfig.getTargetDir(),
+      config,
     }),
   );
 }
@@ -81,12 +80,13 @@ main().catch((error) => {
 });
 
 function registerTools(targetDir: string) {
+  const config = loadCliConfig();
   const lsTool = new LSTool(targetDir);
   const readFileTool = new ReadFileTool(targetDir);
   const grepTool = new GrepTool(targetDir);
   const globTool = new GlobTool(targetDir);
   const editTool = new EditTool(targetDir);
-  const terminalTool = new TerminalTool(targetDir);
+  const terminalTool = new TerminalTool(targetDir, config);
   const writeFileTool = new WriteFileTool(targetDir);
   const webFetchTool = new WebFetchTool();
 

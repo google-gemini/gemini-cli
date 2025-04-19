@@ -7,10 +7,11 @@
 import { ToolResultDisplay } from '../tools/tools.js';
 
 export enum ToolCallStatus {
-  Pending,
-  Invoked,
-  Confirming,
-  Canceled,
+  Pending = 'Pending',
+  Invoked = 'Invoked',
+  Confirming = 'Confirming',
+  Success = 'Success',
+  Error = 'Error',
 }
 
 export interface ToolCallEvent {

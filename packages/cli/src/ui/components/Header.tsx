@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { UI_WIDTH, BOX_PADDING_X } from '../constants.js';
-import { shortenPath } from '../../utils/paths.js';
+import { shortenPath } from '@gemini-code/server';
 
 interface HeaderProps {
   cwd: string;

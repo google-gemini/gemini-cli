@@ -1,0 +1,353 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import fs from 'fs';
+import path from 'path';
+import * as Diff from 'diff';
+import { BaseTool, ToolResult, ToolResultDisplay } from './tools.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
+import { isNodeError } from '../utils/errors.js';
+
+/**
+ * Parameters for the Edit tool
+ */
+export interface EditToolParams {
+  /**
+   * The absolute path to the file to modify
+   */
+  file_path: string;
+
+  /**
+   * The text to replace
+   */
+  old_string: string;
+
+  /**
+   * The text to replace it with
+   */
+  new_string: string;
+
+  /**
+   * The expected number of replacements to perform (optional, defaults to 1)
+   */
+  expected_replacements?: number;
+}
+
+interface CalculatedEdit {
+  currentContent: string | null;
+  newContent: string;
+  occurrences: number;
+  error?: { display: string; raw: string };
+  isNewFile: boolean;
+}
+
+/**
+ * Implementation of the Edit tool logic (moved from CLI)
+ */
+export class EditLogic extends BaseTool<EditToolParams, ToolResult> {
+  static readonly Name = 'replace'; // Keep static name
+
+  private readonly rootDirectory: string;
+
+  /**
+   * Creates a new instance of the EditLogic
+   * @param rootDirectory Root directory to ground this tool in.
+   */
+  constructor(rootDirectory: string) {
+    // Note: The description here mentions other tools like ReadFileTool/WriteFileTool
+    // by name. This might need updating if those tool names change.
+    super(
+      EditLogic.Name,
+      '', // Display name handled by CLI wrapper
+      '', // Description handled by CLI wrapper
+      {
+        properties: {
+          file_path: {
+            description:
+              'The absolute path to the file to modify. Must start with /. When creating a new file, ensure the parent directory exists (use the `LS` tool to verify).',
+            type: 'string',
+          },
+          old_string: {
+            description:
+              'The exact text to replace. CRITICAL: Must uniquely identify the single instance to change. Include at least 3-5 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations or does not match exactly, the tool will fail. Use an empty string ("") when creating a new file.',
+            type: 'string',
+          },
+          new_string: {
+            description:
+              'The text to replace the `old_string` with. When creating a new file (using an empty `old_string`), this should contain the full desired content of the new file. Ensure the resulting code is correct and idiomatic.',
+            type: 'string',
+          },
+        },
+        required: ['file_path', 'old_string', 'new_string'],
+        type: 'object',
+      },
+    );
+    this.rootDirectory = path.resolve(rootDirectory);
+  }
+
+  /**
+   * Checks if a path is within the root directory.
+   * @param pathToCheck The absolute path to check.
+   * @returns True if the path is within the root directory, false otherwise.
+   */
+  private isWithinRoot(pathToCheck: string): boolean {
+    const normalizedPath = path.normalize(pathToCheck);
+    const normalizedRoot = this.rootDirectory;
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
+      : normalizedRoot + path.sep;
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
+    );
+  }
+
+  /**
+   * Validates the parameters for the Edit tool
+   * @param params Parameters to validate
+   * @returns Error message string or null if valid
+   */
+  validateParams(params: EditToolParams): string | null {
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
+    }
+
+    if (!path.isAbsolute(params.file_path)) {
+      return `File path must be absolute: ${params.file_path}`;
+    }
+
+    if (!this.isWithinRoot(params.file_path)) {
+      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
+    }
+
+    if (
+      params.expected_replacements !== undefined &&
+      params.expected_replacements < 0
+    ) {
+      return 'Expected replacements must be a non-negative number';
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculates the potential outcome of an edit operation.
+   * @param params Parameters for the edit operation
+   * @returns An object describing the potential edit outcome
+   * @throws File system errors if reading the file fails unexpectedly (e.g., permissions)
+   */
+  private calculateEdit(params: EditToolParams): CalculatedEdit {
+    const expectedReplacements =
+      params.expected_replacements === undefined
+        ? 1
+        : params.expected_replacements;
+    let currentContent: string | null = null;
+    let fileExists = false;
+    let isNewFile = false;
+    let newContent = '';
+    let occurrences = 0;
+    let error: { display: string; raw: string } | undefined = undefined;
+
+    try {
+      currentContent = fs.readFileSync(params.file_path, 'utf8');
+      fileExists = true;
+    } catch (err: unknown) {
+      if (!isNodeError(err) || err.code !== 'ENOENT') {
+        // Rethrow unexpected FS errors (permissions, etc.)
+        throw err;
+      }
+      fileExists = false;
+    }
+
+    if (params.old_string === '' && !fileExists) {
+      // Creating a new file
+      isNewFile = true;
+      newContent = params.new_string;
+      occurrences = 0;
+    } else if (!fileExists) {
+      // Trying to edit a non-existent file (and old_string is not empty)
+      error = {
+        display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
+        raw: `File not found: ${params.file_path}`,
+      };
+    } else if (currentContent !== null) {
+      // Editing an existing file
+      occurrences = this.countOccurrences(currentContent, params.old_string);
+
+      if (params.old_string === '') {
+        // Error: Trying to create a file that already exists
+        error = {
+          display: `File already exists. Use a non-empty old_string to edit.`,
+          raw: `File already exists, cannot create: ${params.file_path}`,
+        };
+      } else if (occurrences === 0) {
+        error = {
+          display: `No edits made. The exact text in old_string was not found. Check whitespace, indentation, and context. Use ReadFile tool to verify. `,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}`,
+        };
+      } else if (occurrences !== expectedReplacements) {
+        error = {
+          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}. Make old_string more specific with more context.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
+        };
+      } else {
+        // Successful edit calculation
+        newContent = this.replaceAll(
+          currentContent,
+          params.old_string,
+          params.new_string,
+        );
+      }
+    } else {
+      // Should not happen if fileExists and no exception was thrown, but defensively:
+      error = {
+        display: `Failed to read content of existing file.`,
+        raw: `Failed to read content of existing file: ${params.file_path}`,
+      };
+    }
+
+    return {
+      currentContent,
+      newContent,
+      occurrences,
+      error,
+      isNewFile,
+    };
+  }
+
+  // Removed shouldConfirmExecute - Confirmation is handled by the CLI wrapper
+
+  getDescription(params: EditToolParams): string {
+    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    if (params.old_string === '') {
+      return `Create ${shortenPath(relativePath)}`;
+    }
+    const oldStringSnippet =
+      params.old_string.split('\n')[0].substring(0, 30) +
+      (params.old_string.length > 30 ? '...' : '');
+    const newStringSnippet =
+      params.new_string.split('\n')[0].substring(0, 30) +
+      (params.new_string.length > 30 ? '...' : '');
+    return `${shortenPath(relativePath)}: ${oldStringSnippet} => ${newStringSnippet}`;
+  }
+
+  /**
+   * Executes the edit operation with the given parameters.
+   * @param params Parameters for the edit operation
+   * @returns Result of the edit operation
+   */
+  async execute(params: EditToolParams): Promise<ToolResult> {
+    const validationError = this.validateParams(params);
+    if (validationError) {
+      return {
+        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        returnDisplay: `Error: ${validationError}`,
+      };
+    }
+
+    let editData: CalculatedEdit;
+    try {
+      editData = this.calculateEdit(params);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error preparing edit: ${errorMsg}`,
+        returnDisplay: `Error preparing edit: ${errorMsg}`,
+      };
+    }
+
+    if (editData.error) {
+      return {
+        llmContent: editData.error.raw,
+        returnDisplay: `Error: ${editData.error.display}`,
+      };
+    }
+
+    try {
+      this.ensureParentDirectoriesExist(params.file_path);
+      fs.writeFileSync(params.file_path, editData.newContent, 'utf8');
+
+      let displayResult: ToolResultDisplay;
+      if (editData.isNewFile) {
+        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+      } else {
+        // Generate diff for display, even though core logic doesn't technically need it
+        // The CLI wrapper will use this part of the ToolResult
+        const fileName = path.basename(params.file_path);
+        const fileDiff = Diff.createPatch(
+          fileName,
+          editData.currentContent ?? '', // Should not be null here if not isNewFile
+          editData.newContent,
+          'Current',
+          'Proposed',
+          { context: 3 }, // Removed ignoreWhitespace for potentially more accurate display diff
+        );
+        displayResult = { fileDiff };
+      }
+
+      const llmSuccessMessage = editData.isNewFile
+        ? `Created new file: ${params.file_path} with provided content.`
+        : `Successfully modified file: ${params.file_path} (${editData.occurrences} replacements).`;
+
+      return {
+        llmContent: llmSuccessMessage,
+        returnDisplay: displayResult,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error executing edit: ${errorMsg}`,
+        returnDisplay: `Error writing file: ${errorMsg}`,
+      };
+    }
+  }
+
+  /**
+   * Counts occurrences of a substring in a string
+   */
+  private countOccurrences(str: string, substr: string): number {
+    if (substr === '') {
+      return 0;
+    }
+    let count = 0;
+    let pos = str.indexOf(substr);
+    while (pos !== -1) {
+      count++;
+      pos = str.indexOf(substr, pos + 1); // Ensure overlap is not counted if substr repeats
+    }
+    return count;
+  }
+
+  /**
+   * Replaces all occurrences of a substring in a string
+   */
+  private replaceAll(str: string, find: string, replace: string): string {
+    if (find === '') {
+      return str;
+    }
+    // Use RegExp with global flag for true replacement of all instances
+    // Escape special regex characters in the find string
+    const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return str.replace(new RegExp(escapedFind, 'g'), replace);
+  }
+
+  /**
+   * Creates parent directories if they don't exist
+   */
+  private ensureParentDirectoriesExist(filePath: string): void {
+    const dirName = path.dirname(filePath);
+    if (!fs.existsSync(dirName)) {
+      fs.mkdirSync(dirName, { recursive: true });
+    }
+  }
+}

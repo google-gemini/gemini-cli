@@ -5,41 +5,43 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, useInput, useFocus } from 'ink';
 import TextInput from 'ink-text-input';
-import { globalConfig } from '../../config/config.js';
 
 interface InputPromptProps {
-  query: string;
-  setQuery: (value: string) => void;
   onSubmit: (value: string) => void;
-  isActive: boolean;
-  forceKey?: number;
 }
 
-export const InputPrompt: React.FC<InputPromptProps> = ({
-  query,
-  setQuery,
-  onSubmit,
-  isActive,
-  forceKey,
-}) => {
-  const model = globalConfig.getModel();
+export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit }) => {
+  const [value, setValue] = React.useState('');
+  const { isFocused } = useFocus({ autoFocus: true });
+
+  useInput(
+    (input, key) => {
+      if (key.return) {
+        if (value.trim()) {
+          onSubmit(value);
+          setValue('');
+        }
+      }
+    },
+    { isActive: isFocused },
+  );
 
   return (
-    <Box marginTop={1} borderStyle="round" borderColor={'white'} paddingX={1}>
-      <Text color={'white'}>&gt; </Text>
-      <Box flexGrow={1}>
-        <TextInput
-          key={forceKey?.toString()}
-          value={query}
-          onChange={setQuery}
-          onSubmit={onSubmit}
-          showCursor={true}
-          focus={isActive}
-          placeholder={`Ask Gemini (${model})... (try "/init" or "/help")`}
-        />
-      </Box>
+    <Box
+      borderStyle="round"
+      borderColor={isFocused ? 'blue' : 'gray'}
+      paddingX={1}
+    >
+      <TextInput
+        value={value}
+        onChange={setValue}
+        placeholder="Enter your message or use tools..."
+        onSubmit={() => {
+          /* Empty to prevent double submission */
+        }}
+      />
     </Box>
   );
 };

@@ -8,8 +8,8 @@ import { useEffect } from 'react';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import type { HistoryItem } from '../types.js';
-import { getErrorMessage } from '../../utils/errors.js';
+import { HistoryItem } from '../types.js';
+import { getErrorMessage } from '@gemini-code/server';
 
 const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt');
 

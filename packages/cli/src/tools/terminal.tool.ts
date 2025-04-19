@@ -8,22 +8,25 @@ import {
   spawn,
   SpawnOptions,
   ChildProcessWithoutNullStreams,
-} from 'child_process'; // Added 'exec'
+} from 'child_process';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { promises as fs } from 'fs';
+import {
+  SchemaValidator,
+  getErrorMessage,
+  isNodeError,
+  Config,
+} from '@gemini-code/server';
 import { BaseTool, ToolResult } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
-} from '../ui/types.js'; // Adjust path as needed
+} from '../ui/types.js';
 import { BackgroundTerminalAnalyzer } from '../utils/BackgroundTerminalAnalyzer.js';
-import { getErrorMessage, isNodeError } from '../utils/errors.js';
 
-// --- Interfaces ---
 export interface TerminalToolParams {
   command: string;
   description?: string;
@@ -31,15 +34,13 @@ export interface TerminalToolParams {
   runInBackground?: boolean;
 }
 
-// --- Constants ---
-const MAX_OUTPUT_LENGTH = 10000; // Default max output length
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (for foreground commands)
-const MAX_TIMEOUT_OVERRIDE_MS = 10 * 60 * 1000; // 10 minutes (max override for foreground)
-const BACKGROUND_LAUNCH_TIMEOUT_MS = 15 * 1000; // 15 seconds timeout for *launching* background tasks
-const BACKGROUND_POLL_TIMEOUT_MS = 30000; // 30 seconds total polling time for background process status
+const MAX_OUTPUT_LENGTH = 10000;
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
+const MAX_TIMEOUT_OVERRIDE_MS = 10 * 60 * 1000;
+const BACKGROUND_LAUNCH_TIMEOUT_MS = 15 * 1000;
+const BACKGROUND_POLL_TIMEOUT_MS = 30000;
 
 const BANNED_COMMAND_ROOTS = [
-  // Session/flow control (excluding cd)
   'alias',
   'bg',
   'command',
@@ -64,7 +65,7 @@ const BANNED_COMMAND_ROOTS = [
   'popd',
   'printf',
   'pushd',
-  /* 'pwd' is safe */ 'read',
+  'read',
   'readonly',
   'set',
   'shift',
@@ -81,7 +82,6 @@ const BANNED_COMMAND_ROOTS = [
   'unalias',
   'unset',
   'wait',
-  // Network commands
   'curl',
   'wget',
   'nc',
@@ -92,9 +92,7 @@ const BANNED_COMMAND_ROOTS = [
   'sftp',
   'http',
   'https',
-  'ftp',
   'rsync',
-  // Browsers/GUI launchers
   'lynx',
   'w3m',
   'links',
@@ -110,20 +108,15 @@ const BANNED_COMMAND_ROOTS = [
   'open',
 ];
 
-// --- Helper Type for Command Queue ---
 interface QueuedCommand {
   params: TerminalToolParams;
   resolve: (result: ToolResult) => void;
   reject: (error: Error) => void;
-  confirmationDetails: ToolExecuteConfirmationDetails | false; // Kept for potential future use
+  confirmationDetails: ToolExecuteConfirmationDetails | false;
 }
 
-/**
- * Implementation of the terminal tool that executes shell commands within a persistent session.
- */
 export class TerminalTool extends BaseTool<TerminalToolParams, ToolResult> {
   static Name: string = 'execute_bash_command';
-
   private readonly rootDirectory: string;
   private readonly outputLimit: number;
   private bashProcess: ChildProcessWithoutNullStreams | null = null;
@@ -131,16 +124,19 @@ export class TerminalTool extends BaseTool<TerminalToolParams, ToolResult> {
   private isExecuting: boolean = false;
   private commandQueue: QueuedCommand[] = [];
   private currentCommandCleanup: (() => void) | null = null;
-  private shouldAlwaysExecuteCommands: Map<string, boolean> = new Map(); // Track confirmation per root command
+  private shouldAlwaysExecuteCommands: Map<string, boolean> = new Map();
   private shellReady: Promise<void>;
-  private resolveShellReady: (() => void) | undefined; // Definite assignment assertion
-  private rejectShellReady: ((reason?: unknown) => void) | undefined; // Definite assignment assertion
+  private resolveShellReady: (() => void) | undefined;
+  private rejectShellReady: ((reason?: unknown) => void) | undefined;
   private readonly backgroundTerminalAnalyzer: BackgroundTerminalAnalyzer;
+  private readonly config: Config;
 
-  constructor(rootDirectory: string, outputLimit: number = MAX_OUTPUT_LENGTH) {
+  constructor(
+    rootDirectory: string,
+    config: Config,
+    outputLimit: number = MAX_OUTPUT_LENGTH,
+  ) {
     const toolDisplayName = 'Terminal';
-    // --- LLM-Facing Description ---
-    // Updated description for background tasks to mention polling and LLM analysis
     const toolDescription = `Executes one or more bash commands sequentially in a secure and persistent interactive shell session. Can run commands in the foreground (waiting for completion) or background (returning after launch, with subsequent status polling).
 
 Core Functionality:
@@ -182,7 +178,6 @@ Usage Guidance & Restrictions:
     * The initial exit code (usually 0) signifies successful *launching*; the final status indicates completion or timeout after polling.
 
 Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`eslint .\`), test runners (\`pytest\`, \`jest\`), code formatters (\`prettier --write .\`), package managers (\`pip install\`), version control operations (\`git status\`, \`git diff\`), starting background servers/services (\`node server.js --runInBackground true\`), or other safe, standard command-line operations within the project workspace.`;
-    // --- Parameter Schema ---
     const toolParameterSchema = {
       type: 'object',
       properties: {
@@ -205,14 +200,13 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       },
       required: ['command'],
     };
-
     super(
       TerminalTool.Name,
       toolDisplayName,
       toolDescription,
       toolParameterSchema,
     );
-
+    this.config = config;
     this.rootDirectory = path.resolve(rootDirectory);
     this.currentCwd = this.rootDirectory;
     this.outputLimit = outputLimit;
@@ -220,12 +214,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       this.resolveShellReady = resolve;
       this.rejectShellReady = reject;
     });
-    this.backgroundTerminalAnalyzer = new BackgroundTerminalAnalyzer();
-
+    this.backgroundTerminalAnalyzer = new BackgroundTerminalAnalyzer(config);
     this.initializeShell();
   }
 
-  // --- Shell Initialization and Management (largely unchanged) ---
   private initializeShell() {
     if (this.bashProcess) {
       try {
@@ -234,14 +226,12 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         /* Ignore */
       }
     }
-
     const spawnOptions: SpawnOptions = {
       cwd: this.rootDirectory,
       shell: true,
       env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     };
-
     try {
       const bashPath = os.platform() === 'win32' ? 'bash.exe' : 'bash';
       this.bashProcess = spawn(
@@ -249,28 +239,24 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         ['-s'],
         spawnOptions,
       ) as ChildProcessWithoutNullStreams;
-      this.currentCwd = this.rootDirectory; // Reset CWD on restart
-
+      this.currentCwd = this.rootDirectory;
       this.bashProcess.on('error', (err) => {
         console.error('Persistent Bash Error:', err);
-        this.rejectShellReady?.(err); // Use optional chaining as reject might be cleared
+        this.rejectShellReady?.(err);
         this.bashProcess = null;
         this.isExecuting = false;
         this.clearQueue(
           new Error(`Persistent bash process failed to start: ${err.message}`),
         );
       });
-
       this.bashProcess.on('close', (code, signal) => {
         this.bashProcess = null;
         this.isExecuting = false;
-        // Only reject if it hasn't been resolved/rejected already
         this.rejectShellReady?.(
           new Error(
             `Persistent bash process exited (code: ${code}, signal: ${signal})`,
           ),
         );
-        // Reset shell readiness promise for reinitialization attempts
         this.shellReady = new Promise((resolve, reject) => {
           this.resolveShellReady = resolve;
           this.rejectShellReady = reject;
@@ -280,27 +266,22 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             `Persistent bash process exited unexpectedly (code: ${code}, signal: ${signal}). State is lost. Queued commands cancelled.`,
           ),
         );
-        // Attempt to reinitialize after a short delay
         setTimeout(() => this.initializeShell(), 1000);
       });
-
-      // Readiness check - ensure shell is responsive
-      // Slightly longer timeout to allow shell init
       setTimeout(() => {
         if (this.bashProcess && !this.bashProcess.killed) {
-          this.resolveShellReady?.(); // Use optional chaining
+          this.resolveShellReady?.();
         } else if (!this.bashProcess) {
-          // Error likely already handled by 'error' or 'close' event
+          // Error likely handled
         } else {
-          // Process was killed during init?
           this.rejectShellReady?.(
             new Error('Shell killed during initialization'),
           );
         }
-      }, 1000); // Increase readiness check timeout slightly
+      }, 1000);
     } catch (error: unknown) {
       console.error('Failed to spawn persistent bash:', error);
-      this.rejectShellReady?.(error); // Use optional chaining
+      this.rejectShellReady?.(error);
       this.bashProcess = null;
       this.clearQueue(
         new Error(`Failed to spawn persistent bash: ${getErrorMessage(error)}`),
@@ -308,7 +289,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     }
   }
 
-  // --- Parameter Validation (unchanged) ---
   validateToolParams(params: TerminalToolParams): string | null {
     if (
       !SchemaValidator.validate(
@@ -318,16 +298,13 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     ) {
       return `Parameters failed schema validation.`;
     }
-
     const commandOriginal = params.command.trim();
     if (!commandOriginal) {
       return 'Command cannot be empty.';
     }
     const commandParts = commandOriginal.split(/[\s;&&|]+/);
-
     for (const part of commandParts) {
       if (!part) continue;
-      // Improved check: strip leading special chars before checking basename
       const cleanPart =
         part
           .replace(/^[^a-zA-Z0-9]+/, '')
@@ -337,18 +314,15 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         return `Command contains a banned keyword: '${cleanPart}'. Banned list includes network tools, session control, etc.`;
       }
     }
-
     if (
       params.timeout !== undefined &&
       (typeof params.timeout !== 'number' || params.timeout <= 0)
     ) {
       return 'Timeout must be a positive number of milliseconds.';
     }
-
-    return null; // Parameters are valid
+    return null;
   }
 
-  // --- Description and Confirmation (unchanged) ---
   getDescription(params: TerminalToolParams): string {
     return params.description || params.command;
   }
@@ -362,13 +336,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         .split(/[\s;&&|]+/)[0]
         ?.split(/[/\\]/)
         .pop() || 'unknown';
-
     if (this.shouldAlwaysExecuteCommands.get(rootCommand)) {
       return false;
     }
-
     const description = this.getDescription(params);
-
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       title: 'Confirm Shell Command',
       command: params.command,
@@ -383,7 +354,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     return confirmationDetails;
   }
 
-  // --- Command Execution and Queueing (unchanged structure) ---
   async execute(params: TerminalToolParams): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -392,23 +362,18 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         returnDisplay: `Error: ${validationError}`,
       };
     }
-
-    // Assume confirmation is handled before calling execute
-
     return new Promise((resolve) => {
       const queuedItem: QueuedCommand = {
         params,
-        resolve, // Resolve outer promise
+        resolve,
         reject: (error) =>
           resolve({
-            // Handle internal errors by resolving outer promise
             llmContent: `Internal tool error for command: ${params.command}\nError: ${error.message}`,
             returnDisplay: `Internal Tool Error: ${error.message}`,
           }),
-        confirmationDetails: false, // Placeholder
+        confirmationDetails: false,
       };
       this.commandQueue.push(queuedItem);
-      // Ensure queue processing is triggered *after* adding the item
       setImmediate(() => this.triggerQueueProcessing());
     });
   }
@@ -417,24 +382,19 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     if (this.isExecuting || this.commandQueue.length === 0) {
       return;
     }
-
     this.isExecuting = true;
     const { params, resolve, reject } = this.commandQueue.shift()!;
-
     try {
-      await this.shellReady; // Wait for the shell to be ready (or reinitialized)
+      await this.shellReady;
       if (!this.bashProcess || this.bashProcess.killed) {
-        // Check if killed
         throw new Error(
           'Persistent bash process is not available or was killed.',
         );
       }
-      // **** Core execution logic call ****
       const result = await this.executeCommandInShell(params);
-      resolve(result); // Resolve the specific command's promise
+      resolve(result);
     } catch (error: unknown) {
       console.error(`Error executing command "${params.command}":`, error);
-
       if (error instanceof Error) {
         reject(error);
       } else {
@@ -442,46 +402,37 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       }
     } finally {
       this.isExecuting = false;
-      // Use setImmediate to avoid potential deep recursion
       setImmediate(() => this.triggerQueueProcessing());
     }
   }
 
-  // --- **** MODIFIED: Core Command Execution Logic **** ---
   private executeCommandInShell(
     params: TerminalToolParams,
   ): Promise<ToolResult> {
-    // Define temp file paths here to be accessible throughout
     let tempStdoutPath: string | null = null;
     let tempStderrPath: string | null = null;
-    let originalResolve: (value: ToolResult | PromiseLike<ToolResult>) => void; // To pass to polling
+    let originalResolve: (value: ToolResult | PromiseLike<ToolResult>) => void;
     let originalReject: (reason?: unknown) => void;
-
     const promise = new Promise<ToolResult>((resolve, reject) => {
-      originalResolve = resolve; // Assign outer scope resolve
-      originalReject = reject; // Assign outer scope reject
-
+      originalResolve = resolve;
+      originalReject = reject;
       if (!this.bashProcess) {
         return reject(
           new Error('Bash process is not running. Cannot execute command.'),
         );
       }
-
       const isBackgroundTask = params.runInBackground ?? false;
       const commandUUID = crypto.randomUUID();
       const startDelimiter = `::START_CMD_${commandUUID}::`;
       const endDelimiter = `::END_CMD_${commandUUID}::`;
       const exitCodeDelimiter = `::EXIT_CODE_${commandUUID}::`;
-      const pidDelimiter = `::PID_${commandUUID}::`; // For background PID
-
-      // --- Initialize Temp Files for Background Task ---
+      const pidDelimiter = `::PID_${commandUUID}::`;
       if (isBackgroundTask) {
         try {
           const tempDir = os.tmpdir();
           tempStdoutPath = path.join(tempDir, `term_out_${commandUUID}.log`);
           tempStderrPath = path.join(tempDir, `term_err_${commandUUID}.log`);
         } catch (err: unknown) {
-          // If temp dir setup fails, reject immediately
           return reject(
             new Error(
               `Failed to determine temporary directory: ${getErrorMessage(err)}`,
@@ -489,44 +440,34 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           );
         }
       }
-      // --- End Temp File Init ---
-
-      let stdoutBuffer = ''; // For launch output
-      let stderrBuffer = ''; // For launch output
+      let stdoutBuffer = '';
+      let stderrBuffer = '';
       let commandOutputStarted = false;
       let exitCode: number | null = null;
-      let backgroundPid: number | null = null; // Store PID
+      let backgroundPid: number | null = null;
       let receivedEndDelimiter = false;
-
-      // Timeout only applies to foreground execution or background *launch* phase
       const effectiveTimeout = isBackgroundTask
         ? BACKGROUND_LAUNCH_TIMEOUT_MS
         : Math.min(
-            params.timeout ?? DEFAULT_TIMEOUT_MS, // Use default timeout if not provided
+            params.timeout ?? DEFAULT_TIMEOUT_MS,
             MAX_TIMEOUT_OVERRIDE_MS,
           );
-
       let onStdoutData: ((data: Buffer) => void) | null = null;
       let onStderrData: ((data: Buffer) => void) | null = null;
-      let launchTimeoutId: NodeJS.Timeout | null = null; // Renamed for clarity
-
+      let launchTimeoutId: NodeJS.Timeout | null = null;
       launchTimeoutId = setTimeout(() => {
         const timeoutMessage = isBackgroundTask
           ? `Background command launch timed out after ${effectiveTimeout}ms.`
           : `Command timed out after ${effectiveTimeout}ms.`;
-
         if (!isBackgroundTask && this.bashProcess && !this.bashProcess.killed) {
           try {
-            this.bashProcess.stdin.write('\x03'); // Ctrl+C for foreground timeout
+            this.bashProcess.stdin.write('\x03');
           } catch (e: unknown) {
             console.error('Error writing SIGINT on timeout:', e);
           }
         }
-        // Store listeners before calling cleanup, as cleanup nullifies them
         const listenersToClean = { onStdoutData, onStderrData };
-        cleanupListeners(listenersToClean); // Clean up listeners for this command
-
-        // Clean up temp files if background launch timed out
+        cleanupListeners(listenersToClean);
         if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
           this.cleanupTempFiles(tempStdoutPath, tempStderrPath).catch((err) => {
             console.warn(
@@ -534,18 +475,13 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             );
           });
         }
-
-        // Resolve the main promise with timeout info
         originalResolve({
           llmContent: `Command execution failed: ${timeoutMessage}\nCommand: ${params.command}\nExecuted in: ${this.currentCwd}\n${isBackgroundTask ? 'Mode: Background Launch' : `Mode: Foreground\nTimeout Limit: ${effectiveTimeout}ms`}\nPartial Stdout (Launch):\n${this.truncateOutput(stdoutBuffer)}\nPartial Stderr (Launch):\n${this.truncateOutput(stderrBuffer)}\nNote: ${isBackgroundTask ? 'Launch failed or took too long.' : 'Attempted interrupt (SIGINT). Shell state might be unpredictable if command ignored interrupt.'}`,
           returnDisplay: `Timeout: ${timeoutMessage}`,
         });
       }, effectiveTimeout);
-
-      // --- Data processing logic (refined slightly) ---
       const processDataChunk = (chunk: string, isStderr: boolean): boolean => {
         let dataToProcess = chunk;
-
         if (!commandOutputStarted) {
           const startIndex = dataToProcess.indexOf(startDelimiter);
           if (startIndex !== -1) {
@@ -554,14 +490,11 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
               startIndex + startDelimiter.length,
             );
           } else {
-            return false; // Still waiting for start delimiter
+            return false;
           }
         }
-
-        // Process PID delimiter (mostly expected on stderr for background)
         const pidIndex = dataToProcess.indexOf(pidDelimiter);
         if (pidIndex !== -1) {
-          // Extract PID value strictly between delimiter and newline/end
           const pidMatch = dataToProcess
             .substring(pidIndex + pidDelimiter.length)
             .match(/^(\d+)/);
@@ -574,7 +507,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             else stdoutBuffer += beforePid;
             dataToProcess = dataToProcess.substring(pidEndIndex);
           } else {
-            // Consume delimiter even if no number followed
             const beforePid = dataToProcess.substring(0, pidIndex);
             if (isStderr) stderrBuffer += beforePid;
             else stdoutBuffer += beforePid;
@@ -583,8 +515,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             );
           }
         }
-
-        // Process Exit Code delimiter
         const exitCodeIndex = dataToProcess.indexOf(exitCodeDelimiter);
         if (exitCodeIndex !== -1) {
           const exitCodeMatch = dataToProcess
@@ -609,8 +539,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             );
           }
         }
-
-        // Process End delimiter
         const endDelimiterIndex = dataToProcess.indexOf(endDelimiter);
         if (endDelimiterIndex !== -1) {
           receivedEndDelimiter = true;
@@ -620,7 +548,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           );
           if (isStderr) stderrBuffer += beforeEndDelimiter;
           else stdoutBuffer += beforeEndDelimiter;
-          // Consume delimiter and potentially the exit code echoed after it
           const afterEndDelimiter = dataToProcess.substring(
             endDelimiterIndex + endDelimiter.length,
           );
@@ -629,64 +556,44 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             ? afterEndDelimiter.substring(exitCodeEchoMatch[1].length)
             : afterEndDelimiter;
         }
-
-        // Append remaining data
         if (dataToProcess.length > 0) {
           if (isStderr) stderrBuffer += dataToProcess;
           else stdoutBuffer += dataToProcess;
         }
-
-        // Check completion criteria
         if (receivedEndDelimiter && exitCode !== null) {
-          setImmediate(cleanupAndResolve); // Use setImmediate
-          return true; // Signal completion of this command's stream processing
+          setImmediate(cleanupAndResolve);
+          return true;
         }
-
-        return false; // More data or delimiters expected
+        return false;
       };
-
-      // Assign listeners
       onStdoutData = (data: Buffer) => processDataChunk(data.toString(), false);
       onStderrData = (data: Buffer) => processDataChunk(data.toString(), true);
-
-      // --- Cleanup Logic ---
-      // Pass listeners to allow cleanup even if they are nullified later
       const cleanupListeners = (listeners?: {
         onStdoutData: ((data: Buffer) => void) | null;
         onStderrData: ((data: Buffer) => void) | null;
       }) => {
         if (launchTimeoutId) clearTimeout(launchTimeoutId);
         launchTimeoutId = null;
-
-        // Use passed-in listeners if available, otherwise use current scope's
         const stdoutListener = listeners?.onStdoutData ?? onStdoutData;
         const stderrListener = listeners?.onStderrData ?? onStderrData;
-
         if (this.bashProcess && !this.bashProcess.killed) {
           if (stdoutListener)
             this.bashProcess.stdout.removeListener('data', stdoutListener);
           if (stderrListener)
             this.bashProcess.stderr.removeListener('data', stderrListener);
         }
-        // Only nullify the *current command's* cleanup reference if it matches
         if (this.currentCommandCleanup === cleanupListeners) {
           this.currentCommandCleanup = null;
         }
-        // Nullify the listener references in the outer scope regardless
         onStdoutData = null;
         onStderrData = null;
       };
-      // Store *this specific* cleanup function instance for the current command
       this.currentCommandCleanup = cleanupListeners;
-
-      // --- Final Resolution / Polling Logic ---
       const cleanupAndResolve = async () => {
-        // Prevent double execution if cleanup was already called (e.g., by timeout)
         if (
           !this.currentCommandCleanup ||
           this.currentCommandCleanup !== cleanupListeners
         ) {
-          // Ensure temp files are cleaned if this command was superseded but might have created them
           if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
             this.cleanupTempFiles(tempStdoutPath, tempStderrPath).catch(
               (err) => {
@@ -698,16 +605,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           }
           return;
         }
-
-        // Capture initial output *before* cleanup nullifies buffers indirectly
         const launchStdout = this.truncateOutput(stdoutBuffer);
         const launchStderr = this.truncateOutput(stderrBuffer);
-
-        // Store listeners before calling cleanup
         const listenersToClean = { onStdoutData, onStderrData };
-        cleanupListeners(listenersToClean); // Remove listeners and clear launch timeout NOW
-
-        // --- Error check for missing exit code ---
+        cleanupListeners(listenersToClean);
         if (exitCode === null) {
           console.error(
             `CRITICAL: Command "${params.command}" (background: ${isBackgroundTask}) finished delimiter processing but exitCode is null.`,
@@ -719,18 +620,14 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             await this.cleanupTempFiles(tempStdoutPath, tempStderrPath);
           }
           originalResolve({
-            // Use originalResolve as this is a failure *before* polling starts
             llmContent: `Command: ${params.command}\nExecuted in: ${this.currentCwd}\nMode: ${errorMode}\nExit Code: -2 (Internal Error: Exit code not captured)\nStdout (during setup):\n${launchStdout}\nStderr (during setup):\n${launchStderr}`,
             returnDisplay:
               `Internal Error: Failed to capture command exit code.\n${launchStdout}\nStderr: ${launchStderr}`.trim(),
           });
           return;
         }
-
-        // --- CWD Update Logic (Only for Foreground Success or 'cd') ---
         let cwdUpdateError = '';
         if (!isBackgroundTask) {
-          // Only run for foreground
           const mightChangeCwd = params.command.trim().startsWith('cd ');
           if (exitCode === 0 || mightChangeCwd) {
             try {
@@ -740,7 +637,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
               }
             } catch (e: unknown) {
               if (exitCode === 0) {
-                // Only warn if the command itself succeeded
                 cwdUpdateError = `\nWarning: Failed to verify/update current working directory after command: ${getErrorMessage(e)}`;
                 console.error(
                   'Failed to update CWD after successful command:',
@@ -750,37 +646,27 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             }
           }
         }
-        // --- End CWD Update ---
-
-        // --- Result Formatting & Polling Decision ---
         if (isBackgroundTask) {
           const launchSuccess = exitCode === 0;
           const pidString =
             backgroundPid !== null ? backgroundPid.toString() : 'Not Captured';
-
-          // Check if polling should start
           if (
             launchSuccess &&
             backgroundPid !== null &&
             tempStdoutPath &&
             tempStderrPath
           ) {
-            // --- START POLLING ---
-            // Don't await this, let it run in the background and resolve the original promise later
             this.inspectBackgroundProcess(
               backgroundPid,
               params.command,
-              this.currentCwd, // CWD at time of launch
-              launchStdout, // Initial output captured during launch
-              launchStderr, // Initial output captured during launch
-              tempStdoutPath, // Path for final stdout
-              tempStderrPath, // Path for final stderr
-              originalResolve, // The resolve function of the main promise
+              this.currentCwd,
+              launchStdout,
+              launchStderr,
+              tempStdoutPath,
+              tempStderrPath,
+              originalResolve,
             );
-            // IMPORTANT: Do NOT resolve the promise here. pollBackgroundProcess will do it.
-            // --- END POLLING ---
           } else {
-            // Background launch failed OR PID was not captured OR temp files missing
             const reason =
               backgroundPid === null
                 ? 'PID not captured'
@@ -788,50 +674,39 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             const displayMessage = `Failed to launch process in background (${reason})`;
             console.error(
               `Background launch failed for command: ${params.command}. Reason: ${reason}`,
-            ); // ERROR LOG
-            // Ensure cleanup of temp files if launch failed
+            );
             if (tempStdoutPath && tempStderrPath) {
               await this.cleanupTempFiles(tempStdoutPath, tempStderrPath);
             }
             originalResolve({
-              // Use originalResolve as polling won't start
               llmContent: `Background Command Launch Failed: ${params.command}\nExecuted in: ${this.currentCwd}\nReason: ${reason}\nPID: ${pidString}\nExit Code (Launch): ${exitCode}\nStdout (During Launch):\n${launchStdout}\nStderr (During Launch):\n${launchStderr}`,
               returnDisplay: displayMessage,
             });
           }
         } else {
-          // --- Foreground task result (resolve immediately) ---
           let displayOutput = '';
           const stdoutTrimmed = launchStdout.trim();
           const stderrTrimmed = launchStderr.trim();
-
           if (stderrTrimmed) {
             displayOutput = stderrTrimmed;
           } else if (stdoutTrimmed) {
             displayOutput = stdoutTrimmed;
           }
-
           if (exitCode !== 0 && !displayOutput) {
             displayOutput = `Failed with exit code: ${exitCode}`;
           } else if (exitCode === 0 && !displayOutput) {
             displayOutput = `Success (no output)`;
           }
-
           originalResolve({
-            // Use originalResolve for foreground result
             llmContent: `Command: ${params.command}\nExecuted in: ${this.currentCwd}\nExit Code: ${exitCode}\nStdout:\n${launchStdout}\nStderr:\n${launchStderr}${cwdUpdateError}`,
-            returnDisplay: displayOutput.trim() || `Exit Code: ${exitCode}`, // Ensure some display
+            returnDisplay: displayOutput.trim() || `Exit Code: ${exitCode}`,
           });
-          // --- End Foreground Result ---
         }
-      }; // End of cleanupAndResolve
-
-      // --- Attach listeners ---
+      };
       if (!this.bashProcess || this.bashProcess.killed) {
         console.error(
           'Bash process lost or killed before listeners could be attached.',
         );
-        // Ensure temp files are cleaned up if they exist
         if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
           this.cleanupTempFiles(tempStdoutPath, tempStderrPath).catch((err) => {
             console.warn(
@@ -845,34 +720,20 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           ),
         );
       }
-      // Defensive remove shouldn't be strictly necessary with current cleanup logic, but harmless
-      // if (onStdoutData) this.bashProcess.stdout.removeListener('data', onStdoutData);
-      // if (onStderrData) this.bashProcess.stderr.removeListener('data', onStderrData);
-
-      // Attach the fresh listeners
       if (onStdoutData) this.bashProcess.stdout.on('data', onStdoutData);
       if (onStderrData) this.bashProcess.stderr.on('data', onStderrData);
-
-      // --- Construct and Write Command ---
       let commandToWrite: string;
       if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
-        // Background: Redirect command's stdout/stderr to temp files.
-        // Use subshell { ... } > file 2> file to redirect the command inside.
-        // Capture PID of the subshell. Capture exit code of the subshell launch.
-        // Ensure the subshell itself doesn't interfere with delimiter capture on stderr.
         commandToWrite = `echo "${startDelimiter}"; { { ${params.command} > "${tempStdoutPath}" 2> "${tempStderrPath}"; } & } 2>/dev/null; __LAST_PID=$!; echo "${pidDelimiter}$__LAST_PID" >&2; echo "${exitCodeDelimiter}$?" >&2; echo "${endDelimiter}$?" >&1\n`;
       } else if (!isBackgroundTask) {
-        // Foreground: Original structure. Capture command exit code.
         commandToWrite = `echo "${startDelimiter}"; ${params.command}; __EXIT_CODE=$?; echo "${exitCodeDelimiter}$__EXIT_CODE" >&2; echo "${endDelimiter}$__EXIT_CODE" >&1\n`;
       } else {
-        // Should not happen if background task setup failed, but handle defensively
         return originalReject(
           new Error(
             'Internal setup error: Missing temporary file paths for background execution.',
           ),
         );
       }
-
       try {
         if (this.bashProcess?.stdin?.writable) {
           this.bashProcess.stdin.write(commandToWrite, (err) => {
@@ -881,12 +742,8 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
                 `Error writing command "${params.command}" to bash stdin (callback):`,
                 err,
               );
-              // Store listeners before calling cleanup
-              const listenersToClean = {
-                onStdoutData,
-                onStderrData,
-              };
-              cleanupListeners(listenersToClean); // Attempt cleanup
+              const listenersToClean = { onStdoutData, onStderrData };
+              cleanupListeners(listenersToClean);
               if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
                 this.cleanupTempFiles(tempStdoutPath, tempStderrPath).catch(
                   (e) => console.warn(`Cleanup failed: ${e.message}`),
@@ -909,9 +766,8 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           `Error writing command "${params.command}" to bash stdin (sync):`,
           e,
         );
-        // Store listeners before calling cleanup
         const listenersToClean = { onStdoutData, onStderrData };
-        cleanupListeners(listenersToClean); // Attempt cleanup
+        cleanupListeners(listenersToClean);
         if (isBackgroundTask && tempStdoutPath && tempStderrPath) {
           this.cleanupTempFiles(tempStdoutPath, tempStderrPath).catch((err) =>
             console.warn(`Cleanup failed: ${err.message}`),
@@ -923,29 +779,24 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           ),
         );
       }
-    }); // End of main promise constructor
+    });
+    return promise;
+  }
 
-    return promise; // Return the promise created at the top
-  } // End of executeCommandInShell
-
-  // --- **** NEW: Background Process Polling **** ---
   private async inspectBackgroundProcess(
     pid: number,
     command: string,
     cwd: string,
-    initialStdout: string, // Stdout during launch phase
-    initialStderr: string, // Stderr during launch phase
-    tempStdoutPath: string, // Path to redirected stdout
-    tempStderrPath: string, // Path to redirected stderr
-    resolve: (value: ToolResult | PromiseLike<ToolResult>) => void, // The original promise's resolve
+    initialStdout: string,
+    initialStderr: string,
+    tempStdoutPath: string,
+    tempStderrPath: string,
+    resolve: (value: ToolResult | PromiseLike<ToolResult>) => void,
   ): Promise<void> {
-    // This function manages its own lifecycle but resolves the outer promise
     let finalStdout = '';
     let finalStderr = '';
     let llmAnalysis = '';
     let fileReadError = '';
-
-    // --- Call LLM Analysis ---
     try {
       const { status, summary } = await this.backgroundTerminalAnalyzer.analyze(
         pid,
@@ -960,10 +811,8 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         `LLM analysis failed for PID ${pid} command "${command}":`,
         llmerror,
       );
-      llmAnalysis = `LLM analysis failed: ${getErrorMessage(llmerror)}`; // Include error in analysis placeholder
+      llmAnalysis = `LLM analysis failed: ${getErrorMessage(llmerror)}`;
     }
-    // --- End LLM Call ---
-
     try {
       finalStdout = await fs.readFile(tempStdoutPath, 'utf-8');
       finalStderr = await fs.readFile(tempStderrPath, 'utf-8');
@@ -971,22 +820,15 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       console.error(`Error reading temp output files for PID ${pid}:`, err);
       fileReadError = `\nWarning: Failed to read temporary output files (${getErrorMessage(err)}). Final output may be incomplete.`;
     }
-
-    // --- Clean up temp files ---
     await this.cleanupTempFiles(tempStdoutPath, tempStderrPath);
-    // --- End Cleanup ---
-
     const truncatedFinalStdout = this.truncateOutput(finalStdout);
     const truncatedFinalStderr = this.truncateOutput(finalStderr);
-
-    // Resolve the original promise passed into pollBackgroundProcess
     resolve({
       llmContent: `Background Command: ${command}\nLaunched in: ${cwd}\nPID: ${pid}\n--- LLM Analysis ---\n${llmAnalysis}\n--- Final Stdout (from ${path.basename(tempStdoutPath)}) ---\n${truncatedFinalStdout}\n--- Final Stderr (from ${path.basename(tempStderrPath)}) ---\n${truncatedFinalStderr}\n--- Launch Stdout ---\n${initialStdout}\n--- Launch Stderr ---\n${initialStderr}${fileReadError}`,
       returnDisplay: `(PID: ${pid}): ${this.truncateOutput(llmAnalysis, 200)}`,
     });
-  } // End of pollBackgroundProcess
+  }
 
-  // --- **** NEW: Helper to cleanup temp files **** ---
   private async cleanupTempFiles(
     stdoutPath: string | null,
     stderrPath: string | null,
@@ -996,7 +838,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       try {
         await fs.unlink(filePath);
       } catch (err: unknown) {
-        // Ignore errors like file not found (it might have been deleted already or failed to create)
         if (!isNodeError(err) || err.code !== 'ENOENT') {
           console.warn(
             `Failed to delete temporary file '${filePath}': ${getErrorMessage(err)}`,
@@ -1004,11 +845,9 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
         }
       }
     };
-    // Run deletions concurrently and wait for both
     await Promise.all([unlinkQuietly(stdoutPath), unlinkQuietly(stderrPath)]);
   }
 
-  // --- Get CWD (mostly unchanged, added robustness) ---
   private getCurrentShellCwd(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (
@@ -1022,57 +861,48 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           ),
         );
       }
-
       const pwdUuid = crypto.randomUUID();
       const pwdDelimiter = `::PWD_${pwdUuid}::`;
       let pwdOutput = '';
       let onPwdData: ((data: Buffer) => void) | null = null;
-      let onPwdError: ((data: Buffer) => void) | null = null; // To catch errors during pwd
+      let onPwdError: ((data: Buffer) => void) | null = null;
       let pwdTimeoutId: NodeJS.Timeout | null = null;
-      let finished = false; // Prevent double resolution/rejection
-
+      let finished = false;
       const cleanupPwdListeners = (err?: Error) => {
-        if (finished) return; // Already handled
+        if (finished) return;
         finished = true;
         if (pwdTimeoutId) clearTimeout(pwdTimeoutId);
         pwdTimeoutId = null;
-
-        const stdoutListener = onPwdData; // Capture current reference
-        const stderrListener = onPwdError; // Capture current reference
-        onPwdData = null; // Nullify before removing
+        const stdoutListener = onPwdData;
+        const stderrListener = onPwdError;
+        onPwdData = null;
         onPwdError = null;
-
         if (this.bashProcess && !this.bashProcess.killed) {
           if (stdoutListener)
             this.bashProcess.stdout.removeListener('data', stdoutListener);
           if (stderrListener)
             this.bashProcess.stderr.removeListener('data', stderrListener);
         }
-
         if (err) {
           reject(err);
         } else {
-          // Trim whitespace and trailing newlines robustly
           resolve(pwdOutput.trim());
         }
       };
-
       onPwdData = (data: Buffer) => {
-        if (!onPwdData) return; // Listener removed
+        if (!onPwdData) return;
         const dataStr = data.toString();
         const delimiterIndex = dataStr.indexOf(pwdDelimiter);
         if (delimiterIndex !== -1) {
           pwdOutput += dataStr.substring(0, delimiterIndex);
-          cleanupPwdListeners(); // Resolve successfully
+          cleanupPwdListeners();
         } else {
           pwdOutput += dataStr;
         }
       };
-
       onPwdError = (data: Buffer) => {
-        if (!onPwdError) return; // Listener removed
+        if (!onPwdError) return;
         const dataStr = data.toString();
-        // If delimiter appears on stderr, or any stderr occurs, treat as error
         console.error(`Error during PWD check: ${dataStr}`);
         cleanupPwdListeners(
           new Error(
@@ -1080,24 +910,16 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
           ),
         );
       };
-
-      // Attach listeners
       this.bashProcess.stdout.on('data', onPwdData);
       this.bashProcess.stderr.on('data', onPwdError);
-
-      // Set timeout
       pwdTimeoutId = setTimeout(() => {
         cleanupPwdListeners(new Error('Timeout waiting for pwd response'));
-      }, 5000); // 5 second timeout for pwd
-
-      // Write command
+      }, 5000);
       try {
-        // Use printf for robustness against special characters in PWD and ensure newline
         const pwdCommand = `printf "%s" "$PWD"; printf "${pwdDelimiter}";\n`;
         if (this.bashProcess?.stdin?.writable) {
           this.bashProcess.stdin.write(pwdCommand, (err) => {
             if (err) {
-              // Error during write callback, likely means shell is unresponsive
               console.error('Error writing pwd command (callback):', err);
               cleanupPwdListeners(
                 new Error(`Failed to write pwd command: ${err.message}`),
@@ -1116,7 +938,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     });
   }
 
-  // --- Truncate Output (unchanged) ---
   private truncateOutput(output: string, limit?: number): string {
     const effectiveLimit = limit ?? this.outputLimit;
     if (output.length > effectiveLimit) {
@@ -1128,7 +949,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     return output;
   }
 
-  // --- Clear Queue (unchanged) ---
   private clearQueue(error: Error) {
     const queue = this.commandQueue;
     this.commandQueue = [];
@@ -1140,56 +960,39 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     );
   }
 
-  // --- Destroy (Added cleanup for pending background tasks if possible) ---
   destroy() {
-    // Reject any pending shell readiness promise
     this.rejectShellReady?.(
       new Error('BashTool destroyed during initialization or operation.'),
     );
-    this.rejectShellReady = undefined; // Prevent further calls
+    this.rejectShellReady = undefined;
     this.resolveShellReady = undefined;
-
     this.clearQueue(new Error('BashTool is being destroyed.'));
-
-    // Attempt to cleanup listeners for the *currently executing* command, if any
     try {
       this.currentCommandCleanup?.();
     } catch (e) {
       console.warn('Error during current command cleanup:', e);
     }
-
-    // Handle the bash process itself
     if (this.bashProcess) {
-      const proc = this.bashProcess; // Reference before nullifying
+      const proc = this.bashProcess;
       const pid = proc.pid;
-      this.bashProcess = null; // Nullify reference immediately
-
+      this.bashProcess = null;
       proc.stdout?.removeAllListeners();
       proc.stderr?.removeAllListeners();
       proc.removeAllListeners('error');
       proc.removeAllListeners('close');
-
-      // Ensure stdin is closed
       proc.stdin?.end();
-
       try {
-        // Don't wait for these, just attempt
-        proc.kill('SIGTERM'); // Attempt graceful first
+        proc.kill('SIGTERM');
         setTimeout(() => {
           if (!proc.killed) {
-            proc.kill('SIGKILL'); // Force kill if needed
+            proc.kill('SIGKILL');
           }
-        }, 500); // 500ms grace period
+        }, 500);
       } catch (e: unknown) {
-        // Catch errors if process already exited etc.
         console.warn(
           `Error trying to kill bash process PID: ${pid}: ${getErrorMessage(e)}`,
         );
       }
     }
-
-    // Note: We cannot reliably clean up temp files for background tasks
-    // that were polling when destroy() was called without more complex state tracking.
-    // OS should eventually clean /tmp, or implement a startup cleanup routine if needed.
   }
-} // End of TerminalTool class
+}

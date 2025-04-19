@@ -30,10 +30,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         <React.Fragment key={tool.callId}>
           <ToolMessage
             key={tool.callId} // Use callId as the key
+            callId={tool.callId} // Pass callId
             name={tool.name}
             description={tool.description}
             resultDisplay={tool.resultDisplay}
             status={tool.status}
+            confirmationDetails={tool.confirmationDetails} // Pass confirmationDetails
           />
           {tool.status === ToolCallStatus.Confirming &&
             tool.confirmationDetails && (

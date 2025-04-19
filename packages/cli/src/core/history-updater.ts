@@ -54,9 +54,9 @@ export const handleToolCallChunk = (
         handleToolCallChunk(
           {
             ...chunk,
-            status: ToolCallStatus.Canceled,
+            status: ToolCallStatus.Error,
             confirmationDetails: undefined,
-            resultDisplay,
+            resultDisplay: resultDisplay ?? 'Canceled by user.',
           },
           setHistory,
           submitQuery,

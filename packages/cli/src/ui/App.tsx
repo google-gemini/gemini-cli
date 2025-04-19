@@ -22,16 +22,20 @@ import {
   useStartupWarnings,
   useInitializationErrorEffect,
 } from './hooks/useAppEffects.js';
+import type { Config } from '@gemini-code/server';
 
 interface AppProps {
-  directory: string;
+  config: Config;
 }
 
-export const App = ({ directory }: AppProps) => {
+export const App = ({ config }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
-  const { streamingState, submitQuery, initError } =
-    useGeminiStream(setHistory);
+  const { streamingState, submitQuery, initError } = useGeminiStream(
+    setHistory,
+    config.getApiKey(),
+    config.getModel(),
+  );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
@@ -61,12 +65,7 @@ export const App = ({ directory }: AppProps) => {
     !initError &&
     !isWaitingForToolConfirmation;
 
-  const {
-    query,
-    setQuery,
-    handleSubmit: handleHistorySubmit,
-    inputKey,
-  } = useInputHistory({
+  const { query, handleSubmit: handleHistorySubmit } = useInputHistory({
     userMessages,
     onSubmit: submitQuery,
     isActive: isInputActive,
@@ -74,7 +73,7 @@ export const App = ({ directory }: AppProps) => {
 
   return (
     <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
-      <Header cwd={directory} />
+      <Header cwd={config.getTargetDir()} />
 
       {startupWarnings.length > 0 && (
         <Box
@@ -135,15 +134,7 @@ export const App = ({ directory }: AppProps) => {
         />
       </Box>
 
-      {isInputActive && (
-        <InputPrompt
-          query={query}
-          setQuery={setQuery}
-          onSubmit={handleHistorySubmit}
-          isActive={isInputActive}
-          forceKey={inputKey}
-        />
-      )}
+      {isInputActive && <InputPrompt onSubmit={handleHistorySubmit} />}
 
       <Footer queryLength={query.length} />
       <ITermDetectionWarning />

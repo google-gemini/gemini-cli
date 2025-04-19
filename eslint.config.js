@@ -16,7 +16,12 @@ import globals from 'globals';
 export default tseslint.config(
   {
     // Global ignores
-    ignores: ['node_modules/**', 'eslint.config.js', 'packages/cli/dist/**'],
+    ignores: [
+      'node_modules/**',
+      'eslint.config.js',
+      'packages/cli/dist/**',
+      'packages/server/dist/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

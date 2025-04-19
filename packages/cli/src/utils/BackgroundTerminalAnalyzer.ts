@@ -4,16 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Content, SchemaUnion, Type } from '@google/genai';
+import {
+  Config,
+  getErrorMessage,
+  isNodeError,
+  GeminiClient,
+} from '@gemini-code/server';
 import { promises as fs } from 'fs';
-import { Content, SchemaUnion, Type } from '@google/genai'; // Assuming these types exist
-import { GeminiClient } from '../core/gemini-client.js'; // Assuming this path
-import { exec } from 'child_process'; // Needed for Windows process check
-import { promisify } from 'util'; // To promisify exec
-import { globalConfig } from '../config/config.js';
-import { getErrorMessage, isNodeError } from './errors.js';
+import { exec as _exec } from 'child_process';
+import { promisify } from 'util';
+
+// Define the AnalysisStatus type alias
+type AnalysisStatus =
+  | 'Running'
+  | 'SuccessReported'
+  | 'ErrorReported'
+  | 'Unknown'
+  | 'AnalysisFailed';
 
 // Promisify child_process.exec for easier async/await usage
-const execAsync = promisify(exec);
+const execAsync = promisify(_exec);
 
 // Define the expected interface for the AI client dependency
 export interface AiClient {
@@ -49,27 +60,39 @@ function isAnalysisFailure(
 
 // Represents the final outcome after polling is complete (or failed/timed out)
 export interface FinalAnalysisOutcome {
-  status: string; // e.g., 'SuccessReported', 'ErrorReported', 'ProcessEnded_SuccessReported', 'TimedOut_Running', 'AnalysisFailed'
+  status: string; // e.g., 'Completed_SuccessReported', 'TimedOut_Running', 'AnalysisFailed'
   summary: string; // Final summary or error message
 }
 
 export class BackgroundTerminalAnalyzer {
-  private ai: AiClient;
-  // Make polling parameters configurable via constructor
+  private geminiClient: GeminiClient | null = null;
+  private readonly maxOutputAnalysisLength = 20000;
   private pollIntervalMs: number;
   private maxAttempts: number;
   private initialDelayMs: number;
 
-  // --- Dependency Injection & Configuration ---
   constructor(
-    aiClient?: AiClient, // Allow injecting AiClient, default to GeminiClient
+    config: Config, // Accept Config object
     options: {
       pollIntervalMs?: number;
       maxAttempts?: number;
       initialDelayMs?: number;
-    } = {}, // Provide default options
+    } = {},
   ) {
-    this.ai = aiClient || new GeminiClient(globalConfig); // Call constructor without model
+    try {
+      // Initialize Gemini client using config
+      this.geminiClient = new GeminiClient(
+        config.getApiKey(),
+        config.getModel(),
+      );
+    } catch (error) {
+      console.error(
+        'Failed to initialize GeminiClient in BackgroundTerminalAnalyzer:',
+        error,
+      );
+      // Set client to null so analyzeOutput handles it
+      this.geminiClient = null;
+    }
     this.pollIntervalMs = options.pollIntervalMs ?? 5000; // Default 5 seconds
     this.maxAttempts = options.maxAttempts ?? 6; // Default 6 attempts (approx 30s total)
     this.initialDelayMs = options.initialDelayMs ?? 500; // Default 0.5s initial delay
@@ -90,6 +113,17 @@ export class BackgroundTerminalAnalyzer {
     tempStderrFilePath: string,
     command: string,
   ): Promise<FinalAnalysisOutcome> {
+    // --- Validate PID ---
+    if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
+      console.error(
+        `BackgroundTerminalAnalyzer: Invalid or non-numeric PID provided (${pid}). Analysis cannot proceed.`,
+      );
+      return {
+        status: 'AnalysisFailed',
+        summary: 'Invalid PID provided for analysis.',
+      };
+    }
+
     // --- Initial Delay ---
     // Wait briefly before the first check to allow the process to initialize
     // and potentially write initial output.
@@ -142,21 +176,22 @@ export class BackgroundTerminalAnalyzer {
             /* ignore */
           }
 
-          lastAnalysisResult = await this.analyzeOutputWithLLM(
+          lastAnalysisResult = await this.performLlmAnalysis(
             currentStdout,
             currentStderr,
             command,
+            pid,
           );
 
           if (isAnalysisFailure(lastAnalysisResult)) {
             return {
-              status: 'ProcessEnded_AnalysisFailed',
+              status: 'Completed_AnalysisFailed',
               summary: `Process ended. Final analysis failed: ${lastAnalysisResult.error}`,
             };
           }
           // Append ProcessEnded to the status determined by the final analysis
           return {
-            status: 'ProcessEnded_' + lastAnalysisResult.inferredStatus,
+            status: 'Completed_' + lastAnalysisResult.inferredStatus,
             summary: `Process ended. Final analysis summary: ${lastAnalysisResult.summary}`,
           };
         }
@@ -170,10 +205,11 @@ export class BackgroundTerminalAnalyzer {
       }
 
       // --- LLM Analysis ---
-      lastAnalysisResult = await this.analyzeOutputWithLLM(
+      lastAnalysisResult = await this.performLlmAnalysis(
         currentStdout,
         currentStderr,
         command,
+        pid,
       );
 
       if (isAnalysisFailure(lastAnalysisResult)) {
@@ -293,31 +329,31 @@ export class BackgroundTerminalAnalyzer {
   }
 
   // --- LLM Analysis Method (largely unchanged but added validation robustness) ---
-  private async analyzeOutputWithLLM(
-    stdout: string,
-    stderr: string,
+  private async performLlmAnalysis(
+    stdoutContent: string,
+    stderrContent: string,
     command: string,
+    pid: number,
   ): Promise<AnalysisResult | AnalysisFailure> {
-    try {
-      const schema: SchemaUnion = {
-        /* ... schema definition remains the same ... */ type: Type.OBJECT,
-        properties: {
-          summary: {
-            type: Type.STRING,
-            description:
-              "A concise interpretation of significant events, progress, final results, or errors found in the process's stdout and stderr. Summarizes what the logs indicate happened. Should be formatted as markdown.",
-          },
-          inferredStatus: {
-            type: Type.STRING,
-            description:
-              "The inferred status based *only* on analyzing the provided log content. Possible values: 'Running' (logs show ongoing activity without completion/error), 'SuccessReported' (logs indicate successful completion or final positive result), 'ErrorReported' (logs indicate an error or failure), 'Unknown' (status cannot be clearly determined from the log content).",
-            enum: ['Running', 'SuccessReported', 'ErrorReported', 'Unknown'],
-          },
-        },
-        required: ['summary', 'inferredStatus'],
+    if (!this.geminiClient) {
+      return {
+        error: '[Analysis unavailable: Gemini client not initialized]',
+        inferredStatus: 'AnalysisFailed',
       };
+    }
 
-      const prompt = `**Analyze Background Process Logs**
+    const truncatedStdout =
+      stdoutContent.substring(0, this.maxOutputAnalysisLength) +
+      (stdoutContent.length > this.maxOutputAnalysisLength
+        ? '... [truncated]'
+        : '');
+    const truncatedStderr =
+      stderrContent.substring(0, this.maxOutputAnalysisLength) +
+      (stderrContent.length > this.maxOutputAnalysisLength
+        ? '... [truncated]'
+        : '');
+
+    const analysisPrompt = `**Analyze Background Process Logs**
 
 **Context:** A command (\`${command}\`) was executed in the background. You are analyzing the standard output (stdout) and standard error (stderr) collected so far to understand its progress and outcome. This analysis will be used to inform a user about what the command did.
 
@@ -325,11 +361,11 @@ export class BackgroundTerminalAnalyzer {
 * **Command:** \`${command}\`
 * **Stdout:**
     \`\`\`
-    ${stdout.slice(-2000) || '(empty)'} ${stdout.length > 2000 ? '\n... (truncated)' : ''}
+    ${truncatedStdout}
     \`\`\`
 * **Stderr:**
     \`\`\`
-    ${stderr.slice(-2000) || '(empty)'} ${stderr.length > 2000 ? '\n... (truncated)' : ''}
+    ${truncatedStderr}
     \`\`\`
 
 **Task:**
@@ -354,12 +390,14 @@ Based *only* on the provided stdout and stderr:
         properties: {
           summary: {
             type: 'string',
-            description: 'Concise markdown summary of log interpretation.',
+            description:
+              'Concise markdown summary (1-3 sentences) of log interpretation.',
           },
           inferredStatus: {
             type: 'string',
             enum: ['Running', 'SuccessReported', 'ErrorReported', 'Unknown'],
-            description: 'Status inferred *only* from log content.',
+            description:
+              'Status inferred from logs: Running, SuccessReported, ErrorReported, Unknown',
           },
         },
         required: ['summary', 'inferredStatus'],
@@ -373,57 +411,63 @@ Based *only* on the provided stdout and stderr:
 * The \`summary\` must be an interpretation of the logs, focusing on key outcomes or activities. Prioritize recent events if logs are extensive.
 * The \`inferredStatus\` should reflect the most likely state *deduced purely from the log text provided*. Ensure it is one of the specified enum values.`;
 
-      const response = await this.ai.generateJson(
-        [{ role: 'user', parts: [{ text: prompt }] }],
+    const schema: SchemaUnion = {
+      type: Type.OBJECT,
+      properties: {
+        summary: {
+          type: Type.STRING,
+          description:
+            'Concise markdown summary (1-3 sentences) of log interpretation.',
+        },
+        inferredStatus: {
+          type: Type.STRING,
+          description:
+            'Status inferred from logs: Running, SuccessReported, ErrorReported, Unknown',
+          enum: ['Running', 'SuccessReported', 'ErrorReported', 'Unknown'],
+        },
+      },
+      required: ['summary', 'inferredStatus'],
+    };
+
+    try {
+      const resultJson = await this.geminiClient.generateJson(
+        [{ role: 'user', parts: [{ text: analysisPrompt }] }],
         schema,
       );
 
-      // --- Enhanced Validation ---
-      if (typeof response !== 'object' || response === null) {
-        throw new Error(
-          `LLM returned non-object response: ${JSON.stringify(response)}`,
-        );
-      }
-      if (
-        typeof response.summary !== 'string' ||
-        response.summary.trim() === ''
-      ) {
-        // Ensure summary is a non-empty string
-        console.warn(
-          "LLM response validation warning: 'summary' field is missing, empty or not a string. Raw response:",
-          response,
-        );
-        // Decide how to handle: throw error, or assign default? Let's throw for now.
-        throw new Error(
-          `LLM response missing or invalid 'summary'. Got: ${JSON.stringify(response.summary)}`,
-        );
-      }
-      if (
-        !['Running', 'SuccessReported', 'ErrorReported', 'Unknown'].includes(
-          response.inferredStatus,
-        )
-      ) {
-        console.warn(
-          `LLM response validation warning: 'inferredStatus' is invalid ('${response.inferredStatus}'). Raw response:`,
-          response,
-        );
-        // Decide how to handle: throw error, or default to 'Unknown'? Let's throw.
-        throw new Error(
-          `LLM returned invalid 'inferredStatus': ${JSON.stringify(response.inferredStatus)}`,
-        );
-      }
+      // Validate and construct the AnalysisResult object
+      const summary =
+        typeof resultJson?.summary === 'string'
+          ? resultJson.summary
+          : '[Summary unavailable]';
 
-      return response as AnalysisResult; // Cast after validation
+      // Define valid statuses using the AnalysisStatus type (ensure it's defined above)
+      const validStatuses: Array<Exclude<AnalysisStatus, 'AnalysisFailed'>> = [
+        'Running',
+        'SuccessReported',
+        'ErrorReported',
+        'Unknown',
+      ];
+
+      // Cast the unknown value to string before checking with includes
+      const statusString = resultJson?.inferredStatus as string;
+      const inferredStatus = validStatuses.includes(
+        statusString as Exclude<AnalysisStatus, 'AnalysisFailed'>,
+      )
+        ? (statusString as Exclude<AnalysisStatus, 'AnalysisFailed'>)
+        : 'Unknown';
+
+      // Explicitly construct the object matching AnalysisResult type
+      const analysisResult: AnalysisResult = { summary, inferredStatus };
+      return analysisResult;
     } catch (error: unknown) {
-      console.error(
-        `LLM analysis call failed for command "${command}":`,
-        error,
-      );
-      // Ensure the error message passed back is helpful
-      return {
-        error: `LLM analysis call encountered an error: ${getErrorMessage(error)}`,
-        inferredStatus: 'AnalysisFailed',
+      console.error(`LLM Analysis Request Failed for PID ${pid}:`, error);
+      // Return the AnalysisFailure type
+      const analysisFailure: AnalysisFailure = {
+        error: `[Analysis failed: ${getErrorMessage(error)}]`,
+        inferredStatus: 'AnalysisFailed', // This matches the AnalysisStatus type
       };
+      return analysisFailure;
     }
   }
 }

@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/src/index.js",
   "scripts": {
+    "start": "node dist/src/index.js",
     "build": "tsc --build && cp package.json dist/",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
@@ -14,8 +15,16 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@google/genai": "^0.8.0",
+    "fast-glob": "^3.3.3",
+    "diff": "^7.0.0",
+    "dotenv": "^16.4.7"
+  },
   "devDependencies": {
     "typescript": "^5.3.3",
+    "@types/diff": "^7.0.2",
+    "@types/dotenv": "^6.1.1",
     "vitest": "^3.1.1"
   },
   "engines": {

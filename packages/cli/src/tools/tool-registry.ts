@@ -25,25 +25,35 @@ class ToolRegistry {
   }
 
   /**
-   * Retrieves the list of tool schemas in the format required by Gemini.
-   * @returns A ToolListUnion containing the function declarations.
+   * Retrieves the list of tool schemas (FunctionDeclaration array).
+   * Extracts the declarations from the ToolListUnion structure.
+   * @returns An array of FunctionDeclarations.
    */
-  getToolSchemas(): ToolListUnion {
+  getFunctionDeclarations(): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     this.tools.forEach((tool) => {
       declarations.push(tool.schema);
     });
+    return declarations;
+  }
 
-    // Return Gemini's expected format. Handle the case of no tools.
+  /**
+   * Deprecated/Internal? Retrieves schemas in the ToolListUnion format.
+   * Kept for reference, prefer getFunctionDeclarations.
+   */
+  getToolSchemas(): ToolListUnion {
+    const declarations = this.getFunctionDeclarations();
     if (declarations.length === 0) {
-      // Depending on the SDK version, you might need `undefined`, `[]`, or `[{ functionDeclarations: [] }]`
-      // Check the documentation for your @google/genai version.
-      // Let's assume an empty array works or signifies no tools.
       return [];
-      // Or if it requires the structure:
-      // return [{ functionDeclarations: [] }];
     }
     return [{ functionDeclarations: declarations }];
+  }
+
+  /**
+   * Returns an array of all registered tool instances.
+   */
+  getAllTools(): Tool[] {
+    return Array.from(this.tools.values());
   }
 
   /**
