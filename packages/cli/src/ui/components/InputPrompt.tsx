@@ -14,12 +14,15 @@ interface InputPromptProps {
   setQuery: (value: string) => void;
   onSubmit: (value: string) => void;
   isActive: boolean;
+  forceKey?: number;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
   query,
   setQuery,
   onSubmit,
+  isActive,
+  forceKey,
 }) => {
   const model = globalConfig.getModel();
 
@@ -28,11 +31,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       <Text color={'white'}>&gt; </Text>
       <Box flexGrow={1}>
         <TextInput
+          key={forceKey?.toString()}
           value={query}
           onChange={setQuery}
           onSubmit={onSubmit}
           showCursor={true}
-          focus={true}
+          focus={isActive}
           placeholder={`Ask Gemini (${model})... (try "/init" or "/help")`}
         />
       </Box>

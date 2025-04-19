@@ -112,7 +112,7 @@ export const useGeminiStream = (
 
           const maybeCommand = trimmedQuery.split(/\s+/)[0];
           if (allowlistedCommands.includes(maybeCommand)) {
-            exec(trimmedQuery, (error, stdout, stderr) => {
+            exec(trimmedQuery, (error, stdout) => {
               const timestamp = getNextMessageId(userMessageTimestamp);
               // TODO: handle stderr, error
               addHistoryItem(

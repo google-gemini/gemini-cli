@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useInputHistory } from './hooks/useInputHistory.js';
 import { Header } from './components/Header.js';
 import { Tips } from './components/Tips.js';
 import { HistoryDisplay } from './components/HistoryDisplay.js';
@@ -16,7 +17,6 @@ import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { StreamingState } from '../core/gemini-stream.js';
-import { PartListUnion } from '@google/genai';
 import { ITermDetectionWarning } from './utils/itermDetection.js';
 import {
   useStartupWarnings,
@@ -28,7 +28,6 @@ interface AppProps {
 }
 
 export const App = ({ directory }: AppProps) => {
-  const [query, setQuery] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const { streamingState, submitQuery, initError } =
@@ -39,22 +38,39 @@ export const App = ({ directory }: AppProps) => {
   useStartupWarnings(setStartupWarnings);
   useInitializationErrorEffect(initError, history, setHistory);
 
-  const handleInputSubmit = (value: PartListUnion) => {
-    submitQuery(value)
-      .then(() => {
-        setQuery('');
-      })
-      .catch(() => {
-        setQuery('');
-      });
-  };
+  const userMessages = useMemo(
+    () =>
+      history
+        .filter(
+          (item): item is HistoryItem & { type: 'user'; text: string } =>
+            item.type === 'user' &&
+            typeof item.text === 'string' &&
+            item.text.trim() !== '',
+        )
+        .map((item) => item.text),
+    [history],
+  );
 
   const isWaitingForToolConfirmation = history.some(
     (item) =>
       item.type === 'tool_group' &&
       item.tools.some((tool) => tool.confirmationDetails !== undefined),
   );
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputActive =
+    streamingState === StreamingState.Idle &&
+    !initError &&
+    !isWaitingForToolConfirmation;
+
+  const {
+    query,
+    setQuery,
+    handleSubmit: handleHistorySubmit,
+    inputKey,
+  } = useInputHistory({
+    userMessages,
+    onSubmit: submitQuery,
+    isActive: isInputActive,
+  });
 
   return (
     <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
@@ -111,7 +127,7 @@ export const App = ({ directory }: AppProps) => {
         )}
 
       <Box flexDirection="column">
-        <HistoryDisplay history={history} onSubmit={handleInputSubmit} />
+        <HistoryDisplay history={history} onSubmit={submitQuery} />
         <LoadingIndicator
           isLoading={streamingState === StreamingState.Responding}
           currentLoadingPhrase={currentLoadingPhrase}
@@ -119,12 +135,13 @@ export const App = ({ directory }: AppProps) => {
         />
       </Box>
 
-      {!isWaitingForToolConfirmation && isInputActive && (
+      {isInputActive && (
         <InputPrompt
           query={query}
           setQuery={setQuery}
-          onSubmit={handleInputSubmit}
+          onSubmit={handleHistorySubmit}
           isActive={isInputActive}
+          forceKey={inputKey}
         />
       )}
 
