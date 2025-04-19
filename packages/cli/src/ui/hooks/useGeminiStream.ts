@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { exec } from 'child_process';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
 import { GeminiClient } from '../../core/gemini-client.js';
@@ -15,6 +16,8 @@ import {
 } from '../../core/gemini-stream.js';
 import { globalConfig } from '../../config/config.js';
 import { getErrorMessage, isNodeError } from '../../utils/errors.js';
+
+const allowlistedCommands = ['ls'];  // TODO: make this configurable
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -106,6 +109,21 @@ export const useGeminiStream = (
             { type: 'user', text: trimmedQuery },
             userMessageTimestamp,
           );
+
+          const maybeCommand = trimmedQuery.split(/\s+/)[0];
+          if (allowlistedCommands.includes(maybeCommand)) {
+            exec(trimmedQuery, (error, stdout, stderr) => {
+              const timestamp = getNextMessageId(userMessageTimestamp);
+              // TODO: handle stderr, error
+              addHistoryItem(
+                setHistory,
+                { type: 'info', text: stdout },
+                timestamp,
+              );
+            });
+            return;
+          }
+
         } else if (
           // HACK to detect errored function responses.
           typeof query === 'object' &&
