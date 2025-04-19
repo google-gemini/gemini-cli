@@ -10,14 +10,15 @@
     "start": "node dist/gemini.js",
     "debug": "node --inspect-brk dist/gemini.js",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "vitest run"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^0.8.0",
     "@gemini-code/server": "1.0.0",
+    "@google/genai": "^0.8.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
@@ -34,7 +35,8 @@
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.0",
     "@types/yargs": "^17.0.32",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=18"

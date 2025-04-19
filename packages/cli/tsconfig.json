@@ -9,7 +9,8 @@
     "target": "ES2020",
     "paths": {
       "@gemini-code/*": ["./packages/*"]
-    }
+    },
+    "types": ["node", "vitest/globals"]
   },
   "exclude": ["node_modules", "dist"],
   "include": ["src"],

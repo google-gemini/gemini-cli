@@ -8,14 +8,15 @@
     "build": "tsc --build && cp package.json dist/",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "vitest run"
   },
   "files": [
     "dist"
   ],
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=18"
