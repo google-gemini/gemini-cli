@@ -39,10 +39,17 @@ export class Config {
 
 export function loadConfig(): Config {
   loadEnvironment();
+  if (!process.env.GEMINI_API_KEY) {
+    console.log(
+      'GEMINI_API_KEY is not set. See https://ai.google.dev/gemini-api/docs/api-key to obtain one. ' +
+        'Please set it in your .env file or as an environment variable.',
+    );
+    process.exit(1);
+  }
   const argv = parseArguments();
   return new Config(
-    process.env.GEMINI_API_KEY || '',
-    argv.model || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_MODEL,
+    process.env.GEMINI_API_KEY,
+    argv.model || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
   );
 }
