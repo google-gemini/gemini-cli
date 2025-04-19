@@ -138,7 +138,7 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
       const data = await response.text();
       let llmContent = '';
       // Truncate very large responses for the LLM context
-      const MAX_LLM_CONTENT_LENGTH = 100000;
+      const MAX_LLM_CONTENT_LENGTH = 200000;
       if (data) {
         llmContent = `Fetched data from ${url}:\n\n${
           data.length > MAX_LLM_CONTENT_LENGTH
