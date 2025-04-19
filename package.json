@@ -11,6 +11,7 @@
     "clean": "npm run clean --workspaces",
     "test": "npm run test --workspaces",
     "start": "node ./scripts/check-build-status.js && node node_modules/@gemini-code/cli/dist",
+    "debug": "node ./scripts/check-build-status.js && node --inspect-brk node_modules/@gemini-code/cli/dist",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",
