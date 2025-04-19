@@ -17,7 +17,7 @@ import {
 import { globalConfig } from '../../config/config.js';
 import { getErrorMessage, isNodeError } from '../../utils/errors.js';
 
-const allowlistedCommands = ['ls'];  // TODO: make this configurable
+const allowlistedCommands = ['ls']; // TODO: make this configurable
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -123,7 +123,6 @@ export const useGeminiStream = (
             });
             return;
           }
-
         } else if (
           // HACK to detect errored function responses.
           typeof query === 'object' &&
