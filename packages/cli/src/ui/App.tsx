@@ -11,7 +11,6 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistory } from './hooks/useInputHistory.js';
 import { Header } from './components/Header.js';
-import { Tips } from './components/Tips.js';
 import { HistoryDisplay } from './components/HistoryDisplay.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
@@ -22,7 +21,8 @@ import {
   useStartupWarnings,
   useInitializationErrorEffect,
 } from './hooks/useAppEffects.js';
-import type { Config } from '@gemini-code/server';
+import { shortenPath, type Config } from '@gemini-code/server';
+import { Colors } from './colors.js';
 
 interface AppProps {
   config: Config;
@@ -73,39 +73,37 @@ export const App = ({ config }: AppProps) => {
 
   return (
     <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
-      <Header cwd={config.getTargetDir()} />
+      <Header />
 
       {startupWarnings.length > 0 && (
         <Box
           borderStyle="round"
-          borderColor="yellow"
+          borderColor={Colors.AccentYellow}
           paddingX={1}
           marginY={1}
           flexDirection="column"
         >
           {startupWarnings.map((warning, index) => (
-            <Text key={index} color="yellow">
+            <Text key={index} color={Colors.AccentYellow}>
               {warning}
             </Text>
           ))}
         </Box>
       )}
 
-      <Tips />
-
       {initError &&
         streamingState !== StreamingState.Responding &&
         !isWaitingForToolConfirmation && (
           <Box
             borderStyle="round"
-            borderColor="red"
+            borderColor={Colors.AccentRed}
             paddingX={1}
             marginBottom={1}
           >
             {history.find(
               (item) => item.type === 'error' && item.text?.includes(initError),
             )?.text ? (
-              <Text color="red">
+              <Text color={Colors.AccentRed}>
                 {
                   history.find(
                     (item) =>
@@ -115,8 +113,10 @@ export const App = ({ config }: AppProps) => {
               </Text>
             ) : (
               <>
-                <Text color="red">Initialization Error: {initError}</Text>
-                <Text color="red">
+                <Text color={Colors.AccentRed}>
+                  Initialization Error: {initError}
+                </Text>
+                <Text color={Colors.AccentRed}>
                   {' '}
                   Please check API key and configuration.
                 </Text>
@@ -134,7 +134,18 @@ export const App = ({ config }: AppProps) => {
         />
       </Box>
 
-      {isInputActive && <InputPrompt onSubmit={handleHistorySubmit} />}
+      {isInputActive && (
+        <>
+          <Box>
+            <Text color={Colors.SubtleComment}>cwd: </Text>
+            <Text color={Colors.LightBlue}>
+              {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
+            </Text>
+          </Box>
+
+          <InputPrompt onSubmit={handleHistorySubmit} />
+        </>
+      )}
 
       <Footer queryLength={query.length} />
       <ITermDetectionWarning />

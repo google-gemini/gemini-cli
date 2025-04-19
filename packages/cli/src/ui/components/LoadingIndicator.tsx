@@ -7,6 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
+import { Colors } from '../colors.js';
 
 interface LoadingIndicatorProps {
   isLoading: boolean;
@@ -28,11 +29,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       <Box marginRight={1}>
         <Spinner type="dots" />
       </Box>
-      <Text color="cyan">
+      <Text color={Colors.AccentPurple}>
         {currentLoadingPhrase} ({elapsedTime}s)
       </Text>
       <Box flexGrow={1}>{/* Spacer */}</Box>
-      <Text color="gray">(ESC to cancel)</Text>
+      <Text color={Colors.SubtleComment}>(ESC to cancel)</Text>
     </Box>
   );
 };

@@ -16,6 +16,7 @@ import {
 import { PartListUnion } from '@google/genai';
 import { DiffRenderer } from './DiffRenderer.js';
 import { UI_WIDTH } from '../../constants.js';
+import { Colors } from '../../colors.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -74,7 +75,9 @@ export const ToolConfirmationMessage: React.FC<
       confirmationDetails as ToolExecuteConfirmationDetails;
 
     // For execution, we still need context display and description
-    const commandDisplay = <Text color="cyan">{executionProps.command}</Text>;
+    const commandDisplay = (
+      <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
+    );
 
     // Combine command and description into bodyContent for layout consistency
     bodyContent = (

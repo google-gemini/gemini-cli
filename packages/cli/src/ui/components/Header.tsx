@@ -6,37 +6,32 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { UI_WIDTH, BOX_PADDING_X } from '../constants.js';
-import { shortenPath } from '@gemini-code/server';
+import Gradient from 'ink-gradient';
+import { Tips } from './Tips.js';
 
-interface HeaderProps {
-  cwd: string;
-}
+const gradientColors = ['#4796E4', '#847ACE', '#C3677F'];
 
-export const Header: React.FC<HeaderProps> = ({ cwd }) => (
+export const Header: React.FC = () => (
   <>
-    {/* Static Header Art */}
-    <Box marginBottom={1}>
-      <Text color="blue">{`
-   ______  ________  ____    ____  _____  ____  _____  _____
- .' ___  ||_   __  ||_   \\  /   _||_   _||_   \\|_   _||_   _|
-/ .'   \\_|  | |_ \\_|  |   \\/   |    | |    |   \\ | |    | |
-| |   ____  |  _| _   | |\\  /| |    | |    | |\\ \\| |    | |
-\\ \`.___]  |_| |__/ | _| |_\\/_| |_  _| |_  _| |_\\   |_  _| |_
- \`._____.'|________||_____||_____||_____||_____|\\____||_____|`}</Text>
+    <Box marginBottom={1} alignItems="flex-start">
+      <Gradient colors={gradientColors}>
+        <Text>{`
+ ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗
+██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║
+██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║
+██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║
+╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║
+ ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝
+                                            
+ ██████╗ ██████╗ ██████╗ ███████╗           
+██╔════╝██╔═══██╗██╔══██╗██╔════╝           
+██║     ██║   ██║██║  ██║█████╗             
+██║     ██║   ██║██║  ██║██╔══╝             
+╚██████╗╚██████╔╝██████╔╝███████╗           
+ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝           
+`}</Text>
+      </Gradient>
     </Box>
-    {/* CWD Display */}
-    <Box
-      borderStyle="round"
-      borderColor="blue"
-      paddingX={BOX_PADDING_X}
-      flexDirection="column"
-      marginBottom={1}
-      width={UI_WIDTH}
-    >
-      <Box paddingLeft={2}>
-        <Text color="gray">cwd: {shortenPath(cwd, /*maxLength*/ 70)}</Text>
-      </Box>
-    </Box>
+    <Tips />
   </>
 );

@@ -10,6 +10,7 @@ import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { PartListUnion } from '@google/genai';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
+import { Colors } from '../../colors.js';
 
 interface ToolGroupMessageProps {
   toolCalls: IndividualToolCallDisplay[];
@@ -22,7 +23,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   onSubmit,
 }) => {
   const hasPending = toolCalls.some((t) => t.status === ToolCallStatus.Pending);
-  const borderColor = hasPending ? 'yellow' : 'blue';
+  const borderColor = hasPending ? Colors.AccentYellow : Colors.AccentBlue;
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>

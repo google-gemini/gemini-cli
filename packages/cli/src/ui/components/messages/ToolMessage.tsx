@@ -16,6 +16,7 @@ import {
 } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { FileDiff, ToolResultDisplay } from '../../../tools/tools.js';
+import { Colors } from '../../colors.js';
 
 export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   callId,
@@ -31,7 +32,7 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
     | undefined;
   const typedResultDisplay = resultDisplay as ToolResultDisplay | undefined;
 
-  let color = 'gray';
+  let color = Colors.SubtleComment;
   let prefix = '';
   switch (status) {
     case ToolCallStatus.Pending:
@@ -41,15 +42,15 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
       prefix = 'Executing:';
       break;
     case ToolCallStatus.Confirming:
-      color = 'yellow';
+      color = Colors.AccentYellow;
       prefix = 'Confirm:';
       break;
     case ToolCallStatus.Success:
-      color = 'green';
+      color = Colors.AccentGreen;
       prefix = 'Success:';
       break;
     case ToolCallStatus.Error:
-      color = 'red';
+      color = Colors.AccentRed;
       prefix = 'Error:';
       break;
     default:
@@ -60,11 +61,11 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   const title = `${prefix} ${name}`;
 
   return (
-    <Box key={callId} borderStyle="round" paddingX={1} flexDirection="column">
+    <Box key={callId} flexDirection="column" paddingX={1}>
       <Box>
         {status === ToolCallStatus.Invoked && (
           <Box marginRight={1}>
-            <Text color="blue">
+            <Text color={Colors.AccentBlue}>
               <Spinner type="dots" />
             </Text>
           </Box>
@@ -91,7 +92,7 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
           )}
           {/* Display command for execute */}
           {'command' in typedConfirmationDetails && (
-            <Text color="yellow">
+            <Text color={Colors.AccentYellow}>
               Command:{' '}
               {
                 (typedConfirmationDetails as ToolExecuteConfirmationDetails)

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import { Colors } from '../../colors.js';
 
 interface InfoMessageProps {
   text: string;
@@ -18,10 +19,10 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row">
       <Box width={prefixWidth}>
-        <Text color="yellow">{prefix}</Text>
+        <Text color={Colors.AccentYellow}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color="yellow">
+        <Text wrap="wrap" color={Colors.AccentYellow}>
           {text}
         </Text>
       </Box>

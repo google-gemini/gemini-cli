@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { Colors } from '../../colors.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -96,7 +97,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   tabWidth = DEFAULT_TAB_WIDTH,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color="yellow">No diff content.</Text>;
+    return <Text color={Colors.AccentYellow}>No diff content.</Text>;
   }
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
@@ -114,7 +115,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
   if (displayableLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor="gray" padding={1}>
+      <Box borderStyle="round" borderColor={Colors.SubtleComment} padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -137,7 +138,11 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   // --- End Modification ---
 
   return (
-    <Box borderStyle="round" borderColor="gray" flexDirection="column">
+    <Box
+      borderStyle="round"
+      borderColor={Colors.SubtleComment}
+      flexDirection="column"
+    >
       {/* Iterate over the lines that should be displayed (already normalized) */}
       {displayableLines.map((line, index) => {
         const key = `diff-line-${index}`;
@@ -165,7 +170,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
             break;
           default:
             throw new Error(`Unknown line type: ${line.type}`);
-            break;
         }
 
         // Render the line content *after* stripping the calculated *minimum* baseIndentation.
@@ -175,7 +179,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         return (
           // Using your original rendering structure
           <Box key={key} flexDirection="row">
-            <Text color="gray">{gutterNumStr} </Text>
+            <Text color={Colors.SubtleComment}>{gutterNumStr} </Text>
             <Text color={color} dimColor={dim}>
               {prefixSymbol}{' '}
             </Text>

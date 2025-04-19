@@ -23,6 +23,7 @@
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
     "ink": "^5.2.0",
+    "ink-gradient": "^3.0.0",
     "ink-select-input": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import { Colors } from '../../colors.js';
 
 interface UserMessageProps {
   text: string;
@@ -18,7 +19,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row">
       <Box width={prefixWidth}>
-        <Text color="gray">{prefix}</Text>
+        <Text color={Colors.SubtleComment}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap">{text}</Text>

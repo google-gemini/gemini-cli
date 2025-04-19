@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import { Colors } from '../colors.js';
 
 /**
  * A utility class to render a subset of Markdown into Ink components.
@@ -83,14 +84,14 @@ export class MarkdownRenderer {
           const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
           if (codeMatch && codeMatch[2]) {
             renderedNode = (
-              <Text key={key} color="yellow">
+              <Text key={key} color={Colors.AccentPurple}>
                 {codeMatch[2]}
               </Text>
             );
           } else {
             // Fallback for simple or non-matching cases
             renderedNode = (
-              <Text key={key} color="yellow">
+              <Text key={key} color={Colors.AccentPurple}>
                 {fullMatch.slice(1, -1)}
               </Text>
             );
@@ -109,7 +110,7 @@ export class MarkdownRenderer {
             renderedNode = (
               <Text key={key}>
                 {linkText}
-                <Text color="blue"> ({url})</Text>
+                <Text color={Colors.AccentBlue}> ({url})</Text>
               </Text>
             );
           }
@@ -160,7 +161,7 @@ export class MarkdownRenderer {
         key={key}
         borderStyle="round"
         paddingX={1}
-        borderColor="gray"
+        borderColor={Colors.SubtleComment}
         flexDirection="column"
       >
         {lang && <Text dimColor> {lang}</Text>}
@@ -281,14 +282,14 @@ export class MarkdownRenderer {
         switch (level /* ... (header styling as before) ... */) {
           case 1:
             headerNode = (
-              <Text bold color="cyan">
+              <Text bold color={Colors.AccentCyan}>
                 {renderedHeaderText}
               </Text>
             );
             break;
           case 2:
             headerNode = (
-              <Text bold color="blue">
+              <Text bold color={Colors.AccentBlue}>
                 {renderedHeaderText}
               </Text>
             );
@@ -298,7 +299,7 @@ export class MarkdownRenderer {
             break;
           case 4:
             headerNode = (
-              <Text italic color="gray">
+              <Text italic color={Colors.SubtleComment}>
                 {renderedHeaderText}
               </Text>
             );
