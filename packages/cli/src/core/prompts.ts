@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { ReadFileTool } from '../tools/read-file.tool.js';
 import { TerminalTool } from '../tools/terminal.tool.js';
 

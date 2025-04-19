@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { ToolCallEvent, HistoryItem } from '../ui/types.js';
 import { Part } from '@google/genai';
 import {

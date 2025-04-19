@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import fs from 'fs'; // Used for sync checks in validation
 import fsPromises from 'fs/promises'; // Used for async operations in fallback
 import path from 'path';

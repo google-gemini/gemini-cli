@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React from 'react';
 import { Text, Box } from 'ink';
 import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';

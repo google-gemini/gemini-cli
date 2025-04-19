@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { promises as fs } from 'fs';
 import { Content, SchemaUnion, Type } from '@google/genai'; // Assuming these types exist
 import { GeminiClient } from '../core/gemini-client.js'; // Assuming this path

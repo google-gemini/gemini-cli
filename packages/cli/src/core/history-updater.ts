@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { Part } from '@google/genai';
 import { toolRegistry } from '../tools/tool-registry.js';
 import {

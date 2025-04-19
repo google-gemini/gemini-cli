@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Simple utility to validate objects against JSON Schemas
  * In a real implementation, you would use a library like Ajv
  */

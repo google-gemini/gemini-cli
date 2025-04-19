@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { FunctionDeclaration, Schema } from '@google/genai';
 import { ToolCallConfirmationDetails } from '../ui/types.js';
 

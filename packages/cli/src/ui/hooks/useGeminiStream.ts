@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
 import { GeminiClient } from '../../core/gemini-client.js';
