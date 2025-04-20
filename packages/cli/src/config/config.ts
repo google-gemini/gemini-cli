@@ -72,6 +72,7 @@ export function loadCliConfig(): Config {
     argv.model || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
     argv.debug_mode || false,
+    // TODO: load passthroughCommands from .env file
   );
 }
 
