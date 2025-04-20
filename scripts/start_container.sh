@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMAGE=gemini-code-sandbox
-CLI_DIST=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli/dist
+CLI_DIST=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
 
 # use docker if installed, otherwise try to use podman instead
 if command -v docker &> /dev/null; then
