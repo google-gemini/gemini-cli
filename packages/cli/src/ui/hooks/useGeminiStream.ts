@@ -108,7 +108,13 @@ export const useGeminiStream = (
       if (typeof query === 'string') {
         setDebugMessage(`User query: ${query}`);
         const maybeCommand = query.split(/\s+/)[0];
-        if (config.getPassthroughCommands().includes(maybeCommand)) {
+        if (query.trim() === 'clear') {
+          // This just clears the *UI* history, not the model history.
+          // TODO: add a slash command for that.
+          setDebugMessage('Clearing terminal.');
+          setHistory((prevHistory) => []);
+          return;
+        } else if (config.getPassthroughCommands().includes(maybeCommand)) {
           // Execute and capture output
           setDebugMessage(`Executing shell command directly: ${query}`);
           _exec(query, (error, stdout, stderr) => {
