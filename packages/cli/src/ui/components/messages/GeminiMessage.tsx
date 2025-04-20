@@ -38,9 +38,6 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
 
   return (
     <Box flexDirection="row">
-      <Box width={prefixWidth}>
-        <Text color={Colors.AccentPurple}>{prefix}</Text>
-      </Box>
       <Box flexGrow={1} flexDirection="column">
         {renderedBlocks}
       </Box>

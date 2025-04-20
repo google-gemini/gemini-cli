@@ -160,11 +160,12 @@ export class MarkdownRenderer {
       <Box
         key={key}
         borderStyle="round"
-        paddingX={1}
         borderColor={Colors.SubtleComment}
+        borderLeft={false}
+        borderRight={false}
         flexDirection="column"
       >
-        {lang && <Text dimColor> {lang}</Text>}
+        {lang && <Text dimColor>{lang}</Text>}
         {/* Render each line preserving whitespace (within Text component) */}
         {content.map((line, idx) => (
           <Text key={idx}>{line}</Text>

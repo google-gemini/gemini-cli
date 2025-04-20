@@ -69,7 +69,7 @@ export const App = ({ config }: AppProps) => {
   });
 
   return (
-    <Box flexDirection="column" padding={1} marginBottom={1} width="100%">
+    <Box flexDirection="column" marginBottom={1} width="100%">
       <Header />
 
       {startupWarnings.length > 0 && (
