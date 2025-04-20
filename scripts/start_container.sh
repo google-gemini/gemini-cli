@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 IMAGE=gemini-code-sandbox
 CLI_DIST=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
