@@ -13,11 +13,18 @@ export class Config {
   private apiKey: string;
   private model: string;
   private targetDir: string;
+  private debugMode: boolean;
 
-  constructor(apiKey: string, model: string, targetDir: string) {
+  constructor(
+    apiKey: string,
+    model: string,
+    targetDir: string,
+    debugMode: boolean,
+  ) {
     this.apiKey = apiKey;
     this.model = model;
     this.targetDir = targetDir;
+    this.debugMode = debugMode;
   }
 
   getApiKey(): string {
@@ -30,6 +37,10 @@ export class Config {
 
   getTargetDir(): string {
     return this.targetDir;
+  }
+
+  getDebugMode(): boolean {
+    return this.debugMode;
   }
 }
 
@@ -60,6 +71,7 @@ export function createServerConfig(
   apiKey: string,
   model: string,
   targetDir: string,
+  debugMode: boolean,
 ): Config {
-  return new Config(apiKey, model, path.resolve(targetDir));
+  return new Config(apiKey, model, path.resolve(targetDir), debugMode);
 }

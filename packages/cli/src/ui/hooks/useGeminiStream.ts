@@ -49,6 +49,7 @@ export const useGeminiStream = (
   const [streamingState, setStreamingState] = useState<StreamingState>(
     StreamingState.Idle,
   );
+  const [debugMessage, setDebugMessage] = useState<string>('');
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatSessionRef = useRef<Chat | null>(null);
@@ -103,6 +104,10 @@ export const useGeminiStream = (
     async (query: PartListUnion) => {
       if (streamingState === StreamingState.Responding) return;
       if (typeof query === 'string' && query.trim().length === 0) return;
+
+      if (typeof query === 'string') {
+        setDebugMessage(`User query: ${query}`);
+      }
 
       const userMessageTimestamp = Date.now();
       const client = geminiClientRef.current;
@@ -403,7 +408,7 @@ export const useGeminiStream = (
     ],
   );
 
-  return { streamingState, submitQuery, initError };
+  return { streamingState, submitQuery, initError, debugMessage };
 };
 
 // Define ServerTool interface here if not importing from server (circular dep issue?)

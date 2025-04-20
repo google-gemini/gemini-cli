@@ -20,6 +20,7 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 interface CliArgs {
   target_dir: string | undefined;
   model: string | undefined;
+  debug_mode: boolean | undefined;
 }
 
 function parseArguments(): CliArgs {
@@ -35,6 +36,12 @@ function parseArguments(): CliArgs {
       type: 'string',
       description: `The Gemini model to use. Defaults to ${DEFAULT_GEMINI_MODEL}.`,
       default: DEFAULT_GEMINI_MODEL,
+    })
+    .option('debug_mode', {
+      alias: 'z',
+      type: 'boolean',
+      description: 'Whether to run in debug mode. Defaults to false.',
+      default: false,
     })
     .help()
     .alias('h', 'help')
@@ -64,6 +71,7 @@ export function loadCliConfig(): Config {
     process.env.GEMINI_API_KEY,
     argv.model || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
+    argv.debug_mode || false,
   );
 }
 

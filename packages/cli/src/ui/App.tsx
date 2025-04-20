@@ -31,11 +31,8 @@ interface AppProps {
 export const App = ({ config }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
-  const { streamingState, submitQuery, initError } = useGeminiStream(
-    setHistory,
-    config.getApiKey(),
-    config.getModel(),
-  );
+  const { streamingState, submitQuery, initError, debugMessage } =
+    useGeminiStream(setHistory, config.getApiKey(), config.getModel());
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
@@ -147,7 +144,11 @@ export const App = ({ config }: AppProps) => {
         </>
       )}
 
-      <Footer queryLength={query.length} />
+      <Footer
+        queryLength={query.length}
+        debugMode={config.getDebugMode()}
+        debugMessage={debugMessage}
+      />
       <ITermDetectionWarning />
     </Box>
   );
