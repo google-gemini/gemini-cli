@@ -266,7 +266,9 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             `Persistent bash process exited unexpectedly (code: ${code}, signal: ${signal}). State is lost. Queued commands cancelled.`,
           ),
         );
-        setTimeout(() => this.initializeShell(), 1000);
+        if (signal !== 'SIGINT') {
+          setTimeout(() => this.initializeShell(), 1000);
+        }
       });
       setTimeout(() => {
         if (this.bashProcess && !this.bashProcess.killed) {
