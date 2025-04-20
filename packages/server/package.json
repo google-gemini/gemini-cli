@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Gemini Code Server",
   "type": "module",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "scripts": {
     "start": "node dist/src/index.js",
-    "build": "tsc --build && cp package.json dist/",
+    "build": "tsc --build",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",

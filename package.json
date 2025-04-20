@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "clean": "npm run clean --workspaces",
+    "clean": "rm -rf node_modules && npm run clean --workspaces",
     "test": "npm run test --workspaces",
-    "start": "node ./scripts/check-build-status.js && node node_modules/@gemini-code/cli/dist",
-    "debug": "node ./scripts/check-build-status.js && node --inspect-brk node_modules/@gemini-code/cli/dist",
+    "start": "node ./scripts/check-build-status.js && node node_modules/@gemini-code/cli",
+    "debug": "node ./scripts/check-build-status.js && node --inspect-brk node_modules/@gemini-code/cli",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",

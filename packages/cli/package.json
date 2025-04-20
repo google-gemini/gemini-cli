@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Gemini Code CLI",
   "type": "module",
-  "main": "src/gemini.js",
+  "main": "dist/index.js",
+  "bin": "dist/index.js",
   "scripts": {
-    "build": "tsc --build && cp package.json README.md ../../LICENSE dist/ && touch dist/.last_build",
+    "build": "tsc --build && touch dist/.last_build",
     "clean": "rm -rf dist",
     "start": "node dist/gemini.js",
     "debug": "node --inspect-brk dist/gemini.js",

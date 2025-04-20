@@ -7,11 +7,13 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "composite": true,
-    // MONOREPO STUFF
     "incremental": true,
-    "target": "ES2020",
-    "module": "Node16",
     "declaration": true,
-    "moduleResolution": "node16"
+    "allowSyntheticDefaultImports": true,
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "types": ["node"]
   }
 }
