@@ -52,15 +52,7 @@ export const App = ({ config }: AppProps) => {
     [history],
   );
 
-  const isWaitingForToolConfirmation = history.some(
-    (item) =>
-      item.type === 'tool_group' &&
-      item.tools.some((tool) => tool.confirmationDetails !== undefined),
-  );
-  const isInputActive =
-    streamingState === StreamingState.Idle &&
-    !initError &&
-    !isWaitingForToolConfirmation;
+  const isInputActive = streamingState === StreamingState.Idle && !initError;
 
   const { query, handleSubmit: handleHistorySubmit } = useInputHistory({
     userMessages,
@@ -88,39 +80,37 @@ export const App = ({ config }: AppProps) => {
         </Box>
       )}
 
-      {initError &&
-        streamingState !== StreamingState.Responding &&
-        !isWaitingForToolConfirmation && (
-          <Box
-            borderStyle="round"
-            borderColor={Colors.AccentRed}
-            paddingX={1}
-            marginBottom={1}
-          >
-            {history.find(
-              (item) => item.type === 'error' && item.text?.includes(initError),
-            )?.text ? (
+      {initError && streamingState !== StreamingState.Responding && (
+        <Box
+          borderStyle="round"
+          borderColor={Colors.AccentRed}
+          paddingX={1}
+          marginBottom={1}
+        >
+          {history.find(
+            (item) => item.type === 'error' && item.text?.includes(initError),
+          )?.text ? (
+            <Text color={Colors.AccentRed}>
+              {
+                history.find(
+                  (item) =>
+                    item.type === 'error' && item.text?.includes(initError),
+                )?.text
+              }
+            </Text>
+          ) : (
+            <>
               <Text color={Colors.AccentRed}>
-                {
-                  history.find(
-                    (item) =>
-                      item.type === 'error' && item.text?.includes(initError),
-                  )?.text
-                }
+                Initialization Error: {initError}
               </Text>
-            ) : (
-              <>
-                <Text color={Colors.AccentRed}>
-                  Initialization Error: {initError}
-                </Text>
-                <Text color={Colors.AccentRed}>
-                  {' '}
-                  Please check API key and configuration.
-                </Text>
-              </>
-            )}
-          </Box>
-        )}
+              <Text color={Colors.AccentRed}>
+                {' '}
+                Please check API key and configuration.
+              </Text>
+            </>
+          )}
+        </Box>
+      )}
 
       <Box flexDirection="column">
         <HistoryDisplay history={history} onSubmit={submitQuery} />

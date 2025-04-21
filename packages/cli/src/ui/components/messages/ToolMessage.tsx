@@ -11,11 +11,6 @@ import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { FileDiff, ToolResultDisplay } from '../../../tools/tools.js';
 import { Colors } from '../../colors.js';
-import {
-  ToolCallConfirmationDetails,
-  ToolEditConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from '@gemini-code/server';
 
 export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   callId,
@@ -23,12 +18,7 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   description,
   resultDisplay,
   status,
-  confirmationDetails,
 }) => {
-  // Explicitly type the props to help the type checker
-  const typedConfirmationDetails = confirmationDetails as
-    | ToolCallConfirmationDetails
-    | undefined;
   const typedResultDisplay = resultDisplay as ToolResultDisplay | undefined;
 
   let color = Colors.SubtleComment;
@@ -78,30 +68,6 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
             : ` - ${description}`}
         </Text>
       </Box>
-      {status === ToolCallStatus.Confirming && typedConfirmationDetails && (
-        <Box flexDirection="column" marginLeft={2}>
-          {/* Display diff for edit/write */}
-          {'fileDiff' in typedConfirmationDetails && (
-            <DiffRenderer
-              diffContent={
-                (typedConfirmationDetails as ToolEditConfirmationDetails)
-                  .fileDiff
-              }
-            />
-          )}
-          {/* Display command for execute */}
-          {'command' in typedConfirmationDetails && (
-            <Text color={Colors.AccentYellow}>
-              Command:{' '}
-              {
-                (typedConfirmationDetails as ToolExecuteConfirmationDetails)
-                  .command
-              }
-            </Text>
-          )}
-          {/* <ConfirmInput onConfirm={handleConfirm} isFocused={isFocused} /> */}
-        </Box>
-      )}
       {status === ToolCallStatus.Success && typedResultDisplay && (
         <Box flexDirection="column" marginLeft={2}>
           {typeof typedResultDisplay === 'string' ? (
