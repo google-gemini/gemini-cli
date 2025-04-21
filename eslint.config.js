@@ -12,6 +12,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
+import licenseHeader from 'eslint-plugin-license-header';
 
 export default tseslint.config(
   {
@@ -140,6 +141,24 @@ export default tseslint.config(
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
       'default-case': 'error',
+    },
+  },
+  {
+    files: ['./**/*.{tsx,ts,js}'],
+    plugins: {
+      'license-header': licenseHeader,
+    },
+    rules: {
+      'license-header/header': [
+        'error',
+        [
+          '/**',
+          ' * @license',
+          ' * Copyright 2025 Google LLC',
+          ' * SPDX-License-Identifier: Apache-2.0',
+          ' */',
+        ],
+      ],
     },
   },
   // Prettier config must be last
