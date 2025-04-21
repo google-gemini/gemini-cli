@@ -19,12 +19,7 @@ export const Footer: React.FC<FooterProps> = ({
   debugMode,
   debugMessage,
 }) => (
-  <Box
-    marginTop={1}
-    display="flex"
-    justifyContent="space-between"
-    width="100%"
-  >
+  <Box marginTop={1} display="flex" justifyContent="space-between" width="100%">
     {/* Left Section: Help/DebugMode */}
     <Box>
       <Text color={Colors.SubtleComment}>
