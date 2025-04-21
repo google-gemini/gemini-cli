@@ -11,7 +11,7 @@
     "clean": "rm -rf node_modules && npm run clean --workspaces",
     "test": "npm run test --workspaces",
     "start": "scripts/start.sh",
-    "debug": "node ./scripts/check-build-status.js && node --inspect-brk node_modules/@gemini-code/cli",
+    "debug": "scripts/debug.sh",
     "fix": "eslint . --fix",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
