@@ -1,5 +1,7 @@
 # Gemini Code
 
+[![Gemini Code CI](https://github.com/google-gemini/gemini-code/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-code/actions/workflows/ci.yml)
+
 **Disclaimer:** This README.md was created by gemini-code and this project was developed rapidly and currently lacks comprehensive testing, and other quality-of-life features common in mature projects.
 
 This repository contains the Gemini Code CLI tool.
