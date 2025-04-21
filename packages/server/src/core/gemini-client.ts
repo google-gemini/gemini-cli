@@ -18,15 +18,7 @@ import {
 import { CoreSystemPrompt } from './prompts.js';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { Turn, ServerTool, GeminiEventType } from './turn.js';
-
-// Import the ServerGeminiStreamEvent type
-type ServerGeminiStreamEvent =
-  | { type: GeminiEventType.Content; value: string }
-  | {
-      type: GeminiEventType.ToolCallRequest;
-      value: { callId: string; name: string; args: Record<string, unknown> };
-    };
+import { Turn, ServerTool, ServerGeminiStreamEvent } from './turn.js';
 
 export class GeminiClient {
   private ai: GoogleGenAI;
@@ -112,6 +104,14 @@ export class GeminiClient {
         for await (const event of resultStream) {
           yield event;
         }
+
+        const confirmations = turn.getConfirmationDetails();
+        if (confirmations.length > 0) {
+          break;
+        }
+
+        // What do we do when we have both function responses and confirmations?
+
         const fnResponses = turn.getFunctionResponses();
         if (fnResponses.length > 0) {
           request = fnResponses;

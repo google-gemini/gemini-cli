@@ -49,7 +49,14 @@ export interface Tool<
    */
   getDescription(params: TParams): string;
 
-  // Removed shouldConfirmExecute as it's UI-specific
+  /**
+   * Determines if the tool should prompt for confirmation before execution
+   * @param params Parameters for the tool execution
+   * @returns Whether execute should be confirmed.
+   */
+  shouldConfirmExecute(
+    params: TParams,
+  ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
    * Executes the tool with the given parameters
@@ -115,7 +122,17 @@ export abstract class BaseTool<
     return JSON.stringify(params);
   }
 
-  // Removed shouldConfirmExecute as it's UI-specific
+  /**
+   * Determines if the tool should prompt for confirmation before execution
+   * @param params Parameters for the tool execution
+   * @returns Whether or not execute should be confirmed by the user.
+   */
+  shouldConfirmExecute(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    params: TParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return Promise.resolve(false);
+  }
 
   /**
    * Abstract method to execute the tool with the given parameters
@@ -147,4 +164,28 @@ export type ToolResultDisplay = string | FileDiff;
 
 export interface FileDiff {
   fileDiff: string;
+}
+
+export interface ToolCallConfirmationDetails {
+  title: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+}
+
+export interface ToolEditConfirmationDetails
+  extends ToolCallConfirmationDetails {
+  fileName: string;
+  fileDiff: string;
+}
+
+export interface ToolExecuteConfirmationDetails
+  extends ToolCallConfirmationDetails {
+  command: string;
+  rootCommand: string;
+  description: string;
+}
+
+export enum ToolConfirmationOutcome {
+  ProceedOnce,
+  ProceedAlways,
+  Cancel,
 }

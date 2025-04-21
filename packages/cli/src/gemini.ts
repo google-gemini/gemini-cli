@@ -8,15 +8,17 @@ import React from 'react';
 import { render } from 'ink';
 import { App } from './ui/App.js';
 import { toolRegistry } from './tools/tool-registry.js';
-import { LSTool } from './tools/ls.tool.js';
-import { ReadFileTool } from './tools/read-file.tool.js';
-import { GrepTool } from './tools/grep.tool.js';
-import { GlobTool } from './tools/glob.tool.js';
-import { EditTool } from './tools/edit.tool.js';
-import { TerminalTool } from './tools/terminal.tool.js';
-import { WriteFileTool } from './tools/write-file.tool.js';
-import { WebFetchTool } from './tools/web-fetch.tool.js';
 import { loadCliConfig } from './config/config.js';
+import {
+  LSTool,
+  ReadFileTool,
+  GrepTool,
+  GlobTool,
+  EditTool,
+  TerminalTool,
+  WriteFileTool,
+  WebFetchTool,
+} from '@gemini-code/server';
 
 async function main() {
   // Load configuration

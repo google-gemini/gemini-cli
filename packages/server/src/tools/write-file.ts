@@ -7,7 +7,14 @@
 import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff'; // Keep for result generation
-import { BaseTool, ToolResult, FileDiff } from './tools.js'; // Updated import (Removed ToolResultDisplay)
+import {
+  BaseTool,
+  ToolResult,
+  FileDiff,
+  ToolEditConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolCallConfirmationDetails,
+} from './tools.js'; // Updated import (Removed ToolResultDisplay)
 import { SchemaValidator } from '../utils/schemaValidator.js'; // Updated import
 import { makeRelative, shortenPath } from '../utils/paths.js'; // Updated import
 import { isNodeError } from '../utils/errors.js'; // Import isNodeError
@@ -30,16 +37,17 @@ export interface WriteFileToolParams {
 /**
  * Implementation of the WriteFile tool logic (moved from CLI)
  */
-export class WriteFileLogic extends BaseTool<WriteFileToolParams, ToolResult> {
+export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
+  private shouldAlwaysWrite = false;
 
   private readonly rootDirectory: string;
 
   constructor(rootDirectory: string) {
     super(
-      WriteFileLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      WriteFileTool.Name,
+      'WriteFile',
+      'Writes content to a specified file in the local filesystem.',
       {
         properties: {
           file_path: {
@@ -96,6 +104,56 @@ export class WriteFileLogic extends BaseTool<WriteFileToolParams, ToolResult> {
   getDescription(params: WriteFileToolParams): string {
     const relativePath = makeRelative(params.file_path, this.rootDirectory);
     return `Writing to ${shortenPath(relativePath)}`;
+  }
+
+  /**
+   * Handles the confirmation prompt for the WriteFile tool in the CLI.
+   */
+  async shouldConfirmExecute(
+    params: WriteFileToolParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.shouldAlwaysWrite) {
+      return false;
+    }
+
+    const validationError = this.validateToolParams(params);
+    if (validationError) {
+      console.error(
+        `[WriteFile Wrapper] Attempted confirmation with invalid parameters: ${validationError}`,
+      );
+      return false;
+    }
+
+    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const fileName = path.basename(params.file_path);
+
+    let currentContent = '';
+    try {
+      currentContent = fs.readFileSync(params.file_path, 'utf8');
+    } catch {
+      // File might not exist, that's okay for write/create
+    }
+
+    const fileDiff = Diff.createPatch(
+      fileName,
+      currentContent,
+      params.content,
+      'Current',
+      'Proposed',
+      { context: 3 },
+    );
+
+    const confirmationDetails: ToolEditConfirmationDetails = {
+      title: `Confirm Write: ${shortenPath(relativePath)}`,
+      fileName,
+      fileDiff,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.shouldAlwaysWrite = true;
+        }
+      },
+    };
+    return confirmationDetails;
   }
 
   async execute(params: WriteFileToolParams): Promise<ToolResult> {

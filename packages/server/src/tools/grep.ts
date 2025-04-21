@@ -51,7 +51,7 @@ interface GrepMatch {
 /**
  * Implementation of the Grep tool logic (moved from CLI)
  */
-export class GrepLogic extends BaseTool<GrepToolParams, ToolResult> {
+export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   static readonly Name = 'search_file_content'; // Keep static name
 
   private rootDirectory: string;
@@ -62,9 +62,9 @@ export class GrepLogic extends BaseTool<GrepToolParams, ToolResult> {
    */
   constructor(rootDirectory: string) {
     super(
-      GrepLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      GrepTool.Name,
+      'SearchText',
+      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
       {
         properties: {
           pattern: {

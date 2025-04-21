@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ToolCallConfirmationDetails } from '@gemini-code/server';
 import { ToolResultDisplay } from '../tools/tools.js';
 
 export enum ToolCallStatus {
@@ -46,27 +47,3 @@ export type HistoryItem = HistoryItemBase &
     | { type: 'error'; text: string }
     | { type: 'tool_group'; tools: IndividualToolCallDisplay[] }
   );
-
-export interface ToolCallConfirmationDetails {
-  title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
-}
-
-export interface ToolEditConfirmationDetails
-  extends ToolCallConfirmationDetails {
-  fileName: string;
-  fileDiff: string;
-}
-
-export interface ToolExecuteConfirmationDetails
-  extends ToolCallConfirmationDetails {
-  command: string;
-  rootCommand: string;
-  description: string;
-}
-
-export enum ToolConfirmationOutcome {
-  ProceedOnce,
-  ProceedAlways,
-  Cancel,
-}

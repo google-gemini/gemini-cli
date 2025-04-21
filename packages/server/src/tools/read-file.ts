@@ -33,7 +33,7 @@ export interface ReadFileToolParams {
 /**
  * Implementation of the ReadFile tool logic
  */
-export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
+export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
   private static readonly DEFAULT_MAX_LINES = 2000;
   private static readonly MAX_LINE_LENGTH = 2000;
@@ -41,9 +41,9 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
 
   constructor(rootDirectory: string) {
     super(
-      ReadFileLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      ReadFileTool.Name,
+      'ReadFile',
+      'Reads and returns the content of a specified file from the local filesystem. Handles large files by allowing reading specific line ranges.',
       {
         properties: {
           path: {
@@ -236,16 +236,15 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
       const startLine = params.offset || 0;
       const endLine = params.limit
         ? startLine + params.limit
-        : Math.min(startLine + ReadFileLogic.DEFAULT_MAX_LINES, lines.length);
+        : Math.min(startLine + ReadFileTool.DEFAULT_MAX_LINES, lines.length);
       const selectedLines = lines.slice(startLine, endLine);
 
       let truncated = false;
       const formattedLines = selectedLines.map((line) => {
         let processedLine = line;
-        if (line.length > ReadFileLogic.MAX_LINE_LENGTH) {
+        if (line.length > ReadFileTool.MAX_LINE_LENGTH) {
           processedLine =
-            line.substring(0, ReadFileLogic.MAX_LINE_LENGTH) +
-            '... [truncated]';
+            line.substring(0, ReadFileTool.MAX_LINE_LENGTH) + '... [truncated]';
           truncated = true;
         }
 

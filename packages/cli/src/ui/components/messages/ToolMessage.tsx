@@ -7,16 +7,15 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import {
-  IndividualToolCallDisplay,
-  ToolCallStatus,
-  ToolCallConfirmationDetails,
-  ToolEditConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from '../../types.js';
+import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { FileDiff, ToolResultDisplay } from '../../../tools/tools.js';
 import { Colors } from '../../colors.js';
+import {
+  ToolCallConfirmationDetails,
+  ToolEditConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+} from '@gemini-code/server';
 
 export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   callId,

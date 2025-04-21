@@ -7,16 +7,16 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
+import { PartListUnion } from '@google/genai';
+import { DiffRenderer } from './DiffRenderer.js';
+import { UI_WIDTH } from '../../constants.js';
+import { Colors } from '../../colors.js';
 import {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
-} from '../../types.js';
-import { PartListUnion } from '@google/genai';
-import { DiffRenderer } from './DiffRenderer.js';
-import { UI_WIDTH } from '../../constants.js';
-import { Colors } from '../../colors.js';
+} from '@gemini-code/server';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;

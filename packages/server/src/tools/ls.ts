@@ -58,7 +58,7 @@ export interface FileEntry {
 /**
  * Implementation of the LS tool logic
  */
-export class LSLogic extends BaseTool<LSToolParams, ToolResult> {
+export class LSTool extends BaseTool<LSToolParams, ToolResult> {
   static readonly Name = 'list_directory';
 
   /**
@@ -73,9 +73,9 @@ export class LSLogic extends BaseTool<LSToolParams, ToolResult> {
    */
   constructor(rootDirectory: string) {
     super(
-      LSLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      LSTool.Name,
+      'ReadFolder',
+      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
       {
         properties: {
           path: {

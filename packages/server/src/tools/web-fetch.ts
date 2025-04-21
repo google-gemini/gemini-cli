@@ -21,14 +21,14 @@ export interface WebFetchToolParams {
 /**
  * Implementation of the WebFetch tool logic (moved from CLI)
  */
-export class WebFetchLogic extends BaseTool<WebFetchToolParams, ToolResult> {
+export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
   static readonly Name: string = 'web_fetch';
 
   constructor() {
     super(
-      WebFetchLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      WebFetchTool.Name,
+      'WebFetch',
+      'Fetches text content from a given URL. Handles potential network errors and non-success HTTP status codes.',
       {
         properties: {
           url: {

@@ -7,7 +7,14 @@
 import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff';
-import { BaseTool, ToolResult, ToolResultDisplay } from './tools.js';
+import {
+  BaseTool,
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolEditConfirmationDetails,
+  ToolResult,
+  ToolResultDisplay,
+} from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
@@ -48,8 +55,9 @@ interface CalculatedEdit {
 /**
  * Implementation of the Edit tool logic (moved from CLI)
  */
-export class EditLogic extends BaseTool<EditToolParams, ToolResult> {
+export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   static readonly Name = 'replace'; // Keep static name
+  private shouldAlwaysEdit = false;
 
   private readonly rootDirectory: string;
 
@@ -61,9 +69,9 @@ export class EditLogic extends BaseTool<EditToolParams, ToolResult> {
     // Note: The description here mentions other tools like ReadFileTool/WriteFileTool
     // by name. This might need updating if those tool names change.
     super(
-      EditLogic.Name,
-      '', // Display name handled by CLI wrapper
-      '', // Description handled by CLI wrapper
+      EditTool.Name,
+      'Edit',
+      'Replaces a SINGLE, UNIQUE occurrence of text within a file. Requires providing significant context around the change to ensure uniqueness. For moving/renaming files, use the Bash tool with `mv`. For replacing entire file contents or creating new files use the WriteFile tool. Always use the ReadFile tool to examine the file before using this tool.',
       {
         properties: {
           file_path: {
@@ -225,7 +233,82 @@ export class EditLogic extends BaseTool<EditToolParams, ToolResult> {
     };
   }
 
-  // Removed shouldConfirmExecute - Confirmation is handled by the CLI wrapper
+  /**
+   * Handles the confirmation prompt for the Edit tool in the CLI.
+   * It needs to calculate the diff to show the user.
+   */
+  async shouldConfirmExecute(
+    params: EditToolParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.shouldAlwaysEdit) {
+      return false;
+    }
+    const validationError = this.validateToolParams(params);
+    if (validationError) {
+      console.error(
+        `[EditTool Wrapper] Attempted confirmation with invalid parameters: ${validationError}`,
+      );
+      return false;
+    }
+    let currentContent: string | null = null;
+    let fileExists = false;
+    let newContent = '';
+    try {
+      currentContent = fs.readFileSync(params.file_path, 'utf8');
+      fileExists = true;
+    } catch (err: unknown) {
+      if (isNodeError(err) && err.code === 'ENOENT') {
+        fileExists = false;
+      } else {
+        console.error(`Error reading file for confirmation diff: ${err}`);
+        return false;
+      }
+    }
+    if (params.old_string === '' && !fileExists) {
+      newContent = params.new_string;
+    } else if (!fileExists) {
+      return false;
+    } else if (currentContent !== null) {
+      const occurrences = this.countOccurrences(
+        currentContent,
+        params.old_string,
+      );
+      const expectedReplacements =
+        params.expected_replacements === undefined
+          ? 1
+          : params.expected_replacements;
+      if (occurrences === 0 || occurrences !== expectedReplacements) {
+        return false;
+      }
+      newContent = this.replaceAll(
+        currentContent,
+        params.old_string,
+        params.new_string,
+      );
+    } else {
+      return false;
+    }
+    const fileName = path.basename(params.file_path);
+    const fileDiff = Diff.createPatch(
+      fileName,
+      currentContent ?? '',
+      newContent,
+      'Current',
+      'Proposed',
+      { context: 3 },
+    );
+    const confirmationDetails: ToolEditConfirmationDetails = {
+      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
+      fileName,
+      fileDiff,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.shouldAlwaysEdit = true;
+        }
+      },
+    };
+    return confirmationDetails;
+  }
 
   getDescription(params: EditToolParams): string {
     const relativePath = makeRelative(params.file_path, this.rootDirectory);
