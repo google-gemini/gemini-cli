@@ -17,7 +17,8 @@ set -euo pipefail
 
 IMAGE=gemini-code-sandbox
 WORKDIR=/sandbox/$(basename "$PWD")
-CLI_DIST=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
+CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
+DEBUG_PORT=9229
 
 # use docker if installed, otherwise try to use podman instead
 if command -v docker &> /dev/null; then
@@ -42,6 +43,14 @@ while $CMD ps -a --format "{{.Names}}" | grep -q "$IMAGE-$INDEX"; do
 done
 run_args+=(--name "$IMAGE-$INDEX")
 
+# enable debugging via node --inspect-brk (and $DEBUG_PORT) if DEBUG is set
+node_args=()
+if [ -n "${DEBUG:-}" ]; then
+    node_args+=(--inspect-brk="0.0.0.0:$DEBUG_PORT")
+    run_args+=(-p "$DEBUG_PORT:$DEBUG_PORT")
+fi
+node_args+=("$CLI_PATH" "$@")
+
 # run gemini-code in sandbox container
 # use empty --authfile to skip unnecessary auth refresh overhead
-$CMD run "${run_args[@]}" --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "$CLI_DIST" "$@"
+$CMD run "${run_args[@]}" --init --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"

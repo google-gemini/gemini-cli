@@ -25,5 +25,9 @@ if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]] || \
     scripts/start_sandbox.sh "$@"
 else
     echo "WARNING: running outside of sandbox. Set GEMINI_CODE_SANDBOX to enable sandbox."
-    node node_modules/@gemini-code/cli "$@"
+    if [ -n "${DEBUG:-}" ]; then
+        node --inspect-brk node_modules/@gemini-code/cli "$@"
+    else
+        node node_modules/@gemini-code/cli "$@"
+    fi
 fi

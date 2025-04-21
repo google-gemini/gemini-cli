@@ -11,7 +11,7 @@
     "clean": "scripts/clean.sh",
     "test": "npm run test --workspaces",
     "start": "scripts/start.sh",
-    "debug": "scripts/debug.sh",
+    "debug": "DEBUG=1 scripts/start.sh",
     "lint:fix": "eslint . --fix",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
