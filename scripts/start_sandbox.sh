@@ -41,7 +41,10 @@ INDEX=0
 while $CMD ps -a --format "{{.Names}}" | grep -q "$IMAGE-$INDEX"; do
     INDEX=$((INDEX + 1))
 done
-run_args+=(--name "$IMAGE-$INDEX")
+run_args+=(--name "$IMAGE-$INDEX" --hostname "$IMAGE-$INDEX")
+
+# also set SANDBOX environment variable as container name
+run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
 
 # enable debugging via node --inspect-brk (and $DEBUG_PORT) if DEBUG is set
 node_args=()
