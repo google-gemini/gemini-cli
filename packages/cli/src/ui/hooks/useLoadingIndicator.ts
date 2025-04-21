@@ -9,7 +9,7 @@ import {
   WITTY_LOADING_PHRASES,
   PHRASE_CHANGE_INTERVAL_MS,
 } from '../constants.js';
-import { StreamingState } from '../../core/gemini-stream.js';
+import { StreamingState } from '../types.js';
 
 export const useLoadingIndicator = (streamingState: StreamingState) => {
   const [elapsedTime, setElapsedTime] = useState(0);
