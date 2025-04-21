@@ -1,6 +1,6 @@
 # Gemini Code
 
-**Disclaimer:** This README.md was created by gemini-code and this project was developed rapidly and currently lacks comprehensive testing, CI/CD pipelines, and other quality-of-life features common in mature projects.
+**Disclaimer:** This README.md was created by gemini-code and this project was developed rapidly and currently lacks comprehensive testing, and other quality-of-life features common in mature projects.
 
 This repository contains the Gemini Code CLI tool.
 
@@ -61,3 +61,13 @@ npm run format
 ```
 
 This command uses Prettier to format the code according to the project's style guidelines.
+
+## Linting
+
+To lint the code in this project, run the following command fro the root directory:
+
+```bash
+npm run lint
+```
+
+Chances are you will need to manually address errors output. You can also try `npm run lint -- --fix` where some errors may be resolved.
