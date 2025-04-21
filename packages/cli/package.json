@@ -1,6 +1,6 @@
 {
   "name": "@gemini-code/cli",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Gemini Code CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -18,7 +18,7 @@
     "dist"
   ],
   "dependencies": {
-    "@gemini-code/server": "1.0.0",
+    "@gemini-code/server": "*",
     "@google/genai": "^0.8.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
