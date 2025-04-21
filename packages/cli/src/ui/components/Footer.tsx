@@ -19,8 +19,14 @@ export const Footer: React.FC<FooterProps> = ({
   debugMode,
   debugMessage,
 }) => (
-  <Box marginTop={1} justifyContent="space-between">
-    <Box minWidth={15}>
+  <Box
+    marginTop={1}
+    display="flex"
+    justifyContent="space-between"
+    width="100%"
+  >
+    {/* Left Section: Help/DebugMode */}
+    <Box>
       <Text color={Colors.SubtleComment}>
         {queryLength === 0 ? '? for shortcuts' : ''}
         {debugMode && (
@@ -28,6 +34,24 @@ export const Footer: React.FC<FooterProps> = ({
         )}
       </Text>
     </Box>
-    <Text color={Colors.AccentBlue}>Gemini</Text>
+
+    {/* Middle Section: Centered Sandbox Info */}
+    <Box
+      flexGrow={1}
+      alignItems="center"
+      justifyContent="center"
+      display="flex"
+    >
+      {process.env.SANDBOX ? (
+        <Text color="green"> {process.env.SANDBOX} </Text>
+      ) : (
+        <Text color="red"> WARNING: OUTSIDE SANDBOX </Text>
+      )}
+    </Box>
+
+    {/* Right Section: Gemini Label */}
+    <Box>
+      <Text color={Colors.AccentBlue}>Gemini</Text>
+    </Box>
   </Box>
 );

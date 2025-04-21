@@ -36,6 +36,9 @@ run_args=(-it --rm)
 # mount current directory as $WORKDIR inside container
 run_args+=(-v "$PWD:$WORKDIR")
 
+# mount $TMPDIR as /tmp inside container
+run_args+=(-v "$TMPDIR:/tmp")
+
 # name container after image, plus numeric suffix to avoid conflicts
 INDEX=0
 while $CMD ps -a --format "{{.Names}}" | grep -q "$IMAGE-$INDEX"; do
@@ -45,6 +48,9 @@ run_args+=(--name "$IMAGE-$INDEX" --hostname "$IMAGE-$INDEX")
 
 # also set SANDBOX environment variable as container name
 run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
+
+# pass TERM and COLORTERM to container to maintain terminal colors
+run_args+=(--env "TERM=$TERM" --env "COLORTERM=$COLORTERM")
 
 # enable debugging via node --inspect-brk (and $DEBUG_PORT) if DEBUG is set
 node_args=()
