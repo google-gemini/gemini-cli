@@ -19,7 +19,8 @@ set -euo pipefail
 node ./scripts/check-build-status.js
 
 # if GEMINI_CODE_SANDBOX is set (can be in .env file), start in sandbox container
-if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]] || grep -qiE '^GEMINI_CODE_SANDBOX *= *(1|true)' .env; then
+if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]] || \
+   { [ -f .env ] && grep -qiE '^GEMINI_CODE_SANDBOX *= *(1|true)' .env; }; then
     echo "Running in sandbox container ..."
     scripts/start_sandbox.sh "$@"
 else
