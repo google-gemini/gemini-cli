@@ -11,8 +11,10 @@ if command -v docker &> /dev/null; then
 elif command -v podman &> /dev/null; then
     CMD=podman
 else
-    echo "ERROR: docker or podman must be installed"
+    echo "ERROR: missing docker or podman for sandboxing"
     exit 1
 fi
 
-$CMD run -it --rm -v"$PWD:$WORKDIR" --workdir "$WORKDIR" "$IMAGE" node "$CLI_DIST"
+# run gemini-code in sandbox container
+# use empty --authfile to skip unnecessary auth refresh overhead
+$CMD run -it --rm --authfile <(echo '{}') -v"$PWD:$WORKDIR" --workdir "$WORKDIR" "$IMAGE" node "$CLI_DIST"

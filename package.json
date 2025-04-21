@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "clean": "rm -rf node_modules && npm run clean --workspaces",
+    "build": "scripts/build.sh",
+    "clean": "scripts/clean.sh",
     "test": "npm run test --workspaces",
     "start": "scripts/start.sh",
     "debug": "scripts/debug.sh",
