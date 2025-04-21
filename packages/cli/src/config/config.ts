@@ -7,7 +7,6 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
-// Import server config logic
 import {
   Config,
   loadEnvironment,
@@ -75,6 +74,3 @@ export function loadCliConfig(): Config {
     // TODO: load passthroughCommands from .env file
   );
 }
-
-// The globalConfig export is problematic, CLI entry point (gemini.ts) should call loadCliConfig
-// export const globalConfig = loadCliConfig(); // Remove or replace global export
