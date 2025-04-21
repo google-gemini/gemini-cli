@@ -22,6 +22,7 @@ export * from './utils/getFolderStructure.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
+export * from './tools/tool-registry.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';

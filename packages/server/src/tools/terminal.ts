@@ -17,8 +17,8 @@ import {
   SchemaValidator,
   getErrorMessage,
   isNodeError,
-  Config,
 } from '@gemini-code/server';
+import { Config } from '../config/config.js';
 import {
   BaseTool,
   ToolCallConfirmationDetails,

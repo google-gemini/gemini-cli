@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolCallConfirmationDetails } from '@gemini-code/server';
-import { ToolResultDisplay } from '../tools/tools.js';
+import {
+  ToolCallConfirmationDetails,
+  ToolResultDisplay,
+} from '@gemini-code/server';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {

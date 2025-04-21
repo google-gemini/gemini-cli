@@ -7,26 +7,11 @@
 import React from 'react';
 import { render } from 'ink';
 import { App } from './ui/App.js';
-import { toolRegistry } from './tools/tool-registry.js';
 import { loadCliConfig } from './config/config.js';
-import {
-  LSTool,
-  ReadFileTool,
-  GrepTool,
-  GlobTool,
-  EditTool,
-  TerminalTool,
-  WriteFileTool,
-  WebFetchTool,
-} from '@gemini-code/server';
 
 async function main() {
   // Load configuration
   const config = loadCliConfig();
-
-  // Configure tools using the loaded config
-  registerTools(config.getTargetDir());
-
   // Render UI, passing necessary config values
   render(
     React.createElement(App, {
@@ -81,24 +66,3 @@ main().catch((error) => {
   }
   process.exit(1);
 });
-
-function registerTools(targetDir: string) {
-  const config = loadCliConfig();
-  const lsTool = new LSTool(targetDir);
-  const readFileTool = new ReadFileTool(targetDir);
-  const grepTool = new GrepTool(targetDir);
-  const globTool = new GlobTool(targetDir);
-  const editTool = new EditTool(targetDir);
-  const terminalTool = new TerminalTool(targetDir, config);
-  const writeFileTool = new WriteFileTool(targetDir);
-  const webFetchTool = new WebFetchTool();
-
-  toolRegistry.registerTool(lsTool);
-  toolRegistry.registerTool(readFileTool);
-  toolRegistry.registerTool(grepTool);
-  toolRegistry.registerTool(globTool);
-  toolRegistry.registerTool(editTool);
-  toolRegistry.registerTool(terminalTool);
-  toolRegistry.registerTool(writeFileTool);
-  toolRegistry.registerTool(webFetchTool);
-}

@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
-import { FileDiff, ToolResultDisplay } from '../../../tools/tools.js';
+import { FileDiff, ToolResultDisplay } from '@gemini-code/server';
 import { Colors } from '../../colors.js';
 
 export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({

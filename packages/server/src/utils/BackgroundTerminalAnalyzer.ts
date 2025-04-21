@@ -6,11 +6,11 @@
 
 import { Content, SchemaUnion, Type } from '@google/genai';
 import {
-  Config,
   getErrorMessage,
   isNodeError,
   GeminiClient,
 } from '@gemini-code/server';
+import { Config } from '../config/config.js';
 import { promises as fs } from 'fs';
 import { exec as _exec } from 'child_process';
 import { promisify } from 'util';

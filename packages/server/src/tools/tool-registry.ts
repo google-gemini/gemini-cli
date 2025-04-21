@@ -7,7 +7,7 @@
 import { ToolListUnion, FunctionDeclaration } from '@google/genai';
 import { Tool } from './tools.js';
 
-class ToolRegistry {
+export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
 
   /**
@@ -70,6 +70,3 @@ class ToolRegistry {
     return this.tools.get(name);
   }
 }
-
-// Export a singleton instance of the registry
-export const toolRegistry = new ToolRegistry();
