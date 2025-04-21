@@ -44,4 +44,4 @@ run_args+=(--name "$IMAGE-$INDEX")
 
 # run gemini-code in sandbox container
 # use empty --authfile to skip unnecessary auth refresh overhead
-$CMD run "${run_args[@]}" --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "$CLI_DIST"
+$CMD run "${run_args[@]}" --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "$CLI_DIST" "$@"
