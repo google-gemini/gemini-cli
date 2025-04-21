@@ -12,7 +12,7 @@
     "test": "npm run test --workspaces",
     "start": "scripts/start.sh",
     "debug": "scripts/debug.sh",
-    "fix": "eslint . --fix",
+    "lint:fix": "eslint . --fix",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",

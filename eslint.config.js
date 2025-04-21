@@ -13,6 +13,17 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
+import noRelativeCrossPackageImports from './eslint-rules/no-relative-cross-package-imports.js';
+import path from 'node:path'; // Use node: prefix for built-ins
+import url from 'node:url';
+
+// --- ESM way to get __dirname ---
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// --- ---
+
+// Determine the monorepo root (assuming eslint.config.js is at the root)
+const projectRoot = __dirname;
 
 export default tseslint.config(
   {
@@ -22,6 +33,7 @@ export default tseslint.config(
       'eslint.config.js',
       'packages/cli/dist/**',
       'packages/server/dist/**',
+      'eslint-rules/*',
     ],
   },
   eslint.configs.recommended,
@@ -163,4 +175,24 @@ export default tseslint.config(
   },
   // Prettier config must be last
   prettierConfig,
+  // Custom eslint rules for this repo
+  {
+    files: ['packages/**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      custom: {
+        rules: {
+          'no-relative-cross-package-imports': noRelativeCrossPackageImports,
+        },
+      },
+    },
+    rules: {
+      // Enable and configure your custom rule
+      'custom/no-relative-cross-package-imports': [
+        'error',
+        {
+          root: path.join(projectRoot, 'packages'),
+        },
+      ],
+    },
+  },
 );
