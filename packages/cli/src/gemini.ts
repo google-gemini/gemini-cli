@@ -54,20 +54,21 @@ process.on('unhandledRejection', (reason, _promise) => {
     );
     console.warn('-----------------------------------------');
     console.warn('Reason:', reason);
-    // No process.exit(1);
-  } else {
-    // Log other unexpected unhandled rejections as critical errors
-    console.error('=========================================');
-    console.error('CRITICAL: Unhandled Promise Rejection!');
-    console.error('=========================================');
-    console.error('Reason:', reason);
-    console.error('Stack trace may follow:');
-    if (!(reason instanceof Error)) {
-      console.error(reason);
-    }
-    // Exit for genuinely unhandled errors
-    process.exit(1);
+    return;
+    // No process.exit(1); Don't exit.
   }
+
+  // Log other unexpected unhandled rejections as critical errors
+  console.error('=========================================');
+  console.error('CRITICAL: Unhandled Promise Rejection!');
+  console.error('=========================================');
+  console.error('Reason:', reason);
+  console.error('Stack trace may follow:');
+  if (!(reason instanceof Error)) {
+    console.error(reason);
+  }
+  // Exit for genuinely unhandled errors
+  process.exit(1);
 });
 
 // --- Global Entry Point ---

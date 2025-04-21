@@ -299,32 +299,31 @@ export class BackgroundTerminalAnalyzer {
         const { stdout } = await execAsync(command);
         // Check if the output contains the process information (it will have the image name if found)
         return stdout.toLowerCase().includes('.exe'); // A simple check, adjust if needed
-      } else {
-        // Linux/macOS/Unix-like: Use kill -0 signal
-        // process.kill sends signal 0 to check existence without killing
-        process.kill(pid, 0);
-        return true; // If no error is thrown, process exists
       }
+      // Linux/macOS/Unix-like: Use kill -0 signal
+      // process.kill sends signal 0 to check existence without killing
+      process.kill(pid, 0);
+      return true; // If no error is thrown, process exists
     } catch (error: unknown) {
       if (isNodeError(error) && error.code === 'ESRCH') {
         // ESRCH: Standard error code for "No such process" on Unix-like systems
         return false;
-      } else if (
+      }
+      if (
         process.platform === 'win32' &&
         getErrorMessage(error).includes('No tasks are running')
       ) {
         // tasklist specific error when PID doesn't exist
         return false;
-      } else {
-        // Other errors (e.g., EPERM - permission denied) mean we couldn't determine status.
-        // Re-throwing might be appropriate depending on desired behavior.
-        // Here, we log it and cautiously return true, assuming it *might* still be running.
-        console.warn(
-          `isProcessRunning(${pid}) encountered error: ${getErrorMessage(error)}. Assuming process might still exist.`,
-        );
-        // Or you could throw the error: throw new Error(`Failed to check process status for PID ${pid}: ${error.message}`);
-        return true; // Cautious assumption
       }
+      // Other errors (e.g., EPERM - permission denied) mean we couldn't determine status.
+      // Re-throwing might be appropriate depending on desired behavior.
+      // Here, we log it and cautiously return true, assuming it *might* still be running.
+      console.warn(
+        `isProcessRunning(${pid}) encountered error: ${getErrorMessage(error)}. Assuming process might still exist.`,
+      );
+      // Or you could throw the error: throw new Error(`Failed to check process status for PID ${pid}: ${error.message}`);
+      return true; // Cautious assumption
     }
   }
 

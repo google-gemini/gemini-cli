@@ -152,14 +152,13 @@ export class Turn {
           );
           if (confirmationDetails) {
             return { ...pendingToolCall, confirmationDetails };
-          } else {
-            const result = await tool.execute(pendingToolCall.args);
-            return {
-              ...pendingToolCall,
-              result,
-              confirmationDetails: undefined,
-            };
           }
+          const result = await tool.execute(pendingToolCall.args);
+          return {
+            ...pendingToolCall,
+            result,
+            confirmationDetails: undefined,
+          };
         } catch (execError: unknown) {
           return {
             ...pendingToolCall,
@@ -191,17 +190,17 @@ export class Turn {
           type: GeminiEventType.ToolCallConfirmation,
           value: serverConfirmationetails,
         };
-      } else {
-        const responsePart = this.buildFunctionResponse(outcome);
-        this.fnResponses.push(responsePart);
-        const responseInfo: ToolCallResponseInfo = {
-          callId: outcome.callId,
-          responsePart,
-          resultDisplay: outcome.result?.returnDisplay,
-          error: outcome.error,
-        };
-        yield { type: GeminiEventType.ToolCallResponse, value: responseInfo };
       }
+      const responsePart = this.buildFunctionResponse(outcome);
+      this.fnResponses.push(responsePart);
+      const responseInfo: ToolCallResponseInfo = {
+        callId: outcome.callId,
+        responsePart,
+        resultDisplay: outcome.result?.returnDisplay,
+        error: outcome.error,
+      };
+      yield { type: GeminiEventType.ToolCallResponse, value: responseInfo };
+      return;
     }
   }
 
@@ -225,23 +224,23 @@ export class Turn {
   // Builds the Part array expected by the Google GenAI API
   private buildFunctionResponse(outcome: ServerToolExecutionOutcome): Part {
     const { name, result, error } = outcome;
-    let fnResponsePayload: Record<string, unknown>;
-
     if (error) {
       // Format error for the LLM
       const errorMessage = error?.message || String(error);
-      fnResponsePayload = { error: `Tool execution failed: ${errorMessage}` };
       console.error(`[Server Turn] Error executing tool ${name}:`, error);
-    } else {
-      // Pass successful tool result (content meant for LLM)
-      fnResponsePayload = { output: result?.llmContent ?? '' }; // Default to empty string if no content
+      return {
+        functionResponse: {
+          name,
+          id: outcome.callId,
+          response: { error: `Tool execution failed: ${errorMessage}` },
+        },
+      };
     }
-
     return {
       functionResponse: {
         name,
         id: outcome.callId,
-        response: fnResponsePayload,
+        response: { output: result?.llmContent ?? '' },
       },
     };
   }

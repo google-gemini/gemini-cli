@@ -70,12 +70,12 @@ export function usePipedInput(): PipedInputState {
         stdin.removeListener('error', handleError);
         stdin.removeListener('end', handleEnd);
       };
-    } else {
-      // No piped input (running interactively)
-      setIsLoading(false);
-      // Optionally set an 'info' state or just let isLoading=false & isPiped=false suffice
-      // setError('No piped input detected.'); // Maybe don't treat this as an 'error'
     }
+
+    // No piped input (running interactively)
+    setIsLoading(false);
+    // Optionally set an 'info' state or just let isLoading=false & isPiped=false suffice
+    // setError('No piped input detected.'); // Maybe don't treat this as an 'error'
 
     // Intentionally run only once on mount or when stdin theoretically changes
   }, [stdin, isRawModeSupported, setRawMode /*, exit */]);

@@ -129,10 +129,9 @@ export class GeminiClient {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Gemini stream request aborted by user.');
         throw error;
-      } else {
-        console.error(`Error during Gemini stream or tool interaction:`, error);
-        throw error;
       }
+      console.error(`Error during Gemini stream or tool interaction:`, error);
+      throw error;
     }
   }
 
