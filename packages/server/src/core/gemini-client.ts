@@ -64,9 +64,12 @@ export class GeminiClient {
 
   async startChat(toolDeclarations: FunctionDeclaration[]): Promise<Chat> {
     const envPart = await this.getEnvironment();
-    const tools: Tool[] = toolDeclarations.map((declaration) => ({
-      functionDeclarations: [declaration],
-    }));
+    // const tools: Tool[] = toolDeclarations.map((declaration) => ({
+    //   functionDeclarations: [declaration],
+    // }));
+    // merge all functions into a single tool, as seems to be required for gemini 2.5 series
+    // can test by asking "what tools do you have?", which lists single function unless merged
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     try {
       const chat = this.ai.chats.create({
         model: this.model,
