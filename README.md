@@ -71,3 +71,13 @@ npm run lint
 ```
 
 Chances are you will need to manually address errors output. You can also try `npm run lint -- --fix` where some errors may be resolved.
+
+## Sandboxing
+
+To enable sandboxing, set `GEMINI_CODE_SANDBOX=true` in your environment or `.env` file. Once enabled, `npm run build` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. Requires either `docker` or `podman` to be installed on host machine.
+
+The sandbox (container) mounts the current directory with read-write access and is started/stopped/removed automatically as you start/stop Gemini Code. You can tell you are inside the sandbox with the `cwd` being reported as `/sandbox/...`. Files created within the sandbox should be automatically mapped to your user/group on host machine.
+
+The very first build of the container (with `npm run build` or `scripts/build_sandbox.sh`) can take 20-30s (mostly due to downloading of the base image) but after that both build and start overhead should be minimal (1-2s).
+
+You can customize the sandbox in `Dockerfile` (e.g. for pre-installed utilities) or in `scripts/build_sandbox.sh` (e.g. for mounts, environment variables, etc) and changes will be automatically picked up by `npm run build` and `npm start` respectively.
