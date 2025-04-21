@@ -38,8 +38,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
    * Delegates validation to the core logic
    */
   validateToolParams(_params: ReadFileToolParams): string | null {
-    // Currently allowing any path. Add validation if needed.
-    return null;
+    return this.coreLogic.validateToolParams(_params);
   }
 
   /**
@@ -62,7 +61,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   /**
    * Delegates execution to the core logic
    */
-  async execute(params: ReadFileToolParams): Promise<ToolResult> {
+  execute(params: ReadFileToolParams): Promise<ToolResult> {
     return this.coreLogic.execute(params);
   }
 }

@@ -330,7 +330,13 @@ export const useGeminiStream = (
                       ...item,
                       tools: item.tools.map((tool) =>
                         tool.callId === callId
-                          ? { ...tool, status: ToolCallStatus.Invoked }
+                          ? {
+                              ...tool,
+                              status:
+                                tool.status === ToolCallStatus.Error
+                                  ? ToolCallStatus.Error
+                                  : ToolCallStatus.Invoked,
+                            }
                           : tool,
                       ),
                     };
@@ -362,7 +368,10 @@ export const useGeminiStream = (
                         tool.callId === callId
                           ? {
                               ...tool,
-                              status: ToolCallStatus.Success,
+                              status:
+                                tool.status === ToolCallStatus.Error
+                                  ? ToolCallStatus.Error
+                                  : ToolCallStatus.Success,
                               resultDisplay: result.returnDisplay,
                             }
                           : tool,

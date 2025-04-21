@@ -17,7 +17,7 @@ export interface ReadFileToolParams {
   /**
    * The absolute path to the file to read
    */
-  file_path: string;
+  path: string;
 
   /**
    * The line number to start reading from (optional)
@@ -46,7 +46,7 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
       '', // Description handled by CLI wrapper
       {
         properties: {
-          file_path: {
+          path: {
             description:
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
             type: 'string',
@@ -62,7 +62,7 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
             type: 'number',
           },
         },
-        required: ['file_path'],
+        required: ['path'],
         type: 'object',
       },
     );
@@ -101,7 +101,7 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
     ) {
       return 'Parameters failed schema validation.';
     }
-    const filePath = params.file_path;
+    const filePath = params.path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
@@ -185,7 +185,7 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
    * @returns A string describing the file being read
    */
   getDescription(params: ReadFileToolParams): string {
-    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const relativePath = makeRelative(params.path, this.rootDirectory);
     return shortenPath(relativePath);
   }
 
@@ -199,11 +199,11 @@ export class ReadFileLogic extends BaseTool<ReadFileToolParams, ToolResult> {
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: '**Error:** Failed to execute tool.',
+        returnDisplay: validationError,
       };
     }
 
-    const filePath = params.file_path;
+    const filePath = params.path;
     try {
       if (!fs.existsSync(filePath)) {
         return {

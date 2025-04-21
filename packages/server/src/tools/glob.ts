@@ -149,7 +149,7 @@ export class GlobLogic extends BaseTool<GlobToolParams, ToolResult> {
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Error: Failed to execute tool.`,
+        returnDisplay: validationError,
       };
     }
 
