@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM docker.io/library/node:20-slim
 
 # install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
