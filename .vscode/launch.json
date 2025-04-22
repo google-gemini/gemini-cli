@@ -9,7 +9,10 @@
       "port": 9229,
       "request": "attach",
       "skipFiles": ["<node_internals>/**"],
-      "type": "node"
+      "type": "node",
+      // fix source mapping when debugging in sandbox
+      "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-code",
+      "localRoot": "${workspaceFolder}/packages"
     },
     {
       "type": "node",
