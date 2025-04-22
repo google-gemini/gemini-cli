@@ -9,24 +9,9 @@ import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { GeminiClient, ServerTool } from '@gemini-code/server';
-
-import { PartListUnion } from '@google/genai';
+import { GeminiClient } from '@gemini-code/server';
 
 async function main() {
-  let initialInput: string | undefined = undefined;
-
-  // Check if input is being piped
-  if (!process.stdin.isTTY) {
-    try {
-      initialInput = await readStdin();
-    } catch (error) {
-      console.error('Error reading from stdin:', error);
-      process.exit(1);
-    }
-  }
-
-  // Load configuration
   const config = loadCliConfig();
 
   // Render UI, passing necessary config values and initial input
@@ -34,42 +19,33 @@ async function main() {
     render(
       React.createElement(App, {
         config,
-        initialInput,
       }),
     );
-  } else if (initialInput) {
-    // If not a TTY and we have initial input, process it directly
-    const geminiClient = new GeminiClient(
-      config.getApiKey(),
-      config.getModel(),
-    );
-    const toolRegistry = config.getToolRegistry();
-    const availableTools: ServerTool[] = toolRegistry.getAllTools();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const chat = await geminiClient.startChat(toolDeclarations);
+    return;
+  }
 
-    const request: PartListUnion = [{ text: initialInput }];
-
-    try {
-      for await (const event of geminiClient.sendMessageStream(
-        chat,
-        request,
-        availableTools,
-      )) {
-        if (event.type === 'content') {
-          process.stdout.write(event.value);
-        }
-        // We might need to handle other event types later, but for now, just content.
-      }
-      process.stdout.write('\n'); // Add a newline at the end
-      process.exit(0);
-    } catch (error) {
-      console.error('Error processing piped input:', error);
-      process.exit(1);
-    }
-  } else {
-    // If not a TTY and no initial input, exit with an error
+  const input = await readStdin();
+  if (!input) {
     console.error('No input provided via stdin.');
+    process.exit(1);
+  }
+
+  // If not a TTY and we have initial input, process it directly
+  const geminiClient = new GeminiClient(config);
+  const chat = await geminiClient.startChat();
+  try {
+    for await (const event of geminiClient.sendMessageStream(chat, [
+      { text: input },
+    ])) {
+      if (event.type === 'content') {
+        process.stdout.write(event.value);
+      }
+      // We might need to handle other event types later, but for now, just content.
+    }
+    process.stdout.write('\n'); // Add a newline at the end
+    process.exit(0);
+  } catch (error) {
+    console.error('Error processing piped input:', error);
     process.exit(1);
   }
 }

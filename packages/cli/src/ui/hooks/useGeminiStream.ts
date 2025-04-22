@@ -7,13 +7,11 @@
 import { exec as _exec } from 'child_process';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
-// Import server-side client and types
 import {
   GeminiClient,
   GeminiEventType as ServerGeminiEventType, // Rename to avoid conflict
   getErrorMessage,
   isNodeError,
-  ToolResult,
   Config,
   ToolCallConfirmationDetails,
   ToolCallResponseInfo,
@@ -23,12 +21,7 @@ import {
   ToolEditConfirmationDetails,
   ToolExecuteConfirmationDetails,
 } from '@gemini-code/server';
-import {
-  type Chat,
-  type PartListUnion,
-  type FunctionDeclaration,
-  type Part,
-} from '@google/genai';
+import { type Chat, type PartListUnion, type Part } from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -69,10 +62,7 @@ export const useGeminiStream = (
     setInitError(null);
     if (!geminiClientRef.current) {
       try {
-        geminiClientRef.current = new GeminiClient(
-          config.getApiKey(),
-          config.getModel(),
-        );
+        geminiClientRef.current = new GeminiClient(config);
       } catch (error: unknown) {
         setInitError(
           `Failed to initialize client: ${getErrorMessage(error) || 'Unknown error'}`,
@@ -166,9 +156,7 @@ export const useGeminiStream = (
 
       if (!chatSessionRef.current) {
         try {
-          // Use getFunctionDeclarations for startChat
-          const toolSchemas = toolRegistry.getFunctionDeclarations();
-          chatSessionRef.current = await client.startChat(toolSchemas);
+          chatSessionRef.current = await client.startChat();
         } catch (err: unknown) {
           setInitError(`Failed to start chat: ${getErrorMessage(err)}`);
           setStreamingState(StreamingState.Idle);
@@ -196,15 +184,7 @@ export const useGeminiStream = (
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        // Get ServerTool descriptions for the server call
-        const serverTools: ServerTool[] = toolRegistry.getAllTools();
-
-        const stream = client.sendMessageStream(
-          chat,
-          query,
-          serverTools,
-          signal,
-        );
+        const stream = client.sendMessageStream(chat, query, signal);
 
         // Process the stream events from the server logic
         let currentGeminiText = ''; // To accumulate message content
@@ -477,13 +457,3 @@ export const useGeminiStream = (
 
   return { streamingState, submitQuery, initError, debugMessage };
 };
-
-// Define ServerTool interface here if not importing from server (circular dep issue?)
-interface ServerTool {
-  name: string;
-  schema: FunctionDeclaration;
-  shouldConfirmExecute(
-    params: Record<string, unknown>,
-  ): Promise<ToolCallConfirmationDetails | false>;
-  execute(params: Record<string, unknown>): Promise<ToolResult>;
-}

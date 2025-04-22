@@ -12,15 +12,16 @@ import {
   SchemaUnion,
   PartListUnion,
   Content,
-  FunctionDeclaration,
   Tool,
 } from '@google/genai';
 import { CoreSystemPrompt } from './prompts.js';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { Turn, ServerTool, ServerGeminiStreamEvent } from './turn.js';
+import { Turn, ServerGeminiStreamEvent } from './turn.js';
+import { Config } from '../config/config.js';
 
 export class GeminiClient {
+  private config: Config;
   private client: GoogleGenAI;
   private model: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -29,9 +30,10 @@ export class GeminiClient {
   };
   private readonly MAX_TURNS = 100;
 
-  constructor(apiKey: string, model: string) {
-    this.client = new GoogleGenAI({ apiKey: apiKey });
-    this.model = model;
+  constructor(config: Config) {
+    this.client = new GoogleGenAI({ apiKey: config.getApiKey() });
+    this.config = config;
+    this.model = config.getModel();
   }
 
   private async getEnvironment(): Promise<Part> {
@@ -54,8 +56,11 @@ export class GeminiClient {
     return { text: context };
   }
 
-  async startChat(toolDeclarations: FunctionDeclaration[]): Promise<Chat> {
+  async startChat(): Promise<Chat> {
     const envPart = await this.getEnvironment();
+    const toolDeclarations = this.config
+      .getToolRegistry()
+      .getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     try {
       return this.client.chats.create({
@@ -86,10 +91,10 @@ export class GeminiClient {
   async *sendMessageStream(
     chat: Chat,
     request: PartListUnion,
-    availableTools: ServerTool[],
     signal?: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     let turns = 0;
+    const availableTools = this.config.getToolRegistry().getAllTools();
     try {
       while (turns < this.MAX_TURNS) {
         turns++;

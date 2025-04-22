@@ -78,10 +78,7 @@ export class BackgroundTerminalAnalyzer {
   ) {
     try {
       // Initialize Gemini client using config
-      this.geminiClient = new GeminiClient(
-        config.getApiKey(),
-        config.getModel(),
-      );
+      this.geminiClient = new GeminiClient(config);
     } catch (error) {
       console.error(
         'Failed to initialize GeminiClient in BackgroundTerminalAnalyzer:',
