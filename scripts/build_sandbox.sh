@@ -64,5 +64,5 @@ chmod 755 packages/*/dist/gemini-code-*.tgz
 # use empty --authfile to skip unnecessary auth refresh overhead
 echo "building $IMAGE ... (can be slow first time)"
 $CMD build --authfile <(echo '{}') -t "$IMAGE" . >/dev/null
-$CMD image prune -f
+$CMD image prune -f >/dev/null
 echo "built $IMAGE"
