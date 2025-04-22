@@ -50,7 +50,7 @@ run_args+=(--name "$IMAGE-$INDEX" --hostname "$IMAGE-$INDEX")
 run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
 
 # pass TERM and COLORTERM to container to maintain terminal colors
-run_args+=(--env "TERM=$TERM" --env "COLORTERM=$COLORTERM")
+run_args+=(--env "TERM=${TERM:-}" --env "COLORTERM=${COLORTERM:-}")
 
 # enable debugging via node --inspect-brk (and $DEBUG_PORT) if DEBUG is set
 node_args=()
