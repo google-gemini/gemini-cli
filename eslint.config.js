@@ -173,6 +173,16 @@ export default tseslint.config(
       ],
     },
   },
+  // extra settings for scripts that we run directly with node
+  {
+    files: ['./scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
   // Prettier config must be last
   prettierConfig,
   // Custom eslint rules for this repo
