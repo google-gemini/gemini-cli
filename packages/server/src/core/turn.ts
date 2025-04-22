@@ -200,7 +200,6 @@ export class Turn {
         error: outcome.error,
       };
       yield { type: GeminiEventType.ToolCallResponse, value: responseInfo };
-      return;
     }
   }
 
