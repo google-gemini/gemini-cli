@@ -30,3 +30,43 @@ Guidelines](https://opensource.google/conduct/).
 All submissions, including submissions by project members, require review. We
 use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
 for this purpose.
+
+### gemini-code alias
+
+During development phase, you can use the following to create an alias for
+the command line tool:
+
+```bash
+$ npm run build
+$ alias gemini-code="node /path/to/gemini-code/packages/cli/dist/index.js"
+$ gemini-code
+ ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗
+██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║
+██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║
+██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║
+╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║
+ ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝
+
+ ██████╗ ██████╗ ██████╗ ███████╗
+██╔════╝██╔═══██╗██╔══██╗██╔════╝
+██║     ██║   ██║██║  ██║█████╗
+██║     ██║   ██║██║  ██║██╔══╝
+╚██████╗╚██████╔╝██████╔╝███████╗
+ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+
+
+Tips for getting started:
+1. /help for more information.
+2. /init to create a GEMINI.md for instructions & context.
+3. Ask coding questions, edit code or run commands.
+4. Be specific for the best results.
+
+cwd: /Users/jbd/gemini-code
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > Enter your message or use tools...                                                                               │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+? for shortcuts                                                                                                 Gemini
+
+Note: Flickering may occur in iTerm.
+```
