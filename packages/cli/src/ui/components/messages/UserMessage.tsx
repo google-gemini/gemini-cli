@@ -19,10 +19,12 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row">
       <Box width={prefixWidth}>
-        <Text color={Colors.SubtleComment}>{prefix}</Text>
+        <Text color={Colors.Gray}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap">{text}</Text>
+        <Text wrap="wrap" color={Colors.Gray}>
+          {text}
+        </Text>
       </Box>
     </Box>
   );

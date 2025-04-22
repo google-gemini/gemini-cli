@@ -138,11 +138,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   // --- End Modification ---
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={Colors.SubtleComment}
-      flexDirection="column"
-    >
+    <Box flexDirection="column">
       {/* Iterate over the lines that should be displayed (already normalized) */}
       {displayableLines.map((line, index) => {
         const key = `diff-line-${index}`;
@@ -179,7 +175,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         return (
           // Using your original rendering structure
           <Box key={key} flexDirection="row">
-            <Text color={Colors.SubtleComment}>{gutterNumStr} </Text>
+            <Text color={Colors.Foreground}>{gutterNumStr} </Text>
             <Text color={color} dimColor={dim}>
               {prefixSymbol}{' '}
             </Text>

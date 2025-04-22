@@ -22,11 +22,18 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   onSubmit,
 }) => {
-  const hasPending = toolCalls.some((t) => t.status === ToolCallStatus.Pending);
-  const borderColor = hasPending ? Colors.AccentYellow : Colors.AccentBlue;
+  const hasPending = !toolCalls.every(
+    (t) => t.status === ToolCallStatus.Success,
+  );
+  const borderColor = hasPending ? Colors.AccentYellow : Colors.AccentCyan;
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderDimColor={hasPending}
+      borderColor={borderColor}
+    >
       {toolCalls.map((tool) => (
         <React.Fragment key={tool.callId}>
           <ToolMessage

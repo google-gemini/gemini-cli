@@ -269,7 +269,7 @@ export const useGeminiStream = (
             // Create the UI display object matching IndividualToolCallDisplay
             const toolCallDisplay: IndividualToolCallDisplay = {
               callId,
-              name,
+              name: cliTool.displayName,
               description,
               status: ToolCallStatus.Pending,
               resultDisplay: undefined,
