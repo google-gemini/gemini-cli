@@ -32,7 +32,7 @@ shift $((OPTIND - 1))
 
 
 # if GEMINI_CODE_SANDBOX is not set, try to source .env in case set there
-if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then source .env; fi
+if [ -z "${GEMINI_CODE_SANDBOX:-}" ] && [ -f .env ]; then source .env; fi
 
 # if GEMINI_CODE_SANDBOX is still not set, then exit immediately w/ code 1
 if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then exit 1; fi
