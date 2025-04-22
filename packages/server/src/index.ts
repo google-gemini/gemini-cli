@@ -8,7 +8,7 @@
 export * from './config/config.js';
 
 // Export Core Logic
-export * from './core/gemini-client.js';
+export * from './core/client.js';
 export * from './core/prompts.js';
 export * from './core/turn.js';
 // Potentially export types from turn.ts if needed externally

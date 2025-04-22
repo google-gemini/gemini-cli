@@ -21,7 +21,7 @@ import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { Turn, ServerTool, ServerGeminiStreamEvent } from './turn.js';
 
 export class GeminiClient {
-  private ai: GoogleGenAI;
+  private client: GoogleGenAI;
   private model: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -30,7 +30,7 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(apiKey: string, model: string) {
-    this.ai = new GoogleGenAI({ apiKey: apiKey });
+    this.client = new GoogleGenAI({ apiKey: apiKey });
     this.model = model;
   }
 
@@ -56,14 +56,9 @@ export class GeminiClient {
 
   async startChat(toolDeclarations: FunctionDeclaration[]): Promise<Chat> {
     const envPart = await this.getEnvironment();
-    // const tools: Tool[] = toolDeclarations.map((declaration) => ({
-    //   functionDeclarations: [declaration],
-    // }));
-    // merge all functions into a single tool, as seems to be required for gemini 2.5 series
-    // can test by asking "what tools do you have?", which lists single function unless merged
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     try {
-      const chat = this.ai.chats.create({
+      return this.client.chats.create({
         model: this.model,
         config: {
           systemInstruction: CoreSystemPrompt,
@@ -81,7 +76,6 @@ export class GeminiClient {
           },
         ],
       });
-      return chat;
     } catch (error) {
       console.error('Error initializing Gemini chat session:', error);
       const message = error instanceof Error ? error.message : 'Unknown error.';
@@ -111,14 +105,11 @@ export class GeminiClient {
         }
 
         // What do we do when we have both function responses and confirmations?
-
         const fnResponses = turn.getFunctionResponses();
-        if (fnResponses.length > 0) {
-          request = fnResponses;
-          continue;
-        } else {
-          break;
+        if (fnResponses.length == 0) {
+          break; // user's turn to respond
         }
+        request = fnResponses;
       }
       if (turns >= this.MAX_TURNS) {
         console.warn(
@@ -140,7 +131,7 @@ export class GeminiClient {
     schema: SchemaUnion,
   ): Promise<Record<string, unknown>> {
     try {
-      const result = await this.ai.models.generateContent({
+      const result = await this.client.models.generateContent({
         model: this.model,
         config: {
           ...this.generateContentConfig,
@@ -150,15 +141,13 @@ export class GeminiClient {
         },
         contents,
       });
-      const responseText = result.text;
-      if (!responseText) {
+      if (!result || !result.text) {
         throw new Error('API returned an empty response.');
       }
       try {
-        const parsedJson = JSON.parse(responseText);
-        return parsedJson;
+        return JSON.parse(result.text);
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', responseText);
+        console.error('Failed to parse JSON response:', result.text);
         throw new Error(
           `Failed to parse API response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
         );

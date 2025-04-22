@@ -6,7 +6,7 @@
 
 import { Content, SchemaUnion, Type } from '@google/genai';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import { GeminiClient } from '../core/gemini-client.js';
+import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import { promises as fs } from 'fs';
 import { exec as _exec } from 'child_process';
