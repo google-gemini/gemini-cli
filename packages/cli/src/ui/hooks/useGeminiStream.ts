@@ -217,6 +217,11 @@ export const useGeminiStream = (
             // For content events, accumulate the text and update an existing message or create a new one
             currentGeminiText += event.value;
 
+            // Reset group because we're now adding a user message to the history. If we didn't reset the
+            // group here then any subsequent tool calls would get grouped before this message resulting in
+            // a misordering of history.
+            currentToolGroupId = null;
+
             if (!hasInitialGeminiResponse) {
               // Create a new Gemini message if this is the first content event
               hasInitialGeminiResponse = true;
