@@ -10,7 +10,9 @@
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "stage:version": "node ../../scripts/bind_package_version.js",
+    "stage:deps": "node ../../scripts/bind_package_dependencies.js"
   },
   "files": [
     "dist"

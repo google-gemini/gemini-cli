@@ -1,6 +1,6 @@
 {
   "name": "gemini-code",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",
     "preflight": "npm run format --workspaces --if-present && npm run lint --workspaces --if-present && npm run test --workspaces --if-present",
-    "artifactregistry-login": "npx google-artifactregistry-auth"
+    "artifactregistry-login": "npx google-artifactregistry-auth",
+    "stage": "npm run stage:version --workspaces && npm run stage:deps --workspaces"
   },
   "devDependencies": {
     "eslint": "^9.24.0",
@@ -27,6 +28,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
+    "lodash": "^4.17.21",
     "prettier": "^3.5.3",
     "typescript-eslint": "^8.30.1"
   }
