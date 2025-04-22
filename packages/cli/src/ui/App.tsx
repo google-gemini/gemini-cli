@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react'; // Added useEffect
 import { Box, Text } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -25,9 +25,11 @@ import { Colors } from './colors.js';
 
 interface AppProps {
   config: Config;
+  initialInput?: string; // Added optional prop
 }
 
-export const App = ({ config }: AppProps) => {
+export const App = ({ config, initialInput }: AppProps) => {
+  // Destructured prop
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const { streamingState, submitQuery, initError, debugMessage } =
@@ -37,6 +39,15 @@ export const App = ({ config }: AppProps) => {
 
   useStartupWarnings(setStartupWarnings);
   useInitializationErrorEffect(initError, history, setHistory);
+
+  // Effect to handle initial piped input
+  useEffect(() => {
+    if (initialInput && initialInput.trim() !== '') {
+      submitQuery(initialInput);
+    }
+    // Run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const userMessages = useMemo(
     () =>
