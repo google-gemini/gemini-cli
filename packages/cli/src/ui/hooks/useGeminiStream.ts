@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec as _exec } from 'child_process';
+import { exec as _exec, exec } from 'child_process';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
 import {
@@ -115,8 +115,12 @@ export const useGeminiStream = (
           return;
         } else if (config.getPassthroughCommands().includes(maybeCommand)) {
           // Execute and capture output
-          setDebugMessage(`Executing shell command directly: ${query}`);
-          _exec(query, (error, stdout, stderr) => {
+          const targetDir = config.getTargetDir();
+          setDebugMessage(`Executing shell command in ${targetDir}: ${query}`);
+          const execOptions = {
+            cwd: targetDir,
+          };
+          _exec(query, execOptions, (error, stdout, stderr) => {
             const timestamp = getNextMessageId(Date.now());
             if (error) {
               addHistoryItem(
