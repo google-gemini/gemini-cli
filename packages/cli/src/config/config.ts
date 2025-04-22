@@ -34,7 +34,7 @@ function parseArguments(): CliArgs {
       alias: 'm',
       type: 'string',
       description: `The Gemini model to use. Defaults to ${DEFAULT_GEMINI_MODEL}.`,
-      default: DEFAULT_GEMINI_MODEL,
+      default: process.env.GEMINI_CODE_MODEL || DEFAULT_GEMINI_MODEL,
     })
     .option('debug_mode', {
       alias: 'z',

@@ -145,6 +145,7 @@ export const App = ({ config, initialInput }: AppProps) => {
       )}
 
       <Footer
+        config={config}
         queryLength={query.length}
         debugMode={config.getDebugMode()}
         debugMessage={debugMessage}
