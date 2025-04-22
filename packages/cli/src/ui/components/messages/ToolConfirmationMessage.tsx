@@ -61,14 +61,14 @@ export const ToolConfirmationMessage: React.FC<
     question = `Apply this change?`;
     options.push(
       {
-        label: '1. Yes, apply change',
+        label: 'Yes',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: '2. Yes, always apply file edits',
+        label: 'Yes (always allow)',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
-      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel },
+      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
   } else {
     const executionProps =
@@ -89,17 +89,17 @@ export const ToolConfirmationMessage: React.FC<
     );
 
     question = `Allow execution?`;
-    const alwaysLabel = `2. Yes, always allow '${executionProps.rootCommand}' commands`;
+    const alwaysLabel = `Yes (always allow '${executionProps.rootCommand}' commands)`;
     options.push(
       {
-        label: '1. Yes, allow once',
+        label: 'Yes',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
         label: alwaysLabel,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
-      { label: '3. No (esc)', value: ToolConfirmationOutcome.Cancel },
+      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
   }
 
@@ -118,8 +118,32 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Select Input for Options */}
       <Box flexShrink={0}>
-        <SelectInput items={options} onSelect={handleSelect} />
+        <SelectInput
+          indicatorComponent={Indicator}
+          itemComponent={Item}
+          items={options}
+          onSelect={handleSelect}
+        />
       </Box>
     </Box>
   );
 };
+
+function Indicator({ isSelected = false }): React.JSX.Element {
+  return (
+    <Text color={isSelected ? Colors.AccentGreen : Colors.Gray}>
+      {isSelected ? '◉ ' : '○ '}
+    </Text>
+  );
+}
+
+export type ItemProps = {
+  readonly isSelected?: boolean;
+  readonly label: string;
+};
+
+function Item({ isSelected = false, label }: ItemProps): React.JSX.Element {
+  return (
+    <Text color={isSelected ? Colors.AccentGreen : Colors.Gray}>{label}</Text>
+  );
+}
