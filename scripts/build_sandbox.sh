@@ -15,6 +15,14 @@
 
 set -euo pipefail
 
+if ! scripts/sandbox_command.sh -q; then
+    echo "ERROR: sandboxing disabled. See README.md to enable sandboxing."
+    exit 1
+fi
+
+CMD=$(scripts/sandbox_command.sh)
+echo "using $CMD for sandboxing"
+
 IMAGE=gemini-code-sandbox
 
 SKIP_NPM_INSTALL_BUILD=false
@@ -29,17 +37,6 @@ while getopts "s" opt; do
     esac
 done
 shift $((OPTIND - 1))
-
-# use docker if installed, otherwise try to use podman instead
-if command -v docker &> /dev/null; then
-    CMD=docker
-elif command -v podman &> /dev/null; then
-    CMD=podman
-else
-    echo "ERROR: missing docker or podman for sandboxing"
-    exit 1
-fi
-echo "using $CMD for sandboxing"
 
 # npm install + npm run build unless skipping via -s option
 if [ "$SKIP_NPM_INSTALL_BUILD" = false ]; then

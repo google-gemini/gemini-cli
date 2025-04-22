@@ -15,20 +15,16 @@
 
 set -euo pipefail
 
+if ! scripts/sandbox_command.sh -q; then
+    echo "ERROR: sandboxing disabled. See README.md to enable sandboxing."
+    exit 1
+fi
+
+CMD=$(scripts/sandbox_command.sh)
 IMAGE=gemini-code-sandbox
 WORKDIR=/sandbox/$(basename "$PWD")
 CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
 DEBUG_PORT=9229
-
-# use docker if installed, otherwise try to use podman instead
-if command -v docker &> /dev/null; then
-    CMD=docker
-elif command -v podman &> /dev/null; then
-    CMD=podman
-else
-    echo "ERROR: missing docker or podman for sandboxing"
-    exit 1
-fi
 
 # use interactive tty mode and auto-remove container on exit
 run_args=(-it --rm)

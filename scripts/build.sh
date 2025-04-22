@@ -23,9 +23,8 @@ fi
 # build all workspaces/packages
 npm run build --workspaces
 
-# also build container image if GEMINI_CODE_SANDBOX is set (can be in .env file)
+# also build container image if sandboxing is enabled
 # skip (-s) npm install + build since we did that above
-if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]] || \
-   { [ -f .env ] && grep -qiE '^GEMINI_CODE_SANDBOX *= *(1|true)' .env; }; then
+if scripts/sandbox_command.sh -q; then
     scripts/build_sandbox.sh -s
 fi

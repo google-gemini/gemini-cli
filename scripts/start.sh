@@ -18,13 +18,11 @@ set -euo pipefail
 # check build status, write warnings to file for app to display if needed
 node ./scripts/check-build-status.js
 
-# if GEMINI_CODE_SANDBOX is set (can be in .env file), start in sandbox container
-if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]] || \
-   { [ -f .env ] && grep -qiE '^GEMINI_CODE_SANDBOX *= *(1|true)' .env; }; then
-    echo "Running in sandbox container ..."
+# if sandboxing is enabled, start in sandbox container
+if scripts/sandbox_command.sh -q; then
     scripts/start_sandbox.sh "$@"
 else
-    echo "WARNING: running outside of sandbox. Set GEMINI_CODE_SANDBOX to enable sandbox."
+    echo "WARNING: OUTSIDE SANDBOX. See README.md to enable sandboxing."
     if [ -n "${DEBUG:-}" ]; then
         node --inspect-brk node_modules/@gemini-code/cli "$@"
     else
