@@ -33,7 +33,7 @@ run_args=(-it --rm)
 run_args+=(-v "$PWD:$WORKDIR")
 
 # mount $TMPDIR as /tmp inside container
-run_args+=(-v "$TMPDIR:/tmp")
+run_args+=(-v "${TMPDIR:-/tmp/}:/tmp")
 
 # name container after image, plus numeric suffix to avoid conflicts
 INDEX=0
