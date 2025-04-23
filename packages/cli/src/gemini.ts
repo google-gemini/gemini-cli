@@ -25,9 +25,7 @@ async function main() {
   if (process.stdin.isTTY && input?.length === 0) {
     const readUpResult = await readPackageUp({ cwd: __dirname });
     const cliVersion =
-      process.env.NODE_ENV === 'development'
-        ? 'local'
-        : (readUpResult?.packageJson.version ?? 'unknown');
+      process.env.CLI_VERSION || readUpResult?.packageJson.version || 'unknown';
 
     render(
       React.createElement(App, {
