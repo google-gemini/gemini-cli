@@ -7,7 +7,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
-import { Tips } from './Tips.js';
 
 const gradientColors = ['#4796E4', '#847ACE', '#C3677F'];
 
@@ -32,6 +31,5 @@ export const Header: React.FC = () => (
 `}</Text>
       </Gradient>
     </Box>
-    <Tips />
   </>
 );

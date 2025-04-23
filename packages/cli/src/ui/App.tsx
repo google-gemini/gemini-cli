@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistory } from './hooks/useInputHistory.js';
+import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { Header } from './components/Header.js';
 import { HistoryDisplay } from './components/HistoryDisplay.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
+import { ThemeDialog } from './components/ThemeDialog.js';
 import { ITermDetectionWarning } from './utils/itermDetection.js';
 import {
   useStartupWarnings,
@@ -22,13 +24,13 @@ import {
 } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
+import { Tips } from './components/Tips.js';
 
 interface AppProps {
   config: Config;
 }
 
 export const App = ({ config }: AppProps) => {
-  // Destructured prop
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const { streamingState, submitQuery, initError, debugMessage } =
@@ -36,8 +38,23 @@ export const App = ({ config }: AppProps) => {
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
+  const { isThemeDialogOpen, openThemeDialog, handleThemeSelect } =
+    useThemeCommand();
+
   useStartupWarnings(setStartupWarnings);
   useInitializationErrorEffect(initError, history, setHistory);
+
+  const handleFinalSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedValue = submittedValue.trim();
+      if (trimmedValue === '/theme') {
+        openThemeDialog();
+      } else if (trimmedValue.length > 0) {
+        submitQuery(submittedValue);
+      }
+    },
+    [openThemeDialog, submitQuery],
+  );
 
   const userMessages = useMemo(
     () =>
@@ -56,13 +73,16 @@ export const App = ({ config }: AppProps) => {
 
   const { query, handleSubmit: handleHistorySubmit } = useInputHistory({
     userMessages,
-    onSubmit: submitQuery,
+    onSubmit: handleFinalSubmit,
     isActive: isInputActive,
   });
+
+  // --- Render Logic ---
 
   return (
     <Box flexDirection="column" marginBottom={1} width="100%">
       <Header />
+      <Tips />
 
       {startupWarnings.length > 0 && (
         <Box
@@ -112,25 +132,31 @@ export const App = ({ config }: AppProps) => {
         </Box>
       )}
 
-      <Box flexDirection="column">
-        <HistoryDisplay history={history} onSubmit={submitQuery} />
-        <LoadingIndicator
-          isLoading={streamingState === StreamingState.Responding}
-          currentLoadingPhrase={currentLoadingPhrase}
-          elapsedTime={elapsedTime}
-        />
-      </Box>
-
-      {isInputActive && (
+      {isThemeDialogOpen ? (
+        <ThemeDialog onSelect={handleThemeSelect} />
+      ) : (
         <>
-          <Box>
-            <Text color={Colors.SubtleComment}>cwd: </Text>
-            <Text color={Colors.LightBlue}>
-              {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
-            </Text>
+          <Box flexDirection="column">
+            <HistoryDisplay history={history} onSubmit={submitQuery} />
+            <LoadingIndicator
+              isLoading={streamingState === StreamingState.Responding}
+              currentLoadingPhrase={currentLoadingPhrase}
+              elapsedTime={elapsedTime}
+            />
           </Box>
 
-          <InputPrompt onSubmit={handleHistorySubmit} />
+          {isInputActive && (
+            <>
+              <Box>
+                <Text color={Colors.SubtleComment}>cwd: </Text>
+                <Text color={Colors.LightBlue}>
+                  {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
+                </Text>
+              </Box>
+
+              <InputPrompt onSubmit={handleHistorySubmit} />
+            </>
+          )}
         </>
       )}
 
