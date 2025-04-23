@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",
     "preflight": "npm run format --workspaces --if-present && npm run lint --workspaces --if-present && npm run test --workspaces --if-present",
-    "artifactregistry-login": "npx google-artifactregistry-auth",
+    "auth": "npx google-artifactregistry-auth",
     "stage": "npm run stage:version --workspaces && npm run stage:deps --workspaces"
   },
   "devDependencies": {

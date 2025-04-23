@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "stage:version": "node ../../scripts/bind_package_version.js",
-    "stage:deps": "node ../../scripts/bind_package_dependencies.js"
+    "stage:deps": "node ../../scripts/bind_package_dependencies.js",
+    "prepack": "npm run build"
   },
   "files": [
     "dist"
