@@ -7,6 +7,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
+import { colorizeCode } from './CodeColorizer.js';
 
 /**
  * A utility class to render a subset of Markdown into Ink components.
@@ -155,21 +156,12 @@ export class MarkdownRenderer {
     content: string[],
     lang: string | null,
   ): React.ReactNode {
-    // Basic styling for code block
+    const fullContent = content.join('\n');
+    const colorizedCode = colorizeCode(fullContent, lang);
+
     return (
-      <Box
-        key={key}
-        borderStyle="round"
-        borderColor={Colors.SubtleComment}
-        borderLeft={false}
-        borderRight={false}
-        flexDirection="column"
-      >
-        {lang && <Text dimColor>{lang}</Text>}
-        {/* Render each line preserving whitespace (within Text component) */}
-        {content.map((line, idx) => (
-          <Text key={idx}>{line}</Text>
-        ))}
+      <Box key={key} flexDirection="column" padding={1}>
+        {colorizedCode}
       </Box>
     );
   }

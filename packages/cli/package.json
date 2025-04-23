@@ -27,11 +27,13 @@
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
+    "highlight.js": "^11.11.1",
     "ink": "^5.2.0",
     "ink-gradient": "^3.0.0",
     "ink-select-input": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "lowlight": "^3.3.0",
     "react": "^18.3.1",
     "yargs": "^17.7.2"
   },
