@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import SelectInput from 'ink-select-input';
 import { PartListUnion } from '@google/genai';
 import { DiffRenderer } from './DiffRenderer.js';
 import { UI_WIDTH } from '../../constants.js';
@@ -17,6 +16,10 @@ import {
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
 } from '@gemini-code/server';
+import {
+  RadioButtonSelect,
+  RadioSelectItem,
+} from '../shared/RadioButtonSelect.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -27,11 +30,6 @@ function isEditDetails(
   props: ToolCallConfirmationDetails,
 ): props is ToolEditConfirmationDetails {
   return (props as ToolEditConfirmationDetails).fileName !== undefined;
-}
-
-interface InternalOption {
-  label: string;
-  value: ToolConfirmationOutcome;
 }
 
 export const ToolConfirmationMessage: React.FC<
@@ -45,13 +43,14 @@ export const ToolConfirmationMessage: React.FC<
     }
   });
 
-  const handleSelect = (item: InternalOption) => {
-    onConfirm(item.value);
-  };
+  const handleSelect = (item: ToolConfirmationOutcome) => onConfirm(item);
 
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
-  const options: InternalOption[] = [];
+
+  const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = new Array<
+    RadioSelectItem<ToolConfirmationOutcome>
+  >();
 
   if (isEditDetails(confirmationDetails)) {
     // Body content is now the DiffRenderer, passing filename to it
@@ -118,32 +117,8 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Select Input for Options */}
       <Box flexShrink={0}>
-        <SelectInput
-          indicatorComponent={Indicator}
-          itemComponent={Item}
-          items={options}
-          onSelect={handleSelect}
-        />
+        <RadioButtonSelect items={options} onSelect={handleSelect} />
       </Box>
     </Box>
   );
 };
-
-function Indicator({ isSelected = false }): React.JSX.Element {
-  return (
-    <Text color={isSelected ? Colors.AccentGreen : Colors.Gray}>
-      {isSelected ? '◉ ' : '○ '}
-    </Text>
-  );
-}
-
-export type ItemProps = {
-  readonly isSelected?: boolean;
-  readonly label: string;
-};
-
-function Item({ isSelected = false, label }: ItemProps): React.JSX.Element {
-  return (
-    <Text color={isSelected ? Colors.AccentGreen : Colors.Gray}>{label}</Text>
-  );
-}
