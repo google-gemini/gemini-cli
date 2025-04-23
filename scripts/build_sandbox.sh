@@ -54,12 +54,20 @@ echo "packing @gemini-code/server ..."
 rm -f packages/server/dist/gemini-code-server-*.tgz
 npm pack -w @gemini-code/server --pack-destination ./packages/server/dist &> /dev/null
 
-# Give node user access to tgz files
+# give node user access to tgz files
 chmod 755 packages/*/dist/gemini-code-*.tgz
 
 # build container image & prune older unused images
-# use empty --authfile to skip unnecessary auth refresh overhead
 echo "building $IMAGE ... (can be slow first time)"
-$CMD build --authfile <(echo '{}') -t "$IMAGE" . >/dev/null
+
+if [[ "$CMD" == "podman" ]]; then
+    # use empty --authfile to skip unnecessary auth refresh overhead
+    $CMD build --authfile=<(echo '{}') -t "$IMAGE" . >/dev/null
+elif [[ "$CMD" == "docker" ]]; then
+    # use an empty config directory to skip unnecessary auth refresh overhead
+    $CMD --config="empty" build -t "$IMAGE" . >/dev/null
+else
+    $CMD build -t "$IMAGE" . >/dev/null
+fi
 $CMD image prune -f >/dev/null
 echo "built $IMAGE"
