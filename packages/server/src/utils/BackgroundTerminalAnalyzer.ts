@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, SchemaUnion, Type } from '@google/genai';
+import { SchemaUnion, Type } from '@google/genai';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
@@ -22,15 +22,6 @@ type AnalysisStatus =
 
 // Promisify child_process.exec for easier async/await usage
 const execAsync = promisify(_exec);
-
-// Define the expected interface for the AI client dependency
-export interface AiClient {
-  generateJson(
-    prompt: Content[], // Keep flexible or define a stricter prompt structure type
-    schema: SchemaUnion,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any>; // Ideally, specify the expected JSON structure TAnalysisResult | TAnalysisFailure
-}
 
 // Identifier for the background process (e.g., PID)
 // Using `unknown` allows more flexibility than `object` while still being type-safe
