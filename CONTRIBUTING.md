@@ -57,9 +57,8 @@ $ gemini-code
 
 Tips for getting started:
 1. /help for more information.
-2. /init to create a GEMINI.md for instructions & context.
-3. Ask coding questions, edit code or run commands.
-4. Be specific for the best results.
+2. Ask coding questions, edit code or run commands.
+3. Be specific for the best results.
 
 cwd: /Users/jbd/gemini-code
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

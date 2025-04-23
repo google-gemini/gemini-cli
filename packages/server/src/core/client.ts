@@ -14,11 +14,11 @@ import {
   Content,
   Tool,
 } from '@google/genai';
-import { CoreSystemPrompt } from './prompts.js';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { Turn, ServerGeminiStreamEvent } from './turn.js';
 import { Config } from '../config/config.js';
+import { getCoreSystemPrompt } from './prompts.js';
 
 export class GeminiClient {
   private config: Config;
@@ -66,7 +66,7 @@ export class GeminiClient {
       return this.client.chats.create({
         model: this.model,
         config: {
-          systemInstruction: CoreSystemPrompt,
+          systemInstruction: getCoreSystemPrompt(),
           ...this.generateContentConfig,
           tools: tools,
         },
@@ -140,7 +140,7 @@ export class GeminiClient {
         model: this.model,
         config: {
           ...this.generateContentConfig,
-          systemInstruction: CoreSystemPrompt,
+          systemInstruction: getCoreSystemPrompt(),
           responseSchema: schema,
           responseMimeType: 'application/json',
         },
