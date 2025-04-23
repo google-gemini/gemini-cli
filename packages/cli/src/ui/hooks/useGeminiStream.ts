@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec as _exec, exec } from 'child_process';
+import { exec as _exec } from 'child_process';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
 import {

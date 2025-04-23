@@ -26,6 +26,7 @@ export class Config {
   private targetDir: string;
   private toolRegistry: ToolRegistry;
   private debugMode: boolean;
+  private question: string | undefined;
   private passthroughCommands: string[];
 
   constructor(
@@ -33,12 +34,14 @@ export class Config {
     model: string,
     targetDir: string,
     debugMode: boolean,
+    question: string,
     passthroughCommands?: string[],
   ) {
     this.apiKey = apiKey;
     this.model = model;
     this.targetDir = targetDir;
     this.debugMode = debugMode;
+    this.question = question;
     this.passthroughCommands =
       passthroughCommands || DEFAULT_PASSTHROUGH_COMMANDS;
 
@@ -63,6 +66,9 @@ export class Config {
 
   getDebugMode(): boolean {
     return this.debugMode;
+  }
+  getQuestion(): string | undefined {
+    return this.question;
   }
 
   getPassthroughCommands(): string[] {
@@ -98,6 +104,7 @@ export function createServerConfig(
   model: string,
   targetDir: string,
   debugMode: boolean,
+  question: string,
   passthroughCommands?: string[],
 ): Config {
   return new Config(
@@ -105,6 +112,7 @@ export function createServerConfig(
     model,
     path.resolve(targetDir),
     debugMode,
+    question,
     passthroughCommands,
   );
 }

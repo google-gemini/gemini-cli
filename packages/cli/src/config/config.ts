@@ -20,6 +20,7 @@ interface CliArgs {
   target_dir: string | undefined;
   model: string | undefined;
   debug_mode: boolean | undefined;
+  question: string | undefined;
 }
 
 function parseArguments(): CliArgs {
@@ -41,6 +42,12 @@ function parseArguments(): CliArgs {
       type: 'boolean',
       description: 'Whether to run in debug mode. Defaults to false.',
       default: false,
+    })
+    .option('question', {
+      alias: 'q',
+      type: 'string',
+      description:
+        'The question to pass to the command when using piped input.',
     })
     .help()
     .alias('h', 'help')
@@ -71,6 +78,7 @@ export function loadCliConfig(): Config {
     argv.model || DEFAULT_GEMINI_MODEL,
     argv.target_dir || process.cwd(),
     argv.debug_mode || false,
+    argv.question || '',
     // TODO: load passthroughCommands from .env file
   );
 }

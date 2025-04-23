@@ -13,9 +13,10 @@ import { GeminiClient } from '@gemini-code/server';
 
 async function main() {
   const config = loadCliConfig();
+  let input = config.getQuestion();
 
-  // Render UI, passing necessary config values and initial input
-  if (process.stdin.isTTY) {
+  // Render UI, passing necessary config values. Check that there is no command line question.
+  if (process.stdin.isTTY && input?.length === 0) {
     render(
       React.createElement(App, {
         config,
@@ -24,7 +25,11 @@ async function main() {
     return;
   }
 
-  const input = await readStdin();
+  // If not a TTY, read from stdin
+  // This is for cases where the user pipes input directly into the command
+  if (!process.stdin.isTTY) {
+    input += await readStdin();
+  }
   if (!input) {
     console.error('No input provided via stdin.');
     process.exit(1);
