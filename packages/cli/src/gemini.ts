@@ -10,6 +10,12 @@ import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { GeminiClient } from '@gemini-code/server';
+import { readPackageUp } from 'read-package-up';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 async function main() {
   const config = loadCliConfig();
@@ -17,14 +23,20 @@ async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
+    const readUpResult = await readPackageUp({ cwd: __dirname });
+    const cliVersion =
+      process.env.NODE_ENV === 'development'
+        ? 'local'
+        : (readUpResult?.packageJson.version ?? 'unknown');
+
     render(
       React.createElement(App, {
         config,
+        cliVersion,
       }),
     );
     return;
   }
-
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {

@@ -24,8 +24,8 @@ if scripts/sandbox_command.sh -q; then
 else
     echo "WARNING: OUTSIDE SANDBOX. See README.md to enable sandboxing."
     if [ -n "${DEBUG:-}" ]; then
-        node --inspect-brk node_modules/@gemini-code/cli "$@"
+        NODE_ENV='development' node --inspect-brk node_modules/@gemini-code/cli "$@"
     else
-        node node_modules/@gemini-code/cli "$@"
+        NODE_ENV='development' node node_modules/@gemini-code/cli "$@"
     fi
 fi

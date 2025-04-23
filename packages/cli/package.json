@@ -35,6 +35,7 @@
     "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
     "react": "^18.3.1",
+    "read-package-up": "^11.0.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

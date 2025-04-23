@@ -28,9 +28,10 @@ import { Tips } from './components/Tips.js';
 
 interface AppProps {
   config: Config;
+  cliVersion: string;
 }
 
-export const App = ({ config }: AppProps) => {
+export const App = ({ config, cliVersion }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const { streamingState, submitQuery, initError, debugMessage } =
@@ -165,6 +166,7 @@ export const App = ({ config }: AppProps) => {
         queryLength={query.length}
         debugMode={config.getDebugMode()}
         debugMessage={debugMessage}
+        cliVersion={cliVersion}
       />
       <ITermDetectionWarning />
     </Box>

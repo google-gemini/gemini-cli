@@ -14,6 +14,7 @@ interface FooterProps {
   queryLength: number;
   debugMode: boolean;
   debugMessage: string;
+  cliVersion: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -21,6 +22,7 @@ export const Footer: React.FC<FooterProps> = ({
   queryLength,
   debugMode,
   debugMessage,
+  cliVersion,
 }) => (
   <Box marginTop={1} display="flex" justifyContent="space-between" width="100%">
     {/* Left Section: Help/DebugMode */}
@@ -50,6 +52,7 @@ export const Footer: React.FC<FooterProps> = ({
     {/* Right Section: Gemini Label */}
     <Box>
       <Text color={Colors.AccentBlue}> {config.getModel()} </Text>
+      <Text color={Colors.SubtleComment}> | CLI Version: {cliVersion} </Text>
     </Box>
   </Box>
 );
