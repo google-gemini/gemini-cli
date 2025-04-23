@@ -40,6 +40,10 @@ if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then exit 1; fi
 # lowercase GEMINI_CODE_SANDBOX
 GEMINI_CODE_SANDBOX=$(echo "${GEMINI_CODE_SANDBOX:-}" | tr '[:upper:]' '[:lower:]')
 
+if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(0|false)$ ]]; then
+    exit 1
+fi
+
 # if GEMINI_CODE_SANDBOX is set to 1 or true, then try to use docker or podman
 if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]]; then
     if command -v docker &> /dev/null; then
