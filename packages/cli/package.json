@@ -4,7 +4,9 @@
   "description": "Gemini Code CLI",
   "type": "module",
   "main": "dist/index.js",
-  "bin": "dist/index.js",
+  "bin": {
+    "gemini-code": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc --build && touch dist/.last_build",
     "clean": "rm -rf dist",
