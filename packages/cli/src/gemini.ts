@@ -21,6 +21,11 @@ async function main() {
   const config = loadCliConfig();
   let input = config.getQuestion();
 
+  if (process.env.GEMINI_CODE_SANDBOX && !process.env.SANDBOX) {
+    console.log('WARNING: sandboxing is enabled, but still OUTSIDE sandbox');
+    // TODO: get inside sandbox
+  }
+
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
     const readUpResult = await readPackageUp({ cwd: __dirname });

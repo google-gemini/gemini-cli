@@ -42,16 +42,27 @@ while $CMD ps -a --format "{{.Names}}" | grep -q "$IMAGE-$INDEX"; do
 done
 run_args+=(--name "$IMAGE-$INDEX" --hostname "$IMAGE-$INDEX")
 
-# also set SANDBOX environment variable as container name
-run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
+# if .env exists, source it before variable existence checks below
+# allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
+current_dir=$(pwd)
+while [ "$current_dir" != "/" ]; do
+    if [ -f "$current_dir/.env" ]; then
+        source "$current_dir/.env"
+        break
+    fi
+    current_dir=$(dirname "$current_dir")
+done
+
+# if GEMINI_API_KEY is set, copy into container
+if [ -n "${GEMINI_API_KEY:-}" ]; then run_args+=(--env GEMINI_API_KEY="$GEMINI_API_KEY"); fi
 
 # pass TERM and COLORTERM to container to maintain terminal colors
-run_args+=(--env TERM --env COLORTERM)
+if [ -n "${TERM:-}" ]; then run_args+=(--env TERM="$TERM"); fi
+if [ -n "${COLORTERM:-}" ]; then run_args+=(--env COLORTERM="$COLORTERM"); fi
 
-# set GEMINI_API_KEY environment variable if it exists
-if [ -n "${GEMINI_API_KEY:-}" ]; then
-    run_args+=(--env GEMINI_API_KEY)
-fi
+# set SANDBOX environment variable as container name
+# this is the preferred mechanism to detect if inside container/sandbox
+run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
 
 # enable debugging via node --inspect-brk (and $DEBUG_PORT) if DEBUG is set
 node_args=()

@@ -32,7 +32,17 @@ shift $((OPTIND - 1))
 
 
 # if GEMINI_CODE_SANDBOX is not set, try to source .env in case set there
-if [ -z "${GEMINI_CODE_SANDBOX:-}" ] && [ -f .env ]; then source .env; fi
+# allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
+if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
+    current_dir=$(pwd)
+    while [ "$current_dir" != "/" ]; do
+        if [ -f "$current_dir/.env" ]; then
+            source "$current_dir/.env"
+            break
+        fi
+        current_dir=$(dirname "$current_dir")
+    done
+fi
 
 # if GEMINI_CODE_SANDBOX is still not set, then exit immediately w/ code 1
 if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then exit 1; fi
@@ -40,6 +50,7 @@ if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then exit 1; fi
 # lowercase GEMINI_CODE_SANDBOX
 GEMINI_CODE_SANDBOX=$(echo "${GEMINI_CODE_SANDBOX:-}" | tr '[:upper:]' '[:lower:]')
 
+# if GEMINI_CODE_SANDBOX is set to 0 or false, then exit immediately w/ code 1
 if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(0|false)$ ]]; then
     exit 1
 fi
