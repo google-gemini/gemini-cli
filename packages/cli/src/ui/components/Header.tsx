@@ -7,14 +7,9 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
+import { Colors } from '../colors.js';
 
-const gradientColors = ['#4796E4', '#847ACE', '#C3677F'];
-
-export const Header: React.FC = () => (
-  <>
-    <Box marginBottom={1} alignItems="flex-start">
-      <Gradient colors={gradientColors}>
-        <Text>{`
+const asciiArtLogo = `
  ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗
 ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║
 ██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║
@@ -28,8 +23,18 @@ export const Header: React.FC = () => (
 ██║     ██║   ██║██║  ██║██╔══╝             
 ╚██████╗╚██████╔╝██████╔╝███████╗           
  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝           
-`}</Text>
-      </Gradient>
+`;
+
+export const Header: React.FC = () => (
+  <>
+    <Box marginBottom={1} alignItems="flex-start">
+      {Colors.GradientColors ? (
+        <Gradient colors={Colors.GradientColors}>
+          <Text>{asciiArtLogo}</Text>
+        </Gradient>
+      ) : (
+        <Text>{asciiArtLogo}</Text>
+      )}
     </Box>
   </>
 );

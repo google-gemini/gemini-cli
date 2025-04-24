@@ -17,6 +17,7 @@ export interface ColorsTheme {
   AccentRed: string;
   SubtleComment: string;
   Gray: string;
+  GradientColors?: string[];
 }
 
 export const lightTheme: ColorsTheme = {
@@ -31,6 +32,7 @@ export const lightTheme: ColorsTheme = {
   AccentRed: '#EF4444',
   SubtleComment: '#9CA3AF',
   Gray: 'gray',
+  GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
 export const darkTheme: ColorsTheme = {
@@ -44,6 +46,21 @@ export const darkTheme: ColorsTheme = {
   AccentYellow: '#F9E2AF',
   AccentRed: '#F38BA8',
   SubtleComment: '#6C7086',
+  Gray: 'gray',
+  GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
+};
+
+export const ansiTheme: ColorsTheme = {
+  Background: 'black',
+  Foreground: 'white',
+  LightBlue: 'blue',
+  AccentBlue: 'bluebright',
+  AccentPurple: 'magentabright',
+  AccentCyan: 'cyanbright',
+  AccentGreen: 'greenbright',
+  AccentYellow: 'yellowbright',
+  AccentRed: 'red',
+  SubtleComment: 'gray',
   Gray: 'gray',
 };
 

@@ -12,6 +12,7 @@ import { VS } from './vs.js';
 import { VS2015 } from './vs2015.js';
 import { XCode } from './xcode.js';
 import { Theme } from './theme.js';
+import { ANSI } from './ansi.js';
 
 export interface ThemeDisplay {
   name: string;
@@ -32,6 +33,7 @@ class ThemeManager {
       GitHub,
       GoogleCode,
       XCode,
+      ANSI,
     ];
     this.activeTheme = ThemeManager.DEFAULT_THEME;
   }
