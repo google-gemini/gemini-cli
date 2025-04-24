@@ -23,9 +23,11 @@ if scripts/sandbox_command.sh -q; then
     scripts/start_sandbox.sh "$@"
 else
     echo "WARNING: OUTSIDE SANDBOX. See README.md to enable sandboxing."
+    # DEV=true to enable React Dev Tools (https://github.com/vadimdemedes/ink?tab=readme-ov-file#using-react-devtools)
+    # CLI_VERSION to display in the app ui footer
     if [ -n "${DEBUG:-}" ]; then
-        CLI_VERSION='development' node --inspect-brk node_modules/@gemini-code/cli "$@"
+        CLI_VERSION='development' DEV=true node --inspect-brk node_modules/.bin/gemini-code "$@"
     else
-        CLI_VERSION='development' node node_modules/@gemini-code/cli "$@"
+        CLI_VERSION='development' DEV=true node node_modules/.bin/gemini-code "$@"
     fi
 fi
