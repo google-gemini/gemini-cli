@@ -5,6 +5,47 @@
  */
 
 import type { CSSProperties } from 'react';
+export interface ColorsTheme {
+  Background: string;
+  Foreground: string;
+  LightBlue: string;
+  AccentBlue: string;
+  AccentPurple: string;
+  AccentCyan: string;
+  AccentGreen: string;
+  AccentYellow: string;
+  AccentRed: string;
+  SubtleComment: string;
+  Gray: string;
+}
+
+export const lightTheme: ColorsTheme = {
+  Background: '#FAFAFA',
+  Foreground: '#3C3C43',
+  LightBlue: '#ADD8E6',
+  AccentBlue: '#3B82F6',
+  AccentPurple: '#8B5CF6',
+  AccentCyan: '#06B6D4',
+  AccentGreen: '#22C55E',
+  AccentYellow: '#EAB308',
+  AccentRed: '#EF4444',
+  SubtleComment: '#9CA3AF',
+  Gray: 'gray',
+};
+
+export const darkTheme: ColorsTheme = {
+  Background: '#1E1E2E',
+  Foreground: '#CDD6F4',
+  LightBlue: '#ADD8E6',
+  AccentBlue: '#89B4FA',
+  AccentPurple: '#CBA6F7',
+  AccentCyan: '#89DCEB',
+  AccentGreen: '#A6E3A1',
+  AccentYellow: '#F9E2AF',
+  AccentRed: '#F38BA8',
+  SubtleComment: '#6C7086',
+  Gray: 'gray',
+};
 
 export class Theme {
   /**
@@ -18,6 +59,7 @@ export class Theme {
    */
   readonly defaultColor: string;
 
+  readonly colors: ColorsTheme;
   /**
    * Stores the mapping from highlight.js class names (e.g., 'hljs-keyword')
    * to Ink-compatible color strings (hex or name).
@@ -196,9 +238,14 @@ export class Theme {
    * @param name The name of the theme.
    * @param rawMappings The raw CSSProperties mappings from a react-syntax-highlighter theme object.
    */
-  constructor(name: string, rawMappings: Record<string, CSSProperties>) {
+  constructor(
+    name: string,
+    rawMappings: Record<string, CSSProperties>,
+    colors: ColorsTheme,
+  ) {
     this.name = name;
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
+    this.colors = colors;
 
     // Determine the default foreground color
     const rawDefaultColor = rawMappings['hljs']?.color;

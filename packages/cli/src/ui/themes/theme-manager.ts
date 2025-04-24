@@ -27,7 +27,7 @@ class ThemeManager {
     this.availableThemes = [
       AtomOneDark,
       Dracula,
-      VS,
+      VS, // Light mode.
       VS2015,
       GitHub,
       GoogleCode,

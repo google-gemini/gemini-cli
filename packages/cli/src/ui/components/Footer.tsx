@@ -30,7 +30,10 @@ export const Footer: React.FC<FooterProps> = ({
       <Text color={Colors.SubtleComment}>
         {queryLength === 0 ? '? for shortcuts' : ''}
         {debugMode && (
-          <Text color="red"> {debugMessage || 'Running in debug mode.'}</Text>
+          <Text color={Colors.AccentRed}>
+            {' '}
+            {debugMessage || 'Running in debug mode.'}
+          </Text>
         )}
       </Text>
     </Box>
@@ -45,7 +48,7 @@ export const Footer: React.FC<FooterProps> = ({
       {process.env.SANDBOX ? (
         <Text color="green"> {process.env.SANDBOX} </Text>
       ) : (
-        <Text color="red"> WARNING: OUTSIDE SANDBOX </Text>
+        <Text color={Colors.AccentRed}> WARNING: OUTSIDE SANDBOX </Text>
       )}
     </Box>
 

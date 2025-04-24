@@ -4,15 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const Colors = {
-  Foreground: 'white',
-  LightBlue: '#CDD6F4',
-  AccentBlue: '#89B4FA',
-  AccentPurple: '#CBA6F7',
-  AccentCyan: '#89DCEB',
-  AccentGreen: '#A6E3A1',
-  AccentYellow: '#F9E2AF',
-  AccentRed: '#F38BA8',
-  SubtleComment: '#6C7086',
-  Gray: 'gray',
+import { themeManager } from './themes/theme-manager.js';
+import { ColorsTheme } from './themes/theme.js';
+
+export const Colors: ColorsTheme = {
+  get Foreground() {
+    return themeManager.getActiveTheme().colors.Foreground;
+  },
+  get Background() {
+    return themeManager.getActiveTheme().colors.Background;
+  },
+  get LightBlue() {
+    return themeManager.getActiveTheme().colors.LightBlue;
+  },
+  get AccentBlue() {
+    return themeManager.getActiveTheme().colors.AccentBlue;
+  },
+  get AccentPurple() {
+    return themeManager.getActiveTheme().colors.AccentPurple;
+  },
+  get AccentCyan() {
+    return themeManager.getActiveTheme().colors.AccentCyan;
+  },
+  get AccentGreen() {
+    return themeManager.getActiveTheme().colors.AccentGreen;
+  },
+  get AccentYellow() {
+    return themeManager.getActiveTheme().colors.AccentYellow;
+  },
+  get AccentRed() {
+    return themeManager.getActiveTheme().colors.AccentRed;
+  },
+  get SubtleComment() {
+    return themeManager.getActiveTheme().colors.SubtleComment;
+  },
+  get Gray() {
+    return themeManager.getActiveTheme().colors.Gray;
+  },
 };
