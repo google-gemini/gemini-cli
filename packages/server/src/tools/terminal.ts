@@ -38,74 +38,6 @@ const MAX_TIMEOUT_OVERRIDE_MS = 10 * 60 * 1000;
 const BACKGROUND_LAUNCH_TIMEOUT_MS = 15 * 1000;
 const BACKGROUND_POLL_TIMEOUT_MS = 30000;
 
-const BANNED_COMMAND_ROOTS = [
-  'alias',
-  'bg',
-  'command',
-  'declare',
-  'dirs',
-  'disown',
-  'enable',
-  'eval',
-  'exec',
-  'exit',
-  'export',
-  'fc',
-  'fg',
-  'getopts',
-  'hash',
-  'history',
-  'jobs',
-  'kill',
-  'let',
-  'local',
-  'logout',
-  'popd',
-  'printf',
-  'pushd',
-  'read',
-  'readonly',
-  'set',
-  'shift',
-  'shopt',
-  'source',
-  'suspend',
-  'test',
-  'times',
-  'trap',
-  'type',
-  'typeset',
-  'ulimit',
-  'umask',
-  'unalias',
-  'unset',
-  'wait',
-  'curl',
-  'wget',
-  'nc',
-  'telnet',
-  'ssh',
-  'scp',
-  'ftp',
-  'sftp',
-  'http',
-  'https',
-  'rsync',
-  'lynx',
-  'w3m',
-  'links',
-  'elinks',
-  'httpie',
-  'xh',
-  'http-prompt',
-  'chrome',
-  'firefox',
-  'safari',
-  'edge',
-  'xdg-open',
-  'open',
-];
-
 interface QueuedCommand {
   params: TerminalToolParams;
   resolve: (result: ToolResult) => void;
@@ -156,17 +88,13 @@ Usage Guidance & Restrictions:
     * Do NOT use this tool for reading files (\`cat\`, \`head\`, \`tail\`, \`less\`, \`more\`). Use the dedicated File Reader tool instead.
     * Do NOT use this tool for listing files (\`ls\`). Use the dedicated File System tool ('list_directory') instead. Relying on this tool's output for directory structure is unreliable due to potential truncation and lack of structured data.
 
-3.  **Security & Banned Commands:**
-    * Certain commands are banned for security (e.g., network: ${BANNED_COMMAND_ROOTS.filter((c) => ['curl', 'wget', 'ssh'].includes(c)).join(', ')}; session: ${BANNED_COMMAND_ROOTS.filter((c) => ['exit', 'export', 'kill'].includes(c)).join(', ')}; etc.). The full list is extensive.
-    * If you attempt a banned command, this tool will return an error explaining the restriction. You MUST relay this error clearly to the user.
-
-4.  **Command Execution Notes:**
+3.  **Command Execution Notes:**
     * Chain multiple commands using shell operators like ';' or '&&'. Do NOT use newlines within the 'command' parameter string itself (newlines are fine inside quoted arguments).
     * The shell's current working directory is tracked internally. While \`cd\` is permitted if the user explicitly asks or it's necessary for a workflow, **strongly prefer** using absolute paths or paths relative to the *known* current working directory to avoid errors. Check the '(Executed in: ...)' part of the previous command's output for the CWD.
         * Good example (if CWD is /workspace/project): \`pytest tests/unit\` or \`ls /workspace/project/data\`
         * Less preferred: \`cd tests && pytest unit\` (only use if necessary or requested)
 
-5.  **Background Tasks (\`runInBackground: true\`):**
+4.  **Background Tasks (\`runInBackground: true\`):**
     * Use this for commands that are intended to run continuously (e.g., \`node server.js\`, \`npm start\`).
     * The tool initially returns success if the process *launches* successfully, along with its PID.
     * **Polling & Final Result:** The tool then monitors the process. The *final* result (delivered after polling completes or times out) will include:
@@ -298,21 +226,8 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     ) {
       return `Parameters failed schema validation.`;
     }
-    const commandOriginal = params.command.trim();
-    if (!commandOriginal) {
+    if (!params.command.trim()) {
       return 'Command cannot be empty.';
-    }
-    const commandParts = commandOriginal.split(/[\s;&&|]+/);
-    for (const part of commandParts) {
-      if (!part) continue;
-      const cleanPart =
-        part
-          .replace(/^[^a-zA-Z0-9]+/, '')
-          .split(/[/\\]/)
-          .pop() || part.replace(/^[^a-zA-Z0-9]+/, '');
-      if (cleanPart && BANNED_COMMAND_ROOTS.includes(cleanPart.toLowerCase())) {
-        return `Command contains a banned keyword: '${cleanPart}'. Banned list includes network tools, session control, etc.`;
-      }
     }
     if (
       params.timeout !== undefined &&
