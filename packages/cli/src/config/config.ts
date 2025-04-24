@@ -17,7 +17,6 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 
 // Keep CLI-specific argument parsing
 interface CliArgs {
-  target_dir: string | undefined;
   model: string | undefined;
   debug_mode: boolean | undefined;
   question: string | undefined;
@@ -25,12 +24,6 @@ interface CliArgs {
 
 function parseArguments(): CliArgs {
   const argv = yargs(hideBin(process.argv))
-    .option('target_dir', {
-      alias: 'd',
-      type: 'string',
-      description:
-        'The target directory for Gemini operations. Defaults to the current working directory.',
-    })
     .option('model', {
       alias: 'm',
       type: 'string',
@@ -76,7 +69,7 @@ export function loadCliConfig(): Config {
   return createServerConfig(
     process.env.GEMINI_API_KEY,
     argv.model || DEFAULT_GEMINI_MODEL,
-    argv.target_dir || process.cwd(),
+    process.cwd(),
     argv.debug_mode || false,
     argv.question || '',
     // TODO: load passthroughCommands from .env file
