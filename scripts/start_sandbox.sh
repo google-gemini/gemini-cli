@@ -57,5 +57,9 @@ fi
 node_args+=("$CLI_PATH" "$@")
 
 # run gemini-code in sandbox container
-# use empty --authfile to skip unnecessary auth refresh overhead
-$CMD run "${run_args[@]}" --init --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"
+if [[ "$CMD" == "podman" ]]; then
+    # use empty --authfile to skip unnecessary auth refresh overhead
+    $CMD run "${run_args[@]}" --init --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"
+else
+    $CMD run "${run_args[@]}" --init --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"
+fi
