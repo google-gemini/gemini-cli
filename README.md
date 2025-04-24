@@ -47,7 +47,7 @@ To debug the CLI application using VS Code:
 
 1.  Start the CLI in debug mode from the root directory:
     ```bash
-    npm run debug --workspace=gemini-code-cli
+    npm run debug
     ```
     This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches.
 2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`). This configuration is set up to attach to the Node.js process listening on port 9229, which is the default port used by `--inspect-brk`.
