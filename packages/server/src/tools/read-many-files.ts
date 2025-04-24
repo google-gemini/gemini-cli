@@ -115,7 +115,7 @@ export class ReadManyFilesTool extends BaseTool<
   ReadManyFilesParams,
   ToolResult
 > {
-  static readonly Name: string = 'readManyFiles';
+  static readonly Name: string = 'read_many_files';
   readonly targetDir: string;
 
   /**
@@ -165,7 +165,7 @@ export class ReadManyFilesTool extends BaseTool<
 
     super(
       ReadManyFilesTool.Name,
-      'Read Many Files',
+      'ReadManyFiles',
       `Reads content from multiple text files specified by paths or glob patterns within a configured target directory and concatenates them into a single string.
 This tool is useful when you need to understand or analyze a collection of files, such as:
 - Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
@@ -345,7 +345,7 @@ Default excludes apply to common non-text files and large dependency directories
       }
     }
 
-    let displayMessage = `### Read Many Files Result (Target Dir: \`${this.targetDir}\`)\n\n`;
+    let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.targetDir}\`)\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
       displayMessage += `\n**Processed Files (up to 10 shown):**\n`;
