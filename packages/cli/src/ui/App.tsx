@@ -39,8 +39,12 @@ export const App = ({ config, cliVersion }: AppProps) => {
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
-  const { isThemeDialogOpen, openThemeDialog, handleThemeSelect } =
-    useThemeCommand();
+  const {
+    isThemeDialogOpen,
+    openThemeDialog,
+    handleThemeSelect,
+    handleThemeHighlight,
+  } = useThemeCommand();
 
   useStartupWarnings(setStartupWarnings);
   useInitializationErrorEffect(initError, history, setHistory);
@@ -134,7 +138,10 @@ export const App = ({ config, cliVersion }: AppProps) => {
       )}
 
       {isThemeDialogOpen ? (
-        <ThemeDialog onSelect={handleThemeSelect} />
+        <ThemeDialog
+          onSelect={handleThemeSelect}
+          onHighlight={handleThemeHighlight}
+        />
       ) : (
         <>
           <Box flexDirection="column">

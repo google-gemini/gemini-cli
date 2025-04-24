@@ -34,6 +34,9 @@ export interface RadioButtonSelectProps<T> {
 
   /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
+
+  /** Function called when an item is highlighted. Receives the `value` of the selected item. */
+  onHighlight?: (value: T) => void;
 }
 
 /**
@@ -73,9 +76,15 @@ export function RadioButtonSelect<T>({
   items,
   initialIndex,
   onSelect,
+  onHighlight,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   const handleSelect = (item: RadioSelectItem<T>) => {
     onSelect(item.value);
+  };
+  const handleHighlight = (item: RadioSelectItem<T>) => {
+    if (onHighlight) {
+      onHighlight(item.value);
+    }
   };
   initialIndex = initialIndex ?? 0;
   return (
@@ -85,6 +94,7 @@ export function RadioButtonSelect<T>({
       items={items}
       initialIndex={initialIndex}
       onSelect={handleSelect}
+      onHighlight={handleHighlight}
     />
   );
 }

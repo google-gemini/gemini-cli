@@ -11,6 +11,7 @@ interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
   handleThemeSelect: (themeName: string) => void;
+  handleThemeHighlight: (themeName: string) => void;
 }
 
 export const useThemeCommand = (): UseThemeCommandReturn => {
@@ -21,12 +22,22 @@ export const useThemeCommand = (): UseThemeCommandReturn => {
     setIsThemeDialogOpen(true);
   }, []);
 
-  const handleThemeSelect = useCallback((themeName: string) => {
+  function applyTheme(themeName: string) {
     try {
       themeManager.setActiveTheme(themeName);
       setForceRender((v) => v + 1); // Trigger potential re-render
     } catch (error) {
       console.error(`Error setting theme: ${error}`);
+    }
+  }
+
+  const handleThemeHighlight = useCallback((themeName: string) => {
+    applyTheme(themeName);
+  }, []);
+
+  const handleThemeSelect = useCallback((themeName: string) => {
+    try {
+      applyTheme(themeName);
     } finally {
       setIsThemeDialogOpen(false); // Close the dialog
     }
@@ -36,5 +47,6 @@ export const useThemeCommand = (): UseThemeCommandReturn => {
     isThemeDialogOpen,
     openThemeDialog,
     handleThemeSelect,
+    handleThemeHighlight,
   };
 };
