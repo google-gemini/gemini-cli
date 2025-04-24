@@ -18,34 +18,29 @@ function getBaseVersion() {
   // Read root package.json
   const rootPackageJsonPath = path.join(rootDir, 'package.json');
   const rootPackage = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf8'));
-  let baseVersion = rootPackage.version;
+  return rootPackage.version;
+}
 
+function getDefaultSuffix() {
   // Get latest commit hash
   const commitHash = execSync('git rev-parse --short HEAD', {
     encoding: 'utf8',
   }).trim();
 
   // Append dev suffix with commit hash
-  const devSuffix = `-dev-${commitHash}.0`;
-  return `${baseVersion}${devSuffix}`;
+  return `dev-${commitHash}.0`;
 }
 
 const argv = yargs(hideBin(process.argv))
-  .option('pkg-version', {
+  .option('suffix', {
     type: 'string',
-    description: 'Set the package version',
+    description: 'Set the package version suffix',
   })
   .parse();
 
-const newVersion = argv['pkg-version'] ?? getBaseVersion();
-if (argv['pkg-version']) {
-  console.log(`Using provided package version (--pkg-version): ${newVersion}`);
-} else {
-  console.log(
-    `Using base version with dev suffix and commit hash: ${newVersion}`,
-  );
-}
-
+const baseVersion = getBaseVersion();
+const suffix = argv['suffix'] ?? getDefaultSuffix();
+const newVersion = `${baseVersion}${suffix.length ? '-' : ''}${suffix}`;
 console.log(`Setting package version to: ${newVersion}`);
 
 const packageJsonPath = path.join(packageDir, 'package.json');
