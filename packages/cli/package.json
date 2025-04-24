@@ -15,8 +15,8 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
-    "stage:version": "node ../../scripts/bind_package_version.js",
-    "stage:deps": "node ../../scripts/bind_package_dependencies.js",
+    "prerelease:version": "node ../../scripts/bind_package_version.js",
+    "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
     "prepack": "npm run build"
   },
   "files": [
