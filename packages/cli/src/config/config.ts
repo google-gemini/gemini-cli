@@ -20,6 +20,7 @@ interface CliArgs {
   model: string | undefined;
   debug_mode: boolean | undefined;
   question: string | undefined;
+  full_context: boolean | undefined;
 }
 
 function parseArguments(): CliArgs {
@@ -41,6 +42,13 @@ function parseArguments(): CliArgs {
       type: 'string',
       description:
         'The question to pass to the command when using piped input.',
+    })
+    .option('full_context', {
+      alias: 'f',
+      type: 'boolean',
+      description:
+        'Recursively include all files within the current directory as context.',
+      default: false,
     })
     .help()
     .alias('h', 'help')
@@ -72,6 +80,7 @@ export function loadCliConfig(): Config {
     process.cwd(),
     argv.debug_mode || false,
     argv.question || '',
-    // TODO: load passthroughCommands from .env file
+    undefined, // TODO: load passthroughCommands from .env file
+    argv.full_context || false,
   );
 }

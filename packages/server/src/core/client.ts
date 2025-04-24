@@ -19,6 +19,7 @@ import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { Turn, ServerGeminiStreamEvent } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
+import { ReadManyFilesTool } from '../tools/read-many-files.js'; // Import ReadManyFilesTool
 
 export class GeminiClient {
   private config: Config;
@@ -36,7 +37,7 @@ export class GeminiClient {
     this.model = config.getModel();
   }
 
-  private async getEnvironment(): Promise<Part> {
+  private async getEnvironment(): Promise<Part[]> {
     const cwd = process.cwd();
     const today = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
@@ -53,11 +54,49 @@ export class GeminiClient {
   I'm currently working in the directory: ${cwd}
   ${folderStructure}
           `.trim();
-    return { text: context };
+
+    const initialParts: Part[] = [{ text: context }];
+
+    // Add full file context if the flag is set
+    if (this.config.getFullContext()) {
+      try {
+        const readManyFilesTool = this.config
+          .getToolRegistry()
+          .getTool('read_many_files') as ReadManyFilesTool;
+        if (readManyFilesTool) {
+          // Read all files in the target directory
+          const result = await readManyFilesTool.execute({
+            paths: ['**/*'], // Read everything recursively
+            useDefaultExcludes: true, // Use default excludes
+          });
+          if (result.llmContent) {
+            initialParts.push({
+              text: `\n--- Full File Context ---\n${result.llmContent}`,
+            });
+          } else {
+            console.warn(
+              'Full context requested, but read_many_files returned no content.',
+            );
+          }
+        } else {
+          console.warn(
+            'Full context requested, but read_many_files tool not found.',
+          );
+        }
+      } catch (error) {
+        console.error('Error reading full file context:', error);
+        // Optionally add an error message part to the context
+        initialParts.push({
+          text: '\n--- Error reading full file context ---',
+        });
+      }
+    }
+
+    return initialParts;
   }
 
   async startChat(): Promise<Chat> {
-    const envPart = await this.getEnvironment();
+    const envParts = await this.getEnvironment();
     const toolDeclarations = this.config
       .getToolRegistry()
       .getFunctionDeclarations();
@@ -73,7 +112,7 @@ export class GeminiClient {
         history: [
           {
             role: 'user',
-            parts: [envPart],
+            parts: envParts,
           },
           {
             role: 'model',
