@@ -42,7 +42,6 @@ interface QueuedCommand {
   params: TerminalToolParams;
   resolve: (result: ToolResult) => void;
   reject: (error: Error) => void;
-  confirmationDetails: ToolExecuteConfirmationDetails | false;
 }
 
 export class TerminalTool extends BaseTool<TerminalToolParams, ToolResult> {
@@ -183,16 +182,16 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             `Persistent bash process exited (code: ${code}, signal: ${signal})`,
           ),
         );
-        this.shellReady = new Promise((resolve, reject) => {
-          this.resolveShellReady = resolve;
-          this.rejectShellReady = reject;
-        });
         this.clearQueue(
           new Error(
             `Persistent bash process exited unexpectedly (code: ${code}, signal: ${signal}). State is lost. Queued commands cancelled.`,
           ),
         );
         if (signal !== 'SIGINT') {
+          this.shellReady = new Promise((resolve, reject) => {
+            this.resolveShellReady = resolve;
+            this.rejectShellReady = reject;
+          });
           setTimeout(() => this.initializeShell(), 1000);
         }
       });
@@ -286,7 +285,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
             llmContent: `Internal tool error for command: ${params.command}\nError: ${error.message}`,
             returnDisplay: `Internal Tool Error: ${error.message}`,
           }),
-        confirmationDetails: false,
       };
       this.commandQueue.push(queuedItem);
       setImmediate(() => this.triggerQueueProcessing());
