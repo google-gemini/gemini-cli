@@ -21,7 +21,10 @@ async function main() {
   const config = loadCliConfig();
   let input = config.getQuestion();
 
-  if (process.env.GEMINI_CODE_SANDBOX && !process.env.SANDBOX) {
+  const sandboxEnabled =
+    process.env.GEMINI_CODE_SANDBOX &&
+    !['0', 'false'].includes(process.env.GEMINI_CODE_SANDBOX.toLowerCase());
+  if (sandboxEnabled && !process.env.SANDBOX) {
     console.log('WARNING: sandboxing is enabled, but still OUTSIDE sandbox');
     // TODO: get inside sandbox
   }
