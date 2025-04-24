@@ -68,7 +68,7 @@ export class GeminiClient {
         config: {
           systemInstruction: getCoreSystemPrompt(),
           ...this.generateContentConfig,
-          tools: tools,
+          tools,
         },
         history: [
           {
@@ -111,7 +111,7 @@ export class GeminiClient {
 
         // What do we do when we have both function responses and confirmations?
         const fnResponses = turn.getFunctionResponses();
-        if (fnResponses.length == 0) {
+        if (fnResponses.length === 0) {
           break; // user's turn to respond
         }
         request = fnResponses;

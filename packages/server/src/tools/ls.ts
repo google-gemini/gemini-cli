@@ -257,10 +257,7 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
 
       // Create formatted content for LLM
       const directoryContent = entries
-        .map((entry) => {
-          // More concise format for LLM
-          return `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`;
-        })
+        .map((entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`)
         .join('\n');
 
       return {

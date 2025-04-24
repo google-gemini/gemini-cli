@@ -104,7 +104,7 @@ const DEFAULT_EXCLUDES: string[] = [
 
 // Default values for encoding and separator format
 const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
-const DEFAULT_OUTPUT_SEPARATOR_FORMAT: string = '--- {filePath} ---';
+const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 
 /**
  * Tool implementation for finding and reading multiple text files from the local filesystem
@@ -257,7 +257,7 @@ Default excludes apply to common non-text files and large dependency directories
     const toolBaseDir = this.targetDir;
 
     const filesToConsider = new Set<string>();
-    const skippedFiles: { path: string; reason: string }[] = [];
+    const skippedFiles: Array<{ path: string; reason: string }> = [];
     const processedFilesRelativePaths: string[] = [];
     let concatenatedContent = '';
 
