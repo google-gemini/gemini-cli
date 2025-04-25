@@ -64,7 +64,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes, allow always', // TODO: this is extreme w/o being qualified by file or directory
+        label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
