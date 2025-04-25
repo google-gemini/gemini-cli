@@ -24,6 +24,12 @@ CMD=$(scripts/sandbox_command.sh)
 IMAGE=gemini-code-sandbox
 DEBUG_PORT=9229
 
+# stop if image is missing
+if ! $CMD images -q "$IMAGE" | grep -q .; then
+    echo "ERROR: $IMAGE is missing. Try \`npm run build\` with sandboxing enabled."
+    exit 1
+fi
+
 PROJECT=$(basename "$PWD")
 WORKDIR=/sandbox/$PROJECT
 CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
