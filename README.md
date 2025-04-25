@@ -84,19 +84,17 @@ The very first build of the container (with `npm run build` or `scripts/build_sa
 
 You can customize the sandbox in `Dockerfile` (e.g. for pre-installed utilities) or in `scripts/build_sandbox.sh` (e.g. for mounts `-v ...`, ports `-p ...`, or environment variables `-e ...`) and any changes should be automatically picked up by `npm run build` and `npm start` respectively.
 
-## Publishing
+## Manual Publish
 
-Run the following commands:
+We publish an artifact for each commit to our internal registry. But if you need to manually cut a local build, then run the following commands:
 
 ```
 npm run clean
 npm install
 npm run auth
-npm run stage
-npm publish --tag=dogfood --workspaces
+npm run prerelease:dev
+npm publish --workspaces
 ```
-
-> TODO(b/412808531): add arguments to `npm run stage` to give us more control over the version number staged for publishing
 
 ### Attaching from VSCode
 
