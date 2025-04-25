@@ -4,10 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
 import fs from 'fs';
 import { Config } from '../config/config.js';
-import { BaseTool, ToolResult } from './tools.js';
+import {
+  BaseTool,
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import toolParameterSchema from './shell.json' with { type: 'json' };
 
 export interface ShellToolParams {
@@ -17,10 +22,11 @@ export interface ShellToolParams {
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'execute_bash_command';
-  private readonly rootDirectory: string;
   private readonly config: Config;
+  private cwd: string;
+  private whitelist: Set<string> = new Set();
 
-  constructor(rootDirectory: string, config: Config) {
+  constructor(config: Config) {
     const toolDisplayName = 'Shell';
     const descriptionUrl = new URL('shell.md', import.meta.url);
     const toolDescription = fs.readFileSync(descriptionUrl, 'utf-8');
@@ -31,7 +37,41 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       toolParameterSchema,
     );
     this.config = config;
-    this.rootDirectory = path.resolve(rootDirectory);
+    this.cwd = config.getTargetDir();
+  }
+
+  getDescription(params: ShellToolParams): string {
+    return params.description || `Execute \`${params.command}\` in ${this.cwd}`;
+  }
+
+  validateToolParams(_params: ShellToolParams): string | null {
+    // TODO: validate the command here
+    return null;
+  }
+
+  async shouldConfirmExecute(
+    params: ShellToolParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const rootCommand =
+      params.command
+        .trim()
+        .split(/[\s;&&|]+/)[0]
+        ?.split(/[/\\]/)
+        .pop() || 'unknown';
+    if (this.whitelist.has(rootCommand)) {
+      return false;
+    }
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      title: 'Confirm Shell Command',
+      command: params.command,
+      rootCommand,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.whitelist.add(rootCommand);
+        }
+      },
+    };
+    return confirmationDetails;
   }
 
   async execute(_params: ShellToolParams): Promise<ToolResult> {

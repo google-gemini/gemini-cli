@@ -181,7 +181,6 @@ export interface ToolExecuteConfirmationDetails
   extends ToolCallConfirmationDetails {
   command: string;
   rootCommand: string;
-  description: string;
 }
 
 export enum ToolConfirmationOutcome {

@@ -147,7 +147,7 @@ function createToolRegistry(config: Config): ToolRegistry {
 
   // use ShellTool (next-gen TerminalTool) if environment variable is set
   if (process.env.SHELL_TOOL) {
-    tools.push(new ShellTool(targetDir, config));
+    tools.push(new ShellTool(config));
   } else {
     tools.push(new TerminalTool(targetDir, config));
   }

@@ -60,11 +60,11 @@ export const ToolConfirmationMessage: React.FC<
     question = `Apply this change?`;
     options.push(
       {
-        label: 'Yes',
+        label: 'Yes, allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes (always allow)',
+        label: 'Yes, allow always', // TODO: this is extreme w/o being qualified by file or directory
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
@@ -73,29 +73,22 @@ export const ToolConfirmationMessage: React.FC<
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
 
-    // For execution, we still need context display and description
-    const commandDisplay = (
-      <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
-    );
-
-    // Combine command and description into bodyContent for layout consistency
     bodyContent = (
       <Box flexDirection="column">
         <Box paddingX={1} marginLeft={1}>
-          {commandDisplay}
+          <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
         </Box>
       </Box>
     );
 
     question = `Allow execution?`;
-    const alwaysLabel = `Yes (always allow '${executionProps.rootCommand}' commands)`;
     options.push(
       {
-        label: 'Yes',
+        label: 'Yes, allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: alwaysLabel,
+        label: `Yes, allow always for ${executionProps.rootCommand} ...`,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },

@@ -253,12 +253,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     if (this.shouldAlwaysExecuteCommands.get(rootCommand)) {
       return false;
     }
-    const description = this.getDescription(params);
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       title: 'Confirm Shell Command',
       command: params.command,
       rootCommand,
-      description: `Execute in '${this.currentCwd}':\n${description}`,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.shouldAlwaysExecuteCommands.set(rootCommand, true);
