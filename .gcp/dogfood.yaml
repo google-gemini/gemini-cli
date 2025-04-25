@@ -6,11 +6,15 @@ steps:
 
   # Run prerelease versioning script across workspaces with dynamic version
   - name: 'node'
-    entrypoint: 'bash'
+    entrypoint: 'npm'
     args:
-      - '-c'
-      - |
-        npm run prerelease:version --workspaces -- --suffix="$SHORT_SHA.$(date +%Y%m%d).$_REVISION"
+      [
+        'run',
+        'prerelease:version',
+        '--workspaces',
+        '--',
+        '--suffix="$SHORT_SHA.$_REVISION"',
+      ]
 
   # Run prerelease dependency script across workspaces
   - name: 'node'
