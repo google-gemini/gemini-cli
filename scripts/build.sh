@@ -25,6 +25,7 @@ npm run build --workspaces
 
 # also build container image if sandboxing is enabled
 # skip (-s) npm install + build since we did that above
+# use (-d) for dev build that can reuse existing image
 if scripts/sandbox_command.sh -q; then
-    scripts/build_sandbox.sh -s
+    scripts/build_sandbox.sh -sd
 fi

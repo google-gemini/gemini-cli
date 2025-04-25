@@ -22,9 +22,22 @@ fi
 
 CMD=$(scripts/sandbox_command.sh)
 IMAGE=gemini-code-sandbox
-WORKDIR=/sandbox/$(basename "$PWD")
-CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
 DEBUG_PORT=9229
+
+PROJECT=$(basename "$PWD")
+WORKDIR=/sandbox/$PROJECT
+CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
+
+# if project is gemini-code, then run CLI from $WORKDIR/packages/cli
+# note this means the global installation is not required in this case
+if [[ "$PROJECT" == "gemini-code" ]]; then
+    CLI_PATH="$WORKDIR/packages/cli"
+elif [ -n "${DEBUG:-}" ]; then
+    # refuse to debug using global installation
+    # (requires a separate attach config in launch.json, see comments there around remoteRoot)
+    echo "ERROR: debugging is sandbox is not supported when target/root is not gemini-code"
+    exit 1
+fi
 
 # use interactive tty mode and auto-remove container on exit
 run_args=(-it --rm)

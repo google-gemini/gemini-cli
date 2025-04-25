@@ -11,7 +11,10 @@
       "skipFiles": ["<node_internals>/**"],
       "type": "node",
       // fix source mapping when debugging in sandbox
-      "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-code",
+      // we assume debugging is done on gemini-code project itself (see CLI_PATH setup in start_sandbox.sh)
+      // there seems to be no way to map two distinct remoteRoots to same localRoot under same configuration
+      // "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-code",
+      "remoteRoot": "/sandbox/gemini-code/packages",
       "localRoot": "${workspaceFolder}/packages"
     },
     {
