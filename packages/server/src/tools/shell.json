@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "command": {
+      "description": "The exact bash command or sequence of commands (using ';' or '&&') to execute. Must adhere to usage guidelines. Example: 'npm install && npm run build'",
+      "type": "string"
+    },
+    "description": {
+      "description": "Optional: A brief, user-centric explanation of what the command does and why it's being run. Used for logging and confirmation prompts. Example: 'Install project dependencies'",
+      "type": "string"
+    },
+    "runInBackground": {
+      "description": "If true, execute the command in the background using '&'. Defaults to false. Use for servers or long tasks.",
+      "type": "boolean"
+    }
+  },
+  "required": ["command"]
+}

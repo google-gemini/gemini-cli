@@ -15,9 +15,11 @@ import { GrepTool } from '../tools/grep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
 import { TerminalTool } from '../tools/terminal.js';
+import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
+import { BaseTool, ToolResult } from '../tools/tools.js';
 
 const DEFAULT_PASSTHROUGH_COMMANDS = ['ls', 'git', 'npm'];
 
@@ -132,17 +134,24 @@ function createToolRegistry(config: Config): ToolRegistry {
   const registry = new ToolRegistry();
   const targetDir = config.getTargetDir();
 
-  const tools = [
+  const tools: Array<BaseTool<unknown, ToolResult>> = [
     new LSTool(targetDir),
     new ReadFileTool(targetDir),
     new GrepTool(targetDir),
     new GlobTool(targetDir),
     new EditTool(targetDir),
-    new TerminalTool(targetDir, config),
     new WriteFileTool(targetDir),
     new WebFetchTool(), // Note: WebFetchTool takes no arguments
     new ReadManyFilesTool(targetDir),
   ];
+
+  // use ShellTool (next-gen TerminalTool) if environment variable is set
+  if (process.env.SHELL_TOOL) {
+    tools.push(new ShellTool(targetDir, config));
+  } else {
+    tools.push(new TerminalTool(targetDir, config));
+  }
+
   for (const tool of tools) {
     registry.registerTool(tool);
   }

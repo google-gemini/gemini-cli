@@ -8,7 +8,7 @@
     "gemini-code": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc --build && touch dist/.last_build",
+    "build": "../../scripts/build_package.sh",
     "clean": "rm -rf dist",
     "start": "node dist/gemini.js",
     "debug": "node --inspect-brk dist/gemini.js",

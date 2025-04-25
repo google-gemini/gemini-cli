@@ -53,10 +53,13 @@ while [ "$current_dir" != "/" ]; do
     current_dir=$(dirname "$current_dir")
 done
 
-# if GEMINI_API_KEY is set, copy into container
+# copy GEMINI_API_KEY
 if [ -n "${GEMINI_API_KEY:-}" ]; then run_args+=(--env GEMINI_API_KEY="$GEMINI_API_KEY"); fi
 
-# pass TERM and COLORTERM to container to maintain terminal colors
+# copy SHELL_TOOL to optionally enable shell tool
+if [ -n "${SHELL_TOOL:-}" ]; then run_args+=(--env SHELL_TOOL="$SHELL_TOOL"); fi
+
+# copy TERM and COLORTERM to try to maintain terminal setup
 if [ -n "${TERM:-}" ]; then run_args+=(--env TERM="$TERM"); fi
 if [ -n "${COLORTERM:-}" ]; then run_args+=(--env COLORTERM="$COLORTERM"); fi
 

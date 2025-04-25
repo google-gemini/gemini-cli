@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/src/index.js",
-    "build": "tsc --build",
+    "build": "../../scripts/build_package.sh",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
