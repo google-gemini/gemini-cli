@@ -1,24 +1,31 @@
 steps:
   # Install dependencies
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'node'
+    entrypoint: 'npm'
     args: ['install']
 
   # Run prerelease versioning script across workspaces with dynamic version
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'node'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        npm run prerelease:version --workspaces -- --suffix="$(date +%Y%m%d)-$_SHORT_SHA.$_BUILD_ID"
+        npm run prerelease:version --workspaces -- --suffix="$SHORT_SHA.$(date +%Y%m%d).$_REVISION"
 
   # Run prerelease dependency script across workspaces
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'node'
+    entrypoint: 'npm'
     args: ['run', 'prerelease:deps', '--workspaces']
 
   # Authenticate with our registry
-  - name: gcr.io/cloud-builders/npm
-    args: ['run', 'artifactregistry-login']
+  - name: 'node'
+    entrypoint: 'npm'
+    args: ['run', 'auth']
 
   # Publish packages from workspaces with 'dogfood' tag
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'node'
+    entrypoint: 'npm'
     args: ['publish', '--tag=head', '--workspaces']
+
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
