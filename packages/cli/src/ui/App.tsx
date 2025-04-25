@@ -18,10 +18,7 @@ import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { ITermDetectionWarning } from './utils/itermDetection.js';
-import {
-  useStartupWarnings,
-  useInitializationErrorEffect,
-} from './hooks/useAppEffects.js';
+import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Tips } from './components/Tips.js';
@@ -47,7 +44,6 @@ export const App = ({ config, cliVersion }: AppProps) => {
   } = useThemeCommand();
 
   useStartupWarnings(setStartupWarnings);
-  useInitializationErrorEffect(initError, history, setHistory);
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
@@ -105,6 +101,37 @@ export const App = ({ config, cliVersion }: AppProps) => {
         </Box>
       )}
 
+      {isThemeDialogOpen ? (
+        <ThemeDialog
+          onSelect={handleThemeSelect}
+          onHighlight={handleThemeHighlight}
+        />
+      ) : (
+        <>
+          <Box flexDirection="column">
+            <HistoryDisplay history={history} onSubmit={submitQuery} />
+            <LoadingIndicator
+              isLoading={streamingState === StreamingState.Responding}
+              currentLoadingPhrase={currentLoadingPhrase}
+              elapsedTime={elapsedTime}
+            />
+          </Box>
+
+          {isInputActive && (
+            <>
+              <Box>
+                <Text color={Colors.SubtleComment}>cwd: </Text>
+                <Text color={Colors.LightBlue}>
+                  {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
+                </Text>
+              </Box>
+
+              <InputPrompt onSubmit={handleHistorySubmit} />
+            </>
+          )}
+        </>
+      )}
+
       {initError && streamingState !== StreamingState.Responding && (
         <Box
           borderStyle="round"
@@ -135,37 +162,6 @@ export const App = ({ config, cliVersion }: AppProps) => {
             </>
           )}
         </Box>
-      )}
-
-      {isThemeDialogOpen ? (
-        <ThemeDialog
-          onSelect={handleThemeSelect}
-          onHighlight={handleThemeHighlight}
-        />
-      ) : (
-        <>
-          <Box flexDirection="column">
-            <HistoryDisplay history={history} onSubmit={submitQuery} />
-            <LoadingIndicator
-              isLoading={streamingState === StreamingState.Responding}
-              currentLoadingPhrase={currentLoadingPhrase}
-              elapsedTime={elapsedTime}
-            />
-          </Box>
-
-          {isInputActive && (
-            <>
-              <Box>
-                <Text color={Colors.SubtleComment}>cwd: </Text>
-                <Text color={Colors.LightBlue}>
-                  {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
-                </Text>
-              </Box>
-
-              <InputPrompt onSubmit={handleHistorySubmit} />
-            </>
-          )}
-        </>
       )}
 
       <Footer

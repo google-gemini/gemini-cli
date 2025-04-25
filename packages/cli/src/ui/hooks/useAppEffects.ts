@@ -8,7 +8,6 @@ import { useEffect } from 'react';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { HistoryItem } from '../types.js';
 import { getErrorMessage } from '@gemini-code/server';
 
 const warningsFilePath = path.join(os.tmpdir(), 'gemini-code-cli-warnings.txt');
@@ -40,29 +39,4 @@ export function useStartupWarnings(
       ]);
     }
   }, [setStartupWarnings]); // Include setStartupWarnings in dependency array
-}
-
-// Effect to handle initialization errors
-export function useInitializationErrorEffect(
-  initError: string | null,
-  history: HistoryItem[],
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
-) {
-  useEffect(() => {
-    if (
-      initError &&
-      !history.some(
-        (item) => item.type === 'error' && item.text?.includes(initError),
-      )
-    ) {
-      setHistory((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          type: 'error',
-          text: `Initialization Error: ${initError}. Please check API key and configuration.`,
-        } as HistoryItem,
-      ]);
-    }
-  }, [initError, history, setHistory]); // Include setHistory in dependency array
 }
