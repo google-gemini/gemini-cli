@@ -105,14 +105,30 @@ export const useGeminiStream = (
     }
 
     const query = rawQuery.trim();
-    const maybeCommand = query.split(/\s+/)[0];
-    if (query === 'clear') {
+    if (query === 'clear' || query === '/clear') {
       // This just clears the *UI* history, not the model history.
       // TODO: add a slash command for that.
       setDebugMessage('Clearing terminal.');
       setHistory((_) => []);
       return true;
     }
+    if (
+      query === 'exit' ||
+      query === '/exit' ||
+      query === 'quit' ||
+      query === '/quit'
+    ) {
+      setDebugMessage('Quitting. Good-bye.');
+      const timestamp = getNextMessageId(Date.now());
+      addHistoryItem(
+        setHistory,
+        { type: 'info', text: 'good-bye!' },
+        timestamp,
+      );
+      process.exit(0);
+      return true;
+    }
+    const maybeCommand = query.split(/\s+/)[0];
     if (config.getPassthroughCommands().includes(maybeCommand)) {
       // Execute and capture output
       const targetDir = config.getTargetDir();
@@ -147,11 +163,11 @@ export const useGeminiStream = (
       });
       // Set state to Responding while the command runs
       setStreamingState(StreamingState.Responding);
-      return true; // Prevent Gemini call
+      return true;
     }
 
-    return true;
-  }
+    return false; // Not handled by a manual command.
+  };
 
   // Improved submit query function
   const submitQuery = useCallback(
