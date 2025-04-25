@@ -98,6 +98,61 @@ export const useGeminiStream = (
     [setHistory],
   );
 
+  // Possibly handle a query manually, return true if handled.
+  const handleQueryManually = (rawQuery: PartListUnion): boolean => {
+    if (typeof rawQuery !== 'string') {
+      return false;
+    }
+
+    const query = rawQuery.trim();
+    const maybeCommand = query.split(/\s+/)[0];
+    if (query === 'clear') {
+      // This just clears the *UI* history, not the model history.
+      // TODO: add a slash command for that.
+      setDebugMessage('Clearing terminal.');
+      setHistory((_) => []);
+      return true;
+    }
+    if (config.getPassthroughCommands().includes(maybeCommand)) {
+      // Execute and capture output
+      const targetDir = config.getTargetDir();
+      setDebugMessage(`Executing shell command in ${targetDir}: ${query}`);
+      const execOptions = {
+        cwd: targetDir,
+      };
+      _exec(query, execOptions, (error, stdout, stderr) => {
+        const timestamp = getNextMessageId(Date.now());
+        if (error) {
+          addHistoryItem(
+            setHistory,
+            { type: 'error', text: error.message },
+            timestamp,
+          );
+        } else if (stderr) {
+          addHistoryItem(
+            setHistory,
+            { type: 'error', text: stderr },
+            timestamp,
+          );
+        } else {
+          // Add stdout as an info message
+          addHistoryItem(
+            setHistory,
+            { type: 'info', text: stdout || '' },
+            timestamp,
+          );
+        }
+        // Set state back to Idle *after* command finishes and output is added
+        setStreamingState(StreamingState.Idle);
+      });
+      // Set state to Responding while the command runs
+      setStreamingState(StreamingState.Responding);
+      return true; // Prevent Gemini call
+    }
+
+    return true;
+  }
+
   // Improved submit query function
   const submitQuery = useCallback(
     async (query: PartListUnion) => {
@@ -105,50 +160,11 @@ export const useGeminiStream = (
       if (typeof query === 'string' && query.trim().length === 0) return;
 
       if (typeof query === 'string') {
-        setDebugMessage(`User query: ${query}`);
-        const maybeCommand = query.split(/\s+/)[0];
-        if (query.trim() === 'clear') {
-          // This just clears the *UI* history, not the model history.
-          // TODO: add a slash command for that.
-          setDebugMessage('Clearing terminal.');
-          setHistory((_) => []);
-          return;
-        } else if (config.getPassthroughCommands().includes(maybeCommand)) {
-          // Execute and capture output
-          const targetDir = config.getTargetDir();
-          setDebugMessage(`Executing shell command in ${targetDir}: ${query}`);
-          const execOptions = {
-            cwd: targetDir,
-          };
-          _exec(query, execOptions, (error, stdout, stderr) => {
-            const timestamp = getNextMessageId(Date.now());
-            if (error) {
-              addHistoryItem(
-                setHistory,
-                { type: 'error', text: error.message },
-                timestamp,
-              );
-            } else if (stderr) {
-              addHistoryItem(
-                setHistory,
-                { type: 'error', text: stderr },
-                timestamp,
-              );
-            } else {
-              // Add stdout as an info message
-              addHistoryItem(
-                setHistory,
-                { type: 'info', text: stdout || '' },
-                timestamp,
-              );
-            }
-            // Set state back to Idle *after* command finishes and output is added
-            setStreamingState(StreamingState.Idle);
-          });
-          // Set state to Responding while the command runs
-          setStreamingState(StreamingState.Responding);
-          return; // Prevent Gemini call
-        }
+        setDebugMessage(`User query: '${query}'`);
+      }
+
+      if (handleQueryManually(query)) {
+        return;
       }
 
       const userMessageTimestamp = Date.now();
