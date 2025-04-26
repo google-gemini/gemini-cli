@@ -24,7 +24,7 @@ steps:
   # Authenticate with our registry
   - name: 'node:bookworm'
     entrypoint: 'npm'
-    args: ['run', 'auth']
+    args: ['run', 'auth:npm']
 
   # Publish packages from workspaces with 'dogfood' tag
   # we awkwardly need to install rsync beforehand. TODO: use a dedicated dev container

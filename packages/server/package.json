@@ -1,6 +1,6 @@
 {
   "name": "@gemini-code/server",
-  "version": "0.1.0",
+  "version": "0.1.0-dev-62cc889.0",
   "description": "Gemini Code Server",
   "type": "module",
   "main": "dist/index.js",

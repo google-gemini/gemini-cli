@@ -17,7 +17,9 @@
     "typecheck": "tsc --noEmit --jsx react",
     "format": "prettier --write .",
     "preflight": "npm run format --workspaces --if-present && npm run lint --workspaces --if-present && npm run test --workspaces --if-present",
-    "auth": "npx google-artifactregistry-auth",
+    "auth:npm": "npx google-artifactregistry-auth",
+    "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
+    "auth": "npm run auth:npm && npm run auth:docker",
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces"
   },
   "devDependencies": {

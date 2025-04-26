@@ -1,11 +1,12 @@
 {
   "name": "@gemini-code/cli",
-  "version": "0.1.0",
+  "version": "0.1.0-dev-62cc889.0",
   "description": "Gemini Code CLI",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini-code": "dist/index.js"
+    "gemini-code": "dist/index.js",
+    "gemini-code-sandbox": "bin/sandbox.sh"
   },
   "scripts": {
     "build": "../../scripts/build_package.sh",
@@ -17,13 +18,15 @@
     "test": "vitest run",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build"
+    "prerelease:sandbox": "DOCKER_BUILDKIT=1 docker build --no-cache --secret id=npmrc,src=$HOME/.npmrc -t 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code:0.1.0-fakeversion' .",
+    "prepack": "npm run build",
+    "xpostpublish": "docker push 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code:0.1.0-fakeversion'"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@gemini-code/server": "*",
+    "@gemini-code/server": "0.1.0-dev-62cc889.0",
     "@google/genai": "^0.8.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
