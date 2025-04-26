@@ -20,6 +20,7 @@ import { Turn, ServerGeminiStreamEvent } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js'; // Import ReadManyFilesTool
+import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
 export class GeminiClient {
   private config: Config;
@@ -185,13 +186,14 @@ export class GeminiClient {
         },
         contents,
       });
-      if (!result || !result.text) {
+      const text = getResponseText(result);
+      if (!text) {
         throw new Error('API returned an empty response.');
       }
       try {
-        return JSON.parse(result.text);
+        return JSON.parse(text);
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', result.text);
+        console.error('Failed to parse JSON response:', text);
         throw new Error(
           `Failed to parse API response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
         );

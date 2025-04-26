@@ -18,6 +18,7 @@ import {
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js'; // Keep ToolResult for now
+import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 // Removed gemini-stream import (types defined locally)
 
 // --- Types for Server Logic ---
@@ -102,7 +103,6 @@ export class Turn {
     this.confirmationDetails = [];
     this.debugResponses = [];
   }
-
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
@@ -115,10 +115,12 @@ export class Turn {
       if (signal?.aborted) {
         throw this.abortError();
       }
-      if (resp.text) {
-        yield { type: GeminiEventType.Content, value: resp.text };
-        continue;
+
+      const text = getResponseText(resp);
+      if (text) {
+        yield { type: GeminiEventType.Content, value: text };
       }
+
       if (!resp.functionCalls) {
         continue;
       }
