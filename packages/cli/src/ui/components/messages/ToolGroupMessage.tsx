@@ -13,12 +13,14 @@ import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { Colors } from '../../colors.js';
 
 interface ToolGroupMessageProps {
+  groupId: number;
   toolCalls: IndividualToolCallDisplay[];
   onSubmit: (value: PartListUnion) => void;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
+  groupId,
   toolCalls,
   onSubmit,
 }) => {
@@ -29,13 +31,23 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   return (
     <Box
+      key={groupId}
       flexDirection="column"
       borderStyle="round"
+      /*
+        This width constraint is highly important and protects us from an Ink rendering bug.
+        Since the ToolGroup can typically change rendering states frequently, it can cause
+        Ink to render the border of the box incorrectly and span multiple lines and even
+        cause tearing.
+      */
+      width="100%"
+      marginLeft={1}
       borderDimColor={hasPending}
       borderColor={borderColor}
+      marginBottom={1}
     >
       {toolCalls.map((tool) => (
-        <React.Fragment key={tool.callId}>
+        <Box key={groupId + '-' + tool.callId} flexDirection="column">
           <ToolMessage
             key={tool.callId} // Use callId as the key
             callId={tool.callId} // Pass callId
@@ -52,7 +64,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 onSubmit={onSubmit}
               ></ToolConfirmationMessage>
             )}
-        </React.Fragment>
+        </Box>
       ))}
       {/* Optional: Add padding below the last item if needed,
                 though ToolMessage already has some vertical space implicitly */}

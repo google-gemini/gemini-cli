@@ -54,8 +54,8 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
         </Box>
       </Box>
       {hasResult && (
-        <Box paddingLeft={statusIndicatorWidth}>
-          <Box flexShrink={1} flexDirection="row">
+        <Box paddingLeft={statusIndicatorWidth} width="100%">
+          <Box flexDirection="row">
             {/* Use default text color (white) or gray instead of dimColor */}
             {typeof resultDisplay === 'string' && (
               <Box flexDirection="column">

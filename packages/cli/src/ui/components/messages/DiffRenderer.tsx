@@ -7,6 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
+import crypto from 'crypto';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -94,6 +95,7 @@ const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
 
 export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
+  filename,
   tabWidth = DEFAULT_TAB_WIDTH,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
@@ -137,8 +139,11 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   }
   // --- End Modification ---
 
+  const key = filename
+    ? `diff-box-${filename}`
+    : `diff-box-${crypto.createHash('sha1').update(diffContent).digest('hex')}`;
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" key={key}>
       {/* Iterate over the lines that should be displayed (already normalized) */}
       {displayableLines.map((line, index) => {
         const key = `diff-line-${index}`;

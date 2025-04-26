@@ -1,0 +1,207 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+**Background & Purpose:**
+
+The `findSafeSplitPoint` function is designed to address the challenge of displaying or processing large, potentially streaming, pieces of Markdown text. When content (e.g., from an LLM like Gemini) arrives in chunks or grows too large for a single display unit (like a message bubble), it needs to be split. A naive split (e.g., just at a character limit) can break Markdown formatting, especially critical for multi-line elements like code blocks, lists, or blockquotes, leading to incorrect rendering.
+
+This function aims to find an *intelligent* or "safe" index within the provided `content` string at which to make such a split, prioritizing the preservation of Markdown integrity.
+
+**Key Expectations & Behavior (Prioritized):**
+
+1.  **No Split if Short Enough:**
+    * If `content.length` is less than or equal to `idealMaxLength`, the function should return `content.length` (indicating no split is necessary for length reasons).
+
+2.  **Code Block Integrity (Highest Priority for Safety):**
+    * The function must try to avoid splitting *inside* a fenced code block (i.e., between ` ``` ` and ` ``` `).
+    * If `idealMaxLength` falls within a code block:
+        * The function will attempt to return an index that splits the content *before* the start of that code block.
+        * If a code block starts at the very beginning of the `content` and `idealMaxLength` falls within it (meaning the block itself is too long for the first chunk), the function might return `0`. This effectively makes the first chunk empty, pushing the entire oversized code block to the second part of the split.
+    * When considering splits near code blocks, the function prefers to keep the entire code block intact in one of the resulting chunks.
+
+3.  **Markdown-Aware Newline Splitting (If Not Governed by Code Block Logic):**
+    * If `idealMaxLength` does not fall within a code block (or after code block considerations have been made), the function will look for natural break points by scanning backwards from `idealMaxLength`:
+        * **Paragraph Breaks:** It prioritizes splitting after a double newline (`\n\n`), as this typically signifies the end of a paragraph or a block-level element.
+        * **Single Line Breaks:** If no double newline is found in a suitable range, it will look for a single newline (`\n`).
+    * Any newline chosen as a split point must also not be inside a code block.
+
+4.  **Fallback to `idealMaxLength`:**
+    * If no "safer" split point (respecting code blocks or finding suitable newlines) is identified before or at `idealMaxLength`, and `idealMaxLength` itself is not determined to be an unsafe split point (e.g., inside a code block), the function may return a length larger than `idealMaxLength`, again it CANNOT break markdown formatting. This could happen with very long lines of text without Markdown block structures or newlines.
+
+**In essence, `findSafeSplitPoint` tries to be a good Markdown citizen when forced to divide content, preferring structural boundaries over arbitrary character limits, with a strong emphasis on not corrupting code blocks.**
+*/
+
+/**
+ * Checks if a given character index within a string is inside a fenced (```) code block.
+ * @param content The full string content.
+ * @param indexToTest The character index to test.
+ * @returns True if the index is inside a code block's content, false otherwise.
+ */
+const isIndexInsideCodeBlock = (
+  content: string,
+  indexToTest: number,
+): boolean => {
+  let fenceCount = 0;
+  let searchPos = 0;
+  while (searchPos < content.length) {
+    const nextFence = content.indexOf('```', searchPos);
+    if (nextFence === -1 || nextFence >= indexToTest) {
+      break;
+    }
+    fenceCount++;
+    searchPos = nextFence + 3;
+  }
+  return fenceCount % 2 === 1;
+};
+
+/**
+ * Finds the starting index of the code block that encloses the given index.
+ * Returns -1 if the index is not inside a code block.
+ * @param content The markdown content.
+ * @param index The index to check.
+ * @returns Start index of the enclosing code block or -1.
+ */
+const findEnclosingCodeBlockStart = (
+  content: string,
+  index: number,
+): number => {
+  if (!isIndexInsideCodeBlock(content, index)) {
+    return -1;
+  }
+  let currentSearchPos = 0;
+  while (currentSearchPos < index) {
+    const blockStartIndex = content.indexOf('```', currentSearchPos);
+    if (blockStartIndex === -1 || blockStartIndex >= index) {
+      break;
+    }
+    const blockEndIndex = content.indexOf('```', blockStartIndex + 3);
+    if (blockStartIndex < index) {
+      if (blockEndIndex === -1 || index < blockEndIndex + 3) {
+        return blockStartIndex;
+      }
+    }
+    if (blockEndIndex === -1) break;
+    currentSearchPos = blockEndIndex + 3;
+  }
+  return -1;
+};
+
+export const findSafeSplitPoint = (
+  content: string,
+  idealMaxLength: number = 500,
+): number => {
+  if (content.length <= idealMaxLength) {
+    return content.length;
+  }
+
+  const enclosingBlockStartForIdealMax = findEnclosingCodeBlockStart(
+    content,
+    idealMaxLength,
+  );
+
+  if (enclosingBlockStartForIdealMax !== -1) {
+    // idealMaxLength is inside a code block. Try to split *before* this block.
+    const textToSearchForNewline = content.substring(
+      0,
+      enclosingBlockStartForIdealMax,
+    );
+
+    // Iteratively search for the last safe \n\n before enclosingBlockStartForIdealMax
+    let currentSearchFromIndex = textToSearchForNewline.length;
+    while (currentSearchFromIndex > 0) {
+      // searchEndIndex refers to character count to search within
+      const dnlIndex = textToSearchForNewline.lastIndexOf(
+        '\n\n',
+        currentSearchFromIndex - 1,
+      ); // fromIndex for lastIndexOf is 0-based
+      if (dnlIndex === -1) break;
+
+      const potentialSplit = dnlIndex + 2;
+      // The split must be strictly before the block idealMaxLength was in.
+      // This is implicitly true if dnlIndex is found within textToSearchForNewline.
+      if (!isIndexInsideCodeBlock(content, potentialSplit)) {
+        // Condition: (potentialSplit > 0) OR (it's 0 AND the problematic block also started at 0)
+        if (
+          potentialSplit > 0 ||
+          (enclosingBlockStartForIdealMax === 0 && potentialSplit === 0)
+        ) {
+          return potentialSplit;
+        }
+      }
+      currentSearchFromIndex = dnlIndex; // Continue search before the start of this found \n\n
+      // (dnlIndex is start of \n\n, so next search is before it)
+    }
+
+    // Iteratively search for the last safe \n
+    currentSearchFromIndex = textToSearchForNewline.length;
+    while (currentSearchFromIndex >= 0) {
+      // Can be 0 if textToSearchForNewline has length 1 and it's \n
+      const snlIndex = textToSearchForNewline.lastIndexOf(
+        '\n',
+        currentSearchFromIndex - 1,
+      );
+      if (snlIndex === -1) break;
+
+      const potentialSplit = snlIndex + 1;
+      if (!isIndexInsideCodeBlock(content, potentialSplit)) {
+        if (
+          potentialSplit > 0 ||
+          (enclosingBlockStartForIdealMax === 0 && potentialSplit === 0)
+        ) {
+          return potentialSplit;
+        }
+      }
+      currentSearchFromIndex = snlIndex;
+    }
+
+    // Fallback: split right before this code block
+    return enclosingBlockStartForIdealMax;
+  }
+
+  // idealMaxLength is NOT inside a code block.
+  // Search backwards from idealMaxLength for a double newline (\n\n) not in a code block.
+  for (let i = Math.min(idealMaxLength, content.length) - 1; i > 0; i--) {
+    if (content[i] === '\n' && content[i - 1] === '\n') {
+      const potentialSplitPoint = i + 1;
+      if (potentialSplitPoint <= idealMaxLength) {
+        if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
+          return potentialSplitPoint;
+        }
+      }
+    }
+  }
+
+  // If no safe double newline, look for a single newline (\n)
+  for (let i = Math.min(idealMaxLength, content.length) - 1; i >= 0; i--) {
+    if (content[i] === '\n') {
+      const potentialSplitPoint = i + 1;
+      if (potentialSplitPoint <= idealMaxLength) {
+        if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
+          return potentialSplitPoint;
+        }
+      }
+    }
+  }
+
+  // Fallback logic if no prior safe split was found
+  if (!isIndexInsideCodeBlock(content, idealMaxLength)) {
+    return idealMaxLength;
+  } else {
+    // This should ideally not be reached frequently if prior logic is sound.
+    // enclosingBlockStartForIdealMax would have been set if idealMaxLength was in a block.
+    // If somehow it's still in a block, attempt to use the start of that block.
+    const lastResortBlockStart = findEnclosingCodeBlockStart(
+      content,
+      idealMaxLength,
+    ); // Re-check
+    if (lastResortBlockStart !== -1) {
+      return lastResortBlockStart;
+    }
+    // Absolute fallback: if idealMaxLength is in a block and we can't find its start (very unlikely)
+    return 0;
+  }
+};

@@ -28,6 +28,7 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
+import { findSafeSplitPoint } from '../utils/markdownUtilities.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -169,6 +170,28 @@ export const useGeminiStream = (
     return false; // Not handled by a manual command.
   };
 
+  // Helper function to update Gemini message content
+  const updateAndAddGeminiMessageContent = useCallback(
+    (
+      messageId: number,
+      previousContent: string,
+      nextId: number,
+      nextContent: string,
+    ) => {
+      setHistory((prevHistory) => {
+        const beforeNextHistory = prevHistory.map((item) =>
+          item.id === messageId ? { ...item, text: previousContent } : item,
+        );
+
+        return [
+          ...beforeNextHistory,
+          { id: nextId, type: 'gemini_content', text: nextContent },
+        ];
+      });
+    },
+    [setHistory],
+  );
+
   // Improved submit query function
   const submitQuery = useCallback(
     async (query: PartListUnion) => {
@@ -250,11 +273,37 @@ export const useGeminiStream = (
                 eventTimestamp,
               );
             } else if (currentGeminiMessageIdRef.current !== null) {
-              // Update the existing message with accumulated content
-              updateGeminiMessage(
-                currentGeminiMessageIdRef.current,
-                currentGeminiText,
-              );
+              const splitPoint = findSafeSplitPoint(currentGeminiText);
+
+              if (splitPoint === currentGeminiText.length) {
+                // Update the existing message with accumulated content
+                updateGeminiMessage(
+                  currentGeminiMessageIdRef.current,
+                  currentGeminiText,
+                );
+              } else {
+                // This indicates that we need to split up this Gemini Message.
+                // Splitting a message is primarily a performance consideration. There is a
+                // <Static> component at the root of App.tsx which takes care of rendering
+                // content statically or dynamically. Everything but the last message is
+                // treated as static in order to prevent re-rendering an entire message history
+                // multiple times per-second (as streaming occurs). Prior to this change you'd
+                // see heavy flickering of the terminal. This ensures that larger messages get
+                // broken up so that there are more "statically" rendered.
+                const originalMessageRef = currentGeminiMessageIdRef.current;
+                const beforeText = currentGeminiText.substring(0, splitPoint);
+
+                currentGeminiMessageIdRef.current =
+                  getNextMessageId(userMessageTimestamp);
+                const afterText = currentGeminiText.substring(splitPoint);
+                currentGeminiText = afterText;
+                updateAndAddGeminiMessageContent(
+                  originalMessageRef,
+                  beforeText,
+                  currentGeminiMessageIdRef.current,
+                  afterText,
+                );
+              }
             }
           } else if (event.type === ServerGeminiEventType.ToolCallRequest) {
             // Reset the Gemini message tracking for the next response
@@ -414,9 +463,6 @@ export const useGeminiStream = (
         ) => {
           originalConfirmationDetails.onConfirm(outcome);
 
-          // Reset streaming state since confirmation has been chosen.
-          setStreamingState(StreamingState.Idle);
-
           if (outcome === ToolConfirmationOutcome.Cancel) {
             let resultDisplay: ToolResultDisplay | undefined;
             if ('fileDiff' in originalConfirmationDetails) {
@@ -444,8 +490,7 @@ export const useGeminiStream = (
             };
 
             updateFunctionResponseUI(responseInfo, ToolCallStatus.Error);
-
-            await submitQuery(functionResponse);
+            setStreamingState(StreamingState.Idle);
           } else {
             const tool = toolRegistry.getTool(request.name);
             if (!tool) {
@@ -469,7 +514,7 @@ export const useGeminiStream = (
               error: undefined,
             };
             updateFunctionResponseUI(responseInfo, ToolCallStatus.Success);
-
+            setStreamingState(StreamingState.Idle);
             await submitQuery(functionResponse);
           }
         };

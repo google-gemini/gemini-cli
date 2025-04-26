@@ -17,7 +17,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
   const prefixWidth = prefix.length;
 
   return (
-    <Box flexDirection="row">
+    <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth}>
         <Text color={Colors.AccentRed}>{prefix}</Text>
       </Box>

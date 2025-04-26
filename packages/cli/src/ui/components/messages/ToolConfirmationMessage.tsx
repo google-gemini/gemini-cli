@@ -8,7 +8,6 @@ import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { PartListUnion } from '@google/genai';
 import { DiffRenderer } from './DiffRenderer.js';
-import { UI_WIDTH } from '../../constants.js';
 import { Colors } from '../../colors.js';
 import {
   ToolCallConfirmationDetails,
@@ -88,7 +87,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, allow always for ${executionProps.rootCommand} ...`,
+        label: `Yes, allow always "${executionProps.rootCommand} ..."`,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
@@ -96,7 +95,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" padding={1} minWidth={UI_WIDTH}>
+    <Box flexDirection="column" padding={1} minWidth="90%">
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>

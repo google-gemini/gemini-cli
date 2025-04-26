@@ -5,23 +5,23 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Static, Text } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistory } from './hooks/useInputHistory.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { Header } from './components/Header.js';
-import { HistoryDisplay } from './components/HistoryDisplay.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { ITermDetectionWarning } from './utils/itermDetection.js';
 import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Tips } from './components/Tips.js';
+import { ConsoleOutput } from './components/ConsolePatcher.js';
+import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 
 interface AppProps {
   config: Config;
@@ -80,10 +80,53 @@ export const App = ({ config, cliVersion }: AppProps) => {
 
   // --- Render Logic ---
 
+  const staticallyRenderedHistoryItems = history.slice(0, -1);
+  const updatableHistoryItem = history[history.length - 1];
+
   return (
-    <Box flexDirection="column" marginBottom={1} width="100%">
-      <Header />
-      <Tips />
+    <Box flexDirection="column" marginBottom={1} width="90%">
+      {/*
+       * The Static component is an Ink intrinsic in which there can only be 1 per application.
+       * Because of this restriction we're hacking it slightly by having a 'header' item here to
+       * ensure that it's statically rendered.
+       *
+       * Background on the Static Item: Anything in the Static component is written a single time
+       * to the console. Think of it like doing a console.log and then never using ANSI codes to
+       * clear that content ever again. Effectively it has a moving frame that every time new static
+       * content is set it'll flush content to the terminal and move the area which it's "clearing"
+       * down a notch. Without Static the area which gets erased and redrawn continuously grows.
+       */}
+      <Static items={['header', ...staticallyRenderedHistoryItems]}>
+        {(item, index) => {
+          if (item === 'header') {
+            return (
+              <Box flexDirection="column" key={'header-' + index}>
+                <Header />
+                <Tips />
+              </Box>
+            );
+          }
+
+          const historyItem = item as HistoryItem;
+          return (
+            <HistoryItemDisplay
+              key={'history-' + historyItem.id}
+              item={historyItem}
+              onSubmit={submitQuery}
+            />
+          );
+        }}
+      </Static>
+
+      {updatableHistoryItem && (
+        <Box flexDirection="column" alignItems="flex-start">
+          <HistoryItemDisplay
+            key={'history-' + updatableHistoryItem.id}
+            item={updatableHistoryItem}
+            onSubmit={submitQuery}
+          />
+        </Box>
+      )}
 
       {startupWarnings.length > 0 && (
         <Box
@@ -108,21 +151,17 @@ export const App = ({ config, cliVersion }: AppProps) => {
         />
       ) : (
         <>
-          <Box flexDirection="column">
-            <HistoryDisplay history={history} onSubmit={submitQuery} />
-            <LoadingIndicator
-              isLoading={streamingState === StreamingState.Responding}
-              currentLoadingPhrase={currentLoadingPhrase}
-              elapsedTime={elapsedTime}
-            />
-          </Box>
-
+          <LoadingIndicator
+            isLoading={streamingState === StreamingState.Responding}
+            currentLoadingPhrase={currentLoadingPhrase}
+            elapsedTime={elapsedTime}
+          />
           {isInputActive && (
             <>
-              <Box>
+              <Box marginTop={1}>
                 <Text color={Colors.SubtleComment}>cwd: </Text>
                 <Text color={Colors.LightBlue}>
-                  {shortenPath(config.getTargetDir(), /*maxLength*/ 70)}
+                  {shortenPath(config.getTargetDir(), 70)}
                 </Text>
               </Box>
 
@@ -171,7 +210,7 @@ export const App = ({ config, cliVersion }: AppProps) => {
         debugMessage={debugMessage}
         cliVersion={cliVersion}
       />
-      <ITermDetectionWarning />
+      <ConsoleOutput />
     </Box>
   );
 };
