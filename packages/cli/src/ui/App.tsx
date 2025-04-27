@@ -80,8 +80,8 @@ export const App = ({ config, cliVersion }: AppProps) => {
 
   // --- Render Logic ---
 
-  const staticallyRenderedHistoryItems = history.slice(0, -1);
-  const updatableHistoryItem = history[history.length - 1];
+  const { staticallyRenderedHistoryItems, updatableHistoryItems } =
+    getHistoryRenderSlices(history);
 
   return (
     <Box flexDirection="column" marginBottom={1} width="90%">
@@ -118,13 +118,15 @@ export const App = ({ config, cliVersion }: AppProps) => {
         }}
       </Static>
 
-      {updatableHistoryItem && (
+      {updatableHistoryItems.length > 0 && (
         <Box flexDirection="column" alignItems="flex-start">
-          <HistoryItemDisplay
-            key={'history-' + updatableHistoryItem.id}
-            item={updatableHistoryItem}
-            onSubmit={submitQuery}
-          />
+          {updatableHistoryItems.map((historyItem) => (
+            <HistoryItemDisplay
+              key={'history-' + historyItem.id}
+              item={historyItem}
+              onSubmit={submitQuery}
+            />
+          ))}
         </Box>
       )}
 
@@ -214,3 +216,21 @@ export const App = ({ config, cliVersion }: AppProps) => {
     </Box>
   );
 };
+
+function getHistoryRenderSlices(history: HistoryItem[]) {
+  let staticallyRenderedHistoryItems: HistoryItem[] = [];
+  let updatableHistoryItems: HistoryItem[] = [];
+  if (
+    history.length > 1 &&
+    history[history.length - 2]?.type === 'tool_group'
+  ) {
+    // If the second-to-last item is a tool_group, it and the last item are updateable
+    staticallyRenderedHistoryItems = history.slice(0, -2);
+    updatableHistoryItems = history.slice(-2);
+  } else {
+    // Otherwise, only the last item is updateable
+    staticallyRenderedHistoryItems = history.slice(0, -1);
+    updatableHistoryItems = history.slice(-1);
+  }
+  return { staticallyRenderedHistoryItems, updatableHistoryItems };
+}
