@@ -36,6 +36,8 @@ export interface Tool<
 
   /**
    * Validates the parameters for the tool
+   * Should be called from both `shouldConfirmExecute` and `execute`
+   * `shouldConfirmExecute` should return false immediately if invalid
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
@@ -102,6 +104,8 @@ export abstract class BaseTool<
   /**
    * Validates the parameters for the tool
    * This is a placeholder implementation and should be overridden
+   * Should be called from both `shouldConfirmExecute` and `execute`
+   * `shouldConfirmExecute` should return false immediately if invalid
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */

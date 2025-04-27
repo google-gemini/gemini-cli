@@ -244,6 +244,9 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
   async shouldConfirmExecute(
     params: TerminalToolParams,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.validateToolParams(params)) {
+      return false; // skip confirmation, execute call will fail immediately
+    }
     const rootCommand =
       params.command
         .trim()
