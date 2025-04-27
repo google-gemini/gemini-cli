@@ -163,45 +163,24 @@ export const findSafeSplitPoint = (
   }
 
   // idealMaxLength is NOT inside a code block.
-  // Search backwards from idealMaxLength for a double newline (\n\n) not in a code block.
-  for (let i = Math.min(idealMaxLength, content.length) - 1; i > 0; i--) {
-    if (content[i] === '\n' && content[i - 1] === '\n') {
-      const potentialSplitPoint = i + 1;
-      if (potentialSplitPoint <= idealMaxLength) {
-        if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
-          return potentialSplitPoint;
-        }
-      }
+  // Search forwards from idealMaxLength for the next double newline (\n\n) not in a code block.
+  let searchStartIndex = idealMaxLength;
+  while (searchStartIndex < content.length) {
+    const dnlIndex = content.indexOf('\n\n', searchStartIndex);
+    if (dnlIndex === -1) {
+      // No more double newlines found after idealMaxLength
+      break;
     }
+
+    const potentialSplitPoint = dnlIndex + 2;
+    if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
+      return potentialSplitPoint;
+    }
+
+    searchStartIndex = potentialSplitPoint; // Continue search after the found \n\n
   }
 
-  // If no safe double newline, look for a single newline (\n)
-  for (let i = Math.min(idealMaxLength, content.length) - 1; i >= 0; i--) {
-    if (content[i] === '\n') {
-      const potentialSplitPoint = i + 1;
-      if (potentialSplitPoint <= idealMaxLength) {
-        if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
-          return potentialSplitPoint;
-        }
-      }
-    }
-  }
-
-  // Fallback logic if no prior safe split was found
-  if (!isIndexInsideCodeBlock(content, idealMaxLength)) {
-    return idealMaxLength;
-  } else {
-    // This should ideally not be reached frequently if prior logic is sound.
-    // enclosingBlockStartForIdealMax would have been set if idealMaxLength was in a block.
-    // If somehow it's still in a block, attempt to use the start of that block.
-    const lastResortBlockStart = findEnclosingCodeBlockStart(
-      content,
-      idealMaxLength,
-    ); // Re-check
-    if (lastResortBlockStart !== -1) {
-      return lastResortBlockStart;
-    }
-    // Absolute fallback: if idealMaxLength is in a block and we can't find its start (very unlikely)
-    return 0;
-  }
+  // If no safe double newline found after idealMaxLength, return content.length
+  // to keep the entire content as one piece.
+  return content.length;
 };
