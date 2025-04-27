@@ -24,7 +24,7 @@ CMD=$(scripts/sandbox_command.sh)
 echo "using $CMD for sandboxing"
 
 IMAGE=gemini-code-sandbox
-DOCKERFILE=${DOCKERFILE:-Dockerfile}
+DOCKERFILE=Dockerfile
 
 SKIP_NPM_INSTALL_BUILD=false
 while getopts "sd" opt; do
@@ -44,7 +44,7 @@ shift $((OPTIND - 1))
 # npm install + npm run build unless skipping via -s option
 if [ "$SKIP_NPM_INSTALL_BUILD" = false ]; then
     npm install
-    npm run build
+    npm run build --workspaces
 fi
 
 # if using Dockerfile-dev, then skip rebuild unless REBUILD_SANDBOX is set
