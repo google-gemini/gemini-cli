@@ -19,7 +19,7 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^0.8.0",
+    "@google/genai": "^0.10.0",
     "fast-glob": "^3.3.3",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7"
