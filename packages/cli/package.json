@@ -1,6 +1,6 @@
 {
   "name": "@gemini-code/cli",
-  "version": "0.1.0-dev-62cc889.0",
+  "version": "0.1.0",
   "description": "Gemini Code CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -8,8 +8,12 @@
     "gemini-code": "dist/index.js",
     "gemini-code-sandbox": "bin/sandbox.sh"
   },
+  "image": "us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-cli",
   "scripts": {
+    "build:package": "tsc --build",
+    "build:sandbox": "DOCKER_BUILDKIT=1 docker build --build-arg CLI_VERSION=$npm_package_version --no-cache --secret id=npmrc,src=$HOME/.npmrc -t us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-cli:$npm_package_version -f Dockerfile.sandbox .",
     "build": "../../scripts/build_package.sh",
+    "publish:sandbox": "docker push us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-cli:$npm_package_version",
     "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
@@ -18,15 +22,15 @@
     "test": "vitest run",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prerelease:sandbox": "DOCKER_BUILDKIT=1 docker build --no-cache --secret id=npmrc,src=$HOME/.npmrc -t 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code:0.1.0-fakeversion' .",
-    "prepack": "npm run build",
-    "xpostpublish": "docker push 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code:0.1.0-fakeversion'"
+    "prepublishOnly": "npm publish --dry-run --workspace=@gemini-code/server",
+    "prepack": "npm run build:package",
+    "postpublish": "npm run build:sandbox && npm run publish:sandbox"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@gemini-code/server": "0.1.0-dev-62cc889.0",
+    "@gemini-code/server": "0.1.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "highlight.js": "^11.11.1",

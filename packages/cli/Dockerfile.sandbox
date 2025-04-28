@@ -1,7 +1,7 @@
 FROM docker.io/library/node:20-slim
 
-ENV GEMINI_CODE_SANDBOX=docker
-ENV SANDBOX=sandbox
+ARG CLI_VERSION
+ENV SANDBOX=${CLI_VERSION}
 
 # install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,6 +22,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-RUN --mount=type=secret,id=npmrc,dst=/root/.npmrc npm install -g @gemini-code/cli@head --verbose
-
+RUN --mount=type=secret,id=npmrc,dst=/root/.npmrc npm install -g @gemini-code/cli@${CLI_VERSION} --verbose
 ENTRYPOINT 'gemini-code'
