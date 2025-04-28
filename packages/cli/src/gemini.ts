@@ -157,9 +157,9 @@ async function start_sandbox(sandbox: string) {
     args.push('--env', `GEMINI_CODE_MODEL=${process.env.GEMINI_CODE_MODEL}`);
   }
 
-  // copy SHELL_TOOL to optionally enable shell tool
-  if (process.env.SHELL_TOOL) {
-    args.push('--env', `SHELL_TOOL=${process.env.SHELL_TOOL}`);
+  // copy TERMINAL_TOOL to optionally enable shell tool
+  if (process.env.TERMINAL_TOOL) {
+    args.push('--env', `TERMINAL_TOOL=${process.env.TERMINAL_TOOL}`);
   }
 
   // copy TERM and COLORTERM to try to maintain terminal setup

@@ -145,11 +145,11 @@ function createToolRegistry(config: Config): ToolRegistry {
     new ReadManyFilesTool(targetDir),
   ];
 
-  // use ShellTool (next-gen TerminalTool) if environment variable is set
-  if (process.env.SHELL_TOOL) {
-    tools.push(new ShellTool(config));
-  } else {
+  // if TERMINAL_TOOL is set, revert to deprecated TerminalTool
+  if (process.env.TERMINAL_TOOL) {
     tools.push(new TerminalTool(targetDir, config));
+  } else {
+    tools.push(new ShellTool(config));
   }
 
   for (const tool of tools) {

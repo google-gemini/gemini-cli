@@ -24,7 +24,6 @@ export interface ShellToolParams {
 import { spawn } from 'child_process';
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
-  // name should match TerminalTool.Name used in prompts.ts for now
   static Name: string = 'execute_bash_command';
   private readonly config: Config;
   private whitelist: Set<string> = new Set();
@@ -193,18 +192,19 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     // wait for the shell to exit
     await new Promise((resolve) => shell.on('close', resolve));
 
-    return {
-      llmContent: [
-        `Command: ${params.command}`,
-        `Directory: ${params.directory || '(root)'}`,
-        `Stdout: ${stdout || '(empty)'}`,
-        `Stderr: ${stderr || '(empty)'}`,
-        `Error: ${error ?? '(none)'}`,
-        `Exit Code: ${code ?? '(none)'}`,
-        `Signal: ${signal ?? '(none)'}`,
-        `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
-      ].join('\n'),
-      returnDisplay: output,
-    };
+    const llmContent = [
+      `Command: ${params.command}`,
+      `Directory: ${params.directory || '(root)'}`,
+      `Stdout: ${stdout || '(empty)'}`,
+      `Stderr: ${stderr || '(empty)'}`,
+      `Error: ${error ?? '(none)'}`,
+      `Exit Code: ${code ?? '(none)'}`,
+      `Signal: ${signal ?? '(none)'}`,
+      `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
+    ].join('\n');
+
+    const returnDisplay = this.config.getDebugMode() ? llmContent : output;
+
+    return { llmContent, returnDisplay };
   }
 }

@@ -38,8 +38,8 @@ if [ -n "${GEMINI_API_KEY:-}" ]; then run_args+=(--env GEMINI_API_KEY="$GEMINI_A
 # copy GEMINI_CODE_MODEL
 if [ -n "${GEMINI_CODE_MODEL:-}" ]; then run_args+=(--env GEMINI_CODE_MODEL="$GEMINI_CODE_MODEL"); fi
 
-# copy SHELL_TOOL to optionally enable shell tool
-if [ -n "${SHELL_TOOL:-}" ]; then run_args+=(--env SHELL_TOOL="$SHELL_TOOL"); fi
+# copy TERMINAL_TOOL to optionally revert to old terminal tool
+if [ -n "${TERMINAL_TOOL:-}" ]; then run_args+=(--env TERMINAL_TOOL="$TERMINAL_TOOL"); fi
 
 # copy TERM and COLORTERM to try to maintain terminal setup
 if [ -n "${TERM:-}" ]; then run_args+=(--env TERM="$TERM"); fi
