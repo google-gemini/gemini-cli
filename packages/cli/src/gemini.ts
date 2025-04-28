@@ -85,6 +85,25 @@ function start_sandbox(sandbox: string) {
     }
   }
 
+  // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
+  // note this can only be done with binary linked from gemini-code repo
+  if (process.env.BUILD_SANDBOX) {
+    if (!gcPath.includes('gemini-code/packages/')) {
+      console.error(
+        'ERROR: cannot BUILD_SANDBOX using installed gemini-code binary; ' +
+          'run `npm link ./packages/cli` under gemini-code repo to switch to linked binary.',
+      );
+      process.exit(1);
+    } else {
+      console.log('building sandbox ...');
+      const gcRoot = gcPath.split('/packages/')[0];
+      spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh`, {
+        stdio: 'inherit',
+        shell: true,
+      });
+    }
+  }
+
   // stop if image is missing
   if (!execSync(`${sandbox} images -q ${image}`).toString().trim()) {
     const remedy = gcPath.includes('gemini-code/packages/')
