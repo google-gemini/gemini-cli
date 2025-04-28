@@ -22,7 +22,7 @@
     "test": "vitest run",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepublishOnly": "npm publish --dry-run --workspace=@gemini-code/server",
+    "prepublishOnly": "npm publish --workspace=@gemini-code/server",
     "prepack": "npm run build:package",
     "postpublish": "npm run build:sandbox && npm run publish:sandbox"
   },
