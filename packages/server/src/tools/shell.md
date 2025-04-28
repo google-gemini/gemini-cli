@@ -1,8 +1,11 @@
-This is a minimal shell tool that executes a given command as `bash -c <command>`.
+This tool executes a given shell command as `bash -c <command>`.
 Command can be any valid single-line Bash command.
+Command can start background processes using `&`.
+
 The following information is returned:
 
-Command: Given command.
+Command: Executed command.
+Directory: Directory (relative to project root) where command was executed, or `(root)`.
 Stdout: Output on stdout stream. Can be `(empty)` or partial on error.
 Stderr: Output on stderr stream. Can be `(empty)` or partial on error.
 Error: Error or `(none)` if no error occurred.

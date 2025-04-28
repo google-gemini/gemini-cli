@@ -43,12 +43,14 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
   getDescription(params: ShellToolParams): string {
     let description = `${params.command}`;
-    if (params.description) {
-      // replace any line breaks with spaces, in case instructions are not followed
-      description += ` (${params.description.replace(/\n/g, ' ')})`;
-    }
+    // append optional [./directory]
     if (params.directory) {
-      description += ` @ ${params.directory}`;
+      description += ` [./${params.directory}]`;
+    }
+    // append optional (description), replacing any line breaks with spaces
+    // tool description/schema should specify a single line w/o line breaks
+    if (params.description) {
+      description += ` (${params.description.replace(/\n/g, ' ')})`;
     }
     return description;
   }
@@ -193,6 +195,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return {
       llmContent: [
         `Command: ${params.command}`,
+        `Directory: ${params.directory || '(root)'}`,
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
         `Error: ${error ?? '(none)'}`,
