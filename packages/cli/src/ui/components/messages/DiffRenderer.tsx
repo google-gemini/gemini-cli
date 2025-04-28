@@ -8,6 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import crypto from 'crypto';
+import { colorizeCode } from '../../utils/CodeColorizer.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -104,6 +105,42 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
 
+  // Check if the diff represents a new file (only additions and header lines)
+  const isNewFile = parsedLines.every(
+    (line) =>
+      line.type === 'add' ||
+      line.type === 'hunk' ||
+      line.type === 'other' ||
+      line.content.startsWith('diff --git') ||
+      line.content.startsWith('new file mode'),
+  );
+
+  let renderedOutput;
+
+  if (isNewFile) {
+    // Extract only the added lines' content
+    const addedContent = parsedLines
+      .filter((line) => line.type === 'add')
+      .map((line) => line.content)
+      .join('\n');
+    // Attempt to infer language from filename, default to plain text if no filename
+    const fileExtension = filename?.split('.').pop() || null;
+    const language = fileExtension
+      ? getLanguageFromExtension(fileExtension)
+      : null;
+    renderedOutput = colorizeCode(addedContent, language);
+  } else {
+    renderedOutput = renderDiffContent(parsedLines, filename, tabWidth);
+  }
+
+  return renderedOutput;
+};
+
+const renderDiffContent = (
+  parsedLines: DiffLine[],
+  filename?: string,
+  tabWidth = DEFAULT_TAB_WIDTH,
+) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
@@ -137,11 +174,11 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   if (!isFinite(baseIndentation)) {
     baseIndentation = 0;
   }
-  // --- End Modification ---
 
   const key = filename
     ? `diff-box-${filename}`
-    : `diff-box-${crypto.createHash('sha1').update(diffContent).digest('hex')}`;
+    : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
+
   return (
     <Box flexDirection="column" key={key}>
       {/* Iterate over the lines that should be displayed (already normalized) */}
@@ -192,4 +229,20 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       })}
     </Box>
   );
+};
+
+const getLanguageFromExtension = (extension: string): string | null => {
+  const languageMap: { [key: string]: string } = {
+    '.js': 'javascript',
+    '.ts': 'typescript',
+    '.py': 'python',
+    '.json': 'json',
+    '.css': 'css',
+    '.html': 'html',
+    '.sh': 'bash',
+    '.md': 'markdown',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+  };
+  return languageMap[extension] || null; // Return null if extension not found
 };
