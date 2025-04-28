@@ -44,9 +44,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
   getDescription(params: ShellToolParams): string {
     let description = `${params.command}`;
-    // append optional [./directory]
+    // append optional [./directory], prepending ./ if missing (assuming relative per validation)
     if (params.directory) {
-      description += ` [./${params.directory}]`;
+      description += ` [${params.directory.startsWith('./') ? '' : './'}${params.directory}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     // tool description/schema should specify a single line w/o line breaks
