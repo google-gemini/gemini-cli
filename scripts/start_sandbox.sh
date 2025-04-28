@@ -40,7 +40,8 @@ if ! $CMD images -q "$IMAGE" | grep -q .; then
 fi
 
 # use interactive tty mode and auto-remove container on exit
-run_args=(-it --rm)
+# run init binary inside container to forward signals & reap zombies
+run_args=(-it --rm --init --workdir "$WORKDIR")
 
 # mount current directory as $WORKDIR inside container
 run_args+=(-v "$PWD:$WORKDIR")
@@ -133,10 +134,21 @@ if [ -n "${DEBUG:-}" ]; then
 fi
 node_args+=("$CLI_PATH" "$@")
 
+# open additional ports if SANDBOX_PORTS is set
+if [ -n "${SANDBOX_PORTS:-}" ]; then
+    ports=$(echo "$SANDBOX_PORTS" | tr ',' '\n')
+    for port in $ports; do
+        if [ -n "$port" ]; then
+            echo "SANDBOX_PORTS: $port"
+            run_args+=(-p "$port:$port")
+        fi
+    done
+fi
+
 # run gemini-code in sandbox container
 if [[ "$CMD" == "podman" ]]; then
     # use empty --authfile to skip unnecessary auth refresh overhead
-    $CMD run "${run_args[@]}" --init --authfile <(echo '{}') --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"
+    $CMD run "${run_args[@]}" --authfile <(echo '{}') "$IMAGE" node "${node_args[@]}"
 else
-    $CMD run "${run_args[@]}" --init --workdir "$WORKDIR" "$IMAGE" node "${node_args[@]}"
+    $CMD run "${run_args[@]}" "$IMAGE" node "${node_args[@]}"
 fi

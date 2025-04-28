@@ -203,6 +203,16 @@ async function start_sandbox(sandbox: string) {
     nodeArgs.push(`--inspect-brk=0.0.0.0:${debugPort}`);
   }
 
+  // open additional ports if SANDBOX_PORTS is set
+  if (process.env.SANDBOX_PORTS) {
+    for (let port of process.env.SANDBOX_PORTS.split(',')) {
+      if ((port = port.trim())) {
+        console.log(`SANDBOX_PORTS: ${port}`);
+        args.push('-p', `${port}:${port}`);
+      }
+    }
+  }
+
   // append remaining args (image, node, node args, cli path, cli args)
   args.push(image, 'node', ...nodeArgs, cliPath, ...process.argv.slice(2));
 
