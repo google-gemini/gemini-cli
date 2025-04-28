@@ -16,7 +16,7 @@ import { GeminiClient } from '@gemini-code/server';
 import { readPackageUp } from 'read-package-up';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,36 +53,18 @@ function sandbox_command(): string {
 }
 
 // node.js equivalent of scripts/start_sandbox.sh
-function start_sandbox(sandbox: string) {
+async function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
-
-  // stop if debugging in sandbox using linked/installed gemini-code
-  // note this is because it does not work (unclear why, parent process interferes somehow)
-  // note `npm run debug` runs sandbox directly and avoids any interference from parent process
-  if (process.env.DEBUG) {
-    console.error(
-      'ERROR: cannot debug in sandbox using linked/installed gemini-code; ' +
-        'use `npm run debug` under gemini-code repo instead',
-    );
-    process.exit(1);
-  }
 
   // if project is gemini-code, then switch to -dev image & run CLI from ${workdir}/packages/cli
   let image = 'gemini-code-sandbox';
   const project = path.basename(process.cwd());
-  const workdir = `/sandbox/${project}`;
+  const workdir = process.cwd();
   let cliPath = '/usr/local/share/npm-global/lib/node_modules/@gemini-code/cli';
   if (project === 'gemini-code') {
     image += '-dev';
     cliPath = `${workdir}/packages/cli`;
-  } else {
-    // refuse to debug using global installation for now (can be added later)
-    // (requires a separate attach config, see comments in launch.json around remoteRoot)
-    if (process.env.DEBUG) {
-      console.error('ERROR: cannot debug in sandbox outside gemini-code repo');
-      process.exit(1);
-    }
   }
 
   // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
@@ -123,6 +105,35 @@ function start_sandbox(sandbox: string) {
   // mount os.tmpdir() as /tmp inside container
   args.push('-v', `${os.tmpdir()}:/tmp`);
 
+  // mount paths listed in SANDBOX_MOUNTS
+  if (process.env.SANDBOX_MOUNTS) {
+    for (let mount of process.env.SANDBOX_MOUNTS.split(',')) {
+      if (mount.trim()) {
+        // parse mount as from:to:opts
+        let [from, to, opts] = mount.trim().split(':');
+        to = to || from; // default to mount at same path inside container
+        opts = opts || 'ro'; // default to read-only
+        mount = `${from}:${to}:${opts}`;
+        // check that from path is absolute
+        if (!path.isAbsolute(from)) {
+          console.error(
+            `ERROR: path '${from}' listed in SANDBOX_MOUNTS must be absolute`,
+          );
+          process.exit(1);
+        }
+        // check that from path exists on host
+        if (!fs.existsSync(from)) {
+          console.error(
+            `ERROR: missing mount path '${from}' listed in SANDBOX_MOUNTS`,
+          );
+          process.exit(1);
+        }
+        console.log(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
+        args.push('-v', mount);
+      }
+    }
+  }
+
   // name container after image, plus numeric suffix to avoid conflicts
   let index = 0;
   while (
@@ -159,6 +170,23 @@ function start_sandbox(sandbox: string) {
     args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
   }
 
+  // copy additional environment variables from SANDBOX_ENV
+  if (process.env.SANDBOX_ENV) {
+    for (let env of process.env.SANDBOX_ENV.split(',')) {
+      if ((env = env.trim())) {
+        if (env.includes('=')) {
+          console.log(`SANDBOX_ENV: ${env}`);
+          args.push('--env', env);
+        } else {
+          console.error(
+            'ERROR: SANDBOX_ENV must be a comma-separated list of key=value pairs',
+          );
+          process.exit(1);
+        }
+      }
+    }
+  }
+
   // set SANDBOX as container name
   args.push('--env', `SANDBOX=${image}-${index}`);
 
@@ -172,14 +200,23 @@ function start_sandbox(sandbox: string) {
   const debugPort = process.env.DEBUG_PORT || '9229';
   if (process.env.DEBUG) {
     args.push('-p', `${debugPort}:${debugPort}`);
-    nodeArgs.push('--inspect-brk', `0.0.0.0:${debugPort}`);
+    nodeArgs.push(`--inspect-brk=0.0.0.0:${debugPort}`);
   }
 
   // append remaining args (image, node, node args, cli path, cli args)
   args.push(image, 'node', ...nodeArgs, cliPath, ...process.argv.slice(2));
 
   // spawn child and let it inherit stdio
-  spawnSync(sandbox, args, { stdio: 'inherit' });
+  const child = spawn(sandbox, args, {
+    stdio: 'inherit',
+    detached: true,
+  });
+
+  // uncomment this line (and comment the await on following line) to let parent exit
+  // child.unref();
+  await new Promise((resolve) => {
+    child.on('close', resolve);
+  });
 }
 
 async function main() {
@@ -190,7 +227,7 @@ async function main() {
   const sandbox = sandbox_command();
   if (sandbox && !process.env.SANDBOX) {
     console.log('hopping into sandbox ...');
-    start_sandbox(sandbox);
+    await start_sandbox(sandbox);
     process.exit(0);
   }
 
