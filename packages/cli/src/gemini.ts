@@ -57,16 +57,6 @@ function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
 
-  // stop if image is missing
-  const image = 'gemini-code-sandbox';
-  if (!execSync(`${sandbox} images -q ${image}`).toString().trim()) {
-    const remedy = gcPath.includes('gemini-code/packages/')
-      ? 'Try `scripts/build_sandbox.sh` under gemini-code repo.'
-      : 'Please notify gemini-code-dev@google.com.';
-    console.error(`ERROR: ${image} is missing. ${remedy}`);
-    process.exit(1);
-  }
-
   // stop if debugging in sandbox using linked/installed gemini-code
   // note this is because it does not work (unclear why, parent process interferes somehow)
   // note `npm run debug` runs sandbox directly and avoids any interference from parent process
@@ -78,15 +68,29 @@ function start_sandbox(sandbox: string) {
     process.exit(1);
   }
 
-  // if project is gemini-code, then run sandboxed CLI from ${workdir}/packages/cli
-  // otherwise refuse debug mode (see comments in launch.json around remoteRoot)
+  // if project is gemini-code, then switch to -dev image & run CLI from ${workdir}/packages/cli
+  let image = 'gemini-code-sandbox';
   const project = path.basename(process.cwd());
   const workdir = `/sandbox/${project}`;
   let cliPath = '/usr/local/share/npm-global/lib/node_modules/@gemini-code/cli';
   if (project === 'gemini-code') {
+    image += '-dev';
     cliPath = `${workdir}/packages/cli`;
-  } else if (process.env.DEBUG) {
-    console.error('ERROR: cannot debug in sandbox outside gemini-code repo');
+  } else {
+    // refuse to debug using global installation for now (can be added later)
+    // (requires a separate attach config, see comments in launch.json around remoteRoot)
+    if (process.env.DEBUG) {
+      console.error('ERROR: cannot debug in sandbox outside gemini-code repo');
+      process.exit(1);
+    }
+  }
+
+  // stop if image is missing
+  if (!execSync(`${sandbox} images -q ${image}`).toString().trim()) {
+    const remedy = gcPath.includes('gemini-code/packages/')
+      ? 'Try `scripts/build_sandbox.sh` under gemini-code repo.'
+      : 'Please notify gemini-code-dev@google.com.';
+    console.error(`ERROR: ${image} is missing. ${remedy}`);
     process.exit(1);
   }
 

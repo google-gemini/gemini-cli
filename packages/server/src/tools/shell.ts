@@ -24,6 +24,7 @@ export interface ShellToolParams {
 import { spawn } from 'child_process';
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
+  // name should match TerminalTool.Name used in prompts.ts for now
   static Name: string = 'execute_bash_command';
   private readonly config: Config;
   private whitelist: Set<string> = new Set();

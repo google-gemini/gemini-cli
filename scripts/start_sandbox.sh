@@ -23,25 +23,24 @@ fi
 CMD=$(scripts/sandbox_command.sh)
 IMAGE=gemini-code-sandbox
 DEBUG_PORT=9229
-
-# stop if image is missing
-if ! $CMD images -q "$IMAGE" | grep -q .; then
-    echo "ERROR: $IMAGE is missing. Try \`npm run build\` with sandboxing enabled."
-    exit 1
-fi
-
 PROJECT=$(basename "$PWD")
 WORKDIR=/sandbox/$PROJECT
 CLI_PATH=/usr/local/share/npm-global/lib/node_modules/\@gemini-code/cli
 
-# if project is gemini-code, then run CLI from $WORKDIR/packages/cli
-# note this means the global installation is not required in this case
+# if project is gemini-code, then switch to -dev image & run CLI from $WORKDIR/packages/cli
 if [[ "$PROJECT" == "gemini-code" ]]; then
+    IMAGE+="-dev"
     CLI_PATH="$WORKDIR/packages/cli"
 elif [ -n "${DEBUG:-}" ]; then
-    # refuse to debug using global installation
-    # (requires a separate attach config in launch.json, see comments there around remoteRoot)
+    # refuse to debug using global installation for now (can be added later)
+    # (requires a separate attach config, see comments in launch.json around remoteRoot)
     echo "ERROR: debugging is sandbox is not supported when target/root is not gemini-code"
+    exit 1
+fi
+
+# stop if image is missing
+if ! $CMD images -q "$IMAGE" | grep -q .; then
+    echo "ERROR: $IMAGE is missing. Try \`npm run build\` with sandboxing enabled."
     exit 1
 fi
 

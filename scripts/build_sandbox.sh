@@ -30,11 +30,14 @@ SKIP_NPM_INSTALL_BUILD=false
 while getopts "sd" opt; do
     case ${opt} in
     s) SKIP_NPM_INSTALL_BUILD=true ;;
-    d) DOCKERFILE=Dockerfile-dev ;;
+    d)
+        DOCKERFILE=Dockerfile-dev
+        IMAGE+="-dev"
+        ;;
     \?)
         echo "usage: $(basename "$0") [-s] [-d]"
         echo "  -s: skip npm install + npm run build"
-        echo "  -d: use Dockerfile-dev"
+        echo "  -d: build dev image (using Dockerfile-dev)"
         exit 1
         ;;
     esac
