@@ -42,6 +42,21 @@ export const useSlashCommandProcessor = (
       },
     },
     {
+      name: 'help',
+      description: '/help for help on gemini-code',
+      action: (_value: PartListUnion) => {
+        const helpText =
+          'I am an interactive CLI tool assistant designed to ' +
+          'help with software engineering tasks. I can use tools to read ' +
+          'and write files, search code, execute bash commands, and more ' +
+          'to assist with development workflows. I will explain commands ' +
+          'and ask for permission before running them and will not ' +
+          'commit changes unless explicitly instructed.';
+        const timestamp = getNextMessageId(Date.now());
+        addHistoryItem(setHistory, { type: 'info', text: helpText }, timestamp);
+      },
+    },
+    {
       name: 'exit',
       description: 'Exit gemini-code',
       action: (_value: PartListUnion) => {
