@@ -27,9 +27,11 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
-import { findSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { isAtCommand } from '../utils/commandUtils.js'; // Import the @ command checker
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { usePassthroughProcessor } from './passthroughCommandProcessor.js';
+import { handleAtCommand } from './atCommandProcessor.js'; // Import the @ command handler
+import { findSafeSplitPoint } from '../utils/markdownUtilities.js'; // Import the split point finder
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -61,6 +63,7 @@ export const useGeminiStream = (
 
   // ID Generation Callback
   const getNextMessageId = useCallback((baseTimestamp: number): number => {
+    // Increment *before* adding to ensure uniqueness against the base timestamp
     messageIdCounterRef.current += 1;
     return baseTimestamp + messageIdCounterRef.current;
   }, []);
@@ -144,32 +147,63 @@ export const useGeminiStream = (
       if (typeof query === 'string' && query.trim().length === 0) return;
 
       const userMessageTimestamp = Date.now();
+      messageIdCounterRef.current = 0; // Reset counter for this new submission
+      let queryToSendToGemini: PartListUnion | null = null;
 
       if (typeof query === 'string') {
-        setDebugMessage(`User query: '${query}'`);
+        const trimmedQuery = query.trim();
+        setDebugMessage(`User query: '${trimmedQuery}'`);
 
         // 1. Check for Slash Commands
-        if (handleSlashCommand(query)) {
-          return; // Command was handled, exit early
+        if (handleSlashCommand(trimmedQuery)) {
+          return; // Handled, exit
         }
 
         // 2. Check for Passthrough Commands
-        if (handlePassthroughCommand(query)) {
-          return; // Command was handled, exit early
+        if (handlePassthroughCommand(trimmedQuery)) {
+          return; // Handled, exit
         }
 
-        // 3. Add user message if not handled by slash/passthrough
-        addHistoryItem(
-          setHistory,
-          { type: 'user', text: query },
-          userMessageTimestamp,
-        );
+        // 3. Check for @ Commands using the utility function
+        if (isAtCommand(trimmedQuery)) {
+          const atCommandResult = await handleAtCommand({
+            query: trimmedQuery,
+            config,
+            setHistory,
+            setDebugMessage,
+            getNextMessageId,
+            userMessageTimestamp,
+          });
+
+          if (!atCommandResult.shouldProceed) {
+            return; // @ command handled it (e.g., error) or decided not to proceed
+          }
+          queryToSendToGemini = atCommandResult.processedQuery;
+          // User message and tool UI were added by handleAtCommand
+        } else {
+          // 4. It's a normal query for Gemini
+          addHistoryItem(
+            setHistory,
+            { type: 'user', text: trimmedQuery },
+            userMessageTimestamp,
+          );
+          queryToSendToGemini = trimmedQuery;
+        }
       } else {
-        // For function responses (PartListUnion that isn't a string),
-        // we don't add a user message here. The tool call/response UI handles it.
+        // 5. It's a function response (PartListUnion that isn't a string)
+        // Tool call/response UI handles history. Always proceed.
+        queryToSendToGemini = query;
       }
 
-      // 4. Proceed to Gemini API call
+      // --- Proceed to Gemini API call ---
+      if (queryToSendToGemini === null) {
+        // Should only happen if @ command failed and returned null query
+        setDebugMessage(
+          'Query processing resulted in null, not sending to Gemini.',
+        );
+        return;
+      }
+
       const client = geminiClientRef.current;
       if (!client) {
         setInitError('Gemini client is not available.');
@@ -188,7 +222,6 @@ export const useGeminiStream = (
 
       setStreamingState(StreamingState.Responding);
       setInitError(null);
-      messageIdCounterRef.current = 0; // Reset counter for new submission
       const chat = chatSessionRef.current;
       let currentToolGroupId: number | null = null;
 
@@ -196,8 +229,12 @@ export const useGeminiStream = (
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        // Use the original query for the Gemini call
-        const stream = client.sendMessageStream(chat, query, signal);
+        // Use the determined query for the Gemini call
+        const stream = client.sendMessageStream(
+          chat,
+          queryToSendToGemini,
+          signal,
+        );
 
         // Process the stream events from the server logic
         let currentGeminiText = ''; // To accumulate message content
@@ -488,6 +525,9 @@ export const useGeminiStream = (
       updateGeminiMessage,
       handleSlashCommand,
       handlePassthroughCommand,
+      // handleAtCommand is implicitly included via its direct call
+      setDebugMessage, // Added dependency for handleAtCommand & passthrough
+      setStreamingState, // Added dependency for handlePassthroughCommand
       updateAndAddGeminiMessageContent,
     ],
   );

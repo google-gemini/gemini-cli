@@ -12,7 +12,7 @@
  * @param query The input query string.
  * @returns True if the query looks like an '@' command, false otherwise.
  */
-export const isPotentiallyAtCommand = (query: string): boolean =>
+export const isAtCommand = (query: string): boolean =>
   // Check if starts with @ OR has a space, then @, then a non-space character.
   query.startsWith('@') || /\s@\S/.test(query);
 
