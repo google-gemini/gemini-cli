@@ -26,8 +26,8 @@ else
     # DEV=true to enable React Dev Tools (https://github.com/vadimdemedes/ink?tab=readme-ov-file#using-react-devtools)
     # CLI_VERSION to display in the app ui footer
     if [ -n "${DEBUG:-}" ]; then
-        CLI_VERSION='development' DEV=true npm run debug --workspace=@gemini-code/cli -- "$@"
+        CLI_VERSION='development' DEV=true node --inspect-brk ./packages/cli "$@"
     else
-        CLI_VERSION='development' DEV=true npm run start --workspace=@gemini-code/cli -- "$@"
+        CLI_VERSION='development' DEV=true node ./packages/cli "$@"
     fi
 fi
