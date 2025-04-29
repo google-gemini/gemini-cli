@@ -44,10 +44,10 @@ fi
 run_args=(-it --rm --init --workdir "$WORKDIR")
 
 # mount current directory as $WORKDIR inside container
-run_args+=(-v "$PWD:$WORKDIR")
+run_args+=(--volume "$PWD:$WORKDIR")
 
 # mount $TMPDIR as /tmp inside container
-run_args+=(-v "${TMPDIR:-/tmp/}:/tmp")
+run_args+=(--volume "${TMPDIR:-/tmp/}:/tmp")
 
 # if .env exists, source it before checking/parsing environment variables below
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
@@ -81,7 +81,7 @@ if [ -n "${SANDBOX_MOUNTS:-}" ]; then
                 exit 1
             fi
             echo "SANDBOX_MOUNTS: $from -> $to ($opts)"
-            run_args+=(-v "$mount")
+            run_args+=(--volume "$mount")
         fi
     done
 fi
@@ -130,7 +130,7 @@ run_args+=(--env "SANDBOX=$IMAGE-$INDEX")
 node_args=()
 if [ -n "${DEBUG:-}" ]; then
     node_args+=(--inspect-brk="0.0.0.0:$DEBUG_PORT")
-    run_args+=(-p "$DEBUG_PORT:$DEBUG_PORT")
+    run_args+=(--publish "$DEBUG_PORT:$DEBUG_PORT")
 fi
 node_args+=("$CLI_PATH" "$@")
 
@@ -142,12 +142,19 @@ if [ -n "${SANDBOX_PORTS:-}" ]; then
     for port in $ports; do
         if [ -n "$port" ]; then
             echo "SANDBOX_PORTS: $port"
-            run_args+=(-p "$port:$port")
+            run_args+=(--publish "$port:$port")
             bash_cmd+="socat TCP4-LISTEN:$port,bind=\$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:$port 2> /dev/null& "
         fi
     done
 fi
 bash_cmd+="node $(printf '%q ' "${node_args[@]}")" # printf fixes quoting within args
+
+# specify --user as "$(id -u):$(id -g)" if SANDBOX_SET_UID_GID is 1|true
+# only necessary if user mapping is not handled by sandboxing setup on host
+# (e.g. rootful docker on linux w/o userns-remap configured)
+if [[ "${SANDBOX_SET_UID_GID:-}" =~ ^(1|true)$ ]]; then
+    run_args+=(--user "$(id -u):$(id -g)")
+fi
 
 # run gemini-code in sandbox container
 if [[ "$CMD" == "podman" ]]; then

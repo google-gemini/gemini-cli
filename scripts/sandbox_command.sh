@@ -22,14 +22,14 @@ set -euo pipefail
 QUIET=false
 while getopts ":q" opt; do
     case ${opt} in
-        q ) QUIET=true ;;
-        \? ) echo "Usage: $0 [-q]"
-            exit 1
-            ;;
+    q) QUIET=true ;;
+    \?)
+        echo "Usage: $0 [-q]"
+        exit 1
+        ;;
     esac
 done
 shift $((OPTIND - 1))
-
 
 # if GEMINI_CODE_SANDBOX is not set, try to source .env in case set there
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
@@ -57,10 +57,10 @@ fi
 
 # if GEMINI_CODE_SANDBOX is set to 1 or true, then try to use docker or podman
 if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]]; then
-    if command -v docker &> /dev/null; then
+    if command -v docker &>/dev/null; then
         if [ "$QUIET" = false ]; then echo "docker"; fi
         exit 0
-    elif command -v podman &> /dev/null; then
+    elif command -v podman &>/dev/null; then
         if [ "$QUIET" = false ]; then echo "podman"; fi
         exit 0
     else
@@ -69,7 +69,7 @@ if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]]; then
     fi
 fi
 
-if ! command -v "$GEMINI_CODE_SANDBOX" &> /dev/null; then
+if ! command -v "$GEMINI_CODE_SANDBOX" &>/dev/null; then
     echo "ERROR: missing sandbox command '$GEMINI_CODE_SANDBOX' (from GEMINI_CODE_SANDBOX)" >&2
     exit 1
 fi

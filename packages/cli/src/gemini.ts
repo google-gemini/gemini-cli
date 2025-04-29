@@ -101,10 +101,10 @@ async function start_sandbox(sandbox: string) {
   const args = ['run', '-it', '--rm', '--init', '--workdir', workdir];
 
   // mount current directory as ${workdir} inside container
-  args.push('-v', `${process.cwd()}:${workdir}`);
+  args.push('--volume', `${process.cwd()}:${workdir}`);
 
   // mount os.tmpdir() as /tmp inside container
-  args.push('-v', `${os.tmpdir()}:/tmp`);
+  args.push('--volume', `${os.tmpdir()}:/tmp`);
 
   // mount paths listed in SANDBOX_MOUNTS
   if (process.env.SANDBOX_MOUNTS) {
@@ -130,7 +130,7 @@ async function start_sandbox(sandbox: string) {
           process.exit(1);
         }
         console.log(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
-        args.push('-v', mount);
+        args.push('--volume', mount);
       }
     }
   }
@@ -200,29 +200,38 @@ async function start_sandbox(sandbox: string) {
   const nodeArgs = [];
   const debugPort = process.env.DEBUG_PORT || '9229';
   if (process.env.DEBUG) {
-    args.push('-p', `${debugPort}:${debugPort}`);
+    args.push('--publish', `${debugPort}:${debugPort}`);
     nodeArgs.push(`--inspect-brk=0.0.0.0:${debugPort}`);
   }
 
   // open additional ports if SANDBOX_PORTS is set
   // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
-  let bash_cmd = '';
+  let bashCmd = '';
   if (process.env.SANDBOX_PORTS) {
     for (let port of process.env.SANDBOX_PORTS.split(',')) {
       if ((port = port.trim())) {
         console.log(`SANDBOX_PORTS: ${port}`);
-        args.push('-p', `${port}:${port}`);
-        bash_cmd += `socat TCP4-LISTEN:${port},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${port} 2> /dev/null & `;
+        args.push('--publish', `${port}:${port}`);
+        bashCmd += `socat TCP4-LISTEN:${port},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${port} 2> /dev/null & `;
       }
     }
+  }
+
+  // specify --user as "$(id -u):$(id -g)" if SANDBOX_SET_UID_GID is 1|true
+  // only necessary if user mapping is not handled by sandboxing setup on host
+  // (e.g. rootful docker on linux w/o userns-remap configured)
+  if (['1', 'true'].includes(process.env.SANDBOX_SET_UID_GID ?? '')) {
+    const uid = execSync('id -u').toString().trim();
+    const gid = execSync('id -g').toString().trim();
+    args.push('--user', `${uid}:${gid}`);
   }
 
   // append remaining args (image, bash -c "node node_args... cli path cli_args...")
   // node_args and cli_args need to be quoted before being inserted into bash_cmd
   const quotedNodeArgs = nodeArgs.map((arg) => quote([arg]));
   const quotedCliArgs = process.argv.slice(2).map((arg) => quote([arg]));
-  bash_cmd += `node ${quotedNodeArgs.join(' ')} ${quote([cliPath])} ${quotedCliArgs.join(' ')}`;
-  args.push(image, 'bash', '-c', bash_cmd);
+  bashCmd += `node ${quotedNodeArgs.join(' ')} ${quote([cliPath])} ${quotedCliArgs.join(' ')}`;
+  args.push(image, 'bash', '-c', bashCmd);
 
   // spawn child and let it inherit stdio
   const child = spawn(sandbox, args, {
