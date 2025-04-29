@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec as _exec } from 'child_process';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useInput } from 'ink';
 import {
@@ -29,12 +28,8 @@ import {
   ToolCallStatus,
 } from '../types.js';
 import { findSafeSplitPoint } from '../utils/markdownUtilities.js';
-
-interface SlashCommand {
-  name: string; // slash command
-  description: string; // flavor text in UI
-  action: (value: PartListUnion) => void;
-}
+import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import { usePassthroughProcessor } from './passthroughCommandProcessor.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
@@ -64,46 +59,26 @@ export const useGeminiStream = (
   const messageIdCounterRef = useRef(0);
   const currentGeminiMessageIdRef = useRef<number | null>(null);
 
-  const slashCommands: SlashCommand[] = [
-    {
-      name: 'clear',
-      description: 'clear the screen',
-      action: (_value: PartListUnion) => {
-        // This just clears the *UI* history, not the model history.
-        setDebugMessage('Clearing terminal.');
-        setHistory((_) => []);
-      },
-    },
-    {
-      name: 'exit',
-      description: 'Exit gemini-code',
-      action: (_value: PartListUnion) => {
-        setDebugMessage('Exiting. Good-bye.');
-        const timestamp = getNextMessageId(Date.now());
-        addHistoryItem(
-          setHistory,
-          { type: 'info', text: 'good-bye!' },
-          timestamp,
-        );
-        process.exit(0);
-      },
-    },
-    {
-      // TODO: dedup with exit by adding altName or cmdRegex.
-      name: 'quit',
-      description: 'Quit gemini-code',
-      action: (_value: PartListUnion) => {
-        setDebugMessage('Quitting. Good-bye.');
-        const timestamp = getNextMessageId(Date.now());
-        addHistoryItem(
-          setHistory,
-          { type: 'info', text: 'good-bye!' },
-          timestamp,
-        );
-        process.exit(0);
-      },
-    },
-  ];
+  // ID Generation Callback
+  const getNextMessageId = useCallback((baseTimestamp: number): number => {
+    messageIdCounterRef.current += 1;
+    return baseTimestamp + messageIdCounterRef.current;
+  }, []);
+
+  // Instantiate command processors
+  const { handleSlashCommand } = useSlashCommandProcessor(
+    setHistory,
+    setDebugMessage,
+    getNextMessageId,
+  );
+
+  const { handlePassthroughCommand } = usePassthroughProcessor(
+    setHistory,
+    setStreamingState,
+    setDebugMessage,
+    getNextMessageId,
+    config,
+  );
 
   // Initialize Client Effect - uses props now
   useEffect(() => {
@@ -126,12 +101,6 @@ export const useGeminiStream = (
     }
   });
 
-  // ID Generation Callback (remains the same)
-  const getNextMessageId = useCallback((baseTimestamp: number): number => {
-    messageIdCounterRef.current += 1;
-    return baseTimestamp + messageIdCounterRef.current;
-  }, []);
-
   // Helper function to update Gemini message content
   const updateGeminiMessage = useCallback(
     (messageId: number, newContent: string) => {
@@ -145,66 +114,6 @@ export const useGeminiStream = (
     },
     [setHistory],
   );
-
-  // Possibly handle a query manually, return true if handled.
-  const handleQueryManually = (rawQuery: PartListUnion): boolean => {
-    if (typeof rawQuery !== 'string') {
-      return false;
-    }
-
-    const trimmedQuery = rawQuery.trim();
-    let query = trimmedQuery;
-    if (query.length && query.charAt(0) === '/') {
-      query = query.slice(1);
-    }
-
-    for (const cmd of slashCommands) {
-      if (query === cmd.name) {
-        cmd.action(query);
-        return true;
-      }
-    }
-
-    const maybeCommand = trimmedQuery.split(/\s+/)[0];
-    if (config.getPassthroughCommands().includes(maybeCommand)) {
-      // Execute and capture output
-      const targetDir = config.getTargetDir();
-      setDebugMessage(`Executing shell command in ${targetDir}: ${query}`);
-      const execOptions = {
-        cwd: targetDir,
-      };
-      _exec(query, execOptions, (error, stdout, stderr) => {
-        const timestamp = getNextMessageId(Date.now());
-        if (error) {
-          addHistoryItem(
-            setHistory,
-            { type: 'error', text: error.message },
-            timestamp,
-          );
-        } else if (stderr) {
-          addHistoryItem(
-            setHistory,
-            { type: 'error', text: stderr },
-            timestamp,
-          );
-        } else {
-          // Add stdout as an info message
-          addHistoryItem(
-            setHistory,
-            { type: 'info', text: stdout || '' },
-            timestamp,
-          );
-        }
-        // Set state back to Idle *after* command finishes and output is added
-        setStreamingState(StreamingState.Idle);
-      });
-      // Set state to Responding while the command runs
-      setStreamingState(StreamingState.Responding);
-      return true;
-    }
-
-    return false; // Not handled by a manual command.
-  };
 
   // Helper function to update Gemini message content
   const updateAndAddGeminiMessageContent = useCallback(
@@ -234,15 +143,33 @@ export const useGeminiStream = (
       if (streamingState === StreamingState.Responding) return;
       if (typeof query === 'string' && query.trim().length === 0) return;
 
+      const userMessageTimestamp = Date.now();
+
       if (typeof query === 'string') {
         setDebugMessage(`User query: '${query}'`);
+
+        // 1. Check for Slash Commands
+        if (handleSlashCommand(query)) {
+          return; // Command was handled, exit early
+        }
+
+        // 2. Check for Passthrough Commands
+        if (handlePassthroughCommand(query)) {
+          return; // Command was handled, exit early
+        }
+
+        // 3. Add user message if not handled by slash/passthrough
+        addHistoryItem(
+          setHistory,
+          { type: 'user', text: query },
+          userMessageTimestamp,
+        );
+      } else {
+        // For function responses (PartListUnion that isn't a string),
+        // we don't add a user message here. The tool call/response UI handles it.
       }
 
-      if (handleQueryManually(query)) {
-        return;
-      }
-
-      const userMessageTimestamp = Date.now();
+      // 4. Proceed to Gemini API call
       const client = geminiClientRef.current;
       if (!client) {
         setInitError('Gemini client is not available.');
@@ -265,20 +192,11 @@ export const useGeminiStream = (
       const chat = chatSessionRef.current;
       let currentToolGroupId: number | null = null;
 
-      // For function responses, we don't need to add a user message
-      if (typeof query === 'string') {
-        // Only add user message for string queries, not for function responses
-        addHistoryItem(
-          setHistory,
-          { type: 'user', text: query },
-          userMessageTimestamp,
-        );
-      }
-
       try {
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
+        // Use the original query for the Gemini call
         const stream = client.sendMessageStream(chat, query, signal);
 
         // Process the stream events from the server logic
@@ -561,14 +479,16 @@ export const useGeminiStream = (
         };
       }
     },
-    // Dependencies need careful review - including updateGeminiMessage
+    // Dependencies need careful review
     [
       streamingState,
       setHistory,
-      config.getApiKey(),
-      config.getModel(),
+      config,
       getNextMessageId,
       updateGeminiMessage,
+      handleSlashCommand,
+      handlePassthroughCommand,
+      updateAndAddGeminiMessageContent,
     ],
   );
 
