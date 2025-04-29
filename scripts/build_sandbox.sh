@@ -50,11 +50,11 @@ if [ "$SKIP_NPM_INSTALL_BUILD" = false ]; then
     npm run build --workspaces
 fi
 
-# if using Dockerfile-dev, then skip rebuild unless REBUILD_SANDBOX is set
+# if using Dockerfile-dev, then skip rebuild unless BUILD_SANDBOX is set
 # rebuild should not be necessary unless Dockerfile-dev is modified
 if [ "$DOCKERFILE" = "Dockerfile-dev" ]; then
-    if $CMD images -q "$IMAGE" | grep -q . && [ -z "${REBUILD_SANDBOX:-}" ]; then
-        echo "using existing $IMAGE (set REBUILD_SANDBOX=true to force rebuild)"
+    if $CMD images -q "$IMAGE" | grep -q . && [ -z "${BUILD_SANDBOX:-}" ]; then
+        echo "using existing $IMAGE (set BUILD_SANDBOX=true to force rebuild)"
         exit 0
     fi
 fi
