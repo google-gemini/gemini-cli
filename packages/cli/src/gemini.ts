@@ -28,9 +28,9 @@ function sandbox_command(): string {
   const opts: object = { stdio: 'ignore' };
   if (['1', 'true'].includes(sandbox)) {
     // look for docker or podman, in that order
-    if (spawnSync('command', ['-v', 'docker'], opts).status === 0) {
+    if (execSync('command -v docker').toString().trim()) {
       return 'docker'; // Set sandbox to 'docker' if found
-    } else if (spawnSync('command', ['-v', 'podman'], opts).status === 0) {
+    } else if (execSync('command -v podman').toString().trim()) {
       return 'podman'; // Set sandbox to 'podman' if found
     } else {
       console.error(
@@ -41,13 +41,14 @@ function sandbox_command(): string {
     }
   } else if (sandbox) {
     // confirm that specfied command exists
-    if (spawnSync('command', ['-v', sandbox], opts).status !== 0) {
+    if (execSync(`command -v ${sandbox}`).toString().trim()) {
+      return sandbox;
+    } else {
       console.error(
         `ERROR: missing sandbox command '${sandbox}' (from GEMINI_CODE_SANDBOX)`,
       );
       process.exit(1);
     }
-    return sandbox;
   } else {
     return ''; // no sandbox
   }
@@ -191,10 +192,12 @@ async function start_sandbox(sandbox: string) {
   // set SANDBOX as container name
   args.push('--env', `SANDBOX=${image}-${index}`);
 
-  // for podman, use empty --authfile to skip unnecessary auth refresh overhead
-  const emptyAuthFilePath = path.join(os.tmpdir(), 'empty_auth.json');
-  fs.writeFileSync(emptyAuthFilePath, '{}', 'utf-8');
-  args.push('--authfile', emptyAuthFilePath);
+  // for podman only, use empty --authfile to skip unnecessary auth refresh overhead
+  if (sandbox === 'podman') {
+    const emptyAuthFilePath = path.join(os.tmpdir(), 'empty_auth.json');
+    fs.writeFileSync(emptyAuthFilePath, '{}', 'utf-8');
+    args.push('--authfile', emptyAuthFilePath);
+  }
 
   // enable debugging via node --inspect-brk if DEBUG is set
   const nodeArgs = [];
