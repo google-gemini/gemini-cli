@@ -25,12 +25,11 @@ const __dirname = dirname(__filename);
 // node.js equivalent of scripts/sandbox_command.sh
 function sandbox_command(): string {
   const sandbox = process.env.GEMINI_CODE_SANDBOX?.toLowerCase().trim() ?? '';
-  const opts: object = { stdio: 'ignore' };
   if (['1', 'true'].includes(sandbox)) {
     // look for docker or podman, in that order
-    if (execSync('command -v docker').toString().trim()) {
+    if (execSync('command -v docker || true').toString().trim()) {
       return 'docker'; // Set sandbox to 'docker' if found
-    } else if (execSync('command -v podman').toString().trim()) {
+    } else if (execSync('command -v podman || true').toString().trim()) {
       return 'podman'; // Set sandbox to 'podman' if found
     } else {
       console.error(
@@ -41,7 +40,7 @@ function sandbox_command(): string {
     }
   } else if (sandbox) {
     // confirm that specfied command exists
-    if (execSync(`command -v ${sandbox}`).toString().trim()) {
+    if (execSync(`command -v ${sandbox} || true`).toString().trim()) {
       return sandbox;
     } else {
       console.error(
