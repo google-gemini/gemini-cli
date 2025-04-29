@@ -69,7 +69,7 @@ export const useGeminiStream = (
   }, []);
 
   // Instantiate command processors
-  const { handleSlashCommand } = useSlashCommandProcessor(
+  const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
     setHistory,
     setDebugMessage,
     getNextMessageId,
@@ -532,5 +532,11 @@ export const useGeminiStream = (
     ],
   );
 
-  return { streamingState, submitQuery, initError, debugMessage };
+  return {
+    streamingState,
+    submitQuery,
+    initError,
+    debugMessage,
+    slashCommands,
+  };
 };

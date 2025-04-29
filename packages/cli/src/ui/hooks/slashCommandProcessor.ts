@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
-interface SlashCommand {
+export interface SlashCommand {
   name: string; // slash command
   description: string; // flavor text in UI
   action: (value: PartListUnion) => void;
@@ -43,7 +43,7 @@ export const useSlashCommandProcessor = (
     },
     {
       name: 'help',
-      description: '/help for help on gemini-code',
+      description: 'for help on gemini-code',
       action: (_value: PartListUnion) => {
         const helpText =
           'I am an interactive CLI tool assistant designed to ' +
@@ -58,7 +58,7 @@ export const useSlashCommandProcessor = (
     },
     {
       name: 'exit',
-      description: 'Exit gemini-code',
+      description: '',
       action: (_value: PartListUnion) => {
         setDebugMessage('Exiting. Good-bye.');
         const timestamp = getNextMessageId(Date.now());
@@ -73,7 +73,7 @@ export const useSlashCommandProcessor = (
     {
       // TODO: dedup with exit by adding altName or cmdRegex.
       name: 'quit',
-      description: 'Quit gemini-code',
+      description: '',
       action: (_value: PartListUnion) => {
         setDebugMessage('Quitting. Good-bye.');
         const timestamp = getNextMessageId(Date.now());
@@ -121,5 +121,5 @@ export const useSlashCommandProcessor = (
     [setDebugMessage, setHistory, getNextMessageId, slashCommands],
   );
 
-  return { handleSlashCommand };
+  return { handleSlashCommand, slashCommands };
 };

@@ -32,8 +32,13 @@ interface AppProps {
 export const App = ({ config, cliVersion }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
-  const { streamingState, submitQuery, initError, debugMessage } =
-    useGeminiStream(setHistory, config);
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    debugMessage,
+    slashCommands,
+  } = useGeminiStream(setHistory, config);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
@@ -104,7 +109,7 @@ export const App = ({ config, cliVersion }: AppProps) => {
               <Box flexDirection="column" key={'header-' + index}>
                 <Header />
                 <Tips />
-                <Intro />
+                <Intro commands={slashCommands} />
               </Box>
             );
           }
