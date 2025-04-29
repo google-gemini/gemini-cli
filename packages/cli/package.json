@@ -42,6 +42,7 @@
     "lowlight": "^3.3.0",
     "react": "^18.3.1",
     "read-package-up": "^11.0.0",
+    "shell-quote": "^1.8.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.0",
+    "@types/shell-quote": "^1.7.5",
     "@types/yargs": "^17.0.32",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

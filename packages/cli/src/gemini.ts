@@ -8,6 +8,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import React from 'react';
+import { quote } from 'shell-quote';
 import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
@@ -204,17 +205,24 @@ async function start_sandbox(sandbox: string) {
   }
 
   // open additional ports if SANDBOX_PORTS is set
+  // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
+  let bash_cmd = '';
   if (process.env.SANDBOX_PORTS) {
     for (let port of process.env.SANDBOX_PORTS.split(',')) {
       if ((port = port.trim())) {
         console.log(`SANDBOX_PORTS: ${port}`);
         args.push('-p', `${port}:${port}`);
+        bash_cmd += `socat TCP4-LISTEN:${port},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${port} 2> /dev/null & `;
       }
     }
   }
 
-  // append remaining args (image, node, node args, cli path, cli args)
-  args.push(image, 'node', ...nodeArgs, cliPath, ...process.argv.slice(2));
+  // append remaining args (image, bash -c "node node_args... cli path cli_args...")
+  // node_args and cli_args need to be quoted before being inserted into bash_cmd
+  const quotedNodeArgs = nodeArgs.map((arg) => quote([arg]));
+  const quotedCliArgs = process.argv.slice(2).map((arg) => quote([arg]));
+  bash_cmd += `node ${quotedNodeArgs.join(' ')} ${quote([cliPath])} ${quotedCliArgs.join(' ')}`;
+  args.push(image, 'bash', '-c', bash_cmd);
 
   // spawn child and let it inherit stdio
   const child = spawn(sandbox, args, {

@@ -135,20 +135,24 @@ fi
 node_args+=("$CLI_PATH" "$@")
 
 # open additional ports if SANDBOX_PORTS is set
+# also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
+bash_cmd=""
 if [ -n "${SANDBOX_PORTS:-}" ]; then
     ports=$(echo "$SANDBOX_PORTS" | tr ',' '\n')
     for port in $ports; do
         if [ -n "$port" ]; then
             echo "SANDBOX_PORTS: $port"
             run_args+=(-p "$port:$port")
+            bash_cmd+="socat TCP4-LISTEN:$port,bind=\$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:$port 2> /dev/null& "
         fi
     done
 fi
+bash_cmd+="node $(printf '%q ' "${node_args[@]}")" # printf fixes quoting within args
 
 # run gemini-code in sandbox container
 if [[ "$CMD" == "podman" ]]; then
     # use empty --authfile to skip unnecessary auth refresh overhead
-    $CMD run "${run_args[@]}" --authfile <(echo '{}') "$IMAGE" node "${node_args[@]}"
+    $CMD run "${run_args[@]}" --authfile <(echo '{}') "$IMAGE" bash -c "$bash_cmd"
 else
-    $CMD run "${run_args[@]}" "$IMAGE" node "${node_args[@]}"
+    $CMD run "${run_args[@]}" "$IMAGE" bash -c "$bash_cmd"
 fi
