@@ -5,10 +5,6 @@ steps:
 
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     entrypoint: 'npm'
-    args: ['run', 'auth']
-
-  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
-    entrypoint: 'npm'
     args:
       [
         'run',
@@ -21,6 +17,15 @@ steps:
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     entrypoint: 'npm'
     args: ['run', 'prerelease:deps', '--workspaces']
+
+  # A bit of a hack to get the .npmrc into the Dockerfile.sandbox. Should probably streamline this.
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    entrypoint: 'cp'
+    args: ['/workspace/.npmrc', '/builder/home/.npmrc']
+
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    entrypoint: 'npm'
+    args: ['run', 'auth']
 
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     entrypoint: 'npm'

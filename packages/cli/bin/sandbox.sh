@@ -49,6 +49,4 @@ if [ -n "${COLORTERM:-}" ]; then run_args+=(--env COLORTERM="$COLORTERM"); fi
 # this is the preferred mechanism to detect if inside container/sandbox
 run_args+=(--env "SANDBOX=$IMAGE:$TAG-$INDEX")
 
-node_args=("$CLI_PATH" "$@")
-
-docker run "${run_args[@]}" --init --workdir "$WORKDIR" "$REGISTRY/$IMAGE:$TAG" node "${node_args[@]}"
+docker run "${run_args[@]}" --init --workdir "$WORKDIR" "$REGISTRY/$IMAGE:$TAG"

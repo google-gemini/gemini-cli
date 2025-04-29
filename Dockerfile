@@ -35,4 +35,3 @@ COPY packages/server/dist/gemini-code-server-*.tgz /usr/local/share/npm-global/g
 RUN npm install -g /usr/local/share/npm-global/gemini-code-cli.tgz /usr/local/share/npm-global/gemini-code-server.tgz \
   && npm cache clean --force \
   && rm -f /usr/local/share/npm-global/gemini-code-{cli,server}.tgz
-

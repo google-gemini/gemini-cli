@@ -23,4 +23,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=secret,id=npmrc,dst=/root/.npmrc npm install -g @gemini-code/cli@${CLI_VERSION} --verbose
+
 ENTRYPOINT 'gemini-code'

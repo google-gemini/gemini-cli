@@ -9,7 +9,6 @@ ENV NODE_VERSION_MAJOR=20
 ENV DOCKER_CLI_VERSION=26.1.3
 ENV BUILDX_VERSION=v0.14.0
 
-
 # Install dependencies for adding NodeSource repository, gcloud, and other tools
 # - curl: for downloading files
 # - gnupg: for managing GPG keys (used by NodeSource & Google Cloud SDK)
