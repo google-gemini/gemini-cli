@@ -5,8 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini-code": "dist/index.js",
-    "gemini-code-sandbox": "bin/sandbox.sh"
+    "gemini-code": "dist/index.js"
   },
   "image": "us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-cli",
   "scripts": {
