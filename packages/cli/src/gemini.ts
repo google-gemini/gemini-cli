@@ -252,12 +252,14 @@ async function main() {
   const config = loadCliConfig();
   let input = config.getQuestion();
 
-  // hop into sandbox if enabled but outside
-  const sandbox = sandbox_command();
-  if (sandbox && !process.env.SANDBOX) {
-    console.log('hopping into sandbox ...');
-    await start_sandbox(sandbox);
-    process.exit(0);
+  // hop into sandbox if we are outside and sandboxing is enabled
+  if (!process.env.SANDBOX) {
+    const sandbox = sandbox_command();
+    if (sandbox) {
+      console.log('hopping into sandbox ...');
+      await start_sandbox(sandbox);
+      process.exit(0);
+    }
   }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
