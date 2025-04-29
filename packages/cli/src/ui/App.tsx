@@ -19,6 +19,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
+import { Intro } from './components/Intro.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
@@ -103,6 +104,7 @@ export const App = ({ config, cliVersion }: AppProps) => {
               <Box flexDirection="column" key={'header-' + index}>
                 <Header />
                 <Tips />
+                <Intro />
               </Box>
             );
           }
