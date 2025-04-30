@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { PartListUnion } from '@google/genai';
-import { Config, getErrorMessage } from '@gemini-code/server';
+import { Config, getErrorMessage, isNodeError } from '@gemini-code/server';
 import {
   HistoryItem,
   IndividualToolCallDisplay,
@@ -39,9 +41,10 @@ interface HandleAtCommandResult {
 
 /**
  * Processes user input potentially containing an '@<path>' command.
- * It finds the first '@<path>', reads the specified path, updates the UI,
- * and prepares the query for the LLM, incorporating the file content
- * and surrounding text.
+ * It finds the first '@<path>', checks if the path is a file or directory,
+ * prepares the appropriate path specification for the read_many_files tool,
+ * updates the UI, and prepares the query for the LLM, incorporating the
+ * file content and surrounding text.
  *
  * @returns An object containing the potentially modified query (or null)
  *          and a flag indicating if the main hook should proceed.
@@ -60,8 +63,6 @@ export async function handleAtCommand({
   const match = trimmedQuery.match(atCommandRegex);
 
   if (!match) {
-    // This should technically not happen if isPotentiallyAtCommand was true,
-    // but handle defensively.
     const errorTimestamp = getNextMessageId(userMessageTimestamp);
     addHistoryItem(
       setHistory,
@@ -108,19 +109,41 @@ export async function handleAtCommand({
 
   // --- Path Handling for @ command ---
   let pathSpec = pathPart;
-  // Basic check: If no extension or ends with '/', assume directory and add globstar.
-  if (!pathPart.includes('.') || pathPart.endsWith('/')) {
-    pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
+  const contentLabel = pathPart;
+
+  try {
+    // Resolve the path relative to the target directory
+    const absolutePath = path.resolve(config.getTargetDir(), pathPart);
+    const stats = await fs.stat(absolutePath);
+
+    if (stats.isDirectory()) {
+      // If it's a directory, ensure it ends with a globstar for recursive read
+      pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
+      setDebugMessage(`Path resolved to directory, using glob: ${pathSpec}`);
+    } else {
+      // It's a file, use the original pathPart as pathSpec
+      setDebugMessage(`Path resolved to file: ${pathSpec}`);
+    }
+  } catch (error) {
+    // If stat fails (e.g., file/dir not found), proceed with the original pathPart.
+    // The read_many_files tool will handle the error if it's invalid.
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      setDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
+    } else {
+      // Log other stat errors but still proceed
+      console.error(`Error stating path ${pathPart}:`, error);
+      setDebugMessage(
+        `Error stating path, proceeding with original: ${pathSpec}`,
+      );
+    }
   }
+
   const toolArgs = { paths: [pathSpec] };
-  const contentLabel =
-    pathSpec === pathPart ? pathPart : `directory ${pathPart}`;
   // --- End Path Handling ---
 
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {
-    setDebugMessage(`Reading via @ command: ${pathSpec}`);
     const result = await readManyFilesTool.execute(toolArgs);
     const fileContent = result.llmContent || '';
 
@@ -133,7 +156,6 @@ export async function handleAtCommand({
       confirmationDetails: undefined,
     };
 
-    // Construct the query for Gemini, combining parts
     const processedQueryParts = [];
     if (textBefore) {
       processedQueryParts.push({ text: textBefore });
@@ -159,7 +181,6 @@ export async function handleAtCommand({
 
     return { processedQuery, shouldProceed: true };
   } catch (error) {
-    // Construct error UI
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
