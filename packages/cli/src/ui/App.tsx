@@ -36,34 +36,32 @@ export const App = ({ config, cliVersion }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const {
-    streamingState,
-    submitQuery,
-    initError,
-    debugMessage,
-    slashCommands,
-  } = useGeminiStream(setHistory, config);
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
-
-  const {
     isThemeDialogOpen,
     openThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand();
 
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    debugMessage,
+    slashCommands,
+  } = useGeminiStream(setHistory, config, openThemeDialog);
+  const { elapsedTime, currentLoadingPhrase } =
+    useLoadingIndicator(streamingState);
+
   useStartupWarnings(setStartupWarnings);
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue === '/theme') {
-        openThemeDialog();
-      } else if (trimmedValue.length > 0) {
+      if (trimmedValue.length > 0) {
         submitQuery(submittedValue);
       }
     },
-    [openThemeDialog, submitQuery],
+    [submitQuery],
   );
 
   const userMessages = useMemo(

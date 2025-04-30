@@ -30,17 +30,9 @@ export const useSlashCommandProcessor = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
   getNextMessageId: (baseTimestamp: number) => number,
+  openThemeDialog: () => void,
 ) => {
   const slashCommands: SlashCommand[] = [
-    {
-      name: 'clear',
-      description: 'clear the screen',
-      action: (_value: PartListUnion) => {
-        // This just clears the *UI* history, not the model history.
-        setDebugMessage('Clearing terminal.');
-        setHistory((_) => []);
-      },
-    },
     {
       name: 'help',
       description: 'for help on gemini-code',
@@ -54,6 +46,22 @@ export const useSlashCommandProcessor = (
           'commit changes unless explicitly instructed.';
         const timestamp = getNextMessageId(Date.now());
         addHistoryItem(setHistory, { type: 'info', text: helpText }, timestamp);
+      },
+    },
+    {
+      name: 'clear',
+      description: 'clear the screen',
+      action: (_value: PartListUnion) => {
+        // This just clears the *UI* history, not the model history.
+        setDebugMessage('Clearing terminal.');
+        setHistory((_) => []);
+      },
+    },
+    {
+      name: 'theme',
+      description: 'change the theme',
+      action: (_value: PartListUnion) => {
+        openThemeDialog();
       },
     },
     {
@@ -85,7 +93,6 @@ export const useSlashCommandProcessor = (
         process.exit(0);
       },
     },
-    // Removed /theme command, handled in App.tsx
   ];
 
   // Checks if the query is a slash command and executes the command if it is.

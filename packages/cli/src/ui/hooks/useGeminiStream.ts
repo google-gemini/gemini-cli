@@ -49,6 +49,7 @@ const addHistoryItem = (
 export const useGeminiStream = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   config: Config,
+  openThemeDialog: () => void,
 ) => {
   const toolRegistry = config.getToolRegistry();
   const [streamingState, setStreamingState] = useState<StreamingState>(
@@ -74,6 +75,7 @@ export const useGeminiStream = (
     setHistory,
     setDebugMessage,
     getNextMessageId,
+    openThemeDialog,
   );
 
   const { handleShellCommand } = useShellCommandProcessor(
