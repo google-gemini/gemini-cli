@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Newline, Text } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 
@@ -24,7 +24,7 @@ export const Intro: React.FC<Intro> = ({ commands }) => (
       * Semantically search and explain code
     </Text>
     <Text color={Colors.Foreground}> * Execute bash commands</Text>
-    <Newline />
+    <Box height={1} />
     <Text bold color={Colors.Foreground}>
       Commands:
     </Text>
@@ -37,5 +37,19 @@ export const Intro: React.FC<Intro> = ({ commands }) => (
         {command.description && ' - ' + command.description}
       </Text>
     ))}
+    <Text color={Colors.SubtleComment}>
+      <Text bold color={Colors.AccentPurple}>
+        {' '}
+        !{' '}
+      </Text>
+      shell command
+    </Text>
+    <Text color={Colors.SubtleComment}>
+      <Text bold color={Colors.AccentPurple}>
+        {' '}
+        ${' '}
+      </Text>
+      echo hello world
+    </Text>
   </Box>
 );

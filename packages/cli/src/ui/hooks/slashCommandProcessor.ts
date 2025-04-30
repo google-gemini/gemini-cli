@@ -7,7 +7,7 @@
 import { useCallback } from 'react';
 import { type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
+import { getCommandFromQuery } from '../utils/commandUtils.js';
 
 export interface SlashCommand {
   name: string; // slash command
@@ -88,30 +88,31 @@ export const useSlashCommandProcessor = (
     // Removed /theme command, handled in App.tsx
   ];
 
-  // Checks if the query is a slash command and executes it if it is.
+  // Checks if the query is a slash command and executes the command if it is.
   const handleSlashCommand = useCallback(
     (rawQuery: PartListUnion): boolean => {
       if (typeof rawQuery !== 'string') {
         return false;
       }
 
-      const trimmedQuery = rawQuery.trim();
-      if (!isSlashCommand(trimmedQuery)) {
-        return false; // Not a slash command
+      const trimmed = rawQuery.trim();
+      const [symbol, test] = getCommandFromQuery(trimmed);
+
+      // Skip non slash commands
+      if (symbol !== '/') {
+        return false;
       }
 
-      const commandName = trimmedQuery.slice(1).split(/\s+/)[0]; // Get command name after '/'
-
       for (const cmd of slashCommands) {
-        if (commandName === cmd.name) {
+        if (test === cmd.name) {
           // Add user message *before* execution
           const userMessageTimestamp = Date.now();
           addHistoryItem(
             setHistory,
-            { type: 'user', text: trimmedQuery },
+            { type: 'user', text: trimmed },
             userMessageTimestamp,
           );
-          cmd.action(trimmedQuery);
+          cmd.action(trimmed);
           return true; // Command was handled
         }
       }

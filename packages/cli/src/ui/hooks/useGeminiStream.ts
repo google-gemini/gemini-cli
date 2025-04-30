@@ -29,6 +29,7 @@ import {
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js'; // Import the @ command checker
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { usePassthroughProcessor } from './passthroughCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js'; // Import the @ command handler
 import { findSafeSplitPoint } from '../utils/markdownUtilities.js'; // Import the split point finder
@@ -73,6 +74,14 @@ export const useGeminiStream = (
     setHistory,
     setDebugMessage,
     getNextMessageId,
+  );
+
+  const { handleShellCommand } = useShellCommandProcessor(
+    setHistory,
+    setStreamingState,
+    setDebugMessage,
+    getNextMessageId,
+    config,
   );
 
   const { handlePassthroughCommand } = usePassthroughProcessor(
@@ -154,14 +163,19 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         setDebugMessage(`User query: '${trimmedQuery}'`);
 
-        // 1. Check for Slash Commands
+        // 1. Check for Slash Commands (/)
         if (handleSlashCommand(trimmedQuery)) {
-          return; // Handled, exit
+          return;
         }
 
-        // 2. Check for Passthrough Commands
+        // 2. Check for Shell Commands (! or $)
+        if (handleShellCommand(trimmedQuery)) {
+          return;
+        }
+
+        // 3. Check for Passthrough Commands
         if (handlePassthroughCommand(trimmedQuery)) {
-          return; // Handled, exit
+          return;
         }
 
         // 3. Check for @ Commands using the utility function

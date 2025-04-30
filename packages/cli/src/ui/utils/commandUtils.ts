@@ -16,11 +16,19 @@ export const isAtCommand = (query: string): boolean =>
   // Check if starts with @ OR has a space, then @, then a non-space character.
   query.startsWith('@') || /\s@\S/.test(query);
 
+const control_symbols: string[] = ['/', '@', '!', '?', '$'];
 /**
- * Checks if a query string represents a slash command (starts with '/').
+ * Returns the first word of query with optional leading slash, ampersand, bang.
  *
  * @param query The input query string.
- * @returns True if the query is a slash command, false otherwise.
+ * @returns optional leading symbol and first word of query
  */
-export const isSlashCommand = (query: string): boolean =>
-  query.trim().startsWith('/');
+export const getCommandFromQuery = (
+  query: string,
+): [string | undefined, string] => {
+  const word = query.trim().split(/\s/, 1)[0];
+  if (word.length > 0 && control_symbols.includes(word[0])) {
+    return [word[0], word.slice(1)];
+  }
+  return [undefined, word];
+};

@@ -9,6 +9,7 @@ import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
 import { type PartListUnion } from '@google/genai';
 import { HistoryItem, StreamingState } from '../types.js';
+import { getCommandFromQuery } from '../utils/commandUtils.js';
 
 // Helper function (consider moving to a shared util if used elsewhere)
 const addHistoryItem = (
@@ -40,15 +41,14 @@ export const usePassthroughProcessor = (
         return false;
       }
 
-      // Passthrough commands don't start with special characters like '/' or '@'
-      if (trimmedQuery.startsWith('/') || trimmedQuery.startsWith('@')) {
+      const [symbol, command] = getCommandFromQuery(trimmedQuery);
+
+      // Passthrough commands don't start with symbol
+      if (symbol !== undefined) {
         return false;
       }
 
-      const commandParts = trimmedQuery.split(/\s+/);
-      const commandName = commandParts[0];
-
-      if (config.getPassthroughCommands().includes(commandName)) {
+      if (config.getPassthroughCommands().includes(command)) {
         // Add user message *before* execution starts
         const userMessageTimestamp = Date.now();
         addHistoryItem(
@@ -60,7 +60,7 @@ export const usePassthroughProcessor = (
         // Execute and capture output
         const targetDir = config.getTargetDir();
         setDebugMessage(
-          `Executing shell command in ${targetDir}: ${trimmedQuery}`,
+          `Executing pass through command in ${targetDir}: ${trimmedQuery}`,
         );
         const execOptions = {
           cwd: targetDir,
