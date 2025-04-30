@@ -41,19 +41,28 @@ export function sandbox_command(): string {
   }
 }
 
+function parseImageName(image: string): string {
+  const parts = image.split(':');
+  const uri = parts[0];
+  const uriParts = uri.split('/');
+  const name = uriParts.at(-1);
+  const tag = parts.length > 1 ? `-${parts[1]}` : '';
+  return `${name}${tag}`;
+}
+
 // node.js equivalent of scripts/start_sandbox.sh
 export async function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
 
   // if project is gemini-code, then switch to -dev image & run CLI from ${workdir}/packages/cli
-  let image = 'gemini-code-sandbox';
+  let image = process.env.GEMINI_CODE_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
   const project = path.basename(process.cwd());
   const workdir = process.cwd();
-  let cliPath = '/usr/local/share/npm-global/lib/node_modules/@gemini-code/cli';
+  let cliPath = '$(which gemini-code)';
   if (project === 'gemini-code') {
-    image += '-dev';
-    cliPath = `${workdir}/packages/cli`;
+    image = 'gemini-code-sandbox-dev';
+    cliPath = quote([`${workdir}/packages/cli`]);
   }
 
   // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
@@ -124,17 +133,23 @@ export async function start_sandbox(sandbox: string) {
   }
 
   // name container after image, plus numeric suffix to avoid conflicts
+  const containerName = parseImageName(image);
   let index = 0;
   while (
     execSync(
-      `${sandbox} ps -a --format "{{.Names}}" | grep "${image}-${index}" || true`,
+      `${sandbox} ps -a --format "{{.Names}}" | grep "${containerName}-${index}" || true`,
     )
       .toString()
       .trim()
   ) {
     index++;
   }
-  args.push('--name', `${image}-${index}`, '--hostname', `${image}-${index}`);
+  args.push(
+    '--name',
+    `${containerName}-${index}`,
+    '--hostname',
+    `${containerName}-${index}`,
+  );
 
   // copy GEMINI_API_KEY
   if (process.env.GEMINI_API_KEY) {
@@ -177,7 +192,7 @@ export async function start_sandbox(sandbox: string) {
   }
 
   // set SANDBOX as container name
-  args.push('--env', `SANDBOX=${image}-${index}`);
+  args.push('--env', `SANDBOX=${containerName}-${index}`);
 
   // for podman only, use empty --authfile to skip unnecessary auth refresh overhead
   if (sandbox === 'podman') {
@@ -220,7 +235,7 @@ export async function start_sandbox(sandbox: string) {
   // node_args and cli_args need to be quoted before being inserted into bash_cmd
   const quotedNodeArgs = nodeArgs.map((arg) => quote([arg]));
   const quotedCliArgs = process.argv.slice(2).map((arg) => quote([arg]));
-  bashCmd += `node ${quotedNodeArgs.join(' ')} ${quote([cliPath])} ${quotedCliArgs.join(' ')}`;
+  bashCmd += `node ${quotedNodeArgs.join(' ')} ${cliPath} ${quotedCliArgs.join(' ')}`;
   args.push(image, 'bash', '-c', bashCmd);
 
   // spawn child and let it inherit stdio
