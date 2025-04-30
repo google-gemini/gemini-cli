@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Box, Static, Text } from 'ink';
+import { Box, Static, Text, useStdout } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -23,6 +23,9 @@ import { Intro } from './components/Intro.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
+import { useCompletion } from './hooks/useCompletion.js';
+import { SuggestionsDisplay } from './components/SuggestionsDisplay.js';
+import { isAtCommand } from './utils/commandUtils.js';
 
 interface AppProps {
   config: Config;
@@ -78,16 +81,34 @@ export const App = ({ config, cliVersion }: AppProps) => {
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 
-  const { query, handleSubmit: handleHistorySubmit } = useInputHistory({
+  const {
+    query,
+    setQuery,
+    handleSubmit: handleHistorySubmit,
+    inputKey,
+    setInputKey,
+  } = useInputHistory({
     userMessages,
     onSubmit: handleFinalSubmit,
     isActive: isInputActive,
   });
 
+  const completion = useCompletion(
+    query,
+    config.getTargetDir(),
+    isInputActive && isAtCommand(query),
+  );
+
   // --- Render Logic ---
 
   const { staticallyRenderedHistoryItems, updatableHistoryItems } =
     getHistoryRenderSlices(history);
+
+  // Get terminal width
+  const { stdout } = useStdout();
+  const terminalWidth = stdout?.columns ?? 80;
+  // Calculate width for suggestions, leave some padding
+  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
 
   return (
     <Box flexDirection="column" marginBottom={1} width="90%">
@@ -174,7 +195,30 @@ export const App = ({ config, cliVersion }: AppProps) => {
                 </Text>
               </Box>
 
-              <InputPrompt onSubmit={handleHistorySubmit} />
+              <InputPrompt
+                query={query}
+                setQuery={setQuery}
+                inputKey={inputKey}
+                setInputKey={setInputKey}
+                onSubmit={handleHistorySubmit}
+                showSuggestions={completion.showSuggestions}
+                suggestions={completion.suggestions}
+                activeSuggestionIndex={completion.activeSuggestionIndex}
+                navigateUp={completion.navigateUp}
+                navigateDown={completion.navigateDown}
+                resetCompletion={completion.resetCompletionState}
+              />
+              {completion.showSuggestions && (
+                <Box marginTop={1}>
+                  <SuggestionsDisplay
+                    suggestions={completion.suggestions}
+                    activeIndex={completion.activeSuggestionIndex}
+                    isLoading={completion.isLoadingSuggestions}
+                    width={suggestionsWidth}
+                    scrollOffset={completion.visibleStartIndex}
+                  />
+                </Box>
+              )}
             </>
           )}
         </>

@@ -12,7 +12,6 @@ import {
   ToolCallStatus,
 } from '../types.js';
 
-// Helper function to add history items
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   itemData: Omit<HistoryItem, 'id'>,
@@ -25,7 +24,7 @@ const addHistoryItem = (
 };
 
 interface HandleAtCommandParams {
-  query: string; // Raw user input, potentially containing '@'
+  query: string;
   config: Config;
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>;
@@ -34,8 +33,8 @@ interface HandleAtCommandParams {
 }
 
 interface HandleAtCommandResult {
-  processedQuery: PartListUnion | null; // Query for Gemini (null on error/no-proceed)
-  shouldProceed: boolean; // Whether the main hook should continue processing
+  processedQuery: PartListUnion | null;
+  shouldProceed: boolean;
 }
 
 /**
@@ -57,9 +56,7 @@ export async function handleAtCommand({
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
   const trimmedQuery = query.trim();
 
-  // Regex to find the first occurrence of @ followed by non-whitespace chars
-  // It captures the text before, the @path itself (including @), and the text after.
-  const atCommandRegex = /^(.*?)(@\S+)(.*)$/s; // s flag for dot to match newline
+  const atCommandRegex = /^(.*?)(@\S+)(.*)$/s;
   const match = trimmedQuery.match(atCommandRegex);
 
   if (!match) {
@@ -75,20 +72,18 @@ export async function handleAtCommand({
   }
 
   const textBefore = match[1].trim();
-  const atPath = match[2]; // Includes the '@'
+  const atPath = match[2];
   const textAfter = match[3].trim();
 
-  const pathPart = atPath.substring(1); // Remove the leading '@'
+  const pathPart = atPath.substring(1);
 
-  // Add user message for the full original @ command
   addHistoryItem(
     setHistory,
-    { type: 'user', text: query }, // Use original full query for history
+    { type: 'user', text: query },
     userMessageTimestamp,
   );
 
   if (!pathPart) {
-    // Handle case where it's just "@" or "@ " - treat as error/don't proceed
     const errorTimestamp = getNextMessageId(userMessageTimestamp);
     addHistoryItem(
       setHistory,
@@ -108,18 +103,18 @@ export async function handleAtCommand({
       { type: 'error', text: 'Error: read_many_files tool not found.' },
       errorTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false }; // Don't proceed if tool is missing
+    return { processedQuery: null, shouldProceed: false };
   }
 
   // --- Path Handling for @ command ---
-  let pathSpec = pathPart; // Use the extracted path part
+  let pathSpec = pathPart;
   // Basic check: If no extension or ends with '/', assume directory and add globstar.
   if (!pathPart.includes('.') || pathPart.endsWith('/')) {
     pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
   }
   const toolArgs = { paths: [pathSpec] };
   const contentLabel =
-    pathSpec === pathPart ? pathPart : `directory ${pathPart}`; // Adjust label
+    pathSpec === pathPart ? pathPart : `directory ${pathPart}`;
   // --- End Path Handling ---
 
   let toolCallDisplay: IndividualToolCallDisplay;
@@ -129,7 +124,6 @@ export async function handleAtCommand({
     const result = await readManyFilesTool.execute(toolArgs);
     const fileContent = result.llmContent || '';
 
-    // Construct success UI
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
@@ -153,7 +147,6 @@ export async function handleAtCommand({
 
     const processedQuery: PartListUnion = processedQueryParts;
 
-    // Add the tool group UI
     const toolGroupId = getNextMessageId(userMessageTimestamp);
     addHistoryItem(
       setHistory,
@@ -164,7 +157,7 @@ export async function handleAtCommand({
       toolGroupId,
     );
 
-    return { processedQuery, shouldProceed: true }; // Proceed to Gemini
+    return { processedQuery, shouldProceed: true };
   } catch (error) {
     // Construct error UI
     toolCallDisplay = {
@@ -176,7 +169,6 @@ export async function handleAtCommand({
       confirmationDetails: undefined,
     };
 
-    // Add the tool group UI and signal not to proceed
     const toolGroupId = getNextMessageId(userMessageTimestamp);
     addHistoryItem(
       setHistory,
@@ -187,6 +179,6 @@ export async function handleAtCommand({
       toolGroupId,
     );
 
-    return { processedQuery: null, shouldProceed: false }; // Don't proceed on error
+    return { processedQuery: null, shouldProceed: false };
   }
 }
