@@ -41,13 +41,12 @@ export function sandbox_command(): string {
   }
 }
 
+// docker does not allow container names to contain ':' or '/', so we
+// parse those out and make the name a little shorter
 function parseImageName(image: string): string {
-  const parts = image.split(':');
-  const uri = parts[0];
-  const uriParts = uri.split('/');
-  const name = uriParts.at(-1);
-  const tag = parts.length > 1 ? `-${parts[1]}` : '';
-  return `${name}${tag}`;
+  const [fullName, tag] = image.split(':');
+  const name = fullName.split('/').at(-1) ?? 'unknown-image';
+  return tag ? `${name}-${tag}` : name;
 }
 
 // node.js equivalent of scripts/start_sandbox.sh
