@@ -41,7 +41,12 @@ export const useShellCommandProcessor = (
         return false;
       }
       // Remove symbol from rawQuery
-      const trimmed = rawQuery.trim().slice(1);
+      const trimmed = rawQuery.trim().slice(1).trimStart();
+
+      // Stop if command is empty
+      if (!trimmed) {
+        return false;
+      }
 
       // Add user message *before* execution starts
       const userMessageTimestamp = Date.now();
