@@ -37,6 +37,9 @@ export interface RadioButtonSelectProps<T> {
 
   /** Function called when an item is highlighted. Receives the `value` of the selected item. */
   onHighlight?: (value: T) => void;
+
+  /** Whether this select input is currently focused and should respond to input. */
+  isFocused?: boolean;
 }
 
 /**
@@ -77,6 +80,7 @@ export function RadioButtonSelect<T>({
   initialIndex,
   onSelect,
   onHighlight,
+  isFocused,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   const handleSelect = (item: RadioSelectItem<T>) => {
     onSelect(item.value);
@@ -95,6 +99,7 @@ export function RadioButtonSelect<T>({
       initialIndex={initialIndex}
       onSelect={handleSelect}
       onHighlight={handleHighlight}
+      isFocused={isFocused}
     />
   );
 }

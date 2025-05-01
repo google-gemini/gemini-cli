@@ -20,6 +20,7 @@ import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Intro } from './components/Intro.js';
+import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
@@ -29,10 +30,11 @@ import { isAtCommand } from './utils/commandUtils.js';
 
 interface AppProps {
   config: Config;
+  settings: LoadedSettings;
   cliVersion: string;
 }
 
-export const App = ({ config, cliVersion }: AppProps) => {
+export const App = ({ config, settings, cliVersion }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const {
@@ -40,7 +42,7 @@ export const App = ({ config, cliVersion }: AppProps) => {
     openThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
-  } = useThemeCommand();
+  } = useThemeCommand(settings);
 
   const {
     streamingState,
@@ -176,6 +178,7 @@ export const App = ({ config, cliVersion }: AppProps) => {
         <ThemeDialog
           onSelect={handleThemeSelect}
           onHighlight={handleThemeHighlight}
+          settings={settings}
         />
       ) : (
         <>

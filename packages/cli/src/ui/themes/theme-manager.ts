@@ -19,8 +19,9 @@ export interface ThemeDisplay {
   active: boolean;
 }
 
+export const DEFAULT_THEME: Theme = VS2015;
+
 class ThemeManager {
-  private static readonly DEFAULT_THEME: Theme = VS2015;
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
 
@@ -35,7 +36,7 @@ class ThemeManager {
       XCode,
       ANSI,
     ];
-    this.activeTheme = ThemeManager.DEFAULT_THEME;
+    this.activeTheme = DEFAULT_THEME;
   }
 
   /**
@@ -52,16 +53,21 @@ class ThemeManager {
    * Sets the active theme.
    * @param themeName The name of the theme to activate.
    */
-  setActiveTheme(themeName: string): void {
-    const foundTheme = this.availableThemes.find(
-      (theme) => theme.name === themeName,
-    );
+  setActiveTheme(themeName: string | undefined): void {
+    const foundTheme = this.findThemeByName(themeName);
 
     if (foundTheme) {
       this.activeTheme = foundTheme;
     } else {
       throw new Error(`Theme "${themeName}" not found.`);
     }
+  }
+
+  findThemeByName(themeName: string | undefined): Theme | undefined {
+    if (!themeName) {
+      return DEFAULT_THEME;
+    }
+    return this.availableThemes.find((theme) => theme.name === themeName);
   }
 
   /**
