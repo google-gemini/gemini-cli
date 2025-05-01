@@ -18,16 +18,14 @@ set -euo pipefail
 # check build status, write warnings to file for app to display if needed
 node ./scripts/check-build-status.js
 
-# if sandboxing is enabled, start in sandbox container
-if scripts/sandbox_command.sh -q; then
-    scripts/start_sandbox.sh "$@"
-else
-    echo "WARNING: OUTSIDE SANDBOX. See README.md to enable sandboxing."
-    # DEV=true to enable React Dev Tools (https://github.com/vadimdemedes/ink?tab=readme-ov-file#using-react-devtools)
-    # CLI_VERSION to display in the app ui footer
-    if [ -n "${DEBUG:-}" ]; then
-        CLI_VERSION='development' DEV=true node --inspect-brk ./packages/cli "$@"
-    else
-        CLI_VERSION='development' DEV=true node ./packages/cli "$@"
-    fi
+# if debugging is enabled and sandboxing is disabled, use --inspect-brk flag
+# note with sandboxing this flag is passed to the binary inside the sandbox
+node_args=()
+if [ -n "${DEBUG:-}" ] && ! scripts/sandbox_command.sh -q; then
+    node_args=(--inspect-brk)
 fi
+node_args+=("./packages/cli" "$@")
+
+# DEV=true to enable React Dev Tools (https://github.com/vadimdemedes/ink?tab=readme-ov-file#using-react-devtools)
+# CLI_VERSION to display in the app ui footer
+CLI_VERSION='development' DEV=true node "${node_args[@]}"

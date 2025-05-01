@@ -49,7 +49,6 @@ function parseImageName(image: string): string {
   return tag ? `${name}-${tag}` : name;
 }
 
-// node.js equivalent of scripts/start_sandbox.sh
 export async function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
