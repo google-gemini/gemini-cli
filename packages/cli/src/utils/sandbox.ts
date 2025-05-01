@@ -9,6 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { quote } from 'shell-quote';
+import {
+  USER_SETTINGS_DIR,
+  SETTINGS_DIRECTORY_NAME,
+} from '../config/settings.js';
 
 // node.js equivalent of scripts/sandbox_command.sh
 export function sandbox_command(): string {
@@ -97,6 +101,21 @@ export async function start_sandbox(sandbox: string) {
 
   // mount current directory as ${workdir} inside container
   args.push('--volume', `${process.cwd()}:${workdir}`);
+
+  // mount user settings directory inside container, after creating if missing
+  // note user/home changes inside sandbox and we mount at BOTH paths for consistency
+  const userSettingsDirOnHost = USER_SETTINGS_DIR;
+  const userSettingsDirInSandbox = `/home/node/${SETTINGS_DIRECTORY_NAME}`;
+  if (!fs.existsSync(userSettingsDirOnHost)) {
+    fs.mkdirSync(userSettingsDirOnHost);
+  }
+  args.push('--volume', `${userSettingsDirOnHost}:${userSettingsDirOnHost}`);
+  if (userSettingsDirInSandbox !== userSettingsDirOnHost) {
+    args.push(
+      '--volume',
+      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
+    );
+  }
 
   // mount os.tmpdir() as /tmp inside container
   args.push('--volume', `${os.tmpdir()}:/tmp`);

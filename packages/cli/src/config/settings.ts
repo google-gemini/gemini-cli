@@ -9,9 +9,9 @@ import * as path from 'path';
 import { homedir } from 'os';
 import { Config } from '@gemini-code/server';
 
-const SETTINGS_DIRECTORY_NAME = '.gemini';
-const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
-const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+export const SETTINGS_DIRECTORY_NAME = '.gemini';
+export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
+export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
 export enum SettingScope {
   User = 'User',
