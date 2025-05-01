@@ -47,25 +47,37 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return;
     }
     const selectedSuggestion = suggestions[activeSuggestionIndex];
-    const atIndex = query.lastIndexOf('@');
-    if (atIndex === -1) return;
+    const trimmedQuery = query.trimStart();
 
-    // Find the part of the query after the '@'
-    const pathPart = query.substring(atIndex + 1);
-    // Find the last slash within that part
-    const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-
-    let base = '';
-    if (lastSlashIndexInPath === -1) {
-      // No slash after '@', replace everything after '@'
-      base = query.substring(0, atIndex + 1);
+    if (trimmedQuery.startsWith('/')) {
+      // Handle / command completion
+      const slashIndex = query.indexOf('/');
+      const base = query.substring(0, slashIndex + 1);
+      const newValue = base + selectedSuggestion.value;
+      setQuery(newValue);
     } else {
-      // Slash found, keep everything up to and including the last slash
-      base = query.substring(0, atIndex + 1 + lastSlashIndexInPath + 1);
+      // Handle @ command completion
+      const atIndex = query.lastIndexOf('@');
+      if (atIndex === -1) return;
+
+      // Find the part of the query after the '@'
+      const pathPart = query.substring(atIndex + 1);
+      // Find the last slash within that part
+      const lastSlashIndexInPath = pathPart.lastIndexOf('/');
+
+      let base = '';
+      if (lastSlashIndexInPath === -1) {
+        // No slash after '@', replace everything after '@'
+        base = query.substring(0, atIndex + 1);
+      } else {
+        // Slash found, keep everything up to and including the last slash
+        base = query.substring(0, atIndex + 1 + lastSlashIndexInPath + 1);
+      }
+
+      const newValue = base + selectedSuggestion.value;
+      setQuery(newValue);
     }
 
-    const newValue = base + selectedSuggestion.value;
-    setQuery(newValue);
     resetCompletion(); // Hide suggestions after selection
     setInputKey((k) => k + 1); // Increment key to force re-render and cursor reset
   }, [

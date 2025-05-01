@@ -26,7 +26,7 @@ import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { useCompletion } from './hooks/useCompletion.js';
 import { SuggestionsDisplay } from './components/SuggestionsDisplay.js';
-import { isAtCommand } from './utils/commandUtils.js';
+import { isAtCommand, isSlashCommand } from './utils/commandUtils.js';
 
 interface AppProps {
   config: Config;
@@ -96,7 +96,8 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
   const completion = useCompletion(
     query,
     config.getTargetDir(),
-    isInputActive && isAtCommand(query),
+    isInputActive && (isAtCommand(query) || isSlashCommand(query)),
+    slashCommands,
   );
 
   // --- Render Logic ---

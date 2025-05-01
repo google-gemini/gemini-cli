@@ -12,6 +12,8 @@ import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
+import { SlashCommand } from './slashCommandProcessor.js';
+
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
@@ -29,6 +31,7 @@ export function useCompletion(
   query: string,
   cwd: string,
   isActive: boolean,
+  slashCommands: SlashCommand[],
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
@@ -111,6 +114,26 @@ export function useCompletion(
       return;
     }
 
+    const trimmedQuery = query.trimStart(); // Trim leading whitespace
+
+    // --- Handle Slash Command Completion ---
+    if (trimmedQuery.startsWith('/')) {
+      const partialCommand = trimmedQuery.substring(1);
+      const filteredSuggestions = slashCommands
+        .map((cmd) => cmd.name)
+        .filter((name) => name.startsWith(partialCommand))
+        .map((name) => ({ label: name, value: name }))
+        .sort();
+
+      setSuggestions(filteredSuggestions);
+      setShowSuggestions(filteredSuggestions.length > 0);
+      setActiveSuggestionIndex(-1);
+      setVisibleStartIndex(0);
+      setIsLoadingSuggestions(false);
+      return;
+    }
+
+    // --- Handle At Command Completion ---
     const atIndex = query.lastIndexOf('@');
     if (atIndex === -1) {
       resetCompletionState();
