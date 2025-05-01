@@ -19,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function main() {
-  const config = loadCliConfig();
+  const config = await loadCliConfig();
   let input = config.getQuestion();
 
   // hop into sandbox if we are outside and sandboxing is enabled

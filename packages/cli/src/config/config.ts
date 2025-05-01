@@ -23,8 +23,8 @@ interface CliArgs {
   full_context: boolean | undefined;
 }
 
-function parseArguments(): CliArgs {
-  const argv = yargs(hideBin(process.argv))
+async function parseArguments(): Promise<CliArgs> {
+  const argv = await yargs(hideBin(process.argv))
     .option('model', {
       alias: 'm',
       type: 'string',
@@ -53,11 +53,11 @@ function parseArguments(): CliArgs {
     .help()
     .alias('h', 'help')
     .strict().argv;
-  return argv as unknown as CliArgs;
+  return argv;
 }
 
 // Renamed function for clarity
-export function loadCliConfig(): Config {
+export async function loadCliConfig(): Promise<Config> {
   // Load .env file using logic from server package
   loadEnvironment();
 
@@ -71,7 +71,7 @@ export function loadCliConfig(): Config {
   }
 
   // Parse CLI arguments
-  const argv = parseArguments();
+  const argv = await parseArguments();
 
   // Create config using factory from server package
   return createServerConfig(
