@@ -24,36 +24,19 @@ import { BaseTool, ToolResult } from '../tools/tools.js';
 const DEFAULT_PASSTHROUGH_COMMANDS = ['ls', 'git', 'npm'];
 
 export class Config {
-  private apiKey: string;
-  private model: string;
-  private sandbox: boolean | string;
-  private targetDir: string;
   private toolRegistry: ToolRegistry;
-  private debugMode: boolean;
-  private question: string | undefined;
-  private passthroughCommands: string[];
-  private fullContext: boolean;
 
   constructor(
-    apiKey: string,
-    model: string,
-    sandbox: boolean | string,
-    targetDir: string,
-    debugMode: boolean,
-    question: string,
-    passthroughCommands?: string[],
-    fullContext?: boolean,
+    private readonly apiKey: string,
+    private readonly model: string,
+    private readonly sandbox: boolean | string,
+    private readonly targetDir: string,
+    private readonly debugMode: boolean,
+    private readonly question: string | undefined, // Keep undefined possibility
+    private readonly passthroughCommands: string[] = DEFAULT_PASSTHROUGH_COMMANDS, // Default value here
+    private readonly fullContext: boolean = false, // Default value here
   ) {
-    this.apiKey = apiKey;
-    this.model = model;
-    this.sandbox = sandbox;
-    this.targetDir = targetDir;
-    this.debugMode = debugMode;
-    this.question = question;
-    this.passthroughCommands =
-      passthroughCommands || DEFAULT_PASSTHROUGH_COMMANDS;
-    this.fullContext = fullContext || false;
-
+    // toolRegistry still needs initialization based on the instance
     this.toolRegistry = createToolRegistry(this);
   }
 
@@ -89,7 +72,6 @@ export class Config {
   }
 
   getFullContext(): boolean {
-    // Added getter for fullContext
     return this.fullContext;
   }
 }
