@@ -37,9 +37,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
   private static readonly DEFAULT_MAX_LINES = 2000;
   private static readonly MAX_LINE_LENGTH = 2000;
-  private rootDirectory: string;
 
-  constructor(rootDirectory: string) {
+  constructor(private rootDirectory: string) {
     super(
       ReadFileTool.Name,
       'ReadFile',

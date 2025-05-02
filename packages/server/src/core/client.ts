@@ -23,7 +23,6 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js'; // Import ReadM
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
 export class GeminiClient {
-  private config: Config;
   private client: GoogleGenAI;
   private model: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -32,9 +31,8 @@ export class GeminiClient {
   };
   private readonly MAX_TURNS = 100;
 
-  constructor(config: Config) {
+  constructor(private config: Config) {
     this.client = new GoogleGenAI({ apiKey: config.getApiKey() });
-    this.config = config;
     this.model = config.getModel();
   }
 

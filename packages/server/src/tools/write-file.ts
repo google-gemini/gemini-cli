@@ -41,9 +41,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
   private shouldAlwaysWrite = false;
 
-  private readonly rootDirectory: string;
-
-  constructor(rootDirectory: string) {
+  constructor(private readonly rootDirectory: string) {
     super(
       WriteFileTool.Name,
       'WriteFile',

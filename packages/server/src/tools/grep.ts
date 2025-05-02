@@ -54,13 +54,11 @@ interface GrepMatch {
 export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   static readonly Name = 'search_file_content'; // Keep static name
 
-  private rootDirectory: string;
-
   /**
    * Creates a new instance of the GrepLogic
    * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
    */
-  constructor(rootDirectory: string) {
+  constructor(private rootDirectory: string) {
     super(
       GrepTool.Name,
       'SearchText',

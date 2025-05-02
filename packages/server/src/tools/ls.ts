@@ -62,16 +62,10 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
   static readonly Name = 'list_directory';
 
   /**
-   * The root directory that this tool is grounded in.
-   * All path operations will be restricted to this directory.
-   */
-  private rootDirectory: string;
-
-  /**
    * Creates a new instance of the LSLogic
    * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
    */
-  constructor(rootDirectory: string) {
+  constructor(private rootDirectory: string) {
     super(
       LSTool.Name,
       'ReadFolder',

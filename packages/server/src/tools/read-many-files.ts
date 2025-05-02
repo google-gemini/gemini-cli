@@ -116,14 +116,13 @@ export class ReadManyFilesTool extends BaseTool<
   ToolResult
 > {
   static readonly Name: string = 'read_many_files';
-  readonly targetDir: string;
 
   /**
    * Creates an instance of ReadManyFilesTool.
    * @param targetDir The absolute root directory within which this tool is allowed to operate.
    * All paths provided in `params` will be resolved relative to this directory.
    */
-  constructor(targetDir: string) {
+  constructor(readonly targetDir: string) {
     const parameterSchema: Record<string, unknown> = {
       type: 'object',
       properties: {

@@ -59,13 +59,11 @@ export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   static readonly Name = 'replace'; // Keep static name
   private shouldAlwaysEdit = false;
 
-  private readonly rootDirectory: string;
-
   /**
    * Creates a new instance of the EditLogic
    * @param rootDirectory Root directory to ground this tool in.
    */
-  constructor(rootDirectory: string) {
+  constructor(private readonly rootDirectory: string) {
     // Note: The description here mentions other tools like ReadFileTool/WriteFileTool
     // by name. This might need updating if those tool names change.
     super(

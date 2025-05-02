@@ -66,17 +66,10 @@ export const ansiTheme: ColorsTheme = {
 
 export class Theme {
   /**
-   * The user-facing name of the theme.
-   */
-  readonly name: string;
-
-  /**
    * The default foreground color for text when no specific highlight rule applies.
    * This is an Ink-compatible color string (hex or name).
    */
   readonly defaultColor: string;
-
-  readonly colors: ColorsTheme;
   /**
    * Stores the mapping from highlight.js class names (e.g., 'hljs-keyword')
    * to Ink-compatible color strings (hex or name).
@@ -256,13 +249,11 @@ export class Theme {
    * @param rawMappings The raw CSSProperties mappings from a react-syntax-highlighter theme object.
    */
   constructor(
-    name: string,
+    readonly name: string,
     rawMappings: Record<string, CSSProperties>,
-    colors: ColorsTheme,
+    readonly colors: ColorsTheme,
   ) {
-    this.name = name;
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
-    this.colors = colors;
 
     // Determine the default foreground color
     const rawDefaultColor = rawMappings['hljs']?.color;

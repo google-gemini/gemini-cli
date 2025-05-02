@@ -84,7 +84,6 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private readonly chat: Chat;
   private readonly availableTools: Map<string, ServerTool>; // Use passed-in tools
   private pendingToolCalls: Array<{
     callId: string;
@@ -95,8 +94,10 @@ export class Turn {
   private confirmationDetails: ToolCallConfirmationDetails[];
   private debugResponses: GenerateContentResponse[];
 
-  constructor(chat: Chat, availableTools: ServerTool[]) {
-    this.chat = chat;
+  constructor(
+    private readonly chat: Chat,
+    availableTools: ServerTool[],
+  ) {
     this.availableTools = new Map(availableTools.map((t) => [t.name, t]));
     this.pendingToolCalls = [];
     this.fnResponses = [];

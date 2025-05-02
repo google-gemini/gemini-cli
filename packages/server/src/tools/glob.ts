@@ -33,15 +33,10 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   static readonly Name = 'glob'; // Keep static name
 
   /**
-   * The root directory that this tool is grounded in.
-   */
-  private rootDirectory: string;
-
-  /**
    * Creates a new instance of the GlobLogic
    * @param rootDirectory Root directory to ground this tool in.
    */
-  constructor(rootDirectory: string) {
+  constructor(private rootDirectory: string) {
     super(
       GlobTool.Name,
       'FindFiles', // Display name handled by CLI wrapper

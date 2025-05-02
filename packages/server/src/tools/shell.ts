@@ -25,10 +25,9 @@ import { spawn } from 'child_process';
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'execute_bash_command';
-  private readonly config: Config;
   private whitelist: Set<string> = new Set();
 
-  constructor(config: Config) {
+  constructor(private readonly config: Config) {
     const toolDisplayName = 'Shell';
     const descriptionUrl = new URL('shell.md', import.meta.url);
     const toolDescription = fs.readFileSync(descriptionUrl, 'utf-8');
@@ -38,7 +37,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       toolDescription,
       toolParameterSchema,
     );
-    this.config = config;
   }
 
   getDescription(params: ShellToolParams): string {

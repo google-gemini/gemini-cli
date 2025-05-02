@@ -46,8 +46,6 @@ interface QueuedCommand {
 
 export class TerminalTool extends BaseTool<TerminalToolParams, ToolResult> {
   static Name: string = 'execute_bash_command';
-  private readonly rootDirectory: string;
-  private readonly outputLimit: number;
   private bashProcess: ChildProcessWithoutNullStreams | null = null;
   private currentCwd: string;
   private isExecuting: boolean = false;
@@ -58,12 +56,11 @@ export class TerminalTool extends BaseTool<TerminalToolParams, ToolResult> {
   private resolveShellReady: (() => void) | undefined;
   private rejectShellReady: ((reason?: unknown) => void) | undefined;
   private readonly backgroundTerminalAnalyzer: BackgroundTerminalAnalyzer;
-  private readonly config: Config;
 
   constructor(
-    rootDirectory: string,
-    config: Config,
-    outputLimit: number = MAX_OUTPUT_LENGTH,
+    private readonly rootDirectory: string,
+    private readonly config: Config,
+    private readonly outputLimit: number = MAX_OUTPUT_LENGTH,
   ) {
     const toolDisplayName = 'Terminal';
     const toolDescription = `Executes one or more bash commands sequentially in a secure and persistent interactive shell session. Can run commands in the foreground (waiting for completion) or background (returning after launch, with subsequent status polling).
@@ -131,7 +128,6 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
       toolDescription,
       toolParameterSchema,
     );
-    this.config = config;
     this.rootDirectory = path.resolve(rootDirectory);
     this.currentCwd = this.rootDirectory;
     this.outputLimit = outputLimit;
