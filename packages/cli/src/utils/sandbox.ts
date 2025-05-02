@@ -83,7 +83,17 @@ export async function start_sandbox(sandbox: string) {
     } else {
       console.log('building sandbox ...');
       const gcRoot = gcPath.split('/packages/')[0];
-      spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh`, {
+      // if project folder has sandbox.Dockerfile under project settings folder, use that
+      let buildArgs = '';
+      const projectSandboxDockerfile = path.join(
+        SETTINGS_DIRECTORY_NAME,
+        'sandbox.Dockerfile',
+      );
+      if (fs.existsSync(projectSandboxDockerfile)) {
+        console.log(`using ${projectSandboxDockerfile} for sandbox`);
+        buildArgs += `-f ${path.resolve(projectSandboxDockerfile)}`;
+      }
+      spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
         stdio: 'inherit',
         shell: true,
       });
@@ -264,6 +274,15 @@ export async function start_sandbox(sandbox: string) {
   }
   if (pythonPathSuffix) {
     bashCmd += `export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}"; `; // suffix includes leading ':'
+  }
+
+  // source sandbox.bashrc if exists under project settings directory
+  const projectSandboxBashrc = path.join(
+    SETTINGS_DIRECTORY_NAME,
+    'sandbox.bashrc',
+  );
+  if (fs.existsSync(projectSandboxBashrc)) {
+    bashCmd += `source ${projectSandboxBashrc}; `;
   }
 
   // open additional ports if SANDBOX_PORTS is set

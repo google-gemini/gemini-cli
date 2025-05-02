@@ -27,17 +27,21 @@ IMAGE=gemini-code-sandbox
 DOCKERFILE=Dockerfile
 
 SKIP_NPM_INSTALL_BUILD=false
-while getopts "sd" opt; do
+while getopts "sdf:" opt; do
     case ${opt} in
     s) SKIP_NPM_INSTALL_BUILD=true ;;
     d)
         DOCKERFILE=Dockerfile-dev
         IMAGE+="-dev"
         ;;
+    f)
+        DOCKERFILE=$OPTARG
+        ;;
     \?)
-        echo "usage: $(basename "$0") [-s] [-d]"
+        echo "usage: $(basename "$0") [-s] [-d] [-f <dockerfile>]"
         echo "  -s: skip npm install + npm run build"
-        echo "  -d: build dev image (using Dockerfile-dev)"
+        echo "  -d: build dev image (use Dockerfile-dev)"
+        echo "  -f <dockerfile>: use <dockerfile>"
         exit 1
         ;;
     esac
