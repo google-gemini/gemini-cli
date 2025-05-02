@@ -53,10 +53,10 @@ interface CalculatedEdit {
 }
 
 /**
- * Implementation of the Edit tool logic (moved from CLI)
+ * Implementation of the Edit tool logic
  */
 export class EditTool extends BaseTool<EditToolParams, ToolResult> {
-  static readonly Name = 'replace'; // Keep static name
+  static readonly Name = 'replace';
   private shouldAlwaysEdit = false;
 
   /**
@@ -371,7 +371,7 @@ export class EditTool extends BaseTool<EditToolParams, ToolResult> {
           editData.newContent,
           'Current',
           'Proposed',
-          { context: 3 }, // Removed ignoreWhitespace for potentially more accurate display diff
+          { context: 3 },
         );
         displayResult = { fileDiff };
       }

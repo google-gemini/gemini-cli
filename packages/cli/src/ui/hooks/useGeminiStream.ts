@@ -27,12 +27,12 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
-import { isAtCommand } from '../utils/commandUtils.js'; // Import the @ command checker
+import { isAtCommand } from '../utils/commandUtils.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { usePassthroughProcessor } from './passthroughCommandProcessor.js';
-import { handleAtCommand } from './atCommandProcessor.js'; // Import the @ command handler
-import { findSafeSplitPoint } from '../utils/markdownUtilities.js'; // Import the split point finder
+import { handleAtCommand } from './atCommandProcessor.js';
+import { findSafeSplitPoint } from '../utils/markdownUtilities.js';
 
 const addHistoryItem = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,

@@ -17,7 +17,7 @@ interface InputPromptProps {
   setInputKey: React.Dispatch<React.SetStateAction<number>>;
   onSubmit: (value: string) => void;
   showSuggestions: boolean;
-  suggestions: Suggestion[]; // Changed to Suggestion[]
+  suggestions: Suggestion[];
   activeSuggestionIndex: number;
   navigateUp: () => void;
   navigateDown: () => void;

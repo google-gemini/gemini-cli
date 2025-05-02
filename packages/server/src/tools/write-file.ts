@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import * as Diff from 'diff'; // Keep for result generation
+import * as Diff from 'diff';
 import {
   BaseTool,
   ToolResult,
@@ -14,11 +14,10 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
-} from './tools.js'; // Updated import (Removed ToolResultDisplay)
+} from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js'; // Updated import
 import { makeRelative, shortenPath } from '../utils/paths.js'; // Updated import
-import { isNodeError } from '../utils/errors.js'; // Import isNodeError
-
+import { isNodeError } from '../utils/errors.js';
 /**
  * Parameters for the WriteFile tool
  */
@@ -35,7 +34,7 @@ export interface WriteFileToolParams {
 }
 
 /**
- * Implementation of the WriteFile tool logic (moved from CLI)
+ * Implementation of the WriteFile tool logic
  */
 export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
@@ -49,7 +48,6 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       {
         properties: {
           file_path: {
-            // Renamed from filePath in original schema
             description:
               "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
             type: 'string',
@@ -59,7 +57,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
             type: 'string',
           },
         },
-        required: ['file_path', 'content'], // Use correct param names
+        required: ['file_path', 'content'],
         type: 'object',
       },
     );
@@ -97,15 +95,13 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     return null;
   }
 
-  // Removed shouldConfirmExecute - handled by CLI
-
   getDescription(params: WriteFileToolParams): string {
     const relativePath = makeRelative(params.file_path, this.rootDirectory);
     return `Writing to ${shortenPath(relativePath)}`;
   }
 
   /**
-   * Handles the confirmation prompt for the WriteFile tool in the CLI.
+   * Handles the confirmation prompt for the WriteFile tool.
    */
   async shouldConfirmExecute(
     params: WriteFileToolParams,
@@ -203,7 +199,6 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         ? `Successfully created and wrote to new file: ${params.file_path}`
         : `Successfully overwrote file: ${params.file_path}`;
 
-      // The returnDisplay contains the diff
       const displayResult: FileDiff = { fileDiff };
 
       return {
@@ -218,6 +213,4 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       };
     }
   }
-
-  // ensureParentDirectoriesExist logic moved into execute
 }

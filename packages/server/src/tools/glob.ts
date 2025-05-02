@@ -27,11 +27,10 @@ export interface GlobToolParams {
 }
 
 /**
- * Implementation of the Glob tool logic (moved from CLI)
+ * Implementation of the Glob tool logic
  */
 export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
-  static readonly Name = 'glob'; // Keep static name
-
+  static readonly Name = 'glob';
   /**
    * Creates a new instance of the GlobLogic
    * @param rootDirectory Root directory to ground this tool in.
@@ -39,8 +38,8 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   constructor(private rootDirectory: string) {
     super(
       GlobTool.Name,
-      'FindFiles', // Display name handled by CLI wrapper
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.', // Description handled by CLI wrapper
+      'FindFiles',
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
       {
         properties: {
           pattern: {

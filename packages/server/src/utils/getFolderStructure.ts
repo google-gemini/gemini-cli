@@ -66,7 +66,6 @@ async function readFullStructure(
   options: MergedFolderStructureOptions,
 ): Promise<FullFolderInfo | null> {
   const name = path.basename(folderPath);
-  // Initialize with isIgnored: false
   const folderInfo: Omit<FullFolderInfo, 'totalChildren' | 'totalFiles'> = {
     name,
     path: folderPath,
@@ -97,7 +96,7 @@ async function readFullStructure(
             subFolders: [],
             totalChildren: 0, // No children explored
             totalFiles: 0, // No files explored
-            isIgnored: true, // Mark as ignored
+            isIgnored: true,
           };
           folderInfo.subFolders.push(ignoredFolderInfo);
           // Skip recursion for this folder
@@ -122,7 +121,6 @@ async function readFullStructure(
     for (const entry of entries) {
       if (entry.isFile()) {
         const fileName = entry.name;
-        // Include if no pattern or if pattern matches
         if (
           !options.fileIncludePattern ||
           options.fileIncludePattern.test(fileName)
@@ -156,7 +154,7 @@ async function readFullStructure(
   }
 
   return {
-    ...(folderInfo as FullFolderInfo), // Cast needed after conditional assignment check
+    ...folderInfo,
     totalChildren: totalChildrenCount,
     totalFiles: totalFileCount,
   };
@@ -285,7 +283,6 @@ function countReducedItems(node: ReducedFolderNode): number {
 
 /**
  * Formats the reduced folder structure into a tree-like string.
- * (No changes needed in this function)
  * @param node The current node in the reduced structure.
  * @param indent The current indentation string.
  * @param isLast Sibling indicator.

@@ -6,7 +6,6 @@
 
 /**
  * Simple utility to validate objects against JSON Schemas
- * In a real implementation, you would use a library like Ajv
  */
 export class SchemaValidator {
   /**

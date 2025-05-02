@@ -12,14 +12,12 @@ import {
   FunctionCall,
   FunctionDeclaration,
 } from '@google/genai';
-// Removed UI type imports
 import {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
-} from '../tools/tools.js'; // Keep ToolResult for now
+} from '../tools/tools.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
-// Removed gemini-stream import (types defined locally)
 
 // --- Types for Server Logic ---
 
@@ -27,7 +25,7 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 interface ServerToolExecutionOutcome {
   callId: string;
   name: string;
-  args: Record<string, unknown>; // Use unknown for broader compatibility
+  args: Record<string, unknown>;
   result?: ToolResult;
   error?: Error;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
@@ -36,16 +34,14 @@ interface ServerToolExecutionOutcome {
 // Define a structure for tools passed to the server
 export interface ServerTool {
   name: string;
-  schema: FunctionDeclaration; // Schema is needed
+  schema: FunctionDeclaration;
   // The execute method signature might differ slightly or be wrapped
   execute(params: Record<string, unknown>): Promise<ToolResult>;
   shouldConfirmExecute(
     params: Record<string, unknown>,
   ): Promise<ToolCallConfirmationDetails | false>;
-  // validation and description might be handled differently or passed
 }
 
-// Redefine necessary event types locally
 export enum GeminiEventType {
   Content = 'content',
   ToolCallRequest = 'tool_call_request',
@@ -80,15 +76,13 @@ export type ServerGeminiStreamEvent =
       value: ServerToolCallConfirmationDetails;
     };
 
-// --- Turn Class (Refactored for Server) ---
-
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private readonly availableTools: Map<string, ServerTool>; // Use passed-in tools
+  private readonly availableTools: Map<string, ServerTool>;
   private pendingToolCalls: Array<{
     callId: string;
     name: string;
-    args: Record<string, unknown>; // Use unknown
+    args: Record<string, unknown>;
   }>;
   private fnResponses: Part[];
   private confirmationDetails: ToolCallConfirmationDetails[];
@@ -206,7 +200,6 @@ export class Turn {
     }
   }
 
-  // Generates a ToolCallRequest event to signal the need for execution
   private handlePendingFunctionCall(
     fnCall: FunctionCall,
   ): ServerGeminiStreamEvent | null {
@@ -257,12 +250,10 @@ export class Turn {
     return this.confirmationDetails;
   }
 
-  // Allows the service layer to get the responses needed for the next API call
   getFunctionResponses(): Part[] {
     return this.fnResponses;
   }
 
-  // Debugging information (optional)
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
   }

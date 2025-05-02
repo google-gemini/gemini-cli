@@ -12,7 +12,6 @@ import { promises as fs } from 'fs';
 import { exec as _exec } from 'child_process';
 import { promisify } from 'util';
 
-// Define the AnalysisStatus type alias
 type AnalysisStatus =
   | 'Running'
   | 'SuccessReported'
@@ -20,7 +19,6 @@ type AnalysisStatus =
   | 'Unknown'
   | 'AnalysisFailed';
 
-// Promisify child_process.exec for easier async/await usage
 const execAsync = promisify(_exec);
 
 // Identifier for the background process (e.g., PID)
@@ -33,20 +31,17 @@ export interface AnalysisResult {
   inferredStatus: 'Running' | 'SuccessReported' | 'ErrorReported' | 'Unknown';
 }
 
-// Represents the structure returned when the LLM analysis itself fails
 export interface AnalysisFailure {
   error: string;
   inferredStatus: 'AnalysisFailed';
 }
 
-// Type guard to check if the result is a failure object
 function isAnalysisFailure(
   result: AnalysisResult | AnalysisFailure,
 ): result is AnalysisFailure {
   return (result as AnalysisFailure).inferredStatus === 'AnalysisFailed';
 }
 
-// Represents the final outcome after polling is complete (or failed/timed out)
 export interface FinalAnalysisOutcome {
   status: string; // e.g., 'Completed_SuccessReported', 'TimedOut_Running', 'AnalysisFailed'
   summary: string; // Final summary or error message
@@ -60,7 +55,7 @@ export class BackgroundTerminalAnalyzer {
   private initialDelayMs: number;
 
   constructor(
-    config: Config, // Accept Config object
+    config: Config,
     options: {
       pollIntervalMs?: number;
       maxAttempts?: number;
@@ -68,7 +63,6 @@ export class BackgroundTerminalAnalyzer {
     } = {},
   ) {
     try {
-      // Initialize Gemini client using config
       this.geminiClient = new GeminiClient(config);
     } catch (error) {
       console.error(
@@ -262,7 +256,6 @@ export class BackgroundTerminalAnalyzer {
     return { status: finalStatus, summary: finalSummary };
   }
 
-  // --- Actual Implementation of isProcessRunning ---
   /**
    * Checks if the background process is still running using OS-specific methods.
    * @param pid Process handle/identifier (expects a number for standard checks).
@@ -312,7 +305,6 @@ export class BackgroundTerminalAnalyzer {
     }
   }
 
-  // --- LLM Analysis Method (largely unchanged but added validation robustness) ---
   private async performLlmAnalysis(
     stdoutContent: string,
     stderrContent: string,
@@ -433,7 +425,6 @@ Based *only* on the provided stdout and stderr:
         'Unknown',
       ];
 
-      // Cast the unknown value to string before checking with includes
       const statusString = resultJson?.inferredStatus as string;
       const inferredStatus = validStatuses.includes(
         statusString as Exclude<AnalysisStatus, 'AnalysisFailed'>,
@@ -441,15 +432,13 @@ Based *only* on the provided stdout and stderr:
         ? (statusString as Exclude<AnalysisStatus, 'AnalysisFailed'>)
         : 'Unknown';
 
-      // Explicitly construct the object matching AnalysisResult type
       const analysisResult: AnalysisResult = { summary, inferredStatus };
       return analysisResult;
     } catch (error: unknown) {
       console.error(`LLM Analysis Request Failed for PID ${pid}:`, error);
-      // Return the AnalysisFailure type
       const analysisFailure: AnalysisFailure = {
         error: `[Analysis failed: ${getErrorMessage(error)}]`,
-        inferredStatus: 'AnalysisFailed', // This matches the AnalysisStatus type
+        inferredStatus: 'AnalysisFailed',
       };
       return analysisFailure;
     }

@@ -12,12 +12,10 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   } else {
-    // Attempt to convert the non-Error value to a string for logging
     try {
       const errorMessage = String(error);
       return errorMessage;
     } catch {
-      // If String() itself fails (highly unlikely)
       return 'Failed to get error details';
     }
   }

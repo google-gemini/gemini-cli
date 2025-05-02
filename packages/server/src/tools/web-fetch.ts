@@ -19,7 +19,7 @@ export interface WebFetchToolParams {
 }
 
 /**
- * Implementation of the WebFetch tool logic (moved from CLI)
+ * Implementation of the WebFetch tool logic
  */
 export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
   static readonly Name: string = 'web_fetch';
@@ -70,8 +70,6 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     return `Fetching content from ${displayUrl}`;
   }
 
-  // Removed shouldConfirmExecute - handled by CLI
-
   async execute(params: WebFetchToolParams): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
@@ -86,10 +84,9 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     try {
       const response = await fetch(url, {
         headers: {
-          // Identify the client making the request
           'User-Agent': 'GeminiCode-ServerLogic/1.0',
         },
-        signal: AbortSignal.timeout(15000), // Use AbortSignal for timeout
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!response.ok) {

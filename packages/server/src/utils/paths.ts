@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path'; // Import the 'path' module
+import path from 'node:path';
 
 /**
  * Shortens a path string if it exceeds maxLen, prioritizing the start and end segments.

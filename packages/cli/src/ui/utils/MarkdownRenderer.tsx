@@ -24,7 +24,6 @@ export class MarkdownRenderer {
   private static _renderInline(text: string): React.ReactNode[] {
     const nodes: React.ReactNode[] = [];
     let lastIndex = 0;
-    // UPDATED Regex: Added <u>.*?<\/u> pattern
     const inlineRegex =
       /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>)/g;
     let match;

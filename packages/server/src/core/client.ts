@@ -19,7 +19,7 @@ import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { Turn, ServerGeminiStreamEvent } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js'; // Import ReadManyFilesTool
+import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
 export class GeminiClient {

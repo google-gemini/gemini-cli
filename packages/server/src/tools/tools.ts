@@ -5,7 +5,6 @@
  */
 
 import { FunctionDeclaration, Schema } from '@google/genai';
-// Removed import for ../ui/types.js as confirmation is UI-specific
 
 /**
  * Interface representing the base Tool functionality

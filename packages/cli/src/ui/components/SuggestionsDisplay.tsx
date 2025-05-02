@@ -48,12 +48,7 @@ export function SuggestionsDisplay({
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
   return (
-    <Box
-      borderStyle="round"
-      flexDirection="column"
-      paddingX={1}
-      width={width} // Use the passed width
-    >
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width={width}>
       {scrollOffset > 0 && <Text color="gray">▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {

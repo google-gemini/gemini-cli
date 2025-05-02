@@ -66,9 +66,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             )}
         </Box>
       ))}
-      {/* Optional: Add padding below the last item if needed,
-                though ToolMessage already has some vertical space implicitly */}
-      {/* {tools.length > 0 && <Box height={1} />} */}
     </Box>
   );
 };
