@@ -6,9 +6,12 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-
+export interface Suggestion {
+  label: string;
+  value: string;
+}
 interface SuggestionsDisplayProps {
-  suggestions: string[];
+  suggestions: Suggestion[];
   activeIndex: number;
   isLoading: boolean;
   width: number;
@@ -62,7 +65,7 @@ export function SuggestionsDisplay({
             color={isActive ? 'black' : 'white'}
             backgroundColor={isActive ? 'blue' : undefined}
           >
-            {suggestion}
+            {suggestion.label}
           </Text>
         );
       })}

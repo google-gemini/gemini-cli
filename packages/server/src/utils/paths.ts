@@ -100,3 +100,26 @@ export function makeRelative(
   // If the paths are the same, path.relative returns '', return '.' instead
   return relativePath || '.';
 }
+
+/**
+ * Escapes spaces in a file path.
+ */
+export function escapePath(filePath: string): string {
+  let result = '';
+  for (let i = 0; i < filePath.length; i++) {
+    // Only escape spaces that are not already escaped.
+    if (filePath[i] === ' ' && (i === 0 || filePath[i - 1] !== '\\')) {
+      result += '\\ ';
+    } else {
+      result += filePath[i];
+    }
+  }
+  return result;
+}
+
+/**
+ * Unescapes spaces in a file path.
+ */
+export function unescapePath(filePath: string): string {
+  return filePath.replace(/\\ /g, ' ');
+}

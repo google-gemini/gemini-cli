@@ -8,6 +8,7 @@ import React, { useCallback } from 'react';
 import { Text, Box, useInput, useFocus, Key } from 'ink';
 import TextInput from 'ink-text-input';
 import { Colors } from '../colors.js';
+import { Suggestion } from './SuggestionsDisplay.js';
 
 interface InputPromptProps {
   query: string;
@@ -16,7 +17,7 @@ interface InputPromptProps {
   setInputKey: React.Dispatch<React.SetStateAction<number>>;
   onSubmit: (value: string) => void;
   showSuggestions: boolean;
-  suggestions: string[];
+  suggestions: Suggestion[]; // Changed to Suggestion[]
   activeSuggestionIndex: number;
   navigateUp: () => void;
   navigateDown: () => void;
@@ -63,7 +64,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       base = query.substring(0, atIndex + 1 + lastSlashIndexInPath + 1);
     }
 
-    const newValue = base + selectedSuggestion;
+    const newValue = base + selectedSuggestion.value;
     setQuery(newValue);
     resetCompletion(); // Hide suggestions after selection
     setInputKey((k) => k + 1); // Increment key to force re-render and cursor reset

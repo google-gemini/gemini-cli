@@ -7,7 +7,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PartListUnion } from '@google/genai';
-import { Config, getErrorMessage, isNodeError } from '@gemini-code/server';
+import {
+  Config,
+  getErrorMessage,
+  isNodeError,
+  unescapePath,
+} from '@gemini-code/server';
 import {
   HistoryItem,
   IndividualToolCallDisplay,
@@ -40,6 +45,54 @@ interface HandleAtCommandResult {
 }
 
 /**
+ * Parses a query string to find the first '@<path>' command,
+ * handling \ escaped spaces within the path.
+ */
+function parseAtCommand(
+  query: string,
+): { textBefore: string; atPath: string; textAfter: string } | null {
+  let atIndex = -1;
+  for (let i = 0; i < query.length; i++) {
+    // Find the first '@' that is not preceded by a '\'
+    if (query[i] === '@' && (i === 0 || query[i - 1] !== '\\')) {
+      atIndex = i;
+      break;
+    }
+  }
+
+  if (atIndex === -1) {
+    return null; // No '@' command found
+  }
+
+  const textBefore = query.substring(0, atIndex).trim();
+  let pathEndIndex = atIndex + 1;
+  let inEscape = false;
+
+  while (pathEndIndex < query.length) {
+    const char = query[pathEndIndex];
+
+    if (inEscape) {
+      // Current char is escaped, move past it
+      inEscape = false;
+    } else if (char === '\\') {
+      // Start of an escape sequence
+      inEscape = true;
+    } else if (/\s/.test(char)) {
+      // Unescaped whitespace marks the end of the path
+      break;
+    }
+    pathEndIndex++;
+  }
+
+  const rawAtPath = query.substring(atIndex, pathEndIndex);
+  const textAfter = query.substring(pathEndIndex).trim();
+
+  const atPath = unescapePath(rawAtPath);
+
+  return { textBefore, atPath, textAfter };
+}
+
+/**
  * Processes user input potentially containing an '@<path>' command.
  * It finds the first '@<path>', checks if the path is a file or directory,
  * prepares the appropriate path specification for the read_many_files tool,
@@ -58,25 +111,50 @@ export async function handleAtCommand({
   userMessageTimestamp,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
   const trimmedQuery = query.trim();
+  const parsedCommand = parseAtCommand(trimmedQuery);
 
-  const atCommandRegex = /^(.*?)(@\S+)(.*)$/s;
-  const match = trimmedQuery.match(atCommandRegex);
-
-  if (!match) {
+  if (!parsedCommand) {
+    // If no '@' was found, treat the whole query as user text and proceed
+    // This allows users to just type text without an @ command
+    addHistoryItem(
+      setHistory,
+      { type: 'user', text: query },
+      userMessageTimestamp,
+    );
+    // Let the main hook decide what to do (likely send to LLM)
+    return { processedQuery: [{ text: query }], shouldProceed: true };
+    // Or, if an @ command is *required* when the function is called:
+    /*
     const errorTimestamp = getNextMessageId(userMessageTimestamp);
     addHistoryItem(
       setHistory,
-      { type: 'error', text: 'Error: Could not parse @ command.' },
+      { type: 'error', text: 'Error: Could not find @ command.' },
+      errorTimestamp,
+    );
+    return { processedQuery: null, shouldProceed: false };
+    */
+  }
+
+  const { textBefore, atPath, textAfter } = parsedCommand;
+
+  // Add the original user query to history *before* processing
+  addHistoryItem(
+    setHistory,
+    { type: 'user', text: query },
+    userMessageTimestamp,
+  );
+
+  const pathPart = atPath.substring(1); // Remove the leading '@'
+
+  if (!pathPart) {
+    const errorTimestamp = getNextMessageId(userMessageTimestamp);
+    addHistoryItem(
+      setHistory,
+      { type: 'error', text: 'Error: No path specified after @.' },
       errorTimestamp,
     );
     return { processedQuery: null, shouldProceed: false };
   }
-
-  const textBefore = match[1].trim();
-  const atPath = match[2];
-  const textAfter = match[3].trim();
-
-  const pathPart = atPath.substring(1);
 
   addHistoryItem(
     setHistory,

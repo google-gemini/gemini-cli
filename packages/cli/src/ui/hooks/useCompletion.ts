@@ -7,11 +7,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { isNodeError } from '@gemini-code/server';
-import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
-
+import { isNodeError, escapePath, unescapePath } from '@gemini-code/server';
+import {
+  MAX_SUGGESTIONS_TO_SHOW,
+  Suggestion,
+} from '../components/SuggestionsDisplay.js';
 export interface UseCompletionReturn {
-  suggestions: string[];
+  suggestions: Suggestion[];
   activeSuggestionIndex: number;
   visibleStartIndex: number;
   showSuggestions: boolean;
@@ -28,7 +30,7 @@ export function useCompletion(
   cwd: string,
   isActive: boolean,
 ): UseCompletionReturn {
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
     useState<number>(-1);
   const [visibleStartIndex, setVisibleStartIndex] = useState<number>(0);
@@ -121,10 +123,12 @@ export function useCompletion(
       lastSlashIndex === -1
         ? '.'
         : partialPath.substring(0, lastSlashIndex + 1);
-    const prefix =
+    const prefix = unescapePath(
       lastSlashIndex === -1
         ? partialPath
-        : partialPath.substring(lastSlashIndex + 1);
+        : partialPath.substring(lastSlashIndex + 1),
+    );
+
     const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
 
     let isMounted = true;
@@ -144,7 +148,11 @@ export function useCompletion(
             if (aIsDir && !bIsDir) return -1;
             if (!aIsDir && bIsDir) return 1;
             return a.localeCompare(b);
-          });
+          })
+          .map((entry) => ({
+            label: entry,
+            value: escapePath(entry),
+          }));
 
         if (isMounted) {
           setSuggestions(filteredSuggestions);
