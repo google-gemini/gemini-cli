@@ -103,7 +103,7 @@ export async function start_sandbox(sandbox: string) {
   // run init binary inside container to forward signals & reap zombies
   const args = ['run', '-it', '--rm', '--init', '--workdir', workdir];
 
-  // mount current directory as ${workdir} inside container
+  // mount current directory as working directory in sandbox (set via --workdir)
   args.push('--volume', `${process.cwd()}:${workdir}`);
 
   // mount user settings directory inside container, after creating if missing
@@ -195,6 +195,32 @@ export async function start_sandbox(sandbox: string) {
     args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
   }
 
+  // copy any paths in PATH that are under working directory in sandbox
+  // note we can't just pass these as --env since that would override base PATH
+  // instead we construct a suffix and append as part of bashCmd below
+  let pathSuffix = '';
+  if (process.env.PATH) {
+    const paths = process.env.PATH.split(':');
+    for (const path of paths) {
+      if (path.startsWith(workdir)) {
+        pathSuffix += `:${path}`;
+      }
+    }
+  }
+
+  // copy any paths in PYTHONPATH that are under working directory in sandbox
+  // note we can't just pass these as --env since that would override base PYTHONPATH
+  // instead we construct a suffix and append as part of bashCmd below
+  let pythonPathSuffix = '';
+  if (process.env.PYTHONPATH) {
+    const paths = process.env.PYTHONPATH.split(':');
+    for (const path of paths) {
+      if (path.startsWith(workdir)) {
+        pythonPathSuffix += `:${path}`;
+      }
+    }
+  }
+
   // copy additional environment variables from SANDBOX_ENV
   if (process.env.SANDBOX_ENV) {
     for (let env of process.env.SANDBOX_ENV.split(',')) {
@@ -230,9 +256,18 @@ export async function start_sandbox(sandbox: string) {
     nodeArgs.push(`--inspect-brk=0.0.0.0:${debugPort}`);
   }
 
+  // set up bash command to be run inside container
+  // start with setting up PATH and PYTHONPATH with optional suffixes from host
+  let bashCmd = '';
+  if (pathSuffix) {
+    bashCmd += `export PATH="$PATH${pathSuffix}"; `; // suffix includes leading ':'
+  }
+  if (pythonPathSuffix) {
+    bashCmd += `export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}"; `; // suffix includes leading ':'
+  }
+
   // open additional ports if SANDBOX_PORTS is set
   // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
-  let bashCmd = '';
   if (process.env.SANDBOX_PORTS) {
     for (let port of process.env.SANDBOX_PORTS.split(',')) {
       if ((port = port.trim())) {

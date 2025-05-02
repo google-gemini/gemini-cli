@@ -31,6 +31,16 @@ while getopts ":q" opt; do
 done
 shift $((OPTIND - 1))
 
+# if GEMINI_CODE_SANDBOX is not set, see if it is set in user settings
+# note it can be string or boolean, and if missing jq will return null
+USER_SETTINGS_FILE=~/.gemini/settings.json
+if [ -z "${GEMINI_CODE_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
+    USER_SANDBOX_SETTING=$(jq -r '.sandbox' "$USER_SETTINGS_FILE")
+    if [ "$USER_SANDBOX_SETTING" != null ]; then
+        GEMINI_CODE_SANDBOX=$USER_SANDBOX_SETTING
+    fi
+fi
+
 # if GEMINI_CODE_SANDBOX is not set, try to source .env in case set there
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
 if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
