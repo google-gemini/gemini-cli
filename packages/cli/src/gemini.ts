@@ -21,24 +21,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function main() {
-  const config = await loadCliConfig();
-  const settings = loadSettings(config);
-  const theme = settings.getMerged().theme;
-  if (theme) {
-    themeManager.setActiveTheme(theme);
+  const settings = loadSettings(process.cwd());
+  const config = await loadCliConfig(settings.merged);
+  if (settings.merged.theme) {
+    themeManager.setActiveTheme(settings.merged.theme);
   }
-
-  let input = config.getQuestion();
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
-    const sandbox = sandbox_command();
+    const sandbox = sandbox_command(config.getSandbox());
     if (sandbox) {
       console.log('hopping into sandbox ...');
       await start_sandbox(sandbox);
       process.exit(0);
     }
   }
+
+  let input = config.getQuestion();
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {

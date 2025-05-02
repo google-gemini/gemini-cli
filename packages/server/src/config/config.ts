@@ -26,6 +26,7 @@ const DEFAULT_PASSTHROUGH_COMMANDS = ['ls', 'git', 'npm'];
 export class Config {
   private apiKey: string;
   private model: string;
+  private sandbox: boolean | string;
   private targetDir: string;
   private toolRegistry: ToolRegistry;
   private debugMode: boolean;
@@ -36,6 +37,7 @@ export class Config {
   constructor(
     apiKey: string,
     model: string,
+    sandbox: boolean | string,
     targetDir: string,
     debugMode: boolean,
     question: string,
@@ -44,6 +46,7 @@ export class Config {
   ) {
     this.apiKey = apiKey;
     this.model = model;
+    this.sandbox = sandbox;
     this.targetDir = targetDir;
     this.debugMode = debugMode;
     this.question = question;
@@ -60,6 +63,10 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getSandbox(): boolean | string {
+    return this.sandbox;
   }
 
   getTargetDir(): string {
@@ -113,6 +120,7 @@ export function loadEnvironment(): void {
 export function createServerConfig(
   apiKey: string,
   model: string,
+  sandbox: boolean | string,
   targetDir: string,
   debugMode: boolean,
   question: string,
@@ -122,6 +130,7 @@ export function createServerConfig(
   return new Config(
     apiKey,
     model,
+    sandbox,
     path.resolve(targetDir),
     debugMode,
     question,

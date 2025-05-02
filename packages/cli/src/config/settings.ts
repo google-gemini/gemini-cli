@@ -7,7 +7,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { Config } from '@gemini-code/server';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -20,6 +19,7 @@ export enum SettingScope {
 
 export interface Settings {
   theme?: string;
+  sandbox?: boolean | string;
   // Add other settings here.
 }
 
@@ -31,16 +31,16 @@ export class LoadedSettings {
   constructor(user: SettingsFile, workspace: SettingsFile) {
     this.user = user;
     this.workspace = workspace;
-    this.merged = this.computeMergedSettings();
+    this._merged = this.computeMergedSettings();
   }
 
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
 
-  private merged: Settings;
+  private _merged: Settings;
 
-  getMerged(): Settings {
-    return this.merged;
+  get merged(): Settings {
+    return this._merged;
   }
 
   private computeMergedSettings(): Settings {
@@ -68,16 +68,16 @@ export class LoadedSettings {
   ): void {
     const settingsFile = this.forScope(scope);
     settingsFile.settings[key] = value;
-    this.merged = this.computeMergedSettings();
+    this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
   }
 }
 
 /**
- * Loads settings from user and project configuration files.
+ * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
-export function loadSettings(config: Config): LoadedSettings {
+export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings = {};
 
@@ -92,7 +92,7 @@ export function loadSettings(config: Config): LoadedSettings {
   }
 
   const workspaceSettingsPath = path.join(
-    config.getTargetDir(),
+    workspaceDir,
     SETTINGS_DIRECTORY_NAME,
     'settings.json',
   );

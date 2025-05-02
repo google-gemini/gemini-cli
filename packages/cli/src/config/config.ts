@@ -12,12 +12,14 @@ import {
   loadEnvironment,
   createServerConfig,
 } from '@gemini-code/server';
+import { Settings } from './settings.js';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 
 // Keep CLI-specific argument parsing
 interface CliArgs {
   model: string | undefined;
+  sandbox: boolean | string | undefined;
   debug_mode: boolean | undefined;
   question: string | undefined;
   full_context: boolean | undefined;
@@ -30,6 +32,12 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: `The Gemini model to use. Defaults to ${DEFAULT_GEMINI_MODEL}.`,
       default: process.env.GEMINI_CODE_MODEL || DEFAULT_GEMINI_MODEL,
+    })
+    .option('sandbox', {
+      alias: 's',
+      type: 'boolean',
+      description: 'Whether to run in sandbox mode. Defaults to false.',
+      default: false,
     })
     .option('debug_mode', {
       alias: 'z',
@@ -57,7 +65,7 @@ async function parseArguments(): Promise<CliArgs> {
 }
 
 // Renamed function for clarity
-export async function loadCliConfig(): Promise<Config> {
+export async function loadCliConfig(settings: Settings): Promise<Config> {
   // Load .env file using logic from server package
   loadEnvironment();
 
@@ -77,6 +85,7 @@ export async function loadCliConfig(): Promise<Config> {
   return createServerConfig(
     process.env.GEMINI_API_KEY,
     argv.model || DEFAULT_GEMINI_MODEL,
+    argv.sandbox ?? settings.sandbox ?? false,
     process.cwd(),
     argv.debug_mode || false,
     argv.question || '',

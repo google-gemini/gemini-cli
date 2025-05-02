@@ -22,7 +22,7 @@ export const useThemeCommand = (
   loadedSettings: LoadedSettings, // Changed parameter
 ): UseThemeCommandReturn => {
   // Determine the effective theme
-  const effectiveTheme = loadedSettings.getMerged().theme;
+  const effectiveTheme = loadedSettings.merged.theme;
 
   // Initial state: Open dialog if no theme is set in either user or workspace settings
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(
@@ -56,7 +56,7 @@ export const useThemeCommand = (
       // Added scope parameter
       try {
         loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
-        applyTheme(loadedSettings.getMerged().theme); // Apply the current theme
+        applyTheme(loadedSettings.merged.theme); // Apply the current theme
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }

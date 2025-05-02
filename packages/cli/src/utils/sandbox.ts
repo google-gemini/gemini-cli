@@ -15,9 +15,13 @@ import {
 } from '../config/settings.js';
 
 // node.js equivalent of scripts/sandbox_command.sh
-export function sandbox_command(): string {
-  const sandbox = process.env.GEMINI_CODE_SANDBOX?.toLowerCase().trim() ?? '';
-  if (['1', 'true'].includes(sandbox)) {
+export function sandbox_command(sandbox?: string | boolean): string {
+  // note environment variable takes precedence over argument (from command line or settings)
+  sandbox = process.env.GEMINI_CODE_SANDBOX?.toLowerCase().trim() ?? sandbox;
+  if (sandbox === '1' || sandbox === 'true') sandbox = true;
+  else if (sandbox === '0' || sandbox === 'false') sandbox = false;
+
+  if (sandbox === true) {
     // look for docker or podman, in that order
     if (execSync('command -v docker || true').toString().trim()) {
       return 'docker'; // Set sandbox to 'docker' if found
