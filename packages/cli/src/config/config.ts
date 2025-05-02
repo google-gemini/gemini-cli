@@ -37,7 +37,6 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 's',
       type: 'boolean',
       description: 'Whether to run in sandbox mode. Defaults to false.',
-      default: false,
     })
     .option('debug_mode', {
       alias: 'z',
