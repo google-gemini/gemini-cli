@@ -63,8 +63,8 @@ if [ "$DOCKERFILE" = "Dockerfile-dev" ]; then
     fi
 fi
 
-# prepare global installation files for prod build
-if [ "$DOCKERFILE" = "Dockerfile" ]; then
+# prepare global installation files for prod builds (anything but Dockerfile-dev)
+if [ "$DOCKERFILE" != "Dockerfile-dev" ]; then
     # pack cli
     echo "packing @gemini-code/cli ..."
     rm -f packages/cli/dist/gemini-code-cli-*.tgz
