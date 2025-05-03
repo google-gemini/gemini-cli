@@ -231,18 +231,11 @@ export async function start_sandbox(sandbox: string) {
     }
   }
 
-  // if VIRTUAL_ENV is set, require that it is workdir/.venv
-  // then mount-replace it with sandbox.venv under project settings directory
-  // this helps avoid host binaries in sandbox and lets uv work seamlessly w/o requiring --active flag
-  // sandbox must be ready to set up an empty .venv directory via sandbox.{Dockerfile,bashrc}
-  if (process.env.VIRTUAL_ENV) {
-    const workdirVenvPath = path.join(workdir, '.venv');
-    if (workdirVenvPath !== process.env.VIRTUAL_ENV) {
-      console.error(
-        `ERROR: VIRTUAL_ENV '${process.env.VIRTUAL_ENV}' is not supported; should be ${workdirVenvPath}`,
-      );
-      process.exit(1);
-    }
+  // copy VIRTUAL_ENV if under working directory
+  // also mount-replace VIRTUAL_ENV directory with <project_settings>/sandbox.venv
+  // sandbox can then set up this new VIRTUAL_ENV directory using sandbox.bashrc (see below)
+  // directory will be empty if not set up, which is still preferable to having host binaries
+  if (process.env.VIRTUAL_ENV?.startsWith(workdir)) {
     const sandboxVenvPath = path.resolve(
       SETTINGS_DIRECTORY_NAME,
       'sandbox.venv',
@@ -250,7 +243,8 @@ export async function start_sandbox(sandbox: string) {
     if (!fs.existsSync(sandboxVenvPath)) {
       fs.mkdirSync(sandboxVenvPath, { recursive: true });
     }
-    args.push('--volume', `${sandboxVenvPath}:${workdirVenvPath}`);
+    args.push('--volume', `${sandboxVenvPath}:${process.env.VIRTUAL_ENV}`);
+    args.push('--env', `VIRTUAL_ENV=${process.env.VIRTUAL_ENV}`);
   }
 
   // copy additional environment variables from SANDBOX_ENV
