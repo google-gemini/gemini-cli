@@ -22,6 +22,7 @@ export interface Settings {
   sandbox?: boolean | string;
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
+  mcpServerCommand?: string;
   // Add other settings here.
 }
 

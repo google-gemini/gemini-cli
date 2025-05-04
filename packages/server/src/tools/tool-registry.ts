@@ -8,7 +8,8 @@ import { FunctionDeclaration } from '@google/genai';
 import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
-
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 type ToolParams = Record<string, unknown>;
 
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
@@ -88,8 +89,40 @@ Signal: Signal number or \`(none)\` if no signal was received.
   }
 }
 
+export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
+  constructor(
+    private readonly mcpClient: Client,
+    private readonly config: Config,
+    readonly name: string,
+    readonly description: string,
+    readonly parameterSchema: Record<string, unknown>,
+  ) {
+    const mcpServerCmd = config.getMcpServerCommand()!;
+    description += `
+This MCP tool was discovered from a local MCP server using JSON RPC 2.0 over stdio transport protocol.
+The MCP server was started by executing the command \`${mcpServerCmd}\` on project root.
+When called, this tool will invoke the \`tools/call\` method for tool name \`${name}\`.
+MCP server command can be configured in project settings.
+Returns the MCP server response as a json string.
+`;
+    super(name, name, description, parameterSchema);
+  }
+
+  async execute(params: ToolParams): Promise<ToolResult> {
+    const result = await this.mcpClient.callTool({
+      name: this.name,
+      arguments: params,
+    });
+    return {
+      llmContent: JSON.stringify(result, null, 2),
+      returnDisplay: JSON.stringify(result, null, 2),
+    };
+  }
+}
+
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private mcpClient: Client | null = null;
 
   constructor(private readonly config: Config) {}
 
@@ -112,29 +145,72 @@ export class ToolRegistry {
    * Can be called multiple times to update discovered tools.
    */
   discoverTools(): void {
-    const discoveryCmd = this.config.getToolDiscoveryCommand();
-    if (!discoveryCmd) return;
     // remove any previously discovered tools
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool) {
         this.tools.delete(tool.name);
       }
     }
-    // execute discovery command and extract function declarations
-    const functions: FunctionDeclaration[] = [];
-    for (const tool of JSON.parse(execSync(discoveryCmd).toString().trim())) {
-      functions.push(...tool['function_declarations']);
+    // discover tools using discovery command, if configured
+    const discoveryCmd = this.config.getToolDiscoveryCommand();
+    if (discoveryCmd) {
+      // execute discovery command and extract function declarations
+      const functions: FunctionDeclaration[] = [];
+      for (const tool of JSON.parse(execSync(discoveryCmd).toString().trim())) {
+        functions.push(...tool['function_declarations']);
+      }
+      // register each function as a tool
+      for (const func of functions) {
+        this.registerTool(
+          new DiscoveredTool(
+            this.config,
+            func.name!,
+            func.description!,
+            func.parameters! as Record<string, unknown>,
+          ),
+        );
+      }
     }
-    // register each function as a tool
-    for (const func of functions) {
-      this.registerTool(
-        new DiscoveredTool(
-          this.config,
-          func.name!,
-          func.description!,
-          func.parameters! as Record<string, unknown>,
-        ),
-      );
+    // discover tools using MCP server command, if configured
+    const mcpServerCmd = this.config.getMcpServerCommand();
+    if (mcpServerCmd) {
+      (async () => {
+        if (!this.mcpClient) {
+          this.mcpClient = new Client({
+            name: 'mcp-client',
+            version: '0.0.1',
+          });
+          const transport = new StdioClientTransport({
+            command: mcpServerCmd,
+            stderr: 'pipe',
+          });
+          await this.mcpClient.connect(transport);
+          this.mcpClient.onerror = (error) => {
+            console.error('MCP ERROR', error.toString());
+          };
+          if (!transport.stderr) {
+            throw new Error('transport missing stderr stream');
+          }
+          transport.stderr.on('data', (data) => {
+            // filter out INFO messages logged for each request received
+            if (!data.toString().includes('] INFO')) {
+              console.log('MCP STDERR', data.toString());
+            }
+          });
+        }
+        const result = await this.mcpClient.listTools();
+        for (const tool of result.tools) {
+          this.registerTool(
+            new DiscoveredMCPTool(
+              this.mcpClient,
+              this.config,
+              tool.name,
+              tool.description ?? '',
+              tool.inputSchema,
+            ),
+          );
+        }
+      })();
     }
   }
 

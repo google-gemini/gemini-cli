@@ -20,14 +20,15 @@
   ],
   "dependencies": {
     "@google/genai": "^0.10.0",
-    "fast-glob": "^3.3.3",
+    "@modelcontextprotocol/sdk": "^1.11.0",
     "diff": "^7.0.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "fast-glob": "^3.3.3"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
   "engines": {

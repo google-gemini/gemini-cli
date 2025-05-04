@@ -91,5 +91,6 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     argv.full_context || false,
     settings.toolDiscoveryCommand,
     settings.toolCallCommand,
+    settings.mcpServerCommand,
   );
 }
