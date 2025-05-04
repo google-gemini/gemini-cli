@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { common, createLowlight } from 'lowlight';
+import { all, createLowlight } from 'lowlight';
 import type {
   Root,
   Element,
@@ -18,7 +18,7 @@ import { themeManager } from '../themes/theme-manager.js';
 import { Theme } from '../themes/theme.js';
 
 // Configure themeing and parsing utilities.
-const lowlight = createLowlight(common);
+const lowlight = createLowlight(all);
 
 function renderHastNode(
   node: Root | Element | HastText | RootContent,
