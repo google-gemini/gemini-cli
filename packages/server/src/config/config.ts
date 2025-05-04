@@ -32,6 +32,8 @@ export class Config {
     private readonly debugMode: boolean,
     private readonly question: string | undefined, // Keep undefined possibility
     private readonly fullContext: boolean = false, // Default value here
+    private readonly toolDiscoveryCommand: string | undefined,
+    private readonly toolCallCommand: string | undefined,
   ) {
     // toolRegistry still needs initialization based on the instance
     this.toolRegistry = createToolRegistry(this);
@@ -67,6 +69,14 @@ export class Config {
   getFullContext(): boolean {
     return this.fullContext;
   }
+
+  getToolDiscoveryCommand(): string | undefined {
+    return this.toolDiscoveryCommand;
+  }
+
+  getToolCallCommand(): string | undefined {
+    return this.toolCallCommand;
+  }
 }
 
 function findEnvFile(startDir: string): string | null {
@@ -100,6 +110,8 @@ export function createServerConfig(
   debugMode: boolean,
   question: string,
   fullContext?: boolean,
+  toolDiscoveryCommand?: string,
+  toolCallCommand?: string,
 ): Config {
   return new Config(
     apiKey,
@@ -109,11 +121,13 @@ export function createServerConfig(
     debugMode,
     question,
     fullContext,
+    toolDiscoveryCommand,
+    toolCallCommand,
   );
 }
 
 function createToolRegistry(config: Config): ToolRegistry {
-  const registry = new ToolRegistry();
+  const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
 
   const tools: Array<BaseTool<unknown, ToolResult>> = [
@@ -137,5 +151,6 @@ function createToolRegistry(config: Config): ToolRegistry {
   for (const tool of tools) {
     registry.registerTool(tool);
   }
+  registry.discoverTools();
   return registry;
 }
