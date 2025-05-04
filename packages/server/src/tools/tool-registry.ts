@@ -22,6 +22,7 @@ export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
     description += `
+
 This tool was discovered from the project by executing the command \`${discoveryCmd}\` on project root.
 When called, this tool will execute the command \`${callCommand} ${name}\` on project root.
 Tool discovery and call commands can be configured in project settings.
@@ -99,6 +100,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   ) {
     const mcpServerCmd = config.getMcpServerCommand()!;
     description += `
+
 This MCP tool was discovered from a local MCP server using JSON RPC 2.0 over stdio transport protocol.
 The MCP server was started by executing the command \`${mcpServerCmd}\` on project root.
 When called, this tool will invoke the \`tools/call\` method for tool name \`${name}\`.
