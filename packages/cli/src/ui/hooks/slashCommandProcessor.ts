@@ -11,6 +11,7 @@ import { getCommandFromQuery } from '../utils/commandUtils.js';
 
 export interface SlashCommand {
   name: string; // slash command
+  altName?: string; // alternative name for the command
   description: string; // flavor text in UI
   action: (value: PartListUnion) => void;
 }
@@ -37,6 +38,7 @@ export const useSlashCommandProcessor = (
   const slashCommands: SlashCommand[] = [
     {
       name: 'help',
+      altName: '?',
       description: 'for help on gemini-code',
       action: (_value: PartListUnion) => {
         setDebugMessage('Opening help.');
@@ -61,31 +63,12 @@ export const useSlashCommandProcessor = (
       },
     },
     {
-      name: 'exit',
-      description: '',
-      action: (_value: PartListUnion) => {
-        setDebugMessage('Exiting. Good-bye.');
-        const timestamp = getNextMessageId(Date.now());
-        addHistoryItem(
-          setHistory,
-          { type: 'info', text: 'good-bye!' },
-          timestamp,
-        );
-        process.exit(0);
-      },
-    },
-    {
-      // TODO: dedup with exit by adding altName or cmdRegex.
       name: 'quit',
+      altName: 'exit',
       description: '',
       action: (_value: PartListUnion) => {
         setDebugMessage('Quitting. Good-bye.');
         const timestamp = getNextMessageId(Date.now());
-        addHistoryItem(
-          setHistory,
-          { type: 'info', text: 'good-bye!' },
-          timestamp,
-        );
         process.exit(0);
       },
     },
@@ -102,12 +85,16 @@ export const useSlashCommandProcessor = (
       const [symbol, test] = getCommandFromQuery(trimmed);
 
       // Skip non slash commands
-      if (symbol !== '/') {
+      if (symbol !== '/' && symbol !== '?') {
         return false;
       }
 
       for (const cmd of slashCommands) {
-        if (test === cmd.name) {
+        if (
+          test === cmd.name ||
+          test === cmd.altName ||
+          symbol === cmd.altName
+        ) {
           // Add user message *before* execution
           const userMessageTimestamp = Date.now();
           addHistoryItem(

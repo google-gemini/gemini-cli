@@ -119,9 +119,18 @@ export function useCompletion(
     // --- Handle Slash Command Completion ---
     if (trimmedQuery.startsWith('/')) {
       const partialCommand = trimmedQuery.substring(1);
-      const filteredSuggestions = slashCommands
+      const commands = slashCommands
         .map((cmd) => cmd.name)
+        .concat(
+          slashCommands
+            .map((cmd) => cmd.altName)
+            .filter((cmd) => cmd !== undefined),
+        );
+
+      const filteredSuggestions = commands
         .filter((name) => name.startsWith(partialCommand))
+        // Filter out ? and any other single character commands
+        .filter((name) => name.length > 1)
         .map((name) => ({ label: name, value: name }))
         .sort();
 
