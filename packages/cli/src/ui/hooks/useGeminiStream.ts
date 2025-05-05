@@ -48,6 +48,7 @@ const addHistoryItem = (
 // Hook now accepts apiKey and model
 export const useGeminiStream = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
+  refreshStatic: () => void,
   config: Config,
   openThemeDialog: () => void,
 ) => {
@@ -73,6 +74,7 @@ export const useGeminiStream = (
   // Instantiate command processors
   const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
     setHistory,
+    refreshStatic,
     setDebugMessage,
     getNextMessageId,
     openThemeDialog,

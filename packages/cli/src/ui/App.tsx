@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Box, Static, Text, useStdout } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -44,13 +44,18 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     handleThemeHighlight,
   } = useThemeCommand(settings);
 
+  const [staticKey, setStaticKey] = useState(0);
+  const refreshStatic = useCallback(() => {
+    setStaticKey((prev) => prev + 1);
+  }, [setStaticKey]);
+
   const {
     streamingState,
     submitQuery,
     initError,
     debugMessage,
     slashCommands,
-  } = useGeminiStream(setHistory, config, openThemeDialog);
+  } = useGeminiStream(setHistory, refreshStatic, config, openThemeDialog);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
@@ -124,7 +129,10 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
        * content is set it'll flush content to the terminal and move the area which it's "clearing"
        * down a notch. Without Static the area which gets erased and redrawn continuously grows.
        */}
-      <Static items={['header', ...staticallyRenderedHistoryItems]}>
+      <Static
+        key={'static-key-' + staticKey}
+        items={['header', ...staticallyRenderedHistoryItems]}
+      >
         {(item, index) => {
           if (item === 'header') {
             return (

@@ -28,6 +28,7 @@ const addHistoryItem = (
 
 export const useSlashCommandProcessor = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
+  refreshStatic: () => void,
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
   getNextMessageId: (baseTimestamp: number) => number,
   openThemeDialog: () => void,
@@ -55,6 +56,7 @@ export const useSlashCommandProcessor = (
         // This just clears the *UI* history, not the model history.
         setDebugMessage('Clearing terminal.');
         setHistory((_) => []);
+        refreshStatic();
       },
     },
     {
