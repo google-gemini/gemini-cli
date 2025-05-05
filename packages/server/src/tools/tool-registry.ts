@@ -8,6 +8,7 @@ import { FunctionDeclaration } from '@google/genai';
 import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
+// TODO: remove this dependency once MCP support is built into genai SDK
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 type ToolParams = Record<string, unknown>;
