@@ -9,11 +9,11 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 
-interface Intro {
+interface Help {
   commands: SlashCommand[];
 }
 
-export const Intro: React.FC<Intro> = ({ commands }) => (
+export const Help: React.FC<Help> = ({ commands }) => (
   <Box flexDirection="column" marginBottom={1}>
     <Text bold color={Colors.Foreground}>
       Abilities:

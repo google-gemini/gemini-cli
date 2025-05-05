@@ -48,6 +48,7 @@ const addHistoryItem = (
 export const useGeminiStream = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   refreshStatic: () => void,
+  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
   openThemeDialog: () => void,
 ) => {
@@ -74,6 +75,7 @@ export const useGeminiStream = (
   const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
     setHistory,
     refreshStatic,
+    setShowHelp,
     setDebugMessage,
     getNextMessageId,
     openThemeDialog,
@@ -153,6 +155,8 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
       messageIdCounterRef.current = 0; // Reset counter for this new submission
       let queryToSendToGemini: PartListUnion | null = null;
+
+      setShowHelp(false);
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();

@@ -29,6 +29,7 @@ const addHistoryItem = (
 export const useSlashCommandProcessor = (
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
   refreshStatic: () => void,
+  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
   getNextMessageId: (baseTimestamp: number) => number,
   openThemeDialog: () => void,
@@ -38,15 +39,8 @@ export const useSlashCommandProcessor = (
       name: 'help',
       description: 'for help on gemini-code',
       action: (_value: PartListUnion) => {
-        const helpText =
-          'I am an interactive CLI tool assistant designed to ' +
-          'help with software engineering tasks. I can use tools to read ' +
-          'and write files, search code, execute bash commands, and more ' +
-          'to assist with development workflows. I will explain commands ' +
-          'and ask for permission before running them and will not ' +
-          'commit changes unless explicitly instructed.';
-        const timestamp = getNextMessageId(Date.now());
-        addHistoryItem(setHistory, { type: 'info', text: helpText }, timestamp);
+        setDebugMessage('Opening help.');
+        setShowHelp(true);
       },
     },
     {

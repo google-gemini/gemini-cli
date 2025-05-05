@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Box, Static, Text, useStdout } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -19,7 +19,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
-import { Intro } from './components/Intro.js';
+import { Help } from './components/Help.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
@@ -37,6 +37,7 @@ interface AppProps {
 export const App = ({ config, settings, cliVersion }: AppProps) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState<boolean>(false);
   const {
     isThemeDialogOpen,
     openThemeDialog,
@@ -55,7 +56,13 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     initError,
     debugMessage,
     slashCommands,
-  } = useGeminiStream(setHistory, refreshStatic, config, openThemeDialog);
+  } = useGeminiStream(
+    setHistory,
+    refreshStatic,
+    setShowHelp,
+    config,
+    openThemeDialog,
+  );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
 
@@ -139,7 +146,6 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
               <Box flexDirection="column" key={'header-' + index}>
                 <Header />
                 <Tips />
-                <Intro commands={slashCommands} />
               </Box>
             );
           }
@@ -166,6 +172,8 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
           ))}
         </Box>
       )}
+
+      {showHelp && <Help commands={slashCommands} />}
 
       {startupWarnings.length > 0 && (
         <Box
