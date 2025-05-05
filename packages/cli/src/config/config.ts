@@ -88,7 +88,6 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     process.cwd(),
     argv.debug_mode || false,
     argv.question || '',
-    undefined, // TODO: load passthroughCommands from .env file
     argv.full_context || false,
   );
 }
