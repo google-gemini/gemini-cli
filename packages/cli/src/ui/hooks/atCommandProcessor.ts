@@ -18,25 +18,15 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
-
-const addHistoryItem = (
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
-  itemData: Omit<HistoryItem, 'id'>,
-  id: number,
-) => {
-  setHistory((prevHistory) => [
-    ...prevHistory,
-    { ...itemData, id } as HistoryItem,
-  ]);
-};
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface HandleAtCommandParams {
   query: string;
   config: Config;
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
+  addItem: UseHistoryManagerReturn['addItem'];
+  updateItem: UseHistoryManagerReturn['updateItem'];
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>;
-  getNextMessageId: (baseTimestamp: number) => number;
-  userMessageTimestamp: number;
+  messageId: number;
 }
 
 interface HandleAtCommandResult {
@@ -53,7 +43,6 @@ function parseAtCommand(
 ): { textBefore: string; atPath: string; textAfter: string } | null {
   let atIndex = -1;
   for (let i = 0; i < query.length; i++) {
-    // Find the first '@' that is not preceded by a '\'
     if (query[i] === '@' && (i === 0 || query[i - 1] !== '\\')) {
       atIndex = i;
       break;
@@ -61,7 +50,7 @@ function parseAtCommand(
   }
 
   if (atIndex === -1) {
-    return null; // No '@' command found
+    return null;
   }
 
   const textBefore = query.substring(0, atIndex).trim();
@@ -70,15 +59,11 @@ function parseAtCommand(
 
   while (pathEndIndex < query.length) {
     const char = query[pathEndIndex];
-
     if (inEscape) {
-      // Current char is escaped, move past it
       inEscape = false;
     } else if (char === '\\') {
-      // Start of an escape sequence
       inEscape = true;
     } else if (/\s/.test(char)) {
-      // Unescaped whitespace marks the end of the path
       break;
     }
     pathEndIndex++;
@@ -86,7 +71,6 @@ function parseAtCommand(
 
   const rawAtPath = query.substring(atIndex, pathEndIndex);
   const textAfter = query.substring(pathEndIndex).trim();
-
   const atPath = unescapePath(rawAtPath);
 
   return { textBefore, atPath, textAfter };
@@ -94,80 +78,40 @@ function parseAtCommand(
 
 /**
  * Processes user input potentially containing an '@<path>' command.
- * It finds the first '@<path>', checks if the path is a file or directory,
- * prepares the appropriate path specification for the read_many_files tool,
- * updates the UI, and prepares the query for the LLM, incorporating the
- * file content and surrounding text.
+ * If found, it attempts to read the specified file/directory using the
+ * 'read_many_files' tool, adds the user query and tool result/error to history,
+ * and prepares the content for the LLM.
  *
- * @returns An object containing the potentially modified query (or null)
- *          and a flag indicating if the main hook should proceed.
+ * @returns An object indicating whether the main hook should proceed with an
+ *          LLM call and the processed query parts (including file content).
  */
 export async function handleAtCommand({
   query,
   config,
-  setHistory,
+  addItem: addItem,
   setDebugMessage,
-  getNextMessageId,
-  userMessageTimestamp,
+  messageId: userMessageTimestamp,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
   const trimmedQuery = query.trim();
   const parsedCommand = parseAtCommand(trimmedQuery);
 
+  // If no @ command, add user query normally and proceed to LLM
   if (!parsedCommand) {
-    // If no '@' was found, treat the whole query as user text and proceed
-    // This allows users to just type text without an @ command
-    addHistoryItem(
-      setHistory,
-      { type: 'user', text: query },
-      userMessageTimestamp,
-    );
-    // Let the main hook decide what to do (likely send to LLM)
+    addItem({ type: 'user', text: query }, userMessageTimestamp);
     return { processedQuery: [{ text: query }], shouldProceed: true };
-    // Or, if an @ command is *required* when the function is called:
-    /*
-    const errorTimestamp = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
-      { type: 'error', text: 'Error: Could not find @ command.' },
-      errorTimestamp,
-    );
-    return { processedQuery: null, shouldProceed: false };
-    */
   }
 
   const { textBefore, atPath, textAfter } = parsedCommand;
 
-  // Add the original user query to history *before* processing
-  addHistoryItem(
-    setHistory,
-    { type: 'user', text: query },
-    userMessageTimestamp,
-  );
+  // Add the original user query to history first
+  addItem({ type: 'user', text: query }, userMessageTimestamp);
 
-  const pathPart = atPath.substring(1); // Remove the leading '@'
+  const pathPart = atPath.substring(1); // Remove leading '@'
 
   if (!pathPart) {
-    const errorTimestamp = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
+    addItem(
       { type: 'error', text: 'Error: No path specified after @.' },
-      errorTimestamp,
-    );
-    return { processedQuery: null, shouldProceed: false };
-  }
-
-  addHistoryItem(
-    setHistory,
-    { type: 'user', text: query },
-    userMessageTimestamp,
-  );
-
-  if (!pathPart) {
-    const errorTimestamp = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
-      { type: 'error', text: 'Error: No path specified after @.' },
-      errorTimestamp,
+      userMessageTimestamp,
     );
     return { processedQuery: null, shouldProceed: false };
   }
@@ -176,39 +120,31 @@ export async function handleAtCommand({
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
 
   if (!readManyFilesTool) {
-    const errorTimestamp = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
+    addItem(
       { type: 'error', text: 'Error: read_many_files tool not found.' },
-      errorTimestamp,
+      userMessageTimestamp,
     );
     return { processedQuery: null, shouldProceed: false };
   }
 
-  // --- Path Handling for @ command ---
+  // Determine path spec (file or directory glob)
   let pathSpec = pathPart;
   const contentLabel = pathPart;
-
   try {
-    // Resolve the path relative to the target directory
     const absolutePath = path.resolve(config.getTargetDir(), pathPart);
     const stats = await fs.stat(absolutePath);
-
     if (stats.isDirectory()) {
-      // If it's a directory, ensure it ends with a globstar for recursive read
       pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
       setDebugMessage(`Path resolved to directory, using glob: ${pathSpec}`);
     } else {
-      // It's a file, use the original pathPart as pathSpec
       setDebugMessage(`Path resolved to file: ${pathSpec}`);
     }
   } catch (error) {
-    // If stat fails (e.g., file/dir not found), proceed with the original pathPart.
-    // The read_many_files tool will handle the error if it's invalid.
+    // If stat fails (e.g., not found), proceed with original path.
+    // The tool itself will handle the error during execution.
     if (isNodeError(error) && error.code === 'ENOENT') {
       setDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
     } else {
-      // Log other stat errors but still proceed
       console.error(`Error stating path ${pathPart}:`, error);
       setDebugMessage(
         `Error stating path, proceeding with original: ${pathSpec}`,
@@ -217,8 +153,6 @@ export async function handleAtCommand({
   }
 
   const toolArgs = { paths: [pathSpec] };
-  // --- End Path Handling ---
-
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {
@@ -234,6 +168,7 @@ export async function handleAtCommand({
       confirmationDetails: undefined,
     };
 
+    // Prepare the query parts for the LLM
     const processedQueryParts = [];
     if (textBefore) {
       processedQueryParts.push({ text: textBefore });
@@ -244,21 +179,20 @@ export async function handleAtCommand({
     if (textAfter) {
       processedQueryParts.push({ text: textAfter });
     }
-
     const processedQuery: PartListUnion = processedQueryParts;
 
-    const toolGroupId = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
+    // Add the successful tool result to history
+    addItem(
       { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
         HistoryItem,
         'id'
       >,
-      toolGroupId,
+      userMessageTimestamp,
     );
 
     return { processedQuery, shouldProceed: true };
   } catch (error) {
+    // Handle errors during tool execution
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
@@ -268,14 +202,13 @@ export async function handleAtCommand({
       confirmationDetails: undefined,
     };
 
-    const toolGroupId = getNextMessageId(userMessageTimestamp);
-    addHistoryItem(
-      setHistory,
+    // Add the error tool result to history
+    addItem(
       { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
         HistoryItem,
         'id'
       >,
-      toolGroupId,
+      userMessageTimestamp,
     );
 
     return { processedQuery: null, shouldProceed: false };

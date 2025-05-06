@@ -6,17 +6,17 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useHistoryManager } from './useHistoryManager.js';
+import { useHistory } from './useHistoryManager.js';
 import { HistoryItem } from '../types.js';
 
 describe('useHistoryManager', () => {
   it('should initialize with an empty history', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     expect(result.current.history).toEqual([]);
   });
 
   it('should add an item to history with a unique ID', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -24,7 +24,7 @@ describe('useHistoryManager', () => {
     };
 
     act(() => {
-      result.current.addItemToHistory(itemData, timestamp);
+      result.current.addItem(itemData, timestamp);
     });
 
     expect(result.current.history).toHaveLength(1);
@@ -39,7 +39,7 @@ describe('useHistoryManager', () => {
   });
 
   it('should generate unique IDs for items added with the same base timestamp', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -54,8 +54,8 @@ describe('useHistoryManager', () => {
     let id2!: number;
 
     act(() => {
-      id1 = result.current.addItemToHistory(itemData1, timestamp);
-      id2 = result.current.addItemToHistory(itemData2, timestamp);
+      id1 = result.current.addItem(itemData1, timestamp);
+      id2 = result.current.addItem(itemData2, timestamp);
     });
 
     expect(result.current.history).toHaveLength(2);
@@ -67,7 +67,7 @@ describe('useHistoryManager', () => {
   });
 
   it('should update an existing history item', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const initialItem: Omit<HistoryItem, 'id'> = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
@@ -76,12 +76,12 @@ describe('useHistoryManager', () => {
     let itemId!: number;
 
     act(() => {
-      itemId = result.current.addItemToHistory(initialItem, timestamp);
+      itemId = result.current.addItem(initialItem, timestamp);
     });
 
     const updatedText = 'Updated content';
     act(() => {
-      result.current.updateHistoryItem(itemId, { text: updatedText });
+      result.current.updateItem(itemId, { text: updatedText });
     });
 
     expect(result.current.history).toHaveLength(1);
@@ -93,7 +93,7 @@ describe('useHistoryManager', () => {
   });
 
   it('should not change history if updateHistoryItem is called with a non-existent ID', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -101,20 +101,20 @@ describe('useHistoryManager', () => {
     };
 
     act(() => {
-      result.current.addItemToHistory(itemData, timestamp);
+      result.current.addItem(itemData, timestamp);
     });
 
     const originalHistory = [...result.current.history]; // Clone before update attempt
 
     act(() => {
-      result.current.updateHistoryItem(99999, { text: 'Should not apply' }); // Non-existent ID
+      result.current.updateItem(99999, { text: 'Should not apply' }); // Non-existent ID
     });
 
     expect(result.current.history).toEqual(originalHistory);
   });
 
   it('should clear the history', () => {
-    const { result } = renderHook(() => useHistoryManager());
+    const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -126,14 +126,14 @@ describe('useHistoryManager', () => {
     };
 
     act(() => {
-      result.current.addItemToHistory(itemData1, timestamp);
-      result.current.addItemToHistory(itemData2, timestamp);
+      result.current.addItem(itemData1, timestamp);
+      result.current.addItem(itemData2, timestamp);
     });
 
     expect(result.current.history).toHaveLength(2);
 
     act(() => {
-      result.current.clearHistory();
+      result.current.clearItems();
     });
 
     expect(result.current.history).toEqual([]);

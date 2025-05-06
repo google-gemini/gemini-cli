@@ -8,90 +8,79 @@ import { exec as _exec } from 'child_process';
 import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
 import { type PartListUnion } from '@google/genai';
-import { HistoryItem, StreamingState } from '../types.js';
+import { StreamingState } from '../types.js';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
-// Helper function (consider moving to a shared util if used elsewhere)
-const addHistoryItem = (
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
-  itemData: Omit<HistoryItem, 'id'>,
-  id: number,
-) => {
-  setHistory((prevHistory) => [
-    ...prevHistory,
-    { ...itemData, id } as HistoryItem,
-  ]);
-};
-
+/**
+ * Hook to process shell commands (e.g., !ls, $pwd).
+ * Executes the command in the target directory and adds output/errors to history.
+ */
 export const useShellCommandProcessor = (
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
+  addItemToHistory: UseHistoryManagerReturn['addItem'],
   setStreamingState: React.Dispatch<React.SetStateAction<StreamingState>>,
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
-  getNextMessageId: (baseTimestamp: number) => number,
   config: Config,
 ) => {
+  /**
+   * Checks if the query is a shell command, executes it, and adds results to history.
+   * @returns True if the query was handled as a shell command, false otherwise.
+   */
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion): boolean => {
       if (typeof rawQuery !== 'string') {
-        return false; // Passthrough only works with string commands
+        return false;
       }
 
       const [symbol] = getCommandFromQuery(rawQuery);
       if (symbol !== '!' && symbol !== '$') {
         return false;
       }
-      // Remove symbol from rawQuery
-      const trimmed = rawQuery.trim().slice(1).trimStart();
+      const commandToExecute = rawQuery.trim().slice(1).trimStart();
 
-      // Stop if command is empty
-      if (!trimmed) {
-        return false;
+      const userMessageTimestamp = Date.now();
+      addItemToHistory({ type: 'user', text: rawQuery }, userMessageTimestamp);
+
+      if (!commandToExecute) {
+        addItemToHistory(
+          { type: 'error', text: 'Empty shell command.' },
+          userMessageTimestamp,
+        );
+        return true; // Handled (by showing error)
       }
 
-      // Add user message *before* execution starts
-      const userMessageTimestamp = Date.now();
-      addHistoryItem(
-        setHistory,
-        { type: 'user', text: rawQuery },
-        userMessageTimestamp,
-      );
-
-      // Execute and capture output
       const targetDir = config.getTargetDir();
-      setDebugMessage(`Executing shell command in ${targetDir}: ${trimmed}`);
+      setDebugMessage(
+        `Executing shell command in ${targetDir}: ${commandToExecute}`,
+      );
       const execOptions = {
         cwd: targetDir,
       };
 
-      // Set state to Responding while the command runs
       setStreamingState(StreamingState.Responding);
 
-      _exec(trimmed, execOptions, (error, stdout, stderr) => {
-        const timestamp = getNextMessageId(userMessageTimestamp); // Use user message time as base
+      _exec(commandToExecute, execOptions, (error, stdout, stderr) => {
         if (error) {
-          addHistoryItem(
-            setHistory,
+          addItemToHistory(
             { type: 'error', text: error.message },
-            timestamp,
+            userMessageTimestamp,
           );
-        } else if (stderr) {
-          // Treat stderr as info for passthrough, as some tools use it for non-error output
-          addHistoryItem(setHistory, { type: 'info', text: stderr }, timestamp);
         } else {
-          // Add stdout as an info message
-          addHistoryItem(
-            setHistory,
-            { type: 'info', text: stdout || '(Command produced no output)' },
-            timestamp,
+          let output = '';
+          if (stdout) output += stdout;
+          if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
+
+          addItemToHistory(
+            { type: 'info', text: output || '(Command produced no output)' },
+            userMessageTimestamp,
           );
         }
-        // Set state back to Idle *after* command finishes and output is added
         setStreamingState(StreamingState.Idle);
       });
 
-      return true; // Command was handled
+      return true; // Command was initiated
     },
-    [config, setDebugMessage, setHistory, setStreamingState, getNextMessageId],
+    [config, setDebugMessage, addItemToHistory, setStreamingState],
   );
 
   return { handleShellCommand };

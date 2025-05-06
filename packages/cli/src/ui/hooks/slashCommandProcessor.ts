@@ -6,33 +6,25 @@
 
 import { useCallback, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
-import { HistoryItem } from '../types.js';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 export interface SlashCommand {
-  name: string; // slash command
-  altName?: string; // alternative name for the command
-  description: string; // flavor text in UI
+  name: string;
+  altName?: string;
+  description: string;
   action: (value: PartListUnion) => void;
 }
 
-const addHistoryItem = (
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
-  itemData: Omit<HistoryItem, 'id'>,
-  id: number,
-) => {
-  setHistory((prevHistory) => [
-    ...prevHistory,
-    { ...itemData, id } as HistoryItem,
-  ]);
-};
-
+/**
+ * Hook to define and process slash commands (e.g., /help, /clear).
+ */
 export const useSlashCommandProcessor = (
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
+  addItem: UseHistoryManagerReturn['addItem'],
+  clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
-  getNextMessageId: (baseTimestamp: number) => number,
   openThemeDialog: () => void,
 ) => {
   const slashCommands: SlashCommand[] = useMemo(
@@ -50,9 +42,8 @@ export const useSlashCommandProcessor = (
         name: 'clear',
         description: 'clear the screen',
         action: (_value: PartListUnion) => {
-          // This just clears the *UI* history, not the model history.
           setDebugMessage('Clearing terminal.');
-          setHistory((_) => []);
+          clearItems();
           refreshStatic();
         },
       },
@@ -69,22 +60,19 @@ export const useSlashCommandProcessor = (
         description: '',
         action: (_value: PartListUnion) => {
           setDebugMessage('Quitting. Good-bye.');
-          getNextMessageId(Date.now());
           process.exit(0);
         },
       },
     ],
-    [
-      setDebugMessage,
-      setShowHelp,
-      setHistory,
-      refreshStatic,
-      openThemeDialog,
-      getNextMessageId,
-    ],
+    [setDebugMessage, setShowHelp, refreshStatic, openThemeDialog, clearItems],
   );
 
-  // Checks if the query is a slash command and executes the command if it is.
+  /**
+   * Checks if the query is a slash command and executes it if found.
+   * Adds user query and potential error messages to history.
+   * @returns True if the query was handled as a slash command (valid or invalid),
+   *          false otherwise.
+   */
   const handleSlashCommand = useCallback(
     (rawQuery: PartListUnion): boolean => {
       if (typeof rawQuery !== 'string') {
@@ -94,10 +82,12 @@ export const useSlashCommandProcessor = (
       const trimmed = rawQuery.trim();
       const [symbol, test] = getCommandFromQuery(trimmed);
 
-      // Skip non slash commands
       if (symbol !== '/' && symbol !== '?') {
         return false;
       }
+
+      const userMessageTimestamp = Date.now();
+      addItem({ type: 'user', text: trimmed }, userMessageTimestamp);
 
       for (const cmd of slashCommands) {
         if (
@@ -105,21 +95,20 @@ export const useSlashCommandProcessor = (
           test === cmd.altName ||
           symbol === cmd.altName
         ) {
-          // Add user message *before* execution
-          const userMessageTimestamp = Date.now();
-          addHistoryItem(
-            setHistory,
-            { type: 'user', text: trimmed },
-            userMessageTimestamp,
-          );
           cmd.action(trimmed);
-          return true; // Command was handled
+          return true;
         }
       }
 
-      return false; // Not a recognized slash command
+      // Unknown command: Add error message
+      addItem(
+        { type: 'error', text: `Unknown command: ${trimmed}` },
+        userMessageTimestamp, // Use same base timestamp for related error
+      );
+
+      return true; // Indicate command was processed (even though invalid)
     },
-    [setHistory, slashCommands],
+    [addItem, slashCommands],
   );
 
   return { handleSlashCommand, slashCommands };
