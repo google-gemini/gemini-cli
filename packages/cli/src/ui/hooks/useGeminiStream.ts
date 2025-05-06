@@ -101,7 +101,7 @@ export const useGeminiStream = (
         );
       }
     }
-  }, [config.getApiKey(), config.getModel()]);
+  }, [config]);
 
   // Input Handling Effect (remains the same)
   useInput((input, key) => {
@@ -532,10 +532,13 @@ export const useGeminiStream = (
       getNextMessageId,
       updateGeminiMessage,
       handleSlashCommand,
+      handleShellCommand,
       // handleAtCommand is implicitly included via its direct call
       setDebugMessage, // Added dependency for handleAtCommand & passthrough
       setStreamingState, // Added dependency for handlePassthroughCommand
       updateAndAddGeminiMessageContent,
+      setShowHelp,
+      toolRegistry,
     ],
   );
 

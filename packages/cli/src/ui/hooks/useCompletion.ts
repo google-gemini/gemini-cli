@@ -220,7 +220,7 @@ export function useCompletion(
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
-  }, [query, cwd, isActive, resetCompletionState]);
+  }, [query, cwd, isActive, resetCompletionState, slashCommands]);
 
   return {
     suggestions,

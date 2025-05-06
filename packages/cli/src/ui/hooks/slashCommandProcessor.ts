@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
 import { HistoryItem } from '../types.js';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
@@ -35,44 +35,54 @@ export const useSlashCommandProcessor = (
   getNextMessageId: (baseTimestamp: number) => number,
   openThemeDialog: () => void,
 ) => {
-  const slashCommands: SlashCommand[] = [
-    {
-      name: 'help',
-      altName: '?',
-      description: 'for help on gemini-code',
-      action: (_value: PartListUnion) => {
-        setDebugMessage('Opening help.');
-        setShowHelp(true);
+  const slashCommands: SlashCommand[] = useMemo(
+    () => [
+      {
+        name: 'help',
+        altName: '?',
+        description: 'for help on gemini-code',
+        action: (_value: PartListUnion) => {
+          setDebugMessage('Opening help.');
+          setShowHelp(true);
+        },
       },
-    },
-    {
-      name: 'clear',
-      description: 'clear the screen',
-      action: (_value: PartListUnion) => {
-        // This just clears the *UI* history, not the model history.
-        setDebugMessage('Clearing terminal.');
-        setHistory((_) => []);
-        refreshStatic();
+      {
+        name: 'clear',
+        description: 'clear the screen',
+        action: (_value: PartListUnion) => {
+          // This just clears the *UI* history, not the model history.
+          setDebugMessage('Clearing terminal.');
+          setHistory((_) => []);
+          refreshStatic();
+        },
       },
-    },
-    {
-      name: 'theme',
-      description: 'change the theme',
-      action: (_value: PartListUnion) => {
-        openThemeDialog();
+      {
+        name: 'theme',
+        description: 'change the theme',
+        action: (_value: PartListUnion) => {
+          openThemeDialog();
+        },
       },
-    },
-    {
-      name: 'quit',
-      altName: 'exit',
-      description: '',
-      action: (_value: PartListUnion) => {
-        setDebugMessage('Quitting. Good-bye.');
-        getNextMessageId(Date.now());
-        process.exit(0);
+      {
+        name: 'quit',
+        altName: 'exit',
+        description: '',
+        action: (_value: PartListUnion) => {
+          setDebugMessage('Quitting. Good-bye.');
+          getNextMessageId(Date.now());
+          process.exit(0);
+        },
       },
-    },
-  ];
+    ],
+    [
+      setDebugMessage,
+      setShowHelp,
+      setHistory,
+      refreshStatic,
+      openThemeDialog,
+      getNextMessageId,
+    ],
+  );
 
   // Checks if the query is a slash command and executes the command if it is.
   const handleSlashCommand = useCallback(
@@ -109,7 +119,7 @@ export const useSlashCommandProcessor = (
 
       return false; // Not a recognized slash command
     },
-    [setDebugMessage, setHistory, getNextMessageId, slashCommands],
+    [setHistory, slashCommands],
   );
 
   return { handleSlashCommand, slashCommands };

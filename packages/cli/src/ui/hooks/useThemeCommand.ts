@@ -35,14 +35,14 @@ export const useThemeCommand = (
     setIsThemeDialogOpen(true);
   }, []);
 
-  function applyTheme(themeName: string | undefined) {
+  const applyTheme = useCallback((themeName: string | undefined) => {
     try {
       themeManager.setActiveTheme(themeName);
       setForceRender((v) => v + 1); // Trigger potential re-render
     } catch (error) {
       console.error(`Error setting theme: ${error}`);
     }
-  }
+  }, []);
 
   const handleThemeHighlight = useCallback(
     (themeName: string | undefined) => {
@@ -61,7 +61,7 @@ export const useThemeCommand = (
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme], // Added applyTheme to dependencies
+    [applyTheme, loadedSettings],
   );
 
   return {
