@@ -173,13 +173,15 @@ export class MarkdownRenderer {
     text: string,
     type: 'ul' | 'ol',
     marker: string,
+    leadingWhitespace: string = '',
   ): React.ReactNode {
     const renderedText = MarkdownRenderer._renderInline(text); // Allow inline styles in list items
-    const prefix = type === 'ol' ? `${marker} ` : `${marker} `; // e.g., "1. " or "* "
+    const prefix = type === 'ol' ? `${marker}. ` : `${marker} `; // e.g., "1. " or "* "
     const prefixWidth = prefix.length;
+    const indentation = leadingWhitespace.length;
 
     return (
-      <Box key={key} paddingLeft={1} flexDirection="row">
+      <Box key={key} paddingLeft={indentation + 1} flexDirection="row">
         <Box width={prefixWidth}>
           <Text>{prefix}</Text>
         </Box>
@@ -203,8 +205,8 @@ export class MarkdownRenderer {
     // Regexes for block elements
     const headerRegex = /^ *(#{1,4}) +(.*)/;
     const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\S*?) *$/; // ```lang or ``` or ~~~
-    const ulItemRegex = /^ *([-*+]) +(.*)/; // Unordered list item, captures bullet and text
-    const olItemRegex = /^ *(\d+)\. +(.*)/; // Ordered list item, captures number and text
+    const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/; // Unordered list item, captures leading spaces, bullet and text
+    const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/; // Ordered list item, captures leading spaces, number and text
     const hrRegex = /^ *([-*_] *){3,} *$/; // Horizontal rule
 
     const contentBlocks: React.ReactNode[] = [];
@@ -302,17 +304,31 @@ export class MarkdownRenderer {
         }
         if (headerNode) contentBlocks.push(<Box key={key}>{headerNode}</Box>);
       } else if (ulMatch) {
-        const marker = ulMatch[1]; // *, -, or +
-        const itemText = ulMatch[2];
+        const leadingWhitespace = ulMatch[1];
+        const marker = ulMatch[2]; // *, -, or +
+        const itemText = ulMatch[3];
         // If previous line was not UL, maybe add spacing? For now, just render item.
         contentBlocks.push(
-          MarkdownRenderer._renderListItem(key, itemText, 'ul', marker),
+          MarkdownRenderer._renderListItem(
+            key,
+            itemText,
+            'ul',
+            marker,
+            leadingWhitespace,
+          ),
         );
       } else if (olMatch) {
-        const marker = olMatch[1]; // The number
-        const itemText = olMatch[2];
+        const leadingWhitespace = olMatch[1];
+        const marker = olMatch[2]; // The number
+        const itemText = olMatch[3];
         contentBlocks.push(
-          MarkdownRenderer._renderListItem(key, itemText, 'ol', marker),
+          MarkdownRenderer._renderListItem(
+            key,
+            itemText,
+            'ol',
+            marker,
+            leadingWhitespace,
+          ),
         );
       } else {
         // --- Regular line (Paragraph or Empty line) ---
