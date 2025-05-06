@@ -7,7 +7,6 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactPlugin from 'eslint-plugin-react';
-import reactRecommended from 'eslint-plugin-react/configs/recommended.js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
@@ -29,7 +28,7 @@ export default tseslint.config(
   {
     // Global ignores
     ignores: [
-      'node_modules/**',
+      'node_modules/*',
       'eslint.config.js',
       'packages/cli/dist/**',
       'packages/server/dist/**',
@@ -38,37 +37,9 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
-  {
-    // React specific config
-    files: ['packages/cli/src/**/*.tsx'], // Target only TSX in the cli package
-    languageOptions: {
-      // Keep languageOptions from reactRecommended if needed, or define explicitly
-      parserOptions: {
-        ecmaFeatures: { jsx: true },
-      },
-      globals: {
-        ...globals.browser,
-      },
-    },
-    plugins: {
-      // Define the plugins used in this block
-      react: reactPlugin,
-      'react-hooks': reactHooks,
-    },
-    rules: {
-      // Apply recommended rules explicitly
-      ...reactRecommended.rules,
-      ...reactHooks.configs.recommended.rules,
-      // Custom overrides
-      'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off',
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
-    },
-  },
+  reactHooks.configs['recommended-latest'],
+  reactPlugin.configs.flat.recommended,
+  reactPlugin.configs.flat['jsx-runtime'], // Add this if you are using React 17+
   {
     // Import specific config
     files: ['packages/cli/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
@@ -117,7 +88,7 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',

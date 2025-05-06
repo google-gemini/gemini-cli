@@ -11,7 +11,6 @@ import { GrepTool } from '../tools/grep.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { ShellTool } from '../tools/shell.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
 import { WriteFileTool } from '../tools/write-file.js';
 
 const contactEmail = 'gemini-code-dev@google.com';

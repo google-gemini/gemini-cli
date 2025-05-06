@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { Box, Text } from 'ink';
 export interface Suggestion {
   label: string;
