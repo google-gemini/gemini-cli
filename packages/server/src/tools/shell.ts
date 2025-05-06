@@ -6,6 +6,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
 import { Config } from '../config/config.js';
 import {
   BaseTool,
@@ -131,10 +133,14 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       };
     }
 
-    // wrap command to append subprocess pids (via pgrep) to stderr
+    // wrap command to append subprocess pids (via pgrep) to temporary file
+    const tempFileName = `shell_pgrep_${crypto.randomBytes(6).toString('hex')}.tmp`;
+    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+
     let command = params.command.trim();
     if (!command.endsWith('&')) command += ';';
-    command = `{ ${command} }; { echo __PGREP__; pgrep -g 0; echo __DONE__; } >&2`;
+    // note the final echo is only to trigger the stderr handler below
+    command = `{ ${command} }; pgrep -g 0 >${tempFilePath} 2>&1; echo >&2`;
 
     // spawn command in specified directory (or project root if not specified)
     const shell = spawn('bash', ['-c', command], {
@@ -146,30 +152,22 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let stdout = '';
     let output = '';
     shell.stdout.on('data', (data: Buffer) => {
-      stdout += data.toString();
-      output += data.toString();
+      const str = data.toString();
+      stdout += str;
+      output += str;
     });
 
     let stderr = '';
-    let pgrepStarted = false;
-    const backgroundPIDs: number[] = [];
     shell.stderr.on('data', (data: Buffer) => {
-      if (data.toString().trim() === '__PGREP__') {
-        pgrepStarted = true;
-      } else if (data.toString().trim() === '__DONE__') {
+      // if the temporary file exists, close the streams and ignore any remaining output
+      // otherwise the streams can remain connected to background processes
+      if (fs.existsSync(tempFilePath)) {
         shell.stdout.destroy();
         shell.stderr.destroy();
-      } else if (pgrepStarted) {
-        // allow multiple lines and exclude shell's own pid (esp. in Linux)
-        for (const line of data.toString().trim().split('\n')) {
-          const pid = Number(line.trim());
-          if (pid !== shell.pid) {
-            backgroundPIDs.push(pid);
-          }
-        }
       } else {
-        stderr += data.toString();
-        output += data.toString();
+        const str = data.toString();
+        stderr += str;
+        output += str;
       }
     });
 
@@ -190,6 +188,28 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     // wait for the shell to exit
     await new Promise((resolve) => shell.on('close', resolve));
+
+    // parse pids (pgrep output) from temporary file and remove it
+    const backgroundPIDs: number[] = [];
+    if (fs.existsSync(tempFilePath)) {
+      const pgrepLines = fs
+        .readFileSync(tempFilePath, 'utf8')
+        .split('\n')
+        .filter(Boolean);
+      for (const line of pgrepLines) {
+        if (!/^\d+$/.test(line)) {
+          console.error(`pgrep: ${line}`);
+        }
+        const pid = Number(line);
+        // exclude the shell subprocess pid
+        if (pid !== shell.pid) {
+          backgroundPIDs.push(pid);
+        }
+      }
+      fs.unlinkSync(tempFilePath);
+    } else {
+      console.error('missing pgrep output');
+    }
 
     const llmContent = [
       `Command: ${params.command}`,

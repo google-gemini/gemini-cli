@@ -7,8 +7,8 @@ The following information is returned:
 
 Command: Executed command.
 Directory: Directory (relative to project root) where command was executed, or `(root)`.
-Stdout: Output on stdout stream. Can be `(empty)` or partial on error.
-Stderr: Output on stderr stream. Can be `(empty)` or partial on error.
+Stdout: Output on stdout stream. Can be `(empty)` or partial on error and for any unwaited background processes.
+Stderr: Output on stderr stream. Can be `(empty)` or partial on error and for any unwaited background processes.
 Error: Error or `(none)` if no error was reported for the subprocess.
 Exit Code: Exit code or `(none)` if terminated by signal.
 Signal: Signal number or `(none)` if no signal was received.
