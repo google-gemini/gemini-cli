@@ -39,93 +39,83 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const { isFocused } = useFocus({ autoFocus: true });
 
-  const handleAutocomplete = useCallback(() => {
-    if (
-      activeSuggestionIndex < 0 ||
-      activeSuggestionIndex >= suggestions.length
-    ) {
-      return;
-    }
-    const selectedSuggestion = suggestions[activeSuggestionIndex];
-    const trimmedQuery = query.trimStart();
+  const handleAutocomplete = useCallback(
+    (indexToUse: number) => {
+      if (indexToUse < 0 || indexToUse >= suggestions.length) {
+        return;
+      }
+      const selectedSuggestion = suggestions[indexToUse];
+      const trimmedQuery = query.trimStart();
 
-    if (trimmedQuery.startsWith('/')) {
-      // Handle / command completion
-      const slashIndex = query.indexOf('/');
-      const base = query.substring(0, slashIndex + 1);
-      const newValue = base + selectedSuggestion.value;
-      setQuery(newValue);
-    } else {
-      // Handle @ command completion
-      const atIndex = query.lastIndexOf('@');
-      if (atIndex === -1) return;
-
-      // Find the part of the query after the '@'
-      const pathPart = query.substring(atIndex + 1);
-      // Find the last slash within that part
-      const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-
-      let base = '';
-      if (lastSlashIndexInPath === -1) {
-        // No slash after '@', replace everything after '@'
-        base = query.substring(0, atIndex + 1);
+      if (trimmedQuery.startsWith('/')) {
+        // Handle / command completion
+        const slashIndex = query.indexOf('/');
+        const base = query.substring(0, slashIndex + 1);
+        const newValue = base + selectedSuggestion.value;
+        setQuery(newValue);
       } else {
-        // Slash found, keep everything up to and including the last slash
-        base = query.substring(0, atIndex + 1 + lastSlashIndexInPath + 1);
+        // Handle @ command completion
+        const atIndex = query.lastIndexOf('@');
+        if (atIndex === -1) return;
+
+        // Find the part of the query after the '@'
+        const pathPart = query.substring(atIndex + 1);
+        // Find the last slash within that part
+        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
+
+        let base = '';
+        if (lastSlashIndexInPath === -1) {
+          // No slash after '@', replace everything after '@'
+          base = query.substring(0, atIndex + 1);
+        } else {
+          // Slash found, keep everything up to and including the last slash
+          base = query.substring(0, atIndex + 1 + lastSlashIndexInPath + 1);
+        }
+
+        const newValue = base + selectedSuggestion.value;
+        setQuery(newValue);
       }
 
-      const newValue = base + selectedSuggestion.value;
-      setQuery(newValue);
-    }
-
-    resetCompletion(); // Hide suggestions after selection
-    setInputKey((k) => k + 1); // Increment key to force re-render and cursor reset
-  }, [
-    query,
-    setQuery,
-    suggestions,
-    activeSuggestionIndex,
-    resetCompletion,
-    setInputKey,
-  ]);
+      resetCompletion(); // Hide suggestions after selection
+      setInputKey((k) => k + 1); // Increment key to force re-render and cursor reset
+    },
+    [query, setQuery, suggestions, resetCompletion, setInputKey],
+  );
 
   useInput(
     (input: string, key: Key) => {
-      let handled = false;
+      if (!isFocused) {
+        return;
+      }
 
       if (showSuggestions) {
         if (key.upArrow) {
           navigateUp();
-          handled = true;
         } else if (key.downArrow) {
           navigateDown();
-          handled = true;
-        } else if ((key.tab || key.return) && activeSuggestionIndex >= 0) {
-          handleAutocomplete();
-          handled = true;
+        } else if (key.tab) {
+          if (suggestions.length > 0) {
+            const targetIndex =
+              activeSuggestionIndex === -1 ? 0 : activeSuggestionIndex;
+            if (targetIndex < suggestions.length) {
+              handleAutocomplete(targetIndex);
+            }
+          }
+        } else if (key.return) {
+          if (activeSuggestionIndex >= 0) {
+            handleAutocomplete(activeSuggestionIndex);
+          } else {
+            if (query.trim()) {
+              onSubmit(query);
+            }
+          }
         } else if (key.escape) {
           resetCompletion();
-          handled = true;
         }
       }
-
-      // Only submit on Enter if it wasn't handled above
-      if (!handled && key.return) {
-        if (query.trim()) {
-          onSubmit(query);
-        }
-        handled = true;
-      }
-
-      if (
-        handled &&
-        showSuggestions &&
-        (key.upArrow || key.downArrow || key.tab || key.escape || key.return)
-      ) {
-        // No explicit preventDefault needed, handled flag stops further processing
-      }
+      // Enter key when suggestions are NOT showing is handled by TextInput's onSubmit prop below
     },
-    { isActive: isFocused },
+    { isActive: true },
   );
 
   return (
@@ -138,7 +128,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           onChange={setQuery}
           placeholder="Enter your message or use tools (e.g., @src/file.txt)..."
           onSubmit={() => {
-            /* onSubmit is handled by useInput hook above */
+            // This onSubmit is for the TextInput component itself.
+            // It should only fire if suggestions are NOT showing,
+            // as useInput handles Enter when suggestions are visible.
+            const trimmedQuery = query.trim();
+            if (!showSuggestions && trimmedQuery) {
+              onSubmit(trimmedQuery);
+            }
+            // If suggestions ARE showing, useInput's Enter handler
+            // would have already dealt with it (either completing or submitting).
           }}
         />
       </Box>

@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useInput } from 'ink';
 
 interface UseInputHistoryProps {
   userMessages: readonly string[];
   onSubmit: (value: string) => void;
   isActive: boolean;
+  query: string;
+  setQuery: React.Dispatch<React.SetStateAction<string>>;
 }
 
 interface UseInputHistoryReturn {
@@ -25,8 +27,9 @@ export function useInputHistory({
   userMessages,
   onSubmit,
   isActive,
+  query,
+  setQuery,
 }: UseInputHistoryProps): UseInputHistoryReturn {
-  const [query, setQuery] = useState('');
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [originalQueryBeforeNav, setOriginalQueryBeforeNav] =
     useState<string>('');
@@ -41,9 +44,8 @@ export function useInputHistory({
     (value: string) => {
       const trimmedValue = value.trim();
       if (trimmedValue) {
-        onSubmit(trimmedValue);
+        onSubmit(trimmedValue); // This will call handleFinalSubmit, which then calls setQuery('') from App.tsx
       }
-      setQuery('');
       resetHistoryNav();
     },
     [onSubmit, resetHistoryNav],

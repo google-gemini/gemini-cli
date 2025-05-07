@@ -106,16 +106,25 @@ export async function handleAtCommand({
   // Add the original user query to history first
   addItem({ type: 'user', text: query }, userMessageTimestamp);
 
+  // If the atPath is just "@", pass the original query to the LLM
+  if (atPath === '@') {
+    setDebugMessage('Lone @ detected, passing directly to LLM.');
+    return { processedQuery: [{ text: query }], shouldProceed: true };
+  }
+
   const pathPart = atPath.substring(1); // Remove leading '@'
 
+  // This error condition is for cases where pathPart becomes empty *after* the initial "@" check,
+  // which is unlikely with the current parser but good for robustness.
   if (!pathPart) {
     addItem(
-      { type: 'error', text: 'Error: No path specified after @.' },
+      { type: 'error', text: 'Error: No valid path specified after @ symbol.' },
       userMessageTimestamp,
     );
     return { processedQuery: null, shouldProceed: false };
   }
 
+  const contentLabel = pathPart;
   const toolRegistry = config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
 
@@ -129,7 +138,6 @@ export async function handleAtCommand({
 
   // Determine path spec (file or directory glob)
   let pathSpec = pathPart;
-  const contentLabel = pathPart;
   try {
     const absolutePath = path.resolve(config.getTargetDir(), pathPart);
     const stats = await fs.stat(absolutePath);

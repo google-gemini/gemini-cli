@@ -96,17 +96,8 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 
-  const {
-    query,
-    setQuery,
-    handleSubmit: handleHistorySubmit,
-    inputKey,
-    setInputKey,
-  } = useInputHistory({
-    userMessages,
-    onSubmit: handleFinalSubmit,
-    isActive: isInputActive,
-  });
+  // query and setQuery are now managed by useState here
+  const [query, setQuery] = useState('');
 
   const completion = useCompletion(
     query,
@@ -114,6 +105,22 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     isInputActive && (isAtCommand(query) || isSlashCommand(query)),
     slashCommands,
   );
+
+  const {
+    handleSubmit: handleHistorySubmit,
+    inputKey,
+    setInputKey,
+  } = useInputHistory({
+    userMessages,
+    onSubmit: (value) => {
+      // Adapt onSubmit to use the lifted setQuery
+      handleFinalSubmit(value);
+      setQuery(''); // Clear query from the App's state
+    },
+    isActive: isInputActive && !completion.showSuggestions,
+    query,
+    setQuery,
+  });
 
   // --- Render Logic ---
 

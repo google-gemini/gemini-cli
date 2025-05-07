@@ -13,8 +13,8 @@
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
-  // Check if starts with @ OR has a space, then @, then a non-space character.
-  query.startsWith('@') || /\s@\S/.test(query);
+  // Check if starts with @ OR has a space, then @
+  query.startsWith('@') || /\s@/.test(query);
 
 /**
  * Checks if a query string potentially represents an '/' command.
