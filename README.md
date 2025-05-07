@@ -22,6 +22,10 @@ This repository contains the Gemini Code CLI tool.
 
 ## Building
 
+### Prerequisites:
+
+The build toolchain requires `npm` and `jq` to be installed. You can use the `scripts/setup-dev.sh` script to install these prerequisites.
+
 To build the entire project, including the CLI package, run the following command from the root directory:
 
 ```bash
