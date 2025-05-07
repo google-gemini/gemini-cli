@@ -1,7 +1,6 @@
 This tool executes a given shell command as `bash -c <command>`.
-Command can be any valid single-line Bash command.
 Command can start background processes using `&`.
-Command is executed as a subprocess.
+Command itself is executed as a subprocess.
 
 The following information is returned:
 

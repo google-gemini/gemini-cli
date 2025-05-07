@@ -49,7 +49,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       description += ` [in ${params.directory}]`;
     }
     // append optional (description), replacing any line breaks with spaces
-    // tool description/schema should specify a single line w/o line breaks
     if (params.description) {
       description += ` (${params.description.replace(/\n/g, ' ')})`;
     }
@@ -76,9 +75,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     }
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
-    }
-    if (params.command.match(/[^\S ]/)) {
-      return 'Command cannot contain any whitespace other than plain spaces.';
     }
     if (!this.getCommandRoot(params.command)) {
       return 'Could not identify command root to obtain permission from user.';
