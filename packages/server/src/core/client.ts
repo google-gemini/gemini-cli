@@ -133,39 +133,28 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     let turns = 0;
     const availableTools = this.config.getToolRegistry().getAllTools();
-    try {
-      while (turns < this.MAX_TURNS) {
-        turns++;
-        const turn = new Turn(chat, availableTools);
-        const resultStream = turn.run(request, signal);
-        for await (const event of resultStream) {
-          yield event;
-        }
+    while (turns < this.MAX_TURNS) {
+      turns++;
+      const turn = new Turn(chat, availableTools);
+      const resultStream = turn.run(request, signal);
+      for await (const event of resultStream) {
+        yield event;
+      }
 
-        const confirmations = turn.getConfirmationDetails();
-        if (confirmations.length > 0) {
-          break;
-        }
+      const confirmations = turn.getConfirmationDetails();
+      if (confirmations.length > 0) {
+        break;
+      }
 
-        // What do we do when we have both function responses and confirmations?
-        const fnResponses = turn.getFunctionResponses();
-        if (fnResponses.length === 0) {
-          break; // user's turn to respond
-        }
-        request = fnResponses;
+      // What do we do when we have both function responses and confirmations?
+      const fnResponses = turn.getFunctionResponses();
+      if (fnResponses.length === 0) {
+        break; // user's turn to respond
       }
-      if (turns >= this.MAX_TURNS) {
-        console.warn(
-          'sendMessageStream: Reached maximum tool call turns limit.',
-        );
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Gemini stream request aborted by user.');
-        throw error;
-      }
-      console.error(`Error during Gemini stream or tool interaction:`, error);
-      throw error;
+      request = fnResponses;
+    }
+    if (turns >= this.MAX_TURNS) {
+      console.warn('sendMessageStream: Reached maximum tool call turns limit.');
     }
   }
 
