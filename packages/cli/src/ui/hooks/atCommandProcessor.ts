@@ -24,7 +24,6 @@ interface HandleAtCommandParams {
   query: string;
   config: Config;
   addItem: UseHistoryManagerReturn['addItem'];
-  updateItem: UseHistoryManagerReturn['updateItem'];
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>;
   messageId: number;
 }
@@ -88,7 +87,7 @@ function parseAtCommand(
 export async function handleAtCommand({
   query,
   config,
-  addItem: addItem,
+  addItem,
   setDebugMessage,
   messageId: userMessageTimestamp,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {

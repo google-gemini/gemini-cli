@@ -52,11 +52,13 @@ export interface IndividualToolCallDisplay {
 }
 
 export interface HistoryItemBase {
-  id: number;
   text?: string; // Text content for user/gemini/info/error messages
 }
 
-export type HistoryItem = HistoryItemBase &
+// Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
+// type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
+// 'tools' in historyItem.
+export type HistoryItemWithoutId = HistoryItemBase &
   (
     | { type: 'user'; text: string }
     | { type: 'gemini'; text: string }
@@ -65,3 +67,5 @@ export type HistoryItem = HistoryItemBase &
     | { type: 'error'; text: string }
     | { type: 'tool_group'; tools: IndividualToolCallDisplay[] }
   );
+
+export type HistoryItem = HistoryItemWithoutId & { id: number };

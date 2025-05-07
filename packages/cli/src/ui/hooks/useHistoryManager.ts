@@ -49,7 +49,13 @@ export function useHistory(): UseHistoryManagerReturn {
     [getNextMessageId],
   );
 
-  // Updates an existing history item identified by its ID.
+  /**
+   * Updates an existing history item identified by its ID.
+   * @deprecated Prefer not to update history item directly as we are currently
+   * rendering all history items in <Static /> for performance reasons. Only use
+   * if ABSOLUTELY NECESSARY
+   */
+  //
   const updateItem = useCallback(
     (
       id: number,

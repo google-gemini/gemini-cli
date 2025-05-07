@@ -36,7 +36,7 @@ interface AppProps {
 }
 
 export const App = ({ config, settings, cliVersion }: AppProps) => {
-  const { history, addItem, updateItem, clearItems } = useHistory();
+  const { history, addItem, clearItems } = useHistory();
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const {
@@ -57,9 +57,9 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     initError,
     debugMessage,
     slashCommands,
+    pendingHistoryItem,
   } = useGeminiStream(
     addItem,
-    updateItem,
     clearItems,
     refreshStatic,
     setShowHelp,
@@ -124,9 +124,6 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
 
   // --- Render Logic ---
 
-  const { staticallyRenderedHistoryItems, updatableHistoryItems } =
-    getHistoryRenderSlices(history);
-
   // Get terminal width
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 80;
@@ -146,10 +143,7 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
        * content is set it'll flush content to the terminal and move the area which it's "clearing"
        * down a notch. Without Static the area which gets erased and redrawn continuously grows.
        */}
-      <Static
-        key={'static-key-' + staticKey}
-        items={['header', ...staticallyRenderedHistoryItems]}
-      >
+      <Static key={'static-key-' + staticKey} items={['header', ...history]}>
         {(item, index) => {
           if (item === 'header') {
             return (
@@ -170,19 +164,14 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
           );
         }}
       </Static>
-
-      {updatableHistoryItems.length > 0 && (
-        <Box flexDirection="column" alignItems="flex-start">
-          {updatableHistoryItems.map((historyItem) => (
-            <HistoryItemDisplay
-              key={'history-' + historyItem.id}
-              item={historyItem}
-              onSubmit={submitQuery}
-            />
-          ))}
-        </Box>
+      {pendingHistoryItem && (
+        <HistoryItemDisplay
+          // TODO(taehykim): It seems like references to ids aren't necessary in
+          // HistoryItemDisplay. Refactor later. Use a fake id for now.
+          item={{ ...pendingHistoryItem, id: 0 }}
+          onSubmit={submitQuery}
+        />
       )}
-
       {showHelp && <Help commands={slashCommands} />}
 
       {startupWarnings.length > 0 && (
@@ -295,21 +284,3 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     </Box>
   );
 };
-
-function getHistoryRenderSlices(history: HistoryItem[]) {
-  let staticallyRenderedHistoryItems: HistoryItem[] = [];
-  let updatableHistoryItems: HistoryItem[] = [];
-  if (
-    history.length > 1 &&
-    history[history.length - 2]?.type === 'tool_group'
-  ) {
-    // If the second-to-last item is a tool_group, it and the last item are updateable
-    staticallyRenderedHistoryItems = history.slice(0, -2);
-    updatableHistoryItems = history.slice(-2);
-  } else {
-    // Otherwise, only the last item is updateable
-    staticallyRenderedHistoryItems = history.slice(0, -1);
-    updatableHistoryItems = history.slice(-1);
-  }
-  return { staticallyRenderedHistoryItems, updatableHistoryItems };
-}
