@@ -25,7 +25,8 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
       <Box minHeight={1}>
         {/* Status Indicator */}
         <Box minWidth={statusIndicatorWidth}>
-          {status === ToolCallStatus.Pending && <Spinner type="dots" />}
+          {(status === ToolCallStatus.Pending ||
+            status === ToolCallStatus.Executing) && <Spinner type="dots" />}
           {status === ToolCallStatus.Success && (
             <Text color={Colors.AccentGreen}>✔</Text>
           )}

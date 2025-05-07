@@ -396,6 +396,32 @@ export const useGeminiStream = (
           // Call the original server-side handler first
           originalConfirmationDetails.onConfirm(outcome);
 
+          // Ensure UI updates before potentially long-running operations
+          if (currentToolGroupMessageId !== null) {
+            updateItem(
+              currentToolGroupMessageId,
+              (currentItem: HistoryItem) => {
+                if (currentItem?.type !== 'tool_group')
+                  return currentItem as Partial<Omit<HistoryItem, 'id'>>;
+                return {
+                  ...currentItem,
+                  tools: (currentItem.tools || []).map((tool) =>
+                    tool.callId === request.callId
+                      ? {
+                          ...tool,
+                          confirmationDetails: undefined,
+                          status: ToolCallStatus.Executing,
+                        }
+                      : tool,
+                  ),
+                } as Partial<Omit<HistoryItem, 'id'>>;
+              },
+            );
+            refreshStatic();
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 0)); // Allow UI to re-render
+
           if (outcome === ToolConfirmationOutcome.Cancel) {
             let resultDisplay: ToolResultDisplay | undefined;
             if ('fileDiff' in originalConfirmationDetails) {
@@ -470,6 +496,7 @@ export const useGeminiStream = (
       setShowHelp,
       toolRegistry,
       setInitError,
+      refreshStatic,
     ],
   );
 
