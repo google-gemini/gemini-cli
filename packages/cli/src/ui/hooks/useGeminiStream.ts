@@ -424,8 +424,30 @@ export const useGeminiStream = (
             updateFunctionResponseUI(responseInfo, ToolCallStatus.Error);
             setStreamingState(StreamingState.Idle);
           } else {
-            // If accepted, set state back to Responding to wait for server execution/response
-            setStreamingState(StreamingState.Responding);
+            const tool = toolRegistry.getTool(request.name);
+            if (!tool) {
+              throw new Error(
+                `Tool "${request.name}" not found or is not registered.`,
+              );
+            }
+            const result = await tool.execute(request.args);
+            const functionResponse: Part = {
+              functionResponse: {
+                name: request.name,
+                id: request.callId,
+                response: { output: result.llmContent },
+              },
+            };
+
+            const responseInfo: ToolCallResponseInfo = {
+              callId: request.callId,
+              responsePart: functionResponse,
+              resultDisplay: result.returnDisplay,
+              error: undefined,
+            };
+            updateFunctionResponseUI(responseInfo, ToolCallStatus.Success);
+            setStreamingState(StreamingState.Idle);
+            await submitQuery(functionResponse);
           }
         };
 
