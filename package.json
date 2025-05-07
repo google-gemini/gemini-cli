@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "BUILD_SANDBOX=1 scripts/build.sh",
+    "build": "scripts/build.sh",
+    "build:sandbox": "scripts/build_sandbox.sh",
+    "build:all": "npm run build && npm run build:sandbox",
     "clean": "scripts/clean.sh",
     "test": "npm run test --workspaces",
     "start": "NODE_ENV=development scripts/start.sh",

@@ -76,7 +76,7 @@ Chances are you will need to manually address errors output. You can also try `n
 
 ## Sandboxing
 
-To enable sandboxing, set `GEMINI_CODE_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. Once enabled, `npm run build` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. Requires the specified command (or if `true` then either `docker` or `podman`) to be available on host machine.
+To enable sandboxing, set `GEMINI_CODE_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. Once enabled, `npm run build:all` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. Requires the specified command (or if `true` then either `docker` or `podman`) to be available on host machine.
 
 The sandbox (container) mounts the current directory with read-write access and is started/stopped/removed automatically as you start/stop Gemini Code. You can tell you are inside the sandbox with the `cwd` being reported as `/sandbox/<project>`. Files created within the sandbox should be automatically mapped to your user/group on host machine.
 
