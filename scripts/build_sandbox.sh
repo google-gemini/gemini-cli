@@ -67,10 +67,10 @@ echo "building $IMAGE ... (can be slow first time)"
 
 if [[ "$CMD" == "podman" ]]; then
     # use empty --authfile to skip unnecessary auth refresh overhead
-    $CMD build --authfile=<(echo '{}') -f "$DOCKERFILE" -t "$IMAGE" .
+    $CMD build --authfile=<(echo '{}') --no-cache -f "$DOCKERFILE" -t "$IMAGE" .
 elif [[ "$CMD" == "docker" ]]; then
-    # use an empty config directory to skip unnecessary auth refresh overhead
-    $CMD --config="empty" buildx build -f "$DOCKERFILE" -t "$IMAGE" .
+    # use config directory to skip unnecessary auth refresh overhead
+    $CMD --config=".docker" buildx build --no-cache -f "$DOCKERFILE" -t "$IMAGE" .
 else
     $CMD build -f "$DOCKERFILE" -t "$IMAGE" . >/dev/null
 fi
