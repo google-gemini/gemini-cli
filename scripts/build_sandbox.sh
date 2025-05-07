@@ -30,10 +30,6 @@ SKIP_NPM_INSTALL_BUILD=false
 while getopts "sdf:" opt; do
     case ${opt} in
     s) SKIP_NPM_INSTALL_BUILD=true ;;
-    d)
-        DOCKERFILE=Dockerfile-dev
-        IMAGE+="-dev"
-        ;;
     f)
         DOCKERFILE=$OPTARG
         ;;
@@ -54,38 +50,27 @@ if [ "$SKIP_NPM_INSTALL_BUILD" = false ]; then
     npm run build --workspaces
 fi
 
-# if using Dockerfile-dev, then skip rebuild unless BUILD_SANDBOX is set
-# rebuild should not be necessary unless Dockerfile-dev is modified
-if [ "$DOCKERFILE" = "Dockerfile-dev" ]; then
-    if $CMD images -q "$IMAGE" | grep -q . && [ -z "${BUILD_SANDBOX:-}" ]; then
-        echo "using existing $IMAGE (set BUILD_SANDBOX=true to force rebuild)"
-        exit 0
-    fi
-fi
-
-# prepare global installation files for prod builds (anything but Dockerfile-dev)
-if [ "$DOCKERFILE" != "Dockerfile-dev" ]; then
-    # pack cli
-    echo "packing @gemini-code/cli ..."
-    rm -f packages/cli/dist/gemini-code-cli-*.tgz
-    npm pack -w @gemini-code/cli --pack-destination ./packages/cli/dist &>/dev/null
-    # pack server
-    echo "packing @gemini-code/server ..."
-    rm -f packages/server/dist/gemini-code-server-*.tgz
-    npm pack -w @gemini-code/server --pack-destination ./packages/server/dist &>/dev/null
-    # give node user (used during installation, see Dockerfile) access to these files
-    chmod 755 packages/*/dist/gemini-code-*.tgz
-fi
+# prepare global installation files for prod builds
+# pack cli
+echo "packing @gemini-code/cli ..."
+rm -f packages/cli/dist/gemini-code-cli-*.tgz
+npm pack -w @gemini-code/cli --pack-destination ./packages/cli/dist &>/dev/null
+# pack server
+echo "packing @gemini-code/server ..."
+rm -f packages/server/dist/gemini-code-server-*.tgz
+npm pack -w @gemini-code/server --pack-destination ./packages/server/dist &>/dev/null
+# give node user (used during installation, see Dockerfile) access to these files
+chmod 755 packages/*/dist/gemini-code-*.tgz
 
 # build container image & prune older unused images
 echo "building $IMAGE ... (can be slow first time)"
 
 if [[ "$CMD" == "podman" ]]; then
     # use empty --authfile to skip unnecessary auth refresh overhead
-    $CMD build --authfile=<(echo '{}') -f "$DOCKERFILE" -t "$IMAGE" . >/dev/null
+    $CMD build --authfile=<(echo '{}') -f "$DOCKERFILE" -t "$IMAGE" .
 elif [[ "$CMD" == "docker" ]]; then
     # use an empty config directory to skip unnecessary auth refresh overhead
-    $CMD --config="empty" build -f "$DOCKERFILE" -t "$IMAGE" . >/dev/null
+    $CMD --config="empty" buildx build -f "$DOCKERFILE" -t "$IMAGE" .
 else
     $CMD build -f "$DOCKERFILE" -t "$IMAGE" . >/dev/null
 fi

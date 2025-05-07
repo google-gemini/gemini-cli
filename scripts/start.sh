@@ -22,7 +22,12 @@ node ./scripts/check-build-status.js
 # note with sandboxing this flag is passed to the binary inside the sandbox
 node_args=()
 if [ -n "${DEBUG:-}" ] && ! scripts/sandbox_command.sh -q; then
-    node_args=(--inspect-brk)
+    if [ -n "${SANDBOX:-}" ]; then
+        port="${DEBUG_PORT:-9229}"
+        node_args=("--inspect-brk=0.0.0.0:$port")
+    else
+        node_args=(--inspect-brk)
+    fi
 fi
 node_args+=("./packages/cli" "$@")
 

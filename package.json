@@ -7,11 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "scripts/build.sh",
+    "build": "BUILD_SANDBOX=1 scripts/build.sh",
     "clean": "scripts/clean.sh",
     "test": "npm run test --workspaces",
-    "start": "scripts/start.sh",
-    "debug": "DEBUG=1 scripts/start.sh",
+    "start": "NODE_ENV=development scripts/start.sh",
+    "debug": "NODE_ENV=development DEBUG=1 scripts/start.sh",
     "lint:fix": "eslint . --fix",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --jsx react",

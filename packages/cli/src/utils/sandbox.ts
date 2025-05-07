@@ -57,19 +57,87 @@ function parseImageName(image: string): string {
   return tag ? `${name}-${tag}` : name;
 }
 
+function ports(): string[] {
+  return (process.env.SANDBOX_PORTS ?? '')
+    .split(',')
+    .filter((p) => p.trim())
+    .map((p) => p.trim());
+}
+
+function entrypoint(workdir: string): string[] {
+  // set up bash command to be run inside container
+  // start with setting up PATH and PYTHONPATH with optional suffixes from host
+  const bashCmds = [];
+
+  // copy any paths in PATH that are under working directory in sandbox
+  // note we can't just pass these as --env since that would override base PATH
+  // instead we construct a suffix and append as part of bashCmd below
+  let pathSuffix = '';
+  if (process.env.PATH) {
+    const paths = process.env.PATH.split(':');
+    for (const path of paths) {
+      if (path.startsWith(workdir)) {
+        pathSuffix += `:${path}`;
+      }
+    }
+  }
+  if (pathSuffix) {
+    bashCmds.push(`export PATH="$PATH${pathSuffix}";`); // suffix includes leading ':'
+  }
+
+  // copy any paths in PYTHONPATH that are under working directory in sandbox
+  // note we can't just pass these as --env since that would override base PYTHONPATH
+  // instead we construct a suffix and append as part of bashCmd below
+  let pythonPathSuffix = '';
+  if (process.env.PYTHONPATH) {
+    const paths = process.env.PYTHONPATH.split(':');
+    for (const path of paths) {
+      if (path.startsWith(workdir)) {
+        pythonPathSuffix += `:${path}`;
+      }
+    }
+  }
+  if (pythonPathSuffix) {
+    bashCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`); // suffix includes leading ':'
+  }
+
+  // source sandbox.bashrc if exists under project settings directory
+  const projectSandboxBashrc = path.join(
+    SETTINGS_DIRECTORY_NAME,
+    'sandbox.bashrc',
+  );
+  if (fs.existsSync(projectSandboxBashrc)) {
+    bashCmds.push(`source ${projectSandboxBashrc};`);
+  }
+
+  // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
+  ports().forEach((p) =>
+    bashCmds.push(
+      `socat TCP4-LISTEN:${p},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${p} 2> /dev/null &`,
+    ),
+  );
+
+  // append remaining args (bash -c "gemini-code cli_args...")
+  // cli_args need to be quoted before being inserted into bash_cmd
+  const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
+  const cliCmd =
+    process.env.NODE_ENV === 'development'
+      ? process.env.DEBUG
+        ? 'npm run debug --'
+        : 'npm run start --'
+      : 'gemini-code';
+
+  const args = [...bashCmds, cliCmd, ...cliArgs];
+
+  return ['bash', '-c', args.join(' ')];
+}
+
 export async function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
 
-  // if project is gemini-code, then switch to -dev image & run CLI from ${workdir}/packages/cli
-  let image = process.env.GEMINI_CODE_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
-  const project = path.basename(process.cwd());
+  const image = process.env.GEMINI_CODE_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
   const workdir = process.cwd();
-  let cliPath = '$(which gemini-code)';
-  if (project === 'gemini-code') {
-    image = 'gemini-code-sandbox-dev';
-    cliPath = quote([`${workdir}/packages/cli`]);
-  }
 
   // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
   // note this can only be done with binary linked from gemini-code repo
@@ -163,6 +231,14 @@ export async function start_sandbox(sandbox: string) {
     }
   }
 
+  // expose env-specified ports on the sandbox
+  ports().forEach((p) => args.push('--publish', `${p}:${p}`));
+
+  if (process.env.DEBUG) {
+    const debugPort = process.env.DEBUG_PORT || '9229';
+    args.push(`--publish`, `${debugPort}:${debugPort}`);
+  }
+
   // name container after image, plus numeric suffix to avoid conflicts
   const containerName = parseImageName(image);
   let index = 0;
@@ -203,32 +279,6 @@ export async function start_sandbox(sandbox: string) {
   }
   if (process.env.COLORTERM) {
     args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
-  }
-
-  // copy any paths in PATH that are under working directory in sandbox
-  // note we can't just pass these as --env since that would override base PATH
-  // instead we construct a suffix and append as part of bashCmd below
-  let pathSuffix = '';
-  if (process.env.PATH) {
-    const paths = process.env.PATH.split(':');
-    for (const path of paths) {
-      if (path.startsWith(workdir)) {
-        pathSuffix += `:${path}`;
-      }
-    }
-  }
-
-  // copy any paths in PYTHONPATH that are under working directory in sandbox
-  // note we can't just pass these as --env since that would override base PYTHONPATH
-  // instead we construct a suffix and append as part of bashCmd below
-  let pythonPathSuffix = '';
-  if (process.env.PYTHONPATH) {
-    const paths = process.env.PYTHONPATH.split(':');
-    for (const path of paths) {
-      if (path.startsWith(workdir)) {
-        pythonPathSuffix += `:${path}`;
-      }
-    }
   }
 
   // copy VIRTUAL_ENV if under working directory
@@ -274,45 +324,6 @@ export async function start_sandbox(sandbox: string) {
     args.push('--authfile', emptyAuthFilePath);
   }
 
-  // enable debugging via node --inspect-brk if DEBUG is set
-  const nodeArgs = [];
-  const debugPort = process.env.DEBUG_PORT || '9229';
-  if (process.env.DEBUG) {
-    args.push('--publish', `${debugPort}:${debugPort}`);
-    nodeArgs.push(`--inspect-brk=0.0.0.0:${debugPort}`);
-  }
-
-  // set up bash command to be run inside container
-  // start with setting up PATH and PYTHONPATH with optional suffixes from host
-  let bashCmd = '';
-  if (pathSuffix) {
-    bashCmd += `export PATH="$PATH${pathSuffix}"; `; // suffix includes leading ':'
-  }
-  if (pythonPathSuffix) {
-    bashCmd += `export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}"; `; // suffix includes leading ':'
-  }
-
-  // source sandbox.bashrc if exists under project settings directory
-  const projectSandboxBashrc = path.join(
-    SETTINGS_DIRECTORY_NAME,
-    'sandbox.bashrc',
-  );
-  if (fs.existsSync(projectSandboxBashrc)) {
-    bashCmd += `source ${projectSandboxBashrc}; `;
-  }
-
-  // open additional ports if SANDBOX_PORTS is set
-  // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
-  if (process.env.SANDBOX_PORTS) {
-    for (let port of process.env.SANDBOX_PORTS.split(',')) {
-      if ((port = port.trim())) {
-        console.log(`SANDBOX_PORTS: ${port}`);
-        args.push('--publish', `${port}:${port}`);
-        bashCmd += `socat TCP4-LISTEN:${port},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${port} 2> /dev/null & `;
-      }
-    }
-  }
-
   // specify --user as "$(id -u):$(id -g)" if SANDBOX_SET_UID_GID is 1|true
   // only necessary if user mapping is not handled by sandboxing setup on host
   // (e.g. rootful docker on linux w/o userns-remap configured)
@@ -322,12 +333,11 @@ export async function start_sandbox(sandbox: string) {
     args.push('--user', `${uid}:${gid}`);
   }
 
-  // append remaining args (image, bash -c "node node_args... cli path cli_args...")
-  // node_args and cli_args need to be quoted before being inserted into bash_cmd
-  const quotedNodeArgs = nodeArgs.map((arg) => quote([arg]));
-  const quotedCliArgs = process.argv.slice(2).map((arg) => quote([arg]));
-  bashCmd += `node ${quotedNodeArgs.join(' ')} ${cliPath} ${quotedCliArgs.join(' ')}`;
-  args.push(image, 'bash', '-c', bashCmd);
+  // push container image name
+  args.push(image);
+
+  // push container entrypoint (including args)
+  args.push(...entrypoint(workdir));
 
   // spawn child and let it inherit stdio
   const child = spawn(sandbox, args, {
