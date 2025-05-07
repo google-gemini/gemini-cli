@@ -65,14 +65,26 @@ chmod 755 packages/*/dist/gemini-code-*.tgz
 # build container image & prune older unused images
 echo "building $IMAGE ... (can be slow first time)"
 
+# redirect build output to /dev/null unless VERBOSE is set
+BUILD_STDOUT="/dev/null"
+if [ -n "${VERBOSE:-}" ]; then
+    BUILD_STDOUT="/dev/stdout"
+fi
+
+# initialize build arg array from BUILD_SANDBOX_FLAGS
+read -r -a build_args <<<"${BUILD_SANDBOX_FLAGS:-}"
+
+# append common build args
+build_args+=(-f "$DOCKERFILE" -t "$IMAGE" .)
+
 if [[ "$CMD" == "podman" ]]; then
     # use empty --authfile to skip unnecessary auth refresh overhead
-    $CMD build --authfile=<(echo '{}') --no-cache -f "$DOCKERFILE" -t "$IMAGE" .
+    $CMD build --authfile=<(echo '{}') "${build_args[@]}" >$BUILD_STDOUT
 elif [[ "$CMD" == "docker" ]]; then
     # use config directory to skip unnecessary auth refresh overhead
-    $CMD --config=".docker" buildx build --no-cache -f "$DOCKERFILE" -t "$IMAGE" .
+    $CMD --config=".docker" buildx build "${build_args[@]}" >$BUILD_STDOUT
 else
-    $CMD build -f "$DOCKERFILE" -t "$IMAGE" . >/dev/null
+    $CMD build "${build_args[@]}" >$BUILD_STDOUT
 fi
 $CMD image prune -f >/dev/null
 echo "built $IMAGE"
