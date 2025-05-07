@@ -16,7 +16,7 @@
     "debug": "NODE_ENV=development DEBUG=1 scripts/start.sh",
     "lint:fix": "eslint . --fix",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit --jsx react",
+    "typecheck": "tsc --noEmit --jsx react-jsx",
     "format": "prettier --write .",
     "preflight": "npm run format --workspaces --if-present && npm run lint --workspaces --if-present && npm run test --workspaces --if-present",
     "auth:npm": "npx google-artifactregistry-auth",

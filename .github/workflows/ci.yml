@@ -47,8 +47,7 @@ jobs:
 
       # 6. Type Checking
       - name: Run type check
-        run: npm run typecheck # Or: tsc --noEmit
-        continue-on-error: true
+        run: npm run typecheck
 
       # 7. Build
       # Optional if your tests run directly on TS files (e.g., using ts-jest, ts-node)
