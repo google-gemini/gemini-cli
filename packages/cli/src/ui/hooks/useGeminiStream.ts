@@ -31,7 +31,7 @@ import { isAtCommand } from '../utils/commandUtils.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
-import { findSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -174,14 +174,12 @@ export const useGeminiStream = (
           signal,
         );
 
-        let currentGeminiText = '';
+        let geminiMessageBuffer = '';
 
         for await (const event of stream) {
           if (signal.aborted) break;
 
           if (event.type === ServerGeminiEventType.Content) {
-            currentGeminiText += event.value;
-
             if (pendingHistoryItemRef.current?.type !== 'gemini') {
               // Flush out existing pending history item.
               if (pendingHistoryItemRef.current) {
@@ -189,19 +187,22 @@ export const useGeminiStream = (
               }
               setPendingHistoryItem({
                 type: 'gemini',
-                text: currentGeminiText,
+                text: '',
               });
+              geminiMessageBuffer = '';
             }
 
-            // Split large messages for better rendering performance
-            const splitPoint = findSafeSplitPoint(currentGeminiText);
-            if (splitPoint === currentGeminiText.length) {
+            geminiMessageBuffer += event.value;
+
+            // Split large messages for better rendering performance. Ideally,
+            // we should maximize the amount of output sent to <Static />.
+            const splitPoint = findLastSafeSplitPoint(geminiMessageBuffer);
+            if (splitPoint === geminiMessageBuffer.length) {
               // Update the existing message with accumulated content
-              setPendingHistoryItem((pending) => ({
-                // There might be a more typesafe way to do this.
-                ...pending!,
-                text: currentGeminiText,
-              }));
+              setPendingHistoryItem({
+                type: 'gemini',
+                text: geminiMessageBuffer,
+              });
             } else {
               // This indicates that we need to split up this Gemini Message.
               // Splitting a message is primarily a performance consideration. There is a
@@ -211,21 +212,19 @@ export const useGeminiStream = (
               // multiple times per-second (as streaming occurs). Prior to this change you'd
               // see heavy flickering of the terminal. This ensures that larger messages get
               // broken up so that there are more "statically" rendered.
-              const beforeText = currentGeminiText.substring(0, splitPoint);
-              const afterText = currentGeminiText.substring(splitPoint);
-              currentGeminiText = afterText; // Continue accumulating from split point
+              const beforeText = geminiMessageBuffer.substring(0, splitPoint);
+              const afterText = geminiMessageBuffer.substring(splitPoint);
+              geminiMessageBuffer = afterText; // Continue accumulating from split point
               addItem(
-                { type: 'gemini_content', text: beforeText },
+                { type: 'gemini', text: beforeText },
                 userMessageTimestamp,
               );
               setPendingHistoryItem({
-                type: 'gemini_content',
+                type: 'gemini',
                 text: afterText,
               });
             }
           } else if (event.type === ServerGeminiEventType.ToolCallRequest) {
-            currentGeminiText = '';
-
             const { callId, name, args } = event.value;
             const cliTool = toolRegistry.getTool(name);
             if (!cliTool) {

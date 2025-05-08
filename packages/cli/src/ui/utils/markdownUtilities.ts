@@ -184,3 +184,35 @@ export const findSafeSplitPoint = (
   // to keep the entire content as one piece.
   return content.length;
 };
+
+export const findLastSafeSplitPoint = (content: string) => {
+  const enclosingBlockStart = findEnclosingCodeBlockStart(
+    content,
+    content.length,
+  );
+  if (enclosingBlockStart !== -1) {
+    // The end of the content is contained in a code block. Split right before.
+    return enclosingBlockStart;
+  }
+
+  // Search for the last double newline (\n\n) not in a code block.
+  let searchStartIndex = content.length;
+  while (searchStartIndex >= 0) {
+    const dnlIndex = content.lastIndexOf('\n\n', searchStartIndex);
+    if (dnlIndex === -1) {
+      // No more double newlines found after idealMaxLength
+      break;
+    }
+
+    const potentialSplitPoint = dnlIndex + 2;
+    if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
+      return potentialSplitPoint;
+    }
+
+    searchStartIndex = potentialSplitPoint; // Continue search after the found \n\n
+  }
+
+  // If no safe double newline found after idealMaxLength, return content.length
+  // to keep the entire content as one piece.
+  return content.length;
+};
