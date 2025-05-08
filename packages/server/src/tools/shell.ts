@@ -16,7 +16,6 @@ import {
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
 } from './tools.js';
-import toolParameterSchema from './shell.json' with { type: 'json' };
 import { SchemaValidator } from '../utils/schemaValidator.js';
 export interface ShellToolParams {
   command: string;
@@ -33,6 +32,8 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     const toolDisplayName = 'Shell';
     const descriptionUrl = new URL('shell.md', import.meta.url);
     const toolDescription = fs.readFileSync(descriptionUrl, 'utf-8');
+    const schemaUrl = new URL('shell.json', import.meta.url);
+    const toolParameterSchema = JSON.parse(fs.readFileSync(schemaUrl, 'utf-8'));
     super(
       ShellTool.Name,
       toolDisplayName,
