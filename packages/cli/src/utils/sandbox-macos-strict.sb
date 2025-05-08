@@ -66,6 +66,8 @@
 (allow file-write*
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (subpath (string-append (param "HOME_DIR") "/.npm"))
     (literal "/dev/stdout")
     (literal "/dev/stderr")
     (literal "/dev/null")

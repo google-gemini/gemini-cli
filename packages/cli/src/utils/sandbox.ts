@@ -145,9 +145,11 @@ export async function start_sandbox(sandbox: string) {
     process.env.SEATBELT_PROFILE ??= 'minimal';
     const args = [
       '-D',
-      `TARGET_DIR=${process.cwd()}`,
+      `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
       '-D',
       `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
+      '-D',
+      `HOME_DIR=${fs.realpathSync(os.homedir())}`,
       '-f',
       new URL(
         `sandbox-macos-${process.env.SEATBELT_PROFILE}.sb`,
