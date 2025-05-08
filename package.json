@@ -22,9 +22,11 @@
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
-    "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces"
+    "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
+    "bundle": "esbuild packages/cli/index.ts --bundle --outfile=bundle/gemini.js --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);\" && bash scripts/copy_bundle_assets.sh"
   },
   "devDependencies": {
+    "esbuild": "^0.25.4",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
