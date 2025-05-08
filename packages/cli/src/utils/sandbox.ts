@@ -142,7 +142,8 @@ function entrypoint(workdir: string): string[] {
 
 export async function start_sandbox(sandbox: string) {
   if (sandbox === 'sandbox-exec') {
-    process.env.SEATBELT_PROFILE ??= 'minimal';
+    const profile = (process.env.SEATBELT_PROFILE ??= 'minimal');
+    console.log(`using macos seatbelt (profile: ${profile}) ...`);
     const args = [
       '-D',
       `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
@@ -151,18 +152,17 @@ export async function start_sandbox(sandbox: string) {
       '-D',
       `HOME_DIR=${fs.realpathSync(os.homedir())}`,
       '-f',
-      new URL(
-        `sandbox-macos-${process.env.SEATBELT_PROFILE}.sb`,
-        import.meta.url,
-      ).pathname,
+      new URL(`sandbox-macos-${profile}.sb`, import.meta.url).pathname,
       'bash',
       '-c',
-      'SANDBOX=sandbox-exec ' +
+      `SANDBOX=sandbox-exec NODE_OPTIONS="${process.env.NODE_OPTIONS}" ` +
         process.argv.map((arg) => quote([arg])).join(' '),
     ];
     spawnSync(sandbox, args, { stdio: 'inherit' });
     return;
   }
+
+  console.log(`hopping into sandbox (command: ${sandbox}) ...`);
 
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
@@ -343,6 +343,11 @@ export async function start_sandbox(sandbox: string) {
         }
       }
     }
+  }
+
+  // copy NODE_OPTIONS
+  if (process.env.NODE_OPTIONS) {
+    args.push('--env', `NODE_OPTIONS="${process.env.NODE_OPTIONS}"`);
   }
 
   // set SANDBOX as container name

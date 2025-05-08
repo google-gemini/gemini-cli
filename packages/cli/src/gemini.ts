@@ -31,7 +31,6 @@ async function main() {
   if (!process.env.SANDBOX) {
     const sandbox = sandbox_command(config.getSandbox());
     if (sandbox) {
-      console.log('hopping into sandbox ...');
       await start_sandbox(sandbox);
       process.exit(0);
     }
