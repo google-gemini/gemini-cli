@@ -392,8 +392,6 @@ export const useGeminiStream = (
             refreshStatic();
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 0)); // Allow UI to re-render
-
           if (outcome === ToolConfirmationOutcome.Cancel) {
             let resultDisplay: ToolResultDisplay | undefined;
             if ('fileDiff' in originalConfirmationDetails) {
