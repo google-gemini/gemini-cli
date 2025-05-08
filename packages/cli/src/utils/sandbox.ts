@@ -142,7 +142,7 @@ function entrypoint(workdir: string): string[] {
 
 export async function start_sandbox(sandbox: string) {
   if (sandbox === 'sandbox-exec') {
-    process.env.SANDBOX_EXEC_PROFILE ??= 'minimal';
+    process.env.SEATBELT_PROFILE ??= 'minimal';
     const args = [
       '-D',
       `TARGET_DIR=${process.cwd()}`,
@@ -150,7 +150,7 @@ export async function start_sandbox(sandbox: string) {
       `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
       '-f',
       new URL(
-        `sandbox-macos-${process.env.SANDBOX_EXEC_PROFILE}.sb`,
+        `sandbox-macos-${process.env.SEATBELT_PROFILE}.sb`,
         import.meta.url,
       ).pathname,
       'bash',

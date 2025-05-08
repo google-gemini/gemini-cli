@@ -49,10 +49,10 @@ export const Footer: React.FC<FooterProps> = ({
         <Text color="green"> {process.env.SANDBOX} </Text>
       ) : process.env.SANDBOX === 'sandbox-exec' ? (
         <Text color={Colors.AccentYellow}>
-          using macos seatbelt ({process.env.SANDBOX_EXEC_PROFILE})
+          using macos seatbelt ({process.env.SEATBELT_PROFILE})
         </Text>
       ) : (
-        <Text color={Colors.AccentRed}> WARNING: SANDBOX NOT ENABLED </Text>
+        <Text color={Colors.AccentRed}> WARNING: OUTSIDE SANDBOX </Text>
       )}
     </Box>
 
