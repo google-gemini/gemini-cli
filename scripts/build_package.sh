@@ -27,7 +27,7 @@ fi
 tsc --build
 
 # copy .{md,json} files  (replace -q with -i to see itemized changes)
-rsync -aq --delete --include='*.md' --include='*.json' --include='*/' --exclude='*' ./src/ ./dist/src/
+rsync -aq --delete --include='*.md' --include='*.json' --include='*.sb' --include='*/' --exclude='*' ./src/ ./dist/src/
 
 # touch dist/.last_build
 touch dist/.last_build

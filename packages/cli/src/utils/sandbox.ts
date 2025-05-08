@@ -45,6 +45,14 @@ export function sandbox_command(sandbox?: string | boolean): string {
       process.exit(1);
     }
   } else {
+    // if we are on macOS (Darwin) and sandbox-exec is available, use that for minimal sandboxing
+    if (
+      os.platform() === 'darwin' &&
+      execSync('command -v sandbox-exec || true').toString().trim()
+    ) {
+      return 'sandbox-exec';
+    }
+
     return ''; // no sandbox
   }
 }
@@ -133,6 +141,27 @@ function entrypoint(workdir: string): string[] {
 }
 
 export async function start_sandbox(sandbox: string) {
+  if (sandbox === 'sandbox-exec') {
+    process.env.SANDBOX_EXEC_PROFILE ??= 'minimal';
+    const args = [
+      '-D',
+      `TARGET_DIR=${process.cwd()}`,
+      '-D',
+      `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
+      '-f',
+      new URL(
+        `sandbox-macos-${process.env.SANDBOX_EXEC_PROFILE}.sb`,
+        import.meta.url,
+      ).pathname,
+      'bash',
+      '-c',
+      'SANDBOX=sandbox-exec ' +
+        process.argv.map((arg) => quote([arg])).join(' '),
+    ];
+    spawnSync(sandbox, args, { stdio: 'inherit' });
+    return;
+  }
+
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
 

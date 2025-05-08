@@ -1,0 +1,15 @@
+(version 1)
+
+;; allow everything by default
+(allow default)
+
+;; deny all writes EXCEPT under project directory, temp directory, stdout/stderr and /dev/null
+(deny file-write*)
+(allow file-write*
+    (subpath (param "TARGET_DIR"))
+    (subpath (param "TMP_DIR"))
+    (literal "/dev/stdout")
+    (literal "/dev/stderr")
+    (literal "/dev/null")
+)
+
