@@ -62,7 +62,7 @@
   (sysctl-name-prefix "hw.perflevel")
 )
 
-;; allow writes to project directory, temp directory, stdout/stderr and /dev/null
+;; allow writes to specific paths
 (allow file-write*
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
