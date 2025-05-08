@@ -180,12 +180,16 @@ export const useGeminiStream = (
           if (signal.aborted) break;
 
           if (event.type === ServerGeminiEventType.Content) {
-            if (pendingHistoryItemRef.current?.type !== 'gemini') {
+            if (
+              pendingHistoryItemRef.current?.type !== 'gemini' &&
+              pendingHistoryItemRef.current?.type !== 'gemini_content'
+            ) {
               // Flush out existing pending history item.
               if (pendingHistoryItemRef.current) {
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
               }
               setPendingHistoryItem({
+                // Use the 'gemini' type for the initial history item.
                 type: 'gemini',
                 text: '',
               });
@@ -199,10 +203,10 @@ export const useGeminiStream = (
             const splitPoint = findLastSafeSplitPoint(geminiMessageBuffer);
             if (splitPoint === geminiMessageBuffer.length) {
               // Update the existing message with accumulated content
-              setPendingHistoryItem({
-                type: 'gemini',
+              setPendingHistoryItem((item) => ({
+                type: item?.type as 'gemini' | 'gemini_content',
                 text: geminiMessageBuffer,
-              });
+              }));
             } else {
               // This indicates that we need to split up this Gemini Message.
               // Splitting a message is primarily a performance consideration. There is a
@@ -216,11 +220,16 @@ export const useGeminiStream = (
               const afterText = geminiMessageBuffer.substring(splitPoint);
               geminiMessageBuffer = afterText; // Continue accumulating from split point
               addItem(
-                { type: 'gemini', text: beforeText },
+                {
+                  type: pendingHistoryItemRef.current?.type as
+                    | 'gemini'
+                    | 'gemini_content',
+                  text: beforeText,
+                },
                 userMessageTimestamp,
               );
               setPendingHistoryItem({
-                type: 'gemini',
+                type: 'gemini_content',
                 text: afterText,
               });
             }
