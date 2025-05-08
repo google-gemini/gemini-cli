@@ -18,6 +18,7 @@ import {
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { ReadFileTool } from './read-file.js';
 
 /**
  * Parameters for the Edit tool
@@ -64,27 +65,32 @@ export class EditTool extends BaseTool<EditToolParams, ToolResult> {
    * @param rootDirectory Root directory to ground this tool in.
    */
   constructor(private readonly rootDirectory: string) {
-    // Note: The description here mentions other tools like ReadFileTool/WriteFileTool
-    // by name. This might need updating if those tool names change.
     super(
       EditTool.Name,
       'Edit',
-      'Replaces a SINGLE, UNIQUE occurrence of text within a file. Requires providing significant context around the change to ensure uniqueness. For moving/renaming files, use the Bash tool with `mv`. For replacing entire file contents or creating new files use the WriteFile tool. Always use the ReadFile tool to examine the file before using this tool.',
+      `Replaces a single, unique occurrence of text within a file. This tool requires providing significant context around the change to ensure uniqueness and precise targeting. Always use the ${ReadFileTool} tool to examine the file's current content before attempting a text replacement.
+
+Expectation for parameters:
+1. 'file_path' MUST be an absolute path; otherwise an error will be thrown.
+2. 'old_string' MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+3. 'new_string' MUST be the exact literal text to replace 'old_string' with (also including all whitespace, indentation, newlines, and surrounding code etc.).
+4. NEVER escape 'old_string' or 'new_string', JSON encoding will handle that automatically.
+**Important:** If ANY of the above are not satisfied the tool will fail.`,
       {
         properties: {
           file_path: {
             description:
-              'The absolute path to the file to modify. Must start with /. When creating a new file, ensure the parent directory exists (use the `LS` tool to verify).',
+              "The absolute path to the file to modify. Must start with '/'.",
             type: 'string',
           },
           old_string: {
             description:
-              'The exact text to replace. CRITICAL: Must uniquely identify the single instance to change. Include at least 3-5 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations or does not match exactly, the tool will fail. Use an empty string ("") when creating a new file.',
+              'The exact literal text to replace, preferably unescaped. The tool will attempt to match this string as-is. CRITICAL: Must uniquely identify the single instance to change. Include at least 3-5 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, is escaped in a way that is not present in the original file, or does not match exactly, the tool will fail.',
             type: 'string',
           },
           new_string: {
             description:
-              'The text to replace the `old_string` with. When creating a new file (using an empty `old_string`), this should contain the full desired content of the new file. Ensure the resulting code is correct and idiomatic.',
+              'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
           },
         },
