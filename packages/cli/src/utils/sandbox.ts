@@ -48,7 +48,8 @@ export function sandbox_command(sandbox?: string | boolean): string {
     // if we are on macOS (Darwin) and sandbox-exec is available, use that for minimal sandboxing
     if (
       os.platform() === 'darwin' &&
-      execSync('command -v sandbox-exec || true').toString().trim()
+      execSync('command -v sandbox-exec || true').toString().trim() &&
+      process.env.SEATBELT_PROFILE !== 'none'
     ) {
       return 'sandbox-exec';
     }
