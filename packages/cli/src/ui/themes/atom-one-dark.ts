@@ -7,7 +7,8 @@
 import { darkTheme, Theme } from './theme.js';
 
 export const AtomOneDark: Theme = new Theme(
-  'Atom One Dark',
+  'Atom One',
+  'dark',
   {
     hljs: {
       display: 'block',

@@ -5,7 +5,11 @@
  */
 
 import type { CSSProperties } from 'react';
+
+export type ThemeType = 'light' | 'dark' | 'ansi';
+
 export interface ColorsTheme {
+  type: ThemeType;
   Background: string;
   Foreground: string;
   LightBlue: string;
@@ -21,6 +25,7 @@ export interface ColorsTheme {
 }
 
 export const lightTheme: ColorsTheme = {
+  type: 'light',
   Background: '#FAFAFA',
   Foreground: '#3C3C43',
   LightBlue: '#ADD8E6',
@@ -36,6 +41,7 @@ export const lightTheme: ColorsTheme = {
 };
 
 export const darkTheme: ColorsTheme = {
+  type: 'dark',
   Background: '#1E1E2E',
   Foreground: '#CDD6F4',
   LightBlue: '#ADD8E6',
@@ -51,6 +57,7 @@ export const darkTheme: ColorsTheme = {
 };
 
 export const ansiTheme: ColorsTheme = {
+  type: 'ansi',
   Background: 'black',
   Foreground: 'white',
   LightBlue: 'blue',
@@ -250,6 +257,7 @@ export class Theme {
    */
   constructor(
     readonly name: string,
+    readonly type: ThemeType,
     rawMappings: Record<string, CSSProperties>,
     readonly colors: ColorsTheme,
   ) {

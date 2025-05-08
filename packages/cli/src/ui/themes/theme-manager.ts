@@ -11,12 +11,12 @@ import { GoogleCode } from './googlecode.js';
 import { VS } from './vs.js';
 import { VS2015 } from './vs2015.js';
 import { XCode } from './xcode.js';
-import { Theme } from './theme.js';
+import { Theme, ThemeType } from './theme.js';
 import { ANSI } from './ansi.js';
 
 export interface ThemeDisplay {
   name: string;
-  active: boolean;
+  type: ThemeType;
 }
 
 export const DEFAULT_THEME: Theme = VS2015;
@@ -43,9 +43,30 @@ class ThemeManager {
    * Returns a list of available theme names.
    */
   getAvailableThemes(): ThemeDisplay[] {
-    return this.availableThemes.map((theme) => ({
+    const sortedThemes = [...this.availableThemes].sort((a, b) => {
+      const typeOrder = (type: ThemeType): number => {
+        switch (type) {
+          case 'dark':
+            return 1;
+          case 'light':
+            return 2;
+          case 'ansi':
+            return 3;
+          default:
+            return 4;
+        }
+      };
+
+      const typeComparison = typeOrder(a.type) - typeOrder(b.type);
+      if (typeComparison !== 0) {
+        return typeComparison;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return sortedThemes.map((theme) => ({
       name: theme.name,
-      active: theme === this.activeTheme,
+      type: theme.type,
     }));
   }
 

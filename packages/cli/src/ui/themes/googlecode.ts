@@ -8,6 +8,7 @@ import { lightTheme, Theme } from './theme.js';
 
 export const GoogleCode: Theme = new Theme(
   'Google Code',
+  'light',
   {
     hljs: {
       display: 'block',

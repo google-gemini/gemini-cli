@@ -8,6 +8,7 @@ import { lightTheme, Theme } from './theme.js';
 
 export const VS: Theme = new Theme(
   'VS',
+  'light',
   {
     hljs: {
       display: 'block',

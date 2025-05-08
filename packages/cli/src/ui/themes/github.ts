@@ -8,6 +8,7 @@ import { lightTheme, Theme } from './theme.js';
 
 export const GitHub: Theme = new Theme(
   'GitHub',
+  'light',
   {
     hljs: {
       display: 'block',

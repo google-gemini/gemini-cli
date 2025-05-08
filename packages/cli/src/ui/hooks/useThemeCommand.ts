@@ -19,7 +19,7 @@ interface UseThemeCommandReturn {
 }
 
 export const useThemeCommand = (
-  loadedSettings: LoadedSettings, // Changed parameter
+  loadedSettings: LoadedSettings,
 ): UseThemeCommandReturn => {
   // Determine the effective theme
   const effectiveTheme = loadedSettings.merged.theme;

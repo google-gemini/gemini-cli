@@ -32,16 +32,22 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
-  const themeItems = themeManager.getAvailableThemes().map((theme) => ({
-    label: theme.active ? `${theme.name} (Active)` : theme.name,
-    value: theme.name,
-  }));
+  // Generate theme items
+  const themeItems = themeManager.getAvailableThemes().map((theme) => {
+    const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
+    return {
+      label: theme.name,
+      value: theme.name,
+      themeNameDisplay: theme.name,
+      themeTypeDisplay: typeString,
+    };
+  });
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
+  // Determine which radio button should be initially selected in the theme list
+  // This should reflect the theme *saved* for the selected scope, or the default
   const initialThemeIndex = themeItems.findIndex(
-    (item) =>
-      item.value ===
-      (settings.forScope(selectedScope).settings.theme || DEFAULT_THEME.name),
+    (item) => item.value === (settings.merged.theme || DEFAULT_THEME.name),
   );
 
   const scopeItems = [
@@ -88,45 +94,49 @@ export function ThemeDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.AccentCyan}
-      flexDirection="column"
+      borderColor={Colors.AccentPurple}
+      flexDirection="row"
       padding={1}
-      width="50%"
+      width="100%"
     >
-      <Text bold={focusedSection === 'theme'}>
-        {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
-        <Text color={Colors.SubtleComment}>{otherScopeModifiedMessage}</Text>
-      </Text>
-
-      <RadioButtonSelect
-        key={selectInputKey}
-        items={themeItems}
-        initialIndex={initialThemeIndex}
-        onSelect={handleThemeSelect} // Use the wrapper handler
-        onHighlight={onHighlight}
-        isFocused={focusedSection === 'theme'}
-      />
-      {/* Scope Selection */}
-      <Box marginTop={1} flexDirection="column">
-        <Text bold={focusedSection === 'scope'}>
-          {focusedSection === 'scope' ? '> ' : '  '}Apply To
+      {/* Left Column: Selection */}
+      <Box flexDirection="column" width="50%" paddingRight={2}>
+        <Text bold={focusedSection === 'theme'}>
+          {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text color={Colors.SubtleComment}>{otherScopeModifiedMessage}</Text>
         </Text>
         <RadioButtonSelect
-          items={scopeItems}
-          initialIndex={0} // Default to User Settings
-          onSelect={handleScopeSelect}
-          onHighlight={handleScopeHighlight}
-          isFocused={focusedSection === 'scope'}
+          key={selectInputKey}
+          items={themeItems}
+          initialIndex={initialThemeIndex}
+          onSelect={handleThemeSelect}
+          onHighlight={onHighlight}
+          isFocused={focusedSection === 'theme'}
         />
+
+        {/* Scope Selection */}
+        <Box marginTop={1} flexDirection="column">
+          <Text bold={focusedSection === 'scope'}>
+            {focusedSection === 'scope' ? '> ' : '  '}Apply To
+          </Text>
+          <RadioButtonSelect
+            items={scopeItems}
+            initialIndex={0} // Default to User Settings
+            onSelect={handleScopeSelect}
+            onHighlight={handleScopeHighlight}
+            isFocused={focusedSection === 'scope'}
+          />
+        </Box>
+
+        <Box marginTop={1}>
+          <Text color={Colors.SubtleComment}>
+            (Use ↑/↓ arrows and Enter to select, Tab to change focus)
+          </Text>
+        </Box>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color={Colors.SubtleComment}>
-          (Use ↑/↓ arrows and Enter to select, Tab to change focus)
-        </Text>
-      </Box>
-
-      <Box marginTop={1} flexDirection="column">
+      {/* Right Column: Preview */}
+      <Box flexDirection="column" width="50%" paddingLeft={3}>
         <Text bold>Preview</Text>
         <Box
           borderStyle="single"

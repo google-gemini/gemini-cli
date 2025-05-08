@@ -8,6 +8,7 @@ import { lightTheme, Theme } from './theme.js';
 
 export const XCode: Theme = new Theme(
   'XCode',
+  'light',
   {
     hljs: {
       display: 'block',

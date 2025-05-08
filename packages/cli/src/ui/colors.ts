@@ -8,6 +8,9 @@ import { themeManager } from './themes/theme-manager.js';
 import { ColorsTheme } from './themes/theme.js';
 
 export const Colors: ColorsTheme = {
+  get type() {
+    return themeManager.getActiveTheme().colors.type;
+  },
   get Foreground() {
     return themeManager.getActiveTheme().colors.Foreground;
   },

@@ -8,6 +8,7 @@ import { darkTheme, Theme } from './theme.js';
 
 export const Dracula: Theme = new Theme(
   'Dracula',
+  'dark',
   {
     hljs: {
       display: 'block',

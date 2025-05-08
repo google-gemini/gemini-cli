@@ -8,6 +8,7 @@ import { darkTheme, Theme } from './theme.js';
 
 export const VS2015: Theme = new Theme(
   'VS2015',
+  'dark',
   {
     hljs: {
       display: 'block',

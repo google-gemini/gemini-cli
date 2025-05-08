@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { Colors } from '../colors.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -48,7 +49,7 @@ export function SuggestionsDisplay({
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color="gray">▲</Text>}
+      {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
@@ -56,8 +57,8 @@ export function SuggestionsDisplay({
         return (
           <Text
             key={`${suggestion}-${originalIndex}`}
-            color={isActive ? 'black' : 'white'}
-            backgroundColor={isActive ? 'blue' : undefined}
+            color={isActive ? Colors.Background : Colors.Foreground}
+            backgroundColor={isActive ? Colors.AccentBlue : undefined}
           >
             {suggestion.label}
           </Text>

@@ -7,7 +7,8 @@
 import { ansiTheme, Theme } from './theme.js';
 
 export const ANSI: Theme = new Theme(
-  'ANSI colors only',
+  'ANSI',
+  'ansi',
   {
     hljs: {
       display: 'block',
