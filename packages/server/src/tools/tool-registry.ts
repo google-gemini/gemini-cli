@@ -187,7 +187,15 @@ export class ToolRegistry {
             command: mcpServerCmd,
             stderr: 'pipe',
           });
-          await this.mcpClient.connect(transport);
+          try {
+            await this.mcpClient.connect(transport);
+          } catch (error) {
+            console.error(
+              'failed to start or connect to MCP server using ' +
+                `command '${mcpServerCmd}'; \n${error}`,
+            );
+            throw error;
+          }
           this.mcpClient.onerror = (error) => {
             console.error('MCP ERROR', error.toString());
           };
