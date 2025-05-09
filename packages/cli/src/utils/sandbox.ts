@@ -152,6 +152,21 @@ export async function start_sandbox(sandbox: string) {
       process.exit(1);
     }
     const profile = (process.env.SEATBELT_PROFILE ??= 'minimal');
+    let profileFile = new URL(`sandbox-macos-${profile}.sb`, import.meta.url)
+      .pathname;
+    // if profile is anything other than 'minimal' or 'strict', then look for the profile file under the project settings directory
+    if (profile !== 'minimal' && profile !== 'strict') {
+      profileFile = path.join(
+        SETTINGS_DIRECTORY_NAME,
+        `sandbox-macos-${profile}.sb`,
+      );
+    }
+    if (!fs.existsSync(profileFile)) {
+      console.error(
+        `ERROR: missing macos seatbelt profile file '${profileFile}'`,
+      );
+      process.exit(1);
+    }
     console.log(`using macos seatbelt (profile: ${profile}) ...`);
     // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
     if (process.env.DEBUG) {
@@ -166,7 +181,7 @@ export async function start_sandbox(sandbox: string) {
       '-D',
       `HOME_DIR=${fs.realpathSync(os.homedir())}`,
       '-f',
-      new URL(`sandbox-macos-${profile}.sb`, import.meta.url).pathname,
+      profileFile,
       'bash',
       '-c',
       [
