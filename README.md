@@ -22,18 +22,20 @@ This repository contains the Gemini Code CLI tool.
 
 ## Building
 
+As with most Node projects, major development scripts can be found in the `package.json`. See that for the full list of commands.
+
 ### Prerequisites:
 
 The build toolchain requires `npm` and `jq` to be installed. You can use the `scripts/setup-dev.sh` script to install these prerequisites.
 
-To build the entire project, including the CLI package, run the following command from the root directory:
+To build the entire project, CLI and Sandbox Container Image (if applicable), run the following command from the root directory:
 
 ```bash
 npm install
-npm run build
+npm run build:all
 ```
 
-This command installs dependencies and then runs the build script defined in the root `package.json`, which in turn executes the build scripts in all workspaces (including `packages/cli`).
+This command installs dependencies and builds the entire project, including the CLI and the Sandbox Container Image (if applicable). For a quick build without the sandbox container, you can use `npm run build`.
 
 ## Running
 
@@ -43,7 +45,7 @@ To start the Gemini Code CLI, run the following command from the root directory:
 npm start
 ```
 
-This command executes the `start` script defined in the root `package.json`, which specifically targets and runs the `start` script within the `gemini-code-cli` workspace.
+This command starts the Gemini Code CLI.
 
 ## Debugging
 
@@ -53,10 +55,34 @@ To debug the CLI application using VS Code:
     ```bash
     npm run debug
     ```
-    This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches.
+    This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches. You can then open `chrome://inspect` in your Chrome browser to connect to the debugger. Alternatively, you can achieve the same effect by running `DEBUG=1 npm run start`.
 2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`). This configuration is set up to attach to the Node.js process listening on port 9229, which is the default port used by `--inspect-brk`.
 
 Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
+
+## Using Gemini Code source in other directories
+
+To test your local version of `gemini-code` in other directories on your system, you can use `npm link`. Note, this is not the same as globally installing the released version of Gemini Code via `npm install -g @gemini-code/cli`. Rather, this creates a global symlink to your local project.
+
+From the root of this repository, run:
+
+```bash
+npm link packages/cli
+```
+
+Then, navigate to any other directory where you want to use your local `gemini-code` and run:
+
+```bash
+gemini-code
+```
+
+To breakpoint inside the sandbox container run:
+
+```bash
+DEBUG=1 gemini-code
+```
+
+Note that using `npm link` simulates a production environment. If you are testing sandboxed mode via `npm link`, you must run the full build with `npm run build:all` from the repository root after any code changes to ensure the linked version is up to date.
 
 ## Formatting
 

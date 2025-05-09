@@ -134,7 +134,9 @@ function entrypoint(workdir: string): string[] {
       ? process.env.DEBUG
         ? 'npm run debug --'
         : 'npm run start --'
-      : 'gemini-code';
+      : process.env.DEBUG // for production binary debugging
+        ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini-code)`
+        : 'gemini-code';
 
   const args = [...bashCmds, cliCmd, ...cliArgs];
 
