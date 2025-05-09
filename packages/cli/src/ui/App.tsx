@@ -39,12 +39,13 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
   const { history, addItem, clearItems } = useHistory();
   const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [themeError, setThemeError] = useState<string | null>(null);
   const {
     isThemeDialogOpen,
     openThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
-  } = useThemeCommand(settings);
+  } = useThemeCommand(settings, setThemeError);
 
   const [staticKey, setStaticKey] = useState(0);
   const refreshStatic = useCallback(() => {
@@ -191,11 +192,18 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
       )}
 
       {isThemeDialogOpen ? (
-        <ThemeDialog
-          onSelect={handleThemeSelect}
-          onHighlight={handleThemeHighlight}
-          settings={settings}
-        />
+        <Box flexDirection="column">
+          {themeError && (
+            <Box marginBottom={1}>
+              <Text color={Colors.AccentRed}>{themeError}</Text>
+            </Box>
+          )}
+          <ThemeDialog
+            onSelect={handleThemeSelect}
+            onHighlight={handleThemeHighlight}
+            settings={settings}
+          />
+        </Box>
       ) : (
         <>
           <LoadingIndicator
