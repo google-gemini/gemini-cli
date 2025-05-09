@@ -76,6 +76,9 @@
 ;; allow outbound network connections
 (allow network-outbound)
 
+;; allow inbound network connections to debugging port
+(allow network-inbound (local ip (string-append "*:" "9229")))
+
 ;; allow communication with sysmond for process listing (e.g. for pgrep)
 (allow mach-lookup (global-name "com.apple.sysmond"))
 

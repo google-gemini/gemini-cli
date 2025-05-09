@@ -54,35 +54,37 @@ if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
     done
 fi
 
-# if GEMINI_CODE_SANDBOX is still not set, then exit immediately w/ code 1
-if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then exit 1; fi
-
 # lowercase GEMINI_CODE_SANDBOX
 GEMINI_CODE_SANDBOX=$(echo "${GEMINI_CODE_SANDBOX:-}" | tr '[:upper:]' '[:lower:]')
 
-# if GEMINI_CODE_SANDBOX is set to 0 or false, then exit immediately w/ code 1
-if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(0|false)$ ]]; then
-    exit 1
-fi
-
-# if GEMINI_CODE_SANDBOX is set to 1 or true, then try to use docker or podman
+# if GEMINI_CODE_SANDBOX is set to 1|true, then try to use docker or podman
+# if non-empty and not 0|false, treat as custom command and check that it exists
+# if empty or 0|false, then fail silently (after checking for possible fallbacks)
+command=""
 if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]]; then
     if command -v docker &>/dev/null; then
-        if [ "$QUIET" = false ]; then echo "docker"; fi
-        exit 0
+        command="docker"
     elif command -v podman &>/dev/null; then
-        if [ "$QUIET" = false ]; then echo "podman"; fi
-        exit 0
+        command="podman"
     else
         echo "ERROR: install docker or podman or specify command in GEMINI_CODE_SANDBOX" >&2
         exit 1
     fi
+elif [ -n "${GEMINI_CODE_SANDBOX:-}" ] && [[ ! "${GEMINI_CODE_SANDBOX:-}" =~ ^(0|false)$ ]]; then
+    if ! command -v "$GEMINI_CODE_SANDBOX" &>/dev/null; then
+        echo "ERROR: missing sandbox command '$GEMINI_CODE_SANDBOX' (from GEMINI_CODE_SANDBOX)" >&2
+        exit 1
+    fi
+    command="$GEMINI_CODE_SANDBOX"
+else
+    # if we are on macOS and sandbox-exec is available, use that for minimal sandboxing
+    # unless SEATBELT_PROFILE is set to 'none', which we allow as an escape hatch
+    if [ "$(uname)" = "Darwin" ] && command -v sandbox-exec &>/dev/null && [ "${SEATBELT_PROFILE:-}" != "none" ]; then
+        command="sandbox-exec"
+    else # GEMINI_CODE_SANDBOX is empty or 0|false, so we fail w/o error msg
+        exit 1
+    fi
 fi
 
-if ! command -v "$GEMINI_CODE_SANDBOX" &>/dev/null; then
-    echo "ERROR: missing sandbox command '$GEMINI_CODE_SANDBOX' (from GEMINI_CODE_SANDBOX)" >&2
-    exit 1
-fi
-
-if [ "$QUIET" = false ]; then echo "$GEMINI_CODE_SANDBOX"; fi
+if [ "$QUIET" = false ]; then echo "$command"; fi
 exit 0

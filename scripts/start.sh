@@ -20,6 +20,7 @@ node ./scripts/check-build-status.js
 
 # if debugging is enabled and sandboxing is disabled, use --inspect-brk flag
 # note with sandboxing this flag is passed to the binary inside the sandbox
+# inside sandbox SANDBOX should be set and sandbox_command.sh should fail
 node_args=()
 if [ -n "${DEBUG:-}" ] && ! scripts/sandbox_command.sh -q; then
     if [ -n "${SANDBOX:-}" ]; then

@@ -46,6 +46,7 @@ export function sandbox_command(sandbox?: string | boolean): string {
     }
   } else {
     // if we are on macOS (Darwin) and sandbox-exec is available, use that for minimal sandboxing
+    // unless SEATBELT_PROFILE is set to 'none', which we allow as an escape hatch
     if (
       os.platform() === 'darwin' &&
       execSync('command -v sandbox-exec || true').toString().trim() &&
@@ -145,8 +146,18 @@ function entrypoint(workdir: string): string[] {
 
 export async function start_sandbox(sandbox: string) {
   if (sandbox === 'sandbox-exec') {
+    // disallow BUILD_SANDBOX
+    if (process.env.BUILD_SANDBOX) {
+      console.error('ERROR: cannot BUILD_SANDBOX when using MacOC Seatbelt');
+      process.exit(1);
+    }
     const profile = (process.env.SEATBELT_PROFILE ??= 'minimal');
     console.log(`using macos seatbelt (profile: ${profile}) ...`);
+    // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+    if (process.env.DEBUG) {
+      process.env.NODE_OPTIONS ??= '';
+      process.env.NODE_OPTIONS += ` --inspect-brk`;
+    }
     const args = [
       '-D',
       `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
@@ -158,8 +169,11 @@ export async function start_sandbox(sandbox: string) {
       new URL(`sandbox-macos-${profile}.sb`, import.meta.url).pathname,
       'bash',
       '-c',
-      `SANDBOX=sandbox-exec NODE_OPTIONS="${process.env.NODE_OPTIONS}" ` +
-        process.argv.map((arg) => quote([arg])).join(' '),
+      [
+        `SANDBOX=sandbox-exec`,
+        `NODE_OPTIONS="${process.env.NODE_OPTIONS}"`,
+        ...process.argv.map((arg) => quote([arg])),
+      ].join(' '),
     ];
     spawnSync(sandbox, args, { stdio: 'inherit' });
     return;
@@ -268,6 +282,7 @@ export async function start_sandbox(sandbox: string) {
   // expose env-specified ports on the sandbox
   ports().forEach((p) => args.push('--publish', `${p}:${p}`));
 
+  // if DEBUG is set, expose debugging port
   if (process.env.DEBUG) {
     const debugPort = process.env.DEBUG_PORT || '9229';
     args.push(`--publish`, `${debugPort}:${debugPort}`);
