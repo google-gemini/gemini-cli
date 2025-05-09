@@ -32,28 +32,12 @@ export const useThemeCommand = (
 
   // Apply initial theme on component mount
   useEffect(() => {
-    try {
-      themeManager.setActiveTheme(effectiveTheme);
-      setThemeError(null); // Clear any previous theme error on success
-    } catch (error: unknown) {
+    if (!themeManager.setActiveTheme(effectiveTheme)) {
       // If theme is not found during initial load, open the theme selection dialog and set error message
-      if (
-        error instanceof Error &&
-        error.message.includes('Theme') &&
-        error.message.includes('not found')
-      ) {
-        setIsThemeDialogOpen(true);
-        setThemeError(
-          `Error: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      } else {
-        console.error(
-          `Error setting initial theme: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        setThemeError(
-          `Error setting initial theme: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      setIsThemeDialogOpen(true);
+      setThemeError(`Theme "${effectiveTheme}" not found.`);
+    } else {
+      setThemeError(null); // Clear any previous theme error on success
     }
   }, [effectiveTheme, setThemeError]); // Re-run if effectiveTheme or setThemeError changes
 
@@ -63,29 +47,13 @@ export const useThemeCommand = (
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {
-      try {
-        themeManager.setActiveTheme(themeName);
+      if (!themeManager.setActiveTheme(themeName)) {
+        // If theme is not found, open the theme selection dialog and set error message
+        setIsThemeDialogOpen(true);
+        setThemeError(`Theme "${themeName}" not found.`);
+      } else {
         setForceRender((v) => v + 1); // Trigger potential re-render
         setThemeError(null); // Clear any previous theme error on success
-      } catch (error: unknown) {
-        // If theme is not found, open the theme selection dialog and set error message
-        if (
-          error instanceof Error &&
-          error.message.includes('Theme') &&
-          error.message.includes('not found')
-        ) {
-          setIsThemeDialogOpen(true);
-          setThemeError(
-            `Error: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        } else {
-          console.error(
-            `Error setting theme: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          setThemeError(
-            `Error setting theme: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
       }
     },
     [setForceRender, setThemeError],

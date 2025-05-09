@@ -24,23 +24,10 @@ async function main() {
   const settings = loadSettings(process.cwd());
   const config = await loadCliConfig(settings.merged);
   if (settings.merged.theme) {
-    try {
-      themeManager.setActiveTheme(settings.merged.theme);
-    } catch (error: unknown) {
+    if (!themeManager.setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in App.tsx will handle opening the dialog.
-      if (
-        error instanceof Error &&
-        error.message.includes('Theme') &&
-        error.message.includes('not found')
-      ) {
-        console.warn(
-          `Warning: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      } else {
-        // Re-throw other errors to be caught by the main catch block
-        throw error;
-      }
+      console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
     }
   }
 

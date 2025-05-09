@@ -73,14 +73,23 @@ class ThemeManager {
   /**
    * Sets the active theme.
    * @param themeName The name of the theme to activate.
+   * @returns True if the theme was successfully set, false otherwise.
    */
-  setActiveTheme(themeName: string | undefined): void {
+  setActiveTheme(themeName: string | undefined): boolean {
     const foundTheme = this.findThemeByName(themeName);
 
     if (foundTheme) {
       this.activeTheme = foundTheme;
+      return true;
     } else {
-      throw new Error(`Theme "${themeName}" not found.`);
+      // If themeName is undefined, it means we want to set the default theme.
+      // If findThemeByName returns undefined (e.g. default theme is also not found for some reason)
+      // then this will return false.
+      if (themeName === undefined) {
+        this.activeTheme = DEFAULT_THEME;
+        return true;
+      }
+      return false;
     }
   }
 
