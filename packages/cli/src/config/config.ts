@@ -14,7 +14,7 @@ import {
 } from '@gemini-code/server';
 import { Settings } from './settings.js';
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro-preview-05-06';
 
 // Keep CLI-specific argument parsing
 interface CliArgs {
