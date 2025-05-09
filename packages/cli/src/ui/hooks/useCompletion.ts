@@ -136,7 +136,7 @@ export function useCompletion(
 
       setSuggestions(filteredSuggestions);
       setShowSuggestions(filteredSuggestions.length > 0);
-      setActiveSuggestionIndex(-1);
+      setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
       setVisibleStartIndex(0);
       setIsLoadingSuggestions(false);
       return;
@@ -189,7 +189,7 @@ export function useCompletion(
         if (isMounted) {
           setSuggestions(filteredSuggestions);
           setShowSuggestions(filteredSuggestions.length > 0);
-          setActiveSuggestionIndex(-1);
+          setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
       } catch (error) {
