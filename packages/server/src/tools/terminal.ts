@@ -265,7 +265,10 @@ Use this tool for running build steps (\`npm install\`, \`make\`), linters (\`es
     return confirmationDetails;
   }
 
-  async execute(params: TerminalToolParams): Promise<ToolResult> {
+  async execute(
+    params: TerminalToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {

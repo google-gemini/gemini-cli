@@ -26,6 +26,7 @@ interface HandleAtCommandParams {
   addItem: UseHistoryManagerReturn['addItem'];
   setDebugMessage: React.Dispatch<React.SetStateAction<string>>;
   messageId: number;
+  signal: AbortSignal;
 }
 
 interface HandleAtCommandResult {
@@ -90,6 +91,7 @@ export async function handleAtCommand({
   addItem,
   setDebugMessage,
   messageId: userMessageTimestamp,
+  signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
   const trimmedQuery = query.trim();
   const parsedCommand = parseAtCommand(trimmedQuery);
@@ -163,7 +165,7 @@ export async function handleAtCommand({
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {
-    const result = await readManyFilesTool.execute(toolArgs);
+    const result = await readManyFilesTool.execute(toolArgs, signal);
     const fileContent = result.llmContent || '';
 
     toolCallDisplay = {

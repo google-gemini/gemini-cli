@@ -70,7 +70,10 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     return `Fetching content from ${displayUrl}`;
   }
 
-  async execute(params: WebFetchToolParams): Promise<ToolResult> {
+  async execute(
+    params: WebFetchToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
       return {

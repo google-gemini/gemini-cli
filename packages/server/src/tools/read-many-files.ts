@@ -237,7 +237,10 @@ Default excludes apply to common non-text files and large dependency directories
     return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace('{filePath}', 'path/to/file.ext')}".`;
   }
 
-  async execute(params: ReadManyFilesParams): Promise<ToolResult> {
+  async execute(
+    params: ReadManyFilesParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
       return {

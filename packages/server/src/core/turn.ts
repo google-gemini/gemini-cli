@@ -36,7 +36,10 @@ export interface ServerTool {
   name: string;
   schema: FunctionDeclaration;
   // The execute method signature might differ slightly or be wrapped
-  execute(params: Record<string, unknown>): Promise<ToolResult>;
+  execute(
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<ToolResult>;
   shouldConfirmExecute(
     params: Record<string, unknown>,
   ): Promise<ToolCallConfirmationDetails | false>;
@@ -153,7 +156,7 @@ export class Turn {
           if (confirmationDetails) {
             return { ...pendingToolCall, confirmationDetails };
           }
-          const result = await tool.execute(pendingToolCall.args);
+          const result = await tool.execute(pendingToolCall.args, signal);
           return {
             ...pendingToolCall,
             result,
@@ -199,7 +202,11 @@ export class Turn {
         resultDisplay: outcome.result?.returnDisplay,
         error: outcome.error,
       };
-      yield { type: GeminiEventType.ToolCallResponse, value: responseInfo };
+
+      // If aborted we're already yielding the user cancellations elsewhere.
+      if (!signal?.aborted) {
+        yield { type: GeminiEventType.ToolCallResponse, value: responseInfo };
+      }
     }
   }
 

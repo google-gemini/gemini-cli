@@ -64,10 +64,13 @@ export class GeminiClient {
           .getTool('read_many_files') as ReadManyFilesTool;
         if (readManyFilesTool) {
           // Read all files in the target directory
-          const result = await readManyFilesTool.execute({
-            paths: ['**/*'], // Read everything recursively
-            useDefaultExcludes: true, // Use default excludes
-          });
+          const result = await readManyFilesTool.execute(
+            {
+              paths: ['**/*'], // Read everything recursively
+              useDefaultExcludes: true, // Use default excludes
+            },
+            AbortSignal.timeout(30000),
+          );
           if (result.llmContent) {
             initialParts.push({
               text: `\n--- Full File Context ---\n${result.llmContent}`,

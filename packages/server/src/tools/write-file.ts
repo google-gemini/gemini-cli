@@ -150,7 +150,10 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     return confirmationDetails;
   }
 
-  async execute(params: WriteFileToolParams): Promise<ToolResult> {
+  async execute(
+    params: WriteFileToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
       return {

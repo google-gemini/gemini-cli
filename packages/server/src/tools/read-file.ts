@@ -193,7 +193,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
    * @param params Parameters for the file reading
    * @returns Result with file contents
    */
-  async execute(params: ReadFileToolParams): Promise<ToolResult> {
+  async execute(
+    params: ReadFileToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {

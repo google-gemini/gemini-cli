@@ -138,7 +138,10 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   /**
    * Executes the glob search with the given parameters
    */
-  async execute(params: GlobToolParams): Promise<ToolResult> {
+  async execute(
+    params: GlobToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
