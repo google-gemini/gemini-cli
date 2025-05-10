@@ -22,6 +22,7 @@ import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
+import { reportError } from '../utils/errorReporting.js';
 
 export class GeminiClient {
   private client: GoogleGenAI;
@@ -87,8 +88,8 @@ export class GeminiClient {
           );
         }
       } catch (error) {
+        // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
         console.error('Error reading full file context:', error);
-        // Optionally add an error message part to the context
         initialParts.push({
           text: '\n--- Error reading full file context ---',
         });
@@ -125,7 +126,12 @@ export class GeminiClient {
         history,
       });
     } catch (error) {
-      console.error('Error initializing Gemini chat session:', error);
+      await reportError(
+        error,
+        'Error initializing Gemini chat session.',
+        history,
+        'startChat',
+      );
       const message = error instanceof Error ? error.message : 'Unknown error.';
       throw new Error(`Failed to initialize chat: ${message}`);
     }
@@ -185,18 +191,47 @@ export class GeminiClient {
       });
       const text = getResponseText(result);
       if (!text) {
-        throw new Error('API returned an empty response.');
+        const error = new Error(
+          'API returned an empty response for generateJson.',
+        );
+        await reportError(
+          error,
+          'Error in generateJson: API returned an empty response.',
+          contents,
+          'generateJson-empty-response',
+        );
+        throw error;
       }
       try {
         return JSON.parse(text);
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', text);
+        await reportError(
+          parseError,
+          'Failed to parse JSON response from generateJson.',
+          {
+            responseTextFailedToParse: text,
+            originalRequestContents: contents,
+          },
+          'generateJson-parse',
+        );
         throw new Error(
           `Failed to parse API response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
         );
       }
     } catch (error) {
-      console.error('Error generating JSON content:', error);
+      // Avoid double reporting for the empty response case handled above
+      if (
+        error instanceof Error &&
+        error.message === 'API returned an empty response for generateJson.'
+      ) {
+        throw error;
+      }
+      await reportError(
+        error,
+        'Error generating JSON content via API.',
+        contents,
+        'generateJson-api',
+      );
       const message =
         error instanceof Error ? error.message : 'Unknown API error.';
       throw new Error(`Failed to generate JSON content: ${message}`);
