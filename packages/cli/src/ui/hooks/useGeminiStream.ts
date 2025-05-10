@@ -177,8 +177,6 @@ export const useGeminiStream = (
         let geminiMessageBuffer = '';
 
         for await (const event of stream) {
-          if (signal.aborted) break;
-
           if (event.type === ServerGeminiEventType.Content) {
             if (
               pendingHistoryItemRef.current?.type !== 'gemini' &&
@@ -293,6 +291,18 @@ export const useGeminiStream = (
             );
             setStreamingState(StreamingState.WaitingForConfirmation);
             return; // Wait for user confirmation
+          } else if (event.type === ServerGeminiEventType.UserCancelled) {
+            // Flush out existing pending history item.
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+              setPendingHistoryItem(null);
+            }
+            addItem(
+              { type: 'info', text: 'User cancelled the request.' },
+              userMessageTimestamp,
+            );
+            setStreamingState(StreamingState.Idle);
+            return; // Stop processing the stream
           }
         } // End stream loop
 

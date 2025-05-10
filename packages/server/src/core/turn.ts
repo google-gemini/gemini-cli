@@ -47,6 +47,7 @@ export enum GeminiEventType {
   ToolCallRequest = 'tool_call_request',
   ToolCallResponse = 'tool_call_response',
   ToolCallConfirmation = 'tool_call_confirmation',
+  UserCancelled = 'user_cancelled',
 }
 
 export interface ToolCallRequestInfo {
@@ -74,7 +75,8 @@ export type ServerGeminiStreamEvent =
   | {
       type: GeminiEventType.ToolCallConfirmation;
       value: ServerToolCallConfirmationDetails;
-    };
+    }
+  | { type: GeminiEventType.UserCancelled };
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -108,7 +110,8 @@ export class Turn {
     for await (const resp of responseStream) {
       this.debugResponses.push(resp);
       if (signal?.aborted) {
-        throw this.abortError();
+        yield { type: GeminiEventType.UserCancelled };
+        return;
       }
 
       const text = getResponseText(resp);
@@ -238,12 +241,6 @@ export class Turn {
         response: { output: result?.llmContent ?? '' },
       },
     };
-  }
-
-  private abortError(): Error {
-    const error = new Error('Request cancelled by user during stream.');
-    error.name = 'AbortError';
-    return error; // Return instead of throw, let caller handle
   }
 
   getConfirmationDetails(): ToolCallConfirmationDetails[] {
