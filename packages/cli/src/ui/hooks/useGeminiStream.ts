@@ -509,6 +509,15 @@ export const useGeminiStream = (
               error: new Error(declineMessage),
             };
 
+            // Update conversation history without re-issuing another request to indicate the decline.
+            const history = chatSessionRef.current?.getHistory();
+            if (history) {
+              history.push({
+                role: 'model',
+                parts: [functionResponse],
+              });
+            }
+
             // Update UI to show cancellation/error
             updateFunctionResponseUI(responseInfo, status);
             setStreamingState(StreamingState.Idle);
