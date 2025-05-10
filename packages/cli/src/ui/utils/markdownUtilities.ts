@@ -200,7 +200,7 @@ export const findLastSafeSplitPoint = (content: string) => {
   while (searchStartIndex >= 0) {
     const dnlIndex = content.lastIndexOf('\n\n', searchStartIndex);
     if (dnlIndex === -1) {
-      // No more double newlines found after idealMaxLength
+      // No more double newlines found.
       break;
     }
 
@@ -209,10 +209,12 @@ export const findLastSafeSplitPoint = (content: string) => {
       return potentialSplitPoint;
     }
 
-    searchStartIndex = potentialSplitPoint; // Continue search after the found \n\n
+    // If potentialSplitPoint was inside a code block,
+    // the next search should start *before* the \n\n we just found to ensure progress.
+    searchStartIndex = dnlIndex - 1;
   }
 
-  // If no safe double newline found after idealMaxLength, return content.length
+  // If no safe double newline is found, return content.length
   // to keep the entire content as one piece.
   return content.length;
 };
