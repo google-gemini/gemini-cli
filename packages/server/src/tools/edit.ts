@@ -333,7 +333,10 @@ Expectation for parameters:
    * @param params Parameters for the edit operation
    * @returns Result of the edit operation
    */
-  async execute(params: EditToolParams): Promise<ToolResult> {
+  async execute(
+    params: EditToolParams,
+    _signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
       return {

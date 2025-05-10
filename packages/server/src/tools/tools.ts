@@ -64,7 +64,7 @@ export interface Tool<
    * @param params Parameters for the tool execution
    * @returns Result of the tool execution
    */
-  execute(params: TParams): Promise<TResult>;
+  execute(params: TParams, signal: AbortSignal): Promise<TResult>;
 }
 
 /**
@@ -141,9 +141,10 @@ export abstract class BaseTool<
    * Abstract method to execute the tool with the given parameters
    * Must be implemented by derived classes
    * @param params Parameters for the tool execution
+   * @param signal AbortSignal for tool cancellation
    * @returns Result of the tool execution
    */
-  abstract execute(params: TParams): Promise<TResult>;
+  abstract execute(params: TParams, signal: AbortSignal): Promise<TResult>;
 }
 
 export interface ToolResult {

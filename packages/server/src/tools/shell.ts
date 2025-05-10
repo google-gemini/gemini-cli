@@ -118,7 +118,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return confirmationDetails;
   }
 
-  async execute(params: ShellToolParams): Promise<ToolResult> {
+  async execute(
+    params: ShellToolParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -174,17 +177,37 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     });
 
     let code: number | null = null;
-    let signal: NodeJS.Signals | null = null;
-    shell.on(
-      'close',
-      (_code: number | null, _signal: NodeJS.Signals | null) => {
-        code = _code;
-        signal = _signal;
-      },
-    );
+    let processSignal: NodeJS.Signals | null = null;
+    const closeHandler = (
+      _code: number | null,
+      _signal: NodeJS.Signals | null,
+    ) => {
+      code = _code;
+      processSignal = _signal;
+    };
+    shell.on('close', closeHandler);
+
+    const abortHandler = () => {
+      if (shell.pid) {
+        try {
+          // Kill the entire process group
+          process.kill(-shell.pid, 'SIGTERM');
+        } catch (_e) {
+          // Fallback to killing the main process if group kill fails
+          try {
+            shell.kill('SIGKILL'); // or 'SIGTERM'
+          } catch (_killError) {
+            // Ignore errors if the process is already dead
+          }
+        }
+      }
+    };
+    abortSignal.addEventListener('abort', abortHandler);
 
     // wait for the shell to exit
     await new Promise((resolve) => shell.on('close', resolve));
+
+    abortSignal.removeEventListener('abort', abortHandler);
 
     // parse pids (pgrep output) from temporary file and remove it
     const backgroundPIDs: number[] = [];
@@ -205,19 +228,26 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       }
       fs.unlinkSync(tempFilePath);
     } else {
-      console.error('missing pgrep output');
+      if (!abortSignal.aborted) {
+        console.error('missing pgrep output');
+      }
     }
 
-    const llmContent = [
-      `Command: ${params.command}`,
-      `Directory: ${params.directory || '(root)'}`,
-      `Stdout: ${stdout || '(empty)'}`,
-      `Stderr: ${stderr || '(empty)'}`,
-      `Error: ${error ?? '(none)'}`,
-      `Exit Code: ${code ?? '(none)'}`,
-      `Signal: ${signal ?? '(none)'}`,
-      `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
-    ].join('\n');
+    let llmContent = '';
+    if (abortSignal.aborted) {
+      llmContent = 'Command did not complete, it was cancelled by the user';
+    } else {
+      llmContent = [
+        `Command: ${params.command}`,
+        `Directory: ${params.directory || '(root)'}`,
+        `Stdout: ${stdout || '(empty)'}`,
+        `Stderr: ${stderr || '(empty)'}`,
+        `Error: ${error ?? '(none)'}`,
+        `Exit Code: ${code ?? '(none)'}`,
+        `Signal: ${processSignal ?? '(none)'}`,
+        `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
+      ].join('\n');
+    }
 
     const returnDisplay = this.config.getDebugMode() ? llmContent : output;
 
