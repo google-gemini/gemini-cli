@@ -21,6 +21,7 @@ import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 
 export class GeminiClient {
   private client: GoogleGenAI;
@@ -103,6 +104,16 @@ export class GeminiClient {
       .getToolRegistry()
       .getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const history: Content[] = [
+      {
+        role: 'user',
+        parts: envParts,
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'Got it. Thanks for the context!' }],
+      },
+    ];
     try {
       return this.client.chats.create({
         model: this.model,
@@ -111,16 +122,7 @@ export class GeminiClient {
           ...this.generateContentConfig,
           tools,
         },
-        history: [
-          {
-            role: 'user',
-            parts: envParts,
-          },
-          {
-            role: 'model',
-            parts: [{ text: 'Got it. Thanks for the context!' }],
-          },
-        ],
+        history,
       });
     } catch (error) {
       console.error('Error initializing Gemini chat session:', error);
@@ -149,10 +151,15 @@ export class GeminiClient {
         break;
       }
 
-      // What do we do when we have both function responses and confirmations?
       const fnResponses = turn.getFunctionResponses();
       if (fnResponses.length === 0) {
-        break; // user's turn to respond
+        const nextSpeakerCheck = await checkNextSpeaker(chat, this);
+        if (nextSpeakerCheck?.next_speaker === 'model') {
+          request = [{ text: 'Please continue.' }];
+          continue;
+        } else {
+          break;
+        }
       }
       request = fnResponses;
     }
@@ -167,7 +174,7 @@ export class GeminiClient {
   ): Promise<Record<string, unknown>> {
     try {
       const result = await this.client.models.generateContent({
-        model: this.model,
+        model: 'gemini-2.0-flash',
         config: {
           ...this.generateContentConfig,
           systemInstruction: getCoreSystemPrompt(),
