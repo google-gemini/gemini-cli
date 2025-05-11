@@ -60,7 +60,12 @@ export async function checkNextSpeaker(
   chat: Chat,
   geminiClient: GeminiClient,
 ): Promise<NextSpeakerResponse | null> {
-  const history = await chat.getHistory();
+  // We need to capture the curated history because there are many moments when the model will return invalid turns
+  // that when passed back up to the endpoint will break subsequent calls. An example of this is when the model decides
+  // to respond with an empty part collection if you were to send that message back to the server it will respond with
+  // a 400 indicating that model part collections MUST have content.
+  const history = await chat.getHistory(/* curated */ true);
+
   // Ensure there's a model response to analyze
   if (history.length === 0 || history[history.length - 1].role !== 'model') {
     // Cannot determine next speaker if the last turn wasn't from the model
