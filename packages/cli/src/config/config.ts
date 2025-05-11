@@ -13,6 +13,7 @@ import {
   createServerConfig,
 } from '@gemini-code/server';
 import { Settings } from './settings.js';
+import { readPackageUp } from 'read-package-up';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro-preview-05-06';
 
@@ -80,6 +81,8 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   // Parse CLI arguments
   const argv = await parseArguments();
 
+  const userAgent = await createUserAgent();
+
   // Create config using factory from server package
   return createServerConfig(
     process.env.GEMINI_API_KEY,
@@ -92,5 +95,12 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     settings.toolDiscoveryCommand,
     settings.toolCallCommand,
     settings.mcpServerCommand,
+    userAgent,
   );
+}
+
+async function createUserAgent(): Promise<string> {
+  const packageJsonInfo = await readPackageUp({ cwd: import.meta.url });
+  const cliVersion = packageJsonInfo?.packageJson.version || 'unknown';
+  return `GeminiCLI/${cliVersion} Node.js/${process.version} (${process.platform}; ${process.arch})`;
 }

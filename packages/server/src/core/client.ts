@@ -34,7 +34,15 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(private config: Config) {
-    this.client = new GoogleGenAI({ apiKey: config.getApiKey() });
+    const userAgent = config.getUserAgent();
+    this.client = new GoogleGenAI({
+      apiKey: config.getApiKey(),
+      httpOptions: {
+        headers: {
+          'User-Agent': userAgent,
+        },
+      },
+    });
     this.model = config.getModel();
   }
 
