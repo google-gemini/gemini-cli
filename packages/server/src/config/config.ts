@@ -14,7 +14,6 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
-import { TerminalTool } from '../tools/terminal.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
@@ -146,14 +145,8 @@ function createToolRegistry(config: Config): ToolRegistry {
     new WriteFileTool(targetDir),
     new WebFetchTool(), // Note: WebFetchTool takes no arguments
     new ReadManyFilesTool(targetDir),
+    new ShellTool(config),
   ];
-
-  // if TERMINAL_TOOL is set, revert to deprecated TerminalTool
-  if (process.env.TERMINAL_TOOL) {
-    tools.push(new TerminalTool(targetDir, config));
-  } else {
-    tools.push(new ShellTool(config));
-  }
 
   for (const tool of tools) {
     registry.registerTool(tool);
