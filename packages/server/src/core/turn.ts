@@ -18,6 +18,8 @@ import {
   ToolResultDisplay,
 } from '../tools/tools.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { reportError } from '../utils/errorReporting.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 // --- Types for Server Logic ---
 
@@ -51,6 +53,11 @@ export enum GeminiEventType {
   ToolCallResponse = 'tool_call_response',
   ToolCallConfirmation = 'tool_call_confirmation',
   UserCancelled = 'user_cancelled',
+  Error = 'error',
+}
+
+export interface GeminiErrorEventValue {
+  message: string;
 }
 
 export interface ToolCallRequestInfo {
@@ -79,7 +86,8 @@ export type ServerGeminiStreamEvent =
       type: GeminiEventType.ToolCallConfirmation;
       value: ServerToolCallConfirmationDetails;
     }
-  | { type: GeminiEventType.UserCancelled };
+  | { type: GeminiEventType.UserCancelled }
+  | { type: GeminiEventType.Error; value: GeminiErrorEventValue };
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -108,31 +116,46 @@ export class Turn {
     req: PartListUnion,
     signal?: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
-    const responseStream = await this.chat.sendMessageStream({ message: req });
+    try {
+      const responseStream = await this.chat.sendMessageStream({
+        message: req,
+      });
 
-    for await (const resp of responseStream) {
-      this.debugResponses.push(resp);
-      if (signal?.aborted) {
-        yield { type: GeminiEventType.UserCancelled };
-        return;
-      }
+      for await (const resp of responseStream) {
+        this.debugResponses.push(resp);
+        if (signal?.aborted) {
+          yield { type: GeminiEventType.UserCancelled };
+          return;
+        }
 
-      const text = getResponseText(resp);
-      if (text) {
-        yield { type: GeminiEventType.Content, value: text };
-      }
+        const text = getResponseText(resp);
+        if (text) {
+          yield { type: GeminiEventType.Content, value: text };
+        }
 
-      if (!resp.functionCalls) {
-        continue;
-      }
+        if (!resp.functionCalls) {
+          continue;
+        }
 
-      // Handle function calls (requesting tool execution)
-      for (const fnCall of resp.functionCalls) {
-        const event = this.handlePendingFunctionCall(fnCall);
-        if (event) {
-          yield event;
+        // Handle function calls (requesting tool execution)
+        for (const fnCall of resp.functionCalls) {
+          const event = this.handlePendingFunctionCall(fnCall);
+          if (event) {
+            yield event;
+          }
         }
       }
+    } catch (error) {
+      const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
+      await reportError(
+        error,
+        'Error when talking to Gemini API',
+        contextForReport,
+        'Turn.run-sendMessageStream',
+      );
+      const errorMessage = getErrorMessage(error);
+      yield { type: GeminiEventType.Error, value: { message: errorMessage } };
+      return;
     }
 
     // Execute pending tool calls

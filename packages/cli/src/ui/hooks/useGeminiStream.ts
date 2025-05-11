@@ -323,6 +323,18 @@ export const useGeminiStream = (
             );
             setStreamingState(StreamingState.Idle);
             return; // Stop processing the stream
+          } else if (event.type === ServerGeminiEventType.Error) {
+            // Flush out existing pending history item.
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+              setPendingHistoryItem(null);
+            }
+            addItem(
+              { type: 'error', text: `[API Error: ${event.value.message}]` },
+              userMessageTimestamp,
+            );
+            setStreamingState(StreamingState.Idle);
+            // Allow stream to end naturally
           }
         } // End stream loop
 
@@ -335,7 +347,6 @@ export const useGeminiStream = (
         setStreamingState(StreamingState.Idle);
       } catch (error: unknown) {
         if (!isNodeError(error) || error.name !== 'AbortError') {
-          console.error('Error processing stream or executing tool:', error);
           addItem(
             {
               type: 'error',
