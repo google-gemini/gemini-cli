@@ -126,6 +126,7 @@ ${(function () {
 - Never push changes to a remote repository without being asked explicitly by the user.
 `;
   }
+  return '';
 })()}
 
 # Examples (Illustrating Tone and Workflow)
