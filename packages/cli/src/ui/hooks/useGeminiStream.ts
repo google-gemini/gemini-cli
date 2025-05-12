@@ -333,8 +333,6 @@ export const useGeminiStream = (
               { type: 'error', text: `[API Error: ${event.value.message}]` },
               userMessageTimestamp,
             );
-            setStreamingState(StreamingState.Idle);
-            // Allow stream to end naturally
           }
         } // End stream loop
 

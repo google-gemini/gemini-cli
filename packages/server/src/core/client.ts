@@ -16,7 +16,7 @@ import {
 } from '@google/genai';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { Turn, ServerGeminiStreamEvent } from './turn.js';
+import { Turn, ServerGeminiStreamEvent, GeminiEventType } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -156,7 +156,10 @@ export class GeminiClient {
       turns++;
       const turn = new Turn(chat, availableTools);
       const resultStream = turn.run(request, signal);
+      let seenError = false;
       for await (const event of resultStream) {
+        seenError =
+          seenError === false ? false : event.type === GeminiEventType.Error;
         yield event;
       }
 
@@ -176,6 +179,11 @@ export class GeminiClient {
         }
       }
       request = fnResponses;
+
+      if (seenError) {
+        // We saw an error, lets stop processing to prevent unexpected consequences.
+        break;
+      }
     }
     if (turns >= this.MAX_TURNS) {
       console.warn('sendMessageStream: Reached maximum tool call turns limit.');
