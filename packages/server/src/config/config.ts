@@ -148,7 +148,7 @@ function createToolRegistry(config: Config): ToolRegistry {
     new ReadFileTool(targetDir),
     new GrepTool(targetDir),
     new GlobTool(targetDir),
-    new EditTool(targetDir),
+    new EditTool(config),
     new WriteFileTool(targetDir),
     new WebFetchTool(), // Note: WebFetchTool takes no arguments
     new ReadManyFilesTool(targetDir),

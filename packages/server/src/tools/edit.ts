@@ -19,6 +19,9 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { ReadFileTool } from './read-file.js';
+import { GeminiClient } from '../core/client.js';
+import { Config } from '../config/config.js';
+import { countOccurrences, ensureCorrectEdit } from '../utils/editCorrector.js';
 
 /**
  * Parameters for the Edit tool
@@ -38,11 +41,6 @@ export interface EditToolParams {
    * The text to replace it with
    */
   new_string: string;
-
-  /**
-   * The expected number of replacements to perform (optional, defaults to 1)
-   */
-  expected_replacements?: number;
 }
 
 interface CalculatedEdit {
@@ -59,23 +57,25 @@ interface CalculatedEdit {
 export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   static readonly Name = 'replace';
   private shouldAlwaysEdit = false;
+  private readonly rootDirectory: string;
+  private readonly client: GeminiClient;
 
   /**
    * Creates a new instance of the EditLogic
    * @param rootDirectory Root directory to ground this tool in.
    */
-  constructor(private readonly rootDirectory: string) {
+  constructor(config: Config) {
     super(
       EditTool.Name,
       'Edit',
       `Replaces a single, unique occurrence of text within a file. This tool requires providing significant context around the change to ensure uniqueness and precise targeting. Always use the ${ReadFileTool} tool to examine the file's current content before attempting a text replacement.
 
 Expectation for parameters:
-1. 'file_path' MUST be an absolute path; otherwise an error will be thrown.
-2. 'old_string' MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-3. 'new_string' MUST be the exact literal text to replace 'old_string' with (also including all whitespace, indentation, newlines, and surrounding code etc.).
-4. NEVER escape 'old_string' or 'new_string', JSON encoding will handle that automatically.
-**Important:** If ANY of the above are not satisfied the tool will fail.`,
+1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
+2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic.
+4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+**Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.`,
       {
         properties: {
           file_path: {
@@ -85,7 +85,7 @@ Expectation for parameters:
           },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. The tool will attempt to match this string as-is. CRITICAL: Must uniquely identify the single instance to change. Include at least 3-5 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, is escaped in a way that is not present in the original file, or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. CRITICAL: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it), matches multiple locations, or does not match exactly, the tool will fail.',
             type: 'string',
           },
           new_string: {
@@ -98,7 +98,8 @@ Expectation for parameters:
         type: 'object',
       },
     );
-    this.rootDirectory = path.resolve(rootDirectory);
+    this.rootDirectory = path.resolve(config.getTargetDir());
+    this.client = new GeminiClient(config);
   }
 
   /**
@@ -142,13 +143,6 @@ Expectation for parameters:
       return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
     }
 
-    if (
-      params.expected_replacements !== undefined &&
-      params.expected_replacements < 0
-    ) {
-      return 'Expected replacements must be a non-negative number';
-    }
-
     return null;
   }
 
@@ -158,11 +152,8 @@ Expectation for parameters:
    * @returns An object describing the potential edit outcome
    * @throws File system errors if reading the file fails unexpectedly (e.g., permissions)
    */
-  private calculateEdit(params: EditToolParams): CalculatedEdit {
-    const expectedReplacements =
-      params.expected_replacements === undefined
-        ? 1
-        : params.expected_replacements;
+  private async calculateEdit(params: EditToolParams): Promise<CalculatedEdit> {
+    const expectedReplacements = 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
@@ -194,22 +185,22 @@ Expectation for parameters:
       };
     } else if (currentContent !== null) {
       // Editing an existing file
-      occurrences = this.countOccurrences(currentContent, params.old_string);
+      occurrences = countOccurrences(currentContent, params.old_string);
 
       if (params.old_string === '') {
         // Error: Trying to create a file that already exists
         error = {
-          display: `File already exists. Use a non-empty old_string to edit.`,
+          display: `Failed to edit. Attempted to create a file that already exists.`,
           raw: `File already exists, cannot create: ${params.file_path}`,
         };
       } else if (occurrences === 0) {
         error = {
-          display: `No edits made. The exact text in old_string was not found. Check whitespace, indentation, and context. Use ReadFile tool to verify. `,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}`,
+          display: `Failed to edit, could not find the string to replace.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ReadFile tool to verify.`,
         };
       } else if (occurrences !== expectedReplacements) {
         error = {
-          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}. Make old_string more specific with more context.`,
+          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}.`,
           raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
         };
       } else {
@@ -223,7 +214,7 @@ Expectation for parameters:
     } else {
       // Should not happen if fileExists and no exception was thrown, but defensively:
       error = {
-        display: `Failed to read content of existing file.`,
+        display: `Failed to read content of file.`,
         raw: `Failed to read content of existing file: ${params.file_path}`,
       };
     }
@@ -273,15 +264,14 @@ Expectation for parameters:
     } else if (!fileExists) {
       return false;
     } else if (currentContent !== null) {
-      const occurrences = this.countOccurrences(
-        currentContent,
-        params.old_string,
-      );
-      const expectedReplacements =
-        params.expected_replacements === undefined
-          ? 1
-          : params.expected_replacements;
-      if (occurrences === 0 || occurrences !== expectedReplacements) {
+      // Use the correctEdit utility to potentially correct params and get occurrences
+      const { params: correctedParams, occurrences: correctedOccurrences } =
+        await ensureCorrectEdit(currentContent, params, this.client);
+
+      params.old_string = correctedParams.old_string;
+      params.new_string = correctedParams.new_string;
+
+      if (correctedOccurrences === 0 || correctedOccurrences !== 1) {
         return false;
       }
       newContent = this.replaceAll(
@@ -347,7 +337,7 @@ Expectation for parameters:
 
     let editData: CalculatedEdit;
     try {
-      editData = this.calculateEdit(params);
+      editData = await this.calculateEdit(params);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {
@@ -400,22 +390,6 @@ Expectation for parameters:
         returnDisplay: `Error writing file: ${errorMsg}`,
       };
     }
-  }
-
-  /**
-   * Counts occurrences of a substring in a string
-   */
-  private countOccurrences(str: string, substr: string): number {
-    if (substr === '') {
-      return 0;
-    }
-    let count = 0;
-    let pos = str.indexOf(substr);
-    while (pos !== -1) {
-      count++;
-      pos = str.indexOf(substr, pos + 1); // Ensure overlap is not counted if substr repeats
-    }
-    return count;
   }
 
   /**
