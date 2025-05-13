@@ -483,6 +483,10 @@ export const useGeminiStream = (
                 error: undefined,
               };
               updateFunctionResponseUI(responseInfo, ToolCallStatus.Success);
+              if (pendingHistoryItemRef.current) {
+                addItem(pendingHistoryItemRef.current, Date.now());
+                setPendingHistoryItem(null);
+              }
               setStreamingState(StreamingState.Idle);
               await submitQuery(functionResponse);
             } finally {
@@ -529,6 +533,10 @@ export const useGeminiStream = (
 
             // Update UI to show cancellation/error
             updateFunctionResponseUI(responseInfo, status);
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, Date.now());
+              setPendingHistoryItem(null);
+            }
             setStreamingState(StreamingState.Idle);
           }
         };
