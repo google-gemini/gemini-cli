@@ -4,36 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useState } from 'react';
-import { useInput } from 'ink';
+import { useState, useCallback } from 'react';
 
 interface UseInputHistoryProps {
   userMessages: readonly string[];
   onSubmit: (value: string) => void;
   isActive: boolean;
-  query: string;
-  setQuery: React.Dispatch<React.SetStateAction<string>>;
+  currentQuery: string; // Renamed from query to avoid confusion
+  onChangeAndMoveCursor: (value: string) => void;
 }
 
 interface UseInputHistoryReturn {
-  query: string;
-  setQuery: React.Dispatch<React.SetStateAction<string>>;
   handleSubmit: (value: string) => void;
-  inputKey: number;
-  setInputKey: React.Dispatch<React.SetStateAction<number>>;
+  navigateUp: () => boolean;
+  navigateDown: () => boolean;
 }
 
 export function useInputHistory({
   userMessages,
   onSubmit,
   isActive,
-  query,
-  setQuery,
+  currentQuery,
+  onChangeAndMoveCursor: setQueryAndMoveCursor,
 }: UseInputHistoryProps): UseInputHistoryReturn {
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [originalQueryBeforeNav, setOriginalQueryBeforeNav] =
     useState<string>('');
-  const [inputKey, setInputKey] = useState<number>(0);
 
   const resetHistoryNav = useCallback(() => {
     setHistoryIndex(-1);
@@ -44,71 +40,72 @@ export function useInputHistory({
     (value: string) => {
       const trimmedValue = value.trim();
       if (trimmedValue) {
-        onSubmit(trimmedValue); // This will call handleFinalSubmit, which then calls setQuery('') from App.tsx
+        onSubmit(trimmedValue); // Parent handles clearing the query
       }
       resetHistoryNav();
     },
     [onSubmit, resetHistoryNav],
   );
 
-  useInput(
-    (input, key) => {
-      if (!isActive) {
-        return;
-      }
+  const navigateUp = useCallback(() => {
+    if (!isActive) return false;
+    if (userMessages.length === 0) return false;
 
-      let didNavigate = false;
+    let nextIndex = historyIndex;
+    if (historyIndex === -1) {
+      // Store the current query from the parent before navigating
+      setOriginalQueryBeforeNav(currentQuery);
+      nextIndex = 0;
+    } else if (historyIndex < userMessages.length - 1) {
+      nextIndex = historyIndex + 1;
+    } else {
+      return false; // Already at the oldest message
+    }
 
-      if (key.upArrow) {
-        if (userMessages.length === 0) return;
+    if (nextIndex !== historyIndex) {
+      setHistoryIndex(nextIndex);
+      const newValue = userMessages[userMessages.length - 1 - nextIndex];
+      setQueryAndMoveCursor(newValue); // Call the prop passed from parent
+      return true;
+    }
+    return false;
+  }, [
+    historyIndex,
+    setHistoryIndex,
+    setQueryAndMoveCursor,
+    userMessages,
+    isActive,
+    currentQuery, // Use currentQuery from props
+    setOriginalQueryBeforeNav,
+  ]);
 
-        let nextIndex = historyIndex;
-        if (historyIndex === -1) {
-          setOriginalQueryBeforeNav(query);
-          nextIndex = 0;
-        } else if (historyIndex < userMessages.length - 1) {
-          nextIndex = historyIndex + 1;
-        } else {
-          return;
-        }
+  const navigateDown = useCallback(() => {
+    if (!isActive) return false;
+    if (historyIndex === -1) return false; // Not currently navigating history
 
-        if (nextIndex !== historyIndex) {
-          setHistoryIndex(nextIndex);
-          const newValue = userMessages[userMessages.length - 1 - nextIndex];
-          setQuery(newValue);
-          setInputKey((k) => k + 1);
-          didNavigate = true;
-        }
-      } else if (key.downArrow) {
-        if (historyIndex === -1) return;
+    const nextIndex = historyIndex - 1;
+    setHistoryIndex(nextIndex);
 
-        const nextIndex = historyIndex - 1;
-        setHistoryIndex(nextIndex);
-
-        if (nextIndex === -1) {
-          setQuery(originalQueryBeforeNav);
-        } else {
-          const newValue = userMessages[userMessages.length - 1 - nextIndex];
-          setQuery(newValue);
-        }
-        setInputKey((k) => k + 1);
-        didNavigate = true;
-      } else {
-        if (historyIndex !== -1 && !didNavigate) {
-          if (input || key.backspace || key.delete) {
-            resetHistoryNav();
-          }
-        }
-      }
-    },
-    { isActive },
-  );
+    if (nextIndex === -1) {
+      // Reached the end of history navigation, restore original query
+      setQueryAndMoveCursor(originalQueryBeforeNav);
+    } else {
+      const newValue = userMessages[userMessages.length - 1 - nextIndex];
+      setQueryAndMoveCursor(newValue);
+    }
+    return true;
+  }, [
+    historyIndex,
+    setHistoryIndex,
+    originalQueryBeforeNav,
+    setQueryAndMoveCursor,
+    userMessages,
+    isActive,
+  ]);
 
   return {
-    query,
-    setQuery,
     handleSubmit,
-    inputKey,
-    setInputKey,
+    navigateUp,
+    navigateDown,
   };
 }
