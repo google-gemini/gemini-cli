@@ -60,6 +60,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const base = query.substring(0, slashIndex + 1);
         const newValue = base + selectedSuggestion.value;
         onChangeAndMoveCursor(newValue);
+        onSubmit(newValue); // Execute the command
       } else {
         // Handle @ command completion
         const atIndex = query.lastIndexOf('@');
@@ -85,7 +86,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       resetCompletion(); // Hide suggestions after selection
     },
-    [query, suggestions, resetCompletion, onChangeAndMoveCursor],
+    [query, suggestions, resetCompletion, onChangeAndMoveCursor, onSubmit],
   );
 
   const inputPreprocessor = useCallback(
