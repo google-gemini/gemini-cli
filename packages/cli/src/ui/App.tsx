@@ -9,7 +9,6 @@ import { Box, Static, Text, useStdout } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
-import { useInputHistory } from './hooks/useInputHistory.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
@@ -121,18 +120,6 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     slashCommands,
   );
 
-  const inputHistory = useInputHistory({
-    userMessages,
-    onSubmit: (value) => {
-      // Adapt onSubmit to use the lifted setQuery
-      handleFinalSubmit(value);
-      onChangeAndMoveCursor('');
-    },
-    isActive: isInputActive && !completion.showSuggestions,
-    currentQuery: query,
-    onChangeAndMoveCursor,
-  });
-
   // --- Render Logic ---
 
   // Get terminal width
@@ -236,12 +223,11 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
                 onChange={setQuery}
                 onChangeAndMoveCursor={onChangeAndMoveCursor}
                 editorState={editorState}
-                onSubmit={inputHistory.handleSubmit}
+                onSubmit={handleFinalSubmit} // Pass handleFinalSubmit directly
                 showSuggestions={completion.showSuggestions}
                 suggestions={completion.suggestions}
                 activeSuggestionIndex={completion.activeSuggestionIndex}
-                navigateHistoryUp={inputHistory.navigateUp}
-                navigateHistoryDown={inputHistory.navigateDown}
+                userMessages={userMessages} // Pass userMessages
                 navigateSuggestionUp={completion.navigateUp}
                 navigateSuggestionDown={completion.navigateDown}
                 resetCompletion={completion.resetCompletionState}

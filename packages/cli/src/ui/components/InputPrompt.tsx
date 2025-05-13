@@ -9,6 +9,7 @@ import { Text, Box, Key } from 'ink';
 import { Colors } from '../colors.js';
 import { Suggestion } from './SuggestionsDisplay.js';
 import { MultilineTextEditor } from './shared/multiline-editor.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
 
 interface InputPromptProps {
   query: string;
@@ -20,8 +21,7 @@ interface InputPromptProps {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
   resetCompletion: () => void;
-  navigateHistoryUp: () => void;
-  navigateHistoryDown: () => void;
+  userMessages: readonly string[];
   navigateSuggestionUp: () => void;
   navigateSuggestionDown: () => void;
 }
@@ -40,12 +40,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   showSuggestions,
   suggestions,
   activeSuggestionIndex,
-  navigateHistoryUp,
-  navigateHistoryDown,
+  userMessages,
   navigateSuggestionUp,
   navigateSuggestionDown,
   resetCompletion,
 }) => {
+  const handleSubmit = useCallback(
+    (submittedValue: string) => {
+      onSubmit(submittedValue);
+      onChangeAndMoveCursor(''); // Clear query after submit
+    },
+    [onSubmit, onChangeAndMoveCursor],
+  );
+
+  const inputHistory = useInputHistory({
+    userMessages,
+    onSubmit: handleSubmit,
+    isActive: !showSuggestions, // Input history is active when suggestions are not shown
+    currentQuery: query,
+    onChangeAndMoveCursor,
+  });
+
   const handleAutocomplete = useCallback(
     (indexToUse: number) => {
       if (indexToUse < 0 || indexToUse >= suggestions.length) {
@@ -112,7 +127,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             handleAutocomplete(activeSuggestionIndex);
           } else {
             if (query.trim()) {
-              onSubmit(query);
+              handleSubmit(query);
             }
           }
           return true;
@@ -132,7 +147,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       showSuggestions,
       resetCompletion,
       activeSuggestionIndex,
-      onSubmit,
+      handleSubmit,
     ],
   );
 
@@ -147,8 +162,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           onChange={onChange}
           placeholder="Enter your message or use tools (e.g., @src/file.txt)..."
           /* Account for width used by the box and &gt; */
-          navigateUp={navigateHistoryUp}
-          navigateDown={navigateHistoryDown}
+          navigateUp={inputHistory.navigateUp}
+          navigateDown={inputHistory.navigateDown}
           inputPreprocessor={inputPreprocessor}
           widthUsedByParent={3}
           widthFraction={0.9}
@@ -158,7 +173,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // as inputPreprocessor handles Enter when suggestions are visible.
             const trimmedQuery = query.trim();
             if (!showSuggestions && trimmedQuery) {
-              onSubmit(trimmedQuery);
+              handleSubmit(trimmedQuery);
             }
           }}
         />
