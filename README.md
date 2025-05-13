@@ -62,7 +62,7 @@ Alternatively, you can use the "Launch Program" configuration in VS Code if you 
 
 ## Using Gemini Code source in other directories
 
-To test your local version of `gemini-code` in other directories on your system, you can use `npm link`. Note, this is not the same as globally installing the released version of Gemini Code via `npm install -g @gemini-code/cli`. Rather, this creates a global symlink to your local project.
+To test your local version of `gemini` in other directories on your system, you can use `npm link`. Note, this is not the same as globally installing the released version of Gemini Code via `npm install -g @gemini-code/cli`. Rather, this creates a global symlink to your local project.
 
 From the root of this repository, run:
 
@@ -70,16 +70,16 @@ From the root of this repository, run:
 npm link packages/cli
 ```
 
-Then, navigate to any other directory where you want to use your local `gemini-code` and run:
+Then, navigate to any other directory where you want to use your local `gemini` and run:
 
 ```bash
-gemini-code
+gemini
 ```
 
 To breakpoint inside the sandbox container run:
 
 ```bash
-DEBUG=1 gemini-code
+DEBUG=1 gemini
 ```
 
 Note that using `npm link` simulates a production environment. If you are testing sandboxed mode via `npm link`, you must run the full build with `npm run build:all` from the repository root after any code changes to ensure the linked version is up to date.

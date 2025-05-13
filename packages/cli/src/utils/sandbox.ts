@@ -127,7 +127,7 @@ function entrypoint(workdir: string): string[] {
     ),
   );
 
-  // append remaining args (bash -c "gemini-code cli_args...")
+  // append remaining args (bash -c "gemini cli_args...")
   // cli_args need to be quoted before being inserted into bash_cmd
   const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
   const cliCmd =
@@ -136,8 +136,8 @@ function entrypoint(workdir: string): string[] {
         ? 'npm run debug --'
         : 'npm run start --'
       : process.env.DEBUG // for production binary debugging
-        ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini-code)`
-        : 'gemini-code';
+        ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini)`
+        : 'gemini';
 
   const args = [...bashCmds, cliCmd, ...cliArgs];
 
@@ -197,7 +197,7 @@ export async function start_sandbox(sandbox: string) {
   console.log(`hopping into sandbox (command: ${sandbox}) ...`);
 
   // determine full path for gemini-code to distinguish linked vs installed setting
-  const gcPath = execSync(`realpath $(which gemini-code)`).toString().trim();
+  const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
 
   const image = process.env.GEMINI_CODE_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
   const workdir = process.cwd();
@@ -207,7 +207,7 @@ export async function start_sandbox(sandbox: string) {
   if (process.env.BUILD_SANDBOX) {
     if (!gcPath.includes('gemini-code/packages/')) {
       console.error(
-        'ERROR: cannot BUILD_SANDBOX using installed gemini-code binary; ' +
+        'ERROR: cannot BUILD_SANDBOX using installed gemini binary; ' +
           'run `npm link ./packages/cli` under gemini-code repo to switch to linked binary.',
       );
       process.exit(1);
