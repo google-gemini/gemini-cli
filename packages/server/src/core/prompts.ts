@@ -115,10 +115,9 @@ ${(function () {
 - The current working (project) directory is being managed by a git repository.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
   - \`git status\` to ensure that all relevant files are tracked & staged, using \`git add ...\` as needed.
-  - \`git diff\` to review all unstaged changes in work tree.
-  - \`git diff --staged\` to review all staged changes.
+  - \`git diff HEAD\` to review all changes to tracked files (both staged and unstaged) in work tree since last commit.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
-- Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff && git diff --staged && git log -n 3\`.
+- Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".
 - Keep the user informed and ask for clarification or confirmation where needed.
