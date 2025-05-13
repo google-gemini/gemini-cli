@@ -19,7 +19,7 @@ import { UseHistoryManagerReturn } from './useHistoryManager.js';
 export const useShellCommandProcessor = (
   addItemToHistory: UseHistoryManagerReturn['addItem'],
   setStreamingState: React.Dispatch<React.SetStateAction<StreamingState>>,
-  setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
+  onDebugMessage: (message: string) => void,
   config: Config,
 ) => {
   /**
@@ -50,7 +50,7 @@ export const useShellCommandProcessor = (
       }
 
       const targetDir = config.getTargetDir();
-      setDebugMessage(
+      onDebugMessage(
         `Executing shell command in ${targetDir}: ${commandToExecute}`,
       );
       const execOptions = {
@@ -80,7 +80,7 @@ export const useShellCommandProcessor = (
 
       return true; // Command was initiated
     },
-    [config, setDebugMessage, addItemToHistory, setStreamingState],
+    [config, onDebugMessage, addItemToHistory, setStreamingState],
   );
 
   return { handleShellCommand };

@@ -24,7 +24,7 @@ interface HandleAtCommandParams {
   query: string;
   config: Config;
   addItem: UseHistoryManagerReturn['addItem'];
-  setDebugMessage: React.Dispatch<React.SetStateAction<string>>;
+  onDebugMessage: (message: string) => void;
   messageId: number;
   signal: AbortSignal;
 }
@@ -89,7 +89,7 @@ export async function handleAtCommand({
   query,
   config,
   addItem,
-  setDebugMessage,
+  onDebugMessage,
   messageId: userMessageTimestamp,
   signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
@@ -109,7 +109,7 @@ export async function handleAtCommand({
 
   // If the atPath is just "@", pass the original query to the LLM
   if (atPath === '@') {
-    setDebugMessage('Lone @ detected, passing directly to LLM.');
+    onDebugMessage('Lone @ detected, passing directly to LLM.');
     return { processedQuery: [{ text: query }], shouldProceed: true };
   }
 
@@ -144,18 +144,18 @@ export async function handleAtCommand({
     const stats = await fs.stat(absolutePath);
     if (stats.isDirectory()) {
       pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
-      setDebugMessage(`Path resolved to directory, using glob: ${pathSpec}`);
+      onDebugMessage(`Path resolved to directory, using glob: ${pathSpec}`);
     } else {
-      setDebugMessage(`Path resolved to file: ${pathSpec}`);
+      onDebugMessage(`Path resolved to file: ${pathSpec}`);
     }
   } catch (error) {
     // If stat fails (e.g., not found), proceed with original path.
     // The tool itself will handle the error during execution.
     if (isNodeError(error) && error.code === 'ENOENT') {
-      setDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
+      onDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
     } else {
       console.error(`Error stating path ${pathPart}:`, error);
-      setDebugMessage(
+      onDebugMessage(
         `Error stating path, proceeding with original: ${pathSpec}`,
       );
     }

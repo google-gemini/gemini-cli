@@ -24,7 +24,7 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
-  setDebugMessage: React.Dispatch<React.SetStateAction<string>>,
+  onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
 ) => {
   const slashCommands: SlashCommand[] = useMemo(
@@ -34,7 +34,7 @@ export const useSlashCommandProcessor = (
         altName: '?',
         description: 'for help on gemini-code',
         action: (_value: PartListUnion) => {
-          setDebugMessage('Opening help.');
+          onDebugMessage('Opening help.');
           setShowHelp(true);
         },
       },
@@ -42,7 +42,7 @@ export const useSlashCommandProcessor = (
         name: 'clear',
         description: 'clear the screen',
         action: (_value: PartListUnion) => {
-          setDebugMessage('Clearing terminal.');
+          onDebugMessage('Clearing terminal.');
           clearItems();
           refreshStatic();
         },
@@ -59,12 +59,12 @@ export const useSlashCommandProcessor = (
         altName: 'exit',
         description: '',
         action: (_value: PartListUnion) => {
-          setDebugMessage('Quitting. Good-bye.');
+          onDebugMessage('Quitting. Good-bye.');
           process.exit(0);
         },
       },
     ],
-    [setDebugMessage, setShowHelp, refreshStatic, openThemeDialog, clearItems],
+    [onDebugMessage, setShowHelp, refreshStatic, openThemeDialog, clearItems],
   );
 
   /**

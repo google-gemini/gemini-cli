@@ -28,7 +28,6 @@ import {
   HistoryItemWithoutId,
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
-import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -41,17 +40,16 @@ import { UseHistoryManagerReturn } from './useHistoryManager.js';
  */
 export const useGeminiStream = (
   addItem: UseHistoryManagerReturn['addItem'],
-  clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
-  openThemeDialog: () => void,
+  onDebugMessage: (message: string) => void,
+  handleSlashCommand: (cmd: PartListUnion) => boolean,
 ) => {
   const toolRegistry = config.getToolRegistry();
   const [streamingState, setStreamingState] = useState<StreamingState>(
     StreamingState.Idle,
   );
-  const [debugMessage, setDebugMessage] = useState<string>('');
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatSessionRef = useRef<Chat | null>(null);
@@ -59,19 +57,10 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
 
-  const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
-    addItem,
-    clearItems,
-    refreshStatic,
-    setShowHelp,
-    setDebugMessage,
-    openThemeDialog,
-  );
-
   const { handleShellCommand } = useShellCommandProcessor(
     addItem,
     setStreamingState,
-    setDebugMessage,
+    onDebugMessage,
     config,
   );
 
@@ -109,7 +98,7 @@ export const useGeminiStream = (
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
-        setDebugMessage(`User query: '${trimmedQuery}'`);
+        onDebugMessage(`User query: '${trimmedQuery}'`);
 
         // Handle UI-only commands first
         if (handleSlashCommand(trimmedQuery)) return;
@@ -121,7 +110,7 @@ export const useGeminiStream = (
             query: trimmedQuery,
             config,
             addItem,
-            setDebugMessage,
+            onDebugMessage,
             messageId: userMessageTimestamp,
             signal,
           });
@@ -138,7 +127,7 @@ export const useGeminiStream = (
       }
 
       if (queryToSendToGemini === null) {
-        setDebugMessage(
+        onDebugMessage(
           'Query processing resulted in null, not sending to Gemini.',
         );
         return;
@@ -558,6 +547,7 @@ export const useGeminiStream = (
       setPendingHistoryItem,
       toolRegistry,
       refreshStatic,
+      onDebugMessage,
     ],
   );
 
@@ -565,8 +555,6 @@ export const useGeminiStream = (
     streamingState,
     submitQuery,
     initError,
-    debugMessage,
-    slashCommands,
     // Normally we would be concerned that the ref would not be up-to-date, but
     // this isn't a concern as the ref is updated whenever the corresponding
     // state is updated.
