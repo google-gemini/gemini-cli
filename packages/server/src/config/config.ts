@@ -8,6 +8,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import process from 'node:process';
+import * as os from 'node:os';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -97,6 +98,11 @@ function findEnvFile(startDir: string): string | null {
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
+      // check ~/.env as fallback
+      const homeEnvPath = path.join(os.homedir(), '.env');
+      if (fs.existsSync(homeEnvPath)) {
+        return homeEnvPath;
+      }
       return null;
     }
     currentDir = parentDir;

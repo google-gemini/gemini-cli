@@ -33,7 +33,7 @@ shift $((OPTIND - 1))
 
 # if GEMINI_CODE_SANDBOX is not set, see if it is set in user settings
 # note it can be string or boolean, and if missing jq will return null
-USER_SETTINGS_FILE=~/.gemini/settings.json
+USER_SETTINGS_FILE="$HOME/.gemini/settings.json"
 if [ -z "${GEMINI_CODE_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
     USER_SANDBOX_SETTING=$(jq -r '.sandbox' "$USER_SETTINGS_FILE")
     if [ "$USER_SANDBOX_SETTING" != null ]; then
@@ -45,13 +45,20 @@ fi
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
 if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
     current_dir=$(pwd)
+    dot_env_sourced=false
     while [ "$current_dir" != "/" ]; do
         if [ -f "$current_dir/.env" ]; then
             source "$current_dir/.env"
+            dot_env_sourced=true
             break
         fi
         current_dir=$(dirname "$current_dir")
     done
+    # if .env is not found in any ancestor directory, try ~/.env as fallback
+    if [ "$dot_env_sourced" = false ] && [ -f "$HOME/.env" ]; then
+        source "$HOME/.env"
+        dot_env_sourced=true
+    fi
 fi
 
 # lowercase GEMINI_CODE_SANDBOX
