@@ -202,6 +202,7 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
             onSelect={handleThemeSelect}
             onHighlight={handleThemeHighlight}
             settings={settings}
+            setQuery={setQuery}
           />
         </Box>
       ) : (

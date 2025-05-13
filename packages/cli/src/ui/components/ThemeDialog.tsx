@@ -21,12 +21,15 @@ interface ThemeDialogProps {
   onHighlight: (themeName: string | undefined) => void;
   /** The settings object */
   settings: LoadedSettings;
+  /** Callback to set the query */
+  setQuery: (query: string) => void;
 }
 
 export function ThemeDialog({
   onSelect,
   onHighlight,
   settings,
+  setQuery,
 }: ThemeDialogProps): React.JSX.Element {
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
@@ -56,6 +59,7 @@ export function ThemeDialog({
   ];
 
   const handleThemeSelect = (themeName: string) => {
+    setQuery(''); // Clear the query when user selects a theme
     onSelect(themeName, selectedScope);
   };
 
@@ -76,6 +80,10 @@ export function ThemeDialog({
   useInput((input, key) => {
     if (key.tab) {
       setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+    }
+    if (key.escape) {
+      setQuery(''); // Clear the query when user hits escape
+      onSelect(undefined, selectedScope);
     }
   });
 
