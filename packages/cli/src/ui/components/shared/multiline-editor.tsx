@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TextBuffer } from './text-buffer.js';
+import { useTextBuffer } from './text-buffer.js';
 import chalk from 'chalk';
 import { Box, Text, useInput, useStdin, Key } from 'ink';
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { Colors } from '../../colors.js';
 
@@ -68,10 +68,6 @@ export const MultilineTextEditor = ({
   navigateDown,
   inputPreprocessor,
 }: MultilineTextEditorProps): React.ReactElement => {
-  const [buffer, setBuffer] = useState(
-    () => new TextBuffer(initialText, initialCursorOffset),
-  );
-
   const terminalSize = useTerminalSize();
   const effectiveWidth = Math.max(
     20,
@@ -81,35 +77,14 @@ export const MultilineTextEditor = ({
 
   const { stdin, setRawMode } = useStdin();
 
-  // TODO(jacobr): make TextBuffer immutable rather than this hack to act
-  // like it is immutable.
-  const updateBufferState = useCallback(
-    (mutator: (currentBuffer: TextBuffer) => void) => {
-      setBuffer((currentBuffer) => {
-        mutator(currentBuffer);
-        // Create a new instance from the mutated buffer to trigger re-render
-        return TextBuffer.fromBuffer(currentBuffer);
-      });
-    },
-    [],
-  );
-
-  const openExternalEditor = useCallback(async () => {
-    const wasRaw = stdin?.isRaw ?? false;
-    try {
-      setRawMode?.(false);
-      // openInExternalEditor mutates the buffer instance
-      await buffer.openInExternalEditor();
-    } catch (err) {
-      console.error('[MultilineTextEditor] external editor error', err);
-    } finally {
-      if (wasRaw) {
-        setRawMode?.(true);
-      }
-      // Update state with the mutated buffer to trigger re-render
-      setBuffer(TextBuffer.fromBuffer(buffer));
-    }
-  }, [buffer, stdin, setRawMode, setBuffer]);
+  const buffer = useTextBuffer({
+    initialText,
+    initialCursorOffset,
+    viewport: { height, width: effectiveWidth },
+    stdin,
+    setRawMode,
+    onChange, // Pass onChange to the hook
+  });
 
   useInput(
     (input, key) => {
@@ -131,7 +106,7 @@ export const MultilineTextEditor = ({
           input.length === 1 &&
           input.charCodeAt(0) === 5);
       if (isCtrlX || isCtrlE) {
-        openExternalEditor();
+        buffer.openInExternalEditor();
         return;
       }
 
@@ -142,8 +117,6 @@ export const MultilineTextEditor = ({
         console.log('[MultilineTextEditor] event', { input, key });
       }
 
-      let bufferMutated = false;
-
       if (input.startsWith('[') && input.endsWith('u')) {
         const m = input.match(/^\[([0-9]+);([0-9]+)u$/);
         if (m && m[1] === '13') {
@@ -151,14 +124,10 @@ export const MultilineTextEditor = ({
           const hasCtrl = Math.floor(mod / 4) % 2 === 1;
           if (hasCtrl) {
             if (onSubmit) {
-              onSubmit(buffer.getText());
+              onSubmit(buffer.text);
             }
           } else {
             buffer.newline();
-            bufferMutated = true;
-          }
-          if (bufferMutated) {
-            updateBufferState((_) => {}); // Trigger re-render if mutated
           }
           return;
         }
@@ -171,14 +140,10 @@ export const MultilineTextEditor = ({
           const hasCtrl = Math.floor(mod / 4) % 2 === 1;
           if (hasCtrl) {
             if (onSubmit) {
-              onSubmit(buffer.getText());
+              onSubmit(buffer.text);
             }
           } else {
             buffer.newline();
-            bufferMutated = true;
-          }
-          if (bufferMutated) {
-            updateBufferState((_) => {}); // Trigger re-render if mutated
           }
           return;
         }
@@ -186,63 +151,42 @@ export const MultilineTextEditor = ({
 
       if (input === '\n') {
         buffer.newline();
-        updateBufferState((_) => {});
         return;
       }
 
       if (input === '\r') {
         if (onSubmit) {
-          onSubmit(buffer.getText());
+          onSubmit(buffer.text);
         }
         return;
       }
 
       if (key.upArrow) {
-        if (buffer.getCursor()[0] === 0 && navigateUp) {
+        if (buffer.cursor[0] === 0 && navigateUp) {
           navigateUp();
           return;
         }
       }
 
       if (key.downArrow) {
-        if (
-          buffer.getCursor()[0] === buffer.getText().split('\n').length - 1 &&
-          navigateDown
-        ) {
+        if (buffer.cursor[0] === buffer.lines.length - 1 && navigateDown) {
           navigateDown();
           return;
         }
       }
 
-      const modifiedByHandleInput = buffer.handleInput(
-        input,
-        key as Record<string, boolean>,
-        { height, width: effectiveWidth },
-      );
-
-      if (modifiedByHandleInput) {
-        updateBufferState((_) => {});
-      }
-
-      const newText = buffer.getText();
-      if (onChange) {
-        onChange(newText);
-      }
+      buffer.handleInput(input, key as Record<string, boolean>);
     },
     { isActive: focus },
   );
 
-  const visibleLines = buffer.getVisibleLines({
-    height,
-    width: effectiveWidth,
-  });
-  const [cursorRow, cursorCol] = buffer.getCursor();
-  const scrollRow = buffer.getScrollRow();
-  const scrollCol = buffer.getScrollCol();
+  const visibleLines = buffer.visibleLines;
+  const [cursorRow, cursorCol] = buffer.cursor;
+  const [scrollRow, scrollCol] = buffer.scroll;
 
   return (
     <Box flexDirection="column">
-      {buffer.getText().length === 0 && placeholder ? (
+      {buffer.text.length === 0 && placeholder ? (
         <Text color={Colors.SubtleComment}>{placeholder}</Text>
       ) : (
         visibleLines.map((lineText, idx) => {

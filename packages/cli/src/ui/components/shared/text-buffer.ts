@@ -8,6 +8,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 
 export type Direction =
   | 'left'
@@ -75,82 +76,809 @@ function dbg(...args: unknown[]): void {
 
 /* ────────────────────────────────────────────────────────────────────────── */
 
-export class TextBuffer {
-  private lines: string[];
-  private cursorRow = 0;
-  private cursorCol = 0;
-  private scrollRow = 0;
-  private scrollCol = 0;
+interface UseTextBufferProps {
+  initialText?: string;
+  initialCursorOffset?: number;
+  viewport: Viewport; // Viewport dimensions needed for scrolling
+  stdin?: NodeJS.ReadStream | null; // For external editor
+  setRawMode?: (mode: boolean) => void; // For external editor
+  onChange?: (text: string) => void; // Callback for when text changes
+}
 
+interface UndoHistoryEntry {
+  lines: string[];
+  cursorRow: number;
+  cursorCol: number;
+}
+
+function calculateInitialCursorPosition(
+  initialLines: string[],
+  offset: number,
+): [number, number] {
+  let remainingChars = offset;
+  let row = 0;
+  while (row < initialLines.length) {
+    const lineLength = cpLen(initialLines[row]);
+    // Add 1 for the newline character (except for the last line)
+    const totalCharsInLineAndNewline =
+      lineLength + (row < initialLines.length - 1 ? 1 : 0);
+
+    if (remainingChars <= lineLength) {
+      // Cursor is on this line
+      return [row, remainingChars];
+    }
+    remainingChars -= totalCharsInLineAndNewline;
+    row++;
+  }
+  // Offset is beyond the text, place cursor at the end of the last line
+  if (initialLines.length > 0) {
+    const lastRow = initialLines.length - 1;
+    return [lastRow, cpLen(initialLines[lastRow])];
+  }
+  return [0, 0]; // Default for empty text
+}
+
+export function useTextBuffer({
+  initialText = '',
+  initialCursorOffset = 0,
+  viewport,
+  stdin,
+  setRawMode,
+  onChange,
+}: UseTextBufferProps): TextBuffer {
+  const [lines, setLines] = useState<string[]>(() => {
+    const l = initialText.split('\n');
+    return l.length === 0 ? [''] : l;
+  });
+
+  const [[initialCursorRow, initialCursorCol]] = useState(() =>
+    calculateInitialCursorPosition(lines, initialCursorOffset),
+  );
+
+  const [cursorRow, setCursorRow] = useState<number>(initialCursorRow);
+  const [cursorCol, setCursorCol] = useState<number>(initialCursorCol);
+  const [scrollRow, setScrollRow] = useState<number>(0);
+  const [scrollCol, setScrollCol] = useState<number>(0);
+  const [preferredCol, setPreferredCol] = useState<number | null>(null);
+
+  const [undoStack, setUndoStack] = useState<UndoHistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<UndoHistoryEntry[]>([]);
+  const historyLimit = 100;
+
+  const [clipboard, setClipboard] = useState<string | null>(null);
+  const [selectionAnchor, setSelectionAnchor] = useState<
+    [number, number] | null
+  >(null);
+
+  const currentLine = useCallback(
+    (r: number): string => lines[r] ?? '',
+    [lines],
+  );
+  const currentLineLen = useCallback(
+    (r: number): number => cpLen(currentLine(r)),
+    [currentLine],
+  );
+
+  useEffect(() => {
+    const { height, width } = viewport;
+    let newScrollRow = scrollRow;
+    let newScrollCol = scrollCol;
+
+    if (cursorRow < scrollRow) {
+      newScrollRow = cursorRow;
+    } else if (cursorRow >= scrollRow + height) {
+      newScrollRow = cursorRow - height + 1;
+    }
+
+    if (cursorCol < scrollCol) {
+      newScrollCol = cursorCol;
+    } else if (cursorCol >= scrollCol + width) {
+      newScrollCol = cursorCol - width + 1;
+    }
+
+    if (newScrollRow !== scrollRow) {
+      setScrollRow(newScrollRow);
+    }
+    if (newScrollCol !== scrollCol) {
+      setScrollCol(newScrollCol);
+    }
+  }, [cursorRow, cursorCol, scrollRow, scrollCol, viewport]);
+
+  const pushUndo = useCallback(() => {
+    dbg('pushUndo', { cursor: [cursorRow, cursorCol], text: lines.join('\n') });
+    const snapshot = { lines: [...lines], cursorRow, cursorCol };
+    setUndoStack((prev) => {
+      const newStack = [...prev, snapshot];
+      if (newStack.length > historyLimit) {
+        newStack.shift();
+      }
+      return newStack;
+    });
+    setRedoStack([]);
+  }, [lines, cursorRow, cursorCol, historyLimit]);
+
+  const _restoreState = useCallback(
+    (state: UndoHistoryEntry | undefined): boolean => {
+      if (!state) return false;
+      setLines(state.lines);
+      setCursorRow(state.cursorRow);
+      setCursorCol(state.cursorCol);
+      return true;
+    },
+    [],
+  );
+
+  const text = lines.join('\n');
+
+  // TODO(jacobr): stop using useEffect for this case. This may require a
+  // refactor of App.tsx and InputPrompt.tsx to simplify where onChange is used.
+  useEffect(() => {
+    if (onChange) {
+      onChange(text);
+    }
+  }, [text, onChange]);
+
+  const undo = useCallback((): boolean => {
+    const state = undoStack[undoStack.length - 1];
+    if (!state) return false;
+
+    setUndoStack((prev) => prev.slice(0, -1));
+    const currentSnapshot = { lines: [...lines], cursorRow, cursorCol };
+    setRedoStack((prev) => [...prev, currentSnapshot]);
+    return _restoreState(state);
+  }, [undoStack, lines, cursorRow, cursorCol, _restoreState]);
+
+  const redo = useCallback((): boolean => {
+    const state = redoStack[redoStack.length - 1];
+    if (!state) return false;
+
+    setRedoStack((prev) => prev.slice(0, -1));
+    const currentSnapshot = { lines: [...lines], cursorRow, cursorCol };
+    setUndoStack((prev) => [...prev, currentSnapshot]);
+    return _restoreState(state);
+  }, [redoStack, lines, cursorRow, cursorCol, _restoreState]);
+
+  const insertStr = useCallback(
+    (str: string): boolean => {
+      dbg('insertStr', { str, beforeCursor: [cursorRow, cursorCol] });
+      if (str === '') return false;
+
+      pushUndo();
+      const normalised = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const parts = normalised.split('\n');
+
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        const lineContent = currentLine(cursorRow);
+        const before = cpSlice(lineContent, 0, cursorCol);
+        const after = cpSlice(lineContent, cursorCol);
+
+        newLines[cursorRow] = before + parts[0];
+
+        if (parts.length > 2) {
+          const middle = parts.slice(1, -1);
+          newLines.splice(cursorRow + 1, 0, ...middle);
+        }
+
+        const lastPart = parts[parts.length - 1]!;
+        newLines.splice(cursorRow + (parts.length - 1), 0, lastPart + after);
+
+        setCursorRow((prev) => prev + parts.length - 1);
+        setCursorCol(cpLen(lastPart));
+        return newLines;
+      });
+      setPreferredCol(null);
+      return true;
+    },
+    [pushUndo, cursorRow, cursorCol, currentLine, setPreferredCol],
+  );
+
+  const insert = useCallback(
+    (ch: string): void => {
+      if (/[\n\r]/.test(ch)) {
+        insertStr(ch);
+        return;
+      }
+      dbg('insert', { ch, beforeCursor: [cursorRow, cursorCol] });
+      pushUndo();
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        const lineContent = currentLine(cursorRow);
+        newLines[cursorRow] =
+          cpSlice(lineContent, 0, cursorCol) +
+          ch +
+          cpSlice(lineContent, cursorCol);
+        return newLines;
+      });
+      setCursorCol((prev) => prev + ch.length);
+      setPreferredCol(null);
+    },
+    [pushUndo, cursorRow, cursorCol, currentLine, insertStr, setPreferredCol],
+  );
+
+  const newline = useCallback((): void => {
+    dbg('newline', { beforeCursor: [cursorRow, cursorCol] });
+    pushUndo();
+    setLines((prevLines) => {
+      const newLines = [...prevLines];
+      const l = currentLine(cursorRow);
+      const before = cpSlice(l, 0, cursorCol);
+      const after = cpSlice(l, cursorCol);
+      newLines[cursorRow] = before;
+      newLines.splice(cursorRow + 1, 0, after);
+      return newLines;
+    });
+    setCursorRow((prev) => prev + 1);
+    setCursorCol(0);
+    setPreferredCol(null);
+  }, [pushUndo, cursorRow, cursorCol, currentLine, setPreferredCol]);
+
+  const backspace = useCallback((): void => {
+    dbg('backspace', { beforeCursor: [cursorRow, cursorCol] });
+    if (cursorCol === 0 && cursorRow === 0) return;
+
+    pushUndo();
+    if (cursorCol > 0) {
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        const lineContent = currentLine(cursorRow);
+        newLines[cursorRow] =
+          cpSlice(lineContent, 0, cursorCol - 1) +
+          cpSlice(lineContent, cursorCol);
+        return newLines;
+      });
+      setCursorCol((prev) => prev - 1);
+    } else if (cursorRow > 0) {
+      const prevLineContent = currentLine(cursorRow - 1);
+      const currentLineContentVal = currentLine(cursorRow);
+      const newCol = cpLen(prevLineContent);
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        newLines[cursorRow - 1] = prevLineContent + currentLineContentVal;
+        newLines.splice(cursorRow, 1);
+        return newLines;
+      });
+      setCursorRow((prev) => prev - 1);
+      setCursorCol(newCol);
+    }
+    setPreferredCol(null);
+  }, [pushUndo, cursorRow, cursorCol, currentLine, setPreferredCol]);
+
+  const del = useCallback((): void => {
+    dbg('delete', { beforeCursor: [cursorRow, cursorCol] });
+    const lineContent = currentLine(cursorRow);
+    if (cursorCol < currentLineLen(cursorRow)) {
+      pushUndo();
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        newLines[cursorRow] =
+          cpSlice(lineContent, 0, cursorCol) +
+          cpSlice(lineContent, cursorCol + 1);
+        return newLines;
+      });
+    } else if (cursorRow < lines.length - 1) {
+      pushUndo();
+      const nextLineContent = currentLine(cursorRow + 1);
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        newLines[cursorRow] = lineContent + nextLineContent;
+        newLines.splice(cursorRow + 1, 1);
+        return newLines;
+      });
+    }
+    // cursor position does not change for del
+    setPreferredCol(null);
+  }, [
+    pushUndo,
+    cursorRow,
+    cursorCol,
+    lines,
+    currentLine,
+    currentLineLen,
+    setPreferredCol,
+  ]);
+
+  const setText = useCallback(
+    (text: string): void => {
+      dbg('setText', { text });
+      pushUndo();
+      const newContentLines = text.replace(/\r\n?/g, '\n').split('\n');
+      setLines(newContentLines.length === 0 ? [''] : newContentLines);
+      setCursorRow(newContentLines.length - 1);
+      setCursorCol(cpLen(newContentLines[newContentLines.length - 1] ?? ''));
+      setScrollRow(0);
+      setScrollCol(0);
+      setPreferredCol(null);
+    },
+    [pushUndo, setPreferredCol],
+  );
+
+  const replaceRange = useCallback(
+    (
+      startRow: number,
+      startCol: number,
+      endRow: number,
+      endCol: number,
+      text: string,
+    ): boolean => {
+      if (
+        startRow > endRow ||
+        (startRow === endRow && startCol > endCol) ||
+        startRow < 0 ||
+        startCol < 0 ||
+        endRow >= lines.length
+      ) {
+        console.error('Invalid range provided to replaceRange');
+        return false;
+      }
+      dbg('replaceRange', {
+        start: [startRow, startCol],
+        end: [endRow, endCol],
+        text,
+      });
+      pushUndo();
+
+      const sCol = clamp(startCol, 0, currentLineLen(startRow));
+      const eCol = clamp(endCol, 0, currentLineLen(endRow));
+
+      const prefix = cpSlice(currentLine(startRow), 0, sCol);
+      const suffix = cpSlice(currentLine(endRow), eCol);
+
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        if (startRow < endRow) {
+          newLines.splice(startRow + 1, endRow - startRow);
+        }
+        newLines[startRow] = prefix + suffix;
+        // Now insert text at this new effective cursor position
+        const tempCursorRow = startRow;
+        const tempCursorCol = sCol;
+
+        const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const parts = normalised.split('\n');
+        const currentLineContent = newLines[tempCursorRow];
+        const beforeInsert = cpSlice(currentLineContent, 0, tempCursorCol);
+        const afterInsert = cpSlice(currentLineContent, tempCursorCol);
+
+        newLines[tempCursorRow] = beforeInsert + parts[0];
+        if (parts.length > 2) {
+          newLines.splice(tempCursorRow + 1, 0, ...parts.slice(1, -1));
+        }
+        const lastPart = parts[parts.length - 1]!;
+        newLines.splice(
+          tempCursorRow + (parts.length - 1),
+          0,
+          lastPart + afterInsert,
+        );
+
+        setCursorRow(tempCursorRow + parts.length - 1);
+        setCursorCol(cpLen(lastPart));
+        return newLines;
+      });
+
+      setPreferredCol(null);
+      return true;
+    },
+    [pushUndo, lines, currentLine, currentLineLen, setPreferredCol],
+  );
+
+  const deleteWordLeft = useCallback((): void => {
+    dbg('deleteWordLeft', { beforeCursor: [cursorRow, cursorCol] });
+    if (cursorCol === 0 && cursorRow === 0) return;
+    if (cursorCol === 0) {
+      backspace();
+      return;
+    }
+    pushUndo();
+    const lineContent = currentLine(cursorRow);
+    const arr = toCodePoints(lineContent);
+    let start = cursorCol;
+    let onlySpaces = true;
+    for (let i = 0; i < start; i++) {
+      if (isWordChar(arr[i])) {
+        onlySpaces = false;
+        break;
+      }
+    }
+    if (onlySpaces && start > 0) {
+      start--;
+    } else {
+      while (start > 0 && !isWordChar(arr[start - 1])) start--;
+      while (start > 0 && isWordChar(arr[start - 1])) start--;
+    }
+    setLines((prevLines) => {
+      const newLines = [...prevLines];
+      newLines[cursorRow] =
+        cpSlice(lineContent, 0, start) + cpSlice(lineContent, cursorCol);
+      return newLines;
+    });
+    setCursorCol(start);
+    setPreferredCol(null);
+  }, [pushUndo, cursorRow, cursorCol, currentLine, backspace, setPreferredCol]);
+
+  const deleteWordRight = useCallback((): void => {
+    dbg('deleteWordRight', { beforeCursor: [cursorRow, cursorCol] });
+    const lineContent = currentLine(cursorRow);
+    const arr = toCodePoints(lineContent);
+    if (cursorCol >= arr.length && cursorRow === lines.length - 1) return;
+    if (cursorCol >= arr.length) {
+      del();
+      return;
+    }
+    pushUndo();
+    let end = cursorCol;
+    while (end < arr.length && !isWordChar(arr[end])) end++;
+    while (end < arr.length && isWordChar(arr[end])) end++;
+    setLines((prevLines) => {
+      const newLines = [...prevLines];
+      newLines[cursorRow] =
+        cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
+      return newLines;
+    });
+    // Cursor col does not change
+    setPreferredCol(null);
+  }, [
+    pushUndo,
+    cursorRow,
+    cursorCol,
+    lines,
+    currentLine,
+    del,
+    setPreferredCol,
+  ]);
+
+  const move = useCallback(
+    (dir: Direction): void => {
+      const before = [cursorRow, cursorCol];
+      let newCursorRow = cursorRow;
+      let newCursorCol = cursorCol;
+      let newPreferredCol = preferredCol;
+
+      switch (dir) {
+        case 'left':
+          newPreferredCol = null;
+          if (newCursorCol > 0) newCursorCol--;
+          else if (newCursorRow > 0) {
+            newCursorRow--;
+            newCursorCol = currentLineLen(newCursorRow);
+          }
+          break;
+        case 'right':
+          newPreferredCol = null;
+          if (newCursorCol < currentLineLen(newCursorRow)) newCursorCol++;
+          else if (newCursorRow < lines.length - 1) {
+            newCursorRow++;
+            newCursorCol = 0;
+          }
+          break;
+        case 'up':
+          if (newCursorRow > 0) {
+            if (newPreferredCol === null) newPreferredCol = newCursorCol;
+            newCursorRow--;
+            newCursorCol = clamp(
+              newPreferredCol,
+              0,
+              currentLineLen(newCursorRow),
+            );
+          }
+          break;
+        case 'down':
+          if (newCursorRow < lines.length - 1) {
+            if (newPreferredCol === null) newPreferredCol = newCursorCol;
+            newCursorRow++;
+            newCursorCol = clamp(
+              newPreferredCol,
+              0,
+              currentLineLen(newCursorRow),
+            );
+          }
+          break;
+        case 'home':
+          newPreferredCol = null;
+          newCursorCol = 0;
+          break;
+        case 'end':
+          newPreferredCol = null;
+          newCursorCol = currentLineLen(newCursorRow);
+          break;
+        case 'wordLeft': {
+          newPreferredCol = null;
+          const slice = cpSlice(
+            currentLine(newCursorRow),
+            0,
+            newCursorCol,
+          ).replace(/[\s,.;!?]+$/, '');
+          let lastIdx = 0;
+          const regex = /[\s,.;!?]+/g;
+          let m;
+          while ((m = regex.exec(slice)) != null) lastIdx = m.index;
+          newCursorCol = lastIdx === 0 ? 0 : cpLen(slice.slice(0, lastIdx)) + 1;
+          break;
+        }
+        case 'wordRight': {
+          newPreferredCol = null;
+          const l = currentLine(newCursorRow);
+          const regex = /[\s,.;!?]+/g;
+          let moved = false;
+          let m;
+          while ((m = regex.exec(l)) != null) {
+            const cpIdx = cpLen(l.slice(0, m.index));
+            if (cpIdx > newCursorCol) {
+              newCursorCol = cpIdx;
+              moved = true;
+              break;
+            }
+          }
+          if (!moved) newCursorCol = currentLineLen(newCursorRow);
+          break;
+        }
+        default: // Add default case to satisfy linter
+          break;
+      }
+      setCursorRow(newCursorRow);
+      setCursorCol(newCursorCol);
+      setPreferredCol(newPreferredCol);
+      dbg('move', { dir, before, after: [newCursorRow, newCursorCol] });
+    },
+    [
+      cursorRow,
+      cursorCol,
+      preferredCol,
+      lines,
+      currentLineLen,
+      currentLine,
+      setPreferredCol,
+    ],
+  );
+
+  const openInExternalEditor = useCallback(
+    async (opts: { editor?: string } = {}): Promise<void> => {
+      const editor =
+        opts.editor ??
+        process.env['VISUAL'] ??
+        process.env['EDITOR'] ??
+        (process.platform === 'win32' ? 'notepad' : 'vi');
+      const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
+      const filePath = pathMod.join(tmpDir, 'buffer.txt');
+      fs.writeFileSync(filePath, text, 'utf8');
+
+      pushUndo(); // Snapshot before external edit
+
+      const wasRaw = stdin?.isRaw ?? false;
+      try {
+        setRawMode?.(false);
+        const { status, error } = spawnSync(editor, [filePath], {
+          stdio: 'inherit',
+        });
+        if (error) throw error;
+        if (typeof status === 'number' && status !== 0)
+          throw new Error(`External editor exited with status ${status}`);
+
+        let newText = fs.readFileSync(filePath, 'utf8');
+        newText = newText.replace(/\r\n?/g, '\n');
+
+        const newContentLines = newText.split('\n');
+        setLines(newContentLines.length === 0 ? [''] : newContentLines);
+        setCursorRow(newContentLines.length - 1);
+        setCursorCol(cpLen(newContentLines[newContentLines.length - 1] ?? ''));
+        setScrollRow(0);
+        setScrollCol(0);
+        setPreferredCol(null);
+      } catch (err) {
+        console.error('[useTextBuffer] external editor error', err);
+        // TODO(jacobr): potentially revert or handle error state.
+      } finally {
+        if (wasRaw) setRawMode?.(true);
+        try {
+          fs.unlinkSync(filePath);
+        } catch {
+          /* ignore */
+        }
+        try {
+          fs.rmdirSync(tmpDir);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [text, pushUndo, stdin, setRawMode, setPreferredCol],
+  );
+
+  const handleInput = useCallback(
+    (input: string | undefined, key: Record<string, boolean>): boolean => {
+      dbg('handleInput', { input, key, cursor: [cursorRow, cursorCol] });
+      const beforeText = text; // For change detection
+      const beforeCursor = [cursorRow, cursorCol];
+
+      if (key['escape']) return false;
+
+      if (key['return'] || input === '\r' || input === '\n') newline();
+      else if (key['leftArrow'] && !key['meta'] && !key['ctrl'] && !key['alt'])
+        move('left');
+      else if (key['rightArrow'] && !key['meta'] && !key['ctrl'] && !key['alt'])
+        move('right');
+      else if (key['upArrow']) move('up');
+      else if (key['downArrow']) move('down');
+      else if ((key['meta'] || key['ctrl'] || key['alt']) && key['leftArrow'])
+        move('wordLeft');
+      else if ((key['meta'] || key['ctrl'] || key['alt']) && key['rightArrow'])
+        move('wordRight');
+      else if (key['home']) move('home');
+      else if (key['end']) move('end');
+      else if (
+        (key['meta'] || key['ctrl'] || key['alt']) &&
+        (key['backspace'] || input === '\x7f')
+      )
+        deleteWordLeft();
+      else if ((key['meta'] || key['ctrl'] || key['alt']) && key['delete'])
+        deleteWordRight();
+      else if (
+        key['backspace'] ||
+        input === '\x7f' ||
+        (key['delete'] && !key['shift'])
+      )
+        backspace();
+      else if (key['delete']) del();
+      else if (input && !key['ctrl'] && !key['meta']) insert(input);
+
+      const textChanged = text !== beforeText;
+      const cursorChanged =
+        cursorRow !== beforeCursor[0] || cursorCol !== beforeCursor[1];
+
+      dbg('handleInput:after', {
+        cursor: [cursorRow, cursorCol],
+        text,
+      });
+      return textChanged || cursorChanged;
+    },
+    [
+      text,
+      cursorRow,
+      cursorCol,
+      newline,
+      move,
+      deleteWordLeft,
+      deleteWordRight,
+      backspace,
+      del,
+      insert,
+    ],
+  );
+
+  const visibleLines = useMemo(
+    () => lines.slice(scrollRow, scrollRow + viewport.height),
+    [lines, scrollRow, viewport.height],
+  );
+
+  // Exposed API of the hook
+  const returnValue: TextBuffer = {
+    // State
+    lines,
+    text,
+    cursor: [cursorRow, cursorCol],
+    scroll: [scrollRow, scrollCol],
+    preferredCol,
+    selectionAnchor,
+
+    // Actions
+    setText,
+    insert,
+    newline,
+    backspace,
+    del,
+    move,
+    undo,
+    redo,
+    replaceRange,
+    deleteWordLeft,
+    deleteWordRight,
+    handleInput,
+    openInExternalEditor,
+
+    // Selection & Clipboard (simplified for now)
+    copy: useCallback(() => {
+      if (!selectionAnchor) return null;
+      const [ar, ac] = selectionAnchor;
+      const [br, bc] = [cursorRow, cursorCol];
+      if (ar === br && ac === bc) return null;
+      const topBefore = ar < br || (ar === br && ac < bc);
+      const [sr, sc, er, ec] = topBefore ? [ar, ac, br, bc] : [br, bc, ar, ac];
+
+      let selectedTextVal;
+      if (sr === er) {
+        selectedTextVal = cpSlice(currentLine(sr), sc, ec);
+      } else {
+        const parts: string[] = [cpSlice(currentLine(sr), sc)];
+        for (let r = sr + 1; r < er; r++) parts.push(currentLine(r));
+        parts.push(cpSlice(currentLine(er), 0, ec));
+        selectedTextVal = parts.join('\n');
+      }
+      setClipboard(selectedTextVal);
+      return selectedTextVal;
+    }, [selectionAnchor, cursorRow, cursorCol, currentLine]),
+    paste: useCallback(() => {
+      if (clipboard === null) return false;
+      return insertStr(clipboard);
+    }, [clipboard, insertStr]),
+    startSelection: useCallback(
+      () => setSelectionAnchor([cursorRow, cursorCol]),
+      [cursorRow, cursorCol],
+    ),
+    visibleLines,
+  };
+  return returnValue;
+}
+
+export interface TextBuffer {
+  // State
+  lines: string[];
+  text: string;
+  cursor: [number, number];
+  scroll: [number, number];
   /**
    * When the user moves the caret vertically we try to keep their original
    * horizontal column even when passing through shorter lines.  We remember
    * that *preferred* column in this field while the user is still travelling
    * vertically.  Any explicit horizontal movement resets the preference.
    */
-  private preferredCol: number | null = null;
+  preferredCol: number | null;
+  selectionAnchor: [number, number] | null;
 
-  /* a single integer that bumps every time text changes */
-  private version = 0;
-
-  /* ------------------------------------------------------------------
-   *  History & clipboard
-   * ---------------------------------------------------------------- */
-  private undoStack: Array<{ lines: string[]; row: number; col: number }> = [];
-  private redoStack: Array<{ lines: string[]; row: number; col: number }> = [];
-  private historyLimit = 100;
-
-  private clipboard: string | null = null;
-  private selectionAnchor: [number, number] | null = null;
+  // Actions
 
   /**
-   * Creates a new TextBuffer with the given text
-   *
-   * @param text Initial text content for the buffer
-   * @param initialCursorOffset Initial cursor position as character offset
+   * Replaces the entire buffer content with the provided text.
+   * The operation is undoable.
    */
-  constructor(text: string = '', initialCursorOffset = 0) {
-    this.lines = text.split('\n');
-    if (this.lines.length === 0) {
-      this.lines = [''];
-    }
-    this.setCursorOffset(initialCursorOffset);
-  }
-
+  setText: (text: string) => void;
   /**
-   * Creates a new TextBuffer that is a copy of an existing one
-   *
-   * @param source The source TextBuffer to copy
-   * @returns A new TextBuffer instance with the same content and state
+   * Insert a single character or string without newlines.
    */
-  static fromBuffer(source: TextBuffer): TextBuffer {
-    const buffer = new TextBuffer('');
-
-    // Copy all properties
-    buffer.lines = source.lines.slice();
-    buffer.cursorRow = source.cursorRow;
-    buffer.cursorCol = source.cursorCol;
-    buffer.scrollRow = source.scrollRow;
-    buffer.scrollCol = source.scrollCol;
-    buffer.preferredCol = source.preferredCol;
-    buffer.version = source.version + 1;
-
-    // Deep copy history stacks
-    buffer.undoStack = source.undoStack.slice();
-    buffer.redoStack = source.redoStack.slice();
-    buffer.historyLimit = source.historyLimit;
-    buffer.clipboard = source.clipboard;
-    buffer.selectionAnchor = source.selectionAnchor
-      ? [...source.selectionAnchor]
-      : null;
-
-    return buffer;
-  }
-
-  /* =====================================================================
-   *  External editor integration (git‑style $EDITOR workflow)
-   * =================================================================== */
-
+  insert: (ch: string) => void;
+  newline: () => void;
+  backspace: () => void;
+  del: () => void;
+  move: (dir: Direction) => void;
+  undo: () => boolean;
+  redo: () => boolean;
+  /**
+   * Replaces the text within the specified range with new text.
+   * Handles both single-line and multi-line ranges.
+   *
+   * @param startRow The starting row index (inclusive).
+   * @param startCol The starting column index (inclusive, code-point based).
+   * @param endRow The ending row index (inclusive).
+   * @param endCol The ending column index (exclusive, code-point based).
+   * @param text The new text to insert.
+   * @returns True if the buffer was modified, false otherwise.
+   */
+  replaceRange: (
+    startRow: number,
+    startCol: number,
+    endRow: number,
+    endCol: number,
+    text: string,
+  ) => boolean;
+  /**
+   * Delete the word to the *left* of the caret, mirroring common
+   * Ctrl/Alt+Backspace behaviour in editors & terminals. Both the adjacent
+   * whitespace *and* the word characters immediately preceding the caret are
+   * removed.  If the caret is already at column‑0 this becomes a no-op.
+   */
+  deleteWordLeft: () => void;
+  /**
+   * Delete the word to the *right* of the caret, akin to many editors'
+   * Ctrl/Alt+Delete shortcut.  Removes any whitespace/punctuation that
+   * follows the caret and the next contiguous run of word characters.
+   */
+  deleteWordRight: () => void;
+  /**
+   * High level "handleInput" – receives what Ink gives us.
+   */
+  handleInput: (
+    input: string | undefined,
+    key: Record<string, boolean>,
+  ) => boolean;
   /**
    * Opens the current buffer contents in the user’s preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
@@ -166,884 +894,13 @@ export class TextBuffer {
    * continuing.  This mirrors Git’s behaviour and simplifies downstream
    * control‑flow (callers can simply `await` the Promise).
    */
-  async openInExternalEditor(opts: { editor?: string } = {}): Promise<void> {
-    const editor =
-      opts.editor ??
-      process.env['VISUAL'] ??
-      process.env['EDITOR'] ??
-      (process.platform === 'win32' ? 'notepad' : 'vi');
-
-    // Prepare a temporary file with the current contents.  We use mkdtempSync
-    // to obtain an isolated directory and avoid name collisions.
-    const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'codex-edit-'));
-    const filePath = pathMod.join(tmpDir, 'buffer.txt');
-
-    fs.writeFileSync(filePath, this.getText(), 'utf8');
-
-    // One snapshot for undo semantics *before* we mutate anything.
-    this.pushUndo();
-
-    // The child inherits stdio so the user can interact with the editor as if
-    // they had launched it directly.
-    const { status, error } = spawnSync(editor, [filePath], {
-      stdio: 'inherit',
-    });
-
-    if (error) {
-      throw error;
-    }
-    if (typeof status === 'number' && status !== 0) {
-      throw new Error(`External editor exited with status ${status}`);
-    }
-
-    // Read the edited contents back in – normalise line endings to \n.
-    let newText = fs.readFileSync(filePath, 'utf8');
-    newText = newText.replace(/\r\n?/g, '\n');
-
-    // Update buffer.
-    this.lines = newText.split('\n');
-    if (this.lines.length === 0) {
-      this.lines = [''];
-    }
-
-    // Position the caret at EOF.
-    this.cursorRow = this.lines.length - 1;
-    this.cursorCol = cpLen(this.line(this.cursorRow));
-
-    // Reset scroll offsets so the new end is visible.
-    this.scrollRow = Math.max(0, this.cursorRow - 1);
-    this.scrollCol = 0;
-
-    this.version++;
-  }
-
-  /* =======================================================================
-   *  Geometry helpers
-   * ===================================================================== */
-  private line(r: number): string {
-    return this.lines[r] ?? '';
-  }
-  private lineLen(r: number): number {
-    return cpLen(this.line(r));
-  }
-
-  private ensureCursorInRange(): void {
-    this.cursorRow = clamp(this.cursorRow, 0, this.lines.length - 1);
-    this.cursorCol = clamp(this.cursorCol, 0, this.lineLen(this.cursorRow));
-  }
-
-  /**
-   * Sets the cursor position based on a character offset from the start of the document.
-   */
-  private setCursorOffset(offset: number): boolean {
-    // Reset preferred column since this is an explicit horizontal movement
-    this.preferredCol = null;
-
-    let remainingChars = offset;
-    let row = 0;
-
-    // Count characters line by line until we find the right position
-    while (row < this.lines.length) {
-      const lineLength = this.lineLen(row);
-      // Add 1 for the newline character (except for the last line)
-      const totalChars = lineLength + (row < this.lines.length - 1 ? 1 : 0);
-
-      if (remainingChars <= lineLength) {
-        this.cursorRow = row;
-        this.cursorCol = remainingChars;
-        return true;
-      }
-
-      // Move to next line, subtract this line's characters plus newline
-      remainingChars -= totalChars;
-      row++;
-    }
-
-    // If we get here, the index was too large
-    return false;
-  }
-
-  /* =====================================================================
-   *  History helpers
-   * =================================================================== */
-  private snapshot() {
-    return {
-      lines: this.lines.slice(),
-      row: this.cursorRow,
-      col: this.cursorCol,
-    };
-  }
-
-  private pushUndo() {
-    dbg('pushUndo', { cursor: this.getCursor(), text: this.getText() });
-    this.undoStack.push(this.snapshot());
-    if (this.undoStack.length > this.historyLimit) {
-      this.undoStack.shift();
-    }
-    // once we mutate we clear redo
-    this.redoStack.length = 0;
-  }
-
-  /**
-   * Restore a snapshot and return true if restoration happened.
-   */
-  private restore(
-    state: { lines: string[]; row: number; col: number } | undefined,
-  ): boolean {
-    if (!state) {
-      return false;
-    }
-    this.lines = state.lines.slice();
-    this.cursorRow = state.row;
-    this.cursorCol = state.col;
-    this.ensureCursorInRange();
-    return true;
-  }
-
-  /* =======================================================================
-   *  Scrolling helpers
-   * ===================================================================== */
-  private ensureCursorVisible(vp: Viewport) {
-    const { height, width } = vp;
-
-    if (this.cursorRow < this.scrollRow) {
-      this.scrollRow = this.cursorRow;
-    } else if (this.cursorRow >= this.scrollRow + height) {
-      this.scrollRow = this.cursorRow - height + 1;
-    }
-
-    if (this.cursorCol < this.scrollCol) {
-      this.scrollCol = this.cursorCol;
-    } else if (this.cursorCol >= this.scrollCol + width) {
-      this.scrollCol = this.cursorCol - width + 1;
-    }
-  }
-
-  /* =======================================================================
-   *  Public read‑only accessors
-   * ===================================================================== */
-  getVersion(): number {
-    return this.version;
-  }
-  getCursor(): [number, number] {
-    return [this.cursorRow, this.cursorCol];
-  }
-  getScrollRow(): number {
-    return this.scrollRow;
-  }
-  getScrollCol(): number {
-    return this.scrollCol;
-  }
-
-  getVisibleLines(vp: Viewport): string[] {
-    // Whenever the viewport dimensions change (e.g. on a terminal resize) we
-    // need to re‑evaluate whether the current scroll offset still keeps the
-    // caret visible.  Calling `ensureCursorVisible` here guarantees that mere
-    // re‑renders – even when not triggered by user input – will adjust the
-    // horizontal and vertical scroll positions so the cursor remains in view.
-    this.ensureCursorVisible(vp);
-
-    return this.lines.slice(this.scrollRow, this.scrollRow + vp.height);
-  }
-  getText(): string {
-    return this.lines.join('\n');
-  }
-  getLines(): string[] {
-    return this.lines.slice();
-  }
-
-  /* =====================================================================
-   *  History public API – undo / redo
-   * =================================================================== */
-  undo(): boolean {
-    const state = this.undoStack.pop();
-    if (!state) {
-      return false;
-    }
-    // push current to redo before restore
-    this.redoStack.push(this.snapshot());
-    this.restore(state);
-    this.version++;
-    return true;
-  }
-
-  redo(): boolean {
-    const state = this.redoStack.pop();
-    if (!state) {
-      return false;
-    }
-    // push current to undo before restore
-    this.undoStack.push(this.snapshot());
-    this.restore(state);
-    this.version++;
-    return true;
-  }
-
-  /* =======================================================================
-   *  Editing operations
-   * ===================================================================== */
-  /**
-   * Insert a single character or string without newlines. If the string
-   * contains a newline we delegate to insertStr so that line splitting
-   * logic is shared.
-   */
-  insert(ch: string): void {
-    // Handle pasted blocks that may contain newline sequences (\n, \r or
-    // Windows‑style \r\n).  Delegate to `insertStr` so the splitting logic is
-    // centralised.
-    if (/[\n\r]/.test(ch)) {
-      this.insertStr(ch);
-      return;
-    }
-
-    dbg('insert', { ch, beforeCursor: this.getCursor() });
-
-    this.pushUndo();
-
-    const line = this.line(this.cursorRow);
-    this.lines[this.cursorRow] =
-      cpSlice(line, 0, this.cursorCol) + ch + cpSlice(line, this.cursorCol);
-    this.cursorCol += ch.length;
-    this.version++;
-
-    dbg('insert:after', {
-      cursor: this.getCursor(),
-      line: this.line(this.cursorRow),
-    });
-  }
-
-  newline(): void {
-    dbg('newline', { beforeCursor: this.getCursor() });
-    this.pushUndo();
-
-    const l = this.line(this.cursorRow);
-    const before = cpSlice(l, 0, this.cursorCol);
-    const after = cpSlice(l, this.cursorCol);
-
-    this.lines[this.cursorRow] = before;
-    this.lines.splice(this.cursorRow + 1, 0, after);
-
-    this.cursorRow += 1;
-    this.cursorCol = 0;
-    this.version++;
-
-    dbg('newline:after', {
-      cursor: this.getCursor(),
-      lines: [this.line(this.cursorRow - 1), this.line(this.cursorRow)],
-    });
-  }
-
-  backspace(): void {
-    dbg('backspace', { beforeCursor: this.getCursor() });
-    if (this.cursorCol === 0 && this.cursorRow === 0) {
-      return;
-    } // nothing to delete
-
-    this.pushUndo();
-
-    if (this.cursorCol > 0) {
-      const line = this.line(this.cursorRow);
-      this.lines[this.cursorRow] =
-        cpSlice(line, 0, this.cursorCol - 1) + cpSlice(line, this.cursorCol);
-      this.cursorCol--;
-    } else if (this.cursorRow > 0) {
-      // merge with previous
-      const prev = this.line(this.cursorRow - 1);
-      const cur = this.line(this.cursorRow);
-      const newCol = cpLen(prev);
-      this.lines[this.cursorRow - 1] = prev + cur;
-      this.lines.splice(this.cursorRow, 1);
-      this.cursorRow--;
-      this.cursorCol = newCol;
-    }
-    this.version++;
-
-    dbg('backspace:after', {
-      cursor: this.getCursor(),
-      line: this.line(this.cursorRow),
-    });
-  }
-
-  del(): void {
-    dbg('delete', { beforeCursor: this.getCursor() });
-    const line = this.line(this.cursorRow);
-    if (this.cursorCol < this.lineLen(this.cursorRow)) {
-      this.pushUndo();
-      this.lines[this.cursorRow] =
-        cpSlice(line, 0, this.cursorCol) + cpSlice(line, this.cursorCol + 1);
-    } else if (this.cursorRow < this.lines.length - 1) {
-      this.pushUndo();
-      const next = this.line(this.cursorRow + 1);
-      this.lines[this.cursorRow] = line + next;
-      this.lines.splice(this.cursorRow + 1, 1);
-    }
-    this.version++;
-
-    dbg('delete:after', {
-      cursor: this.getCursor(),
-      line: this.line(this.cursorRow),
-    });
-  }
-
-  /**
-   * Replaces the entire buffer content with the provided text.
-   * The operation is undoable.
-   *
-   * @param text The new text content for the buffer.
-   */
-  setText(text: string): void {
-    dbg('setText', { text });
-    this.pushUndo(); // Snapshot before replacing everything
-
-    // Normalize line endings and split into lines
-    this.lines = text.replace(/\r\n?/g, '\n').split('\n');
-    if (this.lines.length === 0) {
-      // Ensure there's always at least one line, even if empty
-      this.lines = [''];
-    }
-
-    // Reset cursor to the end of the new text
-    this.cursorRow = this.lines.length - 1;
-    this.cursorCol = this.lineLen(this.cursorRow);
-
-    // Reset scroll positions and preferred column
-    this.scrollRow = 0;
-    this.scrollCol = 0;
-    this.preferredCol = null;
-
-    this.version++; // Bump version to indicate change
-
-    this.ensureCursorInRange(); // Ensure cursor is valid after replacement
-    // ensureCursorVisible will be called on next render via getVisibleLines
-
-    dbg('setText:after', { cursor: this.getCursor(), text: this.getText() });
-  }
-  /**
-   * Replaces the text within the specified range with new text.
-   * Handles both single-line and multi-line ranges. asdf jas
-   *
-   * @param startRow The starting row index (inclusive).
-   * @param startCol The starting column index (inclusive, code-point based).
-   * @param endRow The ending row index (inclusive).
-   * @param endCol The ending column index (exclusive, code-point based).
-   * @param text The new text to insert.
-   * @returns True if the buffer was modified, false otherwise.
-   */
-  replaceRange(
-    startRow: number,
-    startCol: number,
-    endRow: number,
-    endCol: number,
-    text: string,
-  ): boolean {
-    // Ensure range is valid and ordered (start <= end)
-    // Basic validation, more robust checks might be needed
-    if (
-      startRow > endRow ||
-      (startRow === endRow && startCol > endCol) ||
-      startRow < 0 ||
-      startCol < 0 ||
-      endRow >= this.lines.length
-      // endCol check needs line length, done below
-    ) {
-      console.error('Invalid range provided to replaceRange');
-      return false; // Or throw an error
-    }
-
-    dbg('replaceRange', {
-      start: [startRow, startCol],
-      end: [endRow, endCol],
-      text,
-    });
-    this.pushUndo(); // Snapshot before modification
-
-    const startLine = this.line(startRow);
-    const endLine = this.line(endRow);
-
-    // Clamp columns to valid positions within their respective lines
-    startCol = clamp(startCol, 0, this.lineLen(startRow));
-    endCol = clamp(endCol, 0, this.lineLen(endRow));
-
-    // 1. Perform the deletion part
-    const prefix = cpSlice(startLine, 0, startCol);
-    const suffix = cpSlice(endLine, endCol);
-
-    // Remove lines between startRow (exclusive) and endRow (inclusive)
-    if (startRow < endRow) {
-      this.lines.splice(startRow + 1, endRow - startRow);
-    }
-
-    // Replace the startRow line with the combined prefix and suffix
-    this.lines[startRow] = prefix + suffix;
-
-    // 2. Position cursor at the start of the replaced range
-    this.cursorRow = startRow;
-    this.cursorCol = startCol;
-    this.preferredCol = null; // Reset preferred column after modification
-
-    // 3. Insert the new text
-    const inserted = this.insertStr(text); // insertStr handles cursor update & version++
-
-    // Ensure version is bumped even if inserted text was empty
-    if (!inserted && text === '') {
-      this.version++;
-    }
-
-    this.ensureCursorInRange(); // Ensure cursor is valid after potential deletion/insertion
-    // ensureCursorVisible will be called on next render via getVisibleLines
-
-    dbg('replaceRange:after', {
-      cursor: this.getCursor(),
-      text: this.getText(),
-    });
-    return true; // Assume modification happened (pushUndo was called)
-  }
-
-  /* ------------------------------------------------------------------
-   *  Word‑wise deletion helpers – exposed publicly so tests (and future
-   *  key‑bindings) can invoke them directly.
-   * ---------------------------------------------------------------- */
-
-  /** Delete the word to the *left* of the caret, mirroring common
-   *  Ctrl/Alt+Backspace behaviour in editors & terminals.  Both the adjacent
-   *  whitespace *and* the word characters immediately preceding the caret are
-   *  removed.  If the caret is already at column‑0 this becomes a no-op. */
-  deleteWordLeft(): void {
-    dbg('deleteWordLeft', { beforeCursor: this.getCursor() });
-
-    if (this.cursorCol === 0 && this.cursorRow === 0) {
-      return;
-    } // Nothing to delete
-
-    // When at column‑0 but *not* on the first row we merge with the previous
-    // line – matching the behaviour of `backspace` for uniform UX.
-    if (this.cursorCol === 0) {
-      this.backspace();
-      return;
-    }
-
-    this.pushUndo();
-
-    const line = this.line(this.cursorRow);
-    const arr = toCodePoints(line);
-
-    // If the cursor is just after a space (or several spaces), we only delete the separators
-    // then, on the next call, the previous word. We should never delete the entire line.
-    let start = this.cursorCol;
-    let onlySpaces = true;
-    for (let i = 0; i < start; i++) {
-      if (isWordChar(arr[i])) {
-        onlySpaces = false;
-        break;
-      }
-    }
-
-    // If the line contains only spaces up to the cursor, delete just one space
-    if (onlySpaces && start > 0) {
-      start--;
-    } else {
-      // Step 1 – skip over any separators sitting *immediately* to the left of the caret
-      while (start > 0 && !isWordChar(arr[start - 1])) {
-        start--;
-      }
-      // Step 2 – skip the word characters themselves
-      while (start > 0 && isWordChar(arr[start - 1])) {
-        start--;
-      }
-    }
-
-    this.lines[this.cursorRow] =
-      cpSlice(line, 0, start) + cpSlice(line, this.cursorCol);
-    this.cursorCol = start;
-    this.version++;
-
-    dbg('deleteWordLeft:after', {
-      cursor: this.getCursor(),
-      line: this.line(this.cursorRow),
-    });
-  }
-
-  /** Delete the word to the *right* of the caret, akin to many editors'
-   *  Ctrl/Alt+Delete shortcut.  Removes any whitespace/punctuation that
-   *  follows the caret and the next contiguous run of word characters. */
-  deleteWordRight(): void {
-    dbg('deleteWordRight', { beforeCursor: this.getCursor() });
-
-    const line = this.line(this.cursorRow);
-    const arr = toCodePoints(line);
-    if (
-      this.cursorCol >= arr.length &&
-      this.cursorRow === this.lines.length - 1
-    ) {
-      return;
-    } // nothing to delete
-
-    // At end‑of‑line ➜ merge with next row (mirrors `del` behaviour).
-    if (this.cursorCol >= arr.length) {
-      this.del();
-      return;
-    }
-
-    this.pushUndo();
-
-    let end = this.cursorCol;
-
-    // Skip separators *first* so that consecutive calls gradually chew
-    // through whitespace then whole words.
-    while (end < arr.length && !isWordChar(arr[end])) {
-      end++;
-    }
-
-    // Skip the word characters.
-    while (end < arr.length && isWordChar(arr[end])) {
-      end++;
-    }
-
-    this.lines[this.cursorRow] =
-      cpSlice(line, 0, this.cursorCol) + cpSlice(line, end);
-    // caret stays in place
-    this.version++;
-
-    dbg('deleteWordRight:after', {
-      cursor: this.getCursor(),
-      line: this.line(this.cursorRow),
-    });
-  }
-
-  move(dir: Direction): void {
-    const before = this.getCursor();
-    switch (dir) {
-      case 'left':
-        this.preferredCol = null;
-        if (this.cursorCol > 0) {
-          this.cursorCol--;
-        } else if (this.cursorRow > 0) {
-          this.cursorRow--;
-          this.cursorCol = this.lineLen(this.cursorRow);
-        }
-        break;
-      case 'right':
-        this.preferredCol = null;
-        if (this.cursorCol < this.lineLen(this.cursorRow)) {
-          this.cursorCol++;
-        } else if (this.cursorRow < this.lines.length - 1) {
-          this.cursorRow++;
-          this.cursorCol = 0;
-        }
-        break;
-      case 'up':
-        if (this.cursorRow > 0) {
-          if (this.preferredCol == null) {
-            this.preferredCol = this.cursorCol;
-          }
-          this.cursorRow--;
-          this.cursorCol = clamp(
-            this.preferredCol,
-            0,
-            this.lineLen(this.cursorRow),
-          );
-        }
-        break;
-      case 'down':
-        if (this.cursorRow < this.lines.length - 1) {
-          if (this.preferredCol == null) {
-            this.preferredCol = this.cursorCol;
-          }
-          this.cursorRow++;
-          this.cursorCol = clamp(
-            this.preferredCol,
-            0,
-            this.lineLen(this.cursorRow),
-          );
-        }
-        break;
-      case 'home':
-        this.preferredCol = null;
-        this.cursorCol = 0;
-        break;
-      case 'end':
-        this.preferredCol = null;
-        this.cursorCol = this.lineLen(this.cursorRow);
-        break;
-      case 'wordLeft': {
-        this.preferredCol = null;
-        const regex = /[\s,.;!?]+/g;
-        const slice = cpSlice(
-          this.line(this.cursorRow),
-          0,
-          this.cursorCol,
-        ).replace(/[\s,.;!?]+$/, '');
-        let lastIdx = 0;
-        let m;
-        while ((m = regex.exec(slice)) != null) {
-          lastIdx = m.index;
-        }
-        const last = cpLen(slice.slice(0, lastIdx));
-        this.cursorCol = last === 0 ? 0 : last + 1;
-        break;
-      }
-      case 'wordRight': {
-        this.preferredCol = null;
-        const regex = /[\s,.;!?]+/g;
-        const l = this.line(this.cursorRow);
-        let moved = false;
-        let m;
-        while ((m = regex.exec(l)) != null) {
-          const cpIdx = cpLen(l.slice(0, m.index));
-          if (cpIdx > this.cursorCol) {
-            // We want to land *at the beginning* of the separator run so that a
-            // subsequent move("right") behaves naturally.
-            this.cursorCol = cpIdx;
-            moved = true;
-            break;
-          }
-        }
-        if (!moved) {
-          // No boundary to the right – jump to EOL.
-          this.cursorCol = this.lineLen(this.cursorRow);
-        }
-        break;
-      }
-      default:
-        break;
-    }
-
-    if (DEBUG) {
-      dbg('move', { dir, before, after: this.getCursor() });
-    }
-
-    /*
-     * If the user performed any movement other than a consecutive vertical
-     * traversal we clear the preferred column so the next vertical run starts
-     * afresh.  The cases that keep the preference already returned earlier.
-     */
-    if (dir !== 'up' && dir !== 'down') {
-      this.preferredCol = null;
-    }
-  }
-
-  /* =====================================================================
-   *  Higher‑level helpers
-   * =================================================================== */
-
-  /**
-   * Insert an arbitrary string, possibly containing internal newlines.
-   * Returns true if the buffer was modified.
-   */
-  insertStr(str: string): boolean {
-    dbg('insertStr', { str, beforeCursor: this.getCursor() });
-    if (str === '') {
-      return false;
-    }
-
-    // Normalise all newline conventions (\r, \n, \r\n) to a single '\n'.
-    const normalised = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-    // Fast path: resulted in single‑line string ➜ delegate back to insert
-    if (!normalised.includes('\n')) {
-      this.insert(normalised);
-      return true;
-    }
-
-    this.pushUndo();
-
-    const parts = normalised.split('\n');
-    const before = cpSlice(this.line(this.cursorRow), 0, this.cursorCol);
-    const after = cpSlice(this.line(this.cursorRow), this.cursorCol);
-
-    // Replace current line with first part combined with before text
-    this.lines[this.cursorRow] = before + parts[0];
-
-    // Middle lines (if any) are inserted verbatim after current row
-    if (parts.length > 2) {
-      const middle = parts.slice(1, -1);
-      this.lines.splice(this.cursorRow + 1, 0, ...middle);
-    }
-
-    // Smart handling of the *final* inserted part:
-    //   • When the caret is mid‑line we preserve existing behaviour – merge
-    //     the last part with the text to the **right** of the caret so that
-    //     inserting in the middle of a line keeps the remainder on the same
-    //     row (e.g. "he|llo" → paste "x\ny" ⇒ "he x", "y llo").
-    //   • When the caret is at column‑0 we instead treat the current line as
-    //     a *separate* row that follows the inserted block.  This mirrors
-    //     common editor behaviour and avoids the unintuitive merge that led
-    //     to "cd"+"ef" → "cdef" in the failing tests.
-
-    // Append the last part combined with original after text as a new line
-    const last = parts[parts.length - 1] + after;
-    this.lines.splice(this.cursorRow + (parts.length - 1), 0, last);
-
-    // Update cursor position to end of last inserted part (before 'after')
-    this.cursorRow += parts.length - 1;
-    // `parts` is guaranteed to have at least one element here because
-    // `split("\n")` always returns an array with ≥1 entry.  Tell the
-    // compiler so we can pass a plain `string` to `cpLen`.
-    this.cursorCol = cpLen(parts[parts.length - 1]!);
-
-    this.version++;
-    return true;
-  }
-
-  /* =====================================================================
-   *  Selection & clipboard helpers (minimal)
-   * =================================================================== */
-
-  startSelection(): void {
-    this.selectionAnchor = [this.cursorRow, this.cursorCol];
-  }
-
-  endSelection(): void {
-    // no-op for now, kept for API symmetry
-    // we rely on anchor + current cursor to compute selection
-  }
-
-  /** Extract selected text. Returns null if no valid selection. */
-  private getSelectedText(): string | null {
-    if (!this.selectionAnchor) {
-      return null;
-    }
-    const [ar, ac] = this.selectionAnchor;
-    const [br, bc] = [this.cursorRow, this.cursorCol];
-
-    // Determine ordering
-    if (ar === br && ac === bc) {
-      return null;
-    } // empty selection
-
-    const topBefore = ar < br || (ar === br && ac < bc);
-    const [sr, sc, er, ec] = topBefore ? [ar, ac, br, bc] : [br, bc, ar, ac];
-
-    if (sr === er) {
-      return cpSlice(this.line(sr), sc, ec);
-    }
-
-    const parts: string[] = [];
-    parts.push(cpSlice(this.line(sr), sc));
-    for (let r = sr + 1; r < er; r++) {
-      parts.push(this.line(r));
-    }
-    parts.push(cpSlice(this.line(er), 0, ec));
-    return parts.join('\n');
-  }
-
-  copy(): string | null {
-    const txt = this.getSelectedText();
-    if (txt == null) {
-      return null;
-    }
-    this.clipboard = txt;
-    return txt;
-  }
-
-  paste(): boolean {
-    if (this.clipboard == null) {
-      return false;
-    }
-    return this.insertStr(this.clipboard);
-  }
-
-  /* =======================================================================
-   *  High level "handleInput" – receives what Ink gives us
-   *  Returns true when buffer mutated (=> re‑render)
-   * ===================================================================== */
-  handleInput(
-    input: string | undefined,
-    key: Record<string, boolean>,
-    vp: Viewport,
-  ): boolean {
-    if (DEBUG) {
-      dbg('handleInput', { input, key, cursor: this.getCursor() });
-    }
-    const beforeVer = this.version;
-    const [beforeRow, beforeCol] = this.getCursor();
-
-    if (key['escape']) {
-      return false;
-    }
-
-    /* new line — Ink sets either `key.return` *or* passes a literal "\n" */
-    if (key['return'] || input === '\r' || input === '\n') {
-      this.newline();
-    } else if (
-      key['leftArrow'] &&
-      !key['meta'] &&
-      !key['ctrl'] &&
-      !key['alt']
-    ) {
-      /* navigation */
-      this.move('left');
-    } else if (
-      key['rightArrow'] &&
-      !key['meta'] &&
-      !key['ctrl'] &&
-      !key['alt']
-    ) {
-      this.move('right');
-    } else if (key['upArrow']) {
-      this.move('up');
-    } else if (key['downArrow']) {
-      this.move('down');
-    } else if ((key['meta'] || key['ctrl'] || key['alt']) && key['leftArrow']) {
-      this.move('wordLeft');
-    } else if (
-      (key['meta'] || key['ctrl'] || key['alt']) &&
-      key['rightArrow']
-    ) {
-      this.move('wordRight');
-    } else if (key['home']) {
-      this.move('home');
-    } else if (key['end']) {
-      this.move('end');
-    }
-    /* delete */
-    // In raw terminal mode many frameworks (Ink included) surface a physical
-    // Backspace key‑press as the single DEL (0x7f) byte placed in `input` with
-    // no `key.backspace` flag set.  Treat that byte exactly like an ordinary
-    // Backspace for parity with textarea.rs and to make interactive tests
-    // feedable through the simpler `(ch, {}, vp)` path.
-    else if (
-      (key['meta'] || key['ctrl'] || key['alt']) &&
-      (key['backspace'] || input === '\x7f')
-    ) {
-      this.deleteWordLeft();
-    } else if ((key['meta'] || key['ctrl'] || key['alt']) && key['delete']) {
-      this.deleteWordRight();
-    } else if (
-      key['backspace'] ||
-      input === '\x7f' ||
-      (key['delete'] && !key['shift'])
-    ) {
-      // Treat un‑modified "delete" (the common Mac backspace key) as a
-      // standard backspace.  Holding Shift+Delete continues to perform a
-      // forward deletion so we don't lose that capability on keyboards that
-      // expose both behaviours.
-      this.backspace();
-    }
-    // Forward deletion (Fn+Delete on macOS, or Delete key with Shift held after
-    // the branch above) – remove the character *under / to the right* of the
-    // caret, merging lines when at EOL similar to many editors.
-    else if (key['delete']) {
-      this.del();
-    } else if (input && !key['ctrl'] && !key['meta']) {
-      this.insert(input);
-    }
-
-    /* printable */
-
-    /* clamp + scroll */
-    this.ensureCursorInRange();
-    this.ensureCursorVisible(vp);
-
-    const cursorMoved =
-      this.cursorRow !== beforeRow || this.cursorCol !== beforeCol;
-
-    if (DEBUG) {
-      dbg('handleInput:after', {
-        cursor: this.getCursor(),
-        text: this.getText(),
-      });
-    }
-    return this.version !== beforeVer || cursorMoved;
-  }
+  openInExternalEditor: (opts?: { editor?: string }) => Promise<void>;
+
+  // Selection & Clipboard
+  copy: () => string | null;
+  paste: () => boolean;
+  startSelection: () => void;
+
+  // For rendering
+  visibleLines: string[];
 }
