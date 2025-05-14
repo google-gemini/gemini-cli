@@ -55,18 +55,47 @@ export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
 }
 
+export type HistoryItemUser = HistoryItemBase & {
+  type: 'user';
+  text: string;
+};
+
+export type HistoryItemGemini = HistoryItemBase & {
+  type: 'gemini';
+  text: string;
+};
+
+export type HistoryItemGeminiContent = HistoryItemBase & {
+  type: 'gemini_content';
+  text: string;
+};
+
+export type HistoryItemInfo = HistoryItemBase & {
+  type: 'info';
+  text: string;
+};
+
+export type HistoryItemError = HistoryItemBase & {
+  type: 'error';
+  text: string;
+};
+
+export type HistoryItemToolGroup = HistoryItemBase & {
+  type: 'tool_group';
+  tools: IndividualToolCallDisplay[];
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
-export type HistoryItemWithoutId = HistoryItemBase &
-  (
-    | { type: 'user'; text: string }
-    | { type: 'gemini'; text: string }
-    | { type: 'gemini_content'; text: string }
-    | { type: 'info'; text: string }
-    | { type: 'error'; text: string }
-    | { type: 'tool_group'; tools: IndividualToolCallDisplay[] }
-  );
+// Individually exported types extending HistoryItemBase
+export type HistoryItemWithoutId =
+  | HistoryItemUser
+  | HistoryItemGemini
+  | HistoryItemGeminiContent
+  | HistoryItemInfo
+  | HistoryItemError
+  | HistoryItemToolGroup;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 

@@ -78,16 +78,43 @@ export interface ServerToolCallConfirmationDetails {
   details: ToolCallConfirmationDetails;
 }
 
+export type ServerGeminiContentEvent = {
+  type: GeminiEventType.Content;
+  value: string;
+};
+
+export type ServerGeminiToolCallRequestEvent = {
+  type: GeminiEventType.ToolCallRequest;
+  value: ToolCallRequestInfo;
+};
+
+export type ServerGeminiToolCallResponseEvent = {
+  type: GeminiEventType.ToolCallResponse;
+  value: ToolCallResponseInfo;
+};
+
+export type ServerGeminiToolCallConfirmationEvent = {
+  type: GeminiEventType.ToolCallConfirmation;
+  value: ServerToolCallConfirmationDetails;
+};
+
+export type ServerGeminiUserCancelledEvent = {
+  type: GeminiEventType.UserCancelled;
+};
+
+export type ServerGeminiErrorEvent = {
+  type: GeminiEventType.Error;
+  value: GeminiErrorEventValue;
+};
+
+// The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
-  | { type: GeminiEventType.Content; value: string }
-  | { type: GeminiEventType.ToolCallRequest; value: ToolCallRequestInfo }
-  | { type: GeminiEventType.ToolCallResponse; value: ToolCallResponseInfo }
-  | {
-      type: GeminiEventType.ToolCallConfirmation;
-      value: ServerToolCallConfirmationDetails;
-    }
-  | { type: GeminiEventType.UserCancelled }
-  | { type: GeminiEventType.Error; value: GeminiErrorEventValue };
+  | ServerGeminiContentEvent
+  | ServerGeminiToolCallRequestEvent
+  | ServerGeminiToolCallResponseEvent
+  | ServerGeminiToolCallConfirmationEvent
+  | ServerGeminiUserCancelledEvent
+  | ServerGeminiErrorEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
