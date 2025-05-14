@@ -351,7 +351,7 @@ Default excludes apply to common non-text files and large dependency directories
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.targetDir}\`)\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
-      displayMessage += `\n**Processed Files (up to 10 shown):**\n`;
+      displayMessage += `\n**Processed Files:**\n`;
       processedFilesRelativePaths
         .slice(0, 10)
         .forEach((p) => (displayMessage += `- \`${p}\`\n`));
