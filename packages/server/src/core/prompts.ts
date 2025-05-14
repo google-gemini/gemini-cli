@@ -12,12 +12,13 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
+import process from 'node:process'; // Import process
 import { execSync } from 'node:child_process';
 
 const contactEmail = 'gemini-code-dev@google.com';
 
-export function getCoreSystemPrompt() {
-  return `
+export function getCoreSystemPrompt(userMemory?: string): string {
+  const basePrompt = `
 You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.
 
 # Primary Workflows
@@ -87,12 +88,16 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Feedback:** Direct feedback to ${contactEmail}.
 
 ${(function () {
-  if (process.env.SANDBOX === 'sandbox-exec') {
+  // Determine sandbox status based on environment variables
+  const isSandboxExec = process.env.SANDBOX === 'sandbox-exec';
+  const isGenericSandbox = !!process.env.SANDBOX; // Check if SANDBOX is set to any non-empty value
+
+  if (isSandboxExec) {
     return `
 # MacOS Seatbelt
 You are running under macos seatbelt with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to MacOS Seatbelt (e.g. if a command fails with 'Operation not permitted' or similar error), as you report the error to the user, also explain why you think it could be due to MacOS Seatbelt, and how the user may need to adjust their Seatbelt profile.
 `;
-  } else if (process.env.SANDBOX) {
+  } else if (isGenericSandbox) {
     return `
 # Sandbox
 You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.
@@ -184,4 +189,11 @@ assistant: I can run \`rm -rf ./temp\`. This will permanently delete the directo
 # Final Reminder
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions on the contents of files; instead use '${ReadFileTool.Name}' or '${ReadManyFilesTool.Name}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.
 `;
+
+  const memorySuffix =
+    userMemory && userMemory.trim().length > 0
+      ? `\n\n---\n\n${userMemory.trim()}`
+      : '';
+
+  return `${basePrompt}${memorySuffix}`;
 }

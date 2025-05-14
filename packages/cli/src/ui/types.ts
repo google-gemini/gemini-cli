@@ -69,3 +69,18 @@ export type HistoryItemWithoutId = HistoryItemBase &
   );
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
+
+// Message types used by internal command feedback (subset of HistoryItem types)
+export enum MessageType {
+  INFO = 'info',
+  ERROR = 'error',
+  USER = 'user',
+  // Add GEMINI if needed by other commands
+}
+
+// Simplified message structure for internal feedback
+export interface Message {
+  type: MessageType;
+  content: string; // Renamed from text for clarity in this context
+  timestamp: Date; // For consistency, though addItem might use its own timestamping
+}

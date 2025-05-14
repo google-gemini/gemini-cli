@@ -27,6 +27,10 @@ import { useCompletion } from './hooks/useCompletion.js';
 import { SuggestionsDisplay } from './components/SuggestionsDisplay.js';
 import { isAtCommand, isSlashCommand } from './utils/commandUtils.js';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js'; // For performMemoryRefresh
+import process from 'node:process'; // For performMemoryRefresh
+import { MessageType } from './types.js'; // For performMemoryRefresh
+import { getErrorMessage } from '@gemini-code/server'; // For performMemoryRefresh
 
 interface AppProps {
   config: Config;
@@ -57,23 +61,69 @@ export const App = ({
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError);
+
+  const performMemoryRefresh = useCallback(async () => {
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Refreshing hierarchical memory (GEMINI.md files)...',
+      },
+      Date.now(),
+    );
+    try {
+      const newMemory = await loadHierarchicalGeminiMemory(
+        process.cwd(),
+        config.getDebugMode(),
+      );
+      config.setUserMemory(newMemory);
+      // chatSessionRef.current = null; // This was in useGeminiStream, might need similar logic or pass chat ref
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Memory refreshed successfully. ${newMemory.length > 0 ? `Loaded ${newMemory.length} characters.` : 'No memory content found.'}`,
+        },
+        Date.now(),
+      );
+      if (config.getDebugMode()) {
+        console.log(
+          `[DEBUG] Refreshed memory content in config: ${newMemory.substring(0, 200)}...`,
+        );
+      }
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Error refreshing memory: ${errorMessage}`,
+        },
+        Date.now(),
+      );
+      console.error('Error refreshing memory:', error);
+    }
+  }, [config, addItem]);
+
   const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
+    config, // Pass config
     addItem,
     clearItems,
     refreshStatic,
     setShowHelp,
     setDebugMessage,
     openThemeDialog,
+    performMemoryRefresh, // Pass performMemoryRefresh
   );
 
   const { streamingState, submitQuery, initError, pendingHistoryItem } =
     useGeminiStream(
       addItem,
+      clearItems, // Pass clearItems
       refreshStatic,
       setShowHelp,
       config,
       setDebugMessage,
+      openThemeDialog, // Pass openThemeDialog
       handleSlashCommand,
+      // performMemoryRefresh, // Removed performMemoryRefresh
     );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);

@@ -100,6 +100,7 @@ const DEFAULT_EXCLUDES: string[] = [
   '**/*.odp',
   '**/*.DS_Store',
   '**/.env',
+  '**/GEMINI.md',
 ];
 
 // Default values for encoding and separator format

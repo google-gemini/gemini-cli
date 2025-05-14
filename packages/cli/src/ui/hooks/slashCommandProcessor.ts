@@ -8,32 +8,59 @@ import { useCallback, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { Config } from '@gemini-code/server'; // Import Config
+import { Message, MessageType, HistoryItemWithoutId } from '../types.js'; // Import Message types
+import {
+  createShowMemoryAction,
+  SHOW_MEMORY_COMMAND_NAME,
+} from './useShowMemoryCommand.js';
+import { REFRESH_MEMORY_COMMAND_NAME } from './useRefreshMemoryCommand.js'; // Only import name now
+import process from 'node:process'; // For process.exit
 
 export interface SlashCommand {
   name: string;
   altName?: string;
   description: string;
-  action: (value: PartListUnion) => void;
+  action: (value: PartListUnion | string) => void; // Allow string for simpler actions
 }
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
  */
 export const useSlashCommandProcessor = (
+  config: Config | null, // Add config here
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
+  performMemoryRefresh: () => Promise<void>, // Add performMemoryRefresh prop
 ) => {
+  const addMessage = useCallback(
+    (message: Message) => {
+      // Convert Message to HistoryItemWithoutId
+      const historyItemContent: HistoryItemWithoutId = {
+        type: message.type, // MessageType enum should be compatible with HistoryItemWithoutId string literal types
+        text: message.content,
+      };
+      addItem(historyItemContent, message.timestamp.getTime());
+    },
+    [addItem],
+  );
+
+  const showMemoryAction = useCallback(async () => {
+    const actionFn = createShowMemoryAction(config, addMessage);
+    await actionFn();
+  }, [config, addMessage]);
+
   const slashCommands: SlashCommand[] = useMemo(
     () => [
       {
         name: 'help',
         altName: '?',
         description: 'for help on gemini-code',
-        action: (_value: PartListUnion) => {
+        action: (_value: PartListUnion | string) => {
           onDebugMessage('Opening help.');
           setShowHelp(true);
         },
@@ -41,7 +68,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'clear',
         description: 'clear the screen',
-        action: (_value: PartListUnion) => {
+        action: (_value: PartListUnion | string) => {
           onDebugMessage('Clearing terminal.');
           clearItems();
           refreshStatic();
@@ -50,29 +77,41 @@ export const useSlashCommandProcessor = (
       {
         name: 'theme',
         description: 'change the theme',
-        action: (_value: PartListUnion) => {
+        action: (_value) => {
           openThemeDialog();
         },
+      },
+      {
+        name: REFRESH_MEMORY_COMMAND_NAME.substring(1), // Remove leading '/'
+        description: 'Reloads instructions from all GEMINI.md files.',
+        action: performMemoryRefresh, // Use the passed in function
+      },
+      {
+        name: SHOW_MEMORY_COMMAND_NAME.substring(1), // Remove leading '/'
+        description: 'Displays the current hierarchical memory content.',
+        action: showMemoryAction,
       },
       {
         name: 'quit',
         altName: 'exit',
         description: '',
-        action: (_value: PartListUnion) => {
+        action: (_value: PartListUnion | string) => {
           onDebugMessage('Quitting. Good-bye.');
           process.exit(0);
         },
       },
     ],
-    [onDebugMessage, setShowHelp, refreshStatic, openThemeDialog, clearItems],
+    [
+      onDebugMessage,
+      setShowHelp,
+      refreshStatic,
+      openThemeDialog,
+      clearItems,
+      performMemoryRefresh, // Add to dependencies
+      showMemoryAction,
+    ],
   );
 
-  /**
-   * Checks if the query is a slash command and executes it if found.
-   * Adds user query and potential error messages to history.
-   * @returns True if the query was handled as a slash command (valid or invalid),
-   *          false otherwise.
-   */
   const handleSlashCommand = useCallback(
     (rawQuery: PartListUnion): boolean => {
       if (typeof rawQuery !== 'string') {
@@ -87,26 +126,27 @@ export const useSlashCommandProcessor = (
       }
 
       const userMessageTimestamp = Date.now();
-      addItem({ type: 'user', text: trimmed }, userMessageTimestamp);
+      // Add user message to history only if it's not a silent command or handled internally
+      // For now, adding all slash commands to history for transparency.
+      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
       for (const cmd of slashCommands) {
         if (
           test === cmd.name ||
           test === cmd.altName ||
-          symbol === cmd.altName
+          (symbol === '?' && cmd.altName === '?') // Special handling for ? as help
         ) {
-          cmd.action(trimmed);
+          cmd.action(trimmed); // Pass the full trimmed command for context if needed
           return true;
         }
       }
 
-      // Unknown command: Add error message
       addItem(
-        { type: 'error', text: `Unknown command: ${trimmed}` },
-        userMessageTimestamp, // Use same base timestamp for related error
+        { type: MessageType.ERROR, text: `Unknown command: ${trimmed}` },
+        userMessageTimestamp,
       );
 
-      return true; // Indicate command was processed (even though invalid)
+      return true;
     },
     [addItem, slashCommands],
   );

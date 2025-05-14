@@ -26,6 +26,7 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
   HistoryItemWithoutId,
+  MessageType,
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
@@ -34,16 +35,14 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
-/**
- * Hook to manage the Gemini stream, handle user input, process commands,
- * and interact with the Gemini API and history manager.
- */
 export const useGeminiStream = (
   addItem: UseHistoryManagerReturn['addItem'],
+  _clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
   onDebugMessage: (message: string) => void,
+  _openThemeDialog: () => void,
   handleSlashCommand: (cmd: PartListUnion) => boolean,
 ) => {
   const toolRegistry = config.getToolRegistry();
@@ -72,7 +71,7 @@ export const useGeminiStream = (
       } catch (error: unknown) {
         const errorMsg = `Failed to initialize client: ${getErrorMessage(error) || 'Unknown error'}`;
         setInitError(errorMsg);
-        addItem({ type: 'error', text: errorMsg }, Date.now());
+        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
       }
     }
   }, [config, addItem]);
@@ -100,11 +99,9 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         onDebugMessage(`User query: '${trimmedQuery}'`);
 
-        // Handle UI-only commands first
         if (handleSlashCommand(trimmedQuery)) return;
         if (handleShellCommand(trimmedQuery)) return;
 
-        // Handle @-commands (which might involve tool calls)
         if (isAtCommand(trimmedQuery)) {
           const atCommandResult = await handleAtCommand({
             query: trimmedQuery,
@@ -117,12 +114,13 @@ export const useGeminiStream = (
           if (!atCommandResult.shouldProceed) return;
           queryToSendToGemini = atCommandResult.processedQuery;
         } else {
-          // Normal query for Gemini
-          addItem({ type: 'user', text: trimmedQuery }, userMessageTimestamp);
+          addItem(
+            { type: MessageType.USER, text: trimmedQuery },
+            userMessageTimestamp,
+          );
           queryToSendToGemini = trimmedQuery;
         }
       } else {
-        // It's a function response (PartListUnion that isn't a string)
         queryToSendToGemini = query;
       }
 
@@ -137,7 +135,7 @@ export const useGeminiStream = (
       if (!client) {
         const errorMsg = 'Gemini client is not available.';
         setInitError(errorMsg);
-        addItem({ type: 'error', text: errorMsg }, Date.now());
+        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
         return;
       }
 
@@ -147,7 +145,7 @@ export const useGeminiStream = (
         } catch (err: unknown) {
           const errorMsg = `Failed to start chat: ${getErrorMessage(err)}`;
           setInitError(errorMsg);
-          addItem({ type: 'error', text: errorMsg }, Date.now());
+          addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
           setStreamingState(StreamingState.Idle);
           return;
         }
@@ -172,12 +170,10 @@ export const useGeminiStream = (
               pendingHistoryItemRef.current?.type !== 'gemini' &&
               pendingHistoryItemRef.current?.type !== 'gemini_content'
             ) {
-              // Flush out existing pending history item.
               if (pendingHistoryItemRef.current) {
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
               }
               setPendingHistoryItem({
-                // Use the 'gemini' type for the initial history item.
                 type: 'gemini',
                 text: '',
               });
@@ -206,7 +202,7 @@ export const useGeminiStream = (
               // broken up so that there are more "statically" rendered.
               const beforeText = geminiMessageBuffer.substring(0, splitPoint);
               const afterText = geminiMessageBuffer.substring(splitPoint);
-              geminiMessageBuffer = afterText; // Continue accumulating from split point
+              geminiMessageBuffer = afterText;
               addItem(
                 {
                   type: pendingHistoryItemRef.current?.type as
@@ -230,7 +226,6 @@ export const useGeminiStream = (
             }
 
             if (pendingHistoryItemRef.current?.type !== 'tool_group') {
-              // Flush out existing pending history item.
               if (pendingHistoryItemRef.current) {
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
               }
@@ -256,9 +251,7 @@ export const useGeminiStream = (
               confirmationDetails: undefined,
             };
 
-            // Add pending tool call to the UI history group
             setPendingHistoryItem((pending) =>
-              // Should always be true.
               pending?.type === 'tool_group'
                 ? {
                     ...pending,
@@ -280,11 +273,9 @@ export const useGeminiStream = (
               confirmationDetails,
             );
             setStreamingState(StreamingState.WaitingForConfirmation);
-            return; // Wait for user confirmation
+            return;
           } else if (event.type === ServerGeminiEventType.UserCancelled) {
-            // Flush out existing pending history item.
             if (pendingHistoryItemRef.current) {
-              // If the pending item is a tool_group, update statuses to Canceled
               if (pendingHistoryItemRef.current.type === 'tool_group') {
                 const updatedTools = pendingHistoryItemRef.current.tools.map(
                   (tool) => {
@@ -307,25 +298,26 @@ export const useGeminiStream = (
               setPendingHistoryItem(null);
             }
             addItem(
-              { type: 'info', text: 'User cancelled the request.' },
+              { type: MessageType.INFO, text: 'User cancelled the request.' },
               userMessageTimestamp,
             );
             setStreamingState(StreamingState.Idle);
-            return; // Stop processing the stream
+            return;
           } else if (event.type === ServerGeminiEventType.Error) {
-            // Flush out existing pending history item.
             if (pendingHistoryItemRef.current) {
               addItem(pendingHistoryItemRef.current, userMessageTimestamp);
               setPendingHistoryItem(null);
             }
             addItem(
-              { type: 'error', text: `[API Error: ${event.value.message}]` },
+              {
+                type: MessageType.ERROR,
+                text: `[API Error: ${event.value.message}]`,
+              },
               userMessageTimestamp,
             );
           }
-        } // End stream loop
+        }
 
-        // We're waiting for user input now so all pending history can be committed.
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
@@ -336,7 +328,7 @@ export const useGeminiStream = (
         if (!isNodeError(error) || error.name !== 'AbortError') {
           addItem(
             {
-              type: 'error',
+              type: MessageType.ERROR,
               text: `[Stream Error: ${getErrorMessage(error)}]`,
             },
             userMessageTimestamp,
@@ -346,8 +338,6 @@ export const useGeminiStream = (
       } finally {
         abortControllerRef.current = null;
       }
-
-      // --- Helper functions for updating tool UI ---
 
       function updateConfirmingFunctionStatusUI(
         callId: string,
@@ -396,7 +386,6 @@ export const useGeminiStream = (
         );
       }
 
-      // Wires the server-side confirmation callback to UI updates and state changes
       function wireConfirmationSubmission(
         confirmationDetails: ServerToolCallConfirmationDetails,
       ): ToolCallConfirmationDetails {
@@ -405,10 +394,8 @@ export const useGeminiStream = (
         const resubmittingConfirm = async (
           outcome: ToolConfirmationOutcome,
         ) => {
-          // Call the original server-side handler first
           originalConfirmationDetails.onConfirm(outcome);
 
-          // Ensure UI updates before potentially long-running operations
           if (pendingHistoryItemRef?.current?.type === 'tool_group') {
             setPendingHistoryItem((item) =>
               item?.type === 'tool_group'
@@ -511,7 +498,6 @@ export const useGeminiStream = (
               error: new Error(declineMessage),
             };
 
-            // Update conversation history without re-issuing another request to indicate the decline.
             const history = chatSessionRef.current?.getHistory();
             if (history) {
               history.push({
@@ -520,7 +506,6 @@ export const useGeminiStream = (
               });
             }
 
-            // Update UI to show cancellation/error
             updateFunctionResponseUI(responseInfo, status);
             if (pendingHistoryItemRef.current) {
               addItem(pendingHistoryItemRef.current, Date.now());
@@ -555,9 +540,6 @@ export const useGeminiStream = (
     streamingState,
     submitQuery,
     initError,
-    // Normally we would be concerned that the ref would not be up-to-date, but
-    // this isn't a concern as the ref is updated whenever the corresponding
-    // state is updated.
     pendingHistoryItem: pendingHistoryItemRef.current,
   };
 };
