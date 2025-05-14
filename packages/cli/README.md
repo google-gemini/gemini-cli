@@ -1,6 +1,6 @@
-# Gemini Code CLI
+# Gemini CLI
 
-This package contains the core command-line interface for Gemini Code.
+This package contains the core command-line interface for Gemini CLI.
 
 ## Setup
 
@@ -28,7 +28,7 @@ This command executes the TypeScript compiler (`tsc`) as defined in this package
 
 ## Running
 
-To start the Gemini Code CLI directly from this directory:
+To start the Gemini CLI directly from this directory:
 
 ```bash
 npm start

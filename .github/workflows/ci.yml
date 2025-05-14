@@ -1,6 +1,6 @@
 # .github/workflows/ci.yml
 
-name: Gemini Code CI
+name: Gemini CLI CI
 
 on:
   push:

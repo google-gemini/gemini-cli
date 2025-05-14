@@ -31,15 +31,15 @@ All submissions, including submissions by project members, require review. We
 use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
 for this purpose.
 
-### gemini-code alias
+### gemini-cli alias
 
 During development phase, you can use the following to create an alias for
 the command line tool:
 
 ```bash
 $ npm run build
-$ alias gemini-code="node /path/to/gemini-code/packages/cli/dist/index.js"
-$ gemini-code
+$ alias gemini-code="node /path/to/gemini-cli/packages/cli/dist/index.js"
+$ gemini
  ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗
 ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║
 ██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║
@@ -47,25 +47,13 @@ $ gemini-code
 ╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║
  ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝
 
- ██████╗ ██████╗ ██████╗ ███████╗
-██╔════╝██╔═══██╗██╔══██╗██╔════╝
-██║     ██║   ██║██║  ██║█████╗
-██║     ██║   ██║██║  ██║██╔══╝
-╚██████╗╚██████╔╝██████╔╝███████╗
- ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
-
-
 Tips for getting started:
 1. /help for more information.
 2. Ask coding questions, edit code or run commands.
 3. Be specific for the best results.
 
-cwd: /Users/jbd/gemini-code
+cwd: /Users/jbd/gemini-cli
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ > Enter your message or use tools...                                                                               │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-? for shortcuts                                                                                                 Gemini
-
-Note: Flickering may occur in iTerm.
 ```

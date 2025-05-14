@@ -1,10 +1,8 @@
-# Gemini Code
+# Gemini CLI
 
-[![Gemini Code CI](https://github.com/google-gemini/gemini-code/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-code/actions/workflows/ci.yml)
+[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 
-**Disclaimer:** This README.md was created by gemini-code and this project was developed rapidly and currently lacks comprehensive testing, and other quality-of-life features common in mature projects.
-
-This repository contains the Gemini Code CLI tool.
+This repository contains the Gemini CLI tool.
 
 ## Setup
 
@@ -39,13 +37,13 @@ This command installs dependencies and builds the entire project, including the 
 
 ## Running
 
-To start the Gemini Code CLI, run the following command from the root directory:
+To start the Gemini CLI, run the following command from the root directory:
 
 ```bash
 npm start
 ```
 
-This command starts the Gemini Code CLI.
+This command starts the Gemini CLI.
 
 ## Debugging
 
@@ -60,9 +58,9 @@ To debug the CLI application using VS Code:
 
 Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
 
-## Using Gemini Code source in other directories
+## Using Gemini CLI source in other directories
 
-To test your local version of `gemini` in other directories on your system, you can use `npm link`. Note, this is not the same as globally installing the released version of Gemini Code via `npm install -g @gemini-code/cli`. Rather, this creates a global symlink to your local project.
+To test your local version of `gemini` in other directories on your system, you can use `npm link`. Note, this is not the same as globally installing the released version of Gemini CLI via `npm install -g @gemini-code/cli`. Rather, this creates a global symlink to your local project.
 
 From the root of this repository, run:
 
@@ -110,7 +108,7 @@ On MacOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `minimal` profile (see
 
 For stronger container-based sandboxing on MacOS or other platforms, you can set `GEMINI_CODE_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. The specified command (or if `true` then either `docker` or `podman`) must be installed on the host machine. Once enabled, `npm run build:all` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. The first build can take 20-30s (mostly due to downloading of the base image) but after that both build and start overhead should be minimal. Default builds (`npm run build`) will not rebuild the sandbox.
 
-Container-based sandboxing mounts the project directory (and system temp directory) with read-write access and is started/stopped/removed automatically as you start/stop Gemini Code. Files created within the sandbox should be automatically mapped to your user/group on host machine. You can easily specify additional mounts, ports, or environment variables by setting `SANDBOX_{MOUNTS,PORTS,ENV}` as needed. You can also fully customize the sandbox for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or `.gemini/sandbox.bashrc` under your project settings directory `.gemini`.
+Container-based sandboxing mounts the project directory (and system temp directory) with read-write access and is started/stopped/removed automatically as you start/stop Gemini CLI. Files created within the sandbox should be automatically mapped to your user/group on host machine. You can easily specify additional mounts, ports, or environment variables by setting `SANDBOX_{MOUNTS,PORTS,ENV}` as needed. You can also fully customize the sandbox for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or `.gemini/sandbox.bashrc` under your project settings directory `.gemini`.
 
 ### Attaching from VSCode
 

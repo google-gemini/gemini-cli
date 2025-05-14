@@ -1,7 +1,7 @@
 {
   "name": "@gemini-code/cli",
   "version": "0.1.0",
-  "description": "Gemini Code CLI",
+  "description": "Gemini CLI",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
