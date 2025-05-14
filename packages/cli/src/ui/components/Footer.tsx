@@ -11,31 +11,31 @@ import { Config } from '@gemini-code/server';
 
 interface FooterProps {
   config: Config;
-  queryLength: number;
   debugMode: boolean;
   debugMessage: string;
   cliVersion: string;
+  geminiMdFileCount: number;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   config,
-  queryLength,
   debugMode,
   debugMessage,
   cliVersion,
+  geminiMdFileCount,
 }) => (
-  <Box marginTop={1} display="flex" justifyContent="space-between" width="100%">
-    {/* Left Section: Help/DebugMode */}
+  <Box>
     <Box>
-      <Text color={Colors.SubtleComment}>
-        {queryLength === 0 ? '? for shortcuts' : ''}
-        {debugMode && (
-          <Text color={Colors.AccentRed}>
-            {' '}
-            {debugMessage || 'Running in debug mode.'}
-          </Text>
-        )}
-      </Text>
+      {geminiMdFileCount > 0 && (
+        <Text color={Colors.SubtleComment}>
+          Using {geminiMdFileCount} GEMINI.md files
+        </Text>
+      )}
+      {debugMode && (
+        <Text color={Colors.AccentRed}>
+          {debugMessage || ' | Running in debug mode.'}
+        </Text>
+      )}
     </Box>
 
     {/* Middle Section: Centered Sandbox Info */}

@@ -290,13 +290,6 @@ export const App = ({
                     {shortenPath(config.getTargetDir(), 70)}
                   </Text>
                 </Box>
-                {geminiMdFileCount > 0 && (
-                  <Box>
-                    <Text color={Colors.SubtleComment}>
-                      Using {geminiMdFileCount} GEMINI.md files
-                    </Text>
-                  </Box>
-                )}
               </Box>
 
               <InputPrompt
@@ -363,10 +356,10 @@ export const App = ({
 
       <Footer
         config={config}
-        queryLength={query.length}
         debugMode={config.getDebugMode()}
         debugMessage={debugMessage}
         cliVersion={cliVersion}
+        geminiMdFileCount={geminiMdFileCount}
       />
       <ConsoleOutput />
     </Box>
