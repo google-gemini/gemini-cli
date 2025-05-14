@@ -46,13 +46,15 @@ export const Footer: React.FC<FooterProps> = ({
       display="flex"
     >
       {process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (
-        <Text color="green"> {process.env.SANDBOX} </Text>
+        <Text color="green">
+          {process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '')}
+        </Text>
       ) : process.env.SANDBOX === 'sandbox-exec' ? (
         <Text color={Colors.AccentYellow}>
-          using macos seatbelt ({process.env.SEATBELT_PROFILE})
+          sandbox-exec ({process.env.SEATBELT_PROFILE})
         </Text>
       ) : (
-        <Text color={Colors.AccentRed}> WARNING: OUTSIDE SANDBOX </Text>
+        <Text color={Colors.AccentRed}>no sandbox (see README)</Text>
       )}
     </Box>
 
