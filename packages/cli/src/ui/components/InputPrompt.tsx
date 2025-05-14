@@ -76,6 +76,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const newValue = base + selectedSuggestion.value;
         onChangeAndMoveCursor(newValue);
         onSubmit(newValue); // Execute the command
+        onChangeAndMoveCursor(''); // Clear query after submit
       } else {
         // Handle @ command completion
         const atIndex = query.lastIndexOf('@');

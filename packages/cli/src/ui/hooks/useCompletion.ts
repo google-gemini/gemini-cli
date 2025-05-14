@@ -119,20 +119,30 @@ export function useCompletion(
     // --- Handle Slash Command Completion ---
     if (trimmedQuery.startsWith('/')) {
       const partialCommand = trimmedQuery.substring(1);
-      const commands = slashCommands
-        .map((cmd) => cmd.name)
-        .concat(
-          slashCommands
-            .map((cmd) => cmd.altName)
-            .filter((cmd) => cmd !== undefined),
-        );
-
-      const filteredSuggestions = commands
-        .filter((name) => name.startsWith(partialCommand))
-        // Filter out ? and any other single character commands
-        .filter((name) => name.length > 1)
-        .map((name) => ({ label: name, value: name }))
-        .sort();
+      const filteredSuggestions = slashCommands
+        .filter(
+          (cmd) =>
+            cmd.name.startsWith(partialCommand) ||
+            cmd.altName?.startsWith(partialCommand),
+        )
+        // Filter out ? and any other single character commands unless it's the only char
+        .filter((cmd) => {
+          const nameMatch = cmd.name.startsWith(partialCommand);
+          const altNameMatch = cmd.altName?.startsWith(partialCommand);
+          if (partialCommand.length === 1) {
+            return nameMatch || altNameMatch; // Allow single char match if query is single char
+          }
+          return (
+            (nameMatch && cmd.name.length > 1) ||
+            (altNameMatch && cmd.altName && cmd.altName.length > 1)
+          );
+        })
+        .map((cmd) => ({
+          label: cmd.name, // Always show the main name as label
+          value: cmd.name, // Value should be the main command name for execution
+          description: cmd.description,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
 
       setSuggestions(filteredSuggestions);
       setShowSuggestions(filteredSuggestions.length > 0);

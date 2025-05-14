@@ -9,6 +9,7 @@ import { Colors } from '../colors.js';
 export interface Suggestion {
   label: string;
   value: string;
+  description?: string;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -29,7 +30,7 @@ export function SuggestionsDisplay({
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
-      <Box borderStyle="round" paddingX={1} width={width}>
+      <Box paddingX={1} width={width}>
         <Text color="gray">Loading suggestions...</Text>
       </Box>
     );
@@ -48,20 +49,29 @@ export function SuggestionsDisplay({
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
   return (
-    <Box borderStyle="round" flexDirection="column" paddingX={1} width={width}>
+    <Box flexDirection="column" paddingX={1} width={width}>
       {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
+        const textColor = isActive ? Colors.AccentPurple : Colors.SubtleComment;
+
         return (
-          <Text
-            key={`${suggestion}-${originalIndex}`}
-            color={isActive ? Colors.Background : Colors.Foreground}
-            backgroundColor={isActive ? Colors.AccentBlue : undefined}
-          >
-            {suggestion.label}
-          </Text>
+          <Box key={`${suggestion}-${originalIndex}`} width={width}>
+            <Box flexDirection="row">
+              <Box width={20} flexShrink={0}>
+                <Text color={textColor}>{suggestion.label}</Text>
+              </Box>
+              {suggestion.description ? (
+                <Box flexGrow={1}>
+                  <Text color={textColor} wrap="wrap">
+                    {suggestion.description}
+                  </Text>
+                </Box>
+              ) : null}
+            </Box>
+          </Box>
         );
       })}
       {endIndex < suggestions.length && <Text color="gray">▼</Text>}
