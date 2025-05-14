@@ -16,6 +16,7 @@ import { dirname } from 'node:path';
 import { sandbox_command, start_sandbox } from './utils/sandbox.js';
 import { loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
+import { getStartupWarnings } from './utils/startupWarnings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -41,6 +42,7 @@ async function main() {
   }
 
   let input = config.getQuestion();
+  const startupWarnings = await getStartupWarnings();
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
@@ -53,6 +55,7 @@ async function main() {
         config,
         settings,
         cliVersion,
+        startupWarnings,
       }),
     );
     return;

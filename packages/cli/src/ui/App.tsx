@@ -16,7 +16,6 @@ import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { EditorState, InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { useStartupWarnings } from './hooks/useAppEffects.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
@@ -33,16 +32,21 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   cliVersion: string;
+  startupWarnings?: string[];
 }
 
-export const App = ({ config, settings, cliVersion }: AppProps) => {
+export const App = ({
+  config,
+  settings,
+  cliVersion,
+  startupWarnings = [],
+}: AppProps) => {
   const { history, addItem, clearItems } = useHistory();
   const [staticKey, setStaticKey] = useState(0);
   const refreshStatic = useCallback(() => {
     setStaticKey((prev) => prev + 1);
   }, [setStaticKey]);
 
-  const [startupWarnings, setStartupWarnings] = useState<string[]>([]);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
@@ -73,8 +77,6 @@ export const App = ({ config, settings, cliVersion }: AppProps) => {
     );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
-
-  useStartupWarnings(setStartupWarnings);
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
