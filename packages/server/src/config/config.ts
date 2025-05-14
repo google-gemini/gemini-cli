@@ -37,6 +37,7 @@ export class Config {
     private readonly mcpServerCommand: string | undefined,
     private readonly userAgent: string,
     private userMemory: string = '', // Made mutable for refresh
+    private geminiMdFileCount: number = 0,
   ) {
     // toolRegistry still needs initialization based on the instance
     this.toolRegistry = createToolRegistry(this);
@@ -89,13 +90,20 @@ export class Config {
     return this.userAgent;
   }
 
-  // Added getter for userMemory
   getUserMemory(): string {
     return this.userMemory;
   }
 
   setUserMemory(newUserMemory: string): void {
     this.userMemory = newUserMemory;
+  }
+
+  getGeminiMdFileCount(): number {
+    return this.geminiMdFileCount;
+  }
+
+  setGeminiMdFileCount(count: number): void {
+    this.geminiMdFileCount = count;
   }
 }
 
@@ -139,7 +147,8 @@ export function createServerConfig(
   toolCallCommand?: string,
   mcpServerCommand?: string,
   userAgent?: string,
-  userMemory?: string, // Added userMemory parameter
+  userMemory?: string,
+  geminiMdFileCount?: number,
 ): Config {
   return new Config(
     apiKey,
@@ -153,7 +162,8 @@ export function createServerConfig(
     toolCallCommand,
     mcpServerCommand,
     userAgent ?? 'GeminiCLI/unknown', // Default user agent
-    userMemory ?? '', // Pass userMemory, default to empty string
+    userMemory ?? '',
+    geminiMdFileCount ?? 0,
   );
 }
 

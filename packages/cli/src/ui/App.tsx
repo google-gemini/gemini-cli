@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Static, Text, useStdout } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -19,6 +19,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { shortenPath, type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
@@ -27,7 +28,6 @@ import { useCompletion } from './hooks/useCompletion.js';
 import { SuggestionsDisplay } from './components/SuggestionsDisplay.js';
 import { isAtCommand, isSlashCommand } from './utils/commandUtils.js';
 import { useHistory } from './hooks/useHistoryManager.js';
-import { loadHierarchicalGeminiMemory } from '../config/config.js'; // For performMemoryRefresh
 import process from 'node:process'; // For performMemoryRefresh
 import { MessageType } from './types.js'; // For performMemoryRefresh
 import { getErrorMessage } from '@gemini-code/server'; // For performMemoryRefresh
@@ -51,6 +51,7 @@ export const App = ({
     setStaticKey((prev) => prev + 1);
   }, [setStaticKey]);
 
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0); // Added for memory file count
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
@@ -62,6 +63,13 @@ export const App = ({
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError);
 
+  // useEffect to initialize geminiMdFileCount from config when config is ready
+  useEffect(() => {
+    if (config) {
+      setGeminiMdFileCount(config.getGeminiMdFileCount());
+    }
+  }, [config]);
+
   const performMemoryRefresh = useCallback(async () => {
     addItem(
       {
@@ -71,22 +79,25 @@ export const App = ({
       Date.now(),
     );
     try {
-      const newMemory = await loadHierarchicalGeminiMemory(
+      const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
         process.cwd(),
         config.getDebugMode(),
       );
-      config.setUserMemory(newMemory);
+      config.setUserMemory(memoryContent);
+      config.setGeminiMdFileCount(fileCount);
+      setGeminiMdFileCount(fileCount);
+
       // chatSessionRef.current = null; // This was in useGeminiStream, might need similar logic or pass chat ref
       addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${newMemory.length > 0 ? `Loaded ${newMemory.length} characters.` : 'No memory content found.'}`,
+          text: `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
         },
         Date.now(),
       );
       if (config.getDebugMode()) {
         console.log(
-          `[DEBUG] Refreshed memory content in config: ${newMemory.substring(0, 200)}...`,
+          `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,
         );
       }
     } catch (error) {
@@ -110,20 +121,19 @@ export const App = ({
     setShowHelp,
     setDebugMessage,
     openThemeDialog,
-    performMemoryRefresh, // Pass performMemoryRefresh
+    performMemoryRefresh,
   );
 
   const { streamingState, submitQuery, initError, pendingHistoryItem } =
     useGeminiStream(
       addItem,
-      clearItems, // Pass clearItems
+      clearItems,
       refreshStatic,
       setShowHelp,
       config,
       setDebugMessage,
-      openThemeDialog, // Pass openThemeDialog
+      openThemeDialog,
       handleSlashCommand,
-      // performMemoryRefresh, // Removed performMemoryRefresh
     );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
@@ -268,11 +278,25 @@ export const App = ({
           />
           {isInputActive && (
             <>
-              <Box marginTop={1}>
-                <Text color={Colors.SubtleComment}>cwd: </Text>
-                <Text color={Colors.LightBlue}>
-                  {shortenPath(config.getTargetDir(), 70)}
-                </Text>
+              <Box
+                marginTop={1}
+                display="flex"
+                justifyContent="space-between"
+                width="100%"
+              >
+                <Box>
+                  <Text color={Colors.SubtleComment}>cwd: </Text>
+                  <Text color={Colors.LightBlue}>
+                    {shortenPath(config.getTargetDir(), 70)}
+                  </Text>
+                </Box>
+                {geminiMdFileCount > 0 && (
+                  <Box>
+                    <Text color={Colors.SubtleComment}>
+                      Using {geminiMdFileCount} GEMINI.md files
+                    </Text>
+                  </Box>
+                )}
               </Box>
 
               <InputPrompt

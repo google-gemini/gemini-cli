@@ -324,7 +324,7 @@ function concatenateInstructions(
 export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
-): Promise<string> {
+): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
       `Loading hierarchical memory for CWD: ${currentWorkingDirectory}`,
@@ -337,7 +337,7 @@ export async function loadHierarchicalGeminiMemory(
   );
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
-    return '';
+    return { memoryContent: '', fileCount: 0 };
   }
   const contentsWithPaths = await readGeminiMdFiles(filePaths, debugMode);
   const combinedInstructions = concatenateInstructions(contentsWithPaths);
@@ -349,7 +349,7 @@ export async function loadHierarchicalGeminiMemory(
     logger.debug(
       `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
     );
-  return combinedInstructions;
+  return { memoryContent: combinedInstructions, fileCount: filePaths.length };
 }
 
 export async function loadCliConfig(settings: Settings): Promise<Config> {
@@ -368,7 +368,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   const argv = await parseArguments();
   const debugMode = argv.debug_mode || false;
 
-  const userMemory = await loadHierarchicalGeminiMemory(
+  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
     debugMode,
   );
@@ -388,7 +388,8 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     settings.toolCallCommand,
     settings.mcpServerCommand,
     userAgent,
-    userMemory,
+    memoryContent,
+    fileCount,
   );
 }
 
