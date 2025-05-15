@@ -50,7 +50,7 @@ interface CliArgs {
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
-  full_context: boolean | undefined;
+  all_files: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -77,7 +77,7 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Run in debug mode?',
       default: false,
     })
-    .option('full_context', {
+    .option('all_files', {
       alias: 'a',
       type: 'boolean',
       description: 'Include ALL files in context?',
@@ -381,7 +381,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     process.cwd(),
     debugMode,
     argv.prompt || '',
-    argv.full_context || false,
+    argv.all_files || false,
     settings.toolDiscoveryCommand,
     settings.toolCallCommand,
     settings.mcpServerCommand,
