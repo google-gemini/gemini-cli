@@ -76,19 +76,11 @@ export function RadioButtonSelect<T>({
   function DynamicRadioIndicator({
     isSelected = false,
   }: InkSelectIndicatorProps): React.JSX.Element {
-    let indicatorColor = Colors.Foreground; // Default for not selected
-    if (isSelected) {
-      if (isFocused) {
-        // Group is focused, selected item is AccentGreen
-        indicatorColor = Colors.AccentGreen;
-      } else {
-        // Group is NOT focused, selected item is Foreground
-        indicatorColor = Colors.Foreground;
-      }
-    }
     return (
       <Box marginRight={1}>
-        <Text color={indicatorColor}>{isSelected ? '●' : '○'}</Text>
+        <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+          {isSelected ? '●' : '○'}
+        </Text>
       </Box>
     );
   }
@@ -109,7 +101,7 @@ export function RadioButtonSelect<T>({
 
     let textColor = Colors.Foreground;
     if (isSelected) {
-      textColor = isFocused ? Colors.AccentGreen : Colors.Foreground;
+      textColor = Colors.AccentGreen;
     }
 
     if (

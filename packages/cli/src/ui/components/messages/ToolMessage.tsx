@@ -31,7 +31,7 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
             <Text color={Colors.AccentGreen}>✔</Text>
           )}
           {status === ToolCallStatus.Confirming && (
-            <Text color={Colors.AccentPurple}>?</Text>
+            <Text color={Colors.AccentYellow}>?</Text>
           )}
           {status === ToolCallStatus.Canceled && (
             <Text color={Colors.AccentYellow} bold>
