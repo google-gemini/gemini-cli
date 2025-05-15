@@ -48,8 +48,8 @@ const DEFAULT_IGNORE_DIRECTORIES = [
 interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
-  debug_mode: boolean | undefined;
-  question: string | undefined;
+  debug: boolean | undefined;
+  prompt: string | undefined;
   full_context: boolean | undefined;
 }
 
@@ -58,31 +58,29 @@ async function parseArguments(): Promise<CliArgs> {
     .option('model', {
       alias: 'm',
       type: 'string',
-      description: `The Gemini model to use. Defaults to ${DEFAULT_GEMINI_MODEL}.`,
+      description: `Model`,
       default: process.env.GEMINI_CODE_MODEL || DEFAULT_GEMINI_MODEL,
+    })
+    .option('prompt', {
+      alias: 'p',
+      type: 'string',
+      description: 'Prompt. Appended to input on stdin (if any).',
     })
     .option('sandbox', {
       alias: 's',
       type: 'boolean',
-      description: 'Whether to run in sandbox mode. Defaults to false.',
+      description: 'Run in sandbox?',
     })
-    .option('debug_mode', {
-      alias: 'z',
+    .option('debug', {
+      alias: 'd',
       type: 'boolean',
-      description: 'Whether to run in debug mode. Defaults to false.',
+      description: 'Run in debug mode?',
       default: false,
     })
-    .option('question', {
-      alias: 'q',
-      type: 'string',
-      description:
-        'The question to pass to the command when using piped input.',
-    })
     .option('full_context', {
-      alias: 'f',
+      alias: 'a',
       type: 'boolean',
-      description:
-        'Recursively include all files within the current directory as context.',
+      description: 'Include ALL files in context?',
       default: false,
     })
     .help()
@@ -366,7 +364,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   }
 
   const argv = await parseArguments();
-  const debugMode = argv.debug_mode || false;
+  const debugMode = argv.debug || false;
 
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
@@ -382,7 +380,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     argv.sandbox ?? settings.sandbox ?? false,
     process.cwd(),
     debugMode,
-    argv.question || '',
+    argv.prompt || '',
     argv.full_context || false,
     settings.toolDiscoveryCommand,
     settings.toolCallCommand,
