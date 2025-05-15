@@ -71,6 +71,7 @@ export const useSlashCommandProcessor = (
         action: (_value: PartListUnion | string) => {
           onDebugMessage('Clearing terminal.');
           clearItems();
+          console.clear();
           refreshStatic();
         },
       },
