@@ -182,6 +182,7 @@ export const App = ({
 
   const handleClearScreen = useCallback(() => {
     clearItems();
+    console.clear();
     refreshStatic();
   }, [clearItems, refreshStatic]);
 
