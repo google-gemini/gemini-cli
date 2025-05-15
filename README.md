@@ -65,7 +65,7 @@ To test your local version of `gemini` in other directories on your system, you 
 From the root of this repository, run:
 
 ```bash
-npm link packages/cli
+npm link ./packages/cli
 ```
 
 Then, navigate to any other directory where you want to use your local `gemini` and run:
