@@ -212,25 +212,17 @@ export const App = ({
        * content is set it'll flush content to the terminal and move the area which it's "clearing"
        * down a notch. Without Static the area which gets erased and redrawn continuously grows.
        */}
-      <Static key={'static-key-' + staticKey} items={['header', ...history]}>
-        {(item, index) => {
-          if (item === 'header') {
-            return (
-              <Box flexDirection="column" key={'header-' + index}>
-                <Header />
-                <Tips />
-              </Box>
-            );
-          }
-
-          const historyItem = item as HistoryItem;
-          return (
-            <HistoryItemDisplay
-              key={'history-' + historyItem.id}
-              item={historyItem}
-            />
-          );
-        }}
+      <Static
+        key={staticKey}
+        items={[
+          <Box flexDirection="column" key="header">
+            <Header />
+            <Tips />
+          </Box>,
+          ...history.map((h) => <HistoryItemDisplay key={h.id} item={h} />),
+        ]}
+      >
+        {(item) => item}
       </Static>
       {pendingHistoryItem && (
         <HistoryItemDisplay
