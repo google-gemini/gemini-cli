@@ -10,7 +10,7 @@ import Spinner from 'ink-spinner';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
-import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';
+import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 
 export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
   name,
@@ -60,7 +60,7 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
             {/* Use default text color (white) or gray instead of dimColor */}
             {typeof resultDisplay === 'string' && (
               <Box flexDirection="column">
-                {MarkdownRenderer.render(resultDisplay)}
+                <MarkdownDisplay text={resultDisplay} />
               </Box>
             )}
             {typeof resultDisplay === 'object' && (

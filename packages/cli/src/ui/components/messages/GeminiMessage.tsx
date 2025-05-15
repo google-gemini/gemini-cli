@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { MarkdownRenderer } from '../../utils/MarkdownRenderer.js';
+import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { Colors } from '../../colors.js';
 
 interface GeminiMessageProps {
@@ -16,7 +16,6 @@ interface GeminiMessageProps {
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
-  const renderedBlocks = MarkdownRenderer.render(text);
 
   return (
     <Box flexDirection="row">
@@ -24,7 +23,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
         <Text color={Colors.AccentPurple}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
-        {renderedBlocks}
+        <MarkdownDisplay text={text} />
       </Box>
     </Box>
   );
