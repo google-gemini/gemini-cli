@@ -53,7 +53,8 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
         osReleaseContent.match(/^ID_LIKE=.*debian.*/m) || // Covers derivatives
         osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) // Covers derivatives
       ) {
-        console.log(
+        // note here and below we use console.error for informational messages on stderr
+        console.error(
           'INFO: Defaulting to use current user UID/GID for Debian/Ubuntu-based Linux.',
         );
         return true;
@@ -222,7 +223,7 @@ export async function start_sandbox(sandbox: string) {
       );
       process.exit(1);
     }
-    console.log(`using macos seatbelt (profile: ${profile}) ...`);
+    console.error(`using macos seatbelt (profile: ${profile}) ...`);
     // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
     if (process.env.DEBUG) {
       process.env.NODE_OPTIONS ??= '';
@@ -249,7 +250,7 @@ export async function start_sandbox(sandbox: string) {
     return;
   }
 
-  console.log(`hopping into sandbox (command: ${sandbox}) ...`);
+  console.error(`hopping into sandbox (command: ${sandbox}) ...`);
 
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
@@ -267,7 +268,7 @@ export async function start_sandbox(sandbox: string) {
       );
       process.exit(1);
     } else {
-      console.log('building sandbox ...');
+      console.error('building sandbox ...');
       const gcRoot = gcPath.split('/packages/')[0];
       // if project folder has sandbox.Dockerfile under project settings folder, use that
       let buildArgs = '';
@@ -276,7 +277,7 @@ export async function start_sandbox(sandbox: string) {
         'sandbox.Dockerfile',
       );
       if (fs.existsSync(projectSandboxDockerfile)) {
-        console.log(`using ${projectSandboxDockerfile} for sandbox`);
+        console.error(`using ${projectSandboxDockerfile} for sandbox`);
         buildArgs += `-f ${path.resolve(projectSandboxDockerfile)}`;
       }
       spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
@@ -343,7 +344,7 @@ export async function start_sandbox(sandbox: string) {
           );
           process.exit(1);
         }
-        console.log(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
+        console.error(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
         args.push('--volume', mount);
       }
     }
@@ -416,7 +417,7 @@ export async function start_sandbox(sandbox: string) {
     for (let env of process.env.SANDBOX_ENV.split(',')) {
       if ((env = env.trim())) {
         if (env.includes('=')) {
-          console.log(`SANDBOX_ENV: ${env}`);
+          console.error(`SANDBOX_ENV: ${env}`);
           args.push('--env', env);
         } else {
           console.error(
