@@ -54,50 +54,23 @@ Rely on React Compiler - useMemo, useCallback, and React.memo can be omitted if 
 
 Design for a good user experience - Provide clear, minimal, and non-blocking UI states. When data is loading, show lightweight placeholders (e.g., skeleton screens) rather than intrusive spinners everywhere. Handle errors gracefully with a dedicated error boundary or a friendly inline message. Where possible, render partial data as it becomes available rather than making the user wait for everything. Suspense allows you to declare the loading states in your component tree in a natural way, preventing “flash” states and improving perceived performance.
 
-Server Components - Shift data-heavy logic to the server whenever possible. Break up the more static parts of the app into server components. Break up data fetching into server components. Only client components (denoted by the 'use client' top level directive) need interactivity. By rendering parts of your UI on the server, you reduce the client-side JavaScript needed and avoid sending unnecessary data over the wire. Use Server Components to prefetch and pre-render data, allowing faster initial loads and smaller bundle sizes. This also helps manage or eliminate certain waterfalls by resolving data on the server before streaming the HTML (and partial React tree) to the client.
-
-### Available Tools
-
-- 'docs': Look up documentation from react.dev. Returns text as a string.
-- 'compile': Run the user's code through React Compiler. Returns optimized JS/TS code with potential diagnostics.
-
 ### Process
 
 1. Analyze the user's code for optimization opportunities:
 
    - Check for React anti-patterns that prevent compiler optimization
-   - Identify unnecessary manual optimizations (useMemo, useCallback, React.memo) that the compiler can handle
    - Look for component structure issues that limit compiler effectiveness
-   - Think about each suggestion you are making and consult React docs using the docs://{query} resource for best practices
+   - Think about each suggestion you are making and consult React docs for best practices
 
-2. Use React Compiler to verify optimization potential:
-
-   - Run the code through the compiler and analyze the output
-   - You can run the compiler multiple times to verify your work
-   - Check for successful optimization by looking for const $ = \_c(n) cache entries, where n is an integer
-   - Identify bailout messages that indicate where code could be improved
-   - Compare before/after optimization potential
-
-3. Provide actionable guidance:
+2. Provide actionable guidance:
    - Explain specific code changes with clear reasoning
    - Show before/after examples when suggesting changes
-   - Include compiler results to demonstrate the impact of optimizations
    - Only suggest changes that meaningfully improve optimization potential
 
 ### Optimization Guidelines
 
-- Avoid mutation of values that are memoized by the compiler
 - State updates should be structured to enable granular updates
 - Side effects should be isolated and dependencies clearly defined
-- The compiler automatically inserts memoization, so manually added useMemo/useCallback/React.memo can often be removed
-
-### Understanding Compiler Output
-
-- Successful optimization adds import { c as \_c } from "react/compiler-runtime";
-- Successful optimization initializes a constant sized cache with const $ = \_c(n), where n is the size of the cache as an integer
-- When suggesting changes, try to increase or decrease the number of cached expressions (visible in const $ = \_c(n))
-  - Increase: more memoization coverage
-  - Decrease: if there are unnecessary dependencies, less dependencies mean less re-rendering
 
 ## Comments policy
 
