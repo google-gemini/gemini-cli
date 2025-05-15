@@ -372,9 +372,9 @@ export function useTextBuffer({
     pushUndo,
     cursorRow,
     cursorCol,
-    lines,
     currentLine,
     currentLineLen,
+    lines.length,
     setPreferredCol,
   ]);
 
@@ -521,11 +521,57 @@ export function useTextBuffer({
     pushUndo,
     cursorRow,
     cursorCol,
-    lines,
     currentLine,
     del,
+    lines.length,
     setPreferredCol,
   ]);
+
+  const killLineRight = useCallback((): void => {
+    const lineContent = currentLine(cursorRow);
+    if (cursorCol < currentLineLen(cursorRow)) {
+      // Cursor is before the end of the line's content, delete text to the right
+      pushUndo();
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
+        return newLines;
+      });
+      // Cursor position and preferredCol do not change in this case
+    } else if (
+      cursorCol === currentLineLen(cursorRow) &&
+      cursorRow < lines.length - 1
+    ) {
+      // Cursor is at the end of the line's content (or line is empty),
+      // and it's not the last line. Delete the newline.
+      // `del()` handles pushUndo and setPreferredCol.
+      del();
+    }
+    // If cursor is at the end of the line and it's the last line, do nothing.
+  }, [
+    pushUndo,
+    cursorRow,
+    cursorCol,
+    currentLine,
+    currentLineLen,
+    lines.length,
+    del,
+  ]);
+
+  const killLineLeft = useCallback((): void => {
+    const lineContent = currentLine(cursorRow);
+    // Only act if the cursor is not at the beginning of the line
+    if (cursorCol > 0) {
+      pushUndo();
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        newLines[cursorRow] = cpSlice(lineContent, cursorCol);
+        return newLines;
+      });
+      setCursorCol(0);
+      setPreferredCol(null);
+    }
+  }, [pushUndo, cursorRow, cursorCol, currentLine, setPreferredCol]);
 
   const move = useCallback(
     (dir: Direction): void => {
@@ -772,6 +818,8 @@ export function useTextBuffer({
     replaceRange,
     deleteWordLeft,
     deleteWordRight,
+    killLineRight,
+    killLineLeft,
     handleInput,
     openInExternalEditor,
 
@@ -872,6 +920,14 @@ export interface TextBuffer {
    * follows the caret and the next contiguous run of word characters.
    */
   deleteWordRight: () => void;
+  /**
+   * Deletes text from the cursor to the end of the current line.
+   */
+  killLineRight: () => void;
+  /**
+   * Deletes text from the start of the current line to the cursor.
+   */
+  killLineLeft: () => void;
   /**
    * High level "handleInput" – receives what Ink gives us.
    */

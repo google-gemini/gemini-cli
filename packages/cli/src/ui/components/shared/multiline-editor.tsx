@@ -43,7 +43,12 @@ export interface MultilineTextEditorProps {
 
   // Called on all key events to allow the caller. Returns true if the
   // event was handled and should not be passed to the editor.
-  readonly inputPreprocessor?: (input: string, key: Key) => boolean;
+  readonly inputPreprocessor?: (
+    input: string,
+    key: Key,
+    currentText: string,
+    cursorOffset: number,
+  ) => boolean;
 
   // Optional initial cursor position (character offset)
   readonly initialCursorOffset?: number;
@@ -92,7 +97,24 @@ export const MultilineTextEditor = ({
         return;
       }
 
-      if (inputPreprocessor?.(input, key) === true) {
+      // Calculate cursorOffset for inputPreprocessor
+      let charOffset = 0;
+      for (let i = 0; i < buffer.cursor[0]; i++) {
+        charOffset += buffer.lines[i].length + 1; // +1 for newline
+      }
+      charOffset += buffer.cursor[1];
+
+      if (inputPreprocessor?.(input, key, buffer.text, charOffset) === true) {
+        return;
+      }
+
+      if (key.ctrl && input === 'k') {
+        buffer.killLineRight();
+        return;
+      }
+
+      if (key.ctrl && input === 'u') {
+        buffer.killLineLeft();
         return;
       }
 

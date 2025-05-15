@@ -180,6 +180,11 @@ export const App = ({
     [setQuery, setEditorState],
   );
 
+  const handleClearScreen = useCallback(() => {
+    clearItems();
+    refreshStatic();
+  }, [clearItems, refreshStatic]);
+
   const completion = useCompletion(
     query,
     config.getTargetDir(),
@@ -305,6 +310,8 @@ export const App = ({
                 navigateSuggestionUp={completion.navigateUp}
                 navigateSuggestionDown={completion.navigateDown}
                 resetCompletion={completion.resetCompletionState}
+                setEditorState={setEditorState}
+                onClearScreen={handleClearScreen} // Added onClearScreen prop
               />
               {completion.showSuggestions && (
                 <Box>
