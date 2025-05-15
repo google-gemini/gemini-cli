@@ -17,6 +17,7 @@ interface SuggestionsDisplayProps {
   isLoading: boolean;
   width: number;
   scrollOffset: number;
+  userInput: string;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -27,6 +28,7 @@ export function SuggestionsDisplay({
   isLoading,
   width,
   scrollOffset,
+  userInput,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -60,9 +62,15 @@ export function SuggestionsDisplay({
         return (
           <Box key={`${suggestion}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
-              <Box width={20} flexShrink={0}>
+              {userInput.startsWith('/') ? (
+                // only use box model for (/) command mode
+                <Box width={20} flexShrink={0}>
+                  <Text color={textColor}>{suggestion.label}</Text>
+                </Box>
+              ) : (
+                // use regular text for other modes (@ context)
                 <Text color={textColor}>{suggestion.label}</Text>
-              </Box>
+              )}
               {suggestion.description ? (
                 <Box flexGrow={1}>
                   <Text color={textColor} wrap="wrap">

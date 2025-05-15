@@ -310,6 +310,7 @@ export const App = ({
                     isLoading={completion.isLoadingSuggestions}
                     width={suggestionsWidth}
                     scrollOffset={completion.visibleStartIndex}
+                    userInput={query}
                   />
                 </Box>
               )}

@@ -24,7 +24,7 @@ export const Footer: React.FC<FooterProps> = ({
   cliVersion,
   geminiMdFileCount,
 }) => (
-  <Box>
+  <Box marginTop={1}>
     <Box>
       {geminiMdFileCount > 0 && (
         <Text color={Colors.SubtleComment}>

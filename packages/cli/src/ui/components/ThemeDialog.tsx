@@ -102,7 +102,7 @@ export function ThemeDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.AccentPurple}
+      borderColor={Colors.SubtleComment}
       flexDirection="row"
       padding={1}
       width="100%"
