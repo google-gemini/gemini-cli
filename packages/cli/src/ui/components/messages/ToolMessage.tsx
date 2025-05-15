@@ -12,14 +12,38 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 
-export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
+export interface ToolMessageProps extends IndividualToolCallDisplay {
+  availableTerminalHeight: number;
+}
+
+export const ToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
   resultDisplay,
   status,
+  availableTerminalHeight,
 }) => {
   const statusIndicatorWidth = 3;
   const hasResult = resultDisplay && resultDisplay.toString().trim().length > 0;
+  const staticHeight = /* Header */ 1;
+  availableTerminalHeight -= staticHeight;
+
+  let displayableResult = resultDisplay;
+  let hiddenLines = 0;
+
+  // Truncate the overall string content if it's too long.
+  // MarkdownRenderer will handle specific truncation for code blocks within this content.
+  if (typeof resultDisplay === 'string' && resultDisplay.length > 0) {
+    const lines = resultDisplay.split('\n');
+    // Estimate available height for this specific tool message content area
+    // This is a rough estimate; ideally, we'd have a more precise measurement.
+    const contentHeightEstimate = availableTerminalHeight - 5; // Subtracting lines for tool name, status, padding etc.
+    if (lines.length > contentHeightEstimate && contentHeightEstimate > 0) {
+      displayableResult = lines.slice(0, contentHeightEstimate).join('\n');
+      hiddenLines = lines.length - contentHeightEstimate;
+    }
+  }
+
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
@@ -56,15 +80,22 @@ export const ToolMessage: React.FC<IndividualToolCallDisplay> = ({
       </Box>
       {hasResult && (
         <Box paddingLeft={statusIndicatorWidth} width="100%">
-          <Box flexDirection="row">
-            {/* Use default text color (white) or gray instead of dimColor */}
-            {typeof resultDisplay === 'string' && (
+          <Box flexDirection="column">
+            {typeof displayableResult === 'string' && (
               <Box flexDirection="column">
-                <MarkdownDisplay text={resultDisplay} />
+                <MarkdownDisplay text={displayableResult} />
               </Box>
             )}
-            {typeof resultDisplay === 'object' && (
-              <DiffRenderer diffContent={resultDisplay.fileDiff} />
+            {typeof displayableResult === 'object' && (
+              <DiffRenderer diffContent={displayableResult.fileDiff} />
+            )}
+            {hiddenLines > 0 && (
+              <Box>
+                <Text color={Colors.SubtleComment}>
+                  ... {hiddenLines} more line{hiddenLines === 1 ? '' : 's'}{' '}
+                  hidden ...
+                </Text>
+              </Box>
             )}
           </Box>
         </Box>

@@ -14,17 +14,22 @@ import { Colors } from '../../colors.js';
 interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
+  availableTerminalHeight: number;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   groupId,
   toolCalls,
+  availableTerminalHeight,
 }) => {
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
   const borderColor = hasPending ? Colors.AccentYellow : Colors.SubtleComment;
+
+  const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+  availableTerminalHeight -= staticHeight;
 
   return (
     <Box
@@ -46,13 +51,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool) => (
         <Box key={groupId + '-' + tool.callId} flexDirection="column">
           <ToolMessage
-            key={tool.callId} // Use callId as the key
-            callId={tool.callId} // Pass callId
+            key={tool.callId}
+            callId={tool.callId}
             name={tool.name}
             description={tool.description}
             resultDisplay={tool.resultDisplay}
             status={tool.status}
-            confirmationDetails={tool.confirmationDetails} // Pass confirmationDetails
+            confirmationDetails={tool.confirmationDetails}
+            availableTerminalHeight={availableTerminalHeight}
           />
           {tool.status === ToolCallStatus.Confirming &&
             tool.confirmationDetails && (

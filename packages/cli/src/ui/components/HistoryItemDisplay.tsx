@@ -16,10 +16,12 @@ import { Box } from 'ink';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
+  availableTerminalHeight: number;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
+  availableTerminalHeight,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -31,7 +33,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     {item.type === 'info' && <InfoMessage text={item.text} />}
     {item.type === 'error' && <ErrorMessage text={item.text} />}
     {item.type === 'tool_group' && (
-      <ToolGroupMessage toolCalls={item.tools} groupId={item.id} />
+      <ToolGroupMessage
+        toolCalls={item.tools}
+        groupId={item.id}
+        availableTerminalHeight={availableTerminalHeight}
+      />
     )}
   </Box>
 );
