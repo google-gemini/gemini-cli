@@ -55,12 +55,10 @@ enum StreamProcessingStatus {
  */
 export const useGeminiStream = (
   addItem: UseHistoryManagerReturn['addItem'],
-  _clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
   onDebugMessage: (message: string) => void,
-  _openThemeDialog: () => void,
   handleSlashCommand: (cmd: PartListUnion) => boolean,
 ) => {
   const toolRegistry = config.getToolRegistry();

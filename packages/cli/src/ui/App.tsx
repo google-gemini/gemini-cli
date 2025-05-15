@@ -127,12 +127,10 @@ export const App = ({
   const { streamingState, submitQuery, initError, pendingHistoryItem } =
     useGeminiStream(
       addItem,
-      clearItems,
       refreshStatic,
       setShowHelp,
       config,
       setDebugMessage,
-      openThemeDialog,
       handleSlashCommand,
     );
   const { elapsedTime, currentLoadingPhrase } =
@@ -230,7 +228,6 @@ export const App = ({
             <HistoryItemDisplay
               key={'history-' + historyItem.id}
               item={historyItem}
-              onSubmit={submitQuery}
             />
           );
         }}
@@ -240,7 +237,6 @@ export const App = ({
           // TODO(taehykim): It seems like references to ids aren't necessary in
           // HistoryItemDisplay. Refactor later. Use a fake id for now.
           item={{ ...pendingHistoryItem, id: 0 }}
-          onSubmit={submitQuery}
         />
       )}
       {showHelp && <Help commands={slashCommands} />}

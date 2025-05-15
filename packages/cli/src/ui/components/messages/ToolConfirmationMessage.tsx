@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import { PartListUnion } from '@google/genai';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import {
@@ -22,7 +21,6 @@ import {
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
-  onSubmit: (value: PartListUnion) => void;
 }
 
 function isEditDetails(
