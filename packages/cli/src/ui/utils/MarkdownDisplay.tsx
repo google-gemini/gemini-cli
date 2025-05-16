@@ -13,14 +13,25 @@ interface MarkdownDisplayProps {
   text: string;
 }
 
-function MarkdownDisplayComponent({
-  text,
-}: MarkdownDisplayProps): React.ReactElement {
+// Constants for Markdown parsing and rendering
+const BOLD_MARKER_LENGTH = 2; // For "**"
+const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
+const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~"
+const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
+const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
+const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+
+const EMPTY_LINE_HEIGHT = 1;
+const CODE_BLOCK_PADDING = 1;
+const LIST_ITEM_PREFIX_PADDING = 1;
+const LIST_ITEM_TEXT_FLEX_GROW = 1;
+
+const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({ text }) => {
   if (!text) return <></>;
 
   const lines = text.split('\n');
   const headerRegex = /^ *(#{1,4}) +(.*)/;
-  const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\S*?) *$/;
+  const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
   const hrRegex = /^ *([-*_] *){3,} *$/;
@@ -42,7 +53,11 @@ function MarkdownDisplayComponent({
         fenceMatch[1].length >= codeBlockFence.length
       ) {
         contentBlocks.push(
-          _renderCodeBlock(key, codeBlockContent, codeBlockLang),
+          <RenderCodeBlock
+            key={key}
+            content={codeBlockContent}
+            lang={codeBlockLang}
+          />,
         );
         inCodeBlock = false;
         codeBlockContent = [];
@@ -73,35 +88,42 @@ function MarkdownDisplayComponent({
     } else if (headerMatch) {
       const level = headerMatch[1].length;
       const headerText = headerMatch[2];
-      const renderedHeaderText = _renderInline(headerText);
       let headerNode: React.ReactNode = null;
       switch (level) {
         case 1:
           headerNode = (
             <Text bold color={Colors.AccentCyan}>
-              {renderedHeaderText}
+              <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 2:
           headerNode = (
             <Text bold color={Colors.AccentBlue}>
-              {renderedHeaderText}
+              <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 3:
-          headerNode = <Text bold>{renderedHeaderText}</Text>;
+          headerNode = (
+            <Text bold>
+              <RenderInline text={headerText} />
+            </Text>
+          );
           break;
         case 4:
           headerNode = (
             <Text italic color={Colors.SubtleComment}>
-              {renderedHeaderText}
+              <RenderInline text={headerText} />
             </Text>
           );
           break;
         default:
-          headerNode = <Text>{renderedHeaderText}</Text>;
+          headerNode = (
+            <Text>
+              <RenderInline text={headerText} />
+            </Text>
+          );
           break;
       }
       if (headerNode) contentBlocks.push(<Box key={key}>{headerNode}</Box>);
@@ -110,43 +132,64 @@ function MarkdownDisplayComponent({
       const marker = ulMatch[2];
       const itemText = ulMatch[3];
       contentBlocks.push(
-        _renderListItem(key, itemText, 'ul', marker, leadingWhitespace),
+        <RenderListItem
+          key={key}
+          itemText={itemText}
+          type="ul"
+          marker={marker}
+          leadingWhitespace={leadingWhitespace}
+        />,
       );
     } else if (olMatch) {
       const leadingWhitespace = olMatch[1];
       const marker = olMatch[2];
       const itemText = olMatch[3];
       contentBlocks.push(
-        _renderListItem(key, itemText, 'ol', marker, leadingWhitespace),
+        <RenderListItem
+          key={key}
+          itemText={itemText}
+          type="ol"
+          marker={marker}
+          leadingWhitespace={leadingWhitespace}
+        />,
       );
     } else {
-      const renderedLine = _renderInline(line);
-      if (renderedLine.length > 0 || line.length > 0) {
+      if (line.trim().length === 0) {
+        if (contentBlocks.length > 0 && !inCodeBlock) {
+          contentBlocks.push(<Box key={key} height={EMPTY_LINE_HEIGHT} />);
+        }
+      } else {
         contentBlocks.push(
           <Box key={key}>
-            <Text wrap="wrap">{renderedLine}</Text>
+            <Text wrap="wrap">
+              <RenderInline text={line} />
+            </Text>
           </Box>,
         );
-      } else if (line.trim().length === 0) {
-        if (contentBlocks.length > 0 && !inCodeBlock) {
-          contentBlocks.push(<Box key={key} height={1} />);
-        }
       }
     }
   });
 
   if (inCodeBlock) {
     contentBlocks.push(
-      _renderCodeBlock(`line-eof`, codeBlockContent, codeBlockLang),
+      <RenderCodeBlock
+        key="line-eof"
+        content={codeBlockContent}
+        lang={codeBlockLang}
+      />,
     );
   }
 
   return <>{contentBlocks}</>;
-}
+};
 
 // Helper functions (adapted from static methods of MarkdownRenderer)
 
-function _renderInline(text: string): React.ReactNode[] {
+interface RenderInlineProps {
+  text: string;
+}
+
+const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
@@ -170,37 +213,40 @@ function _renderInline(text: string): React.ReactNode[] {
       if (
         fullMatch.startsWith('**') &&
         fullMatch.endsWith('**') &&
-        fullMatch.length > 4
+        fullMatch.length > BOLD_MARKER_LENGTH * 2
       ) {
         renderedNode = (
           <Text key={key} bold>
-            {fullMatch.slice(2, -2)}
+            {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
           </Text>
         );
       } else if (
         ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
           (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-        fullMatch.length > 2
+        fullMatch.length > ITALIC_MARKER_LENGTH * 2
       ) {
         renderedNode = (
           <Text key={key} italic>
-            {fullMatch.slice(1, -1)}
+            {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
           </Text>
         );
       } else if (
         fullMatch.startsWith('~~') &&
         fullMatch.endsWith('~~') &&
-        fullMatch.length > 4
+        fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
       ) {
         renderedNode = (
           <Text key={key} strikethrough>
-            {fullMatch.slice(2, -2)}
+            {fullMatch.slice(
+              STRIKETHROUGH_MARKER_LENGTH,
+              -STRIKETHROUGH_MARKER_LENGTH,
+            )}
           </Text>
         );
       } else if (
         fullMatch.startsWith('`') &&
         fullMatch.endsWith('`') &&
-        fullMatch.length > 1
+        fullMatch.length > INLINE_CODE_MARKER_LENGTH
       ) {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
@@ -212,7 +258,10 @@ function _renderInline(text: string): React.ReactNode[] {
         } else {
           renderedNode = (
             <Text key={key} color={Colors.AccentPurple}>
-              {fullMatch.slice(1, -1)}
+              {fullMatch.slice(
+                INLINE_CODE_MARKER_LENGTH,
+                -INLINE_CODE_MARKER_LENGTH,
+              )}
             </Text>
           );
         }
@@ -235,11 +284,15 @@ function _renderInline(text: string): React.ReactNode[] {
       } else if (
         fullMatch.startsWith('<u>') &&
         fullMatch.endsWith('</u>') &&
-        fullMatch.length > 6
+        fullMatch.length >
+          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
       ) {
         renderedNode = (
           <Text key={key} underline>
-            {fullMatch.slice(3, -4)}
+            {fullMatch.slice(
+              UNDERLINE_TAG_START_LENGTH,
+              -UNDERLINE_TAG_END_LENGTH,
+            )}
           </Text>
         );
       }
@@ -256,46 +309,66 @@ function _renderInline(text: string): React.ReactNode[] {
     nodes.push(<Text key={`t-${lastIndex}`}>{text.slice(lastIndex)}</Text>);
   }
 
-  return nodes.filter((node) => node !== null);
+  return <>{nodes.filter((node) => node !== null)}</>;
+};
+
+const RenderInline = React.memo(RenderInlineInternal);
+
+interface RenderCodeBlockProps {
+  content: string[];
+  lang: string | null;
 }
 
-function _renderCodeBlock(
-  key: string,
-  content: string[],
-  lang: string | null,
-): React.ReactNode {
+const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
+  content,
+  lang,
+}) => {
   const fullContent = content.join('\n');
   const colorizedCode = colorizeCode(fullContent, lang);
 
   return (
-    <Box key={key} flexDirection="column" padding={1}>
+    <Box flexDirection="column" padding={CODE_BLOCK_PADDING}>
       {colorizedCode}
     </Box>
   );
+};
+
+const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
+
+interface RenderListItemProps {
+  itemText: string;
+  type: 'ul' | 'ol';
+  marker: string;
+  leadingWhitespace?: string;
 }
 
-function _renderListItem(
-  key: string,
-  text: string,
-  type: 'ul' | 'ol',
-  marker: string,
-  leadingWhitespace: string = '',
-): React.ReactNode {
-  const renderedText = _renderInline(text);
+const RenderListItemInternal: React.FC<RenderListItemProps> = ({
+  itemText,
+  type,
+  marker,
+  leadingWhitespace = '',
+}) => {
   const prefix = type === 'ol' ? `${marker}. ` : `${marker} `;
   const prefixWidth = prefix.length;
   const indentation = leadingWhitespace.length;
 
   return (
-    <Box key={key} paddingLeft={indentation + 1} flexDirection="row">
+    <Box
+      paddingLeft={indentation + LIST_ITEM_PREFIX_PADDING}
+      flexDirection="row"
+    >
       <Box width={prefixWidth}>
         <Text>{prefix}</Text>
       </Box>
-      <Box flexGrow={1}>
-        <Text wrap="wrap">{renderedText}</Text>
+      <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>
+        <Text wrap="wrap">
+          <RenderInline text={itemText} />
+        </Text>
       </Box>
     </Box>
   );
-}
+};
 
-export const MarkdownDisplay = React.memo(MarkdownDisplayComponent);
+const RenderListItem = React.memo(RenderListItemInternal);
+
+export const MarkdownDisplay = React.memo(MarkdownDisplayInternal);
