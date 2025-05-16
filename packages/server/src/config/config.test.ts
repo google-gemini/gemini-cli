@@ -59,6 +59,7 @@ describe('Server Config (config.ts)', () => {
       undefined, // toolDiscoveryCommand
       undefined, // toolCallCommand
       undefined, // mcpServerCommand
+      undefined, // mcpServers
       USER_AGENT,
       USER_MEMORY, // Pass memory here
     );
@@ -83,6 +84,7 @@ describe('Server Config (config.ts)', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       USER_AGENT,
       // No userMemory argument
     );
@@ -99,6 +101,7 @@ describe('Server Config (config.ts)', () => {
       DEBUG_MODE,
       QUESTION,
       FULL_CONTEXT,
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -125,6 +128,7 @@ describe('Server Config (config.ts)', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       USER_AGENT,
       // No userMemory argument
     );
@@ -144,6 +148,7 @@ describe('Server Config (config.ts)', () => {
       DEBUG_MODE,
       QUESTION,
       FULL_CONTEXT,
+      undefined,
       undefined,
       undefined,
       undefined,
