@@ -354,11 +354,25 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   // Load .env file using logic from server package
   loadEnvironment();
 
-  // Check API key (CLI responsibility)
-  if (!process.env.GEMINI_API_KEY) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
+  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+
+  const hasGeminiApiKey = !!geminiApiKey;
+  const hasGoogleApiKey = !!googleApiKey;
+  const hasVertexProjectLocationConfig =
+    !!googleCloudProject && !!googleCloudLocation;
+
+  if (!hasGeminiApiKey && !hasGoogleApiKey && !hasVertexProjectLocationConfig) {
     logger.error(
-      'GEMINI_API_KEY is not set. See https://ai.google.dev/gemini-api/docs/api-key to obtain one. ' +
-        'Please set it in your .env file or as an environment variable.',
+      'No valid API authentication configuration found. Please set ONE of the following combinations in your environment variables or .env file:\n' +
+        '1. GEMINI_API_KEY (for Gemini API access).\n' +
+        '2. GOOGLE_API_KEY (for Gemini API or Vertex AI Express Mode access).\n' +
+        '3. GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (for Vertex AI access).\n\n' +
+        'For Gemini API keys, visit: https://ai.google.dev/gemini-api/docs/api-key\n' +
+        'For Vertex AI authentication, visit: https://cloud.google.com/vertex-ai/docs/start/authentication\n' +
+        'The GOOGLE_GENAI_USE_VERTEXAI environment variable can also be set to true/false to influence service selection when ambiguity exists.',
     );
     process.exit(1);
   }
@@ -373,9 +387,12 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
 
   const userAgent = await createUserAgent();
 
+  // Gemini Developer API or GCP Express or Vertex AI
+  const apiKeyForServer = geminiApiKey || googleApiKey || '';
+
   // Create config using factory from server package
   return createServerConfig(
-    process.env.GEMINI_API_KEY,
+    apiKeyForServer,
     argv.model || DEFAULT_GEMINI_MODEL,
     argv.sandbox ?? settings.sandbox ?? false,
     process.cwd(),

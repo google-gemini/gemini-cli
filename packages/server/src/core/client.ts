@@ -35,8 +35,9 @@ export class GeminiClient {
 
   constructor(private config: Config) {
     const userAgent = config.getUserAgent();
+    const apiKeyFromConfig = config.getApiKey();
     this.client = new GoogleGenAI({
-      apiKey: config.getApiKey(),
+      apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
       httpOptions: {
         headers: {
           'User-Agent': userAgent,
