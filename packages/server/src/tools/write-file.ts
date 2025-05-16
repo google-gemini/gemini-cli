@@ -202,7 +202,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         ? `Successfully created and wrote to new file: ${params.file_path}`
         : `Successfully overwrote file: ${params.file_path}`;
 
-      const displayResult: FileDiff = { fileDiff };
+      const displayResult: FileDiff = { fileDiff, fileName };
 
       return {
         llmContent: llmSuccessMessage,

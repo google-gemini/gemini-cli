@@ -105,6 +105,14 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
 
+  if (parsedLines.length === 0) {
+    return (
+      <Box borderStyle="round" borderColor={Colors.SubtleComment} padding={1}>
+        <Text dimColor>No changes detected.</Text>
+      </Box>
+    );
+  }
+
   // Check if the diff represents a new file (only additions and header lines)
   const isNewFile = parsedLines.every(
     (line) =>
@@ -233,16 +241,21 @@ const renderDiffContent = (
 
 const getLanguageFromExtension = (extension: string): string | null => {
   const languageMap: { [key: string]: string } = {
-    '.js': 'javascript',
-    '.ts': 'typescript',
-    '.py': 'python',
-    '.json': 'json',
-    '.css': 'css',
-    '.html': 'html',
-    '.sh': 'bash',
-    '.md': 'markdown',
-    '.yaml': 'yaml',
-    '.yml': 'yaml',
+    js: 'javascript',
+    ts: 'typescript',
+    py: 'python',
+    json: 'json',
+    css: 'css',
+    html: 'html',
+    sh: 'bash',
+    md: 'markdown',
+    yaml: 'yaml',
+    yml: 'yaml',
+    txt: 'plaintext',
+    java: 'java',
+    c: 'c',
+    cpp: 'cpp',
+    rb: 'ruby',
   };
   return languageMap[extension] || null; // Return null if extension not found
 };

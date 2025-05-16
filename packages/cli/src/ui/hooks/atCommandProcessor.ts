@@ -154,7 +154,9 @@ export async function handleAtCommand({
     if (isNodeError(error) && error.code === 'ENOENT') {
       onDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
     } else {
-      console.error(`Error stating path ${pathPart}:`, error);
+      console.error(
+        `Error stating path ${pathPart}: ${getErrorMessage(error)}`,
+      );
       onDebugMessage(
         `Error stating path, proceeding with original: ${pathSpec}`,
       );
@@ -200,7 +202,7 @@ export async function handleAtCommand({
     );
 
     return { processedQuery, shouldProceed: true };
-  } catch (error) {
+  } catch (error: unknown) {
     // Handle errors during tool execution
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,

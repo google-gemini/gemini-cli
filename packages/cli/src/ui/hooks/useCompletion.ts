@@ -7,7 +7,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { isNodeError, escapePath, unescapePath } from '@gemini-code/server';
+import {
+  isNodeError,
+  escapePath,
+  unescapePath,
+  getErrorMessage,
+} from '@gemini-code/server';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
@@ -202,7 +207,7 @@ export function useCompletion(
           setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         if (isNodeError(error) && error.code === 'ENOENT') {
           // Directory doesn't exist, likely mid-typing, clear suggestions
           if (isMounted) {
@@ -211,8 +216,7 @@ export function useCompletion(
           }
         } else {
           console.error(
-            `Error fetching completion suggestions for ${baseDirAbsolute}:`,
-            error,
+            `Error fetching completion suggestions for ${baseDirAbsolute}: ${getErrorMessage(error)}`,
           );
           if (isMounted) {
             resetCompletionState();

@@ -38,11 +38,11 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run type check
-        run: npm run typecheck
-
       - name: Build project
         run: npm run build
+
+      - name: Run type check
+        run: npm run typecheck
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

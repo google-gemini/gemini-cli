@@ -90,7 +90,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               </Box>
             )}
             {typeof displayableResult === 'object' && (
-              <DiffRenderer diffContent={displayableResult.fileDiff} />
+              <DiffRenderer
+                diffContent={displayableResult.fileDiff}
+                filename={displayableResult.fileName}
+              />
             )}
             {hiddenLines > 0 && (
               <Box>

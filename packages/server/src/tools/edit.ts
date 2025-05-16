@@ -372,7 +372,7 @@ Expectation for parameters:
           'Proposed',
           { context: 3 },
         );
-        displayResult = { fileDiff };
+        displayResult = { fileDiff, fileName };
       }
 
       const llmSuccessMessage = editData.isNewFile

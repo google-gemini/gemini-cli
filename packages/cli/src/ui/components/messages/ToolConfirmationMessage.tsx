@@ -52,7 +52,12 @@ export const ToolConfirmationMessage: React.FC<
   if (isEditDetails(confirmationDetails)) {
     // Body content is now the DiffRenderer, passing filename to it
     // The bordered box is removed from here and handled within DiffRenderer
-    bodyContent = <DiffRenderer diffContent={confirmationDetails.fileDiff} />;
+    bodyContent = (
+      <DiffRenderer
+        diffContent={confirmationDetails.fileDiff}
+        filename={confirmationDetails.fileName}
+      />
+    );
 
     question = `Apply this change?`;
     options.push(

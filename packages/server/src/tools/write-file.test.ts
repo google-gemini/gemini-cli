@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WriteFileTool } from './write-file.js';
-import { ToolConfirmationOutcome } from './tools.js';
+import { FileDiff, ToolConfirmationOutcome } from './tools.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -152,7 +152,8 @@ describe('WriteFileTool', () => {
       );
       expect(fs.existsSync(filePath)).toBe(true);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(content);
-      const display = result.returnDisplay as { fileDiff: string }; // Type assertion
+      const display = result.returnDisplay as FileDiff; // Type assertion
+      expect(display.fileName).toBe('execute_new_file.txt');
       // For new files, the diff will include the filename in the "Original" header
       expect(display.fileDiff).toMatch(/--- execute_new_file.txt\tOriginal/);
       expect(display.fileDiff).toMatch(/\+\+\+ execute_new_file.txt\tWritten/);
@@ -176,7 +177,8 @@ describe('WriteFileTool', () => {
 
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
-      const display = result.returnDisplay as { fileDiff: string }; // Type assertion
+      const display = result.returnDisplay as FileDiff; // Type assertion
+      expect(display.fileName).toBe('execute_existing_file.txt');
       expect(display.fileDiff).toMatch(initialContent);
       expect(display.fileDiff).toMatch(newContent);
     });
