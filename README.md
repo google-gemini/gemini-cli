@@ -4,6 +4,8 @@
 
 This repository contains the Gemini CLI tool.
 
+For more comprehensive documentation, please see the [full documentation here](./docs/index.md).
+
 ## Setup
 
 1.  **Get a Gemini API Key:** Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
@@ -17,8 +19,10 @@ This repository contains the Gemini CLI tool.
     source ~/.bashrc # Reload the config
     ```
     Replace `"YOUR_API_KEY"` with your actual key.
+3.  **Install the Gemini CLI:**
+    _(Instructions for installing the CLI will be added here once packaging is finalized. For now, if you have access to the source code, you can run it directly after building the project as described below.)_
 
-## Building
+## Building (for contributors)
 
 As with most Node projects, major development scripts can be found in the `package.json`. See that for the full list of commands.
 
@@ -37,13 +41,85 @@ This command installs dependencies and builds the entire project, including the 
 
 ## Running
 
-To start the Gemini CLI, run the following command from the root directory:
+To start the Gemini CLI from the source code (after building), run the following command from the root directory:
 
 ```bash
 npm start
 ```
 
+If you have installed the CLI globally, you can typically run it with:
+
+```bash
+gemini # Or the command name used during installation
+```
+
 This command starts the Gemini CLI.
+
+## Quick Start: Your First Interaction
+
+Once the CLI is running, you can start interacting with Gemini. Try a simple query:
+
+```
+> How can I build a web app?
+```
+
+Or ask it to perform a task using its tools:
+
+```
+> List files in the current directory.
+```
+
+## Next Steps
+
+Congratulations! You've successfully set up and run the Gemini CLI.
+
+- Explore the **[CLI Commands](./docs/cli/commands.md)** to learn about all available functionalities.
+- If you encounter any issues, check the **[Troubleshooting Guide](./docs/troubleshooting.md)**.
+
+## Theming
+
+The Gemini CLI supports theming to customize its color scheme and appearance. Themes define colors for text, backgrounds, syntax highlighting, and other UI elements.
+
+### Available Themes
+
+The CLI comes with a selection of pre-defined themes. As seen in `theme-manager.ts`, these typically include:
+
+- **Dark Themes:**
+  - `AtomOneDark`
+  - `Dracula`
+  - `VS2015` (Default)
+  - `GitHub` (Dark variant usually)
+- **Light Themes:**
+  - `VS` (Visual Studio Light)
+  - `GoogleCode`
+  - `XCode` (Light variant usually)
+- **ANSI:**
+  - `ANSI`: A theme that primarily uses the terminal's native ANSI color capabilities.
+
+_(The exact list and their appearance can be confirmed by running the `/theme` command within the CLI.)_
+
+### Changing Themes
+
+1.  Type the `/theme` command in the CLI.
+2.  A dialog or selection prompt (`ThemeDialog.tsx`) will appear, listing the available themes.
+3.  You can typically navigate (e.g., with arrow keys) and select a theme. Some interfaces might offer a live preview or highlight as you select.
+4.  Confirm your selection (often with Enter) to apply the theme. You can usually cancel out of the selection (e.g., with Escape).
+
+### Theme Persistence
+
+Selected themes are usually saved in the CLI's configuration (see [CLI Configuration](./docs/cli/configuration.md)) so your preference is remembered across sessions.
+
+### Theme Not Found Handling
+
+If a theme specified in your configuration is not found (e.g., due to a typo or removal), the CLI will typically revert to a default theme and may display a notification, ensuring the interface remains usable.
+
+### Theme Structure (`theme.ts`)
+
+Each theme is defined by a structure (likely an object or class) that specifies various color properties for different UI components, such as:
+
+- General text and background colors.
+- Colors for different message types (user, Gemini, tool, error).
+- Syntax highlighting colors for various code token types (keywords, strings, comments, etc.), often based on common token categories found in code editors.
 
 ## Debugging
 
