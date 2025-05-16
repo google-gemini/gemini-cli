@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import stripAnsi from 'strip-ansi';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -1127,7 +1128,12 @@ export function useTextBuffer({
       )
         backspace();
       else if (key['delete']) del();
-      else if (input && !key['ctrl'] && !key['meta']) insert(input);
+      else if (input && !key['ctrl'] && !key['meta']) {
+        // Heuristic for paste: if input is longer than 1 char (potential paste)
+        // strip ANSI escape codes.
+        const cleanedInput = input.length > 1 ? stripAnsi(input) : input;
+        insert(cleanedInput);
+      }
 
       const textChanged = text !== beforeText;
       // After operations, visualCursor might not be immediately updated if the change

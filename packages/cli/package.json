@@ -43,8 +43,9 @@
     "react": "^18.3.1",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.2",
-    "yargs": "^17.7.2",
-    "string-width": "^7.1.0"
+    "string-width": "^7.1.0",
+    "strip-ansi": "^7.1.0",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",

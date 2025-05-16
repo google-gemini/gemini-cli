@@ -495,6 +495,14 @@ describe('useTextBuffer', () => {
       act(() => result.current.handleInput(undefined, { rightArrow: true })); // cursor [0,2]
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
+
+    it('should strip ANSI escape codes when pasting text', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
+      // Simulate pasting by calling handleInput with a string longer than 1 char
+      act(() => result.current.handleInput(textWithAnsi, {}));
+      expect(getBufferState(result).text).toBe('Hello World');
+    });
   });
 
   // More tests would be needed for:
