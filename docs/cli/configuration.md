@@ -25,21 +25,12 @@ The Gemini CLI uses `settings.json` files for persistent configuration. There ar
 
 ### The `.gemini` Directory in Your Project
 
-When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information (like custom Seatbelt profiles, e.g., `.gemini/sandbox-macos-custom.sb`), this `.gemini` directory is used.
+When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information (like custom sandboxing profiles, e.g., `.gemini/sandbox-macos-custom.sb` or `.gemini/sandbox.Dockerfile`), this `.gemini` directory is used.
 
 **Purpose:**
 
 - Stores project-specific configuration for the Gemini CLI (in `settings.json`).
 - Can hold other project-specific files related to Gemini CLI's operation, such as custom sandbox profiles.
-
-**Version Control (`.gitignore`):**
-
-- **Generally, it's recommended to add `.gemini/` to your project's `.gitignore` file.**
-  - **Reasoning:** This directory often contains user-specific preferences (like themes) or local sandbox configurations that might not be relevant or applicable to all collaborators on the project. Keeping it out of version control avoids imposing one user's local setup on others.
-- **Exception:** If your team decides that certain project-specific configurations within `.gemini/` (e.g., a carefully crafted `sandbox-macos-custom.sb` profile that _all_ macOS users on the project should use) are essential for consistent project behavior, you might choose to commit specific files within `.gemini/` (e.g., `.gemini/sandbox-macos-custom.sb`) or the entire directory. However, this should be a deliberate decision by the team.
-- User-specific `settings.json` often contains local paths or preferences that should not be committed.
-
-Always consider the nature of the files within `.gemini/` before deciding to include them in version control. For most common use cases, ignoring the entire directory is the safest approach.
 
 ### Available Settings in `settings.json`:
 
@@ -49,17 +40,19 @@ Always consider the nature of the files within `.gemini/` before deciding to inc
   - See the [Theming section in README.md](../../README.md#theming) for available theme names.
 - **`sandbox`** (boolean or string):
   - Controls whether and how to use sandboxing for tool execution.
-  - `true`: Enable default sandbox (e.g., Docker or Podman if configured, otherwise OS-level like Seatbelt on macOS).
-  - `false`: Disable sandboxing (less secure).
-  - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing.
-  - `<command>`: Specify a custom command for sandboxing.
-  - Example: `"sandbox": true`
+  - `true`: Enable default sandbox (see [README](../../README.md) for behavior).
+  - `false`: Disable sandboxing (WARNING: this is inherently unsafe).
+  - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing command.
+  - `<command>`: Specify custom command for container-based sandboxing.
 - **`toolDiscoveryCommand`** (string, advanced):
   - Custom command for tool discovery (if applicable to your setup).
+  - Must return JSON array of tools of `function_declarations` type as in [Gemini REST API](https://ai.google.dev/gemini-api/docs/function-calling).
 - **`toolCallCommand`** (string, advanced):
   - Custom command for executing tool calls (if applicable to your setup).
+  - Must take function name as first argument and function arguments as JSON on `stdin`
+  - Must return JSON result of funcation call on `stdout`.
 - **`mcpServerCommand`** (string, advanced):
-  - Custom command for the MCP (Multi-Context Prompt) server (if applicable).
+  - Custom command for starting an MCP server with custom tools.
 
 ### Example `settings.json`:
 
@@ -67,9 +60,9 @@ Always consider the nature of the files within `.gemini/` before deciding to inc
 {
   "theme": "VS2015",
   "sandbox": "docker",
-  "toolDiscoveryCommand": "/usr/local/bin/my-custom-tool-discovery --json",
-  "toolCallCommand": "/usr/local/bin/my-custom-tool-executor",
-  "mcpServerCommand": "node /opt/mcp-server/dist/server.js --port 8080"
+  "toolDiscoveryCommand": "bin/get_tools",
+  "toolCallCommand": "bin/call_tool",
+  "mcpServerCommand": "bin/mcp_server.py"
 }
 ```
 
@@ -96,8 +89,8 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
-  - `minimal`: (Default) Restricts writes to the project folder but allows other operations.
-  - `strict`: Uses a more restrictive profile that declines operations by default.
+  - `minimal`: (Default) Restricts writes to the project folder (and a few other folders, see `packages/cli/src/utils/sandbox-macos-minimal.sb`) but allows other operations.
+  - `strict`: Uses a strict profile that declines operations by default.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/` directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful for troubleshooting.

@@ -10,10 +10,10 @@ This guide provides solutions to common issues and debugging tips.
 
 - **Q: Where are the CLI configuration files stored?**
 
-  - A: The CLI configuration is typically managed within `packages/cli/src/config/`. Refer to `docs/cli/configuration.md` for more details.
+  - A: The CLI configuration is typically managed within `packages/cli/src/config/`. Refer to [CLI Configuration](./cli/configuration.md) for more details.
 
 - **Q: Where are the server configuration files stored?**
-  - A: The server configuration is typically managed within `packages/server/src/config/`. Refer to `docs/server/configuration.md` for more details.
+  - A: The server configuration is typically managed within `packages/server/src/config/`. Refer to [Server Configuration](./server/configuration.md) for more details.
 
 ## Common Error Messages and Solutions
 
@@ -22,7 +22,7 @@ This guide provides solutions to common issues and debugging tips.
   - **Cause:** Another process is already using the port the server is trying to bind to.
   - **Solution:**
     1.  Stop the other process using the port.
-    2.  Configure the server to use a different port (see `docs/server/configuration.md`).
+    2.  Configure the server to use a different port (see [`server/configuration.md`](./server/configuration.md)).
 
 - **Error: Command not found (when using the CLI).**
 
@@ -39,9 +39,9 @@ This guide provides solutions to common issues and debugging tips.
     1.  Run `npm install` to ensure all dependencies are present.
     2.  Run `npm run build` to compile the project.
 
-- **Error: MacOS Seatbelt "Operation not permitted" or similar.**
-  - **Cause:** The application is attempting an operation restricted by the MacOS Seatbelt profile it's running under. This is a security feature of MacOS.
-  - **Solution:** The specific Seatbelt profile (`sandbox-macos-minimal.sb` or `sandbox-macos-strict.sb` in `packages/cli/src/utils/`) may need to be adjusted to permit the required operation. This involves understanding the sandbox profile language and carefully considering the security implications of any changes. Modifying sandbox profiles can be complex and should be done with caution.
+- **Error: "Operation not permitted" or "Permission denied" or similar.**
+  - **Cause:** If sandboxing is enabled, then the application is likely attempting an operation restricted by your sandbox, such as writing outside the project directory or system temp directory.
+  - **Solution:** See [README](../README.md#sandboxing) for more information on sandboxing, including how to customize your sandbox configuration.
 
 ## Debugging Tips
 

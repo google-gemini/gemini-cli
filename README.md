@@ -17,7 +17,7 @@ The Gemini CLI supports several ways to authenticate with Google's AI services. 
       ```bash
       export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
       ```
-      Or add it to your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`) for persistence:
+      Or add it to your `.env` file (in project directory or user home) or shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`) for persistence:
       ```bash
       echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc # Or your preferred shell config file
       source ~/.bashrc # Reload the config
