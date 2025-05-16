@@ -154,34 +154,6 @@ export default tseslint.config(
       },
     },
   },
-  // Override for .cjs files to use CommonJS
-  {
-    files: ['**/*.cjs'],
-    languageOptions: {
-      sourceType: 'commonjs',
-      globals: {
-        ...globals.node, // Add all Node.js globals
-        __dirname: 'readonly',
-        __filename: 'readonly',
-        exports: 'writable',
-        module: 'readonly',
-        require: 'readonly',
-      },
-    },
-    rules: {
-      // Disable rules that are not applicable to CommonJS
-      '@typescript-eslint/no-require-imports': 'off',
-      'no-restricted-syntax': [
-        'error',
-        // Keep other restricted syntaxes, but allow require for .cjs
-        {
-          selector: 'ThrowStatement > Literal:not([value=/^\\\\w+Error:/])',
-          message:
-            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
-        },
-      ],
-    },
-  },
   // Prettier config must be last
   prettierConfig,
   // Custom eslint rules for this repo

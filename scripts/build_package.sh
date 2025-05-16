@@ -27,7 +27,7 @@ fi
 tsc --build
 
 # copy .{md,json} files
-node ../../scripts/copy_files.cjs
+node ../../scripts/copy_files.js
 
 # touch dist/.last_build
 touch dist/.last_build
