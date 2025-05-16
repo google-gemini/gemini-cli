@@ -4,58 +4,97 @@ name: Gemini CLI CI
 
 on:
   push:
-    branches: [main] # Run on pushes to the main branch
+    branches: [main]
   pull_request:
-    branches: [main] # Run on pull requests targeting the main branch
+    branches: [main]
 
 jobs:
-  build_and_test:
-    name: Build and Test
+  build:
+    name: Build and Lint
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read # For checkout
     strategy:
       matrix:
-        # Specify the Node.js versions you want to test against
-        node-version: [20.x] # You can add more like [18.x, 20.x]
-
+        node-version: [20.x]
     steps:
-      # 1. Checkout Code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js Environment
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm' # Enable caching for npm dependencies (speeds up subsequent runs)
+          cache: 'npm'
 
-      # 3. Install Dependencies
-      # Use 'ci' for cleaner, faster, deterministic installs based on lockfile
       - name: Install dependencies
         run: npm ci
 
-      # 4. Check Formatting
       - name: Run formatter check
         run: |
           npm run format
           git diff --exit-code
 
-      # 5. Linting
       - name: Run linter
         run: npm run lint
 
-      # 6. Type Checking
       - name: Run type check
         run: npm run typecheck
 
-      # 7. Build
-      # Optional if your tests run directly on TS files (e.g., using ts-jest, ts-node)
-      # But usually good practice to ensure the build itself works.
       - name: Build project
         run: npm run build
 
-      # 8. Testing
-      # Uncomment when we have tests.
-      #- name: Run tests
-      #  run: npm test
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.node-version }}
+          path: |
+            packages/*/dist
+            package-lock.json # Only upload dist and lockfile
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build # This job depends on the 'build' job
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    strategy:
+      matrix:
+        node-version: [20.x] # Should match the build job's matrix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.node-version }}
+          path: . # Download to the root, this will include package-lock.json and packages/*/dist
+
+      # Restore/create package structure for dist folders if necessary.
+      # The download-artifact action with path: . should place them correctly if the
+      # upload paths were relative to the workspace root.
+      # Example: if uploaded `packages/cli/dist`, it will be at `./packages/cli/dist`.
+
+      - name: Install dependencies for testing
+        run: npm ci # Install fresh dependencies using the downloaded package-lock.json
+
+      - name: Run tests
+        run: npm run test:ci --workspaces --if-present
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results (Node ${{ matrix.node-version }})
+          path: packages/*/junit.xml
+          reporter: java-junit
+          fail-on-error: 'false'

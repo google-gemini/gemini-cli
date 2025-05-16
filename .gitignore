@@ -24,3 +24,6 @@ dist
 .docker
 
 bundle
+
+# Test report files
+junit.xml
