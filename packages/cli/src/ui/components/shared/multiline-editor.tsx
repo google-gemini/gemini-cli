@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useTextBuffer } from './text-buffer.js';
+import { useTextBuffer, cpSlice, cpLen } from './text-buffer.js';
 import chalk from 'chalk';
 import { Box, Text, useInput, useStdin, Key } from 'ink';
 import React from 'react';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { Colors } from '../../colors.js';
+import stringWidth from 'string-width';
 
 export interface MultilineTextEditorProps {
   // Initial contents.
@@ -184,14 +185,21 @@ export const MultilineTextEditor = ({
       }
 
       if (key.upArrow) {
-        if (buffer.cursor[0] === 0 && navigateUp) {
+        if (
+          buffer.visualCursor[0] === 0 &&
+          buffer.visualScrollRow === 0 &&
+          navigateUp
+        ) {
           navigateUp();
           return;
         }
       }
 
       if (key.downArrow) {
-        if (buffer.cursor[0] === buffer.lines.length - 1 && navigateDown) {
+        if (
+          buffer.visualCursor[0] === buffer.allVisualLines.length - 1 &&
+          navigateDown
+        ) {
           navigateDown();
           return;
         }
@@ -202,39 +210,57 @@ export const MultilineTextEditor = ({
     { isActive: focus },
   );
 
-  const visibleLines = buffer.visibleLines;
-  const [cursorRow, cursorCol] = buffer.cursor;
-  const [scrollRow, scrollCol] = buffer.scroll;
+  const linesToRender = buffer.viewportVisualLines; // This is the subset of visual lines for display
+  const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
+    buffer.visualCursor; // This is relative to *all* visual lines
+  const scrollVisualRow = buffer.visualScrollRow;
+  // scrollHorizontalCol removed as it's always 0 due to word wrap
 
   return (
     <Box flexDirection="column">
       {buffer.text.length === 0 && placeholder ? (
         <Text color={Colors.SubtleComment}>{placeholder}</Text>
       ) : (
-        visibleLines.map((lineText, idx) => {
-          const absoluteRow = scrollRow + idx;
-          let display = lineText.slice(scrollCol, scrollCol + effectiveWidth);
-          if (display.length < effectiveWidth) {
-            display = display.padEnd(effectiveWidth, ' ');
+        linesToRender.map((lineText, visualIdxInRenderedSet) => {
+          // cursorVisualRow is the cursor's row index within the currently *rendered* set of visual lines
+          const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
+
+          let display = cpSlice(
+            lineText,
+            0, // Start from 0 as horizontal scroll is disabled
+            effectiveWidth, // This is still code point based for slicing
+          );
+          // Pad based on visual width
+          const currentVisualWidth = stringWidth(display);
+          if (currentVisualWidth < effectiveWidth) {
+            display = display + ' '.repeat(effectiveWidth - currentVisualWidth);
           }
 
-          if (absoluteRow === cursorRow) {
-            const relativeCol = cursorCol - scrollCol;
-            const highlightCol = relativeCol;
+          if (visualIdxInRenderedSet === cursorVisualRow) {
+            const relativeVisualColForHighlight = cursorVisualColAbsolute; // Directly use absolute as horizontal scroll is 0
 
-            if (highlightCol >= 0 && highlightCol < effectiveWidth) {
-              const charToHighlight = display[highlightCol] || ' ';
-              const highlighted = chalk.inverse(charToHighlight);
-              display =
-                display.slice(0, highlightCol) +
-                highlighted +
-                display.slice(highlightCol + 1);
-            } else if (relativeCol === effectiveWidth) {
-              display =
-                display.slice(0, effectiveWidth - 1) + chalk.inverse(' ');
+            if (relativeVisualColForHighlight >= 0) {
+              if (relativeVisualColForHighlight < cpLen(display)) {
+                const charToHighlight =
+                  cpSlice(
+                    display,
+                    relativeVisualColForHighlight,
+                    relativeVisualColForHighlight + 1,
+                  ) || ' ';
+                const highlighted = chalk.inverse(charToHighlight);
+                display =
+                  cpSlice(display, 0, relativeVisualColForHighlight) +
+                  highlighted +
+                  cpSlice(display, relativeVisualColForHighlight + 1);
+              } else if (
+                relativeVisualColForHighlight === cpLen(display) &&
+                cpLen(display) === effectiveWidth
+              ) {
+                display = display + chalk.inverse(' ');
+              }
             }
           }
-          return <Text key={idx}>{display}</Text>;
+          return <Text key={visualIdxInRenderedSet}>{display}</Text>;
         })
       )}
     </Box>

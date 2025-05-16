@@ -9,6 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import stringWidth from 'string-width';
 
 export type Direction =
   | 'left'
@@ -43,17 +44,17 @@ function clamp(v: number, min: number, max: number): number {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
-function toCodePoints(str: string): string[] {
+export function toCodePoints(str: string): string[] {
   // [...str] or Array.from both iterate by UTF‑32 code point, handling
   // surrogate pairs correctly.
   return Array.from(str);
 }
 
-function cpLen(str: string): number {
+export function cpLen(str: string): number {
   return toCodePoints(str).length;
 }
 
-function cpSlice(str: string, start: number, end?: number): string {
+export function cpSlice(str: string, start: number, end?: number): string {
   // Slice by code‑point indices and re‑join.
   const arr = toCodePoints(str).slice(start, end);
   return arr.join('');
@@ -117,6 +118,221 @@ function calculateInitialCursorPosition(
   }
   return [0, 0]; // Default for empty text
 }
+// Helper to calculate visual lines and map cursor positions
+function calculateVisualLayout(
+  logicalLines: string[],
+  logicalCursor: [number, number],
+  viewportWidth: number,
+): {
+  visualLines: string[];
+  visualCursor: [number, number];
+  logicalToVisualMap: Array<Array<[number, number]>>; // For each logical line, an array of [visualLineIndex, startColInLogical]
+  visualToLogicalMap: Array<[number, number]>; // For each visual line, its [logicalLineIndex, startColInLogical]
+} {
+  const visualLines: string[] = [];
+  const logicalToVisualMap: Array<Array<[number, number]>> = [];
+  const visualToLogicalMap: Array<[number, number]> = [];
+  let currentVisualCursor: [number, number] = [0, 0];
+
+  logicalLines.forEach((logLine, logIndex) => {
+    logicalToVisualMap[logIndex] = [];
+    if (logLine.length === 0) {
+      // Handle empty logical line
+      logicalToVisualMap[logIndex].push([visualLines.length, 0]);
+      visualToLogicalMap.push([logIndex, 0]);
+      visualLines.push('');
+      if (logIndex === logicalCursor[0] && logicalCursor[1] === 0) {
+        currentVisualCursor = [visualLines.length - 1, 0];
+      }
+    } else {
+      // Non-empty logical line
+      let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
+      const codePointsInLogLine = toCodePoints(logLine);
+
+      while (currentPosInLogLine < codePointsInLogLine.length) {
+        let currentChunk = '';
+        let currentChunkVisualWidth = 0;
+        let numCodePointsInChunk = 0;
+        let lastWordBreakPoint = -1; // Index in codePointsInLogLine for word break
+        let numCodePointsAtLastWordBreak = 0;
+
+        // Iterate through code points to build the current visual line (chunk)
+        for (let i = currentPosInLogLine; i < codePointsInLogLine.length; i++) {
+          const char = codePointsInLogLine[i];
+          const charVisualWidth = stringWidth(char);
+
+          if (currentChunkVisualWidth + charVisualWidth > viewportWidth) {
+            // Character would exceed viewport width
+            if (
+              lastWordBreakPoint !== -1 &&
+              numCodePointsAtLastWordBreak > 0 &&
+              currentPosInLogLine + numCodePointsAtLastWordBreak < i
+            ) {
+              // We have a valid word break point to use, and it's not the start of the current segment
+              currentChunk = codePointsInLogLine
+                .slice(
+                  currentPosInLogLine,
+                  currentPosInLogLine + numCodePointsAtLastWordBreak,
+                )
+                .join('');
+              numCodePointsInChunk = numCodePointsAtLastWordBreak;
+            } else {
+              // No word break, or word break is at the start of this potential chunk, or word break leads to empty chunk.
+              // Hard break: take characters up to viewportWidth, or just the current char if it alone is too wide.
+              if (
+                numCodePointsInChunk === 0 &&
+                charVisualWidth > viewportWidth
+              ) {
+                // Single character is wider than viewport, take it anyway
+                currentChunk = char;
+                numCodePointsInChunk = 1;
+              } else if (
+                numCodePointsInChunk === 0 &&
+                charVisualWidth <= viewportWidth
+              ) {
+                // This case should ideally be caught by the next iteration if the char fits.
+                // If it doesn't fit (because currentChunkVisualWidth was already > 0 from a previous char that filled the line),
+                // then numCodePointsInChunk would not be 0.
+                // This branch means the current char *itself* doesn't fit an empty line, which is handled by the above.
+                // If we are here, it means the loop should break and the current chunk (which is empty) is finalized.
+              }
+            }
+            break; // Break from inner loop to finalize this chunk
+          }
+
+          currentChunk += char;
+          currentChunkVisualWidth += charVisualWidth;
+          numCodePointsInChunk++;
+
+          // Check for word break opportunity (space)
+          if (char === ' ') {
+            lastWordBreakPoint = i; // Store code point index of the space
+            // Store the state *before* adding the space, if we decide to break here.
+            numCodePointsAtLastWordBreak = numCodePointsInChunk - 1; // Chars *before* the space
+          }
+        }
+
+        // If the inner loop completed without breaking (i.e., remaining text fits)
+        // or if the loop broke but numCodePointsInChunk is still 0 (e.g. first char too wide for empty line)
+        if (
+          numCodePointsInChunk === 0 &&
+          currentPosInLogLine < codePointsInLogLine.length
+        ) {
+          // This can happen if the very first character considered for a new visual line is wider than the viewport.
+          // In this case, we take that single character.
+          const firstChar = codePointsInLogLine[currentPosInLogLine];
+          currentChunk = firstChar;
+          numCodePointsInChunk = 1; // Ensure we advance
+        }
+
+        // If after everything, numCodePointsInChunk is still 0 but we haven't processed the whole logical line,
+        // it implies an issue, like viewportWidth being 0 or less. Avoid infinite loop.
+        if (
+          numCodePointsInChunk === 0 &&
+          currentPosInLogLine < codePointsInLogLine.length
+        ) {
+          // Force advance by one character to prevent infinite loop if something went wrong
+          currentChunk = codePointsInLogLine[currentPosInLogLine];
+          numCodePointsInChunk = 1;
+        }
+
+        logicalToVisualMap[logIndex].push([
+          visualLines.length,
+          currentPosInLogLine,
+        ]);
+        visualToLogicalMap.push([logIndex, currentPosInLogLine]);
+        visualLines.push(currentChunk);
+
+        // Cursor mapping logic
+        // Note: currentPosInLogLine here is the start of the currentChunk within the logical line.
+        if (logIndex === logicalCursor[0]) {
+          const cursorLogCol = logicalCursor[1]; // This is a code point index
+          if (
+            cursorLogCol >= currentPosInLogLine &&
+            cursorLogCol < currentPosInLogLine + numCodePointsInChunk // Cursor is within this chunk
+          ) {
+            currentVisualCursor = [
+              visualLines.length - 1,
+              cursorLogCol - currentPosInLogLine, // Visual col is also code point index within visual line
+            ];
+          } else if (
+            cursorLogCol === currentPosInLogLine + numCodePointsInChunk &&
+            numCodePointsInChunk > 0
+          ) {
+            // Cursor is exactly at the end of this non-empty chunk
+            currentVisualCursor = [
+              visualLines.length - 1,
+              numCodePointsInChunk,
+            ];
+          }
+        }
+
+        const logicalStartOfThisChunk = currentPosInLogLine;
+        currentPosInLogLine += numCodePointsInChunk;
+
+        // If the chunk processed did not consume the entire logical line,
+        // and the character immediately following the chunk is a space,
+        // advance past this space as it acted as a delimiter for word wrapping.
+        if (
+          logicalStartOfThisChunk + numCodePointsInChunk <
+            codePointsInLogLine.length &&
+          currentPosInLogLine < codePointsInLogLine.length && // Redundant if previous is true, but safe
+          codePointsInLogLine[currentPosInLogLine] === ' '
+        ) {
+          currentPosInLogLine++;
+        }
+      }
+      // After all chunks of a non-empty logical line are processed,
+      // if the cursor is at the very end of this logical line, update visual cursor.
+      if (
+        logIndex === logicalCursor[0] &&
+        logicalCursor[1] === codePointsInLogLine.length // Cursor at end of logical line
+      ) {
+        const lastVisualLineIdx = visualLines.length - 1;
+        if (
+          lastVisualLineIdx >= 0 &&
+          visualLines[lastVisualLineIdx] !== undefined
+        ) {
+          currentVisualCursor = [
+            lastVisualLineIdx,
+            cpLen(visualLines[lastVisualLineIdx]), // Cursor at end of last visual line for this logical line
+          ];
+        }
+      }
+    }
+  });
+
+  // If the entire logical text was empty, ensure there's one empty visual line.
+  if (
+    logicalLines.length === 0 ||
+    (logicalLines.length === 1 && logicalLines[0] === '')
+  ) {
+    if (visualLines.length === 0) {
+      visualLines.push('');
+      if (!logicalToVisualMap[0]) logicalToVisualMap[0] = [];
+      logicalToVisualMap[0].push([0, 0]);
+      visualToLogicalMap.push([0, 0]);
+    }
+    currentVisualCursor = [0, 0];
+  }
+  // Handle cursor at the very end of the text (after all processing)
+  // This case might be covered by the loop end condition now, but kept for safety.
+  else if (
+    logicalCursor[0] === logicalLines.length - 1 &&
+    logicalCursor[1] === cpLen(logicalLines[logicalLines.length - 1]) &&
+    visualLines.length > 0
+  ) {
+    const lastVisLineIdx = visualLines.length - 1;
+    currentVisualCursor = [lastVisLineIdx, cpLen(visualLines[lastVisLineIdx])];
+  }
+
+  return {
+    visualLines,
+    visualCursor: currentVisualCursor,
+    logicalToVisualMap,
+    visualToLogicalMap,
+  };
+}
 
 export function useTextBuffer({
   initialText = '',
@@ -137,9 +353,7 @@ export function useTextBuffer({
 
   const [cursorRow, setCursorRow] = useState<number>(initialCursorRow);
   const [cursorCol, setCursorCol] = useState<number>(initialCursorCol);
-  const [scrollRow, setScrollRow] = useState<number>(0);
-  const [scrollCol, setScrollCol] = useState<number>(0);
-  const [preferredCol, setPreferredCol] = useState<number | null>(null);
+  const [preferredCol, setPreferredCol] = useState<number | null>(null); // Visual preferred col
 
   const [undoStack, setUndoStack] = useState<UndoHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<UndoHistoryEntry[]>([]);
@@ -148,7 +362,18 @@ export function useTextBuffer({
   const [clipboard, setClipboard] = useState<string | null>(null);
   const [selectionAnchor, setSelectionAnchor] = useState<
     [number, number] | null
-  >(null);
+  >(null); // Logical selection
+
+  // Visual state
+  const [visualLines, setVisualLines] = useState<string[]>(['']);
+  const [visualCursor, setVisualCursor] = useState<[number, number]>([0, 0]);
+  const [visualScrollRow, setVisualScrollRow] = useState<number>(0);
+  const [logicalToVisualMap, setLogicalToVisualMap] = useState<
+    Array<Array<[number, number]>>
+  >([]);
+  const [visualToLogicalMap, setVisualToLogicalMap] = useState<
+    Array<[number, number]>
+  >([]);
 
   const currentLine = useCallback(
     (r: number): string => lines[r] ?? '',
@@ -159,30 +384,33 @@ export function useTextBuffer({
     [currentLine],
   );
 
+  // Recalculate visual layout whenever logical lines or viewport width changes
   useEffect(() => {
-    const { height, width } = viewport;
-    let newScrollRow = scrollRow;
-    let newScrollCol = scrollCol;
+    const layout = calculateVisualLayout(
+      lines,
+      [cursorRow, cursorCol],
+      viewport.width,
+    );
+    setVisualLines(layout.visualLines);
+    setVisualCursor(layout.visualCursor);
+    setLogicalToVisualMap(layout.logicalToVisualMap);
+    setVisualToLogicalMap(layout.visualToLogicalMap);
+  }, [lines, cursorRow, cursorCol, viewport.width]);
 
-    if (cursorRow < scrollRow) {
-      newScrollRow = cursorRow;
-    } else if (cursorRow >= scrollRow + height) {
-      newScrollRow = cursorRow - height + 1;
-    }
+  // Update visual scroll (vertical)
+  useEffect(() => {
+    const { height } = viewport;
+    let newVisualScrollRow = visualScrollRow;
 
-    if (cursorCol < scrollCol) {
-      newScrollCol = cursorCol;
-    } else if (cursorCol >= scrollCol + width) {
-      newScrollCol = cursorCol - width + 1;
+    if (visualCursor[0] < visualScrollRow) {
+      newVisualScrollRow = visualCursor[0];
+    } else if (visualCursor[0] >= visualScrollRow + height) {
+      newVisualScrollRow = visualCursor[0] - height + 1;
     }
-
-    if (newScrollRow !== scrollRow) {
-      setScrollRow(newScrollRow);
+    if (newVisualScrollRow !== visualScrollRow) {
+      setVisualScrollRow(newVisualScrollRow);
     }
-    if (newScrollCol !== scrollCol) {
-      setScrollCol(newScrollCol);
-    }
-  }, [cursorRow, cursorCol, scrollRow, scrollCol, viewport]);
+  }, [visualCursor, visualScrollRow, viewport]);
 
   const pushUndo = useCallback(() => {
     dbg('pushUndo', { cursor: [cursorRow, cursorCol], text: lines.join('\n') });
@@ -210,8 +438,6 @@ export function useTextBuffer({
 
   const text = lines.join('\n');
 
-  // TODO(jacobr): stop using useEffect for this case. This may require a
-  // refactor of App.tsx and InputPrompt.tsx to simplify where onChange is used.
   useEffect(() => {
     if (onChange) {
       onChange(text);
@@ -255,16 +481,21 @@ export function useTextBuffer({
 
         newLines[cursorRow] = before + parts[0];
 
-        if (parts.length > 2) {
-          const middle = parts.slice(1, -1);
-          newLines.splice(cursorRow + 1, 0, ...middle);
+        if (parts.length > 1) {
+          // Adjusted condition for inserting multiple lines
+          const remainingParts = parts.slice(1);
+          const lastPartOriginal = remainingParts.pop() ?? '';
+          newLines.splice(cursorRow + 1, 0, ...remainingParts);
+          newLines.splice(
+            cursorRow + parts.length - 1,
+            0,
+            lastPartOriginal + after,
+          );
+          setCursorRow((prev) => prev + parts.length - 1);
+          setCursorCol(cpLen(lastPartOriginal));
+        } else {
+          setCursorCol(cpLen(before) + cpLen(parts[0]));
         }
-
-        const lastPart = parts[parts.length - 1]!;
-        newLines.splice(cursorRow + (parts.length - 1), 0, lastPart + after);
-
-        setCursorRow((prev) => prev + parts.length - 1);
-        setCursorCol(cpLen(lastPart));
         return newLines;
       });
       setPreferredCol(null);
@@ -290,7 +521,7 @@ export function useTextBuffer({
           cpSlice(lineContent, cursorCol);
         return newLines;
       });
-      setCursorCol((prev) => prev + ch.length);
+      setCursorCol((prev) => prev + cpLen(ch)); // Use cpLen for character length
       setPreferredCol(null);
     },
     [pushUndo, cursorRow, cursorCol, currentLine, insertStr, setPreferredCol],
@@ -379,15 +610,15 @@ export function useTextBuffer({
   ]);
 
   const setText = useCallback(
-    (text: string): void => {
-      dbg('setText', { text });
+    (newText: string): void => {
+      dbg('setText', { text: newText });
       pushUndo();
-      const newContentLines = text.replace(/\r\n?/g, '\n').split('\n');
+      const newContentLines = newText.replace(/\r\n?/g, '\n').split('\n');
       setLines(newContentLines.length === 0 ? [''] : newContentLines);
-      setCursorRow(newContentLines.length - 1);
-      setCursorCol(cpLen(newContentLines[newContentLines.length - 1] ?? ''));
-      setScrollRow(0);
-      setScrollCol(0);
+      // Set logical cursor to the end of the new text
+      const lastNewLineIndex = newContentLines.length - 1;
+      setCursorRow(lastNewLineIndex);
+      setCursorCol(cpLen(newContentLines[lastNewLineIndex] ?? ''));
       setPreferredCol(null);
     },
     [pushUndo, setPreferredCol],
@@ -399,22 +630,30 @@ export function useTextBuffer({
       startCol: number,
       endRow: number,
       endCol: number,
-      text: string,
+      replacementText: string,
     ): boolean => {
       if (
         startRow > endRow ||
         (startRow === endRow && startCol > endCol) ||
         startRow < 0 ||
         startCol < 0 ||
-        endRow >= lines.length
+        endRow >= lines.length ||
+        (endRow < lines.length && endCol > currentLineLen(endRow))
       ) {
-        console.error('Invalid range provided to replaceRange');
+        console.error('Invalid range provided to replaceRange', {
+          startRow,
+          startCol,
+          endRow,
+          endCol,
+          linesLength: lines.length,
+          endRowLineLength: currentLineLen(endRow),
+        });
         return false;
       }
       dbg('replaceRange', {
         start: [startRow, startCol],
         end: [endRow, endCol],
-        text,
+        text: replacementText,
       });
       pushUndo();
 
@@ -423,36 +662,74 @@ export function useTextBuffer({
 
       const prefix = cpSlice(currentLine(startRow), 0, sCol);
       const suffix = cpSlice(currentLine(endRow), eCol);
+      const normalisedReplacement = replacementText
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+      const replacementParts = normalisedReplacement.split('\n');
 
       setLines((prevLines) => {
         const newLines = [...prevLines];
+        // Remove lines between startRow and endRow (exclusive of startRow, inclusive of endRow if different)
         if (startRow < endRow) {
           newLines.splice(startRow + 1, endRow - startRow);
         }
-        newLines[startRow] = prefix + suffix;
-        // Now insert text at this new effective cursor position
-        const tempCursorRow = startRow;
-        const tempCursorCol = sCol;
 
-        const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const parts = normalised.split('\n');
-        const currentLineContent = newLines[tempCursorRow];
-        const beforeInsert = cpSlice(currentLineContent, 0, tempCursorCol);
-        const afterInsert = cpSlice(currentLineContent, tempCursorCol);
+        // Construct the new content for the startRow
+        newLines[startRow] = prefix + replacementParts[0];
 
-        newLines[tempCursorRow] = beforeInsert + parts[0];
-        if (parts.length > 2) {
-          newLines.splice(tempCursorRow + 1, 0, ...parts.slice(1, -1));
+        // If replacementText has multiple lines, insert them
+        if (replacementParts.length > 1) {
+          const lastReplacementPart = replacementParts.pop() ?? ''; // parts are already split by \n
+          // Insert middle parts (if any)
+          if (replacementParts.length > 1) {
+            // parts[0] is already used
+            newLines.splice(startRow + 1, 0, ...replacementParts.slice(1));
+          }
+
+          // The line where the last part of the replacement will go
+          const targetRowForLastPart = startRow + (replacementParts.length - 1); // -1 because parts[0] is on startRow
+          // If the last part is not the first part (multi-line replacement)
+          if (
+            targetRowForLastPart > startRow ||
+            (replacementParts.length === 1 && lastReplacementPart !== '')
+          ) {
+            // If the target row for the last part doesn't exist (because it's a new line created by replacement)
+            // ensure it's created before trying to append suffix.
+            // This case should be handled by splice if replacementParts.length > 1
+            // For single line replacement that becomes multi-line due to parts.length > 1 logic, this is tricky.
+            // Let's assume newLines[targetRowForLastPart] exists due to previous splice or it's newLines[startRow]
+            if (
+              newLines[targetRowForLastPart] === undefined &&
+              targetRowForLastPart === startRow + 1 &&
+              replacementParts.length === 1
+            ) {
+              // This implies a single line replacement that became two lines.
+              // e.g. "abc" replace "b" with "B\nC" -> "aB", "C", "c"
+              // Here, lastReplacementPart is "C", targetRowForLastPart is startRow + 1
+              newLines.splice(
+                targetRowForLastPart,
+                0,
+                lastReplacementPart + suffix,
+              );
+            } else {
+              newLines[targetRowForLastPart] =
+                (newLines[targetRowForLastPart] || '') +
+                lastReplacementPart +
+                suffix;
+            }
+          } else {
+            // Single line in replacementParts, but it was the only part
+            newLines[startRow] += suffix;
+          }
+
+          setCursorRow(targetRowForLastPart);
+          setCursorCol(cpLen(newLines[targetRowForLastPart]) - cpLen(suffix));
+        } else {
+          // Single line replacement (replacementParts has only one item)
+          newLines[startRow] += suffix;
+          setCursorRow(startRow);
+          setCursorCol(cpLen(prefix) + cpLen(replacementParts[0]));
         }
-        const lastPart = parts[parts.length - 1]!;
-        newLines.splice(
-          tempCursorRow + (parts.length - 1),
-          0,
-          lastPart + afterInsert,
-        );
-
-        setCursorRow(tempCursorRow + parts.length - 1);
-        setCursorCol(cpLen(lastPart));
         return newLines;
       });
 
@@ -515,7 +792,6 @@ export function useTextBuffer({
         cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
       return newLines;
     });
-    // Cursor col does not change
     setPreferredCol(null);
   }, [
     pushUndo,
@@ -575,105 +851,192 @@ export function useTextBuffer({
 
   const move = useCallback(
     (dir: Direction): void => {
-      const before = [cursorRow, cursorCol];
-      let newCursorRow = cursorRow;
-      let newCursorCol = cursorCol;
+      let newVisualRow = visualCursor[0];
+      let newVisualCol = visualCursor[1];
       let newPreferredCol = preferredCol;
+
+      const currentVisLineLen = cpLen(visualLines[newVisualRow] ?? '');
 
       switch (dir) {
         case 'left':
           newPreferredCol = null;
-          if (newCursorCol > 0) newCursorCol--;
-          else if (newCursorRow > 0) {
-            newCursorRow--;
-            newCursorCol = currentLineLen(newCursorRow);
+          if (newVisualCol > 0) {
+            newVisualCol--;
+          } else if (newVisualRow > 0) {
+            newVisualRow--;
+            newVisualCol = cpLen(visualLines[newVisualRow] ?? '');
           }
           break;
         case 'right':
           newPreferredCol = null;
-          if (newCursorCol < currentLineLen(newCursorRow)) newCursorCol++;
-          else if (newCursorRow < lines.length - 1) {
-            newCursorRow++;
-            newCursorCol = 0;
+          if (newVisualCol < currentVisLineLen) {
+            newVisualCol++;
+          } else if (newVisualRow < visualLines.length - 1) {
+            newVisualRow++;
+            newVisualCol = 0;
           }
           break;
         case 'up':
-          if (newCursorRow > 0) {
-            if (newPreferredCol === null) newPreferredCol = newCursorCol;
-            newCursorRow--;
-            newCursorCol = clamp(
+          if (newVisualRow > 0) {
+            if (newPreferredCol === null) newPreferredCol = newVisualCol;
+            newVisualRow--;
+            newVisualCol = clamp(
               newPreferredCol,
               0,
-              currentLineLen(newCursorRow),
+              cpLen(visualLines[newVisualRow] ?? ''),
             );
           }
           break;
         case 'down':
-          if (newCursorRow < lines.length - 1) {
-            if (newPreferredCol === null) newPreferredCol = newCursorCol;
-            newCursorRow++;
-            newCursorCol = clamp(
+          if (newVisualRow < visualLines.length - 1) {
+            if (newPreferredCol === null) newPreferredCol = newVisualCol;
+            newVisualRow++;
+            newVisualCol = clamp(
               newPreferredCol,
               0,
-              currentLineLen(newCursorRow),
+              cpLen(visualLines[newVisualRow] ?? ''),
             );
           }
           break;
         case 'home':
           newPreferredCol = null;
-          newCursorCol = 0;
+          newVisualCol = 0;
           break;
         case 'end':
           newPreferredCol = null;
-          newCursorCol = currentLineLen(newCursorRow);
+          newVisualCol = currentVisLineLen;
           break;
+        // wordLeft and wordRight might need more sophisticated visual handling
+        // For now, they operate on the logical line derived from the visual cursor
         case 'wordLeft': {
           newPreferredCol = null;
-          const slice = cpSlice(
-            currentLine(newCursorRow),
-            0,
-            newCursorCol,
-          ).replace(/[\s,.;!?]+$/, '');
+          if (
+            visualToLogicalMap.length === 0 ||
+            logicalToVisualMap.length === 0
+          )
+            break;
+          const [logRow, logColInitial] = visualToLogicalMap[newVisualRow] ?? [
+            0, 0,
+          ];
+          const currentLogCol = logColInitial + newVisualCol;
+          const lineText = lines[logRow];
+          const sliceToCursor = cpSlice(lineText, 0, currentLogCol).replace(
+            /[\s,.;!?]+$/,
+            '',
+          );
           let lastIdx = 0;
           const regex = /[\s,.;!?]+/g;
           let m;
-          while ((m = regex.exec(slice)) != null) lastIdx = m.index;
-          newCursorCol = lastIdx === 0 ? 0 : cpLen(slice.slice(0, lastIdx)) + 1;
+          while ((m = regex.exec(sliceToCursor)) != null) lastIdx = m.index;
+          const newLogicalCol =
+            lastIdx === 0 ? 0 : cpLen(sliceToCursor.slice(0, lastIdx)) + 1;
+
+          // Map newLogicalCol back to visual
+          const targetLogicalMapEntries = logicalToVisualMap[logRow];
+          if (!targetLogicalMapEntries) break;
+          for (let i = targetLogicalMapEntries.length - 1; i >= 0; i--) {
+            const [visRow, logStartCol] = targetLogicalMapEntries[i];
+            if (newLogicalCol >= logStartCol) {
+              newVisualRow = visRow;
+              newVisualCol = newLogicalCol - logStartCol;
+              break;
+            }
+          }
           break;
         }
         case 'wordRight': {
           newPreferredCol = null;
-          const l = currentLine(newCursorRow);
+          if (
+            visualToLogicalMap.length === 0 ||
+            logicalToVisualMap.length === 0
+          )
+            break;
+          const [logRow, logColInitial] = visualToLogicalMap[newVisualRow] ?? [
+            0, 0,
+          ];
+          const currentLogCol = logColInitial + newVisualCol;
+          const lineText = lines[logRow];
           const regex = /[\s,.;!?]+/g;
           let moved = false;
           let m;
-          while ((m = regex.exec(l)) != null) {
-            const cpIdx = cpLen(l.slice(0, m.index));
-            if (cpIdx > newCursorCol) {
-              newCursorCol = cpIdx;
+          let newLogicalCol = currentLineLen(logRow); // Default to end of logical line
+
+          while ((m = regex.exec(lineText)) != null) {
+            const cpIdx = cpLen(lineText.slice(0, m.index));
+            if (cpIdx > currentLogCol) {
+              newLogicalCol = cpIdx;
               moved = true;
               break;
             }
           }
-          if (!moved) newCursorCol = currentLineLen(newCursorRow);
+          if (!moved && currentLogCol < currentLineLen(logRow)) {
+            // If no word break found after cursor, move to end
+            newLogicalCol = currentLineLen(logRow);
+          }
+
+          // Map newLogicalCol back to visual
+          const targetLogicalMapEntries = logicalToVisualMap[logRow];
+          if (!targetLogicalMapEntries) break;
+          for (let i = 0; i < targetLogicalMapEntries.length; i++) {
+            const [visRow, logStartCol] = targetLogicalMapEntries[i];
+            const nextLogStartCol =
+              i + 1 < targetLogicalMapEntries.length
+                ? targetLogicalMapEntries[i + 1][1]
+                : Infinity;
+            if (
+              newLogicalCol >= logStartCol &&
+              newLogicalCol < nextLogStartCol
+            ) {
+              newVisualRow = visRow;
+              newVisualCol = newLogicalCol - logStartCol;
+              break;
+            }
+            if (
+              newLogicalCol === logStartCol &&
+              i === targetLogicalMapEntries.length - 1 &&
+              cpLen(visualLines[visRow] ?? '') === 0
+            ) {
+              // Special case: moving to an empty visual line at the end of a logical line
+              newVisualRow = visRow;
+              newVisualCol = 0;
+              break;
+            }
+          }
           break;
         }
-        default: // Add default case to satisfy linter
+        default:
           break;
       }
-      setCursorRow(newCursorRow);
-      setCursorCol(newCursorCol);
+
+      setVisualCursor([newVisualRow, newVisualCol]);
       setPreferredCol(newPreferredCol);
-      dbg('move', { dir, before, after: [newCursorRow, newCursorCol] });
+
+      // Update logical cursor based on new visual cursor
+      if (visualToLogicalMap[newVisualRow]) {
+        const [logRow, logStartCol] = visualToLogicalMap[newVisualRow];
+        setCursorRow(logRow);
+        setCursorCol(
+          clamp(logStartCol + newVisualCol, 0, currentLineLen(logRow)),
+        );
+      }
+
+      dbg('move', {
+        dir,
+        visualBefore: visualCursor,
+        visualAfter: [newVisualRow, newVisualCol],
+        logicalAfter: [cursorRow, cursorCol],
+      });
     },
     [
-      cursorRow,
-      cursorCol,
+      visualCursor,
+      visualLines,
       preferredCol,
       lines,
       currentLineLen,
-      currentLine,
-      setPreferredCol,
+      visualToLogicalMap,
+      logicalToVisualMap,
+      cursorCol,
+      cursorRow,
     ],
   );
 
@@ -702,14 +1065,7 @@ export function useTextBuffer({
 
         let newText = fs.readFileSync(filePath, 'utf8');
         newText = newText.replace(/\r\n?/g, '\n');
-
-        const newContentLines = newText.split('\n');
-        setLines(newContentLines.length === 0 ? [''] : newContentLines);
-        setCursorRow(newContentLines.length - 1);
-        setCursorCol(cpLen(newContentLines[newContentLines.length - 1] ?? ''));
-        setScrollRow(0);
-        setScrollCol(0);
-        setPreferredCol(null);
+        setText(newText);
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
         // TODO(jacobr): potentially revert or handle error state.
@@ -727,14 +1083,20 @@ export function useTextBuffer({
         }
       }
     },
-    [text, pushUndo, stdin, setRawMode, setPreferredCol],
+    [text, pushUndo, stdin, setRawMode, setText],
   );
 
   const handleInput = useCallback(
     (input: string | undefined, key: Record<string, boolean>): boolean => {
-      dbg('handleInput', { input, key, cursor: [cursorRow, cursorCol] });
-      const beforeText = text; // For change detection
-      const beforeCursor = [cursorRow, cursorCol];
+      dbg('handleInput', {
+        input,
+        key,
+        cursor: [cursorRow, cursorCol],
+        visualCursor,
+      });
+      const beforeText = text;
+      const beforeLogicalCursor = [cursorRow, cursorCol];
+      const beforeVisualCursor = [...visualCursor];
 
       if (key['escape']) return false;
 
@@ -768,11 +1130,18 @@ export function useTextBuffer({
       else if (input && !key['ctrl'] && !key['meta']) insert(input);
 
       const textChanged = text !== beforeText;
+      // After operations, visualCursor might not be immediately updated if the change
+      // was to `lines`, `cursorRow`, or `cursorCol` which then triggers the useEffect.
+      // So, for return value, we check logical cursor change.
       const cursorChanged =
-        cursorRow !== beforeCursor[0] || cursorCol !== beforeCursor[1];
+        cursorRow !== beforeLogicalCursor[0] ||
+        cursorCol !== beforeLogicalCursor[1] ||
+        visualCursor[0] !== beforeVisualCursor[0] ||
+        visualCursor[1] !== beforeVisualCursor[1];
 
       dbg('handleInput:after', {
         cursor: [cursorRow, cursorCol],
+        visualCursor,
         text,
       });
       return textChanged || cursorChanged;
@@ -781,6 +1150,7 @@ export function useTextBuffer({
       text,
       cursorRow,
       cursorCol,
+      visualCursor,
       newline,
       move,
       deleteWordLeft,
@@ -791,22 +1161,23 @@ export function useTextBuffer({
     ],
   );
 
-  const visibleLines = useMemo(
-    () => lines.slice(scrollRow, scrollRow + viewport.height),
-    [lines, scrollRow, viewport.height],
+  const renderedVisualLines = useMemo(
+    () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
+    [visualLines, visualScrollRow, viewport.height],
   );
 
-  // Exposed API of the hook
   const returnValue: TextBuffer = {
-    // State
     lines,
     text,
     cursor: [cursorRow, cursorCol],
-    scroll: [scrollRow, scrollCol],
     preferredCol,
     selectionAnchor,
 
-    // Actions
+    allVisualLines: visualLines,
+    viewportVisualLines: renderedVisualLines,
+    visualCursor,
+    visualScrollRow,
+
     setText,
     insert,
     newline,
@@ -823,7 +1194,6 @@ export function useTextBuffer({
     handleInput,
     openInExternalEditor,
 
-    // Selection & Clipboard (simplified for now)
     copy: useCallback(() => {
       if (!selectionAnchor) return null;
       const [ar, ac] = selectionAnchor;
@@ -843,34 +1213,38 @@ export function useTextBuffer({
       }
       setClipboard(selectedTextVal);
       return selectedTextVal;
-    }, [selectionAnchor, cursorRow, cursorCol, currentLine]),
+    }, [selectionAnchor, cursorRow, cursorCol, currentLine, setClipboard]),
     paste: useCallback(() => {
       if (clipboard === null) return false;
       return insertStr(clipboard);
     }, [clipboard, insertStr]),
     startSelection: useCallback(
       () => setSelectionAnchor([cursorRow, cursorCol]),
-      [cursorRow, cursorCol],
+      [cursorRow, cursorCol, setSelectionAnchor],
     ),
-    visibleLines,
   };
   return returnValue;
 }
 
 export interface TextBuffer {
   // State
-  lines: string[];
+  lines: string[]; // Logical lines
   text: string;
-  cursor: [number, number];
-  scroll: [number, number];
+  cursor: [number, number]; // Logical cursor [row, col]
   /**
    * When the user moves the caret vertically we try to keep their original
    * horizontal column even when passing through shorter lines.  We remember
    * that *preferred* column in this field while the user is still travelling
    * vertically.  Any explicit horizontal movement resets the preference.
    */
-  preferredCol: number | null;
-  selectionAnchor: [number, number] | null;
+  preferredCol: number | null; // Preferred visual column
+  selectionAnchor: [number, number] | null; // Logical selection anchor
+
+  // Visual state (handles wrapping)
+  allVisualLines: string[]; // All visual lines for the current text and viewport width.
+  viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
+  visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
+  visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
 
   // Actions
 
@@ -956,7 +1330,4 @@ export interface TextBuffer {
   copy: () => string | null;
   paste: () => boolean;
   startSelection: () => void;
-
-  // For rendering
-  visibleLines: string[];
 }
