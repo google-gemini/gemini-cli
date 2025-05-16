@@ -8,7 +8,6 @@ import { exec as _exec } from 'child_process';
 import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
 import { type PartListUnion } from '@google/genai';
-import { StreamingState } from '../types.js';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -18,7 +17,7 @@ import { UseHistoryManagerReturn } from './useHistoryManager.js';
  */
 export const useShellCommandProcessor = (
   addItemToHistory: UseHistoryManagerReturn['addItem'],
-  setStreamingState: React.Dispatch<React.SetStateAction<StreamingState>>,
+  onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
 ) => {
@@ -57,30 +56,36 @@ export const useShellCommandProcessor = (
         cwd: targetDir,
       };
 
-      setStreamingState(StreamingState.Responding);
+      const execPromise = new Promise<void>((resolve) => {
+        _exec(commandToExecute, execOptions, (error, stdout, stderr) => {
+          if (error) {
+            addItemToHistory(
+              { type: 'error', text: error.message },
+              userMessageTimestamp,
+            );
+          } else {
+            let output = '';
+            if (stdout) output += stdout;
+            if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
 
-      _exec(commandToExecute, execOptions, (error, stdout, stderr) => {
-        if (error) {
-          addItemToHistory(
-            { type: 'error', text: error.message },
-            userMessageTimestamp,
-          );
-        } else {
-          let output = '';
-          if (stdout) output += stdout;
-          if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
-
-          addItemToHistory(
-            { type: 'info', text: output || '(Command produced no output)' },
-            userMessageTimestamp,
-          );
-        }
-        setStreamingState(StreamingState.Idle);
+            addItemToHistory(
+              { type: 'info', text: output || '(Command produced no output)' },
+              userMessageTimestamp,
+            );
+          }
+          resolve();
+        });
       });
+
+      try {
+        onExec(execPromise);
+      } catch (_e) {
+        // silently ignore errors from this since it's from the caller
+      }
 
       return true; // Command was initiated
     },
-    [config, onDebugMessage, addItemToHistory, setStreamingState],
+    [config, onDebugMessage, addItemToHistory, onExec],
   );
 
   return { handleShellCommand };
