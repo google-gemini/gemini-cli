@@ -11,9 +11,15 @@ import { Colors } from '../../colors.js';
 
 interface GeminiMessageProps {
   text: string;
+  isPending: boolean;
+  availableTerminalHeight: number;
 }
 
-export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
+export const GeminiMessage: React.FC<GeminiMessageProps> = ({
+  text,
+  isPending,
+  availableTerminalHeight,
+}) => {
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
 
@@ -23,7 +29,11 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({ text }) => {
         <Text color={Colors.AccentPurple}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
-        <MarkdownDisplay text={text} />
+        <MarkdownDisplay
+          text={text}
+          isPending={isPending}
+          availableTerminalHeight={availableTerminalHeight}
+        />
       </Box>
     </Box>
   );

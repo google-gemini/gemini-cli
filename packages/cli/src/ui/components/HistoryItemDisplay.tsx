@@ -17,18 +17,30 @@ import { Box } from 'ink';
 interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight: number;
+  isPending: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
   availableTerminalHeight,
+  isPending,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
     {item.type === 'user' && <UserMessage text={item.text} />}
-    {item.type === 'gemini' && <GeminiMessage text={item.text} />}
+    {item.type === 'gemini' && (
+      <GeminiMessage
+        text={item.text}
+        isPending={isPending}
+        availableTerminalHeight={availableTerminalHeight}
+      />
+    )}
     {item.type === 'gemini_content' && (
-      <GeminiMessageContent text={item.text} />
+      <GeminiMessageContent
+        text={item.text}
+        isPending={isPending}
+        availableTerminalHeight={availableTerminalHeight}
+      />
     )}
     {item.type === 'info' && <InfoMessage text={item.text} />}
     {item.type === 'error' && <ErrorMessage text={item.text} />}

@@ -5,8 +5,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Box, DOMElement, measureElement, Static, Text, useStdout } from 'ink';
+import { Box, DOMElement, measureElement, Static, Text } from 'ink';
 import { StreamingState, type HistoryItem } from './types.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -56,8 +57,7 @@ export const App = ({
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
-  const [availableTerminalHeight, setAvailableTerminalHeight] =
-    useState<number>(0);
+  const [footerHeight, setFooterHeight] = useState<number>(0);
   const {
     isThemeDialogOpen,
     openThemeDialog,
@@ -195,26 +195,24 @@ export const App = ({
 
   // --- Render Logic ---
 
-  // Get terminal dimensions
-
-  const { stdout } = useStdout();
-  const terminalWidth = stdout?.columns ?? 80;
-  const terminalHeight = stdout?.rows ?? 24;
-  const footerRef = useRef<DOMElement>(null);
+  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const mainControlsRef = useRef<DOMElement>(null);
   const pendingHistoryItemRef = useRef<DOMElement>(null);
 
   // Calculate width for suggestions, leave some padding
   const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
 
   useEffect(() => {
-    const staticExtraHeight = /* margins and padding */ 3;
-    const fullFooterMeasurement = measureElement(footerRef.current!);
-    const fullFooterHeight = fullFooterMeasurement.height;
+    if (mainControlsRef.current) {
+      const fullFooterMeasurement = measureElement(mainControlsRef.current);
+      setFooterHeight(fullFooterMeasurement.height);
+    }
+  }, [terminalHeight]); // Re-calculate if terminalHeight changes, as it might affect footer's rendered height.
 
-    setAvailableTerminalHeight(
-      terminalHeight - fullFooterHeight - staticExtraHeight,
-    );
-  }, [terminalHeight]);
+  const availableTerminalHeight = useMemo(() => {
+    const staticExtraHeight = /* margins and padding */ 3;
+    return terminalHeight - footerHeight - staticExtraHeight;
+  }, [terminalHeight, footerHeight]);
 
   useEffect(() => {
     if (!pendingHistoryItem) {
@@ -260,7 +258,14 @@ export const App = ({
             <Header />
             <Tips />
           </Box>,
-          ...history.map((h) => <HistoryItemDisplay availableTerminalHeight={availableTerminalHeight} key={h.id} item={h} />),
+          ...history.map((h) => (
+            <HistoryItemDisplay
+              availableTerminalHeight={availableTerminalHeight}
+              key={h.id}
+              item={h}
+              isPending={false}
+            />
+          )),
         ]}
       >
         {(item) => item}
@@ -272,12 +277,13 @@ export const App = ({
             // TODO(taehykim): It seems like references to ids aren't necessary in
             // HistoryItemDisplay. Refactor later. Use a fake id for now.
             item={{ ...pendingHistoryItem, id: 0 }}
+            isPending={true}
           />
         </Box>
       )}
       {showHelp && <Help commands={slashCommands} />}
 
-      <Box flexDirection="column" ref={footerRef}>
+      <Box flexDirection="column" ref={mainControlsRef}>
         {startupWarnings.length > 0 && (
           <Box
             borderStyle="round"

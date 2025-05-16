@@ -26,7 +26,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const statusIndicatorWidth = 3;
   const hasResult = resultDisplay && resultDisplay.toString().trim().length > 0;
   const staticHeight = /* Header */ 1;
-  availableTerminalHeight -= staticHeight;
 
   let displayableResult = resultDisplay;
   let hiddenLines = 0;
@@ -37,7 +36,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     const lines = resultDisplay.split('\n');
     // Estimate available height for this specific tool message content area
     // This is a rough estimate; ideally, we'd have a more precise measurement.
-    const contentHeightEstimate = availableTerminalHeight - 5; // Subtracting lines for tool name, status, padding etc.
+    const contentHeightEstimate = availableTerminalHeight - staticHeight - 5; // Subtracting lines for tool name, status, padding etc.
     if (lines.length > contentHeightEstimate && contentHeightEstimate > 0) {
       displayableResult = lines.slice(0, contentHeightEstimate).join('\n');
       hiddenLines = lines.length - contentHeightEstimate;
@@ -83,7 +82,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           <Box flexDirection="column">
             {typeof displayableResult === 'string' && (
               <Box flexDirection="column">
-                <MarkdownDisplay text={displayableResult} />
+                <MarkdownDisplay
+                  text={displayableResult}
+                  isPending={false}
+                  availableTerminalHeight={availableTerminalHeight}
+                />
               </Box>
             )}
             {typeof displayableResult === 'object' && (

@@ -11,6 +11,8 @@ import { colorizeCode } from './CodeColorizer.js';
 
 interface MarkdownDisplayProps {
   text: string;
+  isPending: boolean;
+  availableTerminalHeight: number;
 }
 
 // Constants for Markdown parsing and rendering
@@ -26,7 +28,11 @@ const CODE_BLOCK_PADDING = 1;
 const LIST_ITEM_PREFIX_PADDING = 1;
 const LIST_ITEM_TEXT_FLEX_GROW = 1;
 
-const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({ text }) => {
+const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
+  text,
+  isPending,
+  availableTerminalHeight,
+}) => {
   if (!text) return <></>;
 
   const lines = text.split('\n');
@@ -57,6 +63,8 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({ text }) => {
             key={key}
             content={codeBlockContent}
             lang={codeBlockLang}
+            isPending={isPending}
+            availableTerminalHeight={availableTerminalHeight}
           />,
         );
         inCodeBlock = false;
@@ -176,6 +184,8 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({ text }) => {
         key="line-eof"
         content={codeBlockContent}
         lang={codeBlockLang}
+        isPending={isPending}
+        availableTerminalHeight={availableTerminalHeight}
       />,
     );
   }
@@ -317,12 +327,49 @@ const RenderInline = React.memo(RenderInlineInternal);
 interface RenderCodeBlockProps {
   content: string[];
   lang: string | null;
+  isPending: boolean;
+  availableTerminalHeight: number;
 }
 
 const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   content,
   lang,
+  isPending,
+  availableTerminalHeight,
 }) => {
+  const MIN_LINES_FOR_MESSAGE = 1; // Minimum lines to show before the "generating more" message
+  const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
+  const MAX_CODE_LINES_WHEN_PENDING = Math.max(
+    0,
+    availableTerminalHeight - CODE_BLOCK_PADDING * 2 - RESERVED_LINES,
+  );
+
+  if (isPending) {
+    if (content.length > MAX_CODE_LINES_WHEN_PENDING) {
+      if (MAX_CODE_LINES_WHEN_PENDING < MIN_LINES_FOR_MESSAGE) {
+        // Not enough space to even show the message meaningfully
+        return (
+          <Box padding={CODE_BLOCK_PADDING}>
+            <Text color={Colors.SubtleComment}>
+              ... code is being written ...
+            </Text>
+          </Box>
+        );
+      }
+      const truncatedContent = content.slice(0, MAX_CODE_LINES_WHEN_PENDING);
+      const colorizedTruncatedCode = colorizeCode(
+        truncatedContent.join('\n'),
+        lang,
+      );
+      return (
+        <Box flexDirection="column" padding={CODE_BLOCK_PADDING}>
+          {colorizedTruncatedCode}
+          <Text color={Colors.SubtleComment}>... generating more ...</Text>
+        </Box>
+      );
+    }
+  }
+
   const fullContent = content.join('\n');
   const colorizedCode = colorizeCode(fullContent, lang);
 

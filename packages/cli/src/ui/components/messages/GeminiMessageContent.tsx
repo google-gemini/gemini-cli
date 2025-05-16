@@ -10,6 +10,8 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 
 interface GeminiMessageContentProps {
   text: string;
+  isPending: boolean;
+  availableTerminalHeight: number;
 }
 
 /*
@@ -20,13 +22,19 @@ interface GeminiMessageContentProps {
  */
 export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   text,
+  isPending,
+  availableTerminalHeight,
 }) => {
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
 
   return (
     <Box flexDirection="column" paddingLeft={prefixWidth}>
-      <MarkdownDisplay text={text} />
+      <MarkdownDisplay
+        text={text}
+        isPending={isPending}
+        availableTerminalHeight={availableTerminalHeight}
+      />
     </Box>
   );
 };

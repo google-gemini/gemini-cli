@@ -29,7 +29,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const borderColor = hasPending ? Colors.AccentYellow : Colors.SubtleComment;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
-  availableTerminalHeight -= staticHeight;
 
   return (
     <Box
@@ -58,7 +57,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             resultDisplay={tool.resultDisplay}
             status={tool.status}
             confirmationDetails={tool.confirmationDetails}
-            availableTerminalHeight={availableTerminalHeight}
+            availableTerminalHeight={availableTerminalHeight - staticHeight}
           />
           {tool.status === ToolCallStatus.Confirming &&
             tool.confirmationDetails && (
