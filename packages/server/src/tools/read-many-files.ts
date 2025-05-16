@@ -10,6 +10,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import fg from 'fast-glob';
+import { GEMINI_MD_FILENAME } from './memoryTool.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -100,7 +101,7 @@ const DEFAULT_EXCLUDES: string[] = [
   '**/*.odp',
   '**/*.DS_Store',
   '**/.env',
-  '**/GEMINI.md',
+  `**/${GEMINI_MD_FILENAME}`,
 ];
 
 // Default values for encoding and separator format

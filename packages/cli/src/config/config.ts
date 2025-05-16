@@ -15,6 +15,8 @@ import {
   Config,
   loadEnvironment,
   createServerConfig,
+  GEMINI_CONFIG_DIR,
+  GEMINI_MD_FILENAME,
 } from '@gemini-code/server';
 import { Settings } from './settings.js';
 import { readPackageUp } from 'read-package-up';
@@ -30,8 +32,6 @@ const logger = {
 };
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro-preview-05-06';
-const GEMINI_MD_FILENAME = 'GEMINI.md';
-const GEMINI_CONFIG_DIR = '.gemini';
 // TODO(adh): Refactor to use a shared ignore list with other tools like glob and read-many-files.
 const DEFAULT_IGNORE_DIRECTORIES = [
   'node_modules',

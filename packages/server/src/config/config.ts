@@ -20,6 +20,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { BaseTool, ToolResult } from '../tools/tools.js';
+import { MemoryTool } from '../tools/memoryTool.js';
 import { StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 export class Config {
@@ -188,9 +189,10 @@ function createToolRegistry(config: Config): ToolRegistry {
     new GlobTool(targetDir),
     new EditTool(config),
     new WriteFileTool(targetDir),
-    new WebFetchTool(), // Note: WebFetchTool takes no arguments
+    new WebFetchTool(),
     new ReadManyFilesTool(targetDir),
     new ShellTool(config),
+    new MemoryTool(),
   ];
 
   for (const tool of tools) {
