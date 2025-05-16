@@ -1,6 +1,6 @@
 # Shell Tool
 
-This document provides details on the shell tool available.
+This document provides details on the shell tool.
 
 ## `execute_bash_command`
 

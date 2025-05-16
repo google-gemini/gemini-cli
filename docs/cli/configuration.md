@@ -36,7 +36,7 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
 
 - **Generally, it's recommended to add `.gemini/` to your project's `.gitignore` file.**
   - **Reasoning:** This directory often contains user-specific preferences (like themes) or local sandbox configurations that might not be relevant or applicable to all collaborators on the project. Keeping it out of version control avoids imposing one user's local setup on others.
-- **Exception:** If your team decides that certain project-specific configurations within `.gemini/` (e.g., a carefully crafted `sandbox-macos-custom.sb` profile that _all_ macOS users on the project should use) are essential for consistent project behavior, you might choose to commit specific files within `.gemini/` (e.g., `!.gemini/sandbox-macos-custom.sb`) or the entire directory. However, this should be a deliberate decision by the team.
+- **Exception:** If your team decides that certain project-specific configurations within `.gemini/` (e.g., a carefully crafted `sandbox-macos-custom.sb` profile that _all_ macOS users on the project should use) are essential for consistent project behavior, you might choose to commit specific files within `.gemini/` (e.g., `.gemini/sandbox-macos-custom.sb`) or the entire directory. However, this should be a deliberate decision by the team.
 - User-specific `settings.json` often contains local paths or preferences that should not be committed.
 
 Always consider the nature of the files within `.gemini/` before deciding to include them in version control. For most common use cases, ignoring the entire directory is the safest approach.
@@ -46,7 +46,7 @@ Always consider the nature of the files within `.gemini/` before deciding to inc
 - **`theme`** (string):
   - Specifies the visual theme for the CLI.
   - Example: `"theme": "VS2015"`
-  - See the [UI Guide](./ui-guide.md#themes) for available theme names.
+  - See the [Theming section in README.md](../../README.md#theming) for available theme names.
 - **`sandbox`** (boolean or string):
   - Controls whether and how to use sandboxing for tool execution.
   - `true`: Enable default sandbox (e.g., Docker or Podman if configured, otherwise OS-level like Seatbelt on macOS).

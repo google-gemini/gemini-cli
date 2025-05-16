@@ -20,9 +20,9 @@ The server package is a crucial part of the Gemini CLI ecosystem. While the CLI 
 
 While the exact implementation details are within the `packages/server/src/` directory, key conceptual components include:
 
-- **API Client (`client.ts`):** A module responsible for making HTTP requests to the Gemini API, handling authentication, and parsing responses.
-- **Prompt Management (`prompts.ts`):** Logic for creating and formatting the prompts sent to the Gemini model. This includes integrating user queries, historical context, and tool specifications.
-- \*\*Tool Registry and Execution (`tool-registry.ts`, `tools.ts`, individual tool files like `read-file.ts`, `shell.ts`):
+- **API Client** (`client.ts`): A module responsible for making HTTP requests to the Gemini API, handling authentication, and parsing responses.
+- **Prompt Management** (`prompts.ts`): Logic for creating and formatting the prompts sent to the Gemini model. This includes integrating user queries, historical context, and tool specifications.
+- **Tool Registry and Execution** (`tool-registry.ts`, `tools.ts`, individual tool files like `read-file.ts`, `shell.ts`):
   - A system for discovering, registering, and describing available tools to the Gemini model.
   - Code for executing each tool safely and effectively, often involving interaction with the operating system or external services.
 - **Configuration (`config.ts`):** Handles loading and providing access to server-side configurations, including API keys, model choices, and potentially tool-specific settings.

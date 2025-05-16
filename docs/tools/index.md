@@ -28,15 +28,6 @@ The server component (`packages/server`) manages these tools, presents their def
 
 You will typically see messages in the CLI indicating when a tool is being called and whether it succeeded or failed.
 
-## Categories of Built-in Tools
-
-The built-in tools can be broadly categorized as follows:
-
-- **[File System Tools](./file-system.md):** For interacting with files and directories (reading, writing, listing, searching, etc.).
-- **[Shell Tool](./shell.md):** For executing shell commands.
-- **[Web Fetch Tool](./web.md):** For retrieving content from URLs.
-- **[Multi-File Read Tool](./multi-file.md):** A specialized tool for reading content from multiple files or directories, often used by the `@` command.
-
 ## Security and Confirmation
 
 Many tools, especially those that can modify your file system or execute commands (`write_file`, `edit`, `execute_bash_command`), are designed with safety in mind. The Gemini CLI will typically:
@@ -46,13 +37,13 @@ Many tools, especially those that can modify your file system or execute command
 
 It's important to always review confirmation prompts carefully before allowing a tool to proceed.
 
-## Detailed Tool Documentation
+## Categories of Built-in Tools
 
-For detailed information on each specific tool, including its parameters and behavior, please refer to the individual pages in this section:
+The built-in tools can be broadly categorized as follows:
 
-- **[File System Tools](./file-system.md)**
-- **[Shell Tool (execute_bash_command)](./shell.md)**
-- **[Web Fetch Tool](./web.md)**
-- **[Multi-File Read Tool](./multi-file.md)**
+- **[File System Tools](./file-system.md):** For interacting with files and directories (reading, writing, listing, searching, etc.).
+- **[Shell Tool](./shell.md):** For executing shell commands.
+- **[Web Fetch Tool](./web.md):** For retrieving content from URLs.
+- **[Multi-File Read Tool](./multi-file.md):** A specialized tool for reading content from multiple files or directories, often used by the `@` command.
 
 Understanding the available tools and how they work will help you make the most effective use of the Gemini CLI.
