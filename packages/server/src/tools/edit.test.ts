@@ -13,13 +13,15 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { Config } from '../config/config.js';
+import { Content, Part, SchemaUnion } from '@google/genai';
 
 // Mock GeminiClient
 const mockEnsureCorrectEdit = vi.fn();
+const mockGenerateJson = vi.fn();
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
-    // This is the method called by EditTool
     ensureCorrectEdit: mockEnsureCorrectEdit,
+    generateJson: mockGenerateJson,
   })),
 }));
 
@@ -57,12 +59,51 @@ describe('EditTool', () => {
       return Promise.resolve({ params, occurrences });
     });
 
-    tool = new EditTool(mockConfig); // GeminiClient is mocked via vi.mock
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (schema.properties?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (schema.properties?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
   });
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
-    // vi.clearAllMocks(); // This might be too broad if other tests need persistent mocks
   });
 
   describe('validateParams', () => {

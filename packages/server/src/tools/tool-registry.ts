@@ -209,7 +209,8 @@ export class ToolRegistry {
             `failed to start or connect to MCP server '${mcpServerName}' ` +
               `${JSON.stringify(mcpServer)}; \n${error}`,
           );
-          throw error;
+          // Do not re-throw, let other MCP servers be discovered.
+          return; // Exit this async IIFE if connection failed
         }
         mcpClient.onerror = (error) => {
           console.error('MCP ERROR', error.toString());
