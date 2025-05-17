@@ -10,7 +10,7 @@ import util from 'util';
 
 interface ConsoleMessage {
   id: Key;
-  type: 'log' | 'warn' | 'error';
+  type: 'log' | 'warn' | 'error' | 'debug';
   content: string;
 }
 
@@ -18,16 +18,24 @@ interface ConsoleMessage {
 // This ensures IDs are unique across messages.
 let messageIdCounter = 0;
 
-export const ConsoleOutput: React.FC = () => {
+interface ConsoleOutputProps {
+  debugMode: boolean;
+}
+
+export const ConsoleOutput: React.FC<ConsoleOutputProps> = ({ debugMode }) => {
   const [messages, setMessages] = useState<ConsoleMessage[]>([]);
 
   useEffect(() => {
     const originalConsoleLog = console.log;
     const originalConsoleWarn = console.warn;
     const originalConsoleError = console.error;
+    const originalConsoleDebug = console.debug;
 
     const formatArgs = (args: unknown[]): string => util.format(...args);
-    const addMessage = (type: 'log' | 'warn' | 'error', args: unknown[]) => {
+    const addMessage = (
+      type: 'log' | 'warn' | 'error' | 'debug',
+      args: unknown[],
+    ) => {
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -42,17 +50,23 @@ export const ConsoleOutput: React.FC = () => {
     console.log = (...args: unknown[]) => addMessage('log', args);
     console.warn = (...args: unknown[]) => addMessage('warn', args);
     console.error = (...args: unknown[]) => addMessage('error', args);
+    console.debug = (...args: unknown[]) => addMessage('debug', args);
 
     return () => {
       console.log = originalConsoleLog;
       console.warn = originalConsoleWarn;
       console.error = originalConsoleError;
+      console.debug = originalConsoleDebug;
     };
   }, []);
 
   return (
     <Box flexDirection="column">
       {messages.map((msg) => {
+        if (msg.type === 'debug' && !debugMode) {
+          return null;
+        }
+
         const textProps: { color?: string } = {};
         let prefix = '';
 
@@ -64,6 +78,10 @@ export const ConsoleOutput: React.FC = () => {
           case 'error':
             textProps.color = 'red';
             prefix = 'ERROR: ';
+            break;
+          case 'debug':
+            textProps.color = 'gray';
+            prefix = 'DEBUG: ';
             break;
           case 'log':
           default:

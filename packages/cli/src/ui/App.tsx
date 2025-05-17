@@ -409,7 +409,7 @@ export const App = ({
           cliVersion={cliVersion}
           geminiMdFileCount={geminiMdFileCount}
         />
-        <ConsoleOutput />
+        <ConsoleOutput debugMode={config.getDebugMode()} />
       </Box>
     </Box>
   );
