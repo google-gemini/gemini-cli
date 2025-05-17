@@ -14,6 +14,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 type ToolParams = Record<string, unknown>;
 
+const MCP_TOOL_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
@@ -95,11 +97,11 @@ Signal: Signal number or \`(none)\` if no signal was received.
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly mcpClient: Client,
-    private readonly config: Config,
     readonly name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
     readonly serverToolName: string,
+    readonly timeout?: number,
   ) {
     description += `
 
@@ -112,10 +114,16 @@ Returns the MCP server response as a json string.
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {
-    const result = await this.mcpClient.callTool({
-      name: this.serverToolName,
-      arguments: params,
-    });
+    const result = await this.mcpClient.callTool(
+      {
+        name: this.serverToolName,
+        arguments: params,
+      },
+      undefined, // skip resultSchema to specify options (RequestOptions)
+      {
+        timeout: this.timeout ?? MCP_TOOL_DEFAULT_TIMEOUT_MSEC,
+      },
+    );
     return {
       llmContent: JSON.stringify(result, null, 2),
       returnDisplay: JSON.stringify(result, null, 2),
@@ -189,17 +197,17 @@ export class ToolRegistry {
         args: args.slice(1),
       };
     }
-    for (const [mcpServerName, mcpServer] of Object.entries(mcpServers)) {
+    for (const [mcpServerName, mcpServerConfig] of Object.entries(mcpServers)) {
       (async () => {
         const mcpClient = new Client({
           name: 'mcp-client',
           version: '0.0.1',
         });
         const transport = new StdioClientTransport({
-          ...mcpServer,
+          ...mcpServerConfig,
           env: {
             ...process.env,
-            ...(mcpServer.env || {}),
+            ...(mcpServerConfig.env || {}),
           } as Record<string, string>,
           stderr: 'pipe',
         });
@@ -208,7 +216,7 @@ export class ToolRegistry {
         } catch (error) {
           console.error(
             `failed to start or connect to MCP server '${mcpServerName}' ` +
-              `${JSON.stringify(mcpServer)}; \n${error}`,
+              `${JSON.stringify(mcpServerConfig)}; \n${error}`,
           );
           // Do not re-throw, let other MCP servers be discovered.
           return; // Exit this async IIFE if connection failed
@@ -246,13 +254,13 @@ export class ToolRegistry {
           this.registerTool(
             new DiscoveredMCPTool(
               mcpClient,
-              this.config,
               Object.keys(mcpServers).length > 1
                 ? mcpServerName + '__' + tool.name
                 : tool.name,
               tool.description ?? '',
               tool.inputSchema,
               tool.name,
+              mcpServerConfig.timeout,
             ),
           );
         }

@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { MCPServerConfig } from '@gemini-code/server/src/config/config.js';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -24,7 +24,7 @@ export interface Settings {
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
-  mcpServers?: Record<string, StdioServerParameters>;
+  mcpServers?: Record<string, MCPServerConfig>;
   // Add other settings here.
 }
 
@@ -69,10 +69,10 @@ export class LoadedSettings {
   setValue(
     scope: SettingScope,
     key: keyof Settings,
-    value: string | Record<string, StdioServerParameters> | undefined,
+    value: string | Record<string, MCPServerConfig> | undefined,
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, StdioServerParameters>
+    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);

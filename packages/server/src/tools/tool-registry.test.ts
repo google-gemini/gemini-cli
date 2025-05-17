@@ -577,7 +577,6 @@ describe('DiscoveredTool', () => {
 });
 
 describe('DiscoveredMCPTool', () => {
-  let config: Config;
   let mockMcpClient: Client;
   const toolName = 'my-mcp-tool';
   const toolDescription = 'An MCP-discovered tool.';
@@ -587,21 +586,6 @@ describe('DiscoveredMCPTool', () => {
   };
 
   beforeEach(() => {
-    const mockTargetDir = '/test/dir';
-    config = new Config(
-      'test-api-key',
-      'test-model',
-      false, // sandbox
-      mockTargetDir, // targetDir
-      false, // debugMode
-      undefined, // question
-      false, // fullContext
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      'TestAgent/1.0', // userAgent
-    );
     mockMcpClient = new Client({
       name: 'test-client',
       version: '0.0.0',
@@ -615,7 +599,6 @@ describe('DiscoveredMCPTool', () => {
   it('constructor should set up properties correctly and enhance description', () => {
     const tool = new DiscoveredMCPTool(
       mockMcpClient,
-      config,
       toolName,
       toolDescription,
       toolInputSchema,
@@ -631,7 +614,6 @@ describe('DiscoveredMCPTool', () => {
   it('execute should call mcpClient.callTool with correct params and return serialized result', async () => {
     const tool = new DiscoveredMCPTool(
       mockMcpClient,
-      config,
       toolName,
       toolDescription,
       toolInputSchema,
@@ -644,10 +626,16 @@ describe('DiscoveredMCPTool', () => {
 
     const result = await tool.execute(params);
 
-    expect(mockMcpClient.callTool).toHaveBeenCalledWith({
-      name: toolName,
-      arguments: params,
-    });
+    expect(mockMcpClient.callTool).toHaveBeenCalledWith(
+      {
+        name: toolName,
+        arguments: params,
+      },
+      undefined,
+      {
+        timeout: 10 * 60 * 1000,
+      },
+    );
     const expectedOutput = JSON.stringify(mcpResult, null, 2);
     expect(result.llmContent).toBe(expectedOutput);
     expect(result.returnDisplay).toBe(expectedOutput);

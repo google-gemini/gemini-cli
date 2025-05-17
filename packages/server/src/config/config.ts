@@ -21,7 +21,16 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { BaseTool, ToolResult } from '../tools/tools.js';
 import { MemoryTool } from '../tools/memoryTool.js';
-import { StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+export class MCPServerConfig {
+  constructor(
+    readonly command: string,
+    readonly args?: string[],
+    readonly env?: Record<string, string>,
+    readonly cwd?: string,
+    readonly timeout?: number,
+  ) {}
+}
 
 export class Config {
   private toolRegistry: ToolRegistry;
@@ -37,9 +46,7 @@ export class Config {
     private readonly toolDiscoveryCommand: string | undefined,
     private readonly toolCallCommand: string | undefined,
     private readonly mcpServerCommand: string | undefined,
-    private readonly mcpServers:
-      | Record<string, StdioServerParameters>
-      | undefined,
+    private readonly mcpServers: Record<string, MCPServerConfig> | undefined,
     private readonly userAgent: string,
     private userMemory: string = '', // Made mutable for refresh
     private geminiMdFileCount: number = 0,
@@ -92,7 +99,7 @@ export class Config {
     return this.mcpServerCommand;
   }
 
-  getMcpServers(): Record<string, StdioServerParameters> | undefined {
+  getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
   }
 
@@ -164,7 +171,7 @@ export function createServerConfig(
   toolDiscoveryCommand?: string,
   toolCallCommand?: string,
   mcpServerCommand?: string,
-  mcpServers?: Record<string, StdioServerParameters>,
+  mcpServers?: Record<string, MCPServerConfig>,
   userAgent?: string,
   userMemory?: string,
   geminiMdFileCount?: number,
