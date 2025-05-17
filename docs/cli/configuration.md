@@ -51,8 +51,16 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - Custom command for executing tool calls (if applicable to your setup).
   - Must take function name as first argument and function arguments as JSON on `stdin`
   - Must return JSON result of funcation call on `stdout`.
-- **`mcpServerCommand`** (string, advanced):
-  - Custom command for starting an MCP server with custom tools.
+- **`mcpServers`** (object, advanced):
+  - Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools.
+  - This is an object where each key is a server name and the value is an object defining the server's parameters:
+    - `command` (string, required): The command to execute to start the MCP server.
+    - `args` (array of strings, optional): Arguments to pass to the command.
+    - `env` (object, optional): Environment variables to set for the server process.
+    - `cwd` (string, optional): The working directory in which to start the server.
+  - Example: `"mcpServers": { "myServer": { "command": "python", "args": ["mcp_server.py", "--port", "8080"], "cwd": "./mcp_tools" } }`
+  - **`mcpServerCommand`** (string, advanced, **deprecated**):
+    - Legacy setting for configuring a single MCP server. Please use `mcpServers` instead for better flexibility and support for multiple servers.
 
 ### Example `settings.json`:
 
@@ -62,7 +70,15 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   "sandbox": "docker",
   "toolDiscoveryCommand": "bin/get_tools",
   "toolCallCommand": "bin/call_tool",
-  "mcpServerCommand": "bin/mcp_server.py"
+  "mcpServers": {
+    "mainServer": {
+      "command": "bin/mcp_server.py"
+    },
+    "anotherServer": {
+      "command": "node",
+      "args": ["mcp_server.js", "--verbose"]
+    }
+  }
 }
 ```
 
