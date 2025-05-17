@@ -263,7 +263,7 @@ describe('ToolRegistry', () => {
       );
     });
 
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
+    it('should discover tools using MCP servers defined in getMcpServers and strip schema properties', async () => {
       mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined); // No regular discovery
       mockConfigGetMcpServerCommand.mockReturnValue(undefined); // No command-based MCP
       mockConfigGetMcpServers.mockReturnValue({
@@ -279,16 +279,26 @@ describe('ToolRegistry', () => {
           {
             name: 'mcp-tool-1',
             description: 'An MCP tool',
-            inputSchema: { type: 'object' },
-          }, // Corrected: Add type: 'object'
+            inputSchema: {
+              type: 'object',
+              properties: {
+                param1: { type: 'string', $schema: 'remove-me' },
+                param2: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    nested: { type: 'number' },
+                  },
+                },
+              },
+              additionalProperties: true,
+              $schema: 'http://json-schema.org/draft-07/schema#',
+            },
+          },
         ],
       });
       mockMcpClientInstance.connect.mockResolvedValue(undefined);
 
-      // discoverTools has an async IIFE, so we need to wait for it.
-      // A simple way is to use a short timeout, but a more robust way would be to
-      // have discoverTools return a promise that resolves when all async operations are done.
-      // For now, using a timeout.
       toolRegistry.discoverTools();
       await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for async operations
 
@@ -302,11 +312,26 @@ describe('ToolRegistry', () => {
       expect(mockMcpClientInstance.connect).toHaveBeenCalled();
       expect(mockMcpClientInstance.listTools).toHaveBeenCalled();
 
-      const discoveredTool = toolRegistry.getTool('mcp-tool-1'); // Name is not prefixed if only one MCP server from getMcpServers
+      const discoveredTool = toolRegistry.getTool('mcp-tool-1');
       expect(discoveredTool).toBeInstanceOf(DiscoveredMCPTool);
       expect(discoveredTool?.name).toBe('mcp-tool-1');
       expect(discoveredTool?.description).toContain('An MCP tool');
       expect(discoveredTool?.description).toContain('mcp-tool-1');
+
+      // Verify that $schema and additionalProperties are removed
+      const cleanedSchema = discoveredTool?.schema.parameters;
+      expect(cleanedSchema).not.toHaveProperty('$schema');
+      expect(cleanedSchema).not.toHaveProperty('additionalProperties');
+      expect(cleanedSchema?.properties?.param1).not.toHaveProperty('$schema');
+      expect(cleanedSchema?.properties?.param2).not.toHaveProperty(
+        'additionalProperties',
+      );
+      expect(
+        cleanedSchema?.properties?.param2?.properties?.nested,
+      ).not.toHaveProperty('$schema');
+      expect(
+        cleanedSchema?.properties?.param2?.properties?.nested,
+      ).not.toHaveProperty('additionalProperties');
     });
 
     it('should discover tools using MCP server command from getMcpServerCommand', async () => {

@@ -226,6 +226,22 @@ export class ToolRegistry {
         });
         const result = await mcpClient.listTools();
         for (const tool of result.tools) {
+          // Recursively remove additionalProperties and $schema from the inputSchema
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This function recursively navigates a deeply nested and potentially heterogeneous JSON schema object. Using 'any' is a pragmatic choice here to avoid overly complex type definitions for all possible schema variations.
+          const removeSchemaProps = (obj: any) => {
+            if (typeof obj !== 'object' || obj === null) {
+              return;
+            }
+            if (Array.isArray(obj)) {
+              obj.forEach(removeSchemaProps);
+            } else {
+              delete obj.additionalProperties;
+              delete obj.$schema;
+              Object.values(obj).forEach(removeSchemaProps);
+            }
+          };
+          removeSchemaProps(tool.inputSchema);
+
           this.registerTool(
             new DiscoveredMCPTool(
               mcpClient,
