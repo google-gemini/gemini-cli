@@ -99,6 +99,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
+    readonly serverToolName: string,
   ) {
     description += `
 
@@ -112,7 +113,7 @@ Returns the MCP server response as a json string.
 
   async execute(params: ToolParams): Promise<ToolResult> {
     const result = await this.mcpClient.callTool({
-      name: this.name,
+      name: this.serverToolName,
       arguments: params,
     });
     return {
@@ -251,6 +252,7 @@ export class ToolRegistry {
                 : tool.name,
               tool.description ?? '',
               tool.inputSchema,
+              tool.name,
             ),
           );
         }

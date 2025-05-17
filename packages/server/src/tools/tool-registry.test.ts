@@ -619,6 +619,7 @@ describe('DiscoveredMCPTool', () => {
       toolName,
       toolDescription,
       toolInputSchema,
+      toolName,
     );
     expect(tool.name).toBe(toolName);
     expect(tool.schema.description).toContain(toolDescription);
@@ -634,6 +635,7 @@ describe('DiscoveredMCPTool', () => {
       toolName,
       toolDescription,
       toolInputSchema,
+      toolName,
     );
     const params = { data: 'test_data' };
     const mcpResult = { success: true, value: 'processed' };
