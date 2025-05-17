@@ -56,7 +56,7 @@ interface CalculatedEdit {
  */
 export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   static readonly Name = 'replace';
-  private shouldAlwaysEdit = false;
+  private readonly config: Config;
   private readonly rootDirectory: string;
   private readonly client: GeminiClient;
 
@@ -98,8 +98,9 @@ Expectation for parameters:
         type: 'object',
       },
     );
-    this.rootDirectory = path.resolve(config.getTargetDir());
-    this.client = new GeminiClient(config);
+    this.config = config;
+    this.rootDirectory = path.resolve(this.config.getTargetDir());
+    this.client = new GeminiClient(this.config);
   }
 
   /**
@@ -234,7 +235,7 @@ Expectation for parameters:
   async shouldConfirmExecute(
     params: EditToolParams,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.shouldAlwaysEdit) {
+    if (this.config.getAlwaysSkipModificationConfirmation()) {
       return false;
     }
     const validationError = this.validateToolParams(params);
@@ -295,7 +296,7 @@ Expectation for parameters:
       fileDiff,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.shouldAlwaysEdit = true;
+          this.config.setAlwaysSkipModificationConfirmation(true);
         }
       },
     };

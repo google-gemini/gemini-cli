@@ -4,18 +4,48 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WriteFileTool } from './write-file.js';
 import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+import { Config } from '../config/config.js';
+import { ToolRegistry } from './tool-registry.js'; // Added import
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
+const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
+
+// Mock Config
+const mockConfigInternal = {
+  getTargetDir: () => rootDir,
+  getAlwaysSkipModificationConfirmation: vi.fn(() => false),
+  setAlwaysSkipModificationConfirmation: vi.fn(),
+  getApiKey: () => 'test-key',
+  getModel: () => 'test-model',
+  getSandbox: () => false,
+  getDebugMode: () => false,
+  getQuestion: () => undefined,
+  getFullContext: () => false,
+  getToolDiscoveryCommand: () => undefined,
+  getToolCallCommand: () => undefined,
+  getMcpServerCommand: () => undefined,
+  getMcpServers: () => undefined,
+  getUserAgent: () => 'test-agent',
+  getUserMemory: () => '',
+  setUserMemory: vi.fn(),
+  getGeminiMdFileCount: () => 0,
+  setGeminiMdFileCount: vi.fn(),
+  getToolRegistry: () =>
+    ({
+      registerTool: vi.fn(),
+      discoverTools: vi.fn(),
+    }) as unknown as ToolRegistry,
+};
+const mockConfig = mockConfigInternal as unknown as Config;
+
 describe('WriteFileTool', () => {
   let tool: WriteFileTool;
   let tempDir: string;
-  // Using a subdirectory within the OS temp directory for the root to avoid potential permission issues.
-  const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
   beforeEach(() => {
     // Create a unique temporary directory for files created outside the root (for testing boundary conditions)
@@ -26,7 +56,12 @@ describe('WriteFileTool', () => {
     if (!fs.existsSync(rootDir)) {
       fs.mkdirSync(rootDir, { recursive: true });
     }
-    tool = new WriteFileTool(rootDir);
+    tool = new WriteFileTool(mockConfig);
+    // Reset mocks before each test that might use them for confirmation logic
+    mockConfigInternal.getAlwaysSkipModificationConfirmation.mockReturnValue(
+      false,
+    );
+    mockConfigInternal.setAlwaysSkipModificationConfirmation.mockClear();
   });
 
   afterEach(() => {

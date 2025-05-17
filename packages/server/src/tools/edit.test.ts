@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
 import { FileDiff } from './tools.js';
 import path from 'path';
@@ -38,9 +38,36 @@ describe('EditTool', () => {
 
     mockConfig = {
       getTargetDir: () => rootDir,
-      getGeminiConfig: () => ({ apiKey: 'test-api-key' }),
+      getAlwaysSkipModificationConfirmation: vi.fn(() => false),
+      setAlwaysSkipModificationConfirmation: vi.fn(),
+      // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
     } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getAlwaysSkipModificationConfirmation as Mock).mockClear();
+    (mockConfig.setAlwaysSkipModificationConfirmation as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getAlwaysSkipModificationConfirmation as Mock).mockReturnValue(
+      false,
+    );
 
     // Reset mocks and set default implementation for ensureCorrectEdit
     mockEnsureCorrectEdit.mockReset();
@@ -290,9 +317,10 @@ describe('EditTool', () => {
         new_string: fileContent,
       };
 
-      (tool as any).shouldAlwaysEdit = true;
+      (
+        mockConfig.getAlwaysSkipModificationConfirmation as Mock
+      ).mockReturnValueOnce(true);
       const result = await tool.execute(params, new AbortController().signal);
-      (tool as any).shouldAlwaysEdit = false;
 
       expect(result.llmContent).toMatch(/Created new file/);
       expect(fs.existsSync(newFilePath)).toBe(true);

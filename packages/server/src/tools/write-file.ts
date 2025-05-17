@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff';
+import { Config } from '../config/config.js';
 import {
   BaseTool,
   ToolResult,
@@ -15,9 +16,10 @@ import {
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js'; // Updated import
-import { makeRelative, shortenPath } from '../utils/paths.js'; // Updated import
+import { SchemaValidator } from '../utils/schemaValidator.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+
 /**
  * Parameters for the WriteFile tool
  */
@@ -38,9 +40,8 @@ export interface WriteFileToolParams {
  */
 export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
-  private shouldAlwaysWrite = false;
 
-  constructor(private readonly rootDirectory: string) {
+  constructor(private readonly config: Config) {
     super(
       WriteFileTool.Name,
       'WriteFile',
@@ -61,12 +62,11 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         type: 'object',
       },
     );
-    this.rootDirectory = path.resolve(rootDirectory);
   }
 
   private isWithinRoot(pathToCheck: string): boolean {
     const normalizedPath = path.normalize(pathToCheck);
-    const normalizedRoot = path.normalize(this.rootDirectory);
+    const normalizedRoot = path.normalize(this.config.getTargetDir());
     const rootWithSep = normalizedRoot.endsWith(path.sep)
       ? normalizedRoot
       : normalizedRoot + path.sep;
@@ -90,13 +90,16 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       return `File path must be absolute: ${params.file_path}`;
     }
     if (!this.isWithinRoot(params.file_path)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
+      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
     }
     return null;
   }
 
   getDescription(params: WriteFileToolParams): string {
-    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const relativePath = makeRelative(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
     return `Writing to ${shortenPath(relativePath)}`;
   }
 
@@ -106,7 +109,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   async shouldConfirmExecute(
     params: WriteFileToolParams,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.shouldAlwaysWrite) {
+    if (this.config.getAlwaysSkipModificationConfirmation()) {
       return false;
     }
 
@@ -118,7 +121,10 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       return false;
     }
 
-    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const relativePath = makeRelative(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
     const fileName = path.basename(params.file_path);
 
     let currentContent = '';
@@ -143,7 +149,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       fileDiff,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.shouldAlwaysWrite = true;
+          this.config.setAlwaysSkipModificationConfirmation(true);
         }
       },
     };

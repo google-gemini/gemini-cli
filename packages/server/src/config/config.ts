@@ -43,6 +43,7 @@ export class Config {
     private readonly userAgent: string,
     private userMemory: string = '', // Made mutable for refresh
     private geminiMdFileCount: number = 0,
+    private alwaysSkipModificationConfirmation: boolean = false,
   ) {
     // toolRegistry still needs initialization based on the instance
     this.toolRegistry = createToolRegistry(this);
@@ -114,6 +115,14 @@ export class Config {
   setGeminiMdFileCount(count: number): void {
     this.geminiMdFileCount = count;
   }
+
+  getAlwaysSkipModificationConfirmation(): boolean {
+    return this.alwaysSkipModificationConfirmation;
+  }
+
+  setAlwaysSkipModificationConfirmation(skip: boolean): void {
+    this.alwaysSkipModificationConfirmation = skip;
+  }
 }
 
 function findEnvFile(startDir: string): string | null {
@@ -159,6 +168,7 @@ export function createServerConfig(
   userAgent?: string,
   userMemory?: string,
   geminiMdFileCount?: number,
+  alwaysSkipModificationConfirmation?: boolean,
 ): Config {
   return new Config(
     apiKey,
@@ -175,6 +185,7 @@ export function createServerConfig(
     userAgent ?? 'GeminiCLI/unknown', // Default user agent
     userMemory ?? '',
     geminiMdFileCount ?? 0,
+    alwaysSkipModificationConfirmation ?? false,
   );
 }
 
@@ -188,7 +199,7 @@ function createToolRegistry(config: Config): ToolRegistry {
     new GrepTool(targetDir),
     new GlobTool(targetDir),
     new EditTool(config),
-    new WriteFileTool(targetDir),
+    new WriteFileTool(config),
     new WebFetchTool(),
     new ReadManyFilesTool(targetDir),
     new ShellTool(config),
