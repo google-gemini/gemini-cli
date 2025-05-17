@@ -205,8 +205,7 @@ Expectation for parameters:
         };
       } else {
         // Successful edit calculation
-        newContent = this.replaceAll(
-          currentContent,
+        newContent = currentContent.replaceAll(
           params.old_string,
           params.new_string,
         );
@@ -274,8 +273,7 @@ Expectation for parameters:
       if (correctedOccurrences === 0 || correctedOccurrences !== 1) {
         return false;
       }
-      newContent = this.replaceAll(
-        currentContent,
+      newContent = currentContent.replaceAll(
         params.old_string,
         params.new_string,
       );
@@ -390,19 +388,6 @@ Expectation for parameters:
         returnDisplay: `Error writing file: ${errorMsg}`,
       };
     }
-  }
-
-  /**
-   * Replaces all occurrences of a substring in a string
-   */
-  private replaceAll(str: string, find: string, replace: string): string {
-    if (find === '') {
-      return str;
-    }
-    // Use RegExp with global flag for true replacement of all instances
-    // Escape special regex characters in the find string
-    const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return str.replace(new RegExp(escapedFind, 'g'), replace);
   }
 
   /**
