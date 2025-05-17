@@ -101,14 +101,15 @@ describe('WriteFileTool', () => {
       );
     });
 
-    it('should return null for path that is the root itself', () => {
+    it('should return error for path that is the root itself', () => {
       const params = {
-        file_path: rootDir, // Attempting to write to the root directory itself (as a file)
+        file_path: rootDir, // Attempting to write to the root directory itself
         content: 'hello',
       };
-      // This is a tricky case. The validation should allow it if it's treated as a file path.
-      // The actual write operation might fail if it's a directory, but validation should pass.
-      expect(tool.validateToolParams(params)).toBeNull();
+      // With the new validation, this should now return an error as rootDir is a directory.
+      expect(tool.validateToolParams(params)).toMatch(
+        `Path is a directory, not a file: ${rootDir}`,
+      );
     });
 
     it('should return error for path that is just / and root is not /', () => {

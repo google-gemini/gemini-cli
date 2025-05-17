@@ -86,12 +86,29 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     ) {
       return 'Parameters failed schema validation.';
     }
-    if (!path.isAbsolute(params.file_path)) {
-      return `File path must be absolute: ${params.file_path}`;
+    const filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
+      return `File path must be absolute: ${filePath}`;
     }
-    if (!this.isWithinRoot(params.file_path)) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
+    if (!this.isWithinRoot(filePath)) {
+      return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
+
+    try {
+      // This check should be performed only if the path exists.
+      // If it doesn't exist, it's a new file, which is valid for writing.
+      if (fs.existsSync(filePath)) {
+        const stats = fs.lstatSync(filePath);
+        if (stats.isDirectory()) {
+          return `Path is a directory, not a file: ${filePath}`;
+        }
+      }
+    } catch (statError: unknown) {
+      // If fs.existsSync is true but lstatSync fails (e.g., permissions, race condition where file is deleted)
+      // this indicates an issue with accessing the path that should be reported.
+      return `Error accessing path properties for validation: ${filePath}. Reason: ${statError instanceof Error ? statError.message : String(statError)}`;
+    }
+
     return null;
   }
 
