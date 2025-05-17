@@ -221,7 +221,7 @@ export class ToolRegistry {
         transport.stderr.on('data', (data) => {
           // filter out INFO messages logged for each request received
           if (!data.toString().includes('] INFO')) {
-            console.log('MCP STDERR', data.toString());
+            console.debug('MCP STDERR', data.toString());
           }
         });
         const result = await mcpClient.listTools();
