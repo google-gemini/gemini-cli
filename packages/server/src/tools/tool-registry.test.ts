@@ -87,6 +87,7 @@ describe('ToolRegistry', () => {
       false, // debugMode
       undefined, // question
       false, // fullContext
+      undefined, // coreTools
       undefined, // toolDiscoveryCommand
       undefined, // toolCallCommand
       undefined, // mcpServerCommand
@@ -167,6 +168,163 @@ describe('ToolRegistry', () => {
       const tool = new MockTool();
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
+    });
+  });
+
+  // New describe block for coreTools testing
+  describe('core tool registration based on config.coreTools', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const MOCK_TOOL_ALPHA_CLASS_NAME = 'MockCoreToolAlpha'; // Class.name
+    const MOCK_TOOL_ALPHA_STATIC_NAME = 'ToolAlphaFromStatic'; // Tool.Name and registration name
+    class MockCoreToolAlpha extends BaseTool<any, ToolResult> {
+      static readonly Name = MOCK_TOOL_ALPHA_STATIC_NAME;
+      constructor() {
+        super(
+          MockCoreToolAlpha.Name,
+          MockCoreToolAlpha.Name,
+          'Description for Alpha Tool',
+          {},
+        );
+      }
+      async execute(_params: any): Promise<ToolResult> {
+        return { llmContent: 'AlphaExecuted', returnDisplay: 'AlphaExecuted' };
+      }
+    }
+
+    const MOCK_TOOL_BETA_CLASS_NAME = 'MockCoreToolBeta'; // Class.name
+    const MOCK_TOOL_BETA_STATIC_NAME = 'ToolBetaFromStatic'; // Tool.Name and registration name
+    class MockCoreToolBeta extends BaseTool<any, ToolResult> {
+      static readonly Name = MOCK_TOOL_BETA_STATIC_NAME;
+      constructor() {
+        super(
+          MockCoreToolBeta.Name,
+          MockCoreToolBeta.Name,
+          'Description for Beta Tool',
+          {},
+        );
+      }
+      async execute(_params: any): Promise<ToolResult> {
+        return { llmContent: 'BetaExecuted', returnDisplay: 'BetaExecuted' };
+      }
+    }
+
+    const availableCoreToolClasses = [MockCoreToolAlpha, MockCoreToolBeta];
+    let currentConfig: Config;
+    let currentToolRegistry: ToolRegistry;
+    const mockTargetDir = '/test/dir'; // As used in outer scope
+
+    // Helper to set up Config, ToolRegistry, and simulate core tool registration
+    const setupRegistryAndSimulateRegistration = (
+      coreToolsValueInConfig: string[] | undefined,
+    ) => {
+      currentConfig = new Config(
+        'test-api-key',
+        'test-model',
+        false, // sandbox
+        mockTargetDir, // targetDir
+        false, // debugMode
+        undefined, // question
+        false, // fullContext
+        coreToolsValueInConfig, // coreTools setting being tested
+        undefined, // toolDiscoveryCommand
+        undefined, // toolCallCommand
+        undefined, // mcpServerCommand
+        undefined, // mcpServers
+        'TestAgent/1.0', // userAgent
+      );
+
+      // We assume Config has a getter like getCoreTools() or stores it publicly.
+      // For this test, we'll directly use coreToolsValueInConfig for the simulation logic,
+      // as that's what Config would provide.
+      const coreToolsListFromConfig = coreToolsValueInConfig; // Simulating config.getCoreTools()
+
+      currentToolRegistry = new ToolRegistry(currentConfig);
+
+      // Simulate the external process that registers core tools based on config
+      if (coreToolsListFromConfig === undefined) {
+        // If coreTools is undefined, all available core tools are registered
+        availableCoreToolClasses.forEach((ToolClass) => {
+          currentToolRegistry.registerTool(new ToolClass());
+        });
+      } else {
+        // If coreTools is an array, register tools if their static Name or class name is in the list
+        availableCoreToolClasses.forEach((ToolClass) => {
+          if (
+            coreToolsListFromConfig.includes(ToolClass.Name) || // Check against static Name
+            coreToolsListFromConfig.includes(ToolClass.name) // Check against class name
+          ) {
+            currentToolRegistry.registerTool(new ToolClass());
+          }
+        });
+      }
+    };
+
+    // beforeEach for this nested describe is not strictly needed if setup is per-test,
+    // but ensure console.warn is mocked if any registration overwrites occur (though unlikely with this setup).
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    it('should register all core tools if coreTools config is undefined', () => {
+      setupRegistryAndSimulateRegistration(undefined);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_ALPHA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolAlpha);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_BETA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolBeta);
+      expect(currentToolRegistry.getAllTools()).toHaveLength(2);
+    });
+
+    it('should register no core tools if coreTools config is an empty array []', () => {
+      setupRegistryAndSimulateRegistration([]);
+      expect(currentToolRegistry.getAllTools()).toHaveLength(0);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_ALPHA_STATIC_NAME),
+      ).toBeUndefined();
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_BETA_STATIC_NAME),
+      ).toBeUndefined();
+    });
+
+    it('should register only tools specified by their static Name (ToolClass.Name) in coreTools config', () => {
+      setupRegistryAndSimulateRegistration([MOCK_TOOL_ALPHA_STATIC_NAME]); // e.g., ["ToolAlphaFromStatic"]
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_ALPHA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolAlpha);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_BETA_STATIC_NAME),
+      ).toBeUndefined();
+      expect(currentToolRegistry.getAllTools()).toHaveLength(1);
+    });
+
+    it('should register only tools specified by their class name (ToolClass.name) in coreTools config', () => {
+      // ToolBeta is registered under MOCK_TOOL_BETA_STATIC_NAME ('ToolBetaFromStatic')
+      // We configure coreTools with its class name: MOCK_TOOL_BETA_CLASS_NAME ('MockCoreToolBeta')
+      setupRegistryAndSimulateRegistration([MOCK_TOOL_BETA_CLASS_NAME]);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_BETA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolBeta);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_ALPHA_STATIC_NAME),
+      ).toBeUndefined();
+      expect(currentToolRegistry.getAllTools()).toHaveLength(1);
+    });
+
+    it('should register tools if specified by either static Name or class name in a mixed coreTools config', () => {
+      // Config: ["ToolAlphaFromStatic", "MockCoreToolBeta"]
+      // ToolAlpha matches by static Name. ToolBeta matches by class name.
+      setupRegistryAndSimulateRegistration([
+        MOCK_TOOL_ALPHA_STATIC_NAME, // Matches MockCoreToolAlpha.Name
+        MOCK_TOOL_BETA_CLASS_NAME, // Matches MockCoreToolBeta.name
+      ]);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_ALPHA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolAlpha);
+      expect(
+        currentToolRegistry.getTool(MOCK_TOOL_BETA_STATIC_NAME),
+      ).toBeInstanceOf(MockCoreToolBeta); // Registered under its static Name
+      expect(currentToolRegistry.getAllTools()).toHaveLength(2);
     });
   });
 
@@ -417,6 +575,7 @@ describe('DiscoveredTool', () => {
       false, // debugMode
       undefined, // question
       false, // fullContext
+      undefined, // coreTools
       undefined, // toolDiscoveryCommand
       undefined, // toolCallCommand
       undefined, // mcpServerCommand

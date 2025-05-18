@@ -399,6 +399,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     debugMode,
     argv.prompt || '',
     argv.all_files || false,
+    settings.coreTools || undefined,
     settings.toolDiscoveryCommand,
     settings.toolCallCommand,
     settings.mcpServerCommand,

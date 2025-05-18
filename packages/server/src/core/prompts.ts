@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
+import fs from 'node:fs';
 import { LSTool } from '../tools/ls.js';
 import { EditTool } from '../tools/edit.js';
 import { GlobTool } from '../tools/glob.js';
@@ -12,14 +14,18 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
-import process from 'node:process'; // Import process
+import process from 'node:process';
 import { execSync } from 'node:child_process';
-import { MemoryTool } from '../tools/memoryTool.js';
+import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
 const contactEmail = 'gemini-code-dev@google.com';
 
 export function getCoreSystemPrompt(userMemory?: string): string {
-  const basePrompt = `
+  // replace base prompt with system.md if it exists under GEMINI_CONFIG_DIR
+  const systemMdPath = path.join(GEMINI_CONFIG_DIR, 'system.md');
+  const basePrompt = fs.existsSync(systemMdPath)
+    ? fs.readFileSync(systemMdPath, 'utf8')
+    : `
 You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.
 
 # Primary Workflows

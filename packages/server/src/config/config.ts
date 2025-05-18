@@ -19,7 +19,6 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { BaseTool, ToolResult } from '../tools/tools.js';
 import { MemoryTool } from '../tools/memoryTool.js';
 
 export class MCPServerConfig {
@@ -43,6 +42,7 @@ export class Config {
     private readonly debugMode: boolean,
     private readonly question: string | undefined, // Keep undefined possibility
     private readonly fullContext: boolean = false, // Default value here
+    private readonly coreTools: string[] | undefined,
     private readonly toolDiscoveryCommand: string | undefined,
     private readonly toolCallCommand: string | undefined,
     private readonly mcpServerCommand: string | undefined,
@@ -85,6 +85,10 @@ export class Config {
 
   getFullContext(): boolean {
     return this.fullContext;
+  }
+
+  getCoreTools(): string[] | undefined {
+    return this.coreTools;
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -168,6 +172,7 @@ export function createServerConfig(
   debugMode: boolean,
   question: string,
   fullContext?: boolean,
+  coreTools?: string[],
   toolDiscoveryCommand?: string,
   toolCallCommand?: string,
   mcpServerCommand?: string,
@@ -185,6 +190,7 @@ export function createServerConfig(
     debugMode,
     question,
     fullContext,
+    coreTools,
     toolDiscoveryCommand,
     toolCallCommand,
     mcpServerCommand,
@@ -199,23 +205,30 @@ export function createServerConfig(
 function createToolRegistry(config: Config): ToolRegistry {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
+  const tools = config.getCoreTools()
+    ? new Set(config.getCoreTools())
+    : undefined;
 
-  const tools: Array<BaseTool<unknown, ToolResult>> = [
-    new LSTool(targetDir),
-    new ReadFileTool(targetDir),
-    new GrepTool(targetDir),
-    new GlobTool(targetDir),
-    new EditTool(config),
-    new WriteFileTool(config),
-    new WebFetchTool(),
-    new ReadManyFilesTool(targetDir),
-    new ShellTool(config),
-    new MemoryTool(),
-  ];
+  // helper to create & register core tools that are enabled
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
+    // check both the tool name (.Name) and the class name (.name)
+    if (!tools || tools.has(ToolClass.Name) || tools.has(ToolClass.name)) {
+      registry.registerTool(new ToolClass(...args));
+    }
+  };
 
-  for (const tool of tools) {
-    registry.registerTool(tool);
-  }
+  registerCoreTool(LSTool, targetDir);
+  registerCoreTool(ReadFileTool, targetDir);
+  registerCoreTool(GrepTool, targetDir);
+  registerCoreTool(GlobTool, targetDir);
+  registerCoreTool(EditTool, config);
+  registerCoreTool(WriteFileTool, config);
+  registerCoreTool(WebFetchTool);
+  registerCoreTool(ReadManyFilesTool, targetDir);
+  registerCoreTool(ShellTool, config);
+  registerCoreTool(MemoryTool);
+
   registry.discoverTools();
   return registry;
 }

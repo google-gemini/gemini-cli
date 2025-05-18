@@ -21,6 +21,7 @@ export enum SettingScope {
 export interface Settings {
   theme?: string;
   sandbox?: boolean | string;
+  coreTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
