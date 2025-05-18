@@ -15,7 +15,7 @@ import { addMemoryEntry } from '../../config/memoryUtils.js';
 export interface SlashCommand {
   name: string;
   altName?: string;
-  description: string;
+  description?: string;
   action: (mainCommand: string, subCommand?: string, args?: string) => void;
 }
 
@@ -31,6 +31,7 @@ export const useSlashCommandProcessor = (
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   performMemoryRefresh: () => Promise<void>, // Add performMemoryRefresh prop
+  toggleCorgiMode: () => void,
 ) => {
   const addMessage = useCallback(
     (message: Message) => {
@@ -132,6 +133,12 @@ export const useSlashCommandProcessor = (
         },
       },
       {
+        name: 'corgi',
+        action: (_mainCommand, _subCommand, _args) => {
+          toggleCorgiMode();
+        },
+      },
+      {
         name: 'quit',
         altName: 'exit',
         description: 'exit the cli',
@@ -151,6 +158,7 @@ export const useSlashCommandProcessor = (
       showMemoryAction,
       addMemoryAction,
       addMessage,
+      toggleCorgiMode,
     ],
   );
 

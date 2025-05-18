@@ -58,6 +58,12 @@ export const App = ({
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
+  const [corgiMode, setCorgiMode] = useState(false);
+
+  const toggleCorgiMode = useCallback(() => {
+    setCorgiMode((prev) => !prev);
+  }, []);
+
   const {
     isThemeDialogOpen,
     openThemeDialog,
@@ -124,6 +130,7 @@ export const App = ({
     setDebugMessage,
     openThemeDialog,
     performMemoryRefresh,
+    toggleCorgiMode,
   );
 
   const { streamingState, submitQuery, initError, pendingHistoryItem } =
@@ -408,6 +415,7 @@ export const App = ({
           debugMessage={debugMessage}
           cliVersion={cliVersion}
           geminiMdFileCount={geminiMdFileCount}
+          corgiMode={corgiMode}
         />
         <ConsoleOutput debugMode={config.getDebugMode()} />
       </Box>

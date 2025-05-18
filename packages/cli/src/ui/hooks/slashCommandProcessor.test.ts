@@ -48,6 +48,7 @@ describe('useSlashCommandProcessor', () => {
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
   let mockConfig: Config;
+  let mockCorgiMode: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockAddItem = vi.fn();
@@ -58,6 +59,7 @@ describe('useSlashCommandProcessor', () => {
     mockOpenThemeDialog = vi.fn();
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockConfig = { getDebugMode: vi.fn(() => false) } as unknown as Config;
+    mockCorgiMode = vi.fn();
 
     // Clear mocks for fsPromises if they were used directly or indirectly
     vi.mocked(fsPromises.readFile).mockClear();
@@ -89,6 +91,7 @@ describe('useSlashCommandProcessor', () => {
         mockOnDebugMessage,
         mockOpenThemeDialog,
         mockPerformMemoryRefresh,
+        mockCorgiMode,
       ),
     );
     return result.current;

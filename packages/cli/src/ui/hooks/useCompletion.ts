@@ -142,6 +142,7 @@ export function useCompletion(
             (altNameMatch && cmd.altName && cmd.altName.length > 1)
           );
         })
+        .filter((cmd) => cmd.description)
         .map((cmd) => ({
           label: cmd.name, // Always show the main name as label
           value: cmd.name, // Value should be the main command name for execution

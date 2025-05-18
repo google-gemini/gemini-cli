@@ -15,6 +15,7 @@ interface FooterProps {
   debugMessage: string;
   cliVersion: string;
   geminiMdFileCount: number;
+  corgiMode: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -23,6 +24,7 @@ export const Footer: React.FC<FooterProps> = ({
   debugMessage,
   cliVersion,
   geminiMdFileCount,
+  corgiMode,
 }) => (
   <Box marginTop={1}>
     <Box>
@@ -62,6 +64,16 @@ export const Footer: React.FC<FooterProps> = ({
     <Box>
       <Text color={Colors.AccentBlue}> {config.getModel()} </Text>
       <Text color={Colors.SubtleComment}>| CLI {cliVersion} </Text>
+      {corgiMode && (
+        <Text>
+          <Text color={Colors.SubtleComment}>| </Text>
+          <Text color={Colors.AccentRed}>▼</Text>
+          <Text color={Colors.Foreground}>(´</Text>
+          <Text color={Colors.AccentRed}>ᴥ</Text>
+          <Text color={Colors.Foreground}>`)</Text>
+          <Text color={Colors.AccentRed}>▼ </Text>
+        </Text>
+      )}
     </Box>
   </Box>
 );

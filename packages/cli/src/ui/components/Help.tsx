@@ -28,15 +28,17 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text bold color={Colors.Foreground}>
       Commands:
     </Text>
-    {commands.map((command: SlashCommand) => (
-      <Text key={command.name} color={Colors.SubtleComment}>
-        <Text bold color={Colors.AccentPurple}>
-          {' '}
-          /{command.name}
+    {commands
+      .filter((command) => command.description)
+      .map((command: SlashCommand) => (
+        <Text key={command.name} color={Colors.SubtleComment}>
+          <Text bold color={Colors.AccentPurple}>
+            {' '}
+            /{command.name}
+          </Text>
+          {command.description && ' - ' + command.description}
         </Text>
-        {command.description && ' - ' + command.description}
-      </Text>
-    ))}
+      ))}
     <Text color={Colors.SubtleComment}>
       <Text bold color={Colors.AccentPurple}>
         {' '}
