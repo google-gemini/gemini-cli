@@ -24,6 +24,11 @@ export interface GlobToolParams {
    * The directory to search in (optional, defaults to current directory)
    */
   path?: string;
+
+  /**
+   * Whether the search should be case-sensitive (optional, defaults to false)
+   */
+  case_sensitive?: boolean;
 }
 
 /**
@@ -44,13 +49,18 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         properties: {
           pattern: {
             description:
-              "The glob pattern to match against (e.g., '*.py', 'src/**/*.js', 'docs/*.md').",
+              "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
             type: 'string',
           },
           path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
             type: 'string',
+          },
+          case_sensitive: {
+            description:
+              'Optional: Whether the search should be case-sensitive. Defaults to false.',
+            type: 'boolean',
           },
         },
         required: ['pattern'],
@@ -88,7 +98,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         params,
       )
     ) {
-      return "Parameters failed schema validation. Ensure 'pattern' is a string and 'path' (if provided) is a string.";
+      return "Parameters failed schema validation. Ensure 'pattern' is a string, 'path' (if provided) is a string, and 'case_sensitive' (if provided) is a boolean.";
     }
 
     const searchDirAbsolute = path.resolve(
@@ -100,12 +110,13 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.rootDirectory}").`;
     }
 
+    const targetDir = searchDirAbsolute || this.rootDirectory;
     try {
-      if (!fs.existsSync(searchDirAbsolute)) {
-        return `Search path does not exist: ${shortenPath(makeRelative(searchDirAbsolute, this.rootDirectory))} (absolute: ${searchDirAbsolute})`;
+      if (!fs.existsSync(targetDir)) {
+        return `Search path does not exist ${targetDir}`;
       }
-      if (!fs.statSync(searchDirAbsolute).isDirectory()) {
-        return `Search path is not a directory: ${shortenPath(makeRelative(searchDirAbsolute, this.rootDirectory))} (absolute: ${searchDirAbsolute})`;
+      if (!fs.statSync(targetDir).isDirectory()) {
+        return `Search path is not a directory: ${targetDir}`;
       }
     } catch (e: unknown) {
       return `Error accessing search path: ${e}`;
@@ -162,15 +173,15 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         onlyFiles: true,
         stats: true,
         dot: true,
+        caseSensitiveMatch: params.case_sensitive ?? false,
         ignore: ['**/node_modules/**', '**/.git/**'],
         followSymbolicLinks: false,
         suppressErrors: true,
       });
 
       if (!entries || entries.length === 0) {
-        const displayPath = makeRelative(searchDirAbsolute, this.rootDirectory);
         return {
-          llmContent: `No files found matching pattern "${params.pattern}" within ${displayPath || '.'}.`,
+          llmContent: `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`,
           returnDisplay: `No files found`,
         };
       }
@@ -182,22 +193,11 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       });
 
       const sortedAbsolutePaths = entries.map((entry) => entry.path);
-      const sortedRelativePaths = sortedAbsolutePaths.map((absPath) =>
-        makeRelative(absPath, this.rootDirectory),
-      );
-
-      const fileListDescription = sortedRelativePaths.join('\n');
-      const fileCount = sortedRelativePaths.length;
-      const relativeSearchDir = makeRelative(
-        searchDirAbsolute,
-        this.rootDirectory,
-      );
-      const displayPath = shortenPath(
-        relativeSearchDir === '.' ? 'root directory' : relativeSearchDir,
-      );
+      const fileListDescription = sortedAbsolutePaths.join('\n');
+      const fileCount = sortedAbsolutePaths.length;
 
       return {
-        llmContent: `Found ${fileCount} file(s) matching "${params.pattern}" within ${displayPath}, sorted by modification time (newest first):\n${fileListDescription}`,
+        llmContent: `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}, sorted by modification time (newest first):\n${fileListDescription}`,
         returnDisplay: `Found ${fileCount} matching file(s)`,
       };
     } catch (error) {
