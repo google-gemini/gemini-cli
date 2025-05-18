@@ -61,6 +61,7 @@ export const App = ({
   const [themeError, setThemeError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
+  const [shellModeActive, setShellModeActive] = useState(false);
 
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
@@ -152,10 +153,16 @@ export const App = ({
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
-        submitQuery(submittedValue);
+        if (shellModeActive && !trimmedValue.startsWith('!')) {
+          // TODO: Don't prefix (hack) and properly submit pass throughs to a dedicated hook:
+          // https://b.corp.google.com/issues/418509745
+          submitQuery(`!${trimmedValue}`);
+        } else {
+          submitQuery(trimmedValue);
+        }
       }
     },
-    [submitQuery],
+    [submitQuery, shellModeActive],
   );
 
   const userMessages = useMemo(
@@ -364,6 +371,8 @@ export const App = ({
                   resetCompletion={completion.resetCompletionState}
                   setEditorState={setEditorState}
                   onClearScreen={handleClearScreen} // Added onClearScreen prop
+                  shellModeActive={shellModeActive}
+                  setShellModeActive={setShellModeActive}
                 />
                 {completion.showSuggestions && (
                   <Box>

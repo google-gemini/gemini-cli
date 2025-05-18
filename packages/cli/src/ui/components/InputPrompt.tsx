@@ -26,6 +26,8 @@ interface InputPromptProps {
   navigateSuggestionDown: () => void;
   setEditorState: (updater: (prevState: EditorState) => EditorState) => void;
   onClearScreen: () => void;
+  shellModeActive: boolean;
+  setShellModeActive: (value: boolean) => void;
 }
 
 export interface EditorState {
@@ -48,6 +50,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   resetCompletion,
   setEditorState,
   onClearScreen,
+  shellModeActive,
+  setShellModeActive,
 }) => {
   const handleSubmit = useCallback(
     (submittedValue: string) => {
@@ -116,6 +120,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       _currentText?: string,
       _cursorOffset?: number,
     ) => {
+      if (input === '!' && query === '' && !showSuggestions) {
+        setShellModeActive(!shellModeActive);
+        onChangeAndMoveCursor(''); // Clear the '!' from input
+        return true;
+      }
       if (showSuggestions) {
         if (key.upArrow) {
           navigateSuggestionUp();
@@ -186,12 +195,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       inputHistory,
       setEditorState,
       onClearScreen,
+      shellModeActive,
+      setShellModeActive,
+      onChangeAndMoveCursor,
     ],
   );
 
   return (
-    <Box borderStyle="round" borderColor={Colors.AccentBlue} paddingX={1}>
-      <Text color={Colors.AccentPurple}>&gt; </Text>
+    <Box
+      borderStyle="round"
+      borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+      paddingX={1}
+    >
+      <Text color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}>
+        {shellModeActive ? '! ' : '> '}
+      </Text>
       <Box flexGrow={1}>
         <MultilineTextEditor
           key={editorState.key.toString()}

@@ -38,7 +38,10 @@ export const useShellCommandProcessor = (
       const commandToExecute = rawQuery.trim().slice(1).trimStart();
 
       const userMessageTimestamp = Date.now();
-      addItemToHistory({ type: 'user', text: rawQuery }, userMessageTimestamp);
+      addItemToHistory(
+        { type: 'user_shell', text: rawQuery },
+        userMessageTimestamp,
+      );
 
       if (!commandToExecute) {
         addItemToHistory(

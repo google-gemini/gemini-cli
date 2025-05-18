@@ -85,12 +85,18 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   tools: IndividualToolCallDisplay[];
 };
 
+export type HistoryItemUserShell = HistoryItemBase & {
+  type: 'user_shell';
+  text: string;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
 // Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
+  | HistoryItemUserShell
   | HistoryItemGemini
   | HistoryItemGeminiContent
   | HistoryItemInfo
