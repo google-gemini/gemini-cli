@@ -334,24 +334,22 @@ export const App = ({
                 showAutoAcceptIndicator ? <AutoAcceptIndicator /> : undefined
               }
             />
-            {isInputActive && (
-              <Box
-                marginTop={1}
-                display="flex"
-                justifyContent="space-between"
-                width="100%"
-              >
-                <Box>
-                  <>
-                    <Text color={Colors.SubtleComment}>cwd: </Text>
-                    <Text color={Colors.LightBlue}>
-                      {shortenPath(config.getTargetDir(), 70)}
-                    </Text>
-                  </>
-                </Box>
-                {showAutoAcceptIndicator && <AutoAcceptIndicator />}
+            <Box
+              marginTop={1}
+              display="flex"
+              justifyContent="space-between"
+              width="100%"
+            >
+              <Box>
+                <>
+                  <Text color={Colors.SubtleComment}>cwd: </Text>
+                  <Text color={Colors.LightBlue}>
+                    {shortenPath(config.getTargetDir(), 70)}
+                  </Text>
+                </>
               </Box>
-            )}
+              {showAutoAcceptIndicator && <AutoAcceptIndicator />}
+            </Box>
             {isInputActive && (
               <>
                 <InputPrompt
