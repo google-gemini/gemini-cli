@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
 import { MCPServerConfig } from '@gemini-code/server/src/config/config.js';
+import stripJsonComments from 'strip-json-comments';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -92,7 +93,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
-      userSettings = JSON.parse(userContent);
+      userSettings = JSON.parse(stripJsonComments(userContent));
     }
   } catch (error) {
     console.error('Error reading user settings file:', error);
@@ -108,7 +109,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
       const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-      workspaceSettings = JSON.parse(projectContent);
+      workspaceSettings = JSON.parse(stripJsonComments(projectContent));
     }
   } catch (error) {
     console.error('Error reading workspace settings file:', error);
