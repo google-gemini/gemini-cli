@@ -132,9 +132,6 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
 
     const validationError = this.validateToolParams(params);
     if (validationError) {
-      console.error(
-        `[WriteFile Wrapper] Attempted confirmation with invalid parameters: ${validationError}`,
-      );
       return false;
     }
 
