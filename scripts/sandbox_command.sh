@@ -31,19 +31,19 @@ while getopts ":q" opt; do
 done
 shift $((OPTIND - 1))
 
-# if GEMINI_CODE_SANDBOX is not set, see if it is set in user settings
+# if GEMINI_SANDBOX is not set, see if it is set in user settings
 # note it can be string or boolean, and if missing jq will return null
 USER_SETTINGS_FILE="$HOME/.gemini/settings.json"
-if [ -z "${GEMINI_CODE_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
+if [ -z "${GEMINI_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
     USER_SANDBOX_SETTING=$(jq -r '.sandbox' "$USER_SETTINGS_FILE")
     if [ "$USER_SANDBOX_SETTING" != null ]; then
-        GEMINI_CODE_SANDBOX=$USER_SANDBOX_SETTING
+        GEMINI_SANDBOX=$USER_SANDBOX_SETTING
     fi
 fi
 
-# if GEMINI_CODE_SANDBOX is not set, try to source .env in case set there
+# if GEMINI_SANDBOX is not set, try to source .env in case set there
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
-if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
+if [ -z "${GEMINI_SANDBOX:-}" ]; then
     current_dir=$(pwd)
     dot_env_sourced=false
     while [ "$current_dir" != "/" ]; do
@@ -61,34 +61,41 @@ if [ -z "${GEMINI_CODE_SANDBOX:-}" ]; then
     fi
 fi
 
-# lowercase GEMINI_CODE_SANDBOX
-GEMINI_CODE_SANDBOX=$(echo "${GEMINI_CODE_SANDBOX:-}" | tr '[:upper:]' '[:lower:]')
+# copy and warn about deprecated GEMINI_CODE_SANDBOX
+if [ -n "${GEMINI_CODE_SANDBOX:-}" ]; then
+    echo "WARNING: GEMINI_CODE_SANDBOX is deprecated. Use GEMINI_SANDBOX instead." >&2
+    GEMINI_SANDBOX=$GEMINI_CODE_SANDBOX
+    export GEMINI_SANDBOX
+fi
 
-# if GEMINI_CODE_SANDBOX is set to 1|true, then try to use docker or podman
+# lowercase GEMINI_SANDBOX
+GEMINI_SANDBOX=$(echo "${GEMINI_SANDBOX:-}" | tr '[:upper:]' '[:lower:]')
+
+# if GEMINI_SANDBOX is set to 1|true, then try to use docker or podman
 # if non-empty and not 0|false, treat as custom command and check that it exists
 # if empty or 0|false, then fail silently (after checking for possible fallbacks)
 command=""
-if [[ "${GEMINI_CODE_SANDBOX:-}" =~ ^(1|true)$ ]]; then
+if [[ "${GEMINI_SANDBOX:-}" =~ ^(1|true)$ ]]; then
     if command -v docker &>/dev/null; then
         command="docker"
     elif command -v podman &>/dev/null; then
         command="podman"
     else
-        echo "ERROR: install docker or podman or specify command in GEMINI_CODE_SANDBOX" >&2
+        echo "ERROR: install docker or podman or specify command in GEMINI_SANDBOX" >&2
         exit 1
     fi
-elif [ -n "${GEMINI_CODE_SANDBOX:-}" ] && [[ ! "${GEMINI_CODE_SANDBOX:-}" =~ ^(0|false)$ ]]; then
-    if ! command -v "$GEMINI_CODE_SANDBOX" &>/dev/null; then
-        echo "ERROR: missing sandbox command '$GEMINI_CODE_SANDBOX' (from GEMINI_CODE_SANDBOX)" >&2
+elif [ -n "${GEMINI_SANDBOX:-}" ] && [[ ! "${GEMINI_SANDBOX:-}" =~ ^(0|false)$ ]]; then
+    if ! command -v "$GEMINI_SANDBOX" &>/dev/null; then
+        echo "ERROR: missing sandbox command '$GEMINI_SANDBOX' (from GEMINI_SANDBOX)" >&2
         exit 1
     fi
-    command="$GEMINI_CODE_SANDBOX"
+    command="$GEMINI_SANDBOX"
 else
     # if we are on macOS and sandbox-exec is available, use that for minimal sandboxing
     # unless SEATBELT_PROFILE is set to 'none', which we allow as an escape hatch
     if [ "$(uname)" = "Darwin" ] && command -v sandbox-exec &>/dev/null && [ "${SEATBELT_PROFILE:-}" != "none" ]; then
         command="sandbox-exec"
-    else # GEMINI_CODE_SANDBOX is empty or 0|false, so we fail w/o error msg
+    else # GEMINI_SANDBOX is empty or 0|false, so we fail w/o error msg
         exit 1
     fi
 fi

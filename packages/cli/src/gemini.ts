@@ -24,6 +24,25 @@ const __dirname = dirname(__filename);
 async function main() {
   const settings = loadSettings(process.cwd());
   const config = await loadCliConfig(settings.merged);
+
+  // warn about deprecated environment variables
+  if (process.env.GEMINI_CODE_MODEL) {
+    console.warn('GEMINI_CODE_MODEL is deprecated. Use GEMINI_MODEL instead.');
+    process.env.GEMINI_MODEL = process.env.GEMINI_CODE_MODEL;
+  }
+  if (process.env.GEMINI_CODE_SANDBOX) {
+    console.warn(
+      'GEMINI_CODE_SANDBOX is deprecated. Use GEMINI_SANDBOX instead.',
+    );
+    process.env.GEMINI_SANDBOX = process.env.GEMINI_CODE_SANDBOX;
+  }
+  if (process.env.GEMINI_CODE_SANDBOX_IMAGE) {
+    console.warn(
+      'GEMINI_CODE_SANDBOX_IMAGE is deprecated. Use GEMINI_SANDBOX_IMAGE_NAME instead.',
+    );
+    process.env.GEMINI_SANDBOX_IMAGE = process.env.GEMINI_CODE_SANDBOX_IMAGE;
+  }
+
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.

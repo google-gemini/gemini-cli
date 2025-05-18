@@ -22,12 +22,12 @@ These are the main pieces of information the server `Config` object holds and us
 
 - **`model` (string):**
 
-  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_CODE_MODEL`), or the default value `gemini-2.5-pro-preview-05-06`.
+  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or the default value `gemini-2.5-pro-preview-05-06`.
   - **Purpose:** Specifies which Gemini model the server should use for generating responses.
 
 - **`sandbox` (boolean | string):**
 
-  - **Source:** Command-line argument (`--sandbox`), environment variable (`GEMINI_CODE_SANDBOX`), or `settings.json` (`sandbox` key).
+  - **Source:** Command-line argument (`--sandbox`), environment variable (`GEMINI_SANDBOX`), or `settings.json` (`sandbox` key).
   - **Purpose:** Determines if and how tools (especially `execute_bash_command`) are sandboxed. This is crucial for security.
     - `true`: Use a default sandboxing method.
     - `false`: No sandboxing (less secure).
@@ -92,12 +92,12 @@ The CLI configuration logic, which precedes server initialization, includes load
 2.  `.env` in parent directories, up to the project root (containing `.git`) or home directory.
 3.  `~/.env` (in the user's home directory).
 
-This file is a common place to store the `GEMINI_API_KEY` and other environment-specific settings like `GEMINI_CODE_MODEL` or `DEBUG` flags.
+This file is a common place to store the `GEMINI_API_KEY` and other environment-specific settings like `GEMINI_MODEL` or `DEBUG` flags.
 
 ```
 # Example .env file
 GEMINI_API_KEY="YOUR_ACTUAL_API_KEY_HERE"
-GEMINI_CODE_MODEL="gemini-1.5-flash-latest"
+GEMINI_MODEL="gemini-1.5-flash-latest"
 # DEBUG=true
 ```
 

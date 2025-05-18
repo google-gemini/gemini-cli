@@ -96,11 +96,11 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Your API key for the Gemini API.
   - **Crucial for operation.** The CLI will not function without it.
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
-- **`GEMINI_CODE_MODEL`**:
+- **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default, which is currently `gemini-2.5-pro-preview-05-06`.
-  - Example: `export GEMINI_CODE_MODEL="gemini-1.5-flash-latest"`
-- **`GEMINI_CODE_SANDBOX`**:
+  - Example: `export GEMINI_MODEL="gemini-1.5-flash-latest"`
+- **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
 - **`SEATBELT_PROFILE`** (macOS specific):

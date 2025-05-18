@@ -73,7 +73,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 // node.js equivalent of scripts/sandbox_command.sh
 export function sandbox_command(sandbox?: string | boolean): string {
   // note environment variable takes precedence over argument (from command line or settings)
-  sandbox = process.env.GEMINI_CODE_SANDBOX?.toLowerCase().trim() ?? sandbox;
+  sandbox = process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? sandbox;
   if (sandbox === '1' || sandbox === 'true') sandbox = true;
   else if (sandbox === '0' || sandbox === 'false') sandbox = false;
 
@@ -86,7 +86,7 @@ export function sandbox_command(sandbox?: string | boolean): string {
     } else {
       console.error(
         'ERROR: failed to determine command for sandbox; ' +
-          'install docker or podman or specify command in GEMINI_CODE_SANDBOX',
+          'install docker or podman or specify command in GEMINI_SANDBOX',
       );
       process.exit(1);
     }
@@ -96,7 +96,7 @@ export function sandbox_command(sandbox?: string | boolean): string {
       return sandbox;
     } else {
       console.error(
-        `ERROR: missing sandbox command '${sandbox}' (from GEMINI_CODE_SANDBOX)`,
+        `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
       );
       process.exit(1);
     }
@@ -255,7 +255,7 @@ export async function start_sandbox(sandbox: string) {
   // determine full path for gemini-code to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
 
-  const image = process.env.GEMINI_CODE_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
+  const image = process.env.GEMINI_SANDBOX_IMAGE ?? 'gemini-code-sandbox';
   const workdir = process.cwd();
 
   // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
@@ -383,9 +383,9 @@ export async function start_sandbox(sandbox: string) {
     args.push('--env', `GEMINI_API_KEY=${process.env.GEMINI_API_KEY}`);
   }
 
-  // copy GEMINI_CODE_MODEL
-  if (process.env.GEMINI_CODE_MODEL) {
-    args.push('--env', `GEMINI_CODE_MODEL=${process.env.GEMINI_CODE_MODEL}`);
+  // copy GEMINI_MODEL
+  if (process.env.GEMINI_MODEL) {
+    args.push('--env', `GEMINI_MODEL=${process.env.GEMINI_MODEL}`);
   }
 
   // copy TERM and COLORTERM to try to maintain terminal setup
