@@ -13,12 +13,14 @@ interface LoadingIndicatorProps {
   isLoading: boolean;
   currentLoadingPhrase: string;
   elapsedTime: number;
+  rightContent?: React.ReactNode;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   isLoading,
   currentLoadingPhrase,
   elapsedTime,
+  rightContent,
 }) => {
   if (!isLoading) {
     return null; // Don't render anything if not loading
@@ -30,10 +32,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         <Spinner type="dots" />
       </Box>
       <Text color={Colors.AccentPurple}>
-        {currentLoadingPhrase} ({elapsedTime}s)
+        {currentLoadingPhrase} (esc to cancel, {elapsedTime}s)
       </Text>
       <Box flexGrow={1}>{/* Spacer */}</Box>
-      <Text color={Colors.SubtleComment}>(ESC to cancel)</Text>
+      {rightContent && <Box>{rightContent}</Box>}
     </Box>
   );
 };
