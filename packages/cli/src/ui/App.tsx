@@ -330,9 +330,6 @@ export const App = ({
               isLoading={streamingState === StreamingState.Responding}
               currentLoadingPhrase={currentLoadingPhrase}
               elapsedTime={elapsedTime}
-              rightContent={
-                showAutoAcceptIndicator ? <AutoAcceptIndicator /> : undefined
-              }
             />
             <Box
               marginTop={1}
