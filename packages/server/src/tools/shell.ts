@@ -17,6 +17,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
+import { getErrorMessage } from '../utils/errors.js';
 export interface ShellToolParams {
   command: string;
   description?: string;
@@ -249,8 +250,29 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       ].join('\n');
     }
 
-    const returnDisplay = this.config.getDebugMode() ? llmContent : output;
+    let returnDisplayMessage = '';
+    if (this.config.getDebugMode()) {
+      returnDisplayMessage = llmContent;
+    } else {
+      if (output.trim()) {
+        returnDisplayMessage = output;
+      } else {
+        // Output is empty, let's provide a reason if the command failed or was cancelled
+        if (abortSignal.aborted) {
+          returnDisplayMessage = 'Command cancelled by user.';
+        } else if (processSignal) {
+          returnDisplayMessage = `Command terminated by signal: ${processSignal}`;
+        } else if (error) {
+          // If error is not null, it's an Error object (or other truthy value)
+          returnDisplayMessage = `Command failed: ${getErrorMessage(error)}`;
+        } else if (code !== null && code !== 0) {
+          returnDisplayMessage = `Command exited with code: ${code}`;
+        }
+        // If output is empty and command succeeded (code 0, no error/signal/abort),
+        // returnDisplayMessage will remain empty, which is fine.
+      }
+    }
 
-    return { llmContent, returnDisplay };
+    return { llmContent, returnDisplay: returnDisplayMessage };
   }
 }
