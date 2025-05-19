@@ -40,6 +40,7 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
+    "open": "^10.1.2",
     "react": "^18.3.1",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.2",

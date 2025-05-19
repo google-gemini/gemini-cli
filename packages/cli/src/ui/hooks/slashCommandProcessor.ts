@@ -6,6 +6,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
+import open from 'open';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
@@ -139,6 +140,71 @@ export const useSlashCommandProcessor = (
         },
       },
       {
+        name: 'bug',
+        description: 'Submit a bug report.',
+        action: (_mainCommand, _subCommand, args) => {
+          let bugDescription = _subCommand || '';
+          if (args) {
+            bugDescription += ` ${args}`;
+          }
+          bugDescription = bugDescription.trim();
+
+          const cliVersion = process.env.npm_package_version || 'Unknown';
+          const osVersion = `${process.platform} ${process.version}`;
+          let sandboxEnv = 'no sandbox';
+          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+            sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
+          } else if (process.env.SANDBOX === 'sandbox-exec') {
+            sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
+          }
+          const modelVersion = config?.getModel() || 'Unknown';
+
+          const diagnosticInfo = `
+## Describe the bug
+A clear and concise description of what the bug is.
+
+## Additional context
+Add any other context about the problem here.
+
+## Diagnostic Information
+*   **CLI Version:** ${cliVersion}
+*   **Operating System:** ${osVersion}
+*   **Sandbox Environment:** ${sandboxEnv}
+*   **Model Version:** ${modelVersion}
+`;
+
+          let bugReportUrl =
+            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.md';
+          if (bugDescription) {
+            const encodedArgs = encodeURIComponent(bugDescription);
+            bugReportUrl += `&title=${encodedArgs}`;
+          }
+          const encodedBody = encodeURIComponent(diagnosticInfo);
+          bugReportUrl += `&body=${encodedBody}`;
+
+          addMessage({
+            type: MessageType.INFO,
+            content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
+            timestamp: new Date(),
+          });
+          // Open the URL in the default browser
+          (async () => {
+            try {
+              await open(bugReportUrl);
+            } catch (error) {
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Could not open URL in browser: ${errorMessage}`,
+                timestamp: new Date(),
+              });
+            }
+          })();
+        },
+      },
+
+      {
         name: 'quit',
         altName: 'exit',
         description: 'exit the cli',
@@ -159,6 +225,7 @@ export const useSlashCommandProcessor = (
       addMemoryAction,
       addMessage,
       toggleCorgiMode,
+      config, // Added config to dependency array
     ],
   );
 

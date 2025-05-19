@@ -21,6 +21,7 @@ vi.mock('node:fs/promises', () => ({
 
 import { act, renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { MessageType } from '../types.js';
 import * as memoryUtils from '../../config/memoryUtils.js';
@@ -38,6 +39,10 @@ vi.mock('./useShowMemoryCommand.js', () => ({
 
 // Spy on the static method we want to mock
 const performAddMemoryEntrySpy = vi.spyOn(MemoryTool, 'performAddMemoryEntry');
+
+vi.mock('open', () => ({
+  default: vi.fn(),
+}));
 
 describe('useSlashCommandProcessor', () => {
   let mockAddItem: ReturnType<typeof vi.fn>;
@@ -58,7 +63,11 @@ describe('useSlashCommandProcessor', () => {
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
-    mockConfig = { getDebugMode: vi.fn(() => false) } as unknown as Config;
+    mockConfig = {
+      getDebugMode: vi.fn(() => false),
+      getSandbox: vi.fn(() => 'test-sandbox'), // Added mock
+      getModel: vi.fn(() => 'test-model'), // Added mock
+    } as unknown as Config;
     mockCorgiMode = vi.fn();
 
     // Clear mocks for fsPromises if they were used directly or indirectly
@@ -66,7 +75,8 @@ describe('useSlashCommandProcessor', () => {
     vi.mocked(fsPromises.writeFile).mockClear();
     vi.mocked(fsPromises.mkdir).mockClear();
 
-    performAddMemoryEntrySpy.mockReset(); // Reset the spy
+    performAddMemoryEntrySpy.mockReset();
+    (open as Mock).mockClear();
     vi.spyOn(memoryUtils, 'deleteLastMemoryEntry').mockImplementation(vi.fn());
     vi.spyOn(memoryUtils, 'deleteAllAddedMemoryEntries').mockImplementation(
       vi.fn(),
@@ -229,6 +239,155 @@ describe('useSlashCommandProcessor', () => {
         handleSlashCommand('/help');
       });
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('/bug command', () => {
+    const getExpectedUrl = (
+      description?: string,
+      sandboxEnvVar?: string,
+      seatbeltProfileVar?: string,
+    ) => {
+      const cliVersion = process.env.npm_package_version || 'Unknown';
+      const osVersion = `${process.platform} ${process.version}`;
+      let sandboxEnvStr = 'no sandbox';
+      if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {
+        sandboxEnvStr = sandboxEnvVar.replace(/^gemini-(?:code-)?/, '');
+      } else if (sandboxEnvVar === 'sandbox-exec') {
+        sandboxEnvStr = `sandbox-exec (${seatbeltProfileVar || 'unknown'})`;
+      }
+      const modelVersion = 'test-model'; // From mockConfig
+
+      const diagnosticInfo = `
+## Describe the bug
+A clear and concise description of what the bug is.
+
+## Additional context
+Add any other context about the problem here.
+
+## Diagnostic Information
+*   **CLI Version:** ${cliVersion}
+*   **Operating System:** ${osVersion}
+*   **Sandbox Environment:** ${sandboxEnvStr}
+*   **Model Version:** ${modelVersion}
+`;
+      let url =
+        'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.md';
+      if (description) {
+        url += `&title=${encodeURIComponent(description)}`;
+      }
+      url += `&body=${encodeURIComponent(diagnosticInfo)}`;
+      return url;
+    };
+
+    it('should call open with the correct GitHub issue URL', async () => {
+      process.env.SANDBOX = 'gemini-sandbox';
+      process.env.SEATBELT_PROFILE = 'test_profile';
+      const { handleSlashCommand } = getProcessor();
+      const bugDescription = 'This is a test bug';
+      const expectedUrl = getExpectedUrl(
+        bugDescription,
+        process.env.SANDBOX,
+        process.env.SEATBELT_PROFILE,
+      );
+
+      await act(async () => {
+        handleSlashCommand(`/bug ${bugDescription}`);
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1, // User command
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: `/bug ${bugDescription}`,
+        }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Info message
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
+        }),
+        expect.any(Number), // Timestamps are numbers from Date.now()
+      );
+      expect(open).toHaveBeenCalledWith(expectedUrl);
+      delete process.env.SANDBOX;
+      delete process.env.SEATBELT_PROFILE;
+    });
+
+    it('should open the generic issue page if no bug description is provided', async () => {
+      process.env.SANDBOX = 'sandbox-exec';
+      process.env.SEATBELT_PROFILE = 'minimal';
+      const { handleSlashCommand } = getProcessor();
+      const expectedUrl = getExpectedUrl(
+        undefined,
+        process.env.SANDBOX,
+        process.env.SEATBELT_PROFILE,
+      );
+      await act(async () => {
+        handleSlashCommand('/bug ');
+      });
+      expect(open).toHaveBeenCalledWith(expectedUrl);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1, // User command
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: '/bug', // Ensure this matches the input
+        }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Info message
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
+        }),
+        expect.any(Number), // Timestamps are numbers from Date.now()
+      );
+      delete process.env.SANDBOX;
+      delete process.env.SEATBELT_PROFILE;
+    });
+
+    it('should handle errors when open fails', async () => {
+      // Test with no SANDBOX env var
+      delete process.env.SANDBOX;
+      delete process.env.SEATBELT_PROFILE;
+      const { handleSlashCommand } = getProcessor();
+      const bugDescription = 'Another bug';
+      const expectedUrl = getExpectedUrl(bugDescription);
+      const openError = new Error('Failed to open browser');
+      (open as Mock).mockRejectedValue(openError);
+
+      await act(async () => {
+        handleSlashCommand(`/bug ${bugDescription}`);
+      });
+
+      expect(open).toHaveBeenCalledWith(expectedUrl);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1, // User command
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: `/bug ${bugDescription}`,
+        }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Info message before open attempt
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
+        }),
+        expect.any(Number), // Timestamps are numbers from Date.now()
+      );
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        3, // Error message after open fails
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `Could not open URL in browser: ${openError.message}`,
+        }),
+        expect.any(Number), // Timestamps are numbers from Date.now()
+      );
     });
   });
 
