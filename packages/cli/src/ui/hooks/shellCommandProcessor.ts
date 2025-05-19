@@ -10,7 +10,10 @@ import { Config } from '@gemini-code/server';
 import { type PartListUnion } from '@google/genai';
 import { getCommandFromQuery } from '../utils/commandUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-
+import crypto from 'crypto';
+import path from 'path';
+import os from 'os';
+import fs from 'fs';
 /**
  * Hook to process shell commands (e.g., !ls, $pwd).
  * Executes the command in the target directory and adds output/errors to history.
@@ -35,7 +38,14 @@ export const useShellCommandProcessor = (
       if (symbol !== '!' && symbol !== '$') {
         return false;
       }
-      const commandToExecute = rawQuery.trim().slice(1).trimStart();
+      let commandToExecute = rawQuery.trim().slice(1).trimStart();
+
+      // wrap command to write pwd to temporary file
+      const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
+      const pwdFilePath = path.join(os.tmpdir(), pwdFileName);
+      if (!commandToExecute.endsWith('&')) commandToExecute += ';';
+      // note here we could also restore a previous pwd with `cd {cwd}; { ... }`
+      commandToExecute = `{ ${commandToExecute} }; pwd >${pwdFilePath}`;
 
       const userMessageTimestamp = Date.now();
       addItemToHistory(
@@ -75,6 +85,15 @@ export const useShellCommandProcessor = (
               { type: 'info', text: output || '(Command produced no output)' },
               userMessageTimestamp,
             );
+          }
+          if (fs.existsSync(pwdFilePath)) {
+            const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+            if (pwd !== targetDir) {
+              console.warn(
+                `shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+              );
+            }
+            fs.unlinkSync(pwdFilePath);
           }
           resolve();
         });
