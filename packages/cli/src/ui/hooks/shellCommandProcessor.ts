@@ -89,8 +89,12 @@ export const useShellCommandProcessor = (
           if (fs.existsSync(pwdFilePath)) {
             const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
             if (pwd !== targetDir) {
-              console.warn(
-                `shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+              addItemToHistory(
+                {
+                  type: 'info',
+                  text: `WARNING: shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+                },
+                userMessageTimestamp,
               );
             }
             fs.unlinkSync(pwdFilePath);
