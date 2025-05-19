@@ -147,13 +147,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     try {
       new RegExp(params.pattern);
     } catch (error) {
-      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${error instanceof Error ? error.message : String(error)}`;
+      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
     }
 
     try {
       this.resolveAndValidatePath(params.path);
     } catch (error) {
-      return error instanceof Error ? error.message : String(error);
+      return getErrorMessage(error);
     }
 
     return null; // Parameters are valid
@@ -172,12 +172,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
-      console.error(
-        `GrepLogic Parameter Validation Failed: ${validationError}`,
-      );
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Error: Failed to execute tool.`,
+        returnDisplay: `Model provided invalid parameters. Error: ${validationError}`,
       };
     }
 
@@ -231,8 +228,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       };
     } catch (error) {
       console.error(`Error during GrepLogic execution: ${error}`);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
@@ -286,7 +282,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           return false;
         } catch (error: unknown) {
           if (!isNodeError(error) || error.code !== 'ENOENT') {
-            console.error(
+            console.debug(
               `Error checking for .git in ${currentPath}: ${error}`,
             );
             return false;
@@ -299,7 +295,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         currentPath = path.dirname(currentPath);
       }
     } catch (error: unknown) {
-      console.error(
+      console.debug(
         `Error traversing directory structure upwards from ${dirPath}: ${getErrorMessage(error)}`,
       );
     }
@@ -366,9 +362,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       description += ` in ${params.include}`;
     }
     if (params.path) {
-      const searchDir = params.path || this.rootDirectory;
-      const relativePath = makeRelative(searchDir, this.rootDirectory);
-      description += ` within ${shortenPath(relativePath || './')}`;
+      const resolvedPath = path.resolve(this.rootDirectory, params.path);
+      if (resolvedPath === this.rootDirectory || params.path === '.') {
+        description += ` within ./`;
+      } else {
+        const relativePath = makeRelative(resolvedPath, this.rootDirectory);
+        description += ` within ${shortenPath(relativePath)}`;
+      }
     }
     return description;
   }
@@ -433,7 +433,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (gitError: unknown) {
-          console.warn(
+          console.debug(
             `GrepLogic: git grep failed: ${getErrorMessage(gitError)}. Falling back...`,
           );
         }
@@ -496,14 +496,14 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: unknown) {
-          console.warn(
+          console.debug(
             `GrepLogic: System grep failed: ${getErrorMessage(grepError)}. Falling back...`,
           );
         }
       }
 
       // --- Strategy 3: Pure JavaScript Fallback ---
-      console.warn(
+      console.debug(
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
@@ -548,7 +548,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         } catch (readError: unknown) {
           // Ignore errors like permission denied or file gone during read
           if (!isNodeError(readError) || readError.code !== 'ENOENT') {
-            console.warn(
+            console.debug(
               `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
             );
           }
