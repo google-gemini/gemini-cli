@@ -216,7 +216,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           initialCursorOffset={editorState.initialCursorOffset}
           initialText={query}
           onChange={onChange}
-          placeholder="Enter your message or use tools (e.g., @src/file.txt)..."
+          placeholder="Type your message or @path/to/file"
           /* Account for width used by the box and &gt; */
           navigateUp={inputHistory.navigateUp}
           navigateDown={inputHistory.navigateDown}

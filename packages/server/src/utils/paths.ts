@@ -5,6 +5,20 @@
  */
 
 import path from 'node:path';
+import os from 'os';
+
+/**
+ * Replaces the home directory with a tilde.
+ * @param path - The path to tildeify.
+ * @returns The tildeified path.
+ */
+export function tildeifyPath(path: string): string {
+  const homeDir = os.homedir();
+  if (path.startsWith(homeDir)) {
+    return path.replace(homeDir, '~');
+  }
+  return path;
+}
 
 /**
  * Shortens a path string if it exceeds maxLen, prioritizing the start and end segments.

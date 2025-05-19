@@ -20,7 +20,7 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { EditorState, InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { shortenPath, type Config } from '@gemini-code/server';
+import { type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -342,14 +342,16 @@ export const App = ({
               justifyContent="space-between"
               width="100%"
             >
-              <Box>
-                <>
-                  <Text color={Colors.SubtleComment}>cwd: </Text>
-                  <Text color={Colors.LightBlue}>
-                    {shortenPath(config.getTargetDir(), 70)}
+              {geminiMdFileCount > 0 && (
+                <Box>
+                  {process.env.GEMINI_SYSTEM_MD && (
+                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+                  )}
+                  <Text color={Colors.SubtleComment}>
+                    Using {geminiMdFileCount} GEMINI.md files
                   </Text>
-                </>
-              </Box>
+                </Box>
+              )}
               <Box>
                 {showAutoAcceptIndicator && !shellModeActive && (
                   <AutoAcceptIndicator />
@@ -431,7 +433,6 @@ export const App = ({
           debugMode={config.getDebugMode()}
           debugMessage={debugMessage}
           cliVersion={cliVersion}
-          geminiMdFileCount={geminiMdFileCount}
           corgiMode={corgiMode}
         />
         <ConsoleOutput debugMode={config.getDebugMode()} />
