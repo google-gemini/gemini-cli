@@ -16,6 +16,7 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
+import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { EditorState, InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
@@ -352,7 +353,12 @@ export const App = ({
                   </Text>
                 </>
               </Box>
-              {showAutoAcceptIndicator && <AutoAcceptIndicator />}
+              <Box>
+                {showAutoAcceptIndicator && !shellModeActive && (
+                  <AutoAcceptIndicator />
+                )}
+                {shellModeActive && <ShellModeIndicator />}
+              </Box>
             </Box>
             {isInputActive && (
               <>
