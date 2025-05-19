@@ -145,6 +145,7 @@ export const App = ({
       config,
       setDebugMessage,
       handleSlashCommand,
+      shellModeActive,
     );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
@@ -154,16 +155,10 @@ export const App = ({
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
-        if (shellModeActive && !trimmedValue.startsWith('!')) {
-          // TODO: Don't prefix (hack) and properly submit pass throughs to a dedicated hook:
-          // https://b.corp.google.com/issues/418509745
-          submitQuery(`!${trimmedValue}`);
-        } else {
-          submitQuery(trimmedValue);
-        }
+        submitQuery(trimmedValue);
       }
     },
-    [submitQuery, shellModeActive],
+    [submitQuery],
   );
 
   const userMessages = useMemo(

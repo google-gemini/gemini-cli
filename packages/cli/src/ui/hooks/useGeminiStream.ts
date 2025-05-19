@@ -60,6 +60,7 @@ export const useGeminiStream = (
   config: Config,
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (cmd: PartListUnion) => boolean,
+  shellModeActive: boolean,
 ) => {
   const toolRegistry = config.getToolRegistry();
   const [initError, setInitError] = useState<string | null>(null);
@@ -120,7 +121,7 @@ export const useGeminiStream = (
       if (handleSlashCommand(trimmedQuery)) {
         return { queryToSend: null, shouldProceed: false };
       }
-      if (handleShellCommand(trimmedQuery)) {
+      if (shellModeActive && handleShellCommand(trimmedQuery)) {
         return { queryToSend: null, shouldProceed: false };
       }
 
@@ -608,6 +609,7 @@ export const useGeminiStream = (
       isResponding,
       setShowHelp,
       handleSlashCommand,
+      shellModeActive,
       handleShellCommand,
       config,
       addItem,
