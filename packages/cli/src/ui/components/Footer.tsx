@@ -74,6 +74,9 @@ export const Footer: React.FC<FooterProps> = ({
           <Text color={Colors.AccentRed}>▼ </Text>
         </Text>
       )}
+      {process.env.GEMINI_SYSTEM_MD && (
+        <Text color={Colors.AccentRed}>|⌐■_■|</Text>
+      )}
     </Box>
   </Box>
 );
