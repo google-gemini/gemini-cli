@@ -141,7 +141,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let command = params.command.trim();
     if (!command.endsWith('&')) command += ';';
     // note the final echo is only to trigger the stderr handler below
-    command = `{ ${command} }; pgrep -g 0 >${tempFilePath} 2>&1; echo >&2`;
+    command = `{ ${command} }; pgrep -g 0 >${tempFilePath} 2>&1; ( trap '' PIPE ; echo >&2 )`;
 
     // spawn command in specified directory (or project root if not specified)
     const shell = spawn('bash', ['-c', command], {
@@ -160,16 +160,19 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     let stderr = '';
     shell.stderr.on('data', (data: Buffer) => {
-      // if the temporary file exists, close the streams and ignore any remaining output
-      // otherwise the streams can remain connected to background processes
+      let str = data.toString();
+      // if the temporary file exists, close the streams and finalize stdout/stderr
+      // otherwise these streams can delay termination ('close' event) until all background processes exit
       if (fs.existsSync(tempFilePath)) {
         shell.stdout.destroy();
         shell.stderr.destroy();
-      } else {
-        const str = data.toString();
-        stderr += str;
-        output += str;
+        // exclude final \n, which should be from echo >&2 unless there are background processes writing to stderr
+        if (str.endsWith('\n')) {
+          str = str.slice(0, -1);
+        }
       }
+      stderr += str;
+      output += str;
     });
 
     let error: Error | null = null;
