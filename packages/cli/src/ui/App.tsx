@@ -207,7 +207,9 @@ export const App = ({
   const completion = useCompletion(
     query,
     config.getTargetDir(),
-    isInputActive && (isAtCommand(query) || isSlashCommand(query)),
+    !shellModeActive &&
+      isInputActive &&
+      (isAtCommand(query) || isSlashCommand(query)),
     slashCommands,
   );
 
@@ -380,7 +382,7 @@ export const App = ({
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                 />
-                {completion.showSuggestions && (
+                {completion.showSuggestions && !shellModeActive && (
                   <Box>
                     <SuggestionsDisplay
                       suggestions={completion.suggestions}
