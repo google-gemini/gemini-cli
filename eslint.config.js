@@ -41,6 +41,14 @@ export default tseslint.config(
   reactPlugin.configs.flat.recommended,
   reactPlugin.configs.flat['jsx-runtime'], // Add this if you are using React 17+
   {
+    // Settings for eslint-plugin-react
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
+  },
+  {
     // Import specific config
     files: ['packages/cli/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
     plugins: {
