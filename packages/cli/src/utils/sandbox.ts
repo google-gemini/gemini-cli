@@ -450,6 +450,8 @@ export async function start_sandbox(sandbox: string) {
     const uid = execSync('id -u').toString().trim();
     const gid = execSync('id -g').toString().trim();
     args.push('--user', `${uid}:${gid}`);
+    // when forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well
+    args.push('--env', `HOME=${os.homedir()}`);
   }
 
   // push container image name
