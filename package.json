@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.4",
+    "@types/mime-types": "^2.1.4",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",

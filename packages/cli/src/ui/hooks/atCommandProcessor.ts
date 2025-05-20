@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PartListUnion } from '@google/genai';
+import { PartListUnion, PartUnion } from '@google/genai';
 import {
   Config,
   getErrorMessage,
@@ -126,6 +126,7 @@ export async function handleAtCommand({
   }
 
   const contentLabel = pathPart;
+
   const toolRegistry = config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
 
@@ -168,7 +169,6 @@ export async function handleAtCommand({
 
   try {
     const result = await readManyFilesTool.execute(toolArgs, signal);
-    const fileContent = result.llmContent || '';
 
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
@@ -180,13 +180,22 @@ export async function handleAtCommand({
     };
 
     // Prepare the query parts for the LLM
-    const processedQueryParts = [];
+    const processedQueryParts: PartUnion[] = [];
     if (textBefore) {
       processedQueryParts.push({ text: textBefore });
     }
-    processedQueryParts.push({
-      text: `\n--- Content from: ${contentLabel} ---\n${fileContent}\n--- End Content ---`,
-    });
+
+    // Process the result from the tool
+    processedQueryParts.push('\n--- Content from: ${contentLabel} ---\n');
+    if (Array.isArray(result.llmContent)) {
+      for (const part of result.llmContent) {
+        processedQueryParts.push(part);
+      }
+    } else {
+      processedQueryParts.push(result.llmContent);
+    }
+    processedQueryParts.push('\n--- End of content ---\n');
+
     if (textAfter) {
       processedQueryParts.push({ text: textAfter });
     }

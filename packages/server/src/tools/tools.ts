@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration, Schema } from '@google/genai';
+import { FunctionDeclaration, PartListUnion, Schema } from '@google/genai';
 
 /**
  * Interface representing the base Tool functionality
@@ -152,7 +152,7 @@ export interface ToolResult {
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.
    */
-  llmContent: string;
+  llmContent: PartListUnion;
 
   /**
    * Markdown string for user display.

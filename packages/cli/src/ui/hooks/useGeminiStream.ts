@@ -25,6 +25,7 @@ import {
   ToolResultDisplay,
   ToolEditConfirmationDetails,
   ToolExecuteConfirmationDetails,
+  partListUnionToString,
 } from '@gemini-code/server';
 import { type Chat, type PartListUnion, type Part } from '@google/genai';
 import {
@@ -280,13 +281,14 @@ export const useGeminiStream = (
           );
           if (abortControllerRef.current.signal.aborted) {
             declineToolExecution(
-              result.llmContent,
+              partListUnionToString(result.llmContent),
               ToolCallStatus.Canceled,
               request,
               originalConfirmationDetails,
             );
             return;
           }
+
           const functionResponse: Part = {
             functionResponse: {
               name: request.name,

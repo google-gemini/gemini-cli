@@ -42,6 +42,46 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server Test: read-many-files",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "test",
+        "-w",
+        "packages/server",
+        "--",
+        "--inspect-brk=9229",
+        "--no-file-parallelism",
+        "${workspaceFolder}/packages/server/src/tools/read-many-files.test.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Test: atCommandProcessor",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "test",
+        "-w",
+        "packages/cli",
+        "--",
+        "--inspect-brk=9229",
+        "--no-file-parallelism",
+        "${workspaceFolder}/packages/cli/src/ui/hooks/atCommandProcessor.test.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

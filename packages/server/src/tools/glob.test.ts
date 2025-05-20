@@ -5,6 +5,7 @@
  */
 
 import { GlobTool, GlobToolParams } from './glob.js';
+import { partListUnionToString } from '../core/geminiRequest.js';
 // import { ToolResult } from './tools.js'; // ToolResult is implicitly used by execute
 import path from 'path';
 import fs from 'fs/promises';
@@ -134,9 +135,14 @@ describe('GlobTool', () => {
     it('should correctly sort files by modification time (newest first)', async () => {
       const params: GlobToolParams = { pattern: '*.sortme' };
       const result = await globTool.execute(params, abortSignal);
-      expect(result.llmContent).toContain('Found 2 file(s)');
-      const filesListed = result.llmContent
-        .substring(result.llmContent.indexOf(':') + 1)
+      const llmContent = partListUnionToString(result.llmContent);
+
+      expect(llmContent).toContain('Found 2 file(s)');
+      // Ensure llmContent is a string for TypeScript type checking
+      expect(typeof llmContent).toBe('string');
+
+      const filesListed = llmContent
+        .substring(llmContent.indexOf(':') + 1)
         .trim()
         .split('\n');
       expect(filesListed[0]).toContain(path.join(tempRootDir, 'newer.sortme'));

@@ -12,6 +12,8 @@ import * as path from 'path';
 import fg from 'fast-glob';
 import { GEMINI_MD_FILENAME } from './memoryTool.js';
 
+import { PartListUnion } from '@google/genai';
+import mime from 'mime-types';
 /**
  * Parameters for the ReadManyFilesTool.
  */
@@ -82,14 +84,6 @@ const DEFAULT_EXCLUDES: string[] = [
   '**/*.bz2',
   '**/*.rar',
   '**/*.7z',
-  '**/*.png',
-  '**/*.jpg',
-  '**/*.jpeg',
-  '**/*.gif',
-  '**/*.bmp',
-  '**/*.tiff',
-  '**/*.ico',
-  '**/*.pdf',
   '**/*.doc',
   '**/*.docx',
   '**/*.xls',
@@ -188,6 +182,13 @@ Default excludes apply to common non-text files and large dependency directories
 
   validateParams(params: ReadManyFilesParams): string | null {
     if (
+      !params.paths ||
+      !Array.isArray(params.paths) ||
+      params.paths.length === 0
+    ) {
+      return 'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.';
+    }
+    if (
       this.schema.parameters &&
       !SchemaValidator.validate(
         this.schema.parameters as Record<string, unknown>,
@@ -263,7 +264,7 @@ Default excludes apply to common non-text files and large dependency directories
     const filesToConsider = new Set<string>();
     const skippedFiles: Array<{ path: string; reason: string }> = [];
     const processedFilesRelativePaths: string[] = [];
-    let concatenatedContent = '';
+    const content: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
       ? [...DEFAULT_EXCLUDES, ...exclude]
@@ -319,28 +320,63 @@ Default excludes apply to common non-text files and large dependency directories
         .relative(toolBaseDir, filePath)
         .replace(/\\/g, '/');
       try {
-        const contentBuffer = await fs.readFile(filePath);
-        // Basic binary detection: check for null bytes in the first 1KB
-        const sample = contentBuffer.subarray(
-          0,
-          Math.min(contentBuffer.length, 1024),
-        );
-        if (sample.includes(0)) {
-          skippedFiles.push({
-            path: relativePathForDisplay,
-            reason: 'Skipped (appears to be binary)',
+        const mimeType = mime.lookup(filePath);
+        if (
+          mimeType &&
+          (mimeType.startsWith('image/') || mimeType === 'application/pdf')
+        ) {
+          const fileExtension = path.extname(filePath);
+          const fileNameWithoutExtension = path.basename(
+            filePath,
+            fileExtension,
+          );
+          const requestedExplicitly = inputPatterns.some(
+            (pattern: string) =>
+              pattern.toLowerCase().includes(fileExtension) ||
+              pattern.includes(fileNameWithoutExtension),
+          );
+
+          if (!requestedExplicitly) {
+            skippedFiles.push({
+              path: relativePathForDisplay,
+              reason:
+                'asset file (image/pdf) was not explicitly requested by name or extension',
+            });
+            continue;
+          }
+          const contentBuffer = await fs.readFile(filePath);
+          const base64Data = contentBuffer.toString('base64');
+          content.push({
+            inlineData: {
+              data: base64Data,
+              mimeType,
+            },
           });
-          continue;
+          processedFilesRelativePaths.push(relativePathForDisplay);
+        } else {
+          const contentBuffer = await fs.readFile(filePath);
+          // Basic binary detection: check for null bytes in the first 1KB
+          const sample = contentBuffer.subarray(
+            0,
+            Math.min(contentBuffer.length, 1024),
+          );
+          if (sample.includes(0)) {
+            skippedFiles.push({
+              path: relativePathForDisplay,
+              reason: 'appears to be binary',
+            });
+            continue;
+          }
+          // Using default encoding
+          const fileContent = contentBuffer.toString(DEFAULT_ENCODING);
+          // Using default separator format
+          const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+            '{filePath}',
+            relativePathForDisplay,
+          );
+          content.push(`${separator}\n\n${fileContent}\n\n`);
+          processedFilesRelativePaths.push(relativePathForDisplay);
         }
-        // Using default encoding
-        const fileContent = contentBuffer.toString(DEFAULT_ENCODING);
-        // Using default separator format
-        const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
-          '{filePath}',
-          relativePathForDisplay,
-        );
-        concatenatedContent += `${separator}\n\n${fileContent}\n\n`;
-        processedFilesRelativePaths.push(relativePathForDisplay);
       } catch (error) {
         skippedFiles.push({
           path: relativePathForDisplay,
@@ -352,18 +388,24 @@ Default excludes apply to common non-text files and large dependency directories
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.targetDir}\`)\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
-      displayMessage += `\n**Processed Files:**\n`;
-      processedFilesRelativePaths
-        .slice(0, 10)
-        .forEach((p) => (displayMessage += `- \`${p}\`\n`));
-      if (processedFilesRelativePaths.length > 10) {
+      if (processedFilesRelativePaths.length <= 10) {
+        displayMessage += `\n**Processed Files:**\n`;
+        processedFilesRelativePaths.forEach(
+          (p) => (displayMessage += `- \`${p}\`\n`),
+        );
+      } else {
+        displayMessage += `\n**Processed Files (first 10 shown):**\n`;
+        processedFilesRelativePaths
+          .slice(0, 10)
+          .forEach((p) => (displayMessage += `- \`${p}\`\n`));
         displayMessage += `- ...and ${processedFilesRelativePaths.length - 10} more.\n`;
       }
-    } else {
-      displayMessage += `No files were read and concatenated based on the criteria.\n`;
     }
 
     if (skippedFiles.length > 0) {
+      if (processedFilesRelativePaths.length === 0) {
+        displayMessage += `No files were read and concatenated based on the criteria.\n`;
+      }
       displayMessage += `\n**Skipped ${skippedFiles.length} item(s) (up to 5 shown):**\n`;
       skippedFiles
         .slice(0, 5)
@@ -373,18 +415,21 @@ Default excludes apply to common non-text files and large dependency directories
       if (skippedFiles.length > 5) {
         displayMessage += `- ...and ${skippedFiles.length - 5} more.\n`;
       }
-    }
-    if (
-      concatenatedContent.length === 0 &&
-      processedFilesRelativePaths.length === 0
+    } else if (
+      processedFilesRelativePaths.length === 0 &&
+      skippedFiles.length === 0
     ) {
-      concatenatedContent =
-        'No files matching the criteria were found or all were skipped.';
+      displayMessage += `No files were read and concatenated based on the criteria.\n`;
     }
 
+    if (content.length === 0) {
+      content.push(
+        'No files matching the criteria were found or all were skipped.',
+      );
+    }
     return {
-      llmContent: concatenatedContent,
-      returnDisplay: displayMessage,
+      llmContent: content,
+      returnDisplay: displayMessage.trim(),
     };
   }
 }

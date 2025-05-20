@@ -11,6 +11,7 @@ export * from './config/config.js';
 export * from './core/client.js';
 export * from './core/prompts.js';
 export * from './core/turn.js';
+export * from './core/geminiRequest.js';
 // Potentially export types from turn.ts if needed externally
 // export { GeminiEventType } from './core/turn.js'; // Example
 
