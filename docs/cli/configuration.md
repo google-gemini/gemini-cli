@@ -38,8 +38,8 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
 
 - **`coreTools`** (array of strings, optional):
   - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict or customize the set of built-in tools.
-  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]` (Note: Use the internal tool names like `ReadFileTool`, `GlobTool`, `SearchText` (for Grep), `WriteFileTool`, `EditTool` (for replace), `LSTool`, `ShellTool`, `WebFetchTool`, `ReadManyFilesTool`).
-  - **Behavior:** If this setting is provided, only the listed tools will be available for the model to use. If omitted, all default core tools are available.
+  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]`.
+  - **Behavior:** If this setting is provided, only the listed tools will be available for the model to use. If omitted, all default core tools are available. See [Built-in Tools](../server/tools-api.md#built-in-tools) for a list of core tools. You can also specify the alternative internal tool names used by the model, e.g. `read_file`, and you can get a full listing for that by simply asking the model "what tools do you have?".
 - **`autoAccept`** (boolean, optional):
 
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation.
