@@ -17,6 +17,7 @@ The Gemini CLI (`packages/cli`) is the primary way users interact with the Gemin
 - **Theming:** Customize the look and feel of the CLI to your preference. See the [Theming section in README.md](../../README.md#theming).
 - **Configuration:** Tailor the CLI's behavior through configuration files. See [CLI Configuration](./configuration.md).
 - **Special Commands:** Utilize built-in commands for tasks like managing history, memory, or display. See [Commands](./commands.md).
+- **Enhanced Input:** Support for multiline input editing and readline-like keybindings for a more comfortable and efficient command entry experience.
 
 ## Basic Interaction
 

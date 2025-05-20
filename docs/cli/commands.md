@@ -21,15 +21,21 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
   - **Description:** Allows you to change the visual theme of the Gemini CLI.
   - **Action:** Opens a dialog or prompt to select from available themes.
 
-- **`/refreshmemory`**
+- **`/memory`**
 
-  - **Description:** Reloads instructional context from all `GEMINI.md` files found in the current directory hierarchy (project, user, and global).
-  - **Action:** The CLI re-scans for `GEMINI.md` files and updates its instructional memory with their content.
-
-- **`/showmemory`**
-
-  - **Description:** Displays the current hierarchical memory content that has been loaded from `GEMINI.md` files.
-  - **Action:** Outputs the combined content of all loaded `GEMINI.md` files, showing the context being provided to the Gemini model.
+  - **Description:** Manages the AI's instructional context (hierarchical memory loaded from `GEMINI.md` files) and allows for adding ad-hoc memory entries.
+  - **Usage:** `/memory <sub_command> [text_for_add]`
+  - **Sub-commands:**
+    - **`show`**:
+      - **Description:** Displays the full, concatenated content of the current hierarchical memory that has been loaded from all `GEMINI.md` files. This allows you to inspect the exact instructional context being provided to the Gemini model.
+      - **Action:** Outputs the combined content of all loaded `GEMINI.md` files, including separators that indicate the origin and path of each part of the memory. This is useful for verifying the loading order and final context.
+    - **`refresh`**:
+      - **Description:** Reloads the hierarchical instructional context (memory) from all `GEMINI.md` files found in the configured locations (global, project/ancestors, and sub-directories). This command updates the AI's understanding based on the latest `GEMINI.md` content.
+      - **Action:** The CLI re-scans for all relevant `GEMINI.md` files and rebuilds its instructional memory. The number of loaded files is typically indicated in the CLI footer.
+    - **`delete_all_added`**:
+      - **Description:** Removes all ad-hoc memory entries that were added during the current session via `/memory add`. This does not affect memory loaded from `GEMINI.md` files.
+      - **Action:** All user-added memory entries for the current session are cleared.
+  - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](./configuration.md#4-geminimd-files-hierarchical-instructional-context).
 
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exits the Gemini CLI application.
@@ -63,18 +69,35 @@ At commands are used to quickly include the content of files or directories as p
 - If the path specified after `@` is not found or is invalid, an error message will be displayed, and the query might not be sent to the Gemini model, or it will be sent without the file content.
 - If the `read_many_files` tool encounters an error (e.g., permission issues), this will also be reported.
 
-## Shell Passthrough Commands (`!`)
+## Shell Mode & Passthrough Commands (`!`)
 
-Shell passthrough commands allow you to execute arbitrary shell commands directly from the Gemini CLI. This can be useful for quickly performing system tasks, listing files, or running scripts without leaving the CLI environment.
+The `!` prefix provides a powerful way to interact with your system's shell directly from within the Gemini CLI. It allows for both single command execution and a toggleable Shell Mode for a more persistent shell experience.
 
 - **`!<shell_command>`**
 
-  - **Description:** Executes the given command in your system's default shell.
+  - **Description:** Executes the given `<shell_command>` in your system's default shell.
   - **Usage:**
-    - `!ls -la`
-    - `!git status`
-    - `!echo "Hello from the shell"`
-  - **Action:** The command following the `!` is passed to the system shell for execution. The standard output and standard error from the command are then displayed directly within the Gemini CLI.
-  - **Caution:** Be mindful of the commands you execute, as they have the same permissions and impact as if you ran them directly in your terminal.
+    - `!ls -la` (executes `ls -la` and returns to normal CLI mode)
+    - `!git status` (executes `git status` and returns to normal CLI mode)
+  - **Action:** The command following the `!` is passed to the system shell for execution. Standard output and standard error are displayed in the CLI. After execution, the CLI typically returns to its standard conversational mode.
 
-These commands provide a powerful way to interact with the Gemini CLI and integrate local file content seamlessly into your conversations with the AI.
+- **`!` (Toggle Shell Mode)**
+
+  - **Description:** Typing `!` on its own (without an immediately following command) toggles Shell Mode.
+  - **Action & Behavior:**
+    - **Entering Shell Mode:**
+      - The UI will update, often with different coloring and a "Shell Mode Indicator," to clearly show that Shell Mode is active.
+      - Most slash commands (e.g., `/help`, `/theme`) and AI-powered suggestions are disabled to provide an uninterrupted shell experience.
+      - Any text you type is interpreted directly as a shell command.
+    - **Exiting Shell Mode:**
+      - Typing `!` again while in Shell Mode will toggle it off.
+      - The UI will revert to its standard appearance.
+      - Slash commands and AI suggestions are re-enabled.
+  - **Usage:**
+    - Type `!` and press Enter to enter Shell Mode.
+    - Type your shell commands (e.g., `cd my_project`, `npm run dev`, `cat file.txt`).
+    - Type `!` and press Enter again to exit Shell Mode.
+
+- **Caution for all `!` usage:** Be mindful of the commands you execute, as they have the same permissions and impact as if you ran them directly in your terminal. The Shell Mode feature does not inherently add extra sandboxing beyond what's already configured for the underlying `execute_bash_command` tool.
+
+This integrated shell capability allows for seamless switching between AI-assisted tasks and direct system interaction.

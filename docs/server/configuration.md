@@ -18,12 +18,12 @@ These are the main pieces of information the server `Config` object holds and us
 - **`apiKey` (string):**
 
   - **Source:** Primarily `process.env.GEMINI_API_KEY` (loaded from the environment or `.env` files).
-  - **Importance:** Absolutely essential. The server cannot communicate with the Gemini API without it.
+  - **Importance:** Absolutely essential for connecting to the Gemini API. (If using Vertex AI, authentication is handled differently, typically via Application Default Credentials - see README.md).
 
 - **`model` (string):**
 
-  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or the default value `gemini-2.5-pro-preview-05-06`.
-  - **Purpose:** Specifies which Gemini model the server should use for generating responses.
+  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or a default value (e.g., `gemini-2.5-pro-preview-05-06`).
+  - **Purpose:** Specifies which Gemini model the server should use. (For Vertex AI model names and usage, refer to the main README.md).
 
 - **`sandbox` (boolean | string):**
 
@@ -57,17 +57,19 @@ These are the main pieces of information the server `Config` object holds and us
 
 - `toolCallCommand` (string | undefined):
 - `mcpServers` (object | undefined):
-  - **Source:** `settings.json` (`mcpServers` key).
-  - **Purpose:** Advanced setting for configuring connections to Model-Context Protocol (MCP) servers. This is an object where each key is a server name and the value is an object defining the server's parameters:
+  - **Source:** `settings.json` (`mcpServers` key), passed from the CLI.
+  - **Purpose:** Advanced setting for configuring connections to one or more Model-Context Protocol (MCP) servers. This allows the Gemini CLI to discover and utilize tools exposed by these external servers.
+  - **Structure:** An object where each key is a unique server name (alias) and the value is an object containing:
     - `command` (string, required): The command to execute to start the MCP server.
-    - `args` (array of strings, optional): Arguments to pass to the command.
-    - `env` (object, optional): Environment variables to set for the server process.
-    - `cwd` (string, optional): The working directory in which to start the server.
-  - Allows discovery and use of tools from multiple MCP sources.
+    - `args` (array of strings, optional): Arguments for the command.
+    - `env` (object, optional): Environment variables for the server process.
+    - `cwd` (string, optional): Working directory for the server.
+    - `timeout` (number, optional): Request timeout in milliseconds.
+  - **Behavior:** The server will attempt to connect to each configured MCP server. Tool names from these servers might be prefixed with the server alias to prevent naming collisions. The server may also adapt tool schemas from MCP servers for internal compatibility.
 - `mcpServerCommand` (string | undefined, **deprecated**):
 
   - **Source:** `settings.json` (`mcpServerCommand` key).
-  - **Purpose:** Legacy setting for configuring a single MCP server. Please use `mcpServers` instead.
+  - **Purpose:** Legacy setting for a single MCP server. Superseded by `mcpServers`.
 
 - `userAgent` (string):
 
@@ -78,7 +80,7 @@ These are the main pieces of information the server `Config` object holds and us
 
   - **Source:** Loaded from the hierarchical `GEMINI.md` files by the CLI (Global, Project Root/Ancestors, Sub-directory) and passed to the server config.
   - **Purpose:** Contains the combined instructional context provided to the Gemini model.
-  - **Mutability:** This can be updated if the memory is refreshed by the user (e.g., via the `/refreshmemory` command in the CLI).
+  - **Mutability:** This can be updated if the memory is refreshed by the user (e.g., via the `/memory refresh` command in the CLI).
 
 - **`geminiMdFileCount` (number):**
   - **Source:** Count of all `GEMINI.md` files successfully loaded by the CLI.

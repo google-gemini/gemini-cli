@@ -110,13 +110,15 @@ All file system tools operate within a `rootDirectory` (usually the current work
   - If `old_string` is empty and `file_path` does not exist, creates a new file with `new_string` as content.
   - If `old_string` is provided, it reads the `file_path` and attempts to find exactly one occurrence of `old_string`.
   - If one occurrence is found, it replaces it with `new_string`.
-  - **Enhanced Reliability:** The tool incorporates a multi-stage edit correction mechanism. If the initial `old_string` provided by the model doesn't perfectly match a unique segment in the file (e.g., it's not found, or matches multiple times), the tool can leverage the Gemini model to attempt to refine `old_string` (and potentially `new_string`). This iterative process aims to identify the correct unique segment for modification, significantly improving the reliability of edits even if the initial context isn't perfectly precise.
+  - **Enhanced Reliability (Multi-Stage Edit Correction):** To significantly improve the success rate of edits, especially when the model-provided `old_string` might not be perfectly precise, the tool incorporates a multi-stage edit correction mechanism.
+    - If the initial `old_string` isn't found or matches multiple locations, the tool can leverage the Gemini model to iteratively refine `old_string` (and potentially `new_string`).
+    - This self-correction process attempts to identify the unique segment the model intended to modify, making the `replace` operation more robust even with slightly imperfect initial context from the AI.
   - **Failure Conditions:** Despite the correction mechanism, the tool will fail if:
     - `file_path` is not absolute or is outside the root directory.
     - `old_string` is not empty, but the `file_path` does not exist.
     - `old_string` is empty, but the `file_path` already exists.
-    - `old_string` is not found in the file.
-    - `old_string` is found multiple times (and self-correction doesn't resolve it to a single match).
+    - `old_string` is not found in the file after attempts to correct it.
+    - `old_string` is found multiple times, and the self-correction mechanism cannot resolve it to a single, unambiguous match.
 - **Output (`llmContent`):**
   - On success: `Successfully modified file: /path/to/file.txt (1 replacements).` or `Created new file: /path/to/new_file.txt with provided content.`
   - On failure: An error message explaining the reason (e.g., `Failed to edit, 0 occurrences found...`, `Failed to edit, expected 1 occurrences but found 2...`).

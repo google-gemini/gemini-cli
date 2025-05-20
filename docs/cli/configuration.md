@@ -25,14 +25,29 @@ The Gemini CLI uses `settings.json` files for persistent configuration. There ar
 
 ### The `.gemini` Directory in Your Project
 
-When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information (like custom sandboxing profiles, e.g., `.gemini/sandbox-macos-custom.sb` or `.gemini/sandbox.Dockerfile`), this `.gemini` directory is used.
+When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information, this `.gemini` directory is used.
 
 **Purpose:**
 
 - Stores project-specific configuration for the Gemini CLI (in `settings.json`).
-- Can hold other project-specific files related to Gemini CLI's operation, such as custom sandbox profiles.
+- Can hold other project-specific files related to Gemini CLI's operation, such as:
+  - Custom sandbox profiles (e.g., `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
+  - A project-specific core system prompt override file (e.g., `.gemini/system.md`). If present, this file can be used to override the default system prompt for the project.
 
 ### Available Settings in `settings.json`:
+
+- **`coreTools`** (array of strings, optional):
+  - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict or customize the set of built-in tools.
+  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]` (Note: Use the internal tool names like `ReadFileTool`, `GlobTool`, `SearchText` (for Grep), `WriteFileTool`, `EditTool` (for replace), `LSTool`, `ShellTool`, `WebFetchTool`, `ReadManyFilesTool`).
+  - **Behavior:** If this setting is provided, only the listed tools will be available for the model to use. If omitted, all default core tools are available.
+- **`autoAccept`** (boolean, optional):
+
+  - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation.
+  - **Default:** `false` (users will be prompted for most tool calls).
+  - **Behavior:**
+    - If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe. An indicator may be shown in the UI when auto-accept is active.
+    - Potentially destructive or system-modifying tools (like `execute_bash_command` or `write_file`) will likely still require confirmation regardless of this setting.
+  - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):
   - Specifies the visual theme for the CLI.
@@ -53,12 +68,32 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - Must return JSON result of funcation call on `stdout`.
 - **`mcpServers`** (object, advanced):
   - Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools.
-  - This is an object where each key is a server name and the value is an object defining the server's parameters:
+  - This is an object where each key is a unique server name (alias) and the value is an object defining that server's parameters:
     - `command` (string, required): The command to execute to start the MCP server.
     - `args` (array of strings, optional): Arguments to pass to the command.
     - `env` (object, optional): Environment variables to set for the server process.
     - `cwd` (string, optional): The working directory in which to start the server.
-  - Example: `"mcpServers": { "myServer": { "command": "python", "args": ["mcp_server.py", "--port", "8080"], "cwd": "./mcp_tools" } }`
+    - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
+  - **Behavior:**
+    - The CLI will attempt to connect to each configured MCP server to discover available tools.
+    - If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts.
+    - The system may strip certain schema properties from MCP tool definitions for compatibility.
+  - Example:
+    ```json
+    "mcpServers": {
+      "myPythonServer": {
+        "command": "python",
+        "args": ["mcp_server.py", "--port", "8080"],
+        "cwd": "./mcp_tools/python",
+        "timeout": 5000
+      },
+      "myNodeServer": {
+        "command": "node",
+        "args": ["mcp_server.js"],
+        "cwd": "./mcp_tools/node"
+      }
+    }
+    ```
   - **`mcpServerCommand`** (string, advanced, **deprecated**):
     - Legacy setting for configuring a single MCP server. Please use `mcpServers` instead for better flexibility and support for multiple servers.
 
@@ -131,9 +166,9 @@ Arguments passed directly when running the CLI can override other configurations
 
 ## 4. `GEMINI.md` Files (Hierarchical Instructional Context)
 
-While not strictly configuration for the CLI's _behavior_, `GEMINI.md` files are crucial for configuring the _instructional context_ provided to the Gemini model. This allows you to give project-specific instructions, coding style guides, or any relevant background information to the AI.
+While not strictly configuration for the CLI's _behavior_, `GEMINI.md` files are crucial for configuring the _instructional context_ (also referred to as "memory") provided to the Gemini model. This powerful feature allows you to give project-specific instructions, coding style guides, or any relevant background information to the AI, making its responses more tailored and accurate to your needs. The CLI includes UI elements, such as an indicator in the footer showing the number of loaded `GEMINI.md` files, to keep you informed about the active context.
 
-- **Purpose:** These Markdown files contain instructions, guidelines, or context that you want the Gemini model to be aware of during your interactions.
+- **Purpose:** These Markdown files contain instructions, guidelines, or context that you want the Gemini model to be aware of during your interactions. The system is designed to manage this instructional context hierarchically.
 
 ### Example `GEMINI.md` Content
 
@@ -168,9 +203,9 @@ Here's a conceptual example of what a `GEMINI.md` file at the root of a TypeScri
 - If a new dependency is required, please state the reason.
 ```
 
-This example demonstrates how you can provide general project context, specific coding conventions, and even notes about particular files or components. The more relevant and precise your `GEMINI.md` files are, the better the AI can assist you.
+This example demonstrates how you can provide general project context, specific coding conventions, and even notes about particular files or components. The more relevant and precise your `GEMINI.md` files are, the better the AI can assist you. Project-specific `GEMINI.md` files are highly encouraged to establish conventions and context.
 
-- **Hierarchical Loading and Precedence:** The CLI loads `GEMINI.md` files from several locations, forming a hierarchy. Content from files lower in this list (more specific) typically overrides or supplements content from files higher up (more general), though the exact concatenation order should be verified with `/showmemory`:
+- **Hierarchical Loading and Precedence:** The CLI implements a sophisticated hierarchical memory system by loading `GEMINI.md` files from several locations. Content from files lower in this list (more specific) typically overrides or supplements content from files higher up (more general). The exact concatenation order and final context can be inspected using the `/showmemory` command. The typical loading order is:
   1.  **Global `GEMINI.md`:**
       - Location: `~/.gemini/GEMINI.md` (in your user home directory).
       - Scope: Provides default instructions for all your projects.
@@ -180,9 +215,10 @@ This example demonstrates how you can provide general project context, specific 
   3.  **Sub-directory `GEMINI.md` (Contextual/Local):**
       - Location: The CLI also scans for `GEMINI.md` files in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
       - Scope: Allows for highly specific instructions relevant to a particular component, module, or sub-section of your project.
-- **Concatenation:** The contents of all found `GEMINI.md` files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. You can see the exact combined content and loading order using the `/showmemory` command.
-- **Commands:**
-  - Use `/refreshmemory` to force a re-scan and reload of all `GEMINI.md` files.
-  - Use `/showmemory` to display the combined instructional context currently loaded.
+- **Concatenation & UI Indication:** The contents of all found `GEMINI.md` files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded `GEMINI.md` files, giving you a quick visual cue about the active instructional context.
+- **Commands for Memory Management:**
+  - Use `/memory refresh` to force a re-scan and reload of all `GEMINI.md` files from all configured locations. This updates the AI's instructional context.
+  - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.
+  - See the [Commands documentation](./commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
 
-By understanding these configuration layers and the hierarchical nature of `GEMINI.md` files, you can effectively tailor the Gemini CLI and the AI's responses to your specific needs and projects.
+By understanding and utilizing these configuration layers and the hierarchical nature of `GEMINI.md` files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
