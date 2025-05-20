@@ -24,7 +24,6 @@ interface InputPromptProps {
   userMessages: readonly string[];
   navigateSuggestionUp: () => void;
   navigateSuggestionDown: () => void;
-  setEditorState: (updater: (prevState: EditorState) => EditorState) => void;
   onClearScreen: () => void;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
@@ -48,7 +47,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   navigateSuggestionUp,
   navigateSuggestionDown,
   resetCompletion,
-  setEditorState,
   onClearScreen,
   shellModeActive,
   setShellModeActive,
@@ -114,12 +112,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const inputPreprocessor = useCallback(
-    (
-      input: string,
-      key: Key,
-      _currentText?: string,
-      _cursorOffset?: number,
-    ) => {
+    (input: string, key: Key) => {
       if (input === '!' && query === '' && !showSuggestions) {
         setShellModeActive(!shellModeActive);
         onChangeAndMoveCursor(''); // Clear the '!' from input
@@ -156,17 +149,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       } else {
         // Keybindings when suggestions are not shown
-        if (key.ctrl && input === 'a') {
-          setEditorState((s) => ({ key: s.key + 1, initialCursorOffset: 0 }));
-          return true;
-        }
-        if (key.ctrl && input === 'e') {
-          setEditorState((s) => ({
-            key: s.key + 1,
-            initialCursorOffset: query.length,
-          }));
-          return true;
-        }
         if (key.ctrl && input === 'l') {
           onClearScreen();
           return true;
@@ -193,7 +175,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       activeSuggestionIndex,
       handleSubmit,
       inputHistory,
-      setEditorState,
       onClearScreen,
       shellModeActive,
       setShellModeActive,

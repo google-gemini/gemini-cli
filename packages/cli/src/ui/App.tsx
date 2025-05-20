@@ -375,7 +375,6 @@ export const App = ({
                   navigateSuggestionUp={completion.navigateUp}
                   navigateSuggestionDown={completion.navigateDown}
                   resetCompletion={completion.resetCompletionState}
-                  setEditorState={setEditorState}
                   onClearScreen={handleClearScreen} // Added onClearScreen prop
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
