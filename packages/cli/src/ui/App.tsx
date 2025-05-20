@@ -342,17 +342,17 @@ export const App = ({
               justifyContent="space-between"
               width="100%"
             >
-              {geminiMdFileCount > 0 && (
-                <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
-                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
-                  )}
+              <Box>
+                {process.env.GEMINI_SYSTEM_MD && (
+                  <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+                )}
+                {geminiMdFileCount > 0 && (
                   <Text color={Colors.SubtleComment}>
                     Using {geminiMdFileCount} GEMINI.md file
                     {geminiMdFileCount > 1 ? 's' : ''}
                   </Text>
-                </Box>
-              )}
+                )}
+              </Box>
               <Box>
                 {showAutoAcceptIndicator && !shellModeActive && (
                   <AutoAcceptIndicator />
