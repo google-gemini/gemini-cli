@@ -92,8 +92,8 @@ index 0000001..0000002 100644
     );
     const output = lastFrame();
     const lines = output!.split('\n');
-    expect(lines[0]).toBe('1 - old line');
-    expect(lines[1]).toBe('1 + new line');
+    expect(lines[0]).toBe('1    - old line');
+    expect(lines[1]).toBe('1    + new line');
   });
 
   it('should handle diff with only header and no changes', () => {
@@ -113,5 +113,31 @@ index 1234567..1234567 100644
     const { lastFrame } = render(<DiffRenderer diffContent="" />);
     expect(lastFrame()).toContain('No diff content');
     expect(mockColorizeCode).not.toHaveBeenCalled();
+  });
+
+  it('should render a gap indicator for skipped lines', () => {
+    const diffWithGap = `
+diff --git a/file.txt b/file.txt
+index 123..456 100644
+--- a/file.txt
++++ b/file.txt
+@@ -1,2 +1,2 @@
+ context line 1
+-deleted line
++added line
+@@ -10,2 +10,2 @@
+ context line 10
+ context line 11
+`;
+    const { lastFrame } = render(
+      <DiffRenderer diffContent={diffWithGap} filename="file.txt" />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('═'); // Check for the border character used in the gap
+
+    // Verify that lines before and after the gap are rendered
+    expect(output).toContain('context line 1');
+    expect(output).toContain('added line');
+    expect(output).toContain('context line 10');
   });
 });

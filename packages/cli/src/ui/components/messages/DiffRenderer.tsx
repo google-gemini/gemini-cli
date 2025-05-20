@@ -187,11 +187,42 @@ const renderDiffContent = (
     ? `diff-box-${filename}`
     : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
 
+  let lastLineNumber: number | null = null;
+  const MAX_CONTEXT_LINES_WITHOUT_GAP = 1;
+
   return (
     <Box flexDirection="column" key={key}>
-      {/* Iterate over the lines that should be displayed (already normalized) */}
-      {displayableLines.map((line, index) => {
-        const key = `diff-line-${index}`;
+      {displayableLines.reduce<React.ReactNode[]>((acc, line, index) => {
+        // Determine the relevant line number for gap calculation based on type
+        let relevantLineNumberForGapCalc: number | null = null;
+        if (line.type === 'add' || line.type === 'context') {
+          relevantLineNumberForGapCalc = line.newLine ?? null;
+        } else if (line.type === 'del') {
+          // For deletions, the gap is typically in relation to the original file's line numbering
+          relevantLineNumberForGapCalc = line.oldLine ?? null;
+        }
+
+        if (
+          lastLineNumber !== null &&
+          relevantLineNumberForGapCalc !== null &&
+          relevantLineNumberForGapCalc >
+            lastLineNumber + MAX_CONTEXT_LINES_WITHOUT_GAP + 1
+        ) {
+          acc.push(
+            <Box
+              key={`gap-${index}`}
+              width="100%"
+              borderTop={true}
+              borderBottom={false}
+              borderRight={false}
+              borderLeft={false}
+              borderStyle="double"
+              borderColor={Colors.SubtleComment}
+            ></Box>,
+          );
+        }
+
+        const lineKey = `diff-line-${index}`;
         let gutterNumStr = '';
         let color: string | undefined = undefined;
         let prefixSymbol = ' ';
@@ -202,39 +233,44 @@ const renderDiffContent = (
             gutterNumStr = (line.newLine ?? '').toString();
             color = 'green';
             prefixSymbol = '+';
+            lastLineNumber = line.newLine ?? null;
             break;
           case 'del':
             gutterNumStr = (line.oldLine ?? '').toString();
             color = 'red';
             prefixSymbol = '-';
+            // For deletions, update lastLineNumber based on oldLine if it's advancing.
+            // This helps manage gaps correctly if there are multiple consecutive deletions
+            // or if a deletion is followed by a context line far away in the original file.
+            if (line.oldLine !== undefined) {
+              lastLineNumber = line.oldLine;
+            }
             break;
           case 'context':
-            // Show new line number for context lines in gutter
             gutterNumStr = (line.newLine ?? '').toString();
             dim = true;
             prefixSymbol = ' ';
+            lastLineNumber = line.newLine ?? null;
             break;
           default:
-            throw new Error(`Unknown line type: ${line.type}`);
+            return acc;
         }
 
-        // Render the line content *after* stripping the calculated *minimum* baseIndentation.
-        // The line.content here is already the tab-normalized version.
         const displayContent = line.content.substring(baseIndentation);
 
-        return (
-          // Using your original rendering structure
-          <Box key={key} flexDirection="row">
-            <Text color={Colors.Foreground}>{gutterNumStr} </Text>
+        acc.push(
+          <Box key={lineKey} flexDirection="row">
+            <Text color={Colors.Foreground}>{gutterNumStr.padEnd(4)} </Text>
             <Text color={color} dimColor={dim}>
               {prefixSymbol}{' '}
             </Text>
             <Text color={color} dimColor={dim} wrap="wrap">
               {displayContent}
             </Text>
-          </Box>
+          </Box>,
         );
-      })}
+        return acc;
+      }, [])}
     </Box>
   );
 };
