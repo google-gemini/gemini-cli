@@ -133,8 +133,11 @@ Returns the MCP server response as a json string.
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private config: Config;
 
-  constructor(private readonly config: Config) {}
+  constructor(config: Config) {
+    this.config = config;
+  }
 
   /**
    * Registers a tool definition.

@@ -20,6 +20,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool } from '../tools/memoryTool.js';
+import { WebSearchTool } from '../tools/web-search.js';
 
 export class MCPServerConfig {
   constructor(
@@ -202,7 +203,7 @@ export function createServerConfig(
   );
 }
 
-function createToolRegistry(config: Config): ToolRegistry {
+export function createToolRegistry(config: Config): ToolRegistry {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
   const tools = config.getCoreTools()
@@ -228,7 +229,7 @@ function createToolRegistry(config: Config): ToolRegistry {
   registerCoreTool(ReadManyFilesTool, targetDir);
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
-
+  registerCoreTool(WebSearchTool, config);
   registry.discoverTools();
   return registry;
 }
