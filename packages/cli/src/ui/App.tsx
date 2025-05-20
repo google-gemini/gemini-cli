@@ -348,7 +348,8 @@ export const App = ({
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
                   <Text color={Colors.SubtleComment}>
-                    Using {geminiMdFileCount} GEMINI.md files
+                    Using {geminiMdFileCount} GEMINI.md file
+                    {geminiMdFileCount > 1 ? 's' : ''}
                   </Text>
                 </Box>
               )}

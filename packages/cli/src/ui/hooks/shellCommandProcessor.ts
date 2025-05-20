@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec as _exec } from 'child_process';
+import { exec as defaultExec } from 'child_process';
+import type { exec as ExecType } from 'child_process';
 import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
 import { type PartListUnion } from '@google/genai';
@@ -13,6 +14,7 @@ import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+
 /**
  * Hook to process shell commands (e.g., !ls, $pwd).
  * Executes the command in the target directory and adds output/errors to history.
@@ -22,6 +24,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
+  executeCommand: typeof ExecType = defaultExec, // Injectable for testing
 ) => {
   /**
    * Checks if the query is a shell command, executes it, and adds results to history.
@@ -33,7 +36,7 @@ export const useShellCommandProcessor = (
         return false;
       }
 
-      let commandToExecute = rawQuery.trim().slice(1).trimStart();
+      let commandToExecute = rawQuery.trim().trimStart();
 
       // wrap command to write pwd to temporary file
       const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
@@ -48,7 +51,7 @@ export const useShellCommandProcessor = (
         userMessageTimestamp,
       );
 
-      if (!commandToExecute) {
+      if (rawQuery.trim() === '') {
         addItemToHistory(
           { type: 'error', text: 'Empty shell command.' },
           userMessageTimestamp,
@@ -65,37 +68,44 @@ export const useShellCommandProcessor = (
       };
 
       const execPromise = new Promise<void>((resolve) => {
-        _exec(commandToExecute, execOptions, (error, stdout, stderr) => {
-          if (error) {
-            addItemToHistory(
-              { type: 'error', text: error.message },
-              userMessageTimestamp,
-            );
-          } else {
-            let output = '';
-            if (stdout) output += stdout;
-            if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
+        executeCommand(
+          commandToExecute,
+          execOptions,
+          (error, stdout, stderr) => {
+            if (error) {
+              addItemToHistory(
+                { type: 'error', text: error.message },
+                userMessageTimestamp,
+              );
+            } else {
+              let output = '';
+              if (stdout) output += stdout;
+              if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
 
-            addItemToHistory(
-              { type: 'info', text: output || '(Command produced no output)' },
-              userMessageTimestamp,
-            );
-          }
-          if (fs.existsSync(pwdFilePath)) {
-            const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
-            if (pwd !== targetDir) {
               addItemToHistory(
                 {
                   type: 'info',
-                  text: `WARNING: shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+                  text: output || '(Command produced no output)',
                 },
                 userMessageTimestamp,
               );
             }
-            fs.unlinkSync(pwdFilePath);
-          }
-          resolve();
-        });
+            if (fs.existsSync(pwdFilePath)) {
+              const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+              if (pwd !== targetDir) {
+                addItemToHistory(
+                  {
+                    type: 'info',
+                    text: `WARNING: shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+                  },
+                  userMessageTimestamp,
+                );
+              }
+              fs.unlinkSync(pwdFilePath);
+            }
+            resolve();
+          },
+        );
       });
 
       try {
@@ -106,7 +116,7 @@ export const useShellCommandProcessor = (
 
       return true; // Command was initiated
     },
-    [config, onDebugMessage, addItemToHistory, onExec],
+    [config, onDebugMessage, addItemToHistory, onExec, executeCommand],
   );
 
   return { handleShellCommand };
