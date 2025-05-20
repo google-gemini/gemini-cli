@@ -6,7 +6,12 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useTextBuffer, Viewport, TextBuffer } from './text-buffer.js';
+import {
+  useTextBuffer,
+  Viewport,
+  TextBuffer,
+  offsetToLogicalPos,
+} from './text-buffer.js';
 
 // Helper to get the state from the hook
 const getBufferState = (result: { current: TextBuffer }) => ({
@@ -512,4 +517,200 @@ describe('useTextBuffer', () => {
   // - Selection and clipboard (copy/paste) - might need clipboard API mocks or internal state check
   // - openInExternalEditor (heavy mocking of fs, child_process, os)
   // - All edge cases for visual scrolling and wrapping with different viewport sizes and text content.
+
+  describe('replaceRange', () => {
+    it('should replace a single-line range with single-line text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: '@pac', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 1, 0, 4, 'packages'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('@packages');
+      expect(state.cursor).toEqual([0, 9]); // cursor after 'typescript'
+    });
+
+    it('should replace a multi-line range with single-line text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'hello\nworld\nagain', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 2, 1, 3, ' new ')); // replace 'llo\nwor' with ' new '
+      const state = getBufferState(result);
+      expect(state.text).toBe('he new ld\nagain');
+      expect(state.cursor).toEqual([0, 7]); // cursor after ' new '
+    });
+
+    it('should delete a range when replacing with an empty string', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'hello world', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 5, 0, 11, '')); // delete ' world'
+      const state = getBufferState(result);
+      expect(state.text).toBe('hello');
+      expect(state.cursor).toEqual([0, 5]);
+    });
+
+    it('should handle replacing at the beginning of the text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'world', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 0, 0, 0, 'hello '));
+      const state = getBufferState(result);
+      expect(state.text).toBe('hello world');
+      expect(state.cursor).toEqual([0, 6]);
+    });
+
+    it('should handle replacing at the end of the text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'hello', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 5, 0, 5, ' world'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('hello world');
+      expect(state.cursor).toEqual([0, 11]);
+    });
+
+    it('should handle replacing the entire buffer content', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'old text', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 0, 0, 8, 'new text'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('new text');
+      expect(state.cursor).toEqual([0, 8]);
+    });
+
+    it('should correctly replace with unicode characters', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'hello *** world', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 6, 0, 9, '你好'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('hello 你好 world');
+      expect(state.cursor).toEqual([0, 8]); // after '你好'
+    });
+
+    it('should handle invalid range by returning false and not changing text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'test', viewport }),
+      );
+      let success = true;
+      act(() => {
+        success = result.current.replaceRange(0, 5, 0, 3, 'fail'); // startCol > endCol in same line
+      });
+      expect(success).toBe(false);
+      expect(getBufferState(result).text).toBe('test');
+
+      act(() => {
+        success = result.current.replaceRange(1, 0, 0, 0, 'fail'); // startRow > endRow
+      });
+      expect(success).toBe(false);
+      expect(getBufferState(result).text).toBe('test');
+    });
+
+    it('replaceRange: multiple lines with a single character', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ initialText: 'first\nsecond\nthird', viewport }),
+      );
+      act(() => result.current.replaceRange(0, 2, 2, 3, 'X')); // Replace 'rst\nsecond\nthi'
+      const state = getBufferState(result);
+      expect(state.text).toBe('fiXrd');
+      expect(state.cursor).toEqual([0, 3]); // After 'X'
+    });
+  });
+});
+
+describe('offsetToLogicalPos', () => {
+  it('should return [0,0] for offset 0', () => {
+    expect(offsetToLogicalPos('any text', 0)).toEqual([0, 0]);
+  });
+
+  it('should handle single line text', () => {
+    const text = 'hello';
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start
+    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // Middle 'l'
+    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End
+    expect(offsetToLogicalPos(text, 10)).toEqual([0, 5]); // Beyond end
+  });
+
+  it('should handle multi-line text', () => {
+    const text = 'hello\nworld\n123';
+    // "hello" (5) + \n (1) + "world" (5) + \n (1) + "123" (3)
+    // h e l l o \n w o r l d \n 1 2 3
+    // 0 1 2 3 4  5  6 7 8 9 0  1  2 3 4
+    // Line 0: "hello" (length 5)
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of 'hello'
+    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // 'l' in 'hello'
+    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello' (before \n)
+
+    // Line 1: "world" (length 5)
+    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Start of 'world' (after \n)
+    expect(offsetToLogicalPos(text, 8)).toEqual([1, 2]); // 'r' in 'world'
+    expect(offsetToLogicalPos(text, 11)).toEqual([1, 5]); // End of 'world' (before \n)
+
+    // Line 2: "123" (length 3)
+    expect(offsetToLogicalPos(text, 12)).toEqual([2, 0]); // Start of '123' (after \n)
+    expect(offsetToLogicalPos(text, 13)).toEqual([2, 1]); // '2' in '123'
+    expect(offsetToLogicalPos(text, 15)).toEqual([2, 3]); // End of '123'
+    expect(offsetToLogicalPos(text, 20)).toEqual([2, 3]); // Beyond end of text
+  });
+
+  it('should handle empty lines', () => {
+    const text = 'a\n\nc'; // "a" (1) + \n (1) + "" (0) + \n (1) + "c" (1)
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // 'a'
+    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // End of 'a'
+    expect(offsetToLogicalPos(text, 2)).toEqual([1, 0]); // Start of empty line
+    expect(offsetToLogicalPos(text, 3)).toEqual([2, 0]); // Start of 'c'
+    expect(offsetToLogicalPos(text, 4)).toEqual([2, 1]); // End of 'c'
+  });
+
+  it('should handle text ending with a newline', () => {
+    const text = 'hello\n'; // "hello" (5) + \n (1)
+    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello'
+    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Position on the new empty line after
+
+    expect(offsetToLogicalPos(text, 7)).toEqual([1, 0]); // Still on the new empty line
+  });
+
+  it('should handle text starting with a newline', () => {
+    const text = '\nhello'; // "" (0) + \n (1) + "hello" (5)
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of first empty line
+    expect(offsetToLogicalPos(text, 1)).toEqual([1, 0]); // Start of 'hello'
+    expect(offsetToLogicalPos(text, 3)).toEqual([1, 2]); // 'l' in 'hello'
+  });
+
+  it('should handle empty string input', () => {
+    expect(offsetToLogicalPos('', 0)).toEqual([0, 0]);
+    expect(offsetToLogicalPos('', 5)).toEqual([0, 0]);
+  });
+
+  it('should handle multi-byte unicode characters correctly', () => {
+    const text = '你好\n世界'; // "你好" (2 chars) + \n (1) + "世界" (2 chars)
+    // Total "code points" for offset calculation: 2 + 1 + 2 = 5
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of '你好'
+    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After '你', before '好'
+    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // End of '你好'
+    expect(offsetToLogicalPos(text, 3)).toEqual([1, 0]); // Start of '世界'
+    expect(offsetToLogicalPos(text, 4)).toEqual([1, 1]); // After '世', before '界'
+    expect(offsetToLogicalPos(text, 5)).toEqual([1, 2]); // End of '世界'
+    expect(offsetToLogicalPos(text, 6)).toEqual([1, 2]); // Beyond end
+  });
+
+  it('should handle offset exactly at newline character', () => {
+    const text = 'abc\ndef';
+    // a b c \n d e f
+    // 0 1 2  3  4 5 6
+    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // End of 'abc'
+    // The next character is the newline, so an offset of 4 means the start of the next line.
+    expect(offsetToLogicalPos(text, 4)).toEqual([1, 0]); // Start of 'def'
+  });
+
+  it('should handle offset in the middle of a multi-byte character (should place at start of that char)', () => {
+    // This scenario is tricky as "offset" is usually character-based.
+    // Assuming cpLen and related logic handles this by treating multi-byte as one unit.
+    // The current implementation of offsetToLogicalPos uses cpLen, so it should be code-point aware.
+    const text = '🐶🐱'; // 2 code points
+    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]);
+    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After 🐶
+    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // After 🐱
+  });
 });

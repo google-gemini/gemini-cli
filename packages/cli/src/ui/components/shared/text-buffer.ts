@@ -119,6 +119,56 @@ function calculateInitialCursorPosition(
   }
   return [0, 0]; // Default for empty text
 }
+
+export function offsetToLogicalPos(
+  text: string,
+  offset: number,
+): [number, number] {
+  let row = 0;
+  let col = 0;
+  let currentOffset = 0;
+
+  if (offset === 0) return [0, 0];
+
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLength = cpLen(line);
+    const lineLengthWithNewline = lineLength + (i < lines.length - 1 ? 1 : 0);
+
+    if (offset <= currentOffset + lineLength) {
+      // Check against lineLength first
+      row = i;
+      col = offset - currentOffset;
+      return [row, col];
+    } else if (offset <= currentOffset + lineLengthWithNewline) {
+      // Check if offset is the newline itself
+      row = i;
+      col = lineLength; // Position cursor at the end of the current line content
+      // If the offset IS the newline, and it's not the last line, advance to next line, col 0
+      if (
+        offset === currentOffset + lineLengthWithNewline &&
+        i < lines.length - 1
+      ) {
+        return [i + 1, 0];
+      }
+      return [row, col]; // Otherwise, it's at the end of the current line content
+    }
+    currentOffset += lineLengthWithNewline;
+  }
+
+  // If offset is beyond the text length, place cursor at the end of the last line
+  // or [0,0] if text is empty
+  if (lines.length > 0) {
+    row = lines.length - 1;
+    col = cpLen(lines[row]);
+  } else {
+    row = 0;
+    col = 0;
+  }
+  return [row, col];
+}
+
 // Helper to calculate visual lines and map cursor positions
 function calculateVisualLayout(
   logicalLines: string[],
@@ -1178,6 +1228,31 @@ export function useTextBuffer({
     [visualLines, visualScrollRow, viewport.height],
   );
 
+  const replaceRangeByOffset = useCallback(
+    (
+      startOffset: number,
+      endOffset: number,
+      replacementText: string,
+    ): boolean => {
+      dbg('replaceRangeByOffset', { startOffset, endOffset, replacementText });
+      const [startRow, startCol] = offsetToLogicalPos(text, startOffset);
+      const [endRow, endCol] = offsetToLogicalPos(text, endOffset);
+      return replaceRange(startRow, startCol, endRow, endCol, replacementText);
+    },
+    [text, replaceRange],
+  );
+
+  const moveToOffset = useCallback(
+    (offset: number): void => {
+      const [newRow, newCol] = offsetToLogicalPos(text, offset);
+      setCursorRow(newRow);
+      setCursorCol(newCol);
+      setPreferredCol(null);
+      dbg('moveToOffset', { offset, newCursor: [newRow, newCol] });
+    },
+    [text, setPreferredCol],
+  );
+
   const returnValue: TextBuffer = {
     lines,
     text,
@@ -1199,6 +1274,8 @@ export function useTextBuffer({
     undo,
     redo,
     replaceRange,
+    replaceRangeByOffset,
+    moveToOffset, // Added here
     deleteWordLeft,
     deleteWordRight,
     killLineRight,
@@ -1342,4 +1419,10 @@ export interface TextBuffer {
   copy: () => string | null;
   paste: () => boolean;
   startSelection: () => void;
+  replaceRangeByOffset: (
+    startOffset: number,
+    endOffset: number,
+    replacementText: string,
+  ) => boolean;
+  moveToOffset(offset: number): void;
 }

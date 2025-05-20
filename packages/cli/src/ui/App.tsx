@@ -17,7 +17,7 @@ import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './components/ShellModeIndicator.js';
-import { EditorState, InputPrompt } from './components/InputPrompt.js';
+import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { type Config } from '@gemini-code/server';
@@ -28,9 +28,6 @@ import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
-import { useCompletion } from './hooks/useCompletion.js';
-import { SuggestionsDisplay } from './components/SuggestionsDisplay.js';
-import { isAtCommand, isSlashCommand } from './utils/commandUtils.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process'; // For performMemoryRefresh
 import { MessageType } from './types.js'; // For performMemoryRefresh
@@ -99,7 +96,6 @@ export const App = ({
       config.setGeminiMdFileCount(fileCount);
       setGeminiMdFileCount(fileCount);
 
-      // chatSessionRef.current = null; // This was in useGeminiStream, might need similar logic or pass chat ref
       addItem(
         {
           type: MessageType.INFO,
@@ -126,7 +122,7 @@ export const App = ({
   }, [config, addItem]);
 
   const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
-    config, // Pass config
+    config,
     addItem,
     clearItems,
     refreshStatic,
@@ -176,53 +172,24 @@ export const App = ({
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 
-  const [query, setQuery] = useState('');
-  const [editorState, setEditorState] = useState<EditorState>({
-    key: 0,
-    initialCursorOffset: undefined,
-  });
-
-  const onChangeAndMoveCursor = useCallback(
-    (value: string) => {
-      setQuery(value);
-      setEditorState((s) => ({
-        key: s.key + 1,
-        initialCursorOffset: value.length,
-      }));
-    },
-    [setQuery, setEditorState],
-  );
-
   const handleClearScreen = useCallback(() => {
     clearItems();
     console.clear();
     refreshStatic();
   }, [clearItems, refreshStatic]);
 
-  const completion = useCompletion(
-    query,
-    config.getTargetDir(),
-    !shellModeActive &&
-      isInputActive &&
-      (isAtCommand(query) || isSlashCommand(query)),
-    slashCommands,
-  );
-
   // --- Render Logic ---
 
-  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const { rows: terminalHeight } = useTerminalSize();
   const mainControlsRef = useRef<DOMElement>(null);
   const pendingHistoryItemRef = useRef<DOMElement>(null);
-
-  // Calculate width for suggestions, leave some padding
-  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
 
   useEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
       setFooterHeight(fullFooterMeasurement.height);
     }
-  }, [terminalHeight]); // Re-calculate if terminalHeight changes, as it might affect footer's rendered height.
+  }, [terminalHeight]);
 
   const availableTerminalHeight = useMemo(() => {
     const staticExtraHeight = /* margins and padding */ 3;
@@ -326,7 +293,6 @@ export const App = ({
               onSelect={handleThemeSelect}
               onHighlight={handleThemeHighlight}
               settings={settings}
-              setQuery={setQuery}
             />
           </Box>
         ) : (
@@ -361,37 +327,16 @@ export const App = ({
               </Box>
             </Box>
             {isInputActive && (
-              <>
-                <InputPrompt
-                  query={query}
-                  onChange={setQuery}
-                  onChangeAndMoveCursor={onChangeAndMoveCursor}
-                  editorState={editorState}
-                  onSubmit={handleFinalSubmit} // Pass handleFinalSubmit directly
-                  showSuggestions={completion.showSuggestions}
-                  suggestions={completion.suggestions}
-                  activeSuggestionIndex={completion.activeSuggestionIndex}
-                  userMessages={userMessages} // Pass userMessages
-                  navigateSuggestionUp={completion.navigateUp}
-                  navigateSuggestionDown={completion.navigateDown}
-                  resetCompletion={completion.resetCompletionState}
-                  onClearScreen={handleClearScreen} // Added onClearScreen prop
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                />
-                {completion.showSuggestions && !shellModeActive && (
-                  <Box>
-                    <SuggestionsDisplay
-                      suggestions={completion.suggestions}
-                      activeIndex={completion.activeSuggestionIndex}
-                      isLoading={completion.isLoadingSuggestions}
-                      width={suggestionsWidth}
-                      scrollOffset={completion.visibleStartIndex}
-                      userInput={query}
-                    />
-                  </Box>
-                )}
-              </>
+              <InputPrompt
+                widthFraction={0.9}
+                onSubmit={handleFinalSubmit}
+                userMessages={userMessages}
+                onClearScreen={handleClearScreen}
+                config={config}
+                slashCommands={slashCommands}
+                shellModeActive={shellModeActive}
+                setShellModeActive={setShellModeActive}
+              />
             )}
           </>
         )}
