@@ -102,6 +102,7 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockPerformMemoryRefresh,
         mockCorgiMode,
+        'test-version',
       ),
     );
     return result.current;
@@ -248,7 +249,7 @@ describe('useSlashCommandProcessor', () => {
       sandboxEnvVar?: string,
       seatbeltProfileVar?: string,
     ) => {
-      const cliVersion = process.env.npm_package_version || 'Unknown';
+      const cliVersion = 'test-version';
       const osVersion = `${process.platform} ${process.version}`;
       let sandboxEnvStr = 'no sandbox';
       if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {

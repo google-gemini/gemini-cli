@@ -24,15 +24,16 @@ export interface SlashCommand {
  * Hook to define and process slash commands (e.g., /help, /clear).
  */
 export const useSlashCommandProcessor = (
-  config: Config | null, // Add config here
+  config: Config | null,
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   refreshStatic: () => void,
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
-  performMemoryRefresh: () => Promise<void>, // Add performMemoryRefresh prop
+  performMemoryRefresh: () => Promise<void>,
   toggleCorgiMode: () => void,
+  cliVersion: string,
 ) => {
   const addMessage = useCallback(
     (message: Message) => {
@@ -149,7 +150,6 @@ export const useSlashCommandProcessor = (
           }
           bugDescription = bugDescription.trim();
 
-          const cliVersion = process.env.npm_package_version || 'Unknown';
           const osVersion = `${process.platform} ${process.version}`;
           let sandboxEnv = 'no sandbox';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
@@ -226,6 +226,7 @@ Add any other context about the problem here.
       addMessage,
       toggleCorgiMode,
       config, // Added config to dependency array
+      cliVersion,
     ],
   );
 

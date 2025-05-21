@@ -28,10 +28,10 @@ import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
-import { useLogger } from './hooks/useLogger.js';
 import process from 'node:process';
 import { MessageType } from './types.js';
 import { getErrorMessage, type Config } from '@gemini-code/server';
+import { useLogger } from './hooks/useLogger.js';
 
 interface AppProps {
   config: Config;
@@ -53,7 +53,7 @@ export const App = ({
     setStaticKey((prev) => prev + 1);
   }, [setStaticKey]);
 
-  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0); // Added for memory file count
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
@@ -131,6 +131,7 @@ export const App = ({
     openThemeDialog,
     performMemoryRefresh,
     toggleCorgiMode,
+    cliVersion,
   );
 
   const { streamingState, submitQuery, initError, pendingHistoryItem } =
