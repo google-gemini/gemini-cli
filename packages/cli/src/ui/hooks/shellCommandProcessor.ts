@@ -43,7 +43,7 @@ export const useShellCommandProcessor = (
       const pwdFilePath = path.join(os.tmpdir(), pwdFileName);
       if (!commandToExecute.endsWith('&')) commandToExecute += ';';
       // note here we could also restore a previous pwd with `cd {cwd}; { ... }`
-      commandToExecute = `{ ${commandToExecute} }; pwd >${pwdFilePath}`;
+      commandToExecute = `{ ${commandToExecute} }; __code=$?; pwd >${pwdFilePath}; exit $__code`;
 
       const userMessageTimestamp = Date.now();
       addItemToHistory(

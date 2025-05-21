@@ -155,7 +155,7 @@ describe('useShellCommandProcessor', () => {
       expect.stringContaining('Executing shell command in /current/dir:'),
     );
     expect(mockExecuteCommand).toHaveBeenCalledWith(
-      '{ !ls -l; }; pwd >/tmp/shell_pwd_randomBytes.tmp',
+      '{ !ls -l; }; __code=$?; pwd >/tmp/shell_pwd_randomBytes.tmp; exit $__code',
       { cwd: '/current/dir' },
       expect.any(Function),
     );
@@ -272,7 +272,7 @@ describe('useShellCommandProcessor', () => {
       expect.any(Number),
     );
     expect(mockExecuteCommand).toHaveBeenCalledWith(
-      '{ !sleep 5 & }; pwd >/tmp/shell_pwd_randomBytes.tmp',
+      '{ !sleep 5 & }; __code=$?; pwd >/tmp/shell_pwd_randomBytes.tmp; exit $__code',
       { cwd: '/current/dir' },
       expect.any(Function),
     );
