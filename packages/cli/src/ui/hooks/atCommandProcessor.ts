@@ -150,10 +150,67 @@ export async function handleAtCommand({
       onDebugMessage(`Path resolved to file: ${pathSpec}`);
     }
   } catch (error) {
-    // If stat fails (e.g., not found), proceed with original path.
-    // The tool itself will handle the error during execution.
     if (isNodeError(error) && error.code === 'ENOENT') {
-      onDebugMessage(`Path not found, proceeding with original: ${pathSpec}`);
+      onDebugMessage(
+        `Path ${pathPart} not found directly, attempting glob search.`,
+      );
+      const globTool = toolRegistry.getTool('glob');
+      if (globTool) {
+        try {
+          const globResult = await globTool.execute(
+            {
+              pattern: `**/*${pathPart}*`,
+              path: config.getTargetDir(), // Ensure glob searches from the root
+            },
+            signal,
+          );
+          // Assuming llmContent contains the list of files or a "no files found" message.
+          // And that paths are absolute.
+          if (
+            globResult.llmContent &&
+            typeof globResult.llmContent === 'string' &&
+            !globResult.llmContent.startsWith('No files found') &&
+            !globResult.llmContent.startsWith('Error:')
+          ) {
+            // Extract the first line after the header
+            const lines = globResult.llmContent.split('\n');
+            if (lines.length > 1 && lines[1]) {
+              const firstMatchAbsolute = lines[1].trim();
+              // Convert absolute path from glob to relative path for read_many_files
+              pathSpec = path.relative(
+                config.getTargetDir(),
+                firstMatchAbsolute,
+              );
+              onDebugMessage(
+                `Glob search found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
+              );
+            } else {
+              onDebugMessage(
+                `Glob search for '**/*${pathPart}*' did not return a usable path. Proceeding with original: ${pathPart}`,
+              );
+              // pathSpec remains pathPart
+            }
+          } else {
+            onDebugMessage(
+              `Glob search for '**/*${pathPart}*' found no files or an error occurred. Proceeding with original: ${pathPart}`,
+            );
+            // pathSpec remains pathPart
+          }
+        } catch (globError) {
+          console.error(
+            `Error during glob search: ${getErrorMessage(globError)}`,
+          );
+          onDebugMessage(
+            `Error during glob search. Proceeding with original: ${pathPart}`,
+          );
+          // pathSpec remains pathPart
+        }
+      } else {
+        onDebugMessage(
+          'Glob tool not found. Proceeding with original path: ${pathPart}',
+        );
+        // pathSpec remains pathPart
+      }
     } else {
       console.error(
         `Error stating path ${pathPart}: ${getErrorMessage(error)}`,

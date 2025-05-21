@@ -180,44 +180,114 @@ export function useCompletion(
     const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
 
     let isMounted = true;
+
+    const findFilesRecursively = async (
+      startDir: string,
+      searchPrefix: string,
+      currentRelativePath = '',
+      depth = 0,
+      maxDepth = 10, // Limit recursion depth
+      maxResults = 50, // Limit number of results
+    ): Promise<Suggestion[]> => {
+      if (depth > maxDepth) {
+        return [];
+      }
+
+      let foundSuggestions: Suggestion[] = [];
+      try {
+        const entries = await fs.readdir(startDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (foundSuggestions.length >= maxResults) break;
+
+          const entryPathRelative = path.join(currentRelativePath, entry.name);
+          if (entry.name.startsWith(searchPrefix)) {
+            foundSuggestions.push({
+              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
+              value: escapePath(
+                entryPathRelative + (entry.isDirectory() ? '/' : ''),
+              ),
+            });
+          }
+          if (
+            entry.isDirectory() &&
+            entry.name !== 'node_modules' &&
+            !entry.name.startsWith('.')
+          ) {
+            if (foundSuggestions.length < maxResults) {
+              foundSuggestions = foundSuggestions.concat(
+                await findFilesRecursively(
+                  path.join(startDir, entry.name),
+                  searchPrefix,
+                  entryPathRelative,
+                  depth + 1,
+                  maxDepth,
+                  maxResults - foundSuggestions.length,
+                ),
+              );
+            }
+          }
+        }
+      } catch (_err) {
+        // Ignore errors like permission denied or ENOENT during recursive search
+      }
+      return foundSuggestions.slice(0, maxResults);
+    };
+
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
+      let fetchedSuggestions: Suggestion[] = [];
       try {
-        const entries = await fs.readdir(baseDirAbsolute, {
-          withFileTypes: true,
+        // If there's no slash, or it's the root, do a recursive search from cwd
+        if (partialPath.indexOf('/') === -1 && prefix) {
+          fetchedSuggestions = await findFilesRecursively(cwd, prefix);
+        } else {
+          // Original behavior: list files in the specific directory
+          const entries = await fs.readdir(baseDirAbsolute, {
+            withFileTypes: true,
+          });
+          fetchedSuggestions = entries
+            .filter((entry) => entry.name.startsWith(prefix))
+            .map((entry) => {
+              const label = entry.isDirectory() ? entry.name + '/' : entry.name;
+              return {
+                label,
+                value: escapePath(label), // Value for completion should be just the name part
+              };
+            });
+        }
+
+        // Sort by depth, then directories first, then alphabetically
+        fetchedSuggestions.sort((a, b) => {
+          const depthA = (a.label.match(/\//g) || []).length;
+          const depthB = (b.label.match(/\//g) || []).length;
+
+          if (depthA !== depthB) {
+            return depthA - depthB;
+          }
+
+          const aIsDir = a.label.endsWith('/');
+          const bIsDir = b.label.endsWith('/');
+          if (aIsDir && !bIsDir) return -1;
+          if (!aIsDir && bIsDir) return 1;
+
+          return a.label.localeCompare(b.label);
         });
-        const filteredSuggestions = entries
-          .filter((entry) => entry.name.startsWith(prefix))
-          .map((entry) => (entry.isDirectory() ? entry.name + '/' : entry.name))
-          .sort((a, b) => {
-            // Sort directories first, then alphabetically
-            const aIsDir = a.endsWith('/');
-            const bIsDir = b.endsWith('/');
-            if (aIsDir && !bIsDir) return -1;
-            if (!aIsDir && bIsDir) return 1;
-            return a.localeCompare(b);
-          })
-          .map((entry) => ({
-            label: entry,
-            value: escapePath(entry),
-          }));
 
         if (isMounted) {
-          setSuggestions(filteredSuggestions);
-          setShowSuggestions(filteredSuggestions.length > 0);
-          setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
+          setSuggestions(fetchedSuggestions);
+          setShowSuggestions(fetchedSuggestions.length > 0);
+          setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
       } catch (error: unknown) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          // Directory doesn't exist, likely mid-typing, clear suggestions
           if (isMounted) {
             setSuggestions([]);
             setShowSuggestions(false);
           }
         } else {
           console.error(
-            `Error fetching completion suggestions for ${baseDirAbsolute}: ${getErrorMessage(error)}`,
+            `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(error)}`,
           );
           if (isMounted) {
             resetCompletionState();
