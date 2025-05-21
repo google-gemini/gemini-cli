@@ -39,7 +39,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onClearScreen,
   config,
   slashCommands,
-  placeholder = 'Enter your message or use tools (e.g., @src/file.txt)...',
+  placeholder = 'Type your message or @path/to/file',
   height = 10,
   focus = true,
   widthFraction,
