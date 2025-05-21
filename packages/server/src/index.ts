@@ -9,6 +9,7 @@ export * from './config/config.js';
 
 // Export Core Logic
 export * from './core/client.js';
+export * from './core/logger.js';
 export * from './core/prompts.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';

@@ -2,6 +2,9 @@
 .env
 .env~
 
+# gemini-code settings
+.gemini/
+
 # Dependency directory
 node_modules
 bower_components

@@ -20,7 +20,6 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { type Config } from '@gemini-code/server';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -29,9 +28,10 @@ import { Tips } from './components/Tips.js';
 import { ConsoleOutput } from './components/ConsolePatcher.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
-import process from 'node:process'; // For performMemoryRefresh
-import { MessageType } from './types.js'; // For performMemoryRefresh
-import { getErrorMessage } from '@gemini-code/server'; // For performMemoryRefresh
+import { useLogger } from './hooks/useLogger.js';
+import process from 'node:process';
+import { MessageType } from './types.js';
+import { getErrorMessage, type Config } from '@gemini-code/server';
 
 interface AppProps {
   config: Config;
@@ -157,18 +157,29 @@ export const App = ({
     [submitQuery],
   );
 
-  const userMessages = useMemo(
-    () =>
-      history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text),
-    [history],
-  );
+  const logger = useLogger();
+  const [userMessages, setUserMessages] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchUserMessages = async () => {
+      const pastMessages = (await logger?.getPreviousUserMessages()) || [];
+      if (pastMessages.length > 0) {
+        setUserMessages(pastMessages.reverse());
+      } else {
+        setUserMessages(
+          history
+            .filter(
+              (item): item is HistoryItem & { type: 'user'; text: string } =>
+                item.type === 'user' &&
+                typeof item.text === 'string' &&
+                item.text.trim() !== '',
+            )
+            .map((item) => item.text),
+        );
+      }
+    };
+    fetchUserMessages();
+  }, [history, logger]);
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 

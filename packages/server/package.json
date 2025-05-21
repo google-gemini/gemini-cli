@@ -25,7 +25,8 @@
     "@modelcontextprotocol/sdk": "^1.11.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
-    "fast-glob": "^3.3.3"
+    "fast-glob": "^3.3.3",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",

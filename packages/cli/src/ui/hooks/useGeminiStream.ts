@@ -18,13 +18,14 @@ import {
   getErrorMessage,
   isNodeError,
   Config,
+  MessageSenderType,
+  ServerToolCallConfirmationDetails,
   ToolCallConfirmationDetails,
   ToolCallResponseInfo,
-  ServerToolCallConfirmationDetails,
   ToolConfirmationOutcome,
-  ToolResultDisplay,
   ToolEditConfirmationDetails,
   ToolExecuteConfirmationDetails,
+  ToolResultDisplay,
   partListUnionToString,
 } from '@gemini-code/server';
 import { type Chat, type PartListUnion, type Part } from '@google/genai';
@@ -42,6 +43,7 @@ import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { useLogger } from './useLogger.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -71,6 +73,7 @@ export const useGeminiStream = (
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+  const logger = useLogger();
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -117,6 +120,7 @@ export const useGeminiStream = (
     if (typeof query === 'string') {
       const trimmedQuery = query.trim();
       onDebugMessage(`User query: '${trimmedQuery}'`);
+      await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
       // Handle UI-only commands first
       if (handleSlashCommand(trimmedQuery)) {
@@ -616,6 +620,7 @@ export const useGeminiStream = (
       onDebugMessage,
       refreshStatic,
       setInitError,
+      logger,
     ],
   );
 
