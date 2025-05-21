@@ -12,7 +12,7 @@ export const ShellModeIndicator: React.FC = () => (
   <Box>
     <Text color={Colors.AccentYellow}>
       shell mode enabled
-      <Text color={Colors.SubtleComment}> (! to toggle)</Text>
+      <Text color={Colors.SubtleComment}> (esc to disable)</Text>
     </Text>
   </Box>
 );

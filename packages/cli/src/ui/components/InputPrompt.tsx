@@ -189,6 +189,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
         if (key.escape) {
+          if (shellModeActive) {
+            setShellModeActive(false);
+            return;
+          }
           completion.resetCompletionState();
           return;
         }
