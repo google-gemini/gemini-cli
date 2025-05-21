@@ -139,7 +139,7 @@ export const useShellCommandProcessor = (
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
             } else {
               addItemToHistory(
-                { type: 'info', text: output },
+                { type: 'info', text: output + '\n' },
                 userMessageTimestamp,
               );
             }
