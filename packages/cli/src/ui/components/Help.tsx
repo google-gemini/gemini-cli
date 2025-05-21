@@ -46,12 +46,5 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>
       shell command
     </Text>
-    <Text color={Colors.SubtleComment}>
-      <Text bold color={Colors.AccentPurple}>
-        {' '}
-        ${' '}
-      </Text>
-      echo hello world
-    </Text>
   </Box>
 );
