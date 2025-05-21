@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'child_process';
+import type { HistoryItemWithoutId } from '../types.js';
 import type { exec as ExecType } from 'child_process';
 import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
@@ -21,6 +22,9 @@ import fs from 'fs';
  */
 export const useShellCommandProcessor = (
   addItemToHistory: UseHistoryManagerReturn['addItem'],
+  setPendingHistoryItem: React.Dispatch<
+    React.SetStateAction<HistoryItemWithoutId | null>
+  >,
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
@@ -115,18 +119,25 @@ export const useShellCommandProcessor = (
             cwd: targetDir,
             stdio: ['ignore', 'pipe', 'pipe'],
           });
+
           let output = '';
-          child.stdout.on('data', (data) => {
+          const handleOutput = (data: string) => {
             output += data;
-          });
-          child.stderr.on('data', (data) => {
-            output += data;
-          });
+            setPendingHistoryItem({
+              type: 'info',
+              text: output,
+            });
+          };
+          child.stdout.on('data', handleOutput);
+          child.stderr.on('data', handleOutput);
+
           let error: Error | null = null;
           child.on('error', (err: Error) => {
             error = err;
           });
+
           child.on('close', (code, signal) => {
+            setPendingHistoryItem(null);
             output = output.trim() || '(Command produced no output)';
             if (error) {
               const text = `${error.message.replace(commandToExecute, rawQuery)}\n${output}`;
@@ -169,7 +180,14 @@ export const useShellCommandProcessor = (
 
       return true; // Command was initiated
     },
-    [config, onDebugMessage, addItemToHistory, onExec, executeCommand],
+    [
+      config,
+      onDebugMessage,
+      addItemToHistory,
+      setPendingHistoryItem,
+      onExec,
+      executeCommand,
+    ],
   );
 
   return { handleShellCommand };

@@ -82,6 +82,7 @@ export const useGeminiStream = (
   }, []);
   const { handleShellCommand } = useShellCommandProcessor(
     addItem,
+    setPendingHistoryItem,
     onExec,
     onDebugMessage,
     config,
