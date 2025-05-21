@@ -1151,7 +1151,13 @@ export function useTextBuffer({
 
       if (key['escape']) return false;
 
-      if (key['return'] || input === '\r' || input === '\n') newline();
+      if (
+        key['return'] ||
+        input === '\r' ||
+        input === '\n' ||
+        input === '\\\r' // VSCode terminal represents shift + enter this way
+      )
+        newline();
       else if (key['leftArrow'] && !key['meta'] && !key['ctrl'] && !key['alt'])
         move('left');
       else if (key['ctrl'] && input === 'b') move('left');

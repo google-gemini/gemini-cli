@@ -508,6 +508,12 @@ describe('useTextBuffer', () => {
       act(() => result.current.handleInput(textWithAnsi, {}));
       expect(getBufferState(result).text).toBe('Hello World');
     });
+
+    it('should handle VSCode terminal Shift+Enter as newline', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      act(() => result.current.handleInput('\r', {})); // Simulates Shift+Enter in VSCode terminal
+      expect(getBufferState(result).lines).toEqual(['', '']);
+    });
   });
 
   // More tests would be needed for:
