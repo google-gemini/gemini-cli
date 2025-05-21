@@ -141,7 +141,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let command = params.command.trim();
     if (!command.endsWith('&')) command += ';';
     // note the final echo is only to trigger the stderr handler below
-    command = `{ ${command} }; pgrep -g 0 >${tempFilePath} 2>&1; ( trap '' PIPE ; echo >&2 )`;
+    command = `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; ( trap '' PIPE ; echo >&2 ); exit $__code;`;
 
     // spawn command in specified directory (or project root if not specified)
     const shell = spawn('bash', ['-c', command], {
