@@ -600,9 +600,7 @@ export const useGeminiStream = (
           );
         }
       } finally {
-        if (streamingState !== StreamingState.WaitingForConfirmation) {
-          abortControllerRef.current = null;
-        }
+        abortControllerRef.current = null; // Always reset
         setIsResponding(false);
       }
     },
