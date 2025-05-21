@@ -178,6 +178,8 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let error: Error | null = null;
     shell.on('error', (err: Error) => {
       error = err;
+      // remove wrapper from user's command in error message
+      error.message = error.message.replace(command, params.command);
     });
 
     let code: number | null = null;

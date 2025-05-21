@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec as defaultExec } from 'child_process';
+import { spawn } from 'child_process';
 import type { exec as ExecType } from 'child_process';
 import { useCallback } from 'react';
 import { Config } from '@gemini-code/server';
@@ -24,7 +24,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
-  executeCommand: typeof ExecType = defaultExec, // Injectable for testing
+  executeCommand?: typeof ExecType, // injectable for testing
 ) => {
   /**
    * Checks if the query is a shell command, executes it, and adds results to history.
@@ -36,9 +36,8 @@ export const useShellCommandProcessor = (
         return false;
       }
 
-      let commandToExecute = rawQuery.trim().trimStart();
-
       // wrap command to write pwd to temporary file
+      let commandToExecute = rawQuery.trim();
       const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
       const pwdFilePath = path.join(os.tmpdir(), pwdFileName);
       if (!commandToExecute.endsWith('&')) commandToExecute += ';';
@@ -68,25 +67,79 @@ export const useShellCommandProcessor = (
       };
 
       const execPromise = new Promise<void>((resolve) => {
-        executeCommand(
-          commandToExecute,
-          execOptions,
-          (error, stdout, stderr) => {
-            if (error) {
-              addItemToHistory(
-                { type: 'error', text: error.message },
-                userMessageTimestamp,
-              );
-            } else {
-              let output = '';
-              if (stdout) output += stdout;
-              if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
+        if (executeCommand) {
+          executeCommand(
+            commandToExecute,
+            execOptions,
+            (error, stdout, stderr) => {
+              if (error) {
+                addItemToHistory(
+                  {
+                    type: 'error',
+                    // remove wrapper from user's command in error message
+                    text: error.message.replace(commandToExecute, rawQuery),
+                  },
+                  userMessageTimestamp,
+                );
+              } else {
+                let output = '';
+                if (stdout) output += stdout;
+                if (stderr) output += (output ? '\n' : '') + stderr; // Include stderr as info
 
+                addItemToHistory(
+                  {
+                    type: 'info',
+                    text: output || '(Command produced no output)',
+                  },
+                  userMessageTimestamp,
+                );
+              }
+              if (fs.existsSync(pwdFilePath)) {
+                const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+                if (pwd !== targetDir) {
+                  addItemToHistory(
+                    {
+                      type: 'info',
+                      text: `WARNING: shell mode is stateless; \`cd ${pwd}\` will not apply to next command`,
+                    },
+                    userMessageTimestamp,
+                  );
+                }
+                fs.unlinkSync(pwdFilePath);
+              }
+              resolve();
+            },
+          );
+        } else {
+          const child = spawn('bash', ['-c', commandToExecute], {
+            cwd: targetDir,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+          let output = '';
+          child.stdout.on('data', (data) => {
+            output += data;
+          });
+          child.stderr.on('data', (data) => {
+            output += data;
+          });
+          let error: Error | null = null;
+          child.on('error', (err: Error) => {
+            error = err;
+          });
+          child.on('close', (code, signal) => {
+            output = output.trim() || '(Command produced no output)';
+            if (error) {
+              const text = `${error.message.replace(commandToExecute, rawQuery)}\n${output}`;
+              addItemToHistory({ type: 'error', text }, userMessageTimestamp);
+            } else if (code !== 0) {
+              const text = `Command exited with code ${code}\n${output}`;
+              addItemToHistory({ type: 'error', text }, userMessageTimestamp);
+            } else if (signal) {
+              const text = `Command terminated with signal ${signal}\n${output}`;
+              addItemToHistory({ type: 'error', text }, userMessageTimestamp);
+            } else {
               addItemToHistory(
-                {
-                  type: 'info',
-                  text: output || '(Command produced no output)',
-                },
+                { type: 'info', text: output },
                 userMessageTimestamp,
               );
             }
@@ -104,8 +157,8 @@ export const useShellCommandProcessor = (
               fs.unlinkSync(pwdFilePath);
             }
             resolve();
-          },
-        );
+          });
+        }
       });
 
       try {
