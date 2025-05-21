@@ -83,13 +83,11 @@ export class WebSearchTool extends BaseTool<
       },
     );
 
-    const apiKey = this.config.getApiKey();
-    if (!apiKey) {
-      throw new Error(
-        'Google AI API key is not configured. WebSearchTool cannot be initialized.',
-      );
-    }
-    this.ai = new GoogleGenAI({ apiKey });
+    const apiKeyFromConfig = this.config.getApiKey();
+    // Initialize GoogleGenAI, allowing fallback to environment variables for API key
+    this.ai = new GoogleGenAI({
+      apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
+    });
     this.modelName = this.config.getModel();
   }
 
