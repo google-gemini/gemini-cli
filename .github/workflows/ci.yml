@@ -87,8 +87,11 @@ jobs:
       - name: Install dependencies for testing
         run: npm ci # Install fresh dependencies using the downloaded package-lock.json
 
-      - name: Run tests
+      - name: Run tests (generate JUnit XML)
         run: npm run test:ci --workspaces --if-present
+
+      - name: Collect coverage
+        run: npm run coverage # This will run tests again, but also generate coverage
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
@@ -98,3 +101,10 @@ jobs:
           path: packages/*/junit.xml
           reporter: java-junit
           fail-on-error: 'false'
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports-${{ matrix.node-version }}
+          path: packages/*/coverage
