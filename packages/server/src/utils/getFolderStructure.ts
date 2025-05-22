@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
+import { Dirent } from 'fs';
 import * as path from 'path';
 import { getErrorMessage, isNodeError } from './errors.js';
 
@@ -37,286 +38,220 @@ interface FullFolderInfo {
   path: string;
   files: string[];
   subFolders: FullFolderInfo[];
-  totalChildren: number; // Total files + subfolders recursively
-  totalFiles: number; // Total files recursively
+  totalChildren: number; // Number of files and subfolders included from this folder during BFS scan
+  totalFiles: number; // Number of files included from this folder during BFS scan
   isIgnored?: boolean; // Flag to easily identify ignored folders later
-}
-
-/** Represents the potentially truncated structure used for display. */
-interface ReducedFolderNode {
-  name: string; // Folder name
-  isRoot?: boolean;
-  files: string[]; // File names, might end with '...'
-  subFolders: ReducedFolderNode[]; // Subfolders, might be truncated
   hasMoreFiles?: boolean; // Indicates if files were truncated for this specific folder
   hasMoreSubfolders?: boolean; // Indicates if subfolders were truncated for this specific folder
 }
 
+// --- Interfaces ---
+
 // --- Helper Functions ---
 
-/**
- * Recursively reads the full directory structure without truncation.
- * Ignored folders are included but not recursed into.
- * @param folderPath The absolute path to the folder.
- * @param options Configuration options.
- * @returns A promise resolving to the FullFolderInfo or null if access denied/not found.
- */
 async function readFullStructure(
-  folderPath: string,
+  rootPath: string,
   options: MergedFolderStructureOptions,
 ): Promise<FullFolderInfo | null> {
-  const name = path.basename(folderPath);
-  const folderInfo: Omit<FullFolderInfo, 'totalChildren' | 'totalFiles'> = {
-    name,
-    path: folderPath,
+  const rootName = path.basename(rootPath);
+  const rootNode: FullFolderInfo = {
+    name: rootName,
+    path: rootPath,
     files: [],
     subFolders: [],
-    isIgnored: false,
+    totalChildren: 0,
+    totalFiles: 0,
   };
 
-  let totalChildrenCount = 0;
-  let totalFileCount = 0;
+  const queue: Array<{ folderInfo: FullFolderInfo; currentPath: string }> = [
+    { folderInfo: rootNode, currentPath: rootPath },
+  ];
+  let currentItemCount = 0;
+  // Count the root node itself as one item if we are not just listing its content
 
-  try {
-    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+  const processedPaths = new Set<string>(); // To avoid processing same path if symlinks create loops
 
-    // Process directories first
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const subFolderName = entry.name;
-        const subFolderPath = path.join(folderPath, subFolderName);
+  while (queue.length > 0) {
+    const { folderInfo, currentPath } = queue.shift()!;
 
-        // Check if the folder should be ignored
-        if (options.ignoredFolders.has(subFolderName)) {
-          // Add ignored folder node but don't recurse
-          const ignoredFolderInfo: FullFolderInfo = {
-            name: subFolderName,
-            path: subFolderPath,
-            files: [],
-            subFolders: [],
-            totalChildren: 0, // No children explored
-            totalFiles: 0, // No files explored
-            isIgnored: true,
-          };
-          folderInfo.subFolders.push(ignoredFolderInfo);
-          // Skip recursion for this folder
-          continue;
-        }
+    if (processedPaths.has(currentPath)) {
+      continue;
+    }
+    processedPaths.add(currentPath);
 
-        // If not ignored, recurse as before
-        const subFolderInfo = await readFullStructure(subFolderPath, options);
-        // Add non-empty folders OR explicitly ignored folders
-        if (
-          subFolderInfo &&
-          (subFolderInfo.totalChildren > 0 ||
-            subFolderInfo.files.length > 0 ||
-            subFolderInfo.isIgnored)
-        ) {
-          folderInfo.subFolders.push(subFolderInfo);
-        }
-      }
+    if (currentItemCount >= options.maxItems) {
+      // If the root itself caused us to exceed, we can't really show anything.
+      // Otherwise, this folder won't be processed further.
+      // The parent that queued this would have set its own hasMoreSubfolders flag.
+      continue;
     }
 
-    // Then process files (only if the current folder itself isn't marked as ignored)
+    let entries: Dirent[];
+    try {
+      const rawEntries = await fs.readdir(currentPath, { withFileTypes: true });
+      // Sort entries alphabetically by name for consistent processing order
+      entries = rawEntries.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error: unknown) {
+      if (
+        isNodeError(error) &&
+        (error.code === 'EACCES' || error.code === 'ENOENT')
+      ) {
+        console.warn(
+          `Warning: Could not read directory ${currentPath}: ${error.message}`,
+        );
+        if (currentPath === rootPath && error.code === 'ENOENT') {
+          return null; // Root directory itself not found
+        }
+        // For other EACCES/ENOENT on subdirectories, just skip them.
+        continue;
+      }
+      throw error;
+    }
+
+    const filesInCurrentDir: string[] = [];
+    const subFoldersInCurrentDir: FullFolderInfo[] = [];
+
+    // Process files first in the current directory
     for (const entry of entries) {
       if (entry.isFile()) {
+        if (currentItemCount >= options.maxItems) {
+          folderInfo.hasMoreFiles = true;
+          break;
+        }
         const fileName = entry.name;
         if (
           !options.fileIncludePattern ||
           options.fileIncludePattern.test(fileName)
         ) {
-          folderInfo.files.push(fileName);
+          filesInCurrentDir.push(fileName);
+          currentItemCount++;
+          folderInfo.totalFiles++;
+          folderInfo.totalChildren++;
         }
       }
     }
+    folderInfo.files = filesInCurrentDir;
 
-    // Calculate totals *after* processing children
-    // Ignored folders contribute 0 to counts here because we didn't look inside.
-    totalFileCount =
-      folderInfo.files.length +
-      folderInfo.subFolders.reduce((sum, sf) => sum + sf.totalFiles, 0);
-    // Count the ignored folder itself as one child item in the parent's count.
-    totalChildrenCount =
-      folderInfo.files.length +
-      folderInfo.subFolders.length +
-      folderInfo.subFolders.reduce((sum, sf) => sum + sf.totalChildren, 0);
-  } catch (error: unknown) {
-    if (
-      isNodeError(error) &&
-      (error.code === 'EACCES' || error.code === 'ENOENT')
-    ) {
-      console.warn(
-        `Warning: Could not read directory ${folderPath}: ${error.message}`,
-      );
-      return null;
-    }
-    throw error;
-  }
-
-  return {
-    ...folderInfo,
-    totalChildren: totalChildrenCount,
-    totalFiles: totalFileCount,
-  };
-}
-
-/**
- * Reduces the full folder structure based on the maxItems limit using BFS.
- * Handles explicitly ignored folders by showing them with a truncation indicator.
- * @param fullInfo The complete folder structure info.
- * @param maxItems The maximum number of items (files + folders) to include.
- * @param ignoredFolders The set of folder names that were ignored during the read phase.
- * @returns The root node of the reduced structure.
- */
-function reduceStructure(
-  fullInfo: FullFolderInfo,
-  maxItems: number,
-): ReducedFolderNode {
-  const rootReducedNode: ReducedFolderNode = {
-    name: fullInfo.name,
-    files: [],
-    subFolders: [],
-    isRoot: true,
-  };
-  const queue: Array<{
-    original: FullFolderInfo;
-    reduced: ReducedFolderNode;
-  }> = [];
-
-  // Don't count the root itself towards the limit initially
-  queue.push({ original: fullInfo, reduced: rootReducedNode });
-  let itemCount = 0; // Count folders + files added to the reduced structure
-
-  while (queue.length > 0) {
-    const { original: originalFolder, reduced: reducedFolder } = queue.shift()!;
-
-    // If the folder being processed was itself marked as ignored (shouldn't happen for root)
-    if (originalFolder.isIgnored) {
-      continue;
-    }
-
-    // Process Files
-    let fileLimitReached = false;
-    for (const file of originalFolder.files) {
-      // Check limit *before* adding the file
-      if (itemCount >= maxItems) {
-        if (!fileLimitReached) {
-          reducedFolder.files.push(TRUNCATION_INDICATOR);
-          reducedFolder.hasMoreFiles = true;
-          fileLimitReached = true;
+    // Then process directories and queue them
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        // Check if adding this directory ITSELF would meet or exceed maxItems
+        // (currentItemCount refers to items *already* added before this one)
+        if (currentItemCount >= options.maxItems) {
+          folderInfo.hasMoreSubfolders = true;
+          break; // Already at limit, cannot add this folder or any more
         }
-        break;
-      }
-      reducedFolder.files.push(file);
-      itemCount++;
-    }
+        // If adding THIS folder makes us hit the limit exactly, and it might have children,
+        // it's better to show '...' for the parent, unless this is the very last item slot.
+        // This logic is tricky. Let's try a simpler: if we can't add this item, mark and break.
 
-    // Process Subfolders
-    let subfolderLimitReached = false;
-    for (const subFolder of originalFolder.subFolders) {
-      // Count the folder itself towards the limit
-      itemCount++;
-      if (itemCount > maxItems) {
-        if (!subfolderLimitReached) {
-          // Add a placeholder node ONLY if we haven't already added one
-          const truncatedSubfolderNode: ReducedFolderNode = {
-            name: subFolder.name,
-            files: [TRUNCATION_INDICATOR], // Generic truncation
+        const subFolderName = entry.name;
+        const subFolderPath = path.join(currentPath, subFolderName);
+
+        if (options.ignoredFolders.has(subFolderName)) {
+          const ignoredSubFolder: FullFolderInfo = {
+            name: subFolderName,
+            path: subFolderPath,
+            files: [],
             subFolders: [],
-            hasMoreFiles: true,
+            totalChildren: 0,
+            totalFiles: 0,
+            isIgnored: true,
           };
-          reducedFolder.subFolders.push(truncatedSubfolderNode);
-          reducedFolder.hasMoreSubfolders = true;
-          subfolderLimitReached = true;
+          subFoldersInCurrentDir.push(ignoredSubFolder);
+          currentItemCount++; // Count the ignored folder itself
+          folderInfo.totalChildren++; // Also counts towards parent's children
+          continue;
         }
-        continue; // Stop processing further subfolders for this parent
-      }
 
-      // Handle explicitly ignored folders identified during the read phase
-      if (subFolder.isIgnored) {
-        const ignoredReducedNode: ReducedFolderNode = {
-          name: subFolder.name,
-          files: [TRUNCATION_INDICATOR], // Indicate contents ignored/truncated
-          subFolders: [],
-          hasMoreFiles: true, // Mark as truncated
-        };
-        reducedFolder.subFolders.push(ignoredReducedNode);
-        // DO NOT add the ignored folder to the queue for further processing
-      } else {
-        // If not ignored and within limit, create the reduced node and add to queue
-        const reducedSubFolder: ReducedFolderNode = {
-          name: subFolder.name,
+        const subFolderNode: FullFolderInfo = {
+          name: subFolderName,
+          path: subFolderPath,
           files: [],
           subFolders: [],
+          totalChildren: 0,
+          totalFiles: 0,
         };
-        reducedFolder.subFolders.push(reducedSubFolder);
-        queue.push({ original: subFolder, reduced: reducedSubFolder });
+        subFoldersInCurrentDir.push(subFolderNode);
+        currentItemCount++;
+        folderInfo.totalChildren++; // Counts towards parent's children
+
+        // Add to queue for processing its children later
+        queue.push({ folderInfo: subFolderNode, currentPath: subFolderPath });
       }
     }
+    folderInfo.subFolders = subFoldersInCurrentDir;
   }
 
-  return rootReducedNode;
-}
-
-/** Calculates the total number of items present in the reduced structure. */
-function countReducedItems(node: ReducedFolderNode): number {
-  let count = 0;
-  // Count files, treating '...' as one item if present
-  count += node.files.length;
-
-  // Count subfolders and recursively count their contents
-  count += node.subFolders.length;
-  for (const sub of node.subFolders) {
-    // Check if it's a placeholder ignored/truncated node
-    const isTruncatedPlaceholder =
-      sub.files.length === 1 &&
-      sub.files[0] === TRUNCATION_INDICATOR &&
-      sub.subFolders.length === 0;
-
-    if (!isTruncatedPlaceholder) {
-      count += countReducedItems(sub);
-    }
-    // Don't add count for items *inside* the placeholder node itself.
-  }
-  return count;
+  return rootNode;
 }
 
 /**
- * Formats the reduced folder structure into a tree-like string.
+ * Reads the directory structure using BFS, respecting maxItems.
  * @param node The current node in the reduced structure.
  * @param indent The current indentation string.
  * @param isLast Sibling indicator.
  * @param builder Array to build the string lines.
  */
-function formatReducedStructure(
-  node: ReducedFolderNode,
-  indent: string,
-  isLast: boolean,
+function formatStructure(
+  node: FullFolderInfo,
+  currentIndent: string,
+  isLastChildOfParent: boolean,
+  isProcessingRootNode: boolean,
   builder: string[],
 ): void {
-  const connector = isLast ? '└───' : '├───';
-  const linePrefix = indent + connector;
+  const connector = isLastChildOfParent ? '└───' : '├───';
 
-  // Don't print the root node's name directly, only its contents
-  if (!node.isRoot) {
-    builder.push(`${linePrefix}${node.name}/`);
+  // The root node of the structure (the one passed initially to getFolderStructure)
+  // is not printed with a connector line itself, only its name as a header.
+  // Its children are printed relative to that conceptual root.
+  // Ignored root nodes ARE printed with a connector.
+  if (!isProcessingRootNode || node.isIgnored) {
+    builder.push(
+      `${currentIndent}${connector}${node.name}/${node.isIgnored ? TRUNCATION_INDICATOR : ''}`,
+    );
   }
 
-  const childIndent = indent + (isLast || node.isRoot ? '    ' : '│   '); // Use " " if last, "│" otherwise
+  // Determine the indent for the children of *this* node.
+  // If *this* node was the root of the whole structure, its children start with no indent before their connectors.
+  // Otherwise, children's indent extends from the current node's indent.
+  const indentForChildren = isProcessingRootNode
+    ? ''
+    : currentIndent + (isLastChildOfParent ? '    ' : '│   ');
 
-  // Render files
+  // Render files of the current node
   const fileCount = node.files.length;
   for (let i = 0; i < fileCount; i++) {
-    const isLastFile = i === fileCount - 1 && node.subFolders.length === 0;
-    const fileConnector = isLastFile ? '└───' : '├───';
-    builder.push(`${childIndent}${fileConnector}${node.files[i]}`);
+    const isLastFileAmongSiblings =
+      i === fileCount - 1 &&
+      node.subFolders.length === 0 &&
+      !node.hasMoreSubfolders;
+    const fileConnector = isLastFileAmongSiblings ? '└───' : '├───';
+    builder.push(`${indentForChildren}${fileConnector}${node.files[i]}`);
+  }
+  if (node.hasMoreFiles) {
+    const isLastIndicatorAmongSiblings =
+      node.subFolders.length === 0 && !node.hasMoreSubfolders;
+    const fileConnector = isLastIndicatorAmongSiblings ? '└───' : '├───';
+    builder.push(`${indentForChildren}${fileConnector}${TRUNCATION_INDICATOR}`);
   }
 
-  // Render subfolders
+  // Render subfolders of the current node
   const subFolderCount = node.subFolders.length;
   for (let i = 0; i < subFolderCount; i++) {
-    const isLastSub = i === subFolderCount - 1;
-    formatReducedStructure(node.subFolders[i], childIndent, isLastSub, builder);
+    const isLastSubfolderAmongSiblings =
+      i === subFolderCount - 1 && !node.hasMoreSubfolders;
+    // Children are never the root node being processed initially.
+    formatStructure(
+      node.subFolders[i],
+      indentForChildren,
+      isLastSubfolderAmongSiblings,
+      false,
+      builder,
+    );
+  }
+  if (node.hasMoreSubfolders) {
+    builder.push(`${indentForChildren}└───${TRUNCATION_INDICATOR}`);
   }
 }
 
@@ -343,40 +278,44 @@ export async function getFolderStructure(
   };
 
   try {
-    // 1. Read the full structure (includes ignored folders marked as such)
-    const fullInfo = await readFullStructure(resolvedPath, mergedOptions);
+    // 1. Read the structure using BFS, respecting maxItems
+    const structureRoot = await readFullStructure(resolvedPath, mergedOptions);
 
-    if (!fullInfo) {
+    if (!structureRoot) {
       return `Error: Could not read directory "${resolvedPath}". Check path and permissions.`;
     }
 
-    // 2. Reduce the structure (handles ignored folders specifically)
-    const reducedRoot = reduceStructure(fullInfo, mergedOptions.maxItems);
-
-    // 3. Count items in the *reduced* structure for the summary
-    const rootNodeItselfCount = 0; // Don't count the root node in the items summary
-    const reducedItemCount =
-      countReducedItems(reducedRoot) - rootNodeItselfCount;
-
-    // 4. Format the reduced structure into a string
+    // 2. Format the structure into a string
     const structureLines: string[] = [];
-    formatReducedStructure(reducedRoot, '', true, structureLines);
+    // Pass true for isRoot for the initial call
+    formatStructure(structureRoot, '', true, true, structureLines);
 
-    // 5. Build the final output string
+    // 3. Build the final output string
     const displayPath = resolvedPath.replace(/\\/g, '/');
-    const totalOriginalChildren = fullInfo.totalChildren;
 
     let disclaimer = '';
-    // Check if any truncation happened OR if ignored folders were present
-    if (
-      reducedItemCount < totalOriginalChildren ||
-      fullInfo.subFolders.some((sf) => sf.isIgnored)
-    ) {
-      disclaimer = `Folders or files indicated with ${TRUNCATION_INDICATOR} contain more items not shown or were ignored.`;
+    // Check if truncation occurred anywhere or if ignored folders are present.
+    // A simple check: if any node indicates more files/subfolders, or is ignored.
+    let truncationOccurred = false;
+    function checkForTruncation(node: FullFolderInfo) {
+      if (node.hasMoreFiles || node.hasMoreSubfolders || node.isIgnored) {
+        truncationOccurred = true;
+      }
+      if (!truncationOccurred) {
+        for (const sub of node.subFolders) {
+          checkForTruncation(sub);
+          if (truncationOccurred) break;
+        }
+      }
+    }
+    checkForTruncation(structureRoot);
+
+    if (truncationOccurred) {
+      disclaimer = `Folders or files indicated with ${TRUNCATION_INDICATOR} contain more items not shown, were ignored, or the display limit (${mergedOptions.maxItems} items) was reached.`;
     }
 
     const summary =
-      `Showing ${reducedItemCount} of ${totalOriginalChildren} items (files + folders). ${disclaimer}`.trim();
+      `Showing up to ${mergedOptions.maxItems} items (files + folders). ${disclaimer}`.trim();
 
     return `${summary}\n\n${displayPath}/\n${structureLines.join('\n')}`;
   } catch (error: unknown) {
