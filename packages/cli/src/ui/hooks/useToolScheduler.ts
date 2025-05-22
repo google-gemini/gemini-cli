@@ -185,12 +185,19 @@ export function useToolScheduler(
   useEffect(() => {
     // effect for executing scheduled tool calls
     if (toolCalls.every((t) => t.status === 'scheduled')) {
+      const signal = abortController.signal;
       toolCalls.forEach((c) => {
         const callId = c.request.callId;
         setToolCalls(setStatus(c.request.callId, 'executing'));
         c.tool
-          .execute(c.request.args, abortController.signal)
+          .execute(c.request.args, signal)
           .then((result) => {
+            if (signal.aborted) {
+              setToolCalls(
+                setStatus(callId, 'cancelled', 'Cancelled during execution'),
+              );
+              return;
+            }
             const functionResponse: Part = {
               functionResponse: {
                 name: c.request.name,

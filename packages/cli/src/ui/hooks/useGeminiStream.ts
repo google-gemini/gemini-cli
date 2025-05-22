@@ -395,7 +395,10 @@ export const useGeminiStream = (
   };
 
   const streamingState: StreamingState =
-    isResponding || toolCalls.some((t) => t.status === 'awaiting_approval')
+    isResponding ||
+    toolCalls.some(
+      (t) => t.status === 'awaiting_approval' || t.status === 'executing',
+    )
       ? StreamingState.Responding
       : StreamingState.Idle;
 
