@@ -67,8 +67,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Outside of Sandbox
@@ -219,8 +219,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Outside of Sandbox
@@ -366,8 +366,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Sandbox
@@ -513,8 +513,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # MacOS Seatbelt
@@ -660,8 +660,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Outside of Sandbox
@@ -807,8 +807,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Outside of Sandbox
@@ -954,8 +954,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the 'save_memory' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to gemini-code-dev@google.com.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 
 # Outside of Sandbox

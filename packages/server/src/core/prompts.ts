@@ -18,8 +18,6 @@ import process from 'node:process';
 import { execSync } from 'node:child_process';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
-const contactEmail = 'gemini-code-dev@google.com';
-
 export function getCoreSystemPrompt(userMemory?: string): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
@@ -105,8 +103,8 @@ Rigorously adhere to existing project conventions when reading or modifying code
 -   **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 
 ## Interaction Details
--   **Help Command:** The user can use '/help' to display help information.
--   **Feedback:** Direct feedback to ${contactEmail}.
+- **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 
 ${(function () {
   // Determine sandbox status based on environment variables
