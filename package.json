@@ -12,6 +12,7 @@
     "build:all": "npm run build && npm run build:sandbox",
     "clean": "scripts/clean.sh",
     "test": "npm run test --workspaces",
+    "coverage": "npm run coverage --workspaces --if-present",
     "start": "NODE_ENV=development scripts/start.sh",
     "debug": "NODE_ENV=development DEBUG=1 scripts/start.sh",
     "lint:fix": "eslint . --fix",
@@ -26,6 +27,7 @@
     "bundle": "esbuild packages/cli/index.ts --bundle --outfile=bundle/gemini.js --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);\" && bash scripts/copy_bundle_assets.sh"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.1.1",
     "esbuild": "^0.25.4",
     "@types/mime-types": "^2.1.4",
     "eslint": "^9.24.0",

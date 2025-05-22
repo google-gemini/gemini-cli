@@ -30,3 +30,4 @@ bundle
 
 # Test report files
 junit.xml
+packages/*/coverage/
