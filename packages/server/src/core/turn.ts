@@ -106,19 +106,15 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private pendingToolCalls: Array<{
+  readonly pendingToolCalls: Array<{
     callId: string;
     name: string;
     args: Record<string, unknown>;
   }>;
-  private fnResponses: Part[];
-  private confirmationDetails: ToolCallConfirmationDetails[];
   private debugResponses: GenerateContentResponse[];
 
   constructor(private readonly chat: Chat) {
     this.pendingToolCalls = [];
-    this.fnResponses = [];
-    this.confirmationDetails = [];
     this.debugResponses = [];
   }
   // The run method yields simpler events suitable for server logic
@@ -180,14 +176,6 @@ export class Turn {
     // Yield a request for the tool call, not the pending/confirming status
     const value: ToolCallRequestInfo = { callId, name, args };
     return { type: GeminiEventType.ToolCallRequest, value };
-  }
-
-  getConfirmationDetails(): ToolCallConfirmationDetails[] {
-    return this.confirmationDetails;
-  }
-
-  getFunctionResponses(): Part[] {
-    return this.fnResponses;
   }
 
   getDebugResponses(): GenerateContentResponse[] {

@@ -383,6 +383,7 @@ export const useGeminiStream = (
         toolCallRequests.push(event.value);
       } else if (event.type === ServerGeminiEventType.UserCancelled) {
         handleUserCancelledEvent(userMessageTimestamp);
+        cancel();
         return StreamProcessingStatus.UserCancelled;
       } else if (event.type === ServerGeminiEventType.Error) {
         handleErrorEvent(event.value, userMessageTimestamp);
@@ -393,12 +394,9 @@ export const useGeminiStream = (
     return StreamProcessingStatus.Completed;
   };
 
-  const streamingState: StreamingState = isResponding
-    ? StreamingState.Responding
-    : pendingToolCalls?.tools.some(
-          (t) => t.status === ToolCallStatus.Confirming,
-        )
-      ? StreamingState.WaitingForConfirmation
+  const streamingState: StreamingState =
+    isResponding || toolCalls.some((t) => t.status === 'awaiting_approval')
+      ? StreamingState.Responding
       : StreamingState.Idle;
 
   const submitQuery = useCallback(

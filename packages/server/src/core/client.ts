@@ -16,7 +16,7 @@ import {
 } from '@google/genai';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { Turn, ServerGeminiStreamEvent, GeminiEventType } from './turn.js';
+import { Turn, ServerGeminiStreamEvent } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -153,43 +153,23 @@ export class GeminiClient {
     chat: Chat,
     request: PartListUnion,
     signal?: AbortSignal,
+    turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
-    let turns = 0;
-    while (turns < this.MAX_TURNS) {
-      turns++;
-      const turn = new Turn(chat);
-      const resultStream = turn.run(request, signal);
-      let seenError = false;
-      for await (const event of resultStream) {
-        seenError =
-          seenError === false ? false : event.type === GeminiEventType.Error;
-        yield event;
-      }
-
-      const confirmations = turn.getConfirmationDetails();
-      if (confirmations.length > 0) {
-        break;
-      }
-
-      const fnResponses = turn.getFunctionResponses();
-      if (fnResponses.length === 0) {
-        const nextSpeakerCheck = await checkNextSpeaker(chat, this);
-        if (nextSpeakerCheck?.next_speaker === 'model') {
-          request = [{ text: 'Please continue.' }];
-          continue;
-        } else {
-          break;
-        }
-      }
-      request = fnResponses;
-
-      if (seenError) {
-        // We saw an error, lets stop processing to prevent unexpected consequences.
-        break;
-      }
+    if (!turns) {
+      return;
     }
-    if (turns >= this.MAX_TURNS) {
-      console.warn('sendMessageStream: Reached maximum tool call turns limit.');
+
+    const turn = new Turn(chat);
+    const resultStream = turn.run(request, signal);
+    for await (const event of resultStream) {
+      yield event;
+    }
+    if (!turn.pendingToolCalls.length) {
+      const nextSpeakerCheck = await checkNextSpeaker(chat, this);
+      if (nextSpeakerCheck?.next_speaker === 'model') {
+        const nextRequest = [{ text: 'Please continue.' }];
+        return this.sendMessageStream(chat, nextRequest, signal, turns - 1);
+      }
     }
   }
 

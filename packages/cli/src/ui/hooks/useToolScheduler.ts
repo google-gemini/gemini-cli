@@ -184,61 +184,55 @@ export function useToolScheduler(
 
   useEffect(() => {
     // effect for executing scheduled tool calls
-    const scheduledCalls = toolCalls.filter((t) => t.status === 'scheduled');
-    const awaitingConfirmation = toolCalls.some(
-      (t) => t.status === 'awaiting_approval',
-    );
-    if (!awaitingConfirmation && scheduledCalls.length) {
-      scheduledCalls.forEach(async (c) => {
+    if (toolCalls.every((t) => t.status === 'scheduled')) {
+      toolCalls.forEach((c) => {
         const callId = c.request.callId;
-        try {
-          setToolCalls(setStatus(c.request.callId, 'executing'));
-          const result = await c.tool.execute(
-            c.request.args,
-            abortController.signal,
-          );
-          const functionResponse: Part = {
-            functionResponse: {
-              name: c.request.name,
-              id: callId,
-              response: { output: result.llmContent },
-            },
-          };
-          const response: ToolCallResponseInfo = {
-            callId,
-            responsePart: functionResponse,
-            resultDisplay: result.returnDisplay,
-            error: undefined,
-          };
-          setToolCalls(setStatus(callId, 'success', response));
-        } catch (e: unknown) {
-          setToolCalls(
-            setStatus(
+        setToolCalls(setStatus(c.request.callId, 'executing'));
+        c.tool
+          .execute(c.request.args, abortController.signal)
+          .then((result) => {
+            const functionResponse: Part = {
+              functionResponse: {
+                name: c.request.name,
+                id: callId,
+                response: { output: result.llmContent },
+              },
+            };
+            const response: ToolCallResponseInfo = {
               callId,
-              'error',
-              toolErrorResponse(
-                c.request,
-                e instanceof Error ? e : new Error(String(e)),
+              responsePart: functionResponse,
+              resultDisplay: result.returnDisplay,
+              error: undefined,
+            };
+            setToolCalls(setStatus(callId, 'success', response));
+          })
+          .catch((e) =>
+            setToolCalls(
+              setStatus(
+                callId,
+                'error',
+                toolErrorResponse(
+                  c.request,
+                  e instanceof Error ? e : new Error(String(e)),
+                ),
               ),
             ),
           );
-        }
       });
     }
   }, [toolCalls, toolRegistry, abortController.signal]);
 
   useEffect(() => {
-    const completedTools = toolCalls.filter(
+    const allDone = toolCalls.every(
       (t) =>
         t.status === 'success' ||
         t.status === 'error' ||
         t.status === 'cancelled',
     );
-    const allDone = completedTools.length === toolCalls.length;
     if (toolCalls.length && allDone) {
-      onComplete(completedTools);
       setToolCalls([]);
-      setAbortController(new AbortController());
+      onComplete(toolCalls);
+      setAbortController(() => new AbortController());
     }
   }, [toolCalls, onComplete]);
 
