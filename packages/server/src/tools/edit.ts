@@ -291,6 +291,7 @@ Expectation for parameters:
       { context: 3 },
     );
     const confirmationDetails: ToolEditConfirmationDetails = {
+      type: 'edit',
       title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
       fileName,
       fileDiff,

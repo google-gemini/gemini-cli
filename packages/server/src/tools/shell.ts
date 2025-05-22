@@ -107,6 +107,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       return false; // already approved and whitelisted
     }
     const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
       title: 'Confirm Shell Command',
       command: params.command,
       rootCommand,

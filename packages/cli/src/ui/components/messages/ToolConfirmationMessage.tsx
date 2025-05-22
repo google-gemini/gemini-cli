@@ -10,7 +10,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import {
   ToolCallConfirmationDetails,
-  ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
 } from '@gemini-code/server';
@@ -21,12 +20,6 @@ import {
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
-}
-
-function isEditDetails(
-  props: ToolCallConfirmationDetails,
-): props is ToolEditConfirmationDetails {
-  return (props as ToolEditConfirmationDetails).fileName !== undefined;
 }
 
 export const ToolConfirmationMessage: React.FC<
@@ -49,7 +42,7 @@ export const ToolConfirmationMessage: React.FC<
     RadioSelectItem<ToolConfirmationOutcome>
   >();
 
-  if (isEditDetails(confirmationDetails)) {
+  if (confirmationDetails.type === 'edit') {
     // Body content is now the DiffRenderer, passing filename to it
     // The bordered box is removed from here and handled within DiffRenderer
     bodyContent = (

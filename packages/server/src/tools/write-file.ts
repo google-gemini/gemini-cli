@@ -158,6 +158,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     );
 
     const confirmationDetails: ToolEditConfirmationDetails = {
+      type: 'edit',
       title: `Confirm Write: ${shortenPath(relativePath)}`,
       fileName,
       fileDiff,

@@ -10,6 +10,7 @@ import {
   ToolCallResponseInfo,
   ToolConfirmationOutcome,
   Tool,
+  ToolCallConfirmationDetails,
 } from '@gemini-code/server';
 import { Part } from '@google/genai';
 import { useCallback, useEffect, useState } from 'react';
@@ -55,7 +56,7 @@ type WaitingToolCall = {
   status: 'awaiting_approval';
   request: ToolCallRequestInfo;
   tool: Tool;
-  confirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  confirmationDetails: ToolCallConfirmationDetails;
 };
 
 export type Status = ToolCall['status'];
@@ -119,17 +120,20 @@ export function useToolScheduler(
               status: 'awaiting_approval',
               request: r,
               tool,
-              confirm: async (outcome) => {
-                await userApproval.onConfirm(outcome);
-                setToolCalls(
-                  outcome === ToolConfirmationOutcome.Cancel
-                    ? setStatus(
-                        r.callId,
-                        'cancelled',
-                        'User did not allow tool call',
-                      )
-                    : setStatus(r.callId, 'scheduled'),
-                );
+              confirmationDetails: {
+                ...userApproval,
+                onConfirm: async (outcome) => {
+                  await userApproval.onConfirm(outcome);
+                  setToolCalls(
+                    outcome === ToolConfirmationOutcome.Cancel
+                      ? setStatus(
+                          r.callId,
+                          'cancelled',
+                          'User did not allow tool call',
+                        )
+                      : setStatus(r.callId, 'scheduled'),
+                  );
+                },
               },
             };
           }
@@ -249,7 +253,7 @@ function setStatus(
 function setStatus(
   targetCallId: string,
   status: 'awaiting_approval',
-  confirm: (t: ToolConfirmationOutcome) => Promise<void>,
+  confirm: ToolCallConfirmationDetails,
 ): (t: ToolCall[]) => ToolCall[];
 function setStatus(
   targetCallId: string,
@@ -296,9 +300,7 @@ function setStatus(
           const next: WaitingToolCall = {
             ...t,
             status: 'awaiting_approval',
-            confirm: auxiliaryData as (
-              o: ToolConfirmationOutcome,
-            ) => Promise<void>,
+            confirmationDetails: auxiliaryData as ToolCallConfirmationDetails,
           };
           return next;
         }
@@ -426,10 +428,7 @@ export function mapToDisplay(
           description: t.tool.getDescription(t.request.args),
           resultDisplay: undefined,
           status: mapStatus(t.status),
-          confirmationDetails: {
-            title: t.request.name,
-            onConfirm: t.confirm,
-          },
+          confirmationDetails: t.confirmationDetails,
         };
       case 'executing':
         return {
