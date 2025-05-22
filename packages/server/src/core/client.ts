@@ -155,10 +155,9 @@ export class GeminiClient {
     signal?: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     let turns = 0;
-    const availableTools = this.config.getToolRegistry().getAllTools();
     while (turns < this.MAX_TURNS) {
       turns++;
-      const turn = new Turn(chat, availableTools);
+      const turn = new Turn(chat);
       const resultStream = turn.run(request, signal);
       let seenError = false;
       for await (const event of resultStream) {

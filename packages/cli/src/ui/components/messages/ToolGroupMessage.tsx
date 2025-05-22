@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
@@ -19,7 +19,6 @@ interface ToolGroupMessageProps {
 
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
-  groupId,
   toolCalls,
   availableTerminalHeight,
 }) => {
@@ -30,9 +29,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
+  const toolAwaitingApproval = useMemo(
+    () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
+    [toolCalls],
+  );
+
   return (
     <Box
-      key={groupId}
       flexDirection="column"
       borderStyle="round"
       /*
@@ -48,7 +51,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       marginBottom={1}
     >
       {toolCalls.map((tool) => (
-        <Box key={groupId + '-' + tool.callId} flexDirection="column">
+        <Box key={tool.callId} flexDirection="column">
           <ToolMessage
             key={tool.callId}
             callId={tool.callId}
@@ -60,6 +63,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             availableTerminalHeight={availableTerminalHeight - staticHeight}
           />
           {tool.status === ToolCallStatus.Confirming &&
+            tool.callId === toolAwaitingApproval?.callId &&
             tool.confirmationDetails && (
               <ToolConfirmationMessage
                 confirmationDetails={tool.confirmationDetails}

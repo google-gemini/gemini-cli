@@ -171,22 +171,27 @@ export interface FileDiff {
   fileName: string;
 }
 
-export interface ToolCallConfirmationDetails {
+export interface ToolCallConfirmationDetailsDefault {
   title: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
 export interface ToolEditConfirmationDetails
-  extends ToolCallConfirmationDetails {
+  extends ToolCallConfirmationDetailsDefault {
   fileName: string;
   fileDiff: string;
 }
 
 export interface ToolExecuteConfirmationDetails
-  extends ToolCallConfirmationDetails {
+  extends ToolCallConfirmationDetailsDefault {
   command: string;
   rootCommand: string;
 }
+
+export type ToolCallConfirmationDetails =
+  | ToolCallConfirmationDetailsDefault
+  | ToolEditConfirmationDetails
+  | ToolExecuteConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce,

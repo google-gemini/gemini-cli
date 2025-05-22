@@ -134,7 +134,7 @@ export const App = ({
     cliVersion,
   );
 
-  const { streamingState, submitQuery, initError, pendingHistoryItem } =
+  const { streamingState, submitQuery, initError, pendingHistoryItems } =
     useGeminiStream(
       addItem,
       refreshStatic,
@@ -209,7 +209,7 @@ export const App = ({
   }, [terminalHeight, footerHeight]);
 
   useEffect(() => {
-    if (!pendingHistoryItem) {
+    if (!pendingHistoryItems.length) {
       return;
     }
 
@@ -223,7 +223,7 @@ export const App = ({
     if (pendingItemDimensions.height > availableTerminalHeight) {
       setStaticNeedsRefresh(true);
     }
-  }, [pendingHistoryItem, availableTerminalHeight, streamingState]);
+  }, [pendingHistoryItems.length, availableTerminalHeight, streamingState]);
 
   useEffect(() => {
     if (streamingState === StreamingState.Idle && staticNeedsRefresh) {
@@ -264,17 +264,18 @@ export const App = ({
       >
         {(item) => item}
       </Static>
-      {pendingHistoryItem && (
-        <Box ref={pendingHistoryItemRef}>
+      <Box ref={pendingHistoryItemRef}>
+        {pendingHistoryItems.map((item, i) => (
           <HistoryItemDisplay
+            key={i}
             availableTerminalHeight={availableTerminalHeight}
             // TODO(taehykim): It seems like references to ids aren't necessary in
             // HistoryItemDisplay. Refactor later. Use a fake id for now.
-            item={{ ...pendingHistoryItem, id: 0 }}
+            item={{ ...item, id: 0 }}
             isPending={true}
           />
-        </Box>
-      )}
+        ))}
+      </Box>
       {showHelp && <Help commands={slashCommands} />}
 
       <Box flexDirection="column" ref={mainControlsRef}>
