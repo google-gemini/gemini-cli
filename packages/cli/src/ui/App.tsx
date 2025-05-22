@@ -5,8 +5,21 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Box, DOMElement, measureElement, Static, Text } from 'ink';
-import { StreamingState, type HistoryItem } from './types.js';
+import {
+  Box,
+  DOMElement,
+  measureElement,
+  Static,
+  Text,
+  useInput,
+  type Key as InkKeyType,
+} from 'ink';
+import {
+  StreamingState,
+  type HistoryItem,
+  ConsoleMessageItem,
+  MessageType,
+} from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -25,11 +38,11 @@ import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
-import { ConsoleOutput } from './components/ConsolePatcher.js';
+import { useConsolePatcher } from './components/ConsolePatcher.js';
+import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
-import { MessageType } from './types.js';
 import { getErrorMessage, type Config } from '@gemini-code/server';
 import { useLogger } from './hooks/useLogger.js';
 
@@ -61,6 +74,32 @@ export const App = ({
   const [corgiMode, setCorgiMode] = useState(false);
   const [shellModeActive, setShellModeActive] = useState(false);
 
+  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessageItem[]>(
+    [],
+  );
+  const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+
+  const errorCount = useMemo(
+    () => consoleMessages.filter((msg) => msg.type === 'error').length,
+    [consoleMessages],
+  );
+  useInput((input: string, key: InkKeyType) => {
+    // Check for Ctrl+D key press
+    if (key.ctrl && (input === 'd' || input === 'D')) {
+      setShowErrorDetails((prev) => !prev);
+      refreshStatic();
+    }
+  });
+
+  const handleNewMessage = useCallback((message: ConsoleMessageItem) => {
+    setConsoleMessages((prevMessages) => [...prevMessages, message]);
+  }, []);
+
+  useConsolePatcher({
+    onNewMessage: handleNewMessage,
+    debugMode: config.getDebugMode(),
+  });
+
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
   }, []);
@@ -72,7 +111,6 @@ export const App = ({
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError);
 
-  // useEffect to initialize geminiMdFileCount from config when config is ready
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
@@ -186,11 +224,10 @@ export const App = ({
 
   const handleClearScreen = useCallback(() => {
     clearItems();
+    setConsoleMessages([]);
     console.clear();
     refreshStatic();
   }, [clearItems, refreshStatic]);
-
-  // --- Render Logic ---
 
   const { rows: terminalHeight } = useTerminalSize();
   const mainControlsRef = useRef<DOMElement>(null);
@@ -201,7 +238,7 @@ export const App = ({
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
       setFooterHeight(fullFooterMeasurement.height);
     }
-  }, [terminalHeight]);
+  }, [terminalHeight, consoleMessages, showErrorDetails]);
 
   const availableTerminalHeight = useMemo(() => {
     const staticExtraHeight = /* margins and padding */ 3;
@@ -231,6 +268,13 @@ export const App = ({
       refreshStatic();
     }
   }, [streamingState, refreshStatic, staticNeedsRefresh]);
+
+  const filteredConsoleMessages = useMemo(() => {
+    if (config.getDebugMode()) {
+      return consoleMessages;
+    }
+    return consoleMessages.filter((msg) => msg.type !== 'debug');
+  }, [consoleMessages, config]);
 
   return (
     <Box flexDirection="column" marginBottom={1} width="90%">
@@ -339,6 +383,11 @@ export const App = ({
                 {shellModeActive && <ShellModeIndicator />}
               </Box>
             </Box>
+
+            {showErrorDetails && (
+              <DetailedMessagesDisplay messages={filteredConsoleMessages} />
+            )}
+
             {isInputActive && (
               <InputPrompt
                 widthFraction={0.9}
@@ -392,8 +441,9 @@ export const App = ({
           debugMessage={debugMessage}
           cliVersion={cliVersion}
           corgiMode={corgiMode}
+          errorCount={errorCount}
+          showErrorDetails={showErrorDetails}
         />
-        <ConsoleOutput debugMode={config.getDebugMode()} />
       </Box>
     </Box>
   );

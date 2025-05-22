@@ -4,27 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, Key } from 'react';
-import { Box, Text } from 'ink';
+import { useEffect } from 'react';
 import util from 'util';
+import { ConsoleMessageItem } from '../types.js';
 
-interface ConsoleMessage {
-  id: Key;
-  type: 'log' | 'warn' | 'error' | 'debug';
-  content: string;
-}
-
-// Using a module-level counter for unique IDs.
-// This ensures IDs are unique across messages.
-let messageIdCounter = 0;
-
-interface ConsoleOutputProps {
+interface UseConsolePatcherParams {
+  onNewMessage: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
 }
 
-export const ConsoleOutput: React.FC<ConsoleOutputProps> = ({ debugMode }) => {
-  const [messages, setMessages] = useState<ConsoleMessage[]>([]);
-
+export const useConsolePatcher = ({
+  onNewMessage,
+  debugMode,
+}: UseConsolePatcherParams): void => {
   useEffect(() => {
     const originalConsoleLog = console.log;
     const originalConsoleWarn = console.warn;
@@ -32,25 +24,30 @@ export const ConsoleOutput: React.FC<ConsoleOutputProps> = ({ debugMode }) => {
     const originalConsoleDebug = console.debug;
 
     const formatArgs = (args: unknown[]): string => util.format(...args);
-    const addMessage = (
-      type: 'log' | 'warn' | 'error' | 'debug',
-      args: unknown[],
-    ) => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          id: `console-msg-${messageIdCounter++}`,
-          type,
-          content: formatArgs(args),
-        },
-      ]);
-    };
 
-    // It's patching time
-    console.log = (...args: unknown[]) => addMessage('log', args);
-    console.warn = (...args: unknown[]) => addMessage('warn', args);
-    console.error = (...args: unknown[]) => addMessage('error', args);
-    console.debug = (...args: unknown[]) => addMessage('debug', args);
+    const patchConsoleMethod =
+      (
+        type: 'log' | 'warn' | 'error' | 'debug',
+        originalMethod: (...args: unknown[]) => void,
+      ) =>
+      (...args: unknown[]) => {
+        if (debugMode) {
+          originalMethod.apply(console, args);
+        }
+
+        // Then, if it's not a debug message or debugMode is on, pass to onNewMessage
+        if (type !== 'debug' || debugMode) {
+          onNewMessage({
+            type,
+            content: formatArgs(args),
+          });
+        }
+      };
+
+    console.log = patchConsoleMethod('log', originalConsoleLog);
+    console.warn = patchConsoleMethod('warn', originalConsoleWarn);
+    console.error = patchConsoleMethod('error', originalConsoleError);
+    console.debug = patchConsoleMethod('debug', originalConsoleDebug);
 
     return () => {
       console.log = originalConsoleLog;
@@ -58,46 +55,5 @@ export const ConsoleOutput: React.FC<ConsoleOutputProps> = ({ debugMode }) => {
       console.error = originalConsoleError;
       console.debug = originalConsoleDebug;
     };
-  }, []);
-
-  return (
-    <Box flexDirection="column">
-      {messages.map((msg) => {
-        if (msg.type === 'debug' && !debugMode) {
-          return null;
-        }
-
-        const textProps: { color?: string } = {};
-        let prefix = '';
-
-        switch (msg.type) {
-          case 'warn':
-            textProps.color = 'yellow';
-            prefix = 'WARN: ';
-            break;
-          case 'error':
-            textProps.color = 'red';
-            prefix = 'ERROR: ';
-            break;
-          case 'debug':
-            textProps.color = 'gray';
-            prefix = 'DEBUG: ';
-            break;
-          case 'log':
-          default:
-            prefix = 'LOG: ';
-            break;
-        }
-
-        return (
-          <Box key={msg.id}>
-            <Text {...textProps}>
-              {prefix}
-              {msg.content}
-            </Text>
-          </Box>
-        );
-      })}
-    </Box>
-  );
+  }, [onNewMessage, debugMode]);
 };

@@ -8,6 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { shortenPath, tildeifyPath, Config } from '@gemini-code/server';
+import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 
 interface FooterProps {
   config: Config;
@@ -15,6 +16,8 @@ interface FooterProps {
   debugMessage: string;
   cliVersion: string;
   corgiMode: boolean;
+  errorCount: number;
+  showErrorDetails: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -23,8 +26,10 @@ export const Footer: React.FC<FooterProps> = ({
   debugMessage,
   cliVersion,
   corgiMode,
+  errorCount,
+  showErrorDetails,
 }) => (
-  <Box marginTop={1}>
+  <Box marginTop={1} justifyContent="space-between" width="100%">
     <Box>
       <Text color={Colors.LightBlue}>
         {shortenPath(tildeifyPath(config.getTargetDir()), 70)}
@@ -56,8 +61,8 @@ export const Footer: React.FC<FooterProps> = ({
       )}
     </Box>
 
-    {/* Right Section: Gemini Label */}
-    <Box>
+    {/* Right Section: Gemini Label and Console Summary */}
+    <Box alignItems="center">
       <Text color={Colors.AccentBlue}> {config.getModel()} </Text>
       <Text color={Colors.SubtleComment}>| CLI {cliVersion} </Text>
       {corgiMode && (
@@ -69,6 +74,12 @@ export const Footer: React.FC<FooterProps> = ({
           <Text color={Colors.Foreground}>`)</Text>
           <Text color={Colors.AccentRed}>▼ </Text>
         </Text>
+      )}
+      {!showErrorDetails && errorCount > 0 && (
+        <Box>
+          <Text color={Colors.SubtleComment}>| </Text>
+          <ConsoleSummaryDisplay errorCount={errorCount} />
+        </Box>
       )}
     </Box>
   </Box>

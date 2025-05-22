@@ -119,3 +119,8 @@ export interface Message {
   content: string; // Renamed from text for clarity in this context
   timestamp: Date; // For consistency, though addItem might use its own timestamping
 }
+
+export interface ConsoleMessageItem {
+  type: 'log' | 'warn' | 'error' | 'debug';
+  content: string;
+}
