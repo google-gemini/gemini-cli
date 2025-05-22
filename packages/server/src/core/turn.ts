@@ -128,11 +128,12 @@ export class Turn {
       });
 
       for await (const resp of responseStream) {
-        this.debugResponses.push(resp);
         if (signal?.aborted) {
           yield { type: GeminiEventType.UserCancelled };
+          // Do not add resp to debugResponses if aborted before processing
           return;
         }
+        this.debugResponses.push(resp);
 
         const text = getResponseText(resp);
         if (text) {
