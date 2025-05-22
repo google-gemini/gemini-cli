@@ -113,7 +113,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'memory',
         description:
-          'Manage memory. Usage: /memory <show|refresh|add|delete_last|delete_all_added> [text for add]',
+          'Manage memory. Usage: /memory <show|refresh|add> [text for add]',
         action: (mainCommand, subCommand, args) => {
           switch (subCommand) {
             case 'show':

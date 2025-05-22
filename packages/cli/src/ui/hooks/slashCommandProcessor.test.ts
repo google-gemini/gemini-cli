@@ -77,13 +77,13 @@ describe('useSlashCommandProcessor', () => {
 
     performAddMemoryEntrySpy.mockReset();
     (open as Mock).mockClear();
-    vi.spyOn(memoryUtils, 'deleteLastMemoryEntry').mockImplementation(vi.fn());
-    vi.spyOn(memoryUtils, 'deleteAllAddedMemoryEntries').mockImplementation(
-      vi.fn(),
-    );
+    // vi.spyOn(memoryUtils, 'deleteLastMemoryEntry').mockImplementation(vi.fn());
+    // vi.spyOn(memoryUtils, 'deleteAllAddedMemoryEntries').mockImplementation(
+    //   vi.fn(),
+    // );
 
-    vi.mocked(memoryUtils.deleteLastMemoryEntry).mockClear();
-    vi.mocked(memoryUtils.deleteAllAddedMemoryEntries).mockClear();
+    // vi.mocked(memoryUtils.deleteLastMemoryEntry).mockClear();
+    // vi.mocked(memoryUtils.deleteAllAddedMemoryEntries).mockClear();
 
     mockProcessExit.mockClear();
     (ShowMemoryCommandModule.createShowMemoryAction as Mock).mockClear();
