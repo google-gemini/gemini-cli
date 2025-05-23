@@ -1,7 +1,6 @@
 {
   "name": "gemini-code",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -32,10 +31,8 @@
   },
   "files": [
     "bundle/",
-    "packages/cli/dist",
-    "packages/cli/package.json",
-    "packages/server/dist",
-    "packages/server/package.json"
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "sqlite3": "^5.1.7"
