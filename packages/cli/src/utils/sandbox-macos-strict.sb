@@ -69,6 +69,7 @@
     (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
+    (subpath (string-append (param "HOME_DIR") "/.gitconfig"))
     (literal "/dev/stdout")
     (literal "/dev/stderr")
     (literal "/dev/null")
