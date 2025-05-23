@@ -151,7 +151,9 @@ describe('loadServerHierarchicalMemory', () => {
       throw new Error('File not found');
     });
 
-    mockFs.readdir.mockImplementation(async (p) => {
+    mockFs.readdir.mockImplementation((async (
+      p: fsSync.PathLike,
+    ): Promise<Dirent[]> => {
       if (p === CWD) {
         return [
           {
@@ -171,8 +173,8 @@ describe('loadServerHierarchicalMemory', () => {
           },
         ] as Dirent[];
       }
-      return [];
-    });
+      return [] as Dirent[];
+    }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
@@ -226,7 +228,9 @@ describe('loadServerHierarchicalMemory', () => {
       throw new Error('File not found');
     });
 
-    mockFs.readdir.mockImplementation(async (p) => {
+    mockFs.readdir.mockImplementation((async (
+      p: fsSync.PathLike,
+    ): Promise<Dirent[]> => {
       if (p === CWD) {
         return [
           { name: 'sub', isFile: () => false, isDirectory: () => true },
@@ -241,8 +245,8 @@ describe('loadServerHierarchicalMemory', () => {
           },
         ] as Dirent[];
       }
-      return [];
-    });
+      return [] as Dirent[];
+    }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
@@ -288,7 +292,9 @@ describe('loadServerHierarchicalMemory', () => {
       throw new Error('File not found');
     });
 
-    mockFs.readdir.mockImplementation(async (p) => {
+    mockFs.readdir.mockImplementation((async (
+      p: fsSync.PathLike,
+    ): Promise<Dirent[]> => {
       if (p === CWD) {
         return [
           {
@@ -317,8 +323,8 @@ describe('loadServerHierarchicalMemory', () => {
           },
         ] as Dirent[];
       }
-      return [];
-    });
+      return [] as Dirent[];
+    }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
@@ -349,11 +355,14 @@ describe('loadServerHierarchicalMemory', () => {
       } as Dirent);
     }
 
-    mockFs.readdir.mockImplementation(async (p) => {
+    mockFs.readdir.mockImplementation((async (
+      p: fsSync.PathLike,
+    ): Promise<Dirent[]> => {
       if (p === CWD) return dirNames;
-      if (p.toString().startsWith(path.join(CWD, 'deep_dir_'))) return [];
-      return [];
-    });
+      if (p.toString().startsWith(path.join(CWD, 'deep_dir_')))
+        return [] as Dirent[];
+      return [] as Dirent[];
+    }) as any);
     mockFs.access.mockRejectedValue(new Error('not found'));
 
     await loadServerHierarchicalMemory(CWD, true);
