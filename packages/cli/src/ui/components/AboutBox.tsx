@@ -36,7 +36,9 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>CLI Version</Text>
+        <Text bold color={Colors.LightBlue}>
+          CLI Version
+        </Text>
       </Box>
       <Box>
         <Text>{cliVersion}</Text>
@@ -44,7 +46,9 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>Model</Text>
+        <Text bold color={Colors.LightBlue}>
+          Model
+        </Text>
       </Box>
       <Box>
         <Text>{modelVersion}</Text>
@@ -52,7 +56,9 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>Sandbox</Text>
+        <Text bold color={Colors.LightBlue}>
+          Sandbox
+        </Text>
       </Box>
       <Box>
         <Text>{sandboxEnv}</Text>
@@ -60,7 +66,9 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>OS</Text>
+        <Text bold color={Colors.LightBlue}>
+          OS
+        </Text>
       </Box>
       <Box>
         <Text>{osVersion}</Text>
