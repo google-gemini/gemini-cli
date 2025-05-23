@@ -174,6 +174,7 @@ describe('loadServerHierarchicalMemory', () => {
         ] as Dirent[];
       }
       return [] as Dirent[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
@@ -246,6 +247,7 @@ describe('loadServerHierarchicalMemory', () => {
         ] as Dirent[];
       }
       return [] as Dirent[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
@@ -324,6 +326,7 @@ describe('loadServerHierarchicalMemory', () => {
         ] as Dirent[];
       }
       return [] as Dirent[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
@@ -362,6 +365,7 @@ describe('loadServerHierarchicalMemory', () => {
       if (p.toString().startsWith(path.join(CWD, 'deep_dir_')))
         return [] as Dirent[];
       return [] as Dirent[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
     mockFs.access.mockRejectedValue(new Error('not found'));
 
