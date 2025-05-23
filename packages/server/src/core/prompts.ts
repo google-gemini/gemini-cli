@@ -71,7 +71,7 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
   - **Back-End APIs:** Node.js with Express.js (JavaScript/TypeScript) or Python with FastAPI.
   - **Full-stack:** Next.js (React/Node.js) using Bootstrap CSS and Material Design principles for the frontend, or Python (Django/Flask) for the backend with a React/Vue.js frontend styled with Bootstrap CSS and Material Design principles.
   - **CLIs:** Python or Go.
-  - **Mobile App:** Flutter (Dart) which inherently uses Material Design, or React Native (JavaScript/TypeScript) with styling libraries that support Bootstrap CSS concepts and Material Design components.
+  - **Mobile App:** Compose Multiplatform (Kotlin Multiplatform) or Flutter (Dart) using Material Design libraries and principles, when sharing code between Android and iOS. Jetpack Compose (Kotlin JVM) with Material Design principles or SwiftUI (Swift) for native apps targeted at either Android or iOS, respectively.
   - **3d Games:** HTML/CSS/JavaScript with Three.js.
   - **2d Games:** HTML/CSS/JavaScript.
 3. **User Approval:** Obtain user approval for the proposed plan.
