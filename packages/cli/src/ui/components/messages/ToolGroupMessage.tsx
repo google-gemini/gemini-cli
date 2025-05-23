@@ -6,7 +6,11 @@
 
 import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import {
+  IndividualToolCallDisplay,
+  StreamingState,
+  ToolCallStatus,
+} from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { Colors } from '../../colors.js';
@@ -15,12 +19,14 @@ interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight: number;
+  streamingState?: StreamingState;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   availableTerminalHeight,
+  streamingState,
 }) => {
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
@@ -72,6 +78,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       ? 'low'
                       : 'medium'
                 }
+                streamingState={streamingState}
               />
             </Box>
             {tool.status === ToolCallStatus.Confirming &&

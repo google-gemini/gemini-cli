@@ -11,6 +11,7 @@ import { Colors } from '../colors.js';
 
 interface LoadingIndicatorProps {
   isLoading: boolean;
+  showSpinner: boolean;
   currentLoadingPhrase: string;
   elapsedTime: number;
   rightContent?: React.ReactNode;
@@ -18,21 +19,25 @@ interface LoadingIndicatorProps {
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   isLoading,
+  showSpinner,
   currentLoadingPhrase,
   elapsedTime,
   rightContent,
 }) => {
   if (!isLoading) {
-    return null; // Don't render anything if not loading
+    return null;
   }
 
   return (
     <Box marginTop={1} paddingLeft={0}>
-      <Box marginRight={1}>
-        <Spinner type="dots" />
-      </Box>
+      {showSpinner && (
+        <Box marginRight={1}>
+          <Spinner type="dots" />
+        </Box>
+      )}
       <Text color={Colors.AccentPurple}>
-        {currentLoadingPhrase} (esc to cancel, {elapsedTime}s)
+        {currentLoadingPhrase}
+        {isLoading && ` (esc to cancel, ${elapsedTime}s)`}
       </Text>
       <Box flexGrow={1}>{/* Spacer */}</Box>
       {rightContent && <Box>{rightContent}</Box>}

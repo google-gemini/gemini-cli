@@ -7,7 +7,11 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import {
+  IndividualToolCallDisplay,
+  StreamingState,
+  ToolCallStatus,
+} from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
@@ -21,6 +25,7 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 export interface ToolMessageProps extends IndividualToolCallDisplay {
   availableTerminalHeight: number;
   emphasis?: TextEmphasis;
+  streamingState?: StreamingState;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -30,6 +35,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   status,
   availableTerminalHeight,
   emphasis = 'medium',
+  streamingState,
 }) => {
   const contentHeightEstimate =
     availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT;
@@ -57,7 +63,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
         {/* Status Indicator */}
-        <ToolStatusIndicator status={status} />
+        <ToolStatusIndicator status={status} streamingState={streamingState} />
         <ToolInfo
           name={name}
           status={status}
@@ -99,15 +105,32 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   );
 };
 
-type ToolStatusIndicator = {
+type ToolStatusIndicatorProps = {
   status: ToolCallStatus;
+  streamingState?: StreamingState;
 };
-const ToolStatusIndicator: React.FC<ToolStatusIndicator> = ({ status }) => (
+const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
+  status,
+  streamingState,
+}) => (
   <Box minWidth={STATUS_INDICATOR_WIDTH}>
     {status === ToolCallStatus.Pending && (
       <Text color={Colors.AccentGreen}>o</Text>
     )}
-    {status === ToolCallStatus.Executing && <Spinner type="dots" />}
+    {status === ToolCallStatus.Executing &&
+      (streamingState === StreamingState.Responding ? (
+        // If the tool is responding that means the user has already confirmed
+        // this tool call, so we can show a checkmark. The call won't complete
+        // executing until all confirmations are done. Showing a spinner would
+        // be misleading as the task is not actually executing at the moment
+        // and also has flickering issues due to Ink rendering limitations.
+        // If this hack becomes a problem, we can always add an additional prop
+        // indicating that the tool was indeed confirmed. If the tool was not
+        // confirmed we could show a paused version of the spinner.
+        <Text color={Colors.Gray}>✔</Text>
+      ) : (
+        <Spinner type="dots" />
+      ))}
     {status === ToolCallStatus.Success && (
       <Text color={Colors.AccentGreen}>✔</Text>
     )}

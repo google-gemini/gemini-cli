@@ -414,15 +414,13 @@ export const useGeminiStream = (
     return StreamProcessingStatus.Completed;
   };
 
-  const streamingState: StreamingState = (() => {
-    if (toolCalls.some((t) => t.status === 'awaiting_approval')) {
-      return StreamingState.WaitingForConfirmation;
-    }
-    if (isResponding || toolCalls.some((t) => t.status === 'executing')) {
-      return StreamingState.Responding;
-    }
-    return StreamingState.Idle;
-  })();
+  const streamingState: StreamingState =
+    isResponding ||
+    toolCalls.some(
+      (t) => t.status === 'awaiting_approval' || t.status === 'executing',
+    )
+      ? StreamingState.Responding
+      : StreamingState.Idle;
 
   const submitQuery = useCallback(
     async (query: PartListUnion) => {

@@ -182,8 +182,17 @@ export const App = ({
       handleSlashCommand,
       shellModeActive,
     );
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const isPausedForConfirmation = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) =>
+          item?.type === 'tool_group' &&
+          item.tools.some((tool) => tool.status === 'Confirming'),
+      ),
+    [pendingHistoryItems],
+  );
+  const { elapsedTime, currentLoadingPhrase, shouldShowSpinner } =
+    useLoadingIndicator(streamingState, isPausedForConfirmation);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
 
   const handleFinalSubmit = useCallback(
@@ -302,6 +311,7 @@ export const App = ({
               key={h.id}
               item={h}
               isPending={false}
+              streamingState={streamingState}
             />
           )),
         ]}
@@ -317,6 +327,7 @@ export const App = ({
             // HistoryItemDisplay. Refactor later. Use a fake id for now.
             item={{ ...item, id: 0 }}
             isPending={true}
+            streamingState={streamingState}
           />
         ))}
       </Box>
@@ -356,6 +367,7 @@ export const App = ({
           <>
             <LoadingIndicator
               isLoading={streamingState === StreamingState.Responding}
+              showSpinner={shouldShowSpinner}
               currentLoadingPhrase={currentLoadingPhrase}
               elapsedTime={elapsedTime}
             />
