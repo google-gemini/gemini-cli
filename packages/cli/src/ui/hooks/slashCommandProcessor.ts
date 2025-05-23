@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
-import { Message, MessageType, HistoryItemWithoutId } from '../types.js'; // Removed HistoryItem
+import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 
 export interface SlashCommandActionReturn {
