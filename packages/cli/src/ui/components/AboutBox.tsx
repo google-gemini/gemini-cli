@@ -1,0 +1,70 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React from 'react';
+import { Box, Text } from 'ink';
+import { Colors } from '../colors.js';
+
+interface AboutBoxProps {
+  cliVersion: string;
+  osVersion: string;
+  sandboxEnv: string;
+  modelVersion: string;
+}
+
+export const AboutBox: React.FC<AboutBoxProps> = ({
+  cliVersion,
+  osVersion,
+  sandboxEnv,
+  modelVersion,
+}) => (
+  <Box
+    borderStyle="round"
+    borderColor={Colors.SubtleComment}
+    flexDirection="column"
+    padding={1}
+    marginY={1}
+    width="100%"
+  >
+    <Box marginBottom={1}>
+      <Text bold color={Colors.AccentPurple}>
+        About Gemini CLI
+      </Text>
+    </Box>
+    <Box flexDirection="row">
+      <Box width="35%">
+        <Text bold color={Colors.LightBlue}>CLI Version</Text>
+      </Box>
+      <Box>
+        <Text>{cliVersion}</Text>
+      </Box>
+    </Box>
+    <Box flexDirection="row">
+      <Box width="35%">
+        <Text bold color={Colors.LightBlue}>Model</Text>
+      </Box>
+      <Box>
+        <Text>{modelVersion}</Text>
+      </Box>
+    </Box>
+    <Box flexDirection="row">
+      <Box width="35%">
+        <Text bold color={Colors.LightBlue}>Sandbox</Text>
+      </Box>
+      <Box>
+        <Text>{sandboxEnv}</Text>
+      </Box>
+    </Box>
+    <Box flexDirection="row">
+      <Box width="35%">
+        <Text bold color={Colors.LightBlue}>OS</Text>
+      </Box>
+      <Box>
+        <Text>{osVersion}</Text>
+      </Box>
+    </Box>
+  </Box>
+);

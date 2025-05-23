@@ -14,6 +14,7 @@ import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { Box } from 'ink';
+import { AboutBox } from './AboutBox.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -48,6 +49,14 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     )}
     {item.type === 'info' && <InfoMessage text={item.text} />}
     {item.type === 'error' && <ErrorMessage text={item.text} />}
+    {item.type === 'about' && (
+      <AboutBox
+        cliVersion={item.cliVersion}
+        osVersion={item.osVersion}
+        sandboxEnv={item.sandboxEnv}
+        modelVersion={item.modelVersion}
+      />
+    )}
     {item.type === 'tool_group' && (
       <ToolGroupMessage
         toolCalls={item.tools}

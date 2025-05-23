@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
-import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
+import { Message, MessageType, HistoryItemWithoutId } from '../types.js'; // Removed HistoryItem
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 
 export interface SlashCommandActionReturn {
@@ -47,10 +47,25 @@ export const useSlashCommandProcessor = (
 ) => {
   const addMessage = useCallback(
     (message: Message) => {
-      const historyItemContent: HistoryItemWithoutId = {
-        type: message.type,
-        text: message.content,
-      };
+      // Convert Message to HistoryItemWithoutId
+      let historyItemContent: HistoryItemWithoutId;
+      if (message.type === MessageType.ABOUT) {
+        historyItemContent = {
+          type: 'about',
+          cliVersion: message.cliVersion,
+          osVersion: message.osVersion,
+          sandboxEnv: message.sandboxEnv,
+          modelVersion: message.modelVersion,
+        };
+      } else {
+        historyItemContent = {
+          type: message.type as
+            | MessageType.INFO
+            | MessageType.ERROR
+            | MessageType.USER,
+          text: message.content,
+        };
+      }
       addItem(historyItemContent, message.timestamp.getTime());
     },
     [addItem],
@@ -147,6 +162,29 @@ export const useSlashCommandProcessor = (
         name: 'corgi',
         action: (_mainCommand, _subCommand, _args) => {
           toggleCorgiMode();
+        },
+      },
+      {
+        name: 'about',
+        description: 'Show version info',
+        action: (_mainCommand, _subCommand, _args) => {
+          const osVersion = `${process.platform} ${process.version}`;
+          let sandboxEnv = 'no sandbox';
+          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+            sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
+          } else if (process.env.SANDBOX === 'sandbox-exec') {
+            sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
+          }
+          const modelVersion = config?.getModel() || 'Unknown';
+
+          addMessage({
+            type: MessageType.ABOUT,
+            timestamp: new Date(),
+            cliVersion,
+            osVersion,
+            sandboxEnv,
+            modelVersion,
+          });
         },
       },
       {

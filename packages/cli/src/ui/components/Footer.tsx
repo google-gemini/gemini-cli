@@ -64,7 +64,6 @@ export const Footer: React.FC<FooterProps> = ({
     {/* Right Section: Gemini Label and Console Summary */}
     <Box alignItems="center">
       <Text color={Colors.AccentBlue}> {config.getModel()} </Text>
-      <Text color={Colors.SubtleComment}>| CLI {cliVersion} </Text>
       {corgiMode && (
         <Text>
           <Text color={Colors.SubtleComment}>| </Text>

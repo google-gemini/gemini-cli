@@ -80,6 +80,14 @@ export type HistoryItemError = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemAbout = HistoryItemBase & {
+  type: 'about';
+  cliVersion: string;
+  osVersion: string;
+  sandboxEnv: string;
+  modelVersion: string;
+};
+
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
@@ -101,6 +109,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGeminiContent
   | HistoryItemInfo
   | HistoryItemError
+  | HistoryItemAbout
   | HistoryItemToolGroup;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
@@ -110,15 +119,26 @@ export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
   USER = 'user',
+  ABOUT = 'about', // Added ABOUT type
   // Add GEMINI if needed by other commands
 }
 
 // Simplified message structure for internal feedback
-export interface Message {
-  type: MessageType;
-  content: string; // Renamed from text for clarity in this context
-  timestamp: Date; // For consistency, though addItem might use its own timestamping
-}
+export type Message =
+  | {
+      type: MessageType.INFO | MessageType.ERROR | MessageType.USER;
+      content: string; // Renamed from text for clarity in this context
+      timestamp: Date;
+    }
+  | {
+      type: MessageType.ABOUT;
+      timestamp: Date;
+      cliVersion: string;
+      osVersion: string;
+      sandboxEnv: string;
+      modelVersion: string;
+      content?: string; // Optional content, not really used for ABOUT
+    };
 
 export interface ConsoleMessageItem {
   type: 'log' | 'warn' | 'error' | 'debug';
