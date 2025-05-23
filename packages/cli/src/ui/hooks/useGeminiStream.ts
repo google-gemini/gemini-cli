@@ -57,7 +57,9 @@ export const useGeminiStream = (
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
   onDebugMessage: (message: string) => void,
-  handleSlashCommand: (cmd: PartListUnion) => boolean,
+  handleSlashCommand: (
+    cmd: PartListUnion,
+  ) => import('./slashCommandProcessor.js').SlashCommandActionReturn | boolean,
   shellModeActive: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
@@ -138,9 +140,27 @@ export const useGeminiStream = (
       await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
       // Handle UI-only commands first
-      if (handleSlashCommand(trimmedQuery)) {
+      const slashCommandResult = handleSlashCommand(trimmedQuery);
+      if (typeof slashCommandResult === 'boolean' && slashCommandResult) {
+        // Command was handled, and it doesn't require a tool call from here
         return { queryToSend: null, shouldProceed: false };
+      } else if (
+        typeof slashCommandResult === 'object' &&
+        slashCommandResult.shouldScheduleTool
+      ) {
+        // Slash command wants to schedule a tool call (e.g., /memory add)
+        const { toolName, toolArgs } = slashCommandResult;
+        if (toolName && toolArgs) {
+          const toolCallRequest: ToolCallRequestInfo = {
+            callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            name: toolName,
+            args: toolArgs,
+          };
+          schedule([toolCallRequest]); // schedule expects an array or single object
+        }
+        return { queryToSend: null, shouldProceed: false }; // Handled by scheduling the tool
       }
+
       if (shellModeActive && handleShellCommand(trimmedQuery)) {
         return { queryToSend: null, shouldProceed: false };
       }

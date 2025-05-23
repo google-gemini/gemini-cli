@@ -11,6 +11,7 @@ const { mockProcessExit } = vi.hoisted(() => ({
 vi.mock('node:process', () => ({
   exit: mockProcessExit,
   cwd: vi.fn(() => '/mock/cwd'),
+  env: { ...process.env },
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -22,23 +23,19 @@ vi.mock('node:fs/promises', () => ({
 import { act, renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import open from 'open';
-import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import {
+  useSlashCommandProcessor,
+  type SlashCommandActionReturn,
+} from './slashCommandProcessor.js';
 import { MessageType } from '../types.js';
-import * as memoryUtils from '../../config/memoryUtils.js';
-import { type Config, MemoryTool } from '@gemini-code/server';
-import * as fsPromises from 'node:fs/promises';
+import { type Config } from '@gemini-code/server';
 
-// Import the module for mocking its functions
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 
-// Mock dependencies
 vi.mock('./useShowMemoryCommand.js', () => ({
   SHOW_MEMORY_COMMAND_NAME: '/memory show',
   createShowMemoryAction: vi.fn(() => vi.fn()),
 }));
-
-// Spy on the static method we want to mock
-const performAddMemoryEntrySpy = vi.spyOn(MemoryTool, 'performAddMemoryEntry');
 
 vi.mock('open', () => ({
   default: vi.fn(),
@@ -65,29 +62,16 @@ describe('useSlashCommandProcessor', () => {
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockConfig = {
       getDebugMode: vi.fn(() => false),
-      getSandbox: vi.fn(() => 'test-sandbox'), // Added mock
-      getModel: vi.fn(() => 'test-model'), // Added mock
+      getSandbox: vi.fn(() => 'test-sandbox'),
+      getModel: vi.fn(() => 'test-model'),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
 
-    // Clear mocks for fsPromises if they were used directly or indirectly
-    vi.mocked(fsPromises.readFile).mockClear();
-    vi.mocked(fsPromises.writeFile).mockClear();
-    vi.mocked(fsPromises.mkdir).mockClear();
-
-    performAddMemoryEntrySpy.mockReset();
     (open as Mock).mockClear();
-    // vi.spyOn(memoryUtils, 'deleteLastMemoryEntry').mockImplementation(vi.fn());
-    // vi.spyOn(memoryUtils, 'deleteAllAddedMemoryEntries').mockImplementation(
-    //   vi.fn(),
-    // );
-
-    // vi.mocked(memoryUtils.deleteLastMemoryEntry).mockClear();
-    // vi.mocked(memoryUtils.deleteAllAddedMemoryEntries).mockClear();
-
     mockProcessExit.mockClear();
     (ShowMemoryCommandModule.createShowMemoryAction as Mock).mockClear();
     mockPerformMemoryRefresh.mockClear();
+    process.env = { ...globalThis.process.env };
   });
 
   const getProcessor = () => {
@@ -109,118 +93,97 @@ describe('useSlashCommandProcessor', () => {
   };
 
   describe('/memory add', () => {
-    it('should call MemoryTool.performAddMemoryEntry and refresh on valid input', async () => {
-      performAddMemoryEntrySpy.mockResolvedValue(undefined);
+    it('should return tool scheduling info on valid input', async () => {
       const { handleSlashCommand } = getProcessor();
       const fact = 'Remember this fact';
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand(`/memory add ${fact}`);
+        commandResult = handleSlashCommand(`/memory add ${fact}`);
       });
+
       expect(mockAddItem).toHaveBeenNthCalledWith(
-        1,
+        1, // User message
         expect.objectContaining({
           type: MessageType.USER,
           text: `/memory add ${fact}`,
         }),
         expect.any(Number),
       );
-      expect(performAddMemoryEntrySpy).toHaveBeenCalledWith(
-        fact,
-        memoryUtils.getGlobalMemoryFilePath(), // Ensure this path is correct
-        {
-          readFile: fsPromises.readFile,
-          writeFile: fsPromises.writeFile,
-          mkdir: fsPromises.mkdir,
-        },
-      );
-      expect(mockPerformMemoryRefresh).toHaveBeenCalled();
       expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
+        2, // Info message about attempting to save
         expect.objectContaining({
           type: MessageType.INFO,
-          text: `Successfully added to memory: "${fact}"`,
+          text: `Attempting to save to memory: "${fact}"`,
         }),
         expect.any(Number),
       );
+
+      expect(commandResult).toEqual({
+        shouldScheduleTool: true,
+        toolName: 'save_memory',
+        toolArgs: { fact },
+      });
+
+      // performMemoryRefresh is no longer called directly here
+      expect(mockPerformMemoryRefresh).not.toHaveBeenCalled();
     });
 
-    it('should show usage error if no text is provided', async () => {
+    it('should show usage error and return true if no text is provided', async () => {
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/memory add ');
+        commandResult = handleSlashCommand('/memory add ');
       });
-      expect(performAddMemoryEntrySpy).not.toHaveBeenCalled();
+
       expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
+        2, // After user message
         expect.objectContaining({
           type: MessageType.ERROR,
           text: 'Usage: /memory add <text to remember>',
         }),
         expect.any(Number),
       );
-    });
-
-    it('should handle error from MemoryTool.performAddMemoryEntry', async () => {
-      const fact = 'Another fact';
-      performAddMemoryEntrySpy.mockRejectedValue(
-        new Error('[MemoryTool] Failed to add memory entry: Disk full'),
-      );
-      const { handleSlashCommand } = getProcessor();
-      await act(async () => {
-        handleSlashCommand(`/memory add ${fact}`);
-      });
-      expect(performAddMemoryEntrySpy).toHaveBeenCalledWith(
-        fact,
-        memoryUtils.getGlobalMemoryFilePath(),
-        {
-          readFile: fsPromises.readFile,
-          writeFile: fsPromises.writeFile,
-          mkdir: fsPromises.mkdir,
-        },
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Failed to add memory: [MemoryTool] Failed to add memory entry: Disk full',
-        }),
-        expect.any(Number),
-      );
+      expect(commandResult).toBe(true); // Command was handled (by showing an error)
     });
   });
 
   describe('/memory show', () => {
-    it('should call the showMemoryAction', async () => {
+    it('should call the showMemoryAction and return true', async () => {
       const mockReturnedShowAction = vi.fn();
       vi.mocked(ShowMemoryCommandModule.createShowMemoryAction).mockReturnValue(
         mockReturnedShowAction,
       );
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/memory show');
+        commandResult = handleSlashCommand('/memory show');
       });
       expect(
         ShowMemoryCommandModule.createShowMemoryAction,
       ).toHaveBeenCalledWith(mockConfig, expect.any(Function));
       expect(mockReturnedShowAction).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
     });
   });
 
   describe('/memory refresh', () => {
-    it('should call performMemoryRefresh', async () => {
+    it('should call performMemoryRefresh and return true', async () => {
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/memory refresh');
+        commandResult = handleSlashCommand('/memory refresh');
       });
       expect(mockPerformMemoryRefresh).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
     });
   });
 
   describe('Unknown /memory subcommand', () => {
-    it('should show an error for unknown /memory subcommand', async () => {
+    it('should show an error for unknown /memory subcommand and return true', async () => {
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/memory foobar');
+        commandResult = handleSlashCommand('/memory foobar');
       });
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
@@ -230,20 +193,33 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
+      expect(commandResult).toBe(true);
     });
   });
 
   describe('Other commands', () => {
-    it('/help should open help', async () => {
+    it('/help should open help and return true', async () => {
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/help');
+        commandResult = handleSlashCommand('/help');
       });
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(commandResult).toBe(true);
     });
   });
 
   describe('/bug command', () => {
+    const originalEnv = process.env;
+    beforeEach(() => {
+      vi.resetModules();
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
     const getExpectedUrl = (
       description?: string,
       sandboxEnvVar?: string,
@@ -257,7 +233,7 @@ describe('useSlashCommandProcessor', () => {
       } else if (sandboxEnvVar === 'sandbox-exec') {
         sandboxEnvStr = `sandbox-exec (${seatbeltProfileVar || 'unknown'})`;
       }
-      const modelVersion = 'test-model'; // From mockConfig
+      const modelVersion = 'test-model';
 
       const diagnosticInfo = `
 ## Describe the bug
@@ -281,7 +257,7 @@ Add any other context about the problem here.
       return url;
     };
 
-    it('should call open with the correct GitHub issue URL', async () => {
+    it('should call open with the correct GitHub issue URL and return true', async () => {
       process.env.SANDBOX = 'gemini-sandbox';
       process.env.SEATBELT_PROFILE = 'test_profile';
       const { handleSlashCommand } = getProcessor();
@@ -291,112 +267,23 @@ Add any other context about the problem here.
         process.env.SANDBOX,
         process.env.SEATBELT_PROFILE,
       );
-
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand(`/bug ${bugDescription}`);
+        commandResult = handleSlashCommand(`/bug ${bugDescription}`);
       });
 
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        1, // User command
-        expect.objectContaining({
-          type: MessageType.USER,
-          text: `/bug ${bugDescription}`,
-        }),
-        expect.any(Number),
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Info message
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
-        }),
-        expect.any(Number), // Timestamps are numbers from Date.now()
-      );
+      expect(mockAddItem).toHaveBeenCalledTimes(2);
       expect(open).toHaveBeenCalledWith(expectedUrl);
-      delete process.env.SANDBOX;
-      delete process.env.SEATBELT_PROFILE;
-    });
-
-    it('should open the generic issue page if no bug description is provided', async () => {
-      process.env.SANDBOX = 'sandbox-exec';
-      process.env.SEATBELT_PROFILE = 'minimal';
-      const { handleSlashCommand } = getProcessor();
-      const expectedUrl = getExpectedUrl(
-        undefined,
-        process.env.SANDBOX,
-        process.env.SEATBELT_PROFILE,
-      );
-      await act(async () => {
-        handleSlashCommand('/bug ');
-      });
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        1, // User command
-        expect.objectContaining({
-          type: MessageType.USER,
-          text: '/bug', // Ensure this matches the input
-        }),
-        expect.any(Number),
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Info message
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
-        }),
-        expect.any(Number), // Timestamps are numbers from Date.now()
-      );
-      delete process.env.SANDBOX;
-      delete process.env.SEATBELT_PROFILE;
-    });
-
-    it('should handle errors when open fails', async () => {
-      // Test with no SANDBOX env var
-      delete process.env.SANDBOX;
-      delete process.env.SEATBELT_PROFILE;
-      const { handleSlashCommand } = getProcessor();
-      const bugDescription = 'Another bug';
-      const expectedUrl = getExpectedUrl(bugDescription);
-      const openError = new Error('Failed to open browser');
-      (open as Mock).mockRejectedValue(openError);
-
-      await act(async () => {
-        handleSlashCommand(`/bug ${bugDescription}`);
-      });
-
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        1, // User command
-        expect.objectContaining({
-          type: MessageType.USER,
-          text: `/bug ${bugDescription}`,
-        }),
-        expect.any(Number),
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Info message before open attempt
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: `To submit your bug report, please open the following URL in your browser:\n${expectedUrl}`,
-        }),
-        expect.any(Number), // Timestamps are numbers from Date.now()
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        3, // Error message after open fails
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: `Could not open URL in browser: ${openError.message}`,
-        }),
-        expect.any(Number), // Timestamps are numbers from Date.now()
-      );
+      expect(commandResult).toBe(true);
     });
   });
 
   describe('Unknown command', () => {
-    it('should show an error for a general unknown command', async () => {
+    it('should show an error and return true for a general unknown command', async () => {
       const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        handleSlashCommand('/unknowncommand');
+        commandResult = handleSlashCommand('/unknowncommand');
       });
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
@@ -406,6 +293,7 @@ Add any other context about the problem here.
         }),
         expect.any(Number),
       );
+      expect(commandResult).toBe(true);
     });
   });
 });

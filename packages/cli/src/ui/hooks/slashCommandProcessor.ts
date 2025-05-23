@@ -11,13 +11,23 @@ import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
-import { addMemoryEntry } from '../../config/memoryUtils.js';
+
+export interface SlashCommandActionReturn {
+  shouldScheduleTool?: boolean;
+  toolName?: string;
+  toolArgs?: Record<string, unknown>;
+  message?: string; // For simple messages or errors
+}
 
 export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
-  action: (mainCommand: string, subCommand?: string, args?: string) => void;
+  action: (
+    mainCommand: string,
+    subCommand?: string,
+    args?: string,
+  ) => void | SlashCommandActionReturn; // Action can now return this object
 }
 
 /**
@@ -37,9 +47,8 @@ export const useSlashCommandProcessor = (
 ) => {
   const addMessage = useCallback(
     (message: Message) => {
-      // Convert Message to HistoryItemWithoutId
       const historyItemContent: HistoryItemWithoutId = {
-        type: message.type, // MessageType enum should be compatible with HistoryItemWithoutId string literal types
+        type: message.type,
         text: message.content,
       };
       addItem(historyItemContent, message.timestamp.getTime());
@@ -53,7 +62,11 @@ export const useSlashCommandProcessor = (
   }, [config, addMessage]);
 
   const addMemoryAction = useCallback(
-    async (_mainCommand: string, _subCommand?: string, args?: string) => {
+    (
+      _mainCommand: string,
+      _subCommand?: string,
+      args?: string,
+    ): SlashCommandActionReturn | void => {
       if (!args || args.trim() === '') {
         addMessage({
           type: MessageType.ERROR,
@@ -62,24 +75,20 @@ export const useSlashCommandProcessor = (
         });
         return;
       }
-      try {
-        await addMemoryEntry(args);
-        addMessage({
-          type: MessageType.INFO,
-          content: `Successfully added to memory: "${args}"`,
-          timestamp: new Date(),
-        });
-        await performMemoryRefresh(); // Refresh memory to reflect changes
-      } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        addMessage({
-          type: MessageType.ERROR,
-          content: `Failed to add memory: ${errorMessage}`,
-          timestamp: new Date(),
-        });
-      }
+      // UI feedback for attempting to schedule
+      addMessage({
+        type: MessageType.INFO,
+        content: `Attempting to save to memory: "${args.trim()}"`,
+        timestamp: new Date(),
+      });
+      // Return info for scheduling the tool call
+      return {
+        shouldScheduleTool: true,
+        toolName: 'save_memory',
+        toolArgs: { fact: args.trim() },
+      };
     },
-    [addMessage, performMemoryRefresh],
+    [addMessage],
   );
 
   const slashCommands: SlashCommand[] = useMemo(
@@ -118,19 +127,19 @@ export const useSlashCommandProcessor = (
           switch (subCommand) {
             case 'show':
               showMemoryAction();
-              break;
+              return; // Explicitly return void
             case 'refresh':
               performMemoryRefresh();
-              break;
+              return; // Explicitly return void
             case 'add':
-              addMemoryAction(mainCommand, subCommand, args);
-              break;
+              return addMemoryAction(mainCommand, subCommand, args); // Return the object
             default:
               addMessage({
                 type: MessageType.ERROR,
                 content: `Unknown /memory command: ${subCommand}. Available: show, refresh, add`,
                 timestamp: new Date(),
               });
+              return; // Explicitly return void
           }
         },
       },
@@ -187,7 +196,6 @@ Add any other context about the problem here.
             content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
             timestamp: new Date(),
           });
-          // Open the URL in the default browser
           (async () => {
             try {
               await open(bugReportUrl);
@@ -203,7 +211,6 @@ Add any other context about the problem here.
           })();
         },
       },
-
       {
         name: 'quit',
         altName: 'exit',
@@ -225,25 +232,21 @@ Add any other context about the problem here.
       addMemoryAction,
       addMessage,
       toggleCorgiMode,
-      config, // Added config to dependency array
+      config,
       cliVersion,
     ],
   );
 
   const handleSlashCommand = useCallback(
-    (rawQuery: PartListUnion): boolean => {
+    (rawQuery: PartListUnion): SlashCommandActionReturn | boolean => {
       if (typeof rawQuery !== 'string') {
         return false;
       }
-
       const trimmed = rawQuery.trim();
-
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
         return false;
       }
-
       const userMessageTimestamp = Date.now();
-
       addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
       let subCommand: string | undefined;
@@ -251,9 +254,8 @@ Add any other context about the problem here.
 
       const commandToMatch = (() => {
         if (trimmed.startsWith('?')) {
-          return 'help'; // No subCommand or args for '?' acting as help
+          return 'help';
         }
-        // For other slash commands like /memory add foo
         const parts = trimmed.substring(1).trim().split(/\s+/);
         if (parts.length > 1) {
           subCommand = parts[1];
@@ -261,15 +263,21 @@ Add any other context about the problem here.
         if (parts.length > 2) {
           args = parts.slice(2).join(' ');
         }
-        return parts[0]; // This is the main command name
+        return parts[0];
       })();
 
       const mainCommand = commandToMatch;
 
       for (const cmd of slashCommands) {
         if (mainCommand === cmd.name || mainCommand === cmd.altName) {
-          cmd.action(mainCommand, subCommand, args);
-          return true;
+          const actionResult = cmd.action(mainCommand, subCommand, args);
+          if (
+            typeof actionResult === 'object' &&
+            actionResult?.shouldScheduleTool
+          ) {
+            return actionResult; // Return the object for useGeminiStream
+          }
+          return true; // Command was handled, but no tool to schedule
         }
       }
 
@@ -278,8 +286,7 @@ Add any other context about the problem here.
         content: `Unknown command: ${trimmed}`,
         timestamp: new Date(),
       });
-
-      return true;
+      return true; // Indicate command was processed (even if unknown)
     },
     [addItem, slashCommands, addMessage],
   );
