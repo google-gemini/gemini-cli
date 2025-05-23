@@ -184,48 +184,53 @@ export function useToolScheduler(
 
   useEffect(() => {
     // effect for executing scheduled tool calls
-    if (toolCalls.every((t) => t.status === 'scheduled')) {
+    const allToolsConfirmed = toolCalls.every(
+      (t) => t.status === 'scheduled' || t.status === 'cancelled',
+    );
+    if (allToolsConfirmed) {
       const signal = abortController.signal;
-      toolCalls.forEach((c) => {
-        const callId = c.request.callId;
-        setToolCalls(setStatus(c.request.callId, 'executing'));
-        c.tool
-          .execute(c.request.args, signal)
-          .then((result) => {
-            if (signal.aborted) {
-              setToolCalls(
-                setStatus(callId, 'cancelled', 'Cancelled during execution'),
-              );
-              return;
-            }
-            const functionResponse: Part = {
-              functionResponse: {
-                name: c.request.name,
-                id: callId,
-                response: { output: result.llmContent },
-              },
-            };
-            const response: ToolCallResponseInfo = {
-              callId,
-              responsePart: functionResponse,
-              resultDisplay: result.returnDisplay,
-              error: undefined,
-            };
-            setToolCalls(setStatus(callId, 'success', response));
-          })
-          .catch((e) =>
-            setToolCalls(
-              setStatus(
+      toolCalls
+        .filter((t) => t.status === 'scheduled')
+        .forEach((t) => {
+          const callId = t.request.callId;
+          setToolCalls(setStatus(t.request.callId, 'executing'));
+          t.tool
+            .execute(t.request.args, signal)
+            .then((result) => {
+              if (signal.aborted) {
+                setToolCalls(
+                  setStatus(callId, 'cancelled', 'Cancelled during execution'),
+                );
+                return;
+              }
+              const functionResponse: Part = {
+                functionResponse: {
+                  name: t.request.name,
+                  id: callId,
+                  response: { output: result.llmContent },
+                },
+              };
+              const response: ToolCallResponseInfo = {
                 callId,
-                'error',
-                toolErrorResponse(
-                  c.request,
-                  e instanceof Error ? e : new Error(String(e)),
+                responsePart: functionResponse,
+                resultDisplay: result.returnDisplay,
+                error: undefined,
+              };
+              setToolCalls(setStatus(callId, 'success', response));
+            })
+            .catch((e) =>
+              setToolCalls(
+                setStatus(
+                  callId,
+                  'error',
+                  toolErrorResponse(
+                    t.request,
+                    e instanceof Error ? e : new Error(String(e)),
+                  ),
                 ),
               ),
-            ),
-          );
-      });
+            );
+        });
     }
   }, [toolCalls, toolRegistry, abortController.signal]);
 

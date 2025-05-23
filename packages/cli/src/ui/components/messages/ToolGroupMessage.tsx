@@ -29,6 +29,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
+  // only prompt for tool approval on the first 'confirming' tool in the list
+  // note, after the CTA, this automatically moves over to the next 'confirming' tool
   const toolAwaitingApproval = useMemo(
     () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
     [toolCalls],
@@ -50,27 +52,38 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       borderColor={borderColor}
       marginBottom={1}
     >
-      {toolCalls.map((tool) => (
-        <Box key={tool.callId} flexDirection="column">
-          <ToolMessage
-            key={tool.callId}
-            callId={tool.callId}
-            name={tool.name}
-            description={tool.description}
-            resultDisplay={tool.resultDisplay}
-            status={tool.status}
-            confirmationDetails={tool.confirmationDetails}
-            availableTerminalHeight={availableTerminalHeight - staticHeight}
-          />
-          {tool.status === ToolCallStatus.Confirming &&
-            tool.callId === toolAwaitingApproval?.callId &&
-            tool.confirmationDetails && (
-              <ToolConfirmationMessage
+      {toolCalls.map((tool) => {
+        const isConfirming = toolAwaitingApproval?.callId === tool.callId;
+        return (
+          <Box key={tool.callId} flexDirection="column">
+            <Box flexDirection="row" alignItems="center">
+              <ToolMessage
+                callId={tool.callId}
+                name={tool.name}
+                description={tool.description}
+                resultDisplay={tool.resultDisplay}
+                status={tool.status}
                 confirmationDetails={tool.confirmationDetails}
-              ></ToolConfirmationMessage>
-            )}
-        </Box>
-      ))}
+                availableTerminalHeight={availableTerminalHeight - staticHeight}
+                emphasis={
+                  isConfirming
+                    ? 'high'
+                    : toolAwaitingApproval
+                      ? 'low'
+                      : 'medium'
+                }
+              />
+            </Box>
+            {tool.status === ToolCallStatus.Confirming &&
+              isConfirming &&
+              tool.confirmationDetails && (
+                <ToolConfirmationMessage
+                  confirmationDetails={tool.confirmationDetails}
+                />
+              )}
+          </Box>
+        );
+      })}
     </Box>
   );
 };
