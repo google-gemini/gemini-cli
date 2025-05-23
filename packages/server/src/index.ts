@@ -21,6 +21,7 @@ export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
+export * from './utils/memoryDiscovery.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
