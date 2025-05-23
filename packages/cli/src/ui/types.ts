@@ -119,7 +119,7 @@ export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
   USER = 'user',
-  ABOUT = 'about', // Added ABOUT type
+  ABOUT = 'about',
   // Add GEMINI if needed by other commands
 }
 
