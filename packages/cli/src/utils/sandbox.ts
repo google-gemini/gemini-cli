@@ -291,7 +291,7 @@ export async function start_sandbox(sandbox: string) {
   if (!execSync(`${sandbox} images -q ${image}`).toString().trim()) {
     const remedy = gcPath.includes('gemini-code/packages/')
       ? 'Try `scripts/build_sandbox.sh` under gemini-code repo.'
-      : 'Please notify gemini-code-dev@google.com.';
+      : 'Please notify gemini-cli-dev@google.com.';
     console.error(`ERROR: ${image} is missing. ${remedy}`);
     process.exit(1);
   }
