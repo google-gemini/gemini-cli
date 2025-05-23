@@ -11,7 +11,7 @@ interface UseInputHistoryProps {
   onSubmit: (value: string) => void;
   isActive: boolean;
   currentQuery: string; // Renamed from query to avoid confusion
-  onChangeAndMoveCursor: (value: string) => void;
+  onChange: (value: string) => void;
 }
 
 interface UseInputHistoryReturn {
@@ -25,7 +25,7 @@ export function useInputHistory({
   onSubmit,
   isActive,
   currentQuery,
-  onChangeAndMoveCursor: setQueryAndMoveCursor,
+  onChange,
 }: UseInputHistoryProps): UseInputHistoryReturn {
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [originalQueryBeforeNav, setOriginalQueryBeforeNav] =
@@ -65,14 +65,14 @@ export function useInputHistory({
     if (nextIndex !== historyIndex) {
       setHistoryIndex(nextIndex);
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
-      setQueryAndMoveCursor(newValue); // Call the prop passed from parent
+      onChange(newValue);
       return true;
     }
     return false;
   }, [
     historyIndex,
     setHistoryIndex,
-    setQueryAndMoveCursor,
+    onChange,
     userMessages,
     isActive,
     currentQuery, // Use currentQuery from props
@@ -88,17 +88,17 @@ export function useInputHistory({
 
     if (nextIndex === -1) {
       // Reached the end of history navigation, restore original query
-      setQueryAndMoveCursor(originalQueryBeforeNav);
+      onChange(originalQueryBeforeNav);
     } else {
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
-      setQueryAndMoveCursor(newValue);
+      onChange(newValue);
     }
     return true;
   }, [
     historyIndex,
     setHistoryIndex,
     originalQueryBeforeNav,
-    setQueryAndMoveCursor,
+    onChange,
     userMessages,
     isActive,
   ]);

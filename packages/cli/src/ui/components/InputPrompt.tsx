@@ -81,20 +81,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [onSubmit, buffer, resetCompletionState],
   );
 
-  const onChangeAndMoveCursor = useCallback(
-    (newValue: string) => {
-      buffer.setText(newValue);
-      buffer.move('end');
-    },
-    [buffer],
-  );
-
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
     isActive: !completion.showSuggestions,
     currentQuery: buffer.text,
-    onChangeAndMoveCursor,
+    onChange: buffer.setText,
   });
 
   const completionSuggestions = completion.suggestions;
