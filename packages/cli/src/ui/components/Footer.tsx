@@ -24,7 +24,6 @@ export const Footer: React.FC<FooterProps> = ({
   config,
   debugMode,
   debugMessage,
-  cliVersion,
   corgiMode,
   errorCount,
   showErrorDetails,
