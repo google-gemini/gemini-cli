@@ -143,4 +143,5 @@ export type Message =
 export interface ConsoleMessageItem {
   type: 'log' | 'warn' | 'error' | 'debug';
   content: string;
+  count: number;
 }

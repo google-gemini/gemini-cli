@@ -14,18 +14,14 @@ import {
   useInput,
   type Key as InkKeyType,
 } from 'ink';
-import {
-  StreamingState,
-  type HistoryItem,
-  ConsoleMessageItem,
-  MessageType,
-} from './types.js';
+import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
@@ -60,6 +56,11 @@ export const App = ({
   startupWarnings = [],
 }: AppProps) => {
   const { history, addItem, clearItems } = useHistory();
+  const {
+    consoleMessages,
+    handleNewMessage,
+    clearConsoleMessages: clearConsoleMessagesState,
+  } = useConsoleMessages();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
   const refreshStatic = useCallback(() => {
@@ -73,10 +74,6 @@ export const App = ({
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [shellModeActive, setShellModeActive] = useState(false);
-
-  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessageItem[]>(
-    [],
-  );
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
 
   const errorCount = useMemo(
@@ -89,10 +86,6 @@ export const App = ({
       refreshStatic();
     }
   });
-
-  const handleNewMessage = useCallback((message: ConsoleMessageItem) => {
-    setConsoleMessages((prevMessages) => [...prevMessages, message]);
-  }, []);
 
   useConsolePatcher({
     onNewMessage: handleNewMessage,
@@ -232,10 +225,10 @@ export const App = ({
 
   const handleClearScreen = useCallback(() => {
     clearItems();
-    setConsoleMessages([]);
+    clearConsoleMessagesState();
     console.clear();
     refreshStatic();
-  }, [clearItems, refreshStatic]);
+  }, [clearItems, clearConsoleMessagesState, refreshStatic]);
 
   const { rows: terminalHeight } = useTerminalSize();
   const mainControlsRef = useRef<DOMElement>(null);

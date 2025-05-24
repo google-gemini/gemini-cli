@@ -40,6 +40,7 @@ export const useConsolePatcher = ({
           onNewMessage({
             type,
             content: formatArgs(args),
+            count: 1,
           });
         }
       };
