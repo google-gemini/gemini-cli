@@ -8,36 +8,38 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
+import { useStreamingContext } from '../contexts/StreamingContext.js';
+import { StreamingState } from '../types.js';
 
 interface LoadingIndicatorProps {
-  isLoading: boolean;
-  showSpinner: boolean;
   currentLoadingPhrase: string;
   elapsedTime: number;
   rightContent?: React.ReactNode;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
-  isLoading,
-  showSpinner,
   currentLoadingPhrase,
   elapsedTime,
   rightContent,
 }) => {
-  if (!isLoading) {
+  const { streamingState } = useStreamingContext();
+
+  if (streamingState === StreamingState.Idle) {
     return null;
   }
 
   return (
     <Box marginTop={1} paddingLeft={0}>
-      {showSpinner && (
+      {streamingState === StreamingState.Responding && (
         <Box marginRight={1}>
           <Spinner type="dots" />
         </Box>
       )}
       <Text color={Colors.AccentPurple}>
         {currentLoadingPhrase}
-        {isLoading && ` (esc to cancel, ${elapsedTime}s)`}
+        {streamingState === StreamingState.WaitingForConfirmation
+          ? ''
+          : ` (esc to cancel, ${elapsedTime}s)`}
       </Text>
       <Box flexGrow={1}>{/* Spacer */}</Box>
       {rightContent && <Box>{rightContent}</Box>}

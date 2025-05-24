@@ -4,91 +4,158 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink-testing-library';
-import { Text } from 'ink'; // Import Text directly from ink
+import { Text } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
+import {
+  StreamingContext,
+  StreamingContextType,
+} from '../contexts/StreamingContext.js';
+import { StreamingState } from '../types.js';
+import { vi } from 'vitest';
 
+// Mock ink-spinner
 vi.mock('ink-spinner', () => ({
-  default: function MockSpinner() {
-    return <Text>MockSpinner</Text>;
-  },
+  default: () => <Text>MockSpinner</Text>,
 }));
 
+const renderWithContext = (
+  ui: React.ReactElement,
+  streamingStateValue: StreamingState,
+) => {
+  const contextValue: StreamingContextType = {
+    streamingState: streamingStateValue,
+  };
+  return render(
+    <StreamingContext.Provider value={contextValue}>
+      {ui}
+    </StreamingContext.Provider>,
+  );
+};
+
 describe('<LoadingIndicator />', () => {
-  it('should not render when isLoading is false', () => {
-    const { lastFrame } = render(
-      <LoadingIndicator
-        isLoading={false}
-        showSpinner={true}
-        currentLoadingPhrase="Loading..."
-        elapsedTime={0}
-      />,
+  const defaultProps = {
+    currentLoadingPhrase: 'Loading...',
+    elapsedTime: 5,
+  };
+
+  it('should not render when streamingState is Idle', () => {
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...defaultProps} />,
+      StreamingState.Idle,
     );
     expect(lastFrame()).toBe('');
   });
 
-  it('should render spinner, phrase, and time when isLoading is true and showSpinner is true', () => {
-    const phrase = 'Processing data...';
-    const time = 5;
-    const { lastFrame } = render(
-      <LoadingIndicator
-        isLoading={true}
-        showSpinner={true}
-        currentLoadingPhrase={phrase}
-        elapsedTime={time}
-      />,
+  it('should render spinner, phrase, and time when streamingState is Responding', () => {
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...defaultProps} />,
+      StreamingState.Responding,
     );
-
     const output = lastFrame();
-    expect(output).toContain(phrase);
-    expect(output).toContain(`(esc to cancel, ${time}s)`);
-    // Check for spinner presence by looking for its characteristic characters or structure
-    // This is a bit fragile as it depends on Spinner's output.
-    // A more robust way would be to mock Spinner and check if it was rendered.
-    expect(output).toContain('MockSpinner'); // Check for the mocked spinner text
+    expect(output).toContain('MockSpinner');
+    expect(output).toContain('Loading...');
+    expect(output).toContain('(esc to cancel, 5s)');
   });
 
-  it('should render phrase and time but no spinner when isLoading is true and showSpinner is false', () => {
-    const phrase = 'Waiting for input...';
-    const time = 10;
-    const { lastFrame } = render(
-      <LoadingIndicator
-        isLoading={true}
-        showSpinner={false}
-        currentLoadingPhrase={phrase}
-        elapsedTime={time}
-      />,
+  it('should render phrase and time but no spinner when streamingState is WaitingForConfirmation', () => {
+    const props = {
+      currentLoadingPhrase: 'Confirm action',
+      elapsedTime: 10,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.WaitingForConfirmation,
     );
     const output = lastFrame();
-    expect(output).toContain(phrase);
-    expect(output).toContain(`(esc to cancel, ${time}s)`);
-    // Ensure spinner characters are NOT present
     expect(output).not.toContain('MockSpinner');
+    expect(output).toContain('Confirm action');
+    expect(output).not.toContain('(esc to cancel)');
+    expect(output).not.toContain(', 10s');
   });
 
   it('should display the currentLoadingPhrase correctly', () => {
-    const specificPhrase = 'Almost there!';
-    const { lastFrame } = render(
-      <LoadingIndicator
-        isLoading={true}
-        showSpinner={true}
-        currentLoadingPhrase={specificPhrase}
-        elapsedTime={3}
-      />,
+    const props = {
+      currentLoadingPhrase: 'Processing data...',
+      elapsedTime: 3,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
     );
-    expect(lastFrame()).toContain(specificPhrase);
+    expect(lastFrame()).toContain('Processing data...');
   });
 
-  it('should display the elapsedTime correctly', () => {
-    const specificTime = 7;
-    const { lastFrame } = render(
-      <LoadingIndicator
-        isLoading={true}
-        showSpinner={true}
-        currentLoadingPhrase="Working..."
-        elapsedTime={specificTime}
-      />,
+  it('should display the elapsedTime correctly when Responding', () => {
+    const props = {
+      currentLoadingPhrase: 'Working...',
+      elapsedTime: 8,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
     );
-    expect(lastFrame()).toContain(`(esc to cancel, ${specificTime}s)`);
+    expect(lastFrame()).toContain('(esc to cancel, 8s)');
+  });
+
+  it('should render rightContent when provided', () => {
+    const rightContent = <Text>Extra Info</Text>;
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...defaultProps} rightContent={rightContent} />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).toContain('Extra Info');
+  });
+
+  it('should transition correctly between states using rerender', () => {
+    const { lastFrame, rerender } = renderWithContext(
+      <LoadingIndicator {...defaultProps} />,
+      StreamingState.Idle,
+    );
+    expect(lastFrame()).toBe(''); // Initial: Idle
+
+    // Transition to Responding
+    rerender(
+      <StreamingContext.Provider
+        value={{ streamingState: StreamingState.Responding }}
+      >
+        <LoadingIndicator
+          currentLoadingPhrase="Now Responding"
+          elapsedTime={2}
+        />
+      </StreamingContext.Provider>,
+    );
+    let output = lastFrame();
+    expect(output).toContain('MockSpinner');
+    expect(output).toContain('Now Responding');
+    expect(output).toContain('(esc to cancel, 2s)');
+
+    // Transition to WaitingForConfirmation
+    rerender(
+      <StreamingContext.Provider
+        value={{ streamingState: StreamingState.WaitingForConfirmation }}
+      >
+        <LoadingIndicator
+          currentLoadingPhrase="Please Confirm"
+          elapsedTime={15}
+        />
+      </StreamingContext.Provider>,
+    );
+    output = lastFrame();
+    expect(output).not.toContain('MockSpinner');
+    expect(output).toContain('Please Confirm');
+    expect(output).not.toContain('(esc to cancel)');
+    expect(output).not.toContain(', 15s');
+
+    // Transition back to Idle
+    rerender(
+      <StreamingContext.Provider
+        value={{ streamingState: StreamingState.Idle }}
+      >
+        <LoadingIndicator {...defaultProps} />
+      </StreamingContext.Provider>,
+    );
+    expect(lastFrame()).toBe('');
   });
 });

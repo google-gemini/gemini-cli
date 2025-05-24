@@ -41,6 +41,10 @@ import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import { getErrorMessage, type Config } from '@gemini-code/server';
 import { useLogger } from './hooks/useLogger.js';
+import {
+  StreamingContext,
+  StreamingContextType,
+} from './contexts/StreamingContext.js';
 
 interface AppProps {
   config: Config;
@@ -174,18 +178,14 @@ export const App = ({
       handleSlashCommand,
       shellModeActive,
     );
-  const isPausedForConfirmation = useMemo(
-    () =>
-      pendingHistoryItems.some(
-        (item) =>
-          item?.type === 'tool_group' &&
-          item.tools.some((tool) => tool.status === 'Confirming'),
-      ),
-    [pendingHistoryItems],
-  );
-  const { elapsedTime, currentLoadingPhrase, shouldShowSpinner } =
-    useLoadingIndicator(streamingState, isPausedForConfirmation);
+  const { elapsedTime, currentLoadingPhrase } =
+    useLoadingIndicator(streamingState);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
+
+  const streamingContextValue: StreamingContextType = useMemo(
+    () => ({ streamingState }),
+    [streamingState],
+  );
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
@@ -278,177 +278,176 @@ export const App = ({
   }, [consoleMessages, config]);
 
   return (
-    <Box flexDirection="column" marginBottom={1} width="90%">
-      {/*
-       * The Static component is an Ink intrinsic in which there can only be 1 per application.
-       * Because of this restriction we're hacking it slightly by having a 'header' item here to
-       * ensure that it's statically rendered.
-       *
-       * Background on the Static Item: Anything in the Static component is written a single time
-       * to the console. Think of it like doing a console.log and then never using ANSI codes to
-       * clear that content ever again. Effectively it has a moving frame that every time new static
-       * content is set it'll flush content to the terminal and move the area which it's "clearing"
-       * down a notch. Without Static the area which gets erased and redrawn continuously grows.
-       */}
-      <Static
-        key={staticKey}
-        items={[
-          <Box flexDirection="column" key="header">
-            <Header />
-            <Tips />
-          </Box>,
-          ...history.map((h) => (
-            <HistoryItemDisplay
-              availableTerminalHeight={availableTerminalHeight}
-              key={h.id}
-              item={h}
-              isPending={false}
-              streamingState={streamingState}
-            />
-          )),
-        ]}
-      >
-        {(item) => item}
-      </Static>
-      <Box ref={pendingHistoryItemRef}>
-        {pendingHistoryItems.map((item, i) => (
-          <HistoryItemDisplay
-            key={i}
-            availableTerminalHeight={availableTerminalHeight}
-            // TODO(taehykim): It seems like references to ids aren't necessary in
-            // HistoryItemDisplay. Refactor later. Use a fake id for now.
-            item={{ ...item, id: 0 }}
-            isPending={true}
-            streamingState={streamingState}
-          />
-        ))}
-      </Box>
-      {showHelp && <Help commands={slashCommands} />}
-
-      <Box flexDirection="column" ref={mainControlsRef}>
-        {startupWarnings.length > 0 && (
-          <Box
-            borderStyle="round"
-            borderColor={Colors.AccentYellow}
-            paddingX={1}
-            marginY={1}
-            flexDirection="column"
-          >
-            {startupWarnings.map((warning, index) => (
-              <Text key={index} color={Colors.AccentYellow}>
-                {warning}
-              </Text>
-            ))}
-          </Box>
-        )}
-
-        {isThemeDialogOpen ? (
-          <Box flexDirection="column">
-            {themeError && (
-              <Box marginBottom={1}>
-                <Text color={Colors.AccentRed}>{themeError}</Text>
-              </Box>
-            )}
-            <ThemeDialog
-              onSelect={handleThemeSelect}
-              onHighlight={handleThemeHighlight}
-              settings={settings}
-            />
-          </Box>
-        ) : (
-          <>
-            <LoadingIndicator
-              isLoading={streamingState === StreamingState.Responding}
-              showSpinner={shouldShowSpinner}
-              currentLoadingPhrase={currentLoadingPhrase}
-              elapsedTime={elapsedTime}
-            />
-            <Box
-              marginTop={1}
-              display="flex"
-              justifyContent="space-between"
-              width="100%"
-            >
-              <Box>
-                {process.env.GEMINI_SYSTEM_MD && (
-                  <Text color={Colors.AccentRed}>|⌐■_■| </Text>
-                )}
-                {geminiMdFileCount > 0 && (
-                  <Text color={Colors.SubtleComment}>
-                    Using {geminiMdFileCount} GEMINI.md file
-                    {geminiMdFileCount > 1 ? 's' : ''}
-                  </Text>
-                )}
-              </Box>
-              <Box>
-                {showAutoAcceptIndicator && !shellModeActive && (
-                  <AutoAcceptIndicator />
-                )}
-                {shellModeActive && <ShellModeIndicator />}
-              </Box>
-            </Box>
-
-            {showErrorDetails && (
-              <DetailedMessagesDisplay messages={filteredConsoleMessages} />
-            )}
-
-            {isInputActive && (
-              <InputPrompt
-                widthFraction={0.9}
-                onSubmit={handleFinalSubmit}
-                userMessages={userMessages}
-                onClearScreen={handleClearScreen}
-                config={config}
-                slashCommands={slashCommands}
-                shellModeActive={shellModeActive}
-                setShellModeActive={setShellModeActive}
+    <StreamingContext.Provider value={streamingContextValue}>
+      <Box flexDirection="column" marginBottom={1} width="90%">
+        {/*
+         * The Static component is an Ink intrinsic in which there can only be 1 per application.
+         * Because of this restriction we're hacking it slightly by having a 'header' item here to
+         * ensure that it's statically rendered.
+         *
+         * Background on the Static Item: Anything in the Static component is written a single time
+         * to the console. Think of it like doing a console.log and then never using ANSI codes to
+         * clear that content ever again. Effectively it has a moving frame that every time new static
+         * content is set it'll flush content to the terminal and move the area which it's "clearing"
+         * down a notch. Without Static the area which gets erased and redrawn continuously grows.
+         */}
+        <Static
+          key={staticKey}
+          items={[
+            <Box flexDirection="column" key="header">
+              <Header />
+              <Tips />
+            </Box>,
+            ...history.map((h) => (
+              <HistoryItemDisplay
+                availableTerminalHeight={availableTerminalHeight}
+                key={h.id}
+                item={h}
+                isPending={false}
               />
-            )}
-          </>
-        )}
+            )),
+          ]}
+        >
+          {(item) => item}
+        </Static>
+        <Box ref={pendingHistoryItemRef}>
+          {pendingHistoryItems.map((item, i) => (
+            <HistoryItemDisplay
+              key={i}
+              availableTerminalHeight={availableTerminalHeight}
+              // TODO(taehykim): It seems like references to ids aren't necessary in
+              // HistoryItemDisplay. Refactor later. Use a fake id for now.
+              item={{ ...item, id: 0 }}
+              isPending={true}
+            />
+          ))}
+        </Box>
+        {showHelp && <Help commands={slashCommands} />}
 
-        {initError && streamingState !== StreamingState.Responding && (
-          <Box
-            borderStyle="round"
-            borderColor={Colors.AccentRed}
-            paddingX={1}
-            marginBottom={1}
-          >
-            {history.find(
-              (item) => item.type === 'error' && item.text?.includes(initError),
-            )?.text ? (
-              <Text color={Colors.AccentRed}>
-                {
-                  history.find(
-                    (item) =>
-                      item.type === 'error' && item.text?.includes(initError),
-                  )?.text
-                }
-              </Text>
-            ) : (
-              <>
-                <Text color={Colors.AccentRed}>
-                  Initialization Error: {initError}
+        <Box flexDirection="column" ref={mainControlsRef}>
+          {startupWarnings.length > 0 && (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentYellow}
+              paddingX={1}
+              marginY={1}
+              flexDirection="column"
+            >
+              {startupWarnings.map((warning, index) => (
+                <Text key={index} color={Colors.AccentYellow}>
+                  {warning}
                 </Text>
-                <Text color={Colors.AccentRed}>
-                  {' '}
-                  Please check API key and configuration.
-                </Text>
-              </>
-            )}
-          </Box>
-        )}
+              ))}
+            </Box>
+          )}
 
-        <Footer
-          config={config}
-          debugMode={config.getDebugMode()}
-          debugMessage={debugMessage}
-          cliVersion={cliVersion}
-          corgiMode={corgiMode}
-          errorCount={errorCount}
-          showErrorDetails={showErrorDetails}
-        />
+          {isThemeDialogOpen ? (
+            <Box flexDirection="column">
+              {themeError && (
+                <Box marginBottom={1}>
+                  <Text color={Colors.AccentRed}>{themeError}</Text>
+                </Box>
+              )}
+              <ThemeDialog
+                onSelect={handleThemeSelect}
+                onHighlight={handleThemeHighlight}
+                settings={settings}
+              />
+            </Box>
+          ) : (
+            <>
+              <LoadingIndicator
+                currentLoadingPhrase={currentLoadingPhrase}
+                elapsedTime={elapsedTime}
+              />
+              <Box
+                marginTop={1}
+                display="flex"
+                justifyContent="space-between"
+                width="100%"
+              >
+                <Box>
+                  {process.env.GEMINI_SYSTEM_MD && (
+                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+                  )}
+                  {geminiMdFileCount > 0 && (
+                    <Text color={Colors.SubtleComment}>
+                      Using {geminiMdFileCount} GEMINI.md file
+                      {geminiMdFileCount > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </Box>
+                <Box>
+                  {showAutoAcceptIndicator && !shellModeActive && (
+                    <AutoAcceptIndicator />
+                  )}
+                  {shellModeActive && <ShellModeIndicator />}
+                </Box>
+              </Box>
+
+              {showErrorDetails && (
+                <DetailedMessagesDisplay messages={filteredConsoleMessages} />
+              )}
+
+              {isInputActive && (
+                <InputPrompt
+                  widthFraction={0.9}
+                  onSubmit={handleFinalSubmit}
+                  userMessages={userMessages}
+                  onClearScreen={handleClearScreen}
+                  config={config}
+                  slashCommands={slashCommands}
+                  shellModeActive={shellModeActive}
+                  setShellModeActive={setShellModeActive}
+                />
+              )}
+            </>
+          )}
+
+          {initError && streamingState !== StreamingState.Responding && (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentRed}
+              paddingX={1}
+              marginBottom={1}
+            >
+              {history.find(
+                (item) =>
+                  item.type === 'error' && item.text?.includes(initError),
+              )?.text ? (
+                <Text color={Colors.AccentRed}>
+                  {
+                    history.find(
+                      (item) =>
+                        item.type === 'error' && item.text?.includes(initError),
+                    )?.text
+                  }
+                </Text>
+              ) : (
+                <>
+                  <Text color={Colors.AccentRed}>
+                    Initialization Error: {initError}
+                  </Text>
+                  <Text color={Colors.AccentRed}>
+                    {' '}
+                    Please check API key and configuration.
+                  </Text>
+                </>
+              )}
+            </Box>
+          )}
+
+          <Footer
+            config={config}
+            debugMode={config.getDebugMode()}
+            debugMessage={debugMessage}
+            cliVersion={cliVersion}
+            corgiMode={corgiMode}
+            errorCount={errorCount}
+            showErrorDetails={showErrorDetails}
+          />
+        </Box>
       </Box>
-    </Box>
+    </StreamingContext.Provider>
   );
 };

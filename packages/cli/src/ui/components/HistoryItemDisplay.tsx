@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import type { HistoryItem, StreamingState } from '../types.js';
+import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
 import { UserShellMessage } from './messages/UserShellMessage.js';
 import { GeminiMessage } from './messages/GeminiMessage.js';
@@ -20,14 +20,12 @@ interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight: number;
   isPending: boolean;
-  streamingState?: StreamingState;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
   availableTerminalHeight,
   isPending,
-  streamingState,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -62,7 +60,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         toolCalls={item.tools}
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
-        streamingState={streamingState}
       />
     )}
   </Box>

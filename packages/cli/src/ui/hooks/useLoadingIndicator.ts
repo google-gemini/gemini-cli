@@ -4,98 +4,54 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
-import {
-  WITTY_LOADING_PHRASES,
-  PHRASE_CHANGE_INTERVAL_MS,
-} from '../constants.js';
 import { StreamingState } from '../types.js';
+import { useTimer } from './useTimer.js';
+import { usePhraseCycler } from './usePhraseCycler.js';
+import { useState, useEffect, useRef } from 'react'; // Added useRef
 
-export const useLoadingIndicator = (
-  streamingState: StreamingState,
-  isPaused: boolean,
-) => {
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
-    WITTY_LOADING_PHRASES[0],
+export const useLoadingIndicator = (streamingState: StreamingState) => {
+  const [timerResetKey, setTimerResetKey] = useState(0);
+  const isTimerActive = streamingState === StreamingState.Responding;
+
+  const elapsedTimeFromTimer = useTimer(isTimerActive, timerResetKey);
+
+  const isPhraseCyclingActive = streamingState === StreamingState.Responding;
+  const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
+  const currentLoadingPhrase = usePhraseCycler(
+    isPhraseCyclingActive,
+    isWaiting,
   );
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const currentPhraseIndexRef = useRef<number>(0);
 
-  const [shouldShowSpinner, setShouldShowSpinner] = useState(true);
+  const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
+  const prevStreamingStateRef = useRef<StreamingState | null>(null);
 
   useEffect(() => {
-    if (streamingState === StreamingState.Responding) {
-      if (!isPaused) {
-        if (!timerRef.current) {
-          // No specific action needed here if timer wasn't running and we are not paused.
-          // Elapsed time continues from where it left off or starts from 0 if it's a fresh start.
-        }
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setElapsedTime((prevTime) => prevTime + 1);
-        }, 1000);
-      } else {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-      }
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      setElapsedTime(0);
+    if (
+      prevStreamingStateRef.current === StreamingState.WaitingForConfirmation &&
+      streamingState === StreamingState.Responding
+    ) {
+      setTimerResetKey((prevKey) => prevKey + 1);
+      setRetainedElapsedTime(0); // Clear retained time when going back to responding
+    } else if (
+      streamingState === StreamingState.Idle &&
+      prevStreamingStateRef.current === StreamingState.Responding
+    ) {
+      setTimerResetKey((prevKey) => prevKey + 1); // Reset timer when becoming idle from responding
+      setRetainedElapsedTime(0);
+    } else if (streamingState === StreamingState.WaitingForConfirmation) {
+      // Capture the time when entering WaitingForConfirmation
+      // elapsedTimeFromTimer will hold the last value from when isTimerActive was true.
+      setRetainedElapsedTime(elapsedTimeFromTimer);
     }
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [streamingState, isPaused]);
+    prevStreamingStateRef.current = streamingState;
+  }, [streamingState, elapsedTimeFromTimer]);
 
-  useEffect(() => {
-    if (streamingState === StreamingState.Responding) {
-      if (!isPaused) {
-        setShouldShowSpinner(true);
-        if (!phraseIntervalRef.current) {
-          currentPhraseIndexRef.current = 0;
-          setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[0]);
-          phraseIntervalRef.current = setInterval(() => {
-            currentPhraseIndexRef.current =
-              (currentPhraseIndexRef.current + 1) %
-              WITTY_LOADING_PHRASES.length;
-            setCurrentLoadingPhrase(
-              WITTY_LOADING_PHRASES[currentPhraseIndexRef.current],
-            );
-          }, PHRASE_CHANGE_INTERVAL_MS);
-        }
-      } else {
-        setShouldShowSpinner(false);
-        setCurrentLoadingPhrase('Waiting for user confirmation...');
-        if (phraseIntervalRef.current) {
-          clearInterval(phraseIntervalRef.current);
-          phraseIntervalRef.current = null;
-        }
-      }
-    } else {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    };
-  }, [streamingState, isPaused]);
-
-  return { elapsedTime, currentLoadingPhrase, shouldShowSpinner };
+  return {
+    elapsedTime:
+      streamingState === StreamingState.WaitingForConfirmation
+        ? retainedElapsedTime
+        : elapsedTimeFromTimer,
+    currentLoadingPhrase,
+  };
 };

@@ -8,6 +8,7 @@ import { render } from 'ink-testing-library';
 import { ToolMessage, ToolMessageProps } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
+import { StreamingContext } from '../../contexts/StreamingContext.js';
 
 // Mock child components or utilities if they are complex or have side effects
 vi.mock('ink-spinner', () => ({
@@ -28,6 +29,17 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
+// Helper to render with context
+const renderWithContext = (
+  ui: React.ReactElement,
+  streamingState: StreamingState,
+) =>
+  render(
+    <StreamingContext.Provider value={{ streamingState }}>
+      {ui}
+    </StreamingContext.Provider>,
+  );
+
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
     callId: 'tool-123',
@@ -38,11 +50,13 @@ describe('<ToolMessage />', () => {
     availableTerminalHeight: 20,
     confirmationDetails: undefined,
     emphasis: 'medium',
-    streamingState: StreamingState.Idle,
   };
 
   it('renders basic tool information', () => {
-    const { lastFrame } = render(<ToolMessage {...baseProps} />);
+    const { lastFrame } = renderWithContext(
+      <ToolMessage {...baseProps} />,
+      StreamingState.Idle,
+    );
     const output = lastFrame();
     expect(output).toContain('✔'); // Success indicator
     expect(output).toContain('test-tool');
@@ -52,73 +66,72 @@ describe('<ToolMessage />', () => {
 
   describe('ToolStatusIndicator rendering', () => {
     it('shows ✔ for Success status', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Success} />,
+        StreamingState.Idle,
       );
       expect(lastFrame()).toContain('✔');
     });
 
     it('shows o for Pending status', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Pending} />,
+        StreamingState.Idle,
       );
       expect(lastFrame()).toContain('o');
     });
 
     it('shows ? for Confirming status', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Confirming} />,
+        StreamingState.Idle,
       );
       expect(lastFrame()).toContain('?');
     });
 
     it('shows - for Canceled status', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Canceled} />,
+        StreamingState.Idle,
       );
       expect(lastFrame()).toContain('-');
     });
 
     it('shows x for Error status', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Error} />,
+        StreamingState.Idle,
       );
       expect(lastFrame()).toContain('x');
     });
 
-    it('shows MockSpinner for Executing status when streamingState is Idle', () => {
-      const { lastFrame } = render(
-        <ToolMessage
-          {...baseProps}
-          status={ToolCallStatus.Executing}
-          streamingState={StreamingState.Idle}
-        />,
-      );
-      expect(lastFrame()).toContain('MockSpinner');
-      expect(lastFrame()).not.toContain('✔');
-    });
-
-    it('shows MockSpinner for Executing status when streamingState is undefined (default behavior)', () => {
-      const { lastFrame } = render(
+    it('shows paused spiner for Executing status when streamingState is Idle', () => {
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('MockSpinner');
+      expect(lastFrame()).toContain('⠇');
+      expect(lastFrame()).not.toContain('MockSpinner');
       expect(lastFrame()).not.toContain('✔');
     });
 
-    it('shows ✔ (paused/confirmed look) for Executing status when streamingState is Responding', () => {
-      // This is the key change from the commit: if the overall app is still responding
-      // (e.g., waiting for other tool confirmations), an already confirmed and executing tool
-      // should show a static checkmark to avoid spinner flicker.
-      const { lastFrame } = render(
-        <ToolMessage
-          {...baseProps}
-          status={ToolCallStatus.Executing}
-          streamingState={StreamingState.Responding} // Simulate app still responding
-        />,
+    it('shows paused spiner for Executing status when streamingState is WaitingForConfirmation', () => {
+      const { lastFrame } = renderWithContext(
+        <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        StreamingState.WaitingForConfirmation,
       );
-      expect(lastFrame()).toContain('✔'); // Should be a checkmark, not spinner
+      expect(lastFrame()).toContain('⠇');
       expect(lastFrame()).not.toContain('MockSpinner');
+      expect(lastFrame()).not.toContain('✔');
+    });
+
+    it('shows MockSpinner for Executing status when streamingState is Responding', () => {
+      const { lastFrame } = renderWithContext(
+        <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        StreamingState.Responding, // Simulate app still responding
+      );
+      expect(lastFrame()).toContain('MockSpinner');
+      expect(lastFrame()).not.toContain('✔');
     });
   });
 
@@ -127,22 +140,25 @@ describe('<ToolMessage />', () => {
       fileDiff: '--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new',
       fileName: 'file.txt',
     };
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={diffResult} />,
+      StreamingState.Idle,
     );
     // Check that the output contains the MockDiff content as part of the whole message
     expect(lastFrame()).toMatch(/MockDiff:--- a\/file\.txt/);
   });
 
   it('renders emphasis correctly', () => {
-    const { lastFrame: highEmphasisFrame } = render(
+    const { lastFrame: highEmphasisFrame } = renderWithContext(
       <ToolMessage {...baseProps} emphasis="high" />,
+      StreamingState.Idle,
     );
     // Check for trailing indicator or specific color if applicable (Colors are not easily testable here)
     expect(highEmphasisFrame()).toContain('←'); // Trailing indicator for high emphasis
 
-    const { lastFrame: lowEmphasisFrame } = render(
+    const { lastFrame: lowEmphasisFrame } = renderWithContext(
       <ToolMessage {...baseProps} emphasis="low" />,
+      StreamingState.Idle,
     );
     // For low emphasis, the name and description might be dimmed (check for dimColor if possible)
     // This is harder to assert directly in text output without color checks.
