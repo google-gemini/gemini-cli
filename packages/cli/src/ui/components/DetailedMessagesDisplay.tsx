@@ -33,7 +33,7 @@ export const DetailedMessagesDisplay: React.FC<
       <Box marginBottom={1}>
         <Text bold color={Colors.Foreground}>
           Debug Console{' '}
-          <Text color={Colors.SubtleComment}>(CTRL-D to close)</Text>
+          <Text color={Colors.SubtleComment}>(CTRL-O to close)</Text>
         </Text>
       </Box>
       {messages.map((msg, index) => {

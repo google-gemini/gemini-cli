@@ -1186,10 +1186,11 @@ export function useTextBuffer({
       else if (
         key['backspace'] ||
         input === '\x7f' ||
+        (key['ctrl'] && input === 'h') ||
         (key['delete'] && !key['shift'])
       )
         backspace();
-      else if (key['delete']) del();
+      else if (key['delete'] || (key['ctrl'] && input === 'd')) del();
       else if (input && !key['ctrl'] && !key['meta']) {
         // Heuristic for paste: if input is longer than 1 char (potential paste)
         // strip ANSI escape codes.

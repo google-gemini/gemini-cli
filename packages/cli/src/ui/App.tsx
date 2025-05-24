@@ -84,8 +84,7 @@ export const App = ({
     [consoleMessages],
   );
   useInput((input: string, key: InkKeyType) => {
-    // Check for Ctrl+D key press
-    if (key.ctrl && (input === 'd' || input === 'D')) {
+    if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
       refreshStatic();
     }

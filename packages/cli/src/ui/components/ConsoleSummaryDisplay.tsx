@@ -27,7 +27,7 @@ export const ConsoleSummaryDisplay: React.FC<ConsoleSummaryDisplayProps> = ({
       {errorCount > 0 && (
         <Text color={Colors.AccentRed}>
           {errorIcon} {errorCount} error{errorCount > 1 ? 's' : ''}{' '}
-          <Text color={Colors.SubtleComment}>(CTRL-D for details)</Text>
+          <Text color={Colors.SubtleComment}>(CTRL-O for details)</Text>
         </Text>
       )}
     </Box>
