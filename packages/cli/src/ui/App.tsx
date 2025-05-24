@@ -296,7 +296,7 @@ export const App = ({
           items={[
             <Box flexDirection="column" key="header">
               <Header />
-              <Tips />
+              <Tips config={config} />
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
