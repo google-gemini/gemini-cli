@@ -109,7 +109,10 @@ export const useGeminiStream = (
     if (
       isResponding ||
       toolCalls.some(
-        (t) => t.status === 'executing' || t.status === 'scheduled',
+        (t) =>
+          t.status === 'executing' ||
+          t.status === 'scheduled' ||
+          t.status === 'validating',
       )
     ) {
       return StreamingState.Responding;
