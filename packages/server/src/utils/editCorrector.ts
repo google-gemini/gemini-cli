@@ -78,7 +78,14 @@ export async function ensureCorrectEdit(
 
     if (occurrences === 1) {
       finalOldString = unescapedOldStringAttempt;
-      finalNewString = unescapeStringForGeminiBug(originalParams.new_string);
+      if (newStringPotentiallyEscaped) {
+        finalNewString = await correctNewString(
+          client,
+          originalParams.old_string, // original old
+          unescapedOldStringAttempt, // corrected old
+          originalParams.new_string, // original new (which is potentially escaped)
+        );
+      }
     } else if (occurrences === 0) {
       const llmCorrectedOldString = await correctOldStringMismatch(
         client,
