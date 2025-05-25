@@ -140,4 +140,34 @@ index 123..456 100644
     expect(output).toContain('added line');
     expect(output).toContain('context line 10');
   });
+
+  it('should not render a gap indicator for small gaps (<= MAX_CONTEXT_LINES_WITHOUT_GAP)', () => {
+    const diffWithSmallGap = `
+diff --git a/file.txt b/file.txt
+index abc..def 100644
+--- a/file.txt
++++ b/file.txt
+@@ -1,5 +1,5 @@
+ context line 1
+ context line 2
+ context line 3
+ context line 4
+ context line 5
+@@ -11,5 +11,5 @@
+ context line 11
+ context line 12
+ context line 13
+ context line 14
+ context line 15
+`;
+    const { lastFrame } = render(
+      <DiffRenderer diffContent={diffWithSmallGap} filename="file.txt" />,
+    );
+    const output = lastFrame();
+    expect(output).not.toContain('═'); // Ensure no separator is rendered
+
+    // Verify that lines before and after the gap are rendered
+    expect(output).toContain('context line 5');
+    expect(output).toContain('context line 11');
+  });
 });

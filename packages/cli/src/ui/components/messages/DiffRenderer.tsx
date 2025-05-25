@@ -188,7 +188,7 @@ const renderDiffContent = (
     : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
 
   let lastLineNumber: number | null = null;
-  const MAX_CONTEXT_LINES_WITHOUT_GAP = 1;
+  const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
 
   return (
     <Box flexDirection="column" key={key}>
