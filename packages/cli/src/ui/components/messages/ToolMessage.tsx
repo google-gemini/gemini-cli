@@ -118,7 +118,7 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
       )}
       {status === ToolCallStatus.Executing &&
         (streamingState === StreamingState.Responding ? (
-          <Spinner type="dots" />
+          <Spinner type="toggle" />
         ) : (
           // Paused spinner to avoid flicker.
           <Text>⠇</Text>
