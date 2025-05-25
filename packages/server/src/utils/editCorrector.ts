@@ -136,6 +136,14 @@ export async function ensureCorrectEdit(
     }
   }
 
+  const { targetString, pair } = trimPairIfPossible(
+    finalOldString,
+    finalNewString,
+    currentContent,
+  );
+  finalOldString = targetString;
+  finalNewString = pair;
+
   // Final result construction
   const result: CorrectedEditResult = {
     params: {
@@ -357,6 +365,33 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
     );
     return potentiallyProblematicNewString;
   }
+}
+
+function trimPairIfPossible(
+  target: string,
+  trimIfTargetTrims: string,
+  currentContent: string,
+) {
+  const trimmedTargetString = target.trim();
+  if (target.length !== trimmedTargetString.length) {
+    const trimmedTargetOccurrences = countOccurrences(
+      currentContent,
+      trimmedTargetString,
+    );
+
+    if (trimmedTargetOccurrences === 1) {
+      const trimmedReactiveString = trimIfTargetTrims.trim();
+      return {
+        targetString: trimmedTargetString,
+        pair: trimmedReactiveString,
+      };
+    }
+  }
+
+  return {
+    targetString: target,
+    pair: trimIfTargetTrims,
+  };
 }
 
 /**
