@@ -62,7 +62,13 @@ export async function ensureCorrectEdit(
   let occurrences = countOccurrences(currentContent, finalOldString);
 
   if (occurrences === 1) {
-    return { params: originalParams, occurrences };
+    if (newStringPotentiallyEscaped) {
+      finalNewString = await correctNewStringEscaping(
+        client,
+        finalOldString,
+        originalParams.new_string,
+      );
+    }
   } else {
     // occurrences is 0 or some other unexpected state initially
     const unescapedOldStringAttempt = unescapeStringForGeminiBug(
@@ -271,6 +277,72 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   } catch (error) {
     console.error('Error during LLM call for new_string correction:', error);
     return originalNewString;
+  }
+}
+
+const CORRECT_NEW_STRING_ESCAPING_SCHEMA: SchemaUnion = {
+  type: Type.OBJECT,
+  properties: {
+    corrected_new_string_escaping: {
+      type: Type.STRING,
+      description:
+        'The new_string with corrected escaping, ensuring it is a proper replacement for the old_string, especially considering potential over-escaping issues from previous LLM generations.',
+    },
+  },
+  required: ['corrected_new_string_escaping'],
+};
+
+export async function correctNewStringEscaping(
+  geminiClient: GeminiClient,
+  oldString: string,
+  potentiallyProblematicNewString: string,
+): Promise<string> {
+  const prompt = `
+Context: A text replacement operation is planned. The text to be replaced (old_string) has been correctly identified in the file. However, the replacement text (new_string) might have been improperly escaped by a previous LLM generation (e.g. too many backslashes for newlines like \\n instead of \n, or unnecessarily quotes like \\"Hello\\" instead of "Hello").
+
+old_string (this is the exact text that will be replaced):
+\`\`\`
+${oldString}
+\`\`\`
+
+potentially_problematic_new_string (this is the text that should replace old_string, but MIGHT have bad escaping, or might be entirely correct):
+\`\`\`
+${potentiallyProblematicNewString}
+\`\`\`
+
+Task: Analyze the potentially_problematic_new_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the new_string, when inserted into the code, will be a valid and correctly interpreted.
+
+For example, if old_string is "foo" and potentially_problematic_new_string is "bar\\nbaz", the corrected_new_string_escaping should be "bar\nbaz".
+If potentially_problematic_new_string is console.log(\\"Hello World\\"), it should be console.log("Hello World").
+
+Return ONLY the corrected string in the specified JSON format with the key 'corrected_new_string_escaping'. If no escaping correction is needed, return the original potentially_problematic_new_string.
+  `.trim();
+
+  const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
+
+  try {
+    const result = await geminiClient.generateJson(
+      contents,
+      CORRECT_NEW_STRING_ESCAPING_SCHEMA,
+      EditModel,
+      EditConfig,
+    );
+
+    if (
+      result &&
+      typeof result.corrected_new_string_escaping === 'string' &&
+      result.corrected_new_string_escaping.length > 0
+    ) {
+      return result.corrected_new_string_escaping;
+    } else {
+      return potentiallyProblematicNewString;
+    }
+  } catch (error) {
+    console.error(
+      'Error during LLM call for new_string escaping correction:',
+      error,
+    );
+    return potentiallyProblematicNewString;
   }
 }
 
