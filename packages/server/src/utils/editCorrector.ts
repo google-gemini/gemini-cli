@@ -69,6 +69,12 @@ export async function ensureCorrectEdit(
         originalParams.new_string,
       );
     }
+  } else if (occurrences > 1) {
+    const result: CorrectedEditResult = {
+      params: { ...originalParams },
+      occurrences,
+    };
+    return result;
   } else {
     // occurrences is 0 or some other unexpected state initially
     const unescapedOldStringAttempt = unescapeStringForGeminiBug(
