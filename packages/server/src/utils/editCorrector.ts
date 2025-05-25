@@ -12,6 +12,7 @@ import {
 } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { EditToolParams } from '../tools/edit.js';
+import { LruCache } from './LruCache.js';
 
 const EditModel = 'gemini-2.5-flash-preview-04-17';
 const EditConfig: GenerateContentConfig = {
@@ -19,6 +20,13 @@ const EditConfig: GenerateContentConfig = {
     thinkingBudget: 0,
   },
 };
+
+const MAX_CACHE_SIZE = 50;
+
+// Cache for ensureCorrectEdit results
+const editCorrectionCache = new LruCache<string, CorrectedEditResult>(
+  MAX_CACHE_SIZE,
+);
 
 /**
  * Defines the structure of the parameters within CorrectedEditResult
@@ -53,6 +61,12 @@ export async function ensureCorrectEdit(
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
   client: GeminiClient,
 ): Promise<CorrectedEditResult> {
+  const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
+  const cachedResult = editCorrectionCache.get(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   let finalNewString = originalParams.new_string;
   const newStringPotentiallyEscaped =
     unescapeStringForGeminiBug(originalParams.new_string) !==
@@ -74,6 +88,7 @@ export async function ensureCorrectEdit(
       params: { ...originalParams },
       occurrences,
     };
+    editCorrectionCache.set(cacheKey, result);
     return result;
   } else {
     // occurrences is 0 or some other unexpected state initially
@@ -124,6 +139,7 @@ export async function ensureCorrectEdit(
           params: { ...originalParams },
           occurrences: 0, // Explicitly 0 as LLM failed
         };
+        editCorrectionCache.set(cacheKey, result);
         return result;
       }
     } else {
@@ -132,6 +148,7 @@ export async function ensureCorrectEdit(
         params: { ...originalParams },
         occurrences, // This will be > 1
       };
+      editCorrectionCache.set(cacheKey, result);
       return result;
     }
   }
@@ -153,6 +170,7 @@ export async function ensureCorrectEdit(
     },
     occurrences: countOccurrences(currentContent, finalOldString), // Recalculate occurrences with the final old_string
   };
+  editCorrectionCache.set(cacheKey, result);
   return result;
 }
 
@@ -448,4 +466,8 @@ export function countOccurrences(str: string, substr: string): number {
     pos = str.indexOf(substr, pos + substr.length); // Start search after the current match
   }
   return count;
+}
+
+export function resetEditCorrectorCaches_TEST_ONLY() {
+  editCorrectionCache.clear();
 }
