@@ -28,6 +28,9 @@ const editCorrectionCache = new LruCache<string, CorrectedEditResult>(
   MAX_CACHE_SIZE,
 );
 
+// Cache for ensureCorrectFileContent results
+const fileContentCorrectionCache = new LruCache<string, string>(MAX_CACHE_SIZE);
+
 /**
  * Defines the structure of the parameters within CorrectedEditResult
  */
@@ -172,6 +175,27 @@ export async function ensureCorrectEdit(
   };
   editCorrectionCache.set(cacheKey, result);
   return result;
+}
+
+export async function ensureCorrectFileContent(
+  content: string,
+  client: GeminiClient,
+): Promise<string> {
+  const cachedResult = fileContentCorrectionCache.get(content);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
+  const contentPotentiallyEscaped =
+    unescapeStringForGeminiBug(content) !== content;
+  if (!contentPotentiallyEscaped) {
+    fileContentCorrectionCache.set(content, content);
+    return content;
+  }
+
+  const correctedContent = await correctStringEscaping(content, client);
+  fileContentCorrectionCache.set(content, correctedContent);
+  return correctedContent;
 }
 
 // Define the expected JSON schema for the LLM response for old_string correction
@@ -385,6 +409,66 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
+const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
+  type: Type.OBJECT,
+  properties: {
+    corrected_string_escaping: {
+      type: Type.STRING,
+      description:
+        'The string with corrected escaping, ensuring it is valid, specially considering potential over-escaping issues from previous LLM generations.',
+    },
+  },
+  required: ['corrected_string_escaping'],
+};
+
+export async function correctStringEscaping(
+  potentiallyProblematicString: string,
+  client: GeminiClient,
+): Promise<string> {
+  const prompt = `
+Context: An LLM has just generated potentially_problematic_string and the text might have been improperly escaped (e.g. too many backslashes for newlines like \\n instead of \n, or unnecessarily quotes like \\"Hello\\" instead of "Hello").
+
+potentially_problematic_string (this text MIGHT have bad escaping, or might be entirely correct):
+\`\`\`
+${potentiallyProblematicString}
+\`\`\`
+
+Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the text will be a valid and correctly interpreted.
+
+For example, if potentially_problematic_string is "bar\\nbaz", the corrected_new_string_escaping should be "bar\nbaz".
+If potentially_problematic_string is console.log(\\"Hello World\\"), it should be console.log("Hello World").
+
+Return ONLY the corrected string in the specified JSON format with the key 'corrected_string_escaping'. If no escaping correction is needed, return the original potentially_problematic_string.
+  `.trim();
+
+  const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
+
+  try {
+    const result = await client.generateJson(
+      contents,
+      CORRECT_STRING_ESCAPING_SCHEMA,
+      EditModel,
+      EditConfig,
+    );
+
+    if (
+      result &&
+      typeof result.corrected_new_string_escaping === 'string' &&
+      result.corrected_new_string_escaping.length > 0
+    ) {
+      return result.corrected_new_string_escaping;
+    } else {
+      return potentiallyProblematicString;
+    }
+  } catch (error) {
+    console.error(
+      'Error during LLM call for string escaping correction:',
+      error,
+    );
+    return potentiallyProblematicString;
+  }
+}
+
 function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
@@ -470,4 +554,5 @@ export function countOccurrences(str: string, substr: string): number {
 
 export function resetEditCorrectorCaches_TEST_ONLY() {
   editCorrectionCache.clear();
+  fileContentCorrectionCache.clear();
 }

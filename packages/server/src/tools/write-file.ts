@@ -18,7 +18,12 @@ import {
 } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { isNodeError } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
+import {
+  ensureCorrectEdit,
+  ensureCorrectFileContent,
+} from '../utils/editCorrector.js';
+import { GeminiClient } from '../core/client.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -35,11 +40,19 @@ export interface WriteFileToolParams {
   content: string;
 }
 
+interface GetCorrectedFileContentResult {
+  originalContent: string;
+  correctedContent: string;
+  fileExists: boolean;
+  error?: { message: string; code?: string };
+}
+
 /**
  * Implementation of the WriteFile tool logic
  */
 export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   static readonly Name: string = 'write_file';
+  private readonly client: GeminiClient;
 
   constructor(private readonly config: Config) {
     super(
@@ -62,6 +75,8 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         type: 'object',
       },
     );
+
+    this.client = new GeminiClient(this.config);
   }
 
   private isWithinRoot(pathToCheck: string): boolean {
@@ -135,23 +150,27 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       return false;
     }
 
+    const correctedContentResult = await this._getCorrectedFileContent(
+      params.file_path,
+      params.content,
+    );
+
+    if (correctedContentResult.error) {
+      // If file exists but couldn't be read, we can't show a diff for confirmation.
+      return false;
+    }
+
+    const { originalContent, correctedContent } = correctedContentResult;
     const relativePath = makeRelative(
       params.file_path,
       this.config.getTargetDir(),
     );
     const fileName = path.basename(params.file_path);
 
-    let currentContent = '';
-    try {
-      currentContent = fs.readFileSync(params.file_path, 'utf8');
-    } catch {
-      // File might not exist, that's okay for write/create
-    }
-
     const fileDiff = Diff.createPatch(
       fileName,
-      currentContent,
-      params.content,
+      originalContent, // Original content (empty if new file or unreadable)
+      correctedContent, // Content after potential correction
       'Current',
       'Proposed',
       { context: 3 },
@@ -183,22 +202,31 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       };
     }
 
-    let currentContent = '';
-    let isNewFile = false;
-    try {
-      currentContent = fs.readFileSync(params.file_path, 'utf8');
-    } catch (err: unknown) {
-      if (isNodeError(err) && err.code === 'ENOENT') {
-        isNewFile = true;
-      } else {
-        // Rethrow other read errors (permissions etc.)
-        const errorMsg = `Error checking existing file: ${err instanceof Error ? err.message : String(err)}`;
-        return {
-          llmContent: `Error checking existing file ${params.file_path}: ${errorMsg}`,
-          returnDisplay: `Error: ${errorMsg}`,
-        };
-      }
+    const correctedContentResult = await this._getCorrectedFileContent(
+      params.file_path,
+      params.content,
+    );
+
+    if (correctedContentResult.error) {
+      const errDetails = correctedContentResult.error;
+      const errorMsg = `Error checking existing file: ${errDetails.message}`;
+      return {
+        llmContent: `Error checking existing file ${params.file_path}: ${errDetails.message}`,
+        returnDisplay: errorMsg,
+      };
     }
+
+    const {
+      originalContent,
+      correctedContent: fileContent,
+      fileExists,
+    } = correctedContentResult;
+    // fileExists is true if the file existed (and was readable or unreadable but caught by readError).
+    // fileExists is false if the file did not exist (ENOENT).
+    const isNewFile =
+      !fileExists ||
+      (correctedContentResult.error !== undefined &&
+        !correctedContentResult.fileExists);
 
     try {
       const dirName = path.dirname(params.file_path);
@@ -206,14 +234,21 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         fs.mkdirSync(dirName, { recursive: true });
       }
 
-      fs.writeFileSync(params.file_path, params.content, 'utf8');
+      fs.writeFileSync(params.file_path, fileContent, 'utf8');
 
       // Generate diff for display result
       const fileName = path.basename(params.file_path);
+      // If there was a readError, originalContent in correctedContentResult is '',
+      // but for the diff, we want to show the original content as it was before the write if possible.
+      // However, if it was unreadable, currentContentForDiff will be empty.
+      const currentContentForDiff = correctedContentResult.error
+        ? '' // Or some indicator of unreadable content
+        : originalContent;
+
       const fileDiff = Diff.createPatch(
         fileName,
-        currentContent, // Empty if it was a new file
-        params.content,
+        currentContentForDiff,
+        fileContent,
         'Original',
         'Written',
         { context: 3 },
@@ -236,5 +271,59 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         returnDisplay: `Error: ${errorMsg}`,
       };
     }
+  }
+
+  private async _getCorrectedFileContent(
+    filePath: string,
+    proposedContent: string,
+  ): Promise<GetCorrectedFileContentResult> {
+    let originalContent = '';
+    let fileExists = false;
+    let correctedContent = proposedContent;
+
+    try {
+      originalContent = fs.readFileSync(filePath, 'utf8');
+      fileExists = true; // File exists and was read
+    } catch (err) {
+      if (isNodeError(err) && err.code === 'ENOENT') {
+        fileExists = false;
+        originalContent = '';
+      } else {
+        // File exists but could not be read (permissions, etc.)
+        fileExists = true; // Mark as existing but problematic
+        originalContent = ''; // Can't use its content
+        const error = {
+          message: getErrorMessage(err),
+          code: isNodeError(err) ? err.code : undefined,
+        };
+        // Return early as we can't proceed with content correction meaningfully
+        return { originalContent, correctedContent, fileExists, error };
+      }
+    }
+
+    // If readError is set, we have returned.
+    // So, file was either read successfully (fileExists=true, originalContent set)
+    // or it was ENOENT (fileExists=false, originalContent='').
+
+    if (fileExists) {
+      // This implies originalContent is available
+      const { params: correctedParams } = await ensureCorrectEdit(
+        originalContent,
+        {
+          old_string: originalContent, // Treat entire current content as old_string
+          new_string: proposedContent,
+          file_path: filePath,
+        },
+        this.client,
+      );
+      correctedContent = correctedParams.new_string;
+    } else {
+      // This implies new file (ENOENT)
+      correctedContent = await ensureCorrectFileContent(
+        proposedContent,
+        this.client,
+      );
+    }
+    return { originalContent, correctedContent, fileExists };
   }
 }
