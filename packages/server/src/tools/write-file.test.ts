@@ -4,16 +4,49 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mocked,
+} from 'vitest';
 import { WriteFileTool } from './write-file.js';
-import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+import {
+  FileDiff,
+  ToolConfirmationOutcome,
+  ToolEditConfirmationDetails,
+} from './tools.js';
+import { type EditToolParams } from './edit.js';
 import { Config } from '../config/config.js';
-import { ToolRegistry } from './tool-registry.js'; // Added import
+import { ToolRegistry } from './tool-registry.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { GeminiClient } from '../core/client.js';
+import {
+  ensureCorrectEdit,
+  ensureCorrectFileContent,
+  CorrectedEditResult,
+} from '../utils/editCorrector.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
+
+// --- MOCKS ---
+vi.mock('../core/client.js');
+vi.mock('../utils/editCorrector.js');
+
+let mockGeminiClientInstance: Mocked<GeminiClient>;
+const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
+const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
+
+// Wire up the mocked functions to be used by the actual module imports
+vi.mocked(ensureCorrectEdit).mockImplementation(mockEnsureCorrectEdit);
+vi.mocked(ensureCorrectFileContent).mockImplementation(
+  mockEnsureCorrectFileContent,
+);
 
 // Mock Config
 const mockConfigInternal = {
@@ -42,13 +75,14 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
 };
 const mockConfig = mockConfigInternal as unknown as Config;
+// --- END MOCKS ---
 
 describe('WriteFileTool', () => {
   let tool: WriteFileTool;
   let tempDir: string;
 
   beforeEach(() => {
-    // Create a unique temporary directory for files created outside the root (for testing boundary conditions)
+    // Create a unique temporary directory for files created outside the root
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
@@ -56,12 +90,39 @@ describe('WriteFileTool', () => {
     if (!fs.existsSync(rootDir)) {
       fs.mkdirSync(rootDir, { recursive: true });
     }
+
+    // Setup GeminiClient mock
+    mockGeminiClientInstance = new (vi.mocked(GeminiClient))(
+      mockConfig,
+    ) as Mocked<GeminiClient>;
+    vi.mocked(GeminiClient).mockImplementation(() => mockGeminiClientInstance);
+
     tool = new WriteFileTool(mockConfig);
-    // Reset mocks before each test that might use them for confirmation logic
+
+    // Reset mocks before each test
     mockConfigInternal.getAlwaysSkipModificationConfirmation.mockReturnValue(
       false,
     );
     mockConfigInternal.setAlwaysSkipModificationConfirmation.mockClear();
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectFileContent.mockReset();
+
+    // Default mock implementations that return valid structures
+    mockEnsureCorrectEdit.mockImplementation(
+      async (
+        currentContent: string,
+        params: EditToolParams,
+        _client: GeminiClient,
+      ): Promise<CorrectedEditResult> =>
+        Promise.resolve({
+          params: { ...params, new_string: params.new_string ?? '' },
+          occurrences: 1,
+        }),
+    );
+    mockEnsureCorrectFileContent.mockImplementation(
+      async (content: string, _client: GeminiClient): Promise<string> =>
+        Promise.resolve(content ?? ''),
+    );
   });
 
   afterEach(() => {
@@ -72,6 +133,7 @@ describe('WriteFileTool', () => {
     if (fs.existsSync(rootDir)) {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
+    vi.clearAllMocks();
   });
 
   describe('validateToolParams', () => {
@@ -101,27 +163,113 @@ describe('WriteFileTool', () => {
       );
     });
 
-    it('should return error for path that is the root itself', () => {
+    it('should return error if path is a directory', () => {
+      const dirAsFilePath = path.join(rootDir, 'a_directory');
+      fs.mkdirSync(dirAsFilePath);
       const params = {
-        file_path: rootDir, // Attempting to write to the root directory itself
+        file_path: dirAsFilePath,
         content: 'hello',
       };
-      // With the new validation, this should now return an error as rootDir is a directory.
       expect(tool.validateToolParams(params)).toMatch(
-        `Path is a directory, not a file: ${rootDir}`,
+        `Path is a directory, not a file: ${dirAsFilePath}`,
       );
     });
+  });
 
-    it('should return error for path that is just / and root is not /', () => {
-      const params = { file_path: path.resolve('/'), content: 'hello' };
-      if (rootDir === path.resolve('/')) {
-        // This case would only occur if the test runner somehow sets rootDir to actual '/', which is highly unlikely and unsafe.
-        expect(tool.validateToolParams(params)).toBeNull();
-      } else {
-        expect(tool.validateToolParams(params)).toMatch(
-          /File path must be within the root directory/,
-        );
-      }
+  describe('_getCorrectedFileContent', () => {
+    it('should call ensureCorrectFileContent for a new file', async () => {
+      const filePath = path.join(rootDir, 'new_corrected_file.txt');
+      const proposedContent = 'Proposed new content.';
+      const correctedContent = 'Corrected new content.';
+      // Ensure the mock is set for this specific test case if needed, or rely on beforeEach
+      mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
+
+      // @ts-expect-error _getCorrectedFileContent is private
+      const result = await tool._getCorrectedFileContent(
+        filePath,
+        proposedContent,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockGeminiClientInstance,
+      );
+      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(correctedContent);
+      expect(result.originalContent).toBe('');
+      expect(result.fileExists).toBe(false);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should call ensureCorrectEdit for an existing file', async () => {
+      const filePath = path.join(rootDir, 'existing_corrected_file.txt');
+      const originalContent = 'Original existing content.';
+      const proposedContent = 'Proposed replacement content.';
+      const correctedProposedContent = 'Corrected replacement content.';
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      // Ensure this mock is active and returns the correct structure
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: correctedProposedContent,
+        },
+        occurrences: 1,
+      } as CorrectedEditResult);
+
+      // @ts-expect-error _getCorrectedFileContent is private
+      const result = await tool._getCorrectedFileContent(
+        filePath,
+        proposedContent,
+      );
+
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        originalContent,
+        {
+          old_string: originalContent,
+          new_string: proposedContent,
+          file_path: filePath,
+        },
+        mockGeminiClientInstance,
+      );
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(correctedProposedContent);
+      expect(result.originalContent).toBe(originalContent);
+      expect(result.fileExists).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error if reading an existing file fails (e.g. permissions)', async () => {
+      const filePath = path.join(rootDir, 'unreadable_file.txt');
+      const proposedContent = 'some content';
+      fs.writeFileSync(filePath, 'content', { mode: 0o000 });
+
+      const readError = new Error('Permission denied');
+      const originalReadFileSync = fs.readFileSync;
+      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+        throw readError;
+      });
+
+      // @ts-expect-error _getCorrectedFileContent is private
+      const result = await tool._getCorrectedFileContent(
+        filePath,
+        proposedContent,
+      );
+
+      expect(fs.readFileSync).toHaveBeenCalledWith(filePath, 'utf8');
+      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+      expect(result.originalContent).toBe('');
+      expect(result.fileExists).toBe(true);
+      expect(result.error).toEqual({
+        message: 'Permission denied',
+        code: undefined,
+      });
+
+      vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
+      fs.chmodSync(filePath, 0o600);
     });
   });
 
@@ -139,16 +287,95 @@ describe('WriteFileTool', () => {
       expect(confirmation).toBe(false);
     });
 
-    it('should request confirmation for valid params if file does not exist', async () => {
-      const filePath = path.join(rootDir, 'new_file.txt');
-      const params = { file_path: filePath, content: 'new content' };
+    it('should return false if _getCorrectedFileContent returns an error', async () => {
+      const filePath = path.join(rootDir, 'confirm_error_file.txt');
+      const params = { file_path: filePath, content: 'test content' };
+      fs.writeFileSync(filePath, 'original', { mode: 0o000 });
+
+      const readError = new Error('Simulated read error for confirmation');
+      const originalReadFileSync = fs.readFileSync;
+      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+        throw readError;
+      });
+
       const confirmation = await tool.shouldConfirmExecute(params);
+      expect(confirmation).toBe(false);
+
+      vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
+      fs.chmodSync(filePath, 0o600);
+    });
+
+    it('should request confirmation with diff for a new file (with corrected content)', async () => {
+      const filePath = path.join(rootDir, 'confirm_new_file.txt');
+      const proposedContent = 'Proposed new content for confirmation.';
+      const correctedContent = 'Corrected new content for confirmation.';
+      mockEnsureCorrectFileContent.mockResolvedValue(correctedContent); // Ensure this mock is active
+
+      const params = { file_path: filePath, content: proposedContent };
+      const confirmation = (await tool.shouldConfirmExecute(
+        params,
+      )) as ToolEditConfirmationDetails;
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockGeminiClientInstance,
+      );
       expect(confirmation).toEqual(
         expect.objectContaining({
           title: `Confirm Write: ${path.basename(filePath)}`,
-          fileName: 'new_file.txt',
-          fileDiff: expect.any(String),
+          fileName: 'confirm_new_file.txt',
+          fileDiff: expect.stringContaining(correctedContent),
         }),
+      );
+      expect(confirmation.fileDiff).toMatch(
+        /--- confirm_new_file.txt\tCurrent/,
+      );
+      expect(confirmation.fileDiff).toMatch(
+        /\+\+\+ confirm_new_file.txt\tProposed/,
+      );
+    });
+
+    it('should request confirmation with diff for an existing file (with corrected content)', async () => {
+      const filePath = path.join(rootDir, 'confirm_existing_file.txt');
+      const originalContent = 'Original content for confirmation.';
+      const proposedContent = 'Proposed replacement for confirmation.';
+      const correctedProposedContent =
+        'Corrected replacement for confirmation.';
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      // Ensure this mock is active and returns the correct structure
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: correctedProposedContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: proposedContent };
+      const confirmation = (await tool.shouldConfirmExecute(
+        params,
+      )) as ToolEditConfirmationDetails;
+
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        originalContent,
+        {
+          old_string: originalContent,
+          new_string: proposedContent,
+          file_path: filePath,
+        },
+        mockGeminiClientInstance,
+      );
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          title: `Confirm Write: ${path.basename(filePath)}`,
+          fileName: 'confirm_existing_file.txt',
+          fileDiff: expect.stringContaining(correctedProposedContent),
+        }),
+      );
+      expect(confirmation.fileDiff).toMatch(
+        originalContent.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'),
       );
     });
   });
@@ -171,10 +398,34 @@ describe('WriteFileTool', () => {
       );
     });
 
-    it('should write a new file and return diff', async () => {
-      const filePath = path.join(rootDir, 'execute_new_file.txt');
-      const content = 'Hello from execute!';
-      const params = { file_path: filePath, content };
+    it('should return error if _getCorrectedFileContent returns an error during execute', async () => {
+      const filePath = path.join(rootDir, 'execute_error_file.txt');
+      const params = { file_path: filePath, content: 'test content' };
+      fs.writeFileSync(filePath, 'original', { mode: 0o000 });
+
+      const readError = new Error('Simulated read error for execute');
+      const originalReadFileSync = fs.readFileSync;
+      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+        throw readError;
+      });
+
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/Error checking existing file/);
+      expect(result.returnDisplay).toMatch(
+        /Error checking existing file: Simulated read error for execute/,
+      );
+
+      vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
+      fs.chmodSync(filePath, 0o600);
+    });
+
+    it('should write a new file with corrected content and return diff', async () => {
+      const filePath = path.join(rootDir, 'execute_new_corrected_file.txt');
+      const proposedContent = 'Proposed new content for execute.';
+      const correctedContent = 'Corrected new content for execute.';
+      mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
+
+      const params = { file_path: filePath, content: proposedContent };
 
       const confirmDetails = await tool.shouldConfirmExecute(params);
       if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
@@ -183,26 +434,48 @@ describe('WriteFileTool', () => {
 
       const result = await tool.execute(params, new AbortController().signal);
 
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockGeminiClientInstance,
+      );
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
       );
       expect(fs.existsSync(filePath)).toBe(true);
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(content);
-      const display = result.returnDisplay as FileDiff; // Type assertion
-      expect(display.fileName).toBe('execute_new_file.txt');
-      // For new files, the diff will include the filename in the "Original" header
-      expect(display.fileDiff).toMatch(/--- execute_new_file.txt\tOriginal/);
-      expect(display.fileDiff).toMatch(/\+\+\+ execute_new_file.txt\tWritten/);
-      expect(display.fileDiff).toMatch(content);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(correctedContent);
+      const display = result.returnDisplay as FileDiff;
+      expect(display.fileName).toBe('execute_new_corrected_file.txt');
+      expect(display.fileDiff).toMatch(
+        /--- execute_new_corrected_file.txt\tOriginal/,
+      );
+      expect(display.fileDiff).toMatch(
+        /\+\+\+ execute_new_corrected_file.txt\tWritten/,
+      );
+      expect(display.fileDiff).toMatch(
+        correctedContent.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'),
+      );
     });
 
-    it('should overwrite an existing file and return diff', async () => {
-      const filePath = path.join(rootDir, 'execute_existing_file.txt');
-      const initialContent = 'Initial content.';
-      const newContent = 'Overwritten content!';
+    it('should overwrite an existing file with corrected content and return diff', async () => {
+      const filePath = path.join(
+        rootDir,
+        'execute_existing_corrected_file.txt',
+      );
+      const initialContent = 'Initial content for execute.';
+      const proposedContent = 'Proposed overwrite for execute.';
+      const correctedProposedContent = 'Corrected overwrite for execute.';
       fs.writeFileSync(filePath, initialContent, 'utf8');
 
-      const params = { file_path: filePath, content: newContent };
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: initialContent,
+          new_string: correctedProposedContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: proposedContent };
 
       const confirmDetails = await tool.shouldConfirmExecute(params);
       if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
@@ -211,12 +484,46 @@ describe('WriteFileTool', () => {
 
       const result = await tool.execute(params, new AbortController().signal);
 
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        initialContent,
+        {
+          old_string: initialContent,
+          new_string: proposedContent,
+          file_path: filePath,
+        },
+        mockGeminiClientInstance,
+      );
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
-      const display = result.returnDisplay as FileDiff; // Type assertion
-      expect(display.fileName).toBe('execute_existing_file.txt');
-      expect(display.fileDiff).toMatch(initialContent);
-      expect(display.fileDiff).toMatch(newContent);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(correctedProposedContent);
+      const display = result.returnDisplay as FileDiff;
+      expect(display.fileName).toBe('execute_existing_corrected_file.txt');
+      expect(display.fileDiff).toMatch(
+        initialContent.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'),
+      );
+      expect(display.fileDiff).toMatch(
+        correctedProposedContent.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'),
+      );
+    });
+
+    it('should create directory if it does not exist', async () => {
+      const dirPath = path.join(rootDir, 'new_dir_for_write');
+      const filePath = path.join(dirPath, 'file_in_new_dir.txt');
+      const content = 'Content in new directory';
+      mockEnsureCorrectFileContent.mockResolvedValue(content); // Ensure this mock is active
+
+      const params = { file_path: filePath, content };
+      // Simulate confirmation if your logic requires it before execute, or remove if not needed for this path
+      const confirmDetails = await tool.shouldConfirmExecute(params);
+      if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
+        await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+      }
+
+      await tool.execute(params, new AbortController().signal);
+
+      expect(fs.existsSync(dirPath)).toBe(true);
+      expect(fs.statSync(dirPath).isDirectory()).toBe(true);
+      expect(fs.existsSync(filePath)).toBe(true);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(content);
     });
   });
 });
