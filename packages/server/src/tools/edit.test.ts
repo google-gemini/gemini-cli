@@ -6,6 +6,19 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
+const mockGenerateJson = vi.hoisted(() => vi.fn());
+
+vi.mock('../utils/editCorrector.js', () => ({
+  ensureCorrectEdit: mockEnsureCorrectEdit,
+}));
+
+vi.mock('../core/client.js', () => ({
+  GeminiClient: vi.fn().mockImplementation(() => ({
+    generateJson: mockGenerateJson,
+  })),
+}));
+
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
 import { FileDiff } from './tools.js';
@@ -14,16 +27,6 @@ import fs from 'fs';
 import os from 'os';
 import { Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
-
-// Mock GeminiClient
-const mockEnsureCorrectEdit = vi.fn();
-const mockGenerateJson = vi.fn();
-vi.mock('../core/client.js', () => ({
-  GeminiClient: vi.fn().mockImplementation(() => ({
-    ensureCorrectEdit: mockEnsureCorrectEdit,
-    generateJson: mockGenerateJson,
-  })),
-}));
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -131,6 +134,48 @@ describe('EditTool', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('_applyReplacement', () => {
+    // Access private method for testing
+    // Note: `tool` is initialized in `beforeEach` of the parent describe block
+    it('should return newString if isNewFile is true', () => {
+      expect((tool as any)._applyReplacement(null, 'old', 'new', true)).toBe(
+        'new',
+      );
+      expect(
+        (tool as any)._applyReplacement('existing', 'old', 'new', true),
+      ).toBe('new');
+    });
+
+    it('should return newString if currentContent is null and oldString is empty (defensive)', () => {
+      expect((tool as any)._applyReplacement(null, '', 'new', false)).toBe(
+        'new',
+      );
+    });
+
+    it('should return empty string if currentContent is null and oldString is not empty (defensive)', () => {
+      expect((tool as any)._applyReplacement(null, 'old', 'new', false)).toBe(
+        '',
+      );
+    });
+
+    it('should replace oldString with newString in currentContent', () => {
+      expect(
+        (tool as any)._applyReplacement(
+          'hello old world old',
+          'old',
+          'new',
+          false,
+        ),
+      ).toBe('hello new world new');
+    });
+
+    it('should return currentContent if oldString is empty and not a new file', () => {
+      expect(
+        (tool as any)._applyReplacement('hello world', '', 'new', false),
+      ).toBe('hello world');
+    });
   });
 
   describe('validateParams', () => {
@@ -243,6 +288,68 @@ describe('EditTool', () => {
         }),
       );
     });
+
+    it('should use corrected params from ensureCorrectEdit for diff generation', async () => {
+      const originalContent = 'This is the original string to be replaced.';
+      const originalOldString = 'original string';
+      const originalNewString = 'new string';
+
+      const correctedOldString = 'original string to be replaced'; // More specific
+      const correctedNewString = 'completely new string'; // Different replacement
+      const expectedFinalContent = 'This is the completely new string.';
+
+      fs.writeFileSync(filePath, originalContent);
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: originalOldString,
+        new_string: originalNewString,
+      };
+
+      // The main beforeEach already calls mockEnsureCorrectEdit.mockReset()
+      // Set a specific mock for this test case
+      let mockCalled = false;
+      mockEnsureCorrectEdit.mockImplementationOnce(
+        async (content, p, client) => {
+          console.log('mockEnsureCorrectEdit CALLED IN TEST');
+          mockCalled = true;
+          expect(content).toBe(originalContent);
+          expect(p).toBe(params);
+          expect(client).toBe((tool as any).client);
+          return {
+            params: {
+              file_path: filePath,
+              old_string: correctedOldString,
+              new_string: correctedNewString,
+            },
+            occurrences: 1,
+          };
+        },
+      );
+
+      const confirmation = (await tool.shouldConfirmExecute(
+        params,
+      )) as FileDiff;
+
+      expect(mockCalled).toBe(true); // Check if the mock implementation was run
+      // expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(originalContent, params, expect.anything()); // Keep this commented for now
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          title: `Confirm Edit: ${testFile}`,
+          fileName: testFile,
+        }),
+      );
+      // Check that the diff is based on the corrected strings leading to the new state
+      expect(confirmation.fileDiff).toContain(`-${originalContent}`);
+      expect(confirmation.fileDiff).toContain(`+${expectedFinalContent}`);
+
+      // Verify that applying the correctedOldString and correctedNewString to originalContent
+      // indeed produces the expectedFinalContent, which is what the diff should reflect.
+      const patchedContent = originalContent.replace(
+        correctedOldString, // This was the string identified by ensureCorrectEdit for replacement
+        correctedNewString, // This was the string identified by ensureCorrectEdit as the replacement
+      );
+      expect(patchedContent).toBe(expectedFinalContent);
+    });
   });
 
   describe('execute', () => {
@@ -337,9 +444,11 @@ describe('EditTool', () => {
       };
       // The default mockEnsureCorrectEdit will return 0 occurrences for 'nonexistent'
       const result = await tool.execute(params, new AbortController().signal);
-      expect(result.llmContent).toMatch(/0 occurrences found/);
+      expect(result.llmContent).toMatch(
+        /0 occurrences found for old_string in/,
+      );
       expect(result.returnDisplay).toMatch(
-        /Failed to edit, could not find the string to replace/,
+        /Failed to edit, could not find the string to replace./,
       );
     });
 
@@ -352,7 +461,9 @@ describe('EditTool', () => {
       };
       // The default mockEnsureCorrectEdit will return 2 occurrences for 'old'
       const result = await tool.execute(params, new AbortController().signal);
-      expect(result.llmContent).toMatch(/Expected 1 occurrences but found 2/);
+      expect(result.llmContent).toMatch(
+        /Expected 1 occurrences but found 2 for old_string in file/,
+      );
       expect(result.returnDisplay).toMatch(
         /Failed to edit, expected 1 occurrence\(s\) but found 2/,
       );

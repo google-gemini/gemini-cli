@@ -21,7 +21,7 @@ import { isNodeError } from '../utils/errors.js';
 import { ReadFileTool } from './read-file.js';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
-import { countOccurrences, ensureCorrectEdit } from '../utils/editCorrector.js';
+import { ensureCorrectEdit } from '../utils/editCorrector.js';
 
 /**
  * Parameters for the Edit tool
@@ -147,6 +147,26 @@ Expectation for parameters:
     return null;
   }
 
+  private _applyReplacement(
+    currentContent: string | null,
+    oldString: string,
+    newString: string,
+    isNewFile: boolean,
+  ): string {
+    if (isNewFile) {
+      return newString;
+    }
+    if (currentContent === null) {
+      // Should not happen if not a new file, but defensively return empty or newString if oldString is also empty
+      return oldString === '' ? newString : '';
+    }
+    // If oldString is empty and it's not a new file, do not modify the content.
+    if (oldString === '' && !isNewFile) {
+      return currentContent;
+    }
+    return currentContent.replaceAll(oldString, newString);
+  }
+
   /**
    * Calculates the potential outcome of an edit operation.
    * @param params Parameters for the edit operation
@@ -158,7 +178,8 @@ Expectation for parameters:
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
-    let newContent = '';
+    let finalNewString = params.new_string;
+    let finalOldString = params.old_string;
     let occurrences = 0;
     let error: { display: string; raw: string } | undefined = undefined;
 
@@ -176,8 +197,6 @@ Expectation for parameters:
     if (params.old_string === '' && !fileExists) {
       // Creating a new file
       isNewFile = true;
-      newContent = params.new_string;
-      occurrences = 0;
     } else if (!fileExists) {
       // Trying to edit a non-existent file (and old_string is not empty)
       error = {
@@ -186,7 +205,14 @@ Expectation for parameters:
       };
     } else if (currentContent !== null) {
       // Editing an existing file
-      occurrences = countOccurrences(currentContent, params.old_string);
+      const correctedEdit = await ensureCorrectEdit(
+        currentContent,
+        params,
+        this.client,
+      );
+      finalOldString = correctedEdit.params.old_string;
+      finalNewString = correctedEdit.params.new_string;
+      occurrences = correctedEdit.occurrences;
 
       if (params.old_string === '') {
         // Error: Trying to create a file that already exists
@@ -197,19 +223,13 @@ Expectation for parameters:
       } else if (occurrences === 0) {
         error = {
           display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ReadFile tool to verify.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
         };
       } else if (occurrences !== expectedReplacements) {
         error = {
           display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}.`,
           raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
         };
-      } else {
-        // Successful edit calculation
-        newContent = currentContent.replaceAll(
-          params.old_string,
-          params.new_string,
-        );
       }
     } else {
       // Should not happen if fileExists and no exception was thrown, but defensively:
@@ -218,6 +238,13 @@ Expectation for parameters:
         raw: `Failed to read content of existing file: ${params.file_path}`,
       };
     }
+
+    const newContent = this._applyReplacement(
+      currentContent,
+      finalOldString,
+      finalNewString,
+      isNewFile,
+    );
 
     return {
       currentContent,
@@ -247,7 +274,10 @@ Expectation for parameters:
     }
     let currentContent: string | null = null;
     let fileExists = false;
-    let newContent = '';
+    let finalNewString = params.new_string;
+    let finalOldString = params.old_string;
+    let occurrences = 0;
+
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
       fileExists = true;
@@ -259,28 +289,36 @@ Expectation for parameters:
         return false;
       }
     }
+
     if (params.old_string === '' && !fileExists) {
-      newContent = params.new_string;
+      // Creating new file, newContent is just params.new_string
     } else if (!fileExists) {
-      return false;
+      return false; // Cannot edit non-existent file if old_string is not empty
     } else if (currentContent !== null) {
-      // Use the correctEdit utility to potentially correct params and get occurrences
-      const { params: correctedParams, occurrences: correctedOccurrences } =
-        await ensureCorrectEdit(currentContent, params, this.client);
+      const correctedEdit = await ensureCorrectEdit(
+        currentContent,
+        params,
+        this.client,
+      );
+      finalOldString = correctedEdit.params.old_string;
+      finalNewString = correctedEdit.params.new_string;
+      occurrences = correctedEdit.occurrences;
 
-      params.old_string = correctedParams.old_string;
-      params.new_string = correctedParams.new_string;
-
-      if (correctedOccurrences === 0 || correctedOccurrences !== 1) {
+      if (occurrences === 0 || occurrences !== 1) {
         return false;
       }
-      newContent = currentContent.replaceAll(
-        params.old_string,
-        params.new_string,
-      );
     } else {
-      return false;
+      return false; // Should not happen
     }
+
+    const isNewFileScenario = params.old_string === '' && !fileExists;
+    const newContent = this._applyReplacement(
+      currentContent,
+      finalOldString,
+      finalNewString,
+      isNewFileScenario,
+    );
+
     const fileName = path.basename(params.file_path);
     const fileDiff = Diff.createPatch(
       fileName,
