@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, Mock, afterEach } from 'vitest';
-import { Content } from '@google/genai';
+import { Content, GoogleGenAI, Models } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
-import { Config } from '../config/config.js'; // Added Config import
+import { Config } from '../config/config.js';
 import { checkNextSpeaker, NextSpeakerResponse } from './nextSpeakerChecker.js';
 import { GeminiChat } from '../core/geminiChat.js';
 
@@ -15,40 +15,38 @@ import { GeminiChat } from '../core/geminiChat.js';
 vi.mock('../core/client.js');
 vi.mock('../config/config.js');
 
-// Mock @google/genai
-const mockGetHistory = vi.fn();
-const mockCreateChat = vi.fn(() => ({
-  getHistory: mockGetHistory,
-}));
+// Define mocks for GoogleGenAI and Models instances that will be used across tests
+const mockModelsInstance = {
+  generateContent: vi.fn(),
+  generateContentStream: vi.fn(),
+  countTokens: vi.fn(),
+  embedContent: vi.fn(),
+  batchEmbedContents: vi.fn(),
+} as unknown as Models;
+
+const mockGoogleGenAIInstance = {
+  getGenerativeModel: vi.fn().mockReturnValue(mockModelsInstance),
+  // Add other methods of GoogleGenAI if they are directly used by GeminiChat constructor or its methods
+} as unknown as GoogleGenAI;
 
 vi.mock('@google/genai', async () => {
   const actualGenAI =
     await vi.importActual<typeof import('@google/genai')>('@google/genai');
   return {
     ...actualGenAI,
-    GoogleGenAI: vi.fn().mockImplementation(() => ({
-      chats: {
-        create: mockCreateChat,
-      },
-    })),
-    // Keep Chat constructor mock for type safety if direct instantiation is attempted,
-    // but primary path is via client.chats.create
-    Chat: vi.fn().mockImplementation(() => ({
-      getHistory: mockGetHistory,
-    })),
+    GoogleGenAI: vi.fn(() => mockGoogleGenAIInstance), // Mock constructor to return the predefined instance
+    // If Models is instantiated directly in GeminiChat, mock its constructor too
+    // For now, assuming Models instance is obtained via getGenerativeModel
   };
 });
 
 describe('checkNextSpeaker', () => {
-  let mockChat: GeminiChat;
+  let chatInstance: GeminiChat;
   let mockGeminiClient: GeminiClient;
   let MockConfig: Mock;
 
   beforeEach(() => {
-    // Dynamically import and assign the mock
-    // Must be done within beforeEach or test to ensure mocks are reset
     MockConfig = vi.mocked(Config);
-    // Create a mock instance of Config
     const mockConfigInstance = new MockConfig(
       'test-api-key',
       'gemini-pro',
@@ -61,11 +59,24 @@ describe('checkNextSpeaker', () => {
       undefined,
       undefined,
     );
-    // Mock any methods on mockConfigInstance if needed, e.g., mockConfigInstance.getToolRegistry = vi.fn()...
 
     mockGeminiClient = new GeminiClient(mockConfigInstance);
-    // Simulate chat creation as done in GeminiClient
-    mockChat = { getHistory: mockGetHistory } as unknown as GeminiChat;
+
+    // Reset mocks before each test to ensure test isolation
+    vi.mocked(mockModelsInstance.generateContent).mockReset();
+    vi.mocked(mockModelsInstance.generateContentStream).mockReset();
+
+    // GeminiChat will receive the mocked instances via the mocked GoogleGenAI constructor
+    chatInstance = new GeminiChat(
+      mockGoogleGenAIInstance, // This will be the instance returned by the mocked GoogleGenAI constructor
+      mockModelsInstance, // This is the instance returned by mockGoogleGenAIInstance.getGenerativeModel
+      'gemini-pro', // model name
+      {}, // config
+      [], // initial history
+    );
+
+    // Spy on getHistory for chatInstance
+    vi.spyOn(chatInstance, 'getHistory');
   });
 
   afterEach(() => {
@@ -73,23 +84,23 @@ describe('checkNextSpeaker', () => {
   });
 
   it('should return null if history is empty', async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([]);
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    (chatInstance.getHistory as Mock).mockReturnValue([]);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
     expect(mockGeminiClient.generateJson).not.toHaveBeenCalled();
   });
 
   it('should return null if the last speaker was the user', async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'user', parts: [{ text: 'Hello' }] },
     ] as Content[]);
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
     expect(mockGeminiClient.generateJson).not.toHaveBeenCalled();
   });
 
   it("should return { next_speaker: 'model' } when model intends to continue", async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'I will now do something.' }] },
     ] as Content[]);
     const mockApiResponse: NextSpeakerResponse = {
@@ -98,13 +109,13 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toEqual(mockApiResponse);
     expect(mockGeminiClient.generateJson).toHaveBeenCalledTimes(1);
   });
 
   it("should return { next_speaker: 'user' } when model asks a question", async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'What would you like to do?' }] },
     ] as Content[]);
     const mockApiResponse: NextSpeakerResponse = {
@@ -113,12 +124,12 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toEqual(mockApiResponse);
   });
 
   it("should return { next_speaker: 'user' } when model makes a statement", async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'This is a statement.' }] },
     ] as Content[]);
     const mockApiResponse: NextSpeakerResponse = {
@@ -127,7 +138,7 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toEqual(mockApiResponse);
   });
 
@@ -135,32 +146,32 @@ describe('checkNextSpeaker', () => {
     const consoleWarnSpy = vi
       .spyOn(console, 'warn')
       .mockImplementation(() => {});
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'Some model output.' }] },
     ] as Content[]);
     (mockGeminiClient.generateJson as Mock).mockRejectedValue(
       new Error('API Error'),
     );
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
     consoleWarnSpy.mockRestore();
   });
 
   it('should return null if geminiClient.generateJson returns invalid JSON (missing next_speaker)', async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'Some model output.' }] },
     ] as Content[]);
     (mockGeminiClient.generateJson as Mock).mockResolvedValue({
       reasoning: 'This is incomplete.',
     } as unknown as NextSpeakerResponse); // Type assertion to simulate invalid response
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
   });
 
   it('should return null if geminiClient.generateJson returns a non-string next_speaker', async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'Some model output.' }] },
     ] as Content[]);
     (mockGeminiClient.generateJson as Mock).mockResolvedValue({
@@ -168,12 +179,12 @@ describe('checkNextSpeaker', () => {
       next_speaker: 123, // Invalid type
     } as unknown as NextSpeakerResponse);
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
   });
 
   it('should return null if geminiClient.generateJson returns an invalid next_speaker string value', async () => {
-    (mockChat.getHistory as Mock).mockResolvedValue([
+    (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'model', parts: [{ text: 'Some model output.' }] },
     ] as Content[]);
     (mockGeminiClient.generateJson as Mock).mockResolvedValue({
@@ -181,7 +192,7 @@ describe('checkNextSpeaker', () => {
       next_speaker: 'neither', // Invalid enum value
     } as unknown as NextSpeakerResponse);
 
-    const result = await checkNextSpeaker(mockChat, mockGeminiClient);
+    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
     expect(result).toBeNull();
   });
 });
