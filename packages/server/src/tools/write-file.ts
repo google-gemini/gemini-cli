@@ -24,6 +24,7 @@ import {
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
 import { GeminiClient } from '../core/client.js';
+import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -173,7 +174,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       correctedContent, // Content after potential correction
       'Current',
       'Proposed',
-      { context: 3 },
+      DEFAULT_DIFF_OPTIONS,
     );
 
     const confirmationDetails: ToolEditConfirmationDetails = {
@@ -251,7 +252,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
         fileContent,
         'Original',
         'Written',
-        { context: 3 },
+        DEFAULT_DIFF_OPTIONS,
       );
 
       const llmSuccessMessage = isNewFile

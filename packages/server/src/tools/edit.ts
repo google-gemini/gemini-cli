@@ -22,6 +22,7 @@ import { ReadFileTool } from './read-file.js';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
+import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 
 /**
  * Parameters for the Edit tool
@@ -326,7 +327,7 @@ Expectation for parameters:
       newContent,
       'Current',
       'Proposed',
-      { context: 3 },
+      DEFAULT_DIFF_OPTIONS,
     );
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
@@ -408,7 +409,7 @@ Expectation for parameters:
           editData.newContent,
           'Current',
           'Proposed',
-          { context: 3 },
+          DEFAULT_DIFF_OPTIONS,
         );
         displayResult = { fileDiff, fileName };
       }
