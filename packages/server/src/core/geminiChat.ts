@@ -16,6 +16,7 @@ import {
   GoogleGenAI,
   createUserContent,
 } from '@google/genai';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -292,12 +293,15 @@ export class GeminiChat {
     ) {
       outputContents = modelOutput;
     } else {
-      // Appends an empty content when model returns empty response, so that the
+      // When not a function response appends an empty content when model returns empty response, so that the
       // history is always alternating between user and model.
-      outputContents.push({
-        role: 'model',
-        parts: [],
-      } as Content);
+      // Workaround for: https://b.corp.google.com/issues/420354090
+      if (!isFunctionResponse(userInput)) {
+        outputContents.push({
+          role: 'model',
+          parts: [],
+        } as Content);
+      }
     }
     if (
       automaticFunctionCallingHistory &&
