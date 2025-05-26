@@ -170,7 +170,7 @@ export class GeminiClient {
       const nextSpeakerCheck = await checkNextSpeaker(chat, this);
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
-        return this.sendMessageStream(chat, nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(chat, nextRequest, signal, turns - 1);
       }
     }
   }
