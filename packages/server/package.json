@@ -22,7 +22,7 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^0.13.0",
+    "@google/genai": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
