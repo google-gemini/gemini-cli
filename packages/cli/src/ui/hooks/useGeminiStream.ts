@@ -23,7 +23,7 @@ import {
   ToolResultDisplay,
   ToolCallRequestInfo,
 } from '@gemini-code/server';
-import { type Chat, type PartListUnion, type Part } from '@google/genai';
+import { type PartListUnion, type Part } from '@google/genai';
 import {
   StreamingState,
   ToolCallStatus,
@@ -39,6 +39,7 @@ import { useStateAndRef } from './useStateAndRef.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { useToolScheduler, mapToDisplay } from './useToolScheduler.js';
+import { GeminiChat } from '@gemini-code/server/src/core/geminiChat.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -63,7 +64,7 @@ export const useGeminiStream = (
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatSessionRef = useRef<Chat | null>(null);
+  const chatSessionRef = useRef<GeminiChat | null>(null);
   const geminiClientRef = useRef<GeminiClient | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
@@ -235,7 +236,7 @@ export const useGeminiStream = (
 
   const ensureChatSession = useCallback(async (): Promise<{
     client: GeminiClient | null;
-    chat: Chat | null;
+    chat: GeminiChat | null;
   }> => {
     const currentClient = geminiClientRef.current;
     if (!currentClient) {

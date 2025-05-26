@@ -5,10 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, Mock, afterEach } from 'vitest';
-import { Chat, Content } from '@google/genai';
+import { Content } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js'; // Added Config import
 import { checkNextSpeaker, NextSpeakerResponse } from './nextSpeakerChecker.js';
+import { GeminiChat } from '../core/geminiChat.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -39,7 +40,7 @@ vi.mock('@google/genai', async () => {
 });
 
 describe('checkNextSpeaker', () => {
-  let mockChat: Chat;
+  let mockChat: GeminiChat;
   let mockGeminiClient: GeminiClient;
   let MockConfig: Mock;
 
@@ -64,7 +65,7 @@ describe('checkNextSpeaker', () => {
 
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     // Simulate chat creation as done in GeminiClient
-    mockChat = { getHistory: mockGetHistory } as unknown as Chat;
+    mockChat = { getHistory: mockGetHistory } as unknown as GeminiChat;
   });
 
   afterEach(() => {

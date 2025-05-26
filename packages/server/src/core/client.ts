@@ -8,7 +8,6 @@ import {
   GenerateContentConfig,
   GoogleGenAI,
   Part,
-  Chat,
   SchemaUnion,
   PartListUnion,
   Content,
@@ -23,6 +22,7 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
+import { GeminiChat } from './geminiChat.js';
 
 export class GeminiClient {
   private client: GoogleGenAI;
@@ -108,7 +108,7 @@ export class GeminiClient {
     return initialParts;
   }
 
-  async startChat(): Promise<Chat> {
+  async startChat(): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolDeclarations = this.config
       .getToolRegistry()
@@ -128,15 +128,17 @@ export class GeminiClient {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
 
-      return this.client.chats.create({
-        model: this.model,
-        config: {
+      return new GeminiChat(
+        this.client,
+        this.client.models,
+        this.model,
+        {
           systemInstruction,
           ...this.generateContentConfig,
           tools,
         },
         history,
-      });
+      );
     } catch (error) {
       await reportError(
         error,
@@ -150,7 +152,7 @@ export class GeminiClient {
   }
 
   async *sendMessageStream(
-    chat: Chat,
+    chat: GeminiChat,
     request: PartListUnion,
     signal?: AbortSignal,
     turns: number = this.MAX_TURNS,

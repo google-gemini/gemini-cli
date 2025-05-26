@@ -6,7 +6,6 @@
 
 import {
   Part,
-  Chat,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
@@ -20,6 +19,7 @@ import {
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { GeminiChat } from './geminiChat.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -113,7 +113,7 @@ export class Turn {
   }>;
   private debugResponses: GenerateContentResponse[];
 
-  constructor(private readonly chat: Chat) {
+  constructor(private readonly chat: GeminiChat) {
     this.pendingToolCalls = [];
     this.debugResponses = [];
   }
