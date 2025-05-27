@@ -70,12 +70,14 @@ async function main() {
       process.env.CLI_VERSION || readUpResult?.packageJson.version || 'unknown';
 
     render(
-      React.createElement(App, {
-        config,
-        settings,
-        cliVersion,
-        startupWarnings,
-      }),
+      <React.StrictMode>
+        <App
+          config={config}
+          settings={settings}
+          cliVersion={cliVersion}
+          startupWarnings={startupWarnings}
+        />
+      </React.StrictMode>,
     );
     return;
   }
