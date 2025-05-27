@@ -132,6 +132,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
 
   const userAgent = await createUserAgent();
   const apiKeyForServer = geminiApiKey || googleApiKey || '';
+  const useVertexAI = hasGeminiApiKey ? false : undefined;
 
   return createServerConfig(
     apiKeyForServer,
@@ -149,6 +150,8 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     userAgent,
     memoryContent,
     fileCount,
+    undefined, // alwaysSkipModificationConfirmation - not set by CLI args directly
+    useVertexAI,
   );
 }
 

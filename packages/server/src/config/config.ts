@@ -56,6 +56,7 @@ export class Config {
     private userMemory: string = '', // Made mutable for refresh
     private geminiMdFileCount: number = 0,
     private alwaysSkipModificationConfirmation: boolean = false,
+    private readonly vertexai?: boolean,
   ) {
     // toolRegistry still needs initialization based on the instance
     this.toolRegistry = createToolRegistry(this);
@@ -139,6 +140,10 @@ export class Config {
   setAlwaysSkipModificationConfirmation(skip: boolean): void {
     this.alwaysSkipModificationConfirmation = skip;
   }
+
+  getVertexAI(): boolean | undefined {
+    return this.vertexai;
+  }
 }
 
 function findEnvFile(startDir: string): string | null {
@@ -186,6 +191,7 @@ export function createServerConfig(
   userMemory?: string,
   geminiMdFileCount?: number,
   alwaysSkipModificationConfirmation?: boolean,
+  vertexai?: boolean,
 ): Config {
   return new Config(
     apiKey,
@@ -204,6 +210,7 @@ export function createServerConfig(
     userMemory ?? '',
     geminiMdFileCount ?? 0,
     alwaysSkipModificationConfirmation ?? false,
+    vertexai,
   );
 }
 

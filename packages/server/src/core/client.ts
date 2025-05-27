@@ -36,8 +36,11 @@ export class GeminiClient {
   constructor(private config: Config) {
     const userAgent = config.getUserAgent();
     const apiKeyFromConfig = config.getApiKey();
+    const vertexaiFlag = config.getVertexAI();
+
     this.client = new GoogleGenAI({
       apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
+      vertexai: vertexaiFlag,
       httpOptions: {
         headers: {
           'User-Agent': userAgent,
