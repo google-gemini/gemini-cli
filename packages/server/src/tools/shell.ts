@@ -242,7 +242,12 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     let llmContent = '';
     if (abortSignal.aborted) {
-      llmContent = 'Command did not complete, it was cancelled by the user';
+      llmContent = 'Command was cancelled by user before it could complete.';
+      if (output.trim()) {
+        llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${output}`;
+      } else {
+        llmContent += ' There was no output before it was cancelled.';
+      }
     } else {
       llmContent = [
         `Command: ${params.command}`,
