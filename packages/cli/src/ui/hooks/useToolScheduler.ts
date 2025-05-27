@@ -186,7 +186,7 @@ export function useToolScheduler(
       setAbortController(new AbortController());
       setToolCalls((tc) =>
         tc.map((c) =>
-          c.status !== 'error'
+          c.status !== 'error' && c.status !== 'executing'
             ? {
                 ...c,
                 status: 'cancelled',
@@ -229,7 +229,7 @@ export function useToolScheduler(
             .then((result) => {
               if (signal.aborted) {
                 setToolCalls(
-                  setStatus(callId, 'cancelled', 'Cancelled during execution'),
+                  setStatus(callId, 'cancelled', String(result.llmContent)),
                 );
                 return;
               }
