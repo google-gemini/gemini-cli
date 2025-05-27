@@ -55,16 +55,22 @@ As with most Node projects, major development scripts can be found in the `packa
 
 ### Prerequisites:
 
+#### Dependencies
+
 The build toolchain requires `npm` and `jq` to be installed. You can use the `scripts/setup-dev.sh` script to install these prerequisites.
 
-To build the entire project, CLI and Sandbox Container Image (if applicable), run the following command from the root directory:
+#### Sandboxing
+
+Container-based [sandboxing](#sandboxing) is highly recommended and requires, at a minimum, setting `GEMINI_SANDBOX=true` in your `~/.env` and ensuring a container engine (e.g. `docker` or `podmand`) is available. See [Sandboxing](#sandboxing) for details.
+
+To build both the `gemini` CLI utility and the sandbox container, run the following command from the root directory:
 
 ```bash
 npm install
 npm run build:all
 ```
 
-This command installs dependencies and builds the entire project, including the CLI and the Sandbox Container Image (if applicable). For a quick build without the sandbox container, you can use `npm run build`.
+To skip building the sandbox container, you can use `npm run build` instead.
 
 ## Running
 
@@ -207,13 +213,17 @@ Chances are you will need to manually address errors output. You can also try `n
 
 ## Sandboxing
 
+### MacOS Seatbelt
+
 On MacOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `minimal` profile (see `packages/cli/src/utils/sandbox-macos-minimal.sb`) that restricts writes to the project folder but otherwise allows all other operations by default. You can switch to a `strict` profile (see `.../sandbox-macos-strict.sb`) that declines operations by default by setting `SEATBELT_PROFILE=strict` in your environment or `.env` file. You can also switch to a custom profile `SEATBELT_PROFILE=<profile>` if you also create a file `.gemini/sandbox-macos-<profile>.sb` under your project settings directory `.gemini`.
+
+### Container-based Sandboxing (All Platforms)
 
 For stronger container-based sandboxing on MacOS or other platforms, you can set `GEMINI_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. The specified command (or if `true` then either `docker` or `podman`) must be installed on the host machine. Once enabled, `npm run build:all` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. The first build can take 20-30s (mostly due to downloading of the base image) but after that both build and start overhead should be minimal. Default builds (`npm run build`) will not rebuild the sandbox.
 
 Container-based sandboxing mounts the project directory (and system temp directory) with read-write access and is started/stopped/removed automatically as you start/stop Gemini CLI. Files created within the sandbox should be automatically mapped to your user/group on host machine. You can easily specify additional mounts, ports, or environment variables by setting `SANDBOX_{MOUNTS,PORTS,ENV}` as needed. You can also fully customize the sandbox for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or `.gemini/sandbox.bashrc` under your project settings directory `.gemini`.
 
-### Attaching from VSCode
+#### Attaching from VSCode
 
 With container-based sandboxing, you can have VSCode (or forks like Cursor) attach to a running sandbox container using the [Dev Containers](https://marketplace.cursorapi.com/items?itemName=ms-vscode-remote.remote-containers) extension. Simply use `Dev Containers: Attach to Running Container ...` command and select your container named `...-sandbox-#`. Sandbox container name should be displayed in green at the bottom in terminal when running `gemini`. You may need to set the VSCode setting `dev.containers.dockerPath` (e.g. to `podman`) if you are not using Docker, and otherwise you may be prompted by the extension to install Docker if missing from your system.
 

@@ -15,9 +15,12 @@
 
 set -euo pipefail
 
-if ! scripts/sandbox_command.sh -q; then
-    echo "ERROR: sandboxing disabled. See README.md to enable sandboxing."
-    exit 1
+# exit with warning if container-based sandboxing is disabled
+# note this includes the case where sandbox-exec (seatbelt) is used
+# this happens most commonly when user runs `npm run build:all` without enabling sandboxing
+if ! scripts/sandbox_command.sh -q || [ "$(scripts/sandbox_command.sh)" == "sandbox-exec" ]; then
+    echo "WARNING: container-based sandboxing is disabled (see README.md#sandboxing)"
+    exit 0
 fi
 
 CMD=$(scripts/sandbox_command.sh)
