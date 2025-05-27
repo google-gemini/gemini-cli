@@ -70,21 +70,25 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const logger = useLogger();
-  const [toolCalls, schedule, cancel] = useToolScheduler((tools) => {
-    if (tools.length) {
-      addItem(mapToDisplay(tools), Date.now());
-      submitQuery(
-        tools
-          .filter(
-            (t) =>
-              t.status === 'error' ||
-              t.status === 'cancelled' ||
-              t.status === 'success',
-          )
-          .map((t) => t.response.responsePart),
-      );
-    }
-  }, config);
+  const [toolCalls, schedule, cancel] = useToolScheduler(
+    (tools) => {
+      if (tools.length) {
+        addItem(mapToDisplay(tools), Date.now());
+        submitQuery(
+          tools
+            .filter(
+              (t) =>
+                t.status === 'error' ||
+                t.status === 'cancelled' ||
+                t.status === 'success',
+            )
+            .map((t) => t.response.responsePart),
+        );
+      }
+    },
+    config,
+    setPendingHistoryItem,
+  );
   const pendingToolCalls = useMemo(
     () => (toolCalls.length ? mapToDisplay(toolCalls) : undefined),
     [toolCalls],

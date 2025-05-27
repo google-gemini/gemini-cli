@@ -123,6 +123,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   async execute(
     params: ShellToolParams,
     abortSignal: AbortSignal,
+    onOutputChunk?: (chunk: string) => void,
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -157,6 +158,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       const str = data.toString();
       stdout += str;
       output += str;
+      if (onOutputChunk) {
+        onOutputChunk(str);
+      }
     });
 
     let stderr = '';
@@ -174,6 +178,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       }
       stderr += str;
       output += str;
+      if (onOutputChunk) {
+        onOutputChunk(str);
+      }
     });
 
     let error: Error | null = null;

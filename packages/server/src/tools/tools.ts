@@ -64,7 +64,11 @@ export interface Tool<
    * @param params Parameters for the tool execution
    * @returns Result of the tool execution
    */
-  execute(params: TParams, signal: AbortSignal): Promise<TResult>;
+  execute(
+    params: TParams,
+    signal: AbortSignal,
+    onOutputChunk?: (chunk: string) => void,
+  ): Promise<TResult>;
 }
 
 /**
@@ -144,7 +148,11 @@ export abstract class BaseTool<
    * @param signal AbortSignal for tool cancellation
    * @returns Result of the tool execution
    */
-  abstract execute(params: TParams, signal: AbortSignal): Promise<TResult>;
+  abstract execute(
+    params: TParams,
+    signal: AbortSignal,
+    onOutputChunk?: (chunk: string) => void,
+  ): Promise<TResult>;
 }
 
 export interface ToolResult {

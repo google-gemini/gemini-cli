@@ -11,6 +11,7 @@ import {
   ToolConfirmationOutcome,
   Tool,
   ToolCallConfirmationDetails,
+  ToolResult,
 } from '@gemini-code/server';
 import { Part } from '@google/genai';
 import { useCallback, useEffect, useState } from 'react';
@@ -18,6 +19,7 @@ import {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
   ToolCallStatus,
+  HistoryItemWithoutId,
 } from '../types.js';
 
 type ValidatingToolCall = {
@@ -45,10 +47,11 @@ type SuccessfulToolCall = {
   response: ToolCallResponseInfo;
 };
 
-type ExecutingToolCall = {
+export type ExecutingToolCall = {
   status: 'executing';
   request: ToolCallRequestInfo;
   tool: Tool;
+  liveOutput?: string;
 };
 
 type CancelledToolCall = {
@@ -88,6 +91,9 @@ export type CompletedToolCall =
 export function useToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => void,
   config: Config,
+  setPendingHistoryItem: React.Dispatch<
+    React.SetStateAction<HistoryItemWithoutId | null>
+  >,
 ): [ToolCall[], ScheduleFn, CancelFn] {
   const [toolRegistry] = useState(() => config.getToolRegistry());
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
@@ -224,9 +230,48 @@ export function useToolScheduler(
         .forEach((t) => {
           const callId = t.request.callId;
           setToolCalls(setStatus(t.request.callId, 'executing'));
+
+          let accumulatedOutput = '';
+          const onOutputChunk =
+            t.tool.name === 'execute_bash_command'
+              ? (chunk: string) => {
+                  accumulatedOutput += chunk;
+                  setPendingHistoryItem(
+                    (prevItem: HistoryItemWithoutId | null) => {
+                      if (prevItem?.type === 'tool_group') {
+                        return {
+                          ...prevItem,
+                          tools: prevItem.tools.map(
+                            (toolDisplay: IndividualToolCallDisplay) =>
+                              toolDisplay.callId === callId &&
+                              toolDisplay.status === ToolCallStatus.Executing
+                                ? {
+                                    ...toolDisplay,
+                                    resultDisplay: accumulatedOutput,
+                                  }
+                                : toolDisplay,
+                          ),
+                        };
+                      }
+                      return prevItem;
+                    },
+                  );
+                  // Also update the toolCall itself so that mapToDisplay
+                  // can pick up the live output if the item is not pending
+                  // (e.g. if it's being re-rendered from history)
+                  setToolCalls((prevToolCalls) =>
+                    prevToolCalls.map((tc) =>
+                      tc.request.callId === callId && tc.status === 'executing'
+                        ? { ...tc, liveOutput: accumulatedOutput }
+                        : tc,
+                    ),
+                  );
+                }
+              : undefined;
+
           t.tool
-            .execute(t.request.args, signal)
-            .then((result) => {
+            .execute(t.request.args, signal, onOutputChunk)
+            .then((result: ToolResult) => {
               if (signal.aborted) {
                 setToolCalls(
                   setStatus(callId, 'cancelled', String(result.llmContent)),
@@ -248,7 +293,7 @@ export function useToolScheduler(
               };
               setToolCalls(setStatus(callId, 'success', response));
             })
-            .catch((e) =>
+            .catch((e: Error) =>
               setToolCalls(
                 setStatus(
                   callId,
@@ -262,7 +307,7 @@ export function useToolScheduler(
             );
         });
     }
-  }, [toolCalls, toolRegistry, abortController.signal]);
+  }, [toolCalls, toolRegistry, abortController.signal, setPendingHistoryItem]);
 
   useEffect(() => {
     const allDone = toolCalls.every(
@@ -480,7 +525,7 @@ export function mapToDisplay(
           callId: t.request.callId,
           name: t.tool.displayName,
           description: t.tool.getDescription(t.request.args),
-          resultDisplay: undefined,
+          resultDisplay: t.liveOutput ?? undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
         };
