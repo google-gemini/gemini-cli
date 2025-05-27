@@ -59,7 +59,7 @@ As with most Node projects, major development scripts can be found in the `packa
 
 The build toolchain requires `npm` and `jq` to be installed. You can use the `scripts/setup-dev.sh` script to install these prerequisites.
 
-#### Sandboxing
+#### Enabling Sandboxing
 
 Container-based [sandboxing](#sandboxing) is highly recommended and requires, at a minimum, setting `GEMINI_SANDBOX=true` in your `~/.env` and ensuring a container engine (e.g. `docker` or `podmand`) is available. See [Sandboxing](#sandboxing) for details.
 
