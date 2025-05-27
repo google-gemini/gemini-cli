@@ -87,11 +87,8 @@ jobs:
       - name: Install dependencies for testing
         run: npm ci # Install fresh dependencies using the downloaded package-lock.json
 
-      - name: Run tests (generate JUnit XML)
-        run: npm run test:ci --workspaces --if-present
-
-      - name: Collect coverage
-        run: npm run coverage # This will run tests again, but also generate coverage
+      - name: Run tests and generate reports
+        run: NO_COLOR=true npm run test:ci
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
@@ -108,3 +105,35 @@ jobs:
         with:
           name: coverage-reports-${{ matrix.node-version }}
           path: packages/*/coverage
+
+  post_coverage_comment:
+    name: Post Coverage Comment
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    continue-on-error: true
+    permissions:
+      contents: read # For checkout
+      pull-requests: write # For commenting
+    strategy:
+      matrix:
+        node-version: [20.x] # Should match the test job's matrix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download coverage reports artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports-${{ matrix.node-version }}
+          path: coverage_artifact # Download to a specific directory
+
+      - name: Post Coverage Comment using Composite Action
+        uses: ./.github/actions/post-coverage-comment # Path to the composite action directory
+        with:
+          cli_json_file: coverage_artifact/cli/coverage/coverage-summary.json
+          server_json_file: coverage_artifact/server/coverage/coverage-summary.json
+          cli_full_text_summary_file: coverage_artifact/cli/coverage/full-text-summary.txt
+          server_full_text_summary_file: coverage_artifact/server/coverage/full-text-summary.txt
+          node_version: ${{ matrix.node-version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,102 @@
+name: 'Post Coverage Comment Action'
+description: 'Prepares and posts a code coverage comment to a PR.'
+
+inputs:
+  cli_json_file:
+    description: 'Path to CLI coverage-summary.json'
+    required: true
+  server_json_file:
+    description: 'Path to Server coverage-summary.json'
+    required: true
+  cli_full_text_summary_file:
+    description: 'Path to CLI full-text-summary.txt'
+    required: true
+  server_full_text_summary_file:
+    description: 'Path to Server full-text-summary.txt'
+    required: true
+  node_version:
+    description: 'Node.js version for context in messages'
+    required: true
+  github_token:
+    description: 'GitHub token for posting comments'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Prepare Coverage Comment
+      id: prep_coverage_comment
+      shell: bash
+      run: |
+        cli_json_file="${{ inputs.cli_json_file }}"
+        server_json_file="${{ inputs.server_json_file }}"
+        cli_full_text_summary_file="${{ inputs.cli_full_text_summary_file }}"
+        server_full_text_summary_file="${{ inputs.server_full_text_summary_file }}"
+        comment_file="coverage-comment.md"
+
+        # Extract percentages using jq for the main table
+        if [ -f "$cli_json_file" ]; then
+          cli_lines_pct=$(jq -r '.total.lines.pct' "$cli_json_file")
+          cli_statements_pct=$(jq -r '.total.statements.pct' "$cli_json_file")
+          cli_functions_pct=$(jq -r '.total.functions.pct' "$cli_json_file")
+          cli_branches_pct=$(jq -r '.total.branches.pct' "$cli_json_file")
+        else
+          cli_lines_pct="N/A"; cli_statements_pct="N/A"; cli_functions_pct="N/A"; cli_branches_pct="N/A"
+          echo "CLI coverage-summary.json not found at: $cli_json_file" >&2 # Error to stderr
+        fi
+
+        if [ -f "$server_json_file" ]; then
+          server_lines_pct=$(jq -r '.total.lines.pct' "$server_json_file")
+          server_statements_pct=$(jq -r '.total.statements.pct' "$server_json_file")
+          server_functions_pct=$(jq -r '.total.functions.pct' "$server_json_file")
+          server_branches_pct=$(jq -r '.total.branches.pct' "$server_json_file")
+        else
+          server_lines_pct="N/A"; server_statements_pct="N/A"; server_functions_pct="N/A"; server_branches_pct="N/A"
+          echo "Server coverage-summary.json not found at: $server_json_file" >&2 # Error to stderr
+        fi
+
+        echo "## Code Coverage Summary" > "$comment_file"
+        echo "" >> "$comment_file"
+        echo "| Package | Lines | Statements | Functions | Branches |" >> "$comment_file"
+        echo "|---|---|---|---|---|" >> "$comment_file"
+        echo "| CLI | ${cli_lines_pct}% | ${cli_statements_pct}% | ${cli_functions_pct}% | ${cli_branches_pct}% |" >> "$comment_file"
+        echo "| Server | ${server_lines_pct}% | ${server_statements_pct}% | ${server_functions_pct}% | ${server_branches_pct}% |" >> "$comment_file"
+        echo "" >> "$comment_file"
+
+        # CLI Package - Collapsible Section (with full text summary from file)
+        echo "<details>" >> "$comment_file"
+        echo "<summary>CLI Package - Full Text Report</summary>" >> "$comment_file"
+        echo "" >> "$comment_file"
+        echo '```text' >> "$comment_file"
+        if [ -f "$cli_full_text_summary_file" ]; then
+          cat "$cli_full_text_summary_file" >> "$comment_file"
+        else
+          echo "CLI full-text-summary.txt not found at: $cli_full_text_summary_file" >> "$comment_file"
+        fi
+        echo '```' >> "$comment_file"
+        echo "</details>" >> "$comment_file"
+        echo "" >> "$comment_file"
+
+        # Server Package - Collapsible Section (with full text summary from file)
+        echo "<details>" >> "$comment_file"
+        echo "<summary>Server Package - Full Text Report</summary>" >> "$comment_file"
+        echo "" >> "$comment_file"
+        echo '```text' >> "$comment_file"
+        if [ -f "$server_full_text_summary_file" ]; then
+          cat "$server_full_text_summary_file" >> "$comment_file"
+        else
+          echo "Server full-text-summary.txt not found at: $server_full_text_summary_file" >> "$comment_file"
+        fi
+        echo '```' >> "$comment_file"
+        echo "</details>" >> "$comment_file"
+        echo "" >> "$comment_file"
+
+        echo "_For detailed HTML reports, please see the 'coverage-reports-${{ inputs.node_version }}' artifact from the main CI run._" >> "$comment_file"
+
+    - name: Post Coverage Comment
+      uses: thollander/actions-comment-pull-request@v3
+      if: always()
+      with:
+        file-path: coverage-comment.md # Use the generated file directly
+        comment-tag: code-coverage-summary
+        github-token: ${{ inputs.github_token }}

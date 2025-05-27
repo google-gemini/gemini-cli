@@ -12,7 +12,7 @@
     "clean": "scripts/clean.sh",
     "prepare": "npm run bundle",
     "test": "npm run test --workspaces",
-    "coverage": "npm run coverage --workspaces --if-present",
+    "test:ci": "npm run test:ci --workspaces --if-present",
     "start": "NODE_ENV=development scripts/start.sh",
     "debug": "NODE_ENV=development DEBUG=1 scripts/start.sh",
     "lint:fix": "eslint . --fix",
