@@ -95,9 +95,11 @@ async function main() {
   const geminiClient = new GeminiClient(config);
   const chat = await geminiClient.startChat();
   try {
-    for await (const event of geminiClient.sendMessageStream(chat, [
-      { text: input },
-    ])) {
+    for await (const event of geminiClient.sendMessageStream(
+      chat,
+      [{ text: input }],
+      new AbortController().signal,
+    )) {
       if (event.type === 'content') {
         process.stdout.write(event.value);
       }

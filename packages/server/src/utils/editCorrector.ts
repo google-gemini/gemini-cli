@@ -63,6 +63,7 @@ export async function ensureCorrectEdit(
   currentContent: string,
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
   client: GeminiClient,
+  abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
   const cachedResult = editCorrectionCache.get(cacheKey);
@@ -84,6 +85,7 @@ export async function ensureCorrectEdit(
         client,
         finalOldString,
         originalParams.new_string,
+        abortSignal,
       );
     }
   } else if (occurrences > 1) {
@@ -108,6 +110,7 @@ export async function ensureCorrectEdit(
           originalParams.old_string, // original old
           unescapedOldStringAttempt, // corrected old
           originalParams.new_string, // original new (which is potentially escaped)
+          abortSignal,
         );
       }
     } else if (occurrences === 0) {
@@ -115,6 +118,7 @@ export async function ensureCorrectEdit(
         client,
         currentContent,
         unescapedOldStringAttempt,
+        abortSignal,
       );
       const llmOldOccurrences = countOccurrences(
         currentContent,
@@ -134,6 +138,7 @@ export async function ensureCorrectEdit(
             originalParams.old_string, // original old
             llmCorrectedOldString, // corrected old
             baseNewStringForLLMCorrection, // base new for correction
+            abortSignal,
           );
         }
       } else {
@@ -180,6 +185,7 @@ export async function ensureCorrectEdit(
 export async function ensureCorrectFileContent(
   content: string,
   client: GeminiClient,
+  abortSignal: AbortSignal,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
   if (cachedResult) {
@@ -193,7 +199,11 @@ export async function ensureCorrectFileContent(
     return content;
   }
 
-  const correctedContent = await correctStringEscaping(content, client);
+  const correctedContent = await correctStringEscaping(
+    content,
+    client,
+    abortSignal,
+  );
   fileContentCorrectionCache.set(content, correctedContent);
   return correctedContent;
 }
@@ -215,6 +225,7 @@ export async function correctOldStringMismatch(
   geminiClient: GeminiClient,
   fileContent: string,
   problematicSnippet: string,
+  abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
 Context: A process needs to find an exact literal, unique match for a specific text snippet within a file's content. The provided snippet failed to match exactly. This is most likely because it has been overly escaped.
@@ -243,6 +254,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
     const result = await geminiClient.generateJson(
       contents,
       OLD_STRING_CORRECTION_SCHEMA,
+      abortSignal,
       EditModel,
       EditConfig,
     );
@@ -257,10 +269,15 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       return problematicSnippet;
     }
   } catch (error) {
+    if (abortSignal.aborted) {
+      throw error;
+    }
+
     console.error(
       'Error during LLM call for old string snippet correction:',
       error,
     );
+
     return problematicSnippet;
   }
 }
@@ -286,6 +303,7 @@ export async function correctNewString(
   originalOldString: string,
   correctedOldString: string,
   originalNewString: string,
+  abortSignal: AbortSignal,
 ): Promise<string> {
   if (originalOldString === correctedOldString) {
     return originalNewString;
@@ -324,6 +342,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
     const result = await geminiClient.generateJson(
       contents,
       NEW_STRING_CORRECTION_SCHEMA,
+      abortSignal,
       EditModel,
       EditConfig,
     );
@@ -338,6 +357,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       return originalNewString;
     }
   } catch (error) {
+    if (abortSignal.aborted) {
+      throw error;
+    }
+
     console.error('Error during LLM call for new_string correction:', error);
     return originalNewString;
   }
@@ -359,6 +382,7 @@ export async function correctNewStringEscaping(
   geminiClient: GeminiClient,
   oldString: string,
   potentiallyProblematicNewString: string,
+  abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
 Context: A text replacement operation is planned. The text to be replaced (old_string) has been correctly identified in the file. However, the replacement text (new_string) might have been improperly escaped by a previous LLM generation (e.g. too many backslashes for newlines like \\n instead of \n, or unnecessarily quotes like \\"Hello\\" instead of "Hello").
@@ -387,6 +411,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
     const result = await geminiClient.generateJson(
       contents,
       CORRECT_NEW_STRING_ESCAPING_SCHEMA,
+      abortSignal,
       EditModel,
       EditConfig,
     );
@@ -401,6 +426,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       return potentiallyProblematicNewString;
     }
   } catch (error) {
+    if (abortSignal.aborted) {
+      throw error;
+    }
+
     console.error(
       'Error during LLM call for new_string escaping correction:',
       error,
@@ -424,6 +453,7 @@ const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
 export async function correctStringEscaping(
   potentiallyProblematicString: string,
   client: GeminiClient,
+  abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
 Context: An LLM has just generated potentially_problematic_string and the text might have been improperly escaped (e.g. too many backslashes for newlines like \\n instead of \n, or unnecessarily quotes like \\"Hello\\" instead of "Hello").
@@ -447,6 +477,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
     const result = await client.generateJson(
       contents,
       CORRECT_STRING_ESCAPING_SCHEMA,
+      abortSignal,
       EditModel,
       EditConfig,
     );
@@ -461,6 +492,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       return potentiallyProblematicString;
     }
   } catch (error) {
+    if (abortSignal.aborted) {
+      throw error;
+    }
+
     console.error(
       'Error during LLM call for string escaping correction:',
       error,

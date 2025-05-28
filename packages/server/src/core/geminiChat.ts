@@ -155,7 +155,7 @@ export class GeminiChat {
     const responsePromise = this.modelsModule.generateContent({
       model: this.model,
       contents: this.getHistory(true).concat(userContent),
-      config: params.config ?? this.config,
+      config: { ...this.config, ...params.config },
     });
     this.sendPromise = (async () => {
       const response = await responsePromise;
@@ -219,7 +219,7 @@ export class GeminiChat {
     const streamResponse = this.modelsModule.generateContentStream({
       model: this.model,
       contents: this.getHistory(true).concat(userContent),
-      config: params.config ?? this.config,
+      config: { ...this.config, ...params.config },
     });
     // Resolve the internal tracking of send completion promise - `sendPromise`
     // for both success and failure response. The actual failure is still

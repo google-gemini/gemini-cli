@@ -32,6 +32,7 @@ export interface ServerTool {
   ): Promise<ToolResult>;
   shouldConfirmExecute(
     params: Record<string, unknown>,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false>;
 }
 
@@ -120,11 +121,14 @@ export class Turn {
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       const responseStream = await this.chat.sendMessageStream({
         message: req,
+        config: {
+          abortSignal: signal,
+        },
       });
 
       for await (const resp of responseStream) {
@@ -150,6 +154,12 @@ export class Turn {
         }
       }
     } catch (error) {
+      if (signal.aborted) {
+        yield { type: GeminiEventType.UserCancelled };
+        // Regular cancellation error, fail gracefully.
+        return;
+      }
+
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
       await reportError(
         error,

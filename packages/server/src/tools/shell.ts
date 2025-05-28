@@ -98,6 +98,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
   async shouldConfirmExecute(
     params: ShellToolParams,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.validateToolParams(params)) {
       return false; // skip confirmation, execute call will fail immediately

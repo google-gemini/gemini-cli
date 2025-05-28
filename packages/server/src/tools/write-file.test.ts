@@ -110,18 +110,32 @@ describe('WriteFileTool', () => {
     // Default mock implementations that return valid structures
     mockEnsureCorrectEdit.mockImplementation(
       async (
-        currentContent: string,
+        _currentContent: string,
         params: EditToolParams,
         _client: GeminiClient,
-      ): Promise<CorrectedEditResult> =>
-        Promise.resolve({
+        signal?: AbortSignal, // Make AbortSignal optional to match usage
+      ): Promise<CorrectedEditResult> => {
+        if (signal?.aborted) {
+          return Promise.reject(new Error('Aborted'));
+        }
+        return Promise.resolve({
           params: { ...params, new_string: params.new_string ?? '' },
           occurrences: 1,
-        }),
+        });
+      },
     );
     mockEnsureCorrectFileContent.mockImplementation(
-      async (content: string, _client: GeminiClient): Promise<string> =>
-        Promise.resolve(content ?? ''),
+      async (
+        content: string,
+        _client: GeminiClient,
+        signal?: AbortSignal,
+      ): Promise<string> => {
+        // Make AbortSignal optional
+        if (signal?.aborted) {
+          return Promise.reject(new Error('Aborted'));
+        }
+        return Promise.resolve(content ?? '');
+      },
     );
   });
 
@@ -181,6 +195,7 @@ describe('WriteFileTool', () => {
       const filePath = path.join(rootDir, 'new_corrected_file.txt');
       const proposedContent = 'Proposed new content.';
       const correctedContent = 'Corrected new content.';
+      const abortSignal = new AbortController().signal;
       // Ensure the mock is set for this specific test case if needed, or rely on beforeEach
       mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
 
@@ -188,11 +203,13 @@ describe('WriteFileTool', () => {
       const result = await tool._getCorrectedFileContent(
         filePath,
         proposedContent,
+        abortSignal,
       );
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedContent);
@@ -206,6 +223,7 @@ describe('WriteFileTool', () => {
       const originalContent = 'Original existing content.';
       const proposedContent = 'Proposed replacement content.';
       const correctedProposedContent = 'Corrected replacement content.';
+      const abortSignal = new AbortController().signal;
       fs.writeFileSync(filePath, originalContent, 'utf8');
 
       // Ensure this mock is active and returns the correct structure
@@ -222,6 +240,7 @@ describe('WriteFileTool', () => {
       const result = await tool._getCorrectedFileContent(
         filePath,
         proposedContent,
+        abortSignal,
       );
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
@@ -232,6 +251,7 @@ describe('WriteFileTool', () => {
           file_path: filePath,
         },
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedProposedContent);
@@ -243,6 +263,7 @@ describe('WriteFileTool', () => {
     it('should return error if reading an existing file fails (e.g. permissions)', async () => {
       const filePath = path.join(rootDir, 'unreadable_file.txt');
       const proposedContent = 'some content';
+      const abortSignal = new AbortController().signal;
       fs.writeFileSync(filePath, 'content', { mode: 0o000 });
 
       const readError = new Error('Permission denied');
@@ -255,6 +276,7 @@ describe('WriteFileTool', () => {
       const result = await tool._getCorrectedFileContent(
         filePath,
         proposedContent,
+        abortSignal,
       );
 
       expect(fs.readFileSync).toHaveBeenCalledWith(filePath, 'utf8');
@@ -274,16 +296,17 @@ describe('WriteFileTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
+    const abortSignal = new AbortController().signal;
     it('should return false if params are invalid (relative path)', async () => {
       const params = { file_path: 'relative.txt', content: 'test' };
-      const confirmation = await tool.shouldConfirmExecute(params);
+      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
       expect(confirmation).toBe(false);
     });
 
     it('should return false if params are invalid (outside root)', async () => {
       const outsidePath = path.resolve(tempDir, 'outside-root.txt');
       const params = { file_path: outsidePath, content: 'test' };
-      const confirmation = await tool.shouldConfirmExecute(params);
+      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
       expect(confirmation).toBe(false);
     });
 
@@ -298,7 +321,7 @@ describe('WriteFileTool', () => {
         throw readError;
       });
 
-      const confirmation = await tool.shouldConfirmExecute(params);
+      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
       expect(confirmation).toBe(false);
 
       vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
@@ -314,11 +337,13 @@ describe('WriteFileTool', () => {
       const params = { file_path: filePath, content: proposedContent };
       const confirmation = (await tool.shouldConfirmExecute(
         params,
+        abortSignal,
       )) as ToolEditConfirmationDetails;
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -343,7 +368,6 @@ describe('WriteFileTool', () => {
         'Corrected replacement for confirmation.';
       fs.writeFileSync(filePath, originalContent, 'utf8');
 
-      // Ensure this mock is active and returns the correct structure
       mockEnsureCorrectEdit.mockResolvedValue({
         params: {
           file_path: filePath,
@@ -356,6 +380,7 @@ describe('WriteFileTool', () => {
       const params = { file_path: filePath, content: proposedContent };
       const confirmation = (await tool.shouldConfirmExecute(
         params,
+        abortSignal,
       )) as ToolEditConfirmationDetails;
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
@@ -366,6 +391,7 @@ describe('WriteFileTool', () => {
           file_path: filePath,
         },
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -381,9 +407,10 @@ describe('WriteFileTool', () => {
   });
 
   describe('execute', () => {
+    const abortSignal = new AbortController().signal;
     it('should return error if params are invalid (relative path)', async () => {
       const params = { file_path: 'relative.txt', content: 'test' };
-      const result = await tool.execute(params, new AbortController().signal);
+      const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
       expect(result.returnDisplay).toMatch(/Error: File path must be absolute/);
     });
@@ -391,7 +418,7 @@ describe('WriteFileTool', () => {
     it('should return error if params are invalid (path outside root)', async () => {
       const outsidePath = path.resolve(tempDir, 'outside-root.txt');
       const params = { file_path: outsidePath, content: 'test' };
-      const result = await tool.execute(params, new AbortController().signal);
+      const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
       expect(result.returnDisplay).toMatch(
         /Error: File path must be within the root directory/,
@@ -409,7 +436,7 @@ describe('WriteFileTool', () => {
         throw readError;
       });
 
-      const result = await tool.execute(params, new AbortController().signal);
+      const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toMatch(/Error checking existing file/);
       expect(result.returnDisplay).toMatch(
         /Error checking existing file: Simulated read error for execute/,
@@ -427,16 +454,20 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content: proposedContent };
 
-      const confirmDetails = await tool.shouldConfirmExecute(params);
+      const confirmDetails = await tool.shouldConfirmExecute(
+        params,
+        abortSignal,
+      );
       if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await tool.execute(params, new AbortController().signal);
+      const result = await tool.execute(params, abortSignal);
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
@@ -477,12 +508,15 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content: proposedContent };
 
-      const confirmDetails = await tool.shouldConfirmExecute(params);
+      const confirmDetails = await tool.shouldConfirmExecute(
+        params,
+        abortSignal,
+      );
       if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await tool.execute(params, new AbortController().signal);
+      const result = await tool.execute(params, abortSignal);
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         initialContent,
@@ -492,6 +526,7 @@ describe('WriteFileTool', () => {
           file_path: filePath,
         },
         mockGeminiClientInstance,
+        abortSignal,
       );
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(correctedProposedContent);
@@ -513,12 +548,15 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       // Simulate confirmation if your logic requires it before execute, or remove if not needed for this path
-      const confirmDetails = await tool.shouldConfirmExecute(params);
+      const confirmDetails = await tool.shouldConfirmExecute(
+        params,
+        abortSignal,
+      );
       if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await tool.execute(params, new AbortController().signal);
+      await tool.execute(params, abortSignal);
 
       expect(fs.existsSync(dirPath)).toBe(true);
       expect(fs.statSync(dirPath).isDirectory()).toBe(true);

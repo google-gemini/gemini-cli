@@ -223,7 +223,9 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(await tool.shouldConfirmExecute(params)).toBe(false);
+      expect(
+        await tool.shouldConfirmExecute(params, new AbortController().signal),
+      ).toBe(false);
     });
 
     it('should request confirmation for valid edit', async () => {
@@ -235,7 +237,10 @@ describe('EditTool', () => {
       };
       // ensureCorrectEdit will be called by shouldConfirmExecute
       mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 1 });
-      const confirmation = await tool.shouldConfirmExecute(params);
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
       expect(confirmation).toEqual(
         expect.objectContaining({
           title: `Confirm Edit: ${testFile}`,
@@ -253,7 +258,9 @@ describe('EditTool', () => {
         new_string: 'new',
       };
       mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 0 });
-      expect(await tool.shouldConfirmExecute(params)).toBe(false);
+      expect(
+        await tool.shouldConfirmExecute(params, new AbortController().signal),
+      ).toBe(false);
     });
 
     it('should return false if multiple occurrences of old_string are found (ensureCorrectEdit returns > 1)', async () => {
@@ -264,7 +271,9 @@ describe('EditTool', () => {
         new_string: 'new',
       };
       mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 2 });
-      expect(await tool.shouldConfirmExecute(params)).toBe(false);
+      expect(
+        await tool.shouldConfirmExecute(params, new AbortController().signal),
+      ).toBe(false);
     });
 
     it('should request confirmation for creating a new file (empty old_string)', async () => {
@@ -279,7 +288,10 @@ describe('EditTool', () => {
       // as shouldConfirmExecute handles this for diff generation.
       // If it is called, it should return 0 occurrences for a new file.
       mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 0 });
-      const confirmation = await tool.shouldConfirmExecute(params);
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
       expect(confirmation).toEqual(
         expect.objectContaining({
           title: `Confirm Edit: ${newFileName}`,
@@ -328,6 +340,7 @@ describe('EditTool', () => {
 
       const confirmation = (await tool.shouldConfirmExecute(
         params,
+        new AbortController().signal,
       )) as FileDiff;
 
       expect(mockCalled).toBe(true); // Check if the mock implementation was run

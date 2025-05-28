@@ -174,7 +174,10 @@ Expectation for parameters:
    * @returns An object describing the potential edit outcome
    * @throws File system errors if reading the file fails unexpectedly (e.g., permissions)
    */
-  private async calculateEdit(params: EditToolParams): Promise<CalculatedEdit> {
+  private async calculateEdit(
+    params: EditToolParams,
+    abortSignal: AbortSignal,
+  ): Promise<CalculatedEdit> {
     const expectedReplacements = 1;
     let currentContent: string | null = null;
     let fileExists = false;
@@ -210,6 +213,7 @@ Expectation for parameters:
         currentContent,
         params,
         this.client,
+        abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
       finalNewString = correctedEdit.params.new_string;
@@ -262,6 +266,7 @@ Expectation for parameters:
    */
   async shouldConfirmExecute(
     params: EditToolParams,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getAlwaysSkipModificationConfirmation()) {
       return false;
@@ -300,6 +305,7 @@ Expectation for parameters:
         currentContent,
         params,
         this.client,
+        abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
       finalNewString = correctedEdit.params.new_string;
@@ -376,7 +382,7 @@ Expectation for parameters:
 
     let editData: CalculatedEdit;
     try {
-      editData = await this.calculateEdit(params);
+      editData = await this.calculateEdit(params, _signal);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {

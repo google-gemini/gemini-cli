@@ -44,6 +44,7 @@ describe('checkNextSpeaker', () => {
   let chatInstance: GeminiChat;
   let mockGeminiClient: GeminiClient;
   let MockConfig: Mock;
+  const abortSignal = new AbortController().signal;
 
   beforeEach(() => {
     MockConfig = vi.mocked(Config);
@@ -71,7 +72,7 @@ describe('checkNextSpeaker', () => {
       mockGoogleGenAIInstance, // This will be the instance returned by the mocked GoogleGenAI constructor
       mockModelsInstance, // This is the instance returned by mockGoogleGenAIInstance.getGenerativeModel
       'gemini-pro', // model name
-      {}, // config
+      {},
       [], // initial history
     );
 
@@ -85,7 +86,11 @@ describe('checkNextSpeaker', () => {
 
   it('should return null if history is empty', async () => {
     (chatInstance.getHistory as Mock).mockReturnValue([]);
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
     expect(mockGeminiClient.generateJson).not.toHaveBeenCalled();
   });
@@ -94,7 +99,11 @@ describe('checkNextSpeaker', () => {
     (chatInstance.getHistory as Mock).mockReturnValue([
       { role: 'user', parts: [{ text: 'Hello' }] },
     ] as Content[]);
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
     expect(mockGeminiClient.generateJson).not.toHaveBeenCalled();
   });
@@ -109,7 +118,11 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toEqual(mockApiResponse);
     expect(mockGeminiClient.generateJson).toHaveBeenCalledTimes(1);
   });
@@ -124,7 +137,11 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toEqual(mockApiResponse);
   });
 
@@ -138,7 +155,11 @@ describe('checkNextSpeaker', () => {
     };
     (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toEqual(mockApiResponse);
   });
 
@@ -153,7 +174,11 @@ describe('checkNextSpeaker', () => {
       new Error('API Error'),
     );
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
     consoleWarnSpy.mockRestore();
   });
@@ -166,7 +191,11 @@ describe('checkNextSpeaker', () => {
       reasoning: 'This is incomplete.',
     } as unknown as NextSpeakerResponse); // Type assertion to simulate invalid response
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
   });
 
@@ -179,7 +208,11 @@ describe('checkNextSpeaker', () => {
       next_speaker: 123, // Invalid type
     } as unknown as NextSpeakerResponse);
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
   });
 
@@ -192,7 +225,11 @@ describe('checkNextSpeaker', () => {
       next_speaker: 'neither', // Invalid enum value
     } as unknown as NextSpeakerResponse);
 
-    const result = await checkNextSpeaker(chatInstance, mockGeminiClient);
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockGeminiClient,
+      abortSignal,
+    );
     expect(result).toBeNull();
   });
 });

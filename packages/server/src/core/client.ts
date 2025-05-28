@@ -157,7 +157,7 @@ export class GeminiClient {
   async *sendMessageStream(
     chat: GeminiChat,
     request: PartListUnion,
-    signal?: AbortSignal,
+    signal: AbortSignal,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     if (!turns) {
@@ -169,8 +169,8 @@ export class GeminiClient {
     for await (const event of resultStream) {
       yield event;
     }
-    if (!turn.pendingToolCalls.length) {
-      const nextSpeakerCheck = await checkNextSpeaker(chat, this);
+    if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+      const nextSpeakerCheck = await checkNextSpeaker(chat, this, signal);
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
         yield* this.sendMessageStream(chat, nextRequest, signal, turns - 1);
@@ -181,6 +181,7 @@ export class GeminiClient {
   async generateJson(
     contents: Content[],
     schema: SchemaUnion,
+    abortSignal: AbortSignal,
     model: string = 'gemini-2.0-flash',
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
@@ -188,6 +189,7 @@ export class GeminiClient {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
       const requestConfig = {
+        abortSignal,
         ...this.generateContentConfig,
         ...config,
       };
@@ -232,6 +234,11 @@ export class GeminiClient {
         );
       }
     } catch (error) {
+      if (abortSignal.aborted) {
+        // Regular cancellation error, fail normally
+        throw error;
+      }
+
       // Avoid double reporting for the empty response case handled above
       if (
         error instanceof Error &&

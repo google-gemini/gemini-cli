@@ -141,6 +141,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
    */
   async shouldConfirmExecute(
     params: WriteFileToolParams,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getAlwaysSkipModificationConfirmation()) {
       return false;
@@ -154,6 +155,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
       params.content,
+      abortSignal,
     );
 
     if (correctedContentResult.error) {
@@ -193,7 +195,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
 
   async execute(
     params: WriteFileToolParams,
-    _signal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -206,6 +208,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
       params.content,
+      abortSignal,
     );
 
     if (correctedContentResult.error) {
@@ -277,6 +280,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
   private async _getCorrectedFileContent(
     filePath: string,
     proposedContent: string,
+    abortSignal: AbortSignal,
   ): Promise<GetCorrectedFileContentResult> {
     let originalContent = '';
     let fileExists = false;
@@ -316,6 +320,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
           file_path: filePath,
         },
         this.client,
+        abortSignal,
       );
       correctedContent = correctedParams.new_string;
     } else {
@@ -323,6 +328,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
         this.client,
+        abortSignal,
       );
     }
     return { originalContent, correctedContent, fileExists };

@@ -57,6 +57,7 @@ export interface Tool<
    */
   shouldConfirmExecute(
     params: TParams,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
@@ -137,6 +138,8 @@ export abstract class BaseTool<
   shouldConfirmExecute(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     params: TParams,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     return Promise.resolve(false);
   }

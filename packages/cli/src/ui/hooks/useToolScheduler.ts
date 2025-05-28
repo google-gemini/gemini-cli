@@ -142,7 +142,10 @@ export function useToolScheduler(
 
         const { request: r, tool } = initialCall;
         try {
-          const userApproval = await tool.shouldConfirmExecute(r.args);
+          const userApproval = await tool.shouldConfirmExecute(
+            r.args,
+            abortController.signal,
+          );
           if (userApproval) {
             // Confirmation is needed. Update status to 'awaiting_approval'.
             setToolCalls(
@@ -183,7 +186,7 @@ export function useToolScheduler(
         }
       });
     },
-    [isRunning, setToolCalls, toolRegistry],
+    [isRunning, setToolCalls, toolRegistry, abortController.signal],
   );
 
   const cancel = useCallback(
