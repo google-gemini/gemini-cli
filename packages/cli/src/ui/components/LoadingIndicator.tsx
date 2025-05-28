@@ -6,10 +6,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
+import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase: string;
@@ -30,11 +30,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
   return (
     <Box marginTop={1} paddingLeft={0}>
-      {streamingState === StreamingState.Responding && (
-        <Box marginRight={1}>
-          <Spinner type="dots" />
-        </Box>
-      )}
+      <Box marginRight={1}>
+        <GeminiRespondingSpinner
+          nonRespondingDisplay={
+            streamingState === StreamingState.WaitingForConfirmation ? '⠏' : ''
+          }
+        />
+      </Box>
       <Text color={Colors.AccentPurple}>
         {currentLoadingPhrase}
         {streamingState === StreamingState.WaitingForConfirmation

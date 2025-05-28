@@ -6,16 +6,11 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
-import {
-  IndividualToolCallDisplay,
-  StreamingState,
-  ToolCallStatus,
-} from '../../types.js';
+import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import { useStreamingContext } from '../../contexts/StreamingContext.js';
+import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -61,7 +56,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
-        {/* Status Indicator */}
         <ToolStatusIndicator status={status} />
         <ToolInfo
           name={name}
@@ -107,41 +101,38 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
 type ToolStatusIndicatorProps = {
   status: ToolCallStatus;
 };
+
 const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
-}) => {
-  const { streamingState } = useStreamingContext();
-  return (
-    <Box minWidth={STATUS_INDICATOR_WIDTH}>
-      {status === ToolCallStatus.Pending && (
-        <Text color={Colors.AccentGreen}>o</Text>
-      )}
-      {status === ToolCallStatus.Executing &&
-        (streamingState === StreamingState.Responding ? (
-          <Spinner type="toggle" />
-        ) : (
-          // Paused spinner to avoid flicker.
-          <Text>⠇</Text>
-        ))}
-      {status === ToolCallStatus.Success && (
-        <Text color={Colors.AccentGreen}>✔</Text>
-      )}
-      {status === ToolCallStatus.Confirming && (
-        <Text color={Colors.AccentYellow}>?</Text>
-      )}
-      {status === ToolCallStatus.Canceled && (
-        <Text color={Colors.AccentYellow} bold>
-          -
-        </Text>
-      )}
-      {status === ToolCallStatus.Error && (
-        <Text color={Colors.AccentRed} bold>
-          x
-        </Text>
-      )}
-    </Box>
-  );
-};
+}) => (
+  <Box minWidth={STATUS_INDICATOR_WIDTH}>
+    {status === ToolCallStatus.Pending && (
+      <Text color={Colors.AccentGreen}>o</Text>
+    )}
+    {status === ToolCallStatus.Executing && (
+      <GeminiRespondingSpinner
+        spinnerType="toggle"
+        nonRespondingDisplay={'⊷'}
+      />
+    )}
+    {status === ToolCallStatus.Success && (
+      <Text color={Colors.AccentGreen}>✔</Text>
+    )}
+    {status === ToolCallStatus.Confirming && (
+      <Text color={Colors.AccentYellow}>?</Text>
+    )}
+    {status === ToolCallStatus.Canceled && (
+      <Text color={Colors.AccentYellow} bold>
+        -
+      </Text>
+    )}
+    {status === ToolCallStatus.Error && (
+      <Text color={Colors.AccentRed} bold>
+        x
+      </Text>
+    )}
+  </Box>
+);
 
 type ToolInfo = {
   name: string;

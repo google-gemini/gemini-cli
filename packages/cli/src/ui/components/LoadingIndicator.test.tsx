@@ -15,9 +15,21 @@ import {
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
 
-// Mock ink-spinner
-vi.mock('ink-spinner', () => ({
-  default: () => <Text>MockSpinner</Text>,
+// Mock GeminiRespondingSpinner
+vi.mock('./GeminiRespondingSpinner.js', () => ({
+  GeminiRespondingSpinner: ({
+    nonRespondingDisplay,
+  }: {
+    nonRespondingDisplay?: string;
+  }) => {
+    const { streamingState } = React.useContext(StreamingContext)!;
+    if (streamingState === StreamingState.Responding) {
+      return <Text>MockRespondingSpinner</Text>;
+    } else if (nonRespondingDisplay) {
+      return <Text>{nonRespondingDisplay}</Text>;
+    }
+    return null;
+  },
 }));
 
 const renderWithContext = (
@@ -54,12 +66,12 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
     );
     const output = lastFrame();
-    expect(output).toContain('MockSpinner');
+    expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Loading...');
     expect(output).toContain('(esc to cancel, 5s)');
   });
 
-  it('should render phrase and time but no spinner when streamingState is WaitingForConfirmation', () => {
+  it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
     const props = {
       currentLoadingPhrase: 'Confirm action',
       elapsedTime: 10,
@@ -69,7 +81,7 @@ describe('<LoadingIndicator />', () => {
       StreamingState.WaitingForConfirmation,
     );
     const output = lastFrame();
-    expect(output).not.toContain('MockSpinner');
+    expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 10s');
@@ -127,7 +139,7 @@ describe('<LoadingIndicator />', () => {
       </StreamingContext.Provider>,
     );
     let output = lastFrame();
-    expect(output).toContain('MockSpinner');
+    expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Now Responding');
     expect(output).toContain('(esc to cancel, 2s)');
 
@@ -143,7 +155,7 @@ describe('<LoadingIndicator />', () => {
       </StreamingContext.Provider>,
     );
     output = lastFrame();
-    expect(output).not.toContain('MockSpinner');
+    expect(output).toContain('⠏');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 15s');

@@ -4,15 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink-testing-library';
 import { ToolMessage, ToolMessageProps } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
+import {
+  StreamingContext,
+  StreamingContextType,
+} from '../../contexts/StreamingContext.js';
 
 // Mock child components or utilities if they are complex or have side effects
-vi.mock('ink-spinner', () => ({
-  default: () => <Text>MockSpinner</Text>,
+vi.mock('../GeminiRespondingSpinner.js', () => ({
+  GeminiRespondingSpinner: ({
+    nonRespondingDisplay,
+  }: {
+    nonRespondingDisplay?: string;
+  }) => {
+    const { streamingState } = React.useContext(StreamingContext)!;
+    if (streamingState === StreamingState.Responding) {
+      return <Text>MockRespondingSpinner</Text>;
+    }
+    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
+  },
 }));
 vi.mock('./DiffRenderer.js', () => ({
   DiffRenderer: function MockDiffRenderer({
@@ -33,12 +47,14 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
 const renderWithContext = (
   ui: React.ReactElement,
   streamingState: StreamingState,
-) =>
-  render(
-    <StreamingContext.Provider value={{ streamingState }}>
+) => {
+  const contextValue: StreamingContextType = { streamingState };
+  return render(
+    <StreamingContext.Provider value={contextValue}>
       {ui}
     </StreamingContext.Provider>,
   );
+};
 
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
@@ -110,8 +126,8 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('⠇');
-      expect(lastFrame()).not.toContain('MockSpinner');
+      expect(lastFrame()).toContain('⊷');
+      expect(lastFrame()).not.toContain('MockRespondingSpinner');
       expect(lastFrame()).not.toContain('✔');
     });
 
@@ -120,17 +136,17 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
-      expect(lastFrame()).toContain('⠇');
-      expect(lastFrame()).not.toContain('MockSpinner');
+      expect(lastFrame()).toContain('⊷');
+      expect(lastFrame()).not.toContain('MockRespondingSpinner');
       expect(lastFrame()).not.toContain('✔');
     });
 
-    it('shows MockSpinner for Executing status when streamingState is Responding', () => {
+    it('shows MockRespondingSpinner for Executing status when streamingState is Responding', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Responding, // Simulate app still responding
       );
-      expect(lastFrame()).toContain('MockSpinner');
+      expect(lastFrame()).toContain('MockRespondingSpinner');
       expect(lastFrame()).not.toContain('✔');
     });
   });
