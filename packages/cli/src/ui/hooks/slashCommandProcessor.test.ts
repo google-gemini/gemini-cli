@@ -31,6 +31,7 @@ import { MessageType } from '../types.js';
 import { type Config } from '@gemini-code/server';
 
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 vi.mock('./useShowMemoryCommand.js', () => ({
   SHOW_MEMORY_COMMAND_NAME: '/memory show',
@@ -244,6 +245,7 @@ Add any other context about the problem here.
 
 ## Diagnostic Information
 *   **CLI Version:** ${cliVersion}
+*   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** ${osVersion}
 *   **Sandbox Environment:** ${sandboxEnvStr}
 *   **Model Version:** ${modelVersion}

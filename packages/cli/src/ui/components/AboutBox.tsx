@@ -7,6 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -44,6 +45,18 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         <Text>{cliVersion}</Text>
       </Box>
     </Box>
+    {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
+      <Box flexDirection="row">
+        <Box width="35%">
+          <Text bold color={Colors.LightBlue}>
+            Git Commit
+          </Text>
+        </Box>
+        <Box>
+          <Text>{GIT_COMMIT_INFO}</Text>
+        </Box>
+      </Box>
+    )}
     <Box flexDirection="row">
       <Box width="35%">
         <Text bold color={Colors.LightBlue}>

@@ -11,6 +11,7 @@ import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -215,6 +216,7 @@ Add any other context about the problem here.
 
 ## Diagnostic Information
 *   **CLI Version:** ${cliVersion}
+*   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** ${osVersion}
 *   **Sandbox Environment:** ${sandboxEnv}
 *   **Model Version:** ${modelVersion}

@@ -17,4 +17,5 @@ set -euo pipefail
 
 # remove npm install/build artifacts
 rm -rf node_modules
+rm -rf packages/cli/src/generated/
 npm run clean --workspaces
