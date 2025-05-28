@@ -120,13 +120,19 @@ export const useShellCommandProcessor = (
             stdio: ['ignore', 'pipe', 'pipe'],
           });
 
+          let exited = false;
           let output = '';
           const handleOutput = (data: string) => {
-            output += data;
-            setPendingHistoryItem({
-              type: 'info',
-              text: output,
-            });
+            // continue to consume post-exit for background processes
+            // removing listeners can overflow OS buffer and block subprocesses
+            // destroying (e.g. child.stdout.destroy()) can terminate subprocesses via SIGPIPE
+            if (!exited) {
+              output += data;
+              setPendingHistoryItem({
+                type: 'info',
+                text: output,
+              });
+            }
           };
           child.stdout.on('data', handleOutput);
           child.stderr.on('data', handleOutput);
@@ -136,7 +142,8 @@ export const useShellCommandProcessor = (
             error = err;
           });
 
-          child.on('close', (code, signal) => {
+          child.on('exit', (code, signal) => {
+            exited = true;
             setPendingHistoryItem(null);
             output = output.trim() || '(Command produced no output)';
             if (error) {

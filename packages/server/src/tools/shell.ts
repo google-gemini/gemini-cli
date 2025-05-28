@@ -143,8 +143,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     let command = params.command.trim();
     if (!command.endsWith('&')) command += ';';
-    // note the final echo is only to trigger the stderr handler below
-    command = `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; ( trap '' PIPE ; echo >&2 ); exit $__code;`;
+    command = `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
 
     // spawn command in specified directory (or project root if not specified)
     const shell = spawn('bash', ['-c', command], {
@@ -153,34 +152,32 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
     });
 
+    let exited = false;
     let stdout = '';
     let output = '';
     shell.stdout.on('data', (data: Buffer) => {
-      const str = data.toString();
-      stdout += str;
-      output += str;
-      if (onOutputChunk) {
-        onOutputChunk(str);
+      // continue to consume post-exit for background processes
+      // removing listeners can overflow OS buffer and block subprocesses
+      // destroying (e.g. shell.stdout.destroy()) can terminate subprocesses via SIGPIPE
+      if (!exited) {
+        const str = data.toString();
+        stdout += str;
+        output += str;
+        if (onOutputChunk) {
+          onOutputChunk(str);
+        }
       }
     });
 
     let stderr = '';
     shell.stderr.on('data', (data: Buffer) => {
-      let str = data.toString();
-      // if the temporary file exists, close the streams and finalize stdout/stderr
-      // otherwise these streams can delay termination ('close' event) until all background processes exit
-      if (fs.existsSync(tempFilePath)) {
-        shell.stdout.destroy();
-        shell.stderr.destroy();
-        // exclude final \n, which should be from echo >&2 unless there are background processes writing to stderr
-        if (str.endsWith('\n')) {
-          str = str.slice(0, -1);
+      if (!exited) {
+        const str = data.toString();
+        stderr += str;
+        output += str;
+        if (onOutputChunk) {
+          onOutputChunk(str);
         }
-      }
-      stderr += str;
-      output += str;
-      if (onOutputChunk) {
-        onOutputChunk(str);
       }
     });
 
@@ -193,14 +190,15 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     let code: number | null = null;
     let processSignal: NodeJS.Signals | null = null;
-    const closeHandler = (
+    const exitHandler = (
       _code: number | null,
       _signal: NodeJS.Signals | null,
     ) => {
+      exited = true;
       code = _code;
       processSignal = _signal;
     };
-    shell.on('close', closeHandler);
+    shell.on('exit', exitHandler);
 
     const abortHandler = () => {
       if (shell.pid) {
@@ -220,7 +218,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     abortSignal.addEventListener('abort', abortHandler);
 
     // wait for the shell to exit
-    await new Promise((resolve) => shell.on('close', resolve));
+    await new Promise((resolve) => shell.on('exit', resolve));
 
     abortSignal.removeEventListener('abort', abortHandler);
 
