@@ -1176,6 +1176,7 @@ export function useTextBuffer({
       else if (key['ctrl'] && input === 'a') move('home');
       else if (key['end']) move('end');
       else if (key['ctrl'] && input === 'e') move('end');
+      else if (key['ctrl'] && input === 'w') deleteWordLeft();
       else if (
         (key['meta'] || key['ctrl'] || key['alt']) &&
         (key['backspace'] || input === '\x7f')
