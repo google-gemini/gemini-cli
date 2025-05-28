@@ -8,10 +8,7 @@ import React from 'react';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
-import {
-  StreamingContext,
-  StreamingContextType,
-} from '../contexts/StreamingContext.js';
+import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
 
@@ -22,7 +19,7 @@ vi.mock('./GeminiRespondingSpinner.js', () => ({
   }: {
     nonRespondingDisplay?: string;
   }) => {
-    const { streamingState } = React.useContext(StreamingContext)!;
+    const streamingState = React.useContext(StreamingContext)!;
     if (streamingState === StreamingState.Responding) {
       return <Text>MockRespondingSpinner</Text>;
     } else if (nonRespondingDisplay) {
@@ -36,9 +33,7 @@ const renderWithContext = (
   ui: React.ReactElement,
   streamingStateValue: StreamingState,
 ) => {
-  const contextValue: StreamingContextType = {
-    streamingState: streamingStateValue,
-  };
+  const contextValue: StreamingState = streamingStateValue;
   return render(
     <StreamingContext.Provider value={contextValue}>
       {ui}
@@ -129,9 +124,7 @@ describe('<LoadingIndicator />', () => {
 
     // Transition to Responding
     rerender(
-      <StreamingContext.Provider
-        value={{ streamingState: StreamingState.Responding }}
-      >
+      <StreamingContext.Provider value={StreamingState.Responding}>
         <LoadingIndicator
           currentLoadingPhrase="Now Responding"
           elapsedTime={2}
@@ -145,9 +138,7 @@ describe('<LoadingIndicator />', () => {
 
     // Transition to WaitingForConfirmation
     rerender(
-      <StreamingContext.Provider
-        value={{ streamingState: StreamingState.WaitingForConfirmation }}
-      >
+      <StreamingContext.Provider value={StreamingState.WaitingForConfirmation}>
         <LoadingIndicator
           currentLoadingPhrase="Please Confirm"
           elapsedTime={15}
@@ -162,9 +153,7 @@ describe('<LoadingIndicator />', () => {
 
     // Transition back to Idle
     rerender(
-      <StreamingContext.Provider
-        value={{ streamingState: StreamingState.Idle }}
-      >
+      <StreamingContext.Provider value={StreamingState.Idle}>
         <LoadingIndicator {...defaultProps} />
       </StreamingContext.Provider>,
     );

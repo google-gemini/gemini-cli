@@ -23,7 +23,7 @@ interface GeminiRespondingSpinnerProps {
 export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
 > = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
-  const { streamingState } = useStreamingContext();
+  const streamingState = useStreamingContext();
 
   if (streamingState === StreamingState.Responding) {
     return <Spinner type={spinnerType} />;

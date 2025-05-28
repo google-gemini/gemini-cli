@@ -41,10 +41,7 @@ import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import { getErrorMessage, type Config } from '@gemini-code/server';
 import { useLogger } from './hooks/useLogger.js';
-import {
-  StreamingContext,
-  StreamingContextType,
-} from './contexts/StreamingContext.js';
+import { StreamingContext } from './contexts/StreamingContext.js';
 
 interface AppProps {
   config: Config;
@@ -182,11 +179,6 @@ export const App = ({
     useLoadingIndicator(streamingState);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
 
-  const streamingContextValue: StreamingContextType = useMemo(
-    () => ({ streamingState }),
-    [streamingState],
-  );
-
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
@@ -278,7 +270,7 @@ export const App = ({
   }, [consoleMessages, config]);
 
   return (
-    <StreamingContext.Provider value={streamingContextValue}>
+    <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.

@@ -22,7 +22,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   elapsedTime,
   rightContent,
 }) => {
-  const { streamingState } = useStreamingContext();
+  const streamingState = useStreamingContext();
 
   if (streamingState === StreamingState.Idle) {
     return null;

@@ -9,10 +9,7 @@ import { render } from 'ink-testing-library';
 import { ToolMessage, ToolMessageProps } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
-import {
-  StreamingContext,
-  StreamingContextType,
-} from '../../contexts/StreamingContext.js';
+import { StreamingContext } from '../../contexts/StreamingContext.js';
 
 // Mock child components or utilities if they are complex or have side effects
 vi.mock('../GeminiRespondingSpinner.js', () => ({
@@ -21,7 +18,7 @@ vi.mock('../GeminiRespondingSpinner.js', () => ({
   }: {
     nonRespondingDisplay?: string;
   }) => {
-    const { streamingState } = React.useContext(StreamingContext)!;
+    const streamingState = React.useContext(StreamingContext)!;
     if (streamingState === StreamingState.Responding) {
       return <Text>MockRespondingSpinner</Text>;
     }
@@ -48,7 +45,7 @@ const renderWithContext = (
   ui: React.ReactElement,
   streamingState: StreamingState,
 ) => {
-  const contextValue: StreamingContextType = { streamingState };
+  const contextValue: StreamingState = streamingState;
   return render(
     <StreamingContext.Provider value={contextValue}>
       {ui}

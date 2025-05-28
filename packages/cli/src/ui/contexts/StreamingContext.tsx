@@ -7,15 +7,11 @@
 import React, { createContext } from 'react';
 import { StreamingState } from '../types.js';
 
-export interface StreamingContextType {
-  streamingState: StreamingState;
-}
-
-export const StreamingContext = createContext<StreamingContextType | undefined>(
+export const StreamingContext = createContext<StreamingState | undefined>(
   undefined,
 );
 
-export const useStreamingContext = (): StreamingContextType => {
+export const useStreamingContext = (): StreamingState => {
   const context = React.useContext(StreamingContext);
   if (context === undefined) {
     throw new Error(
