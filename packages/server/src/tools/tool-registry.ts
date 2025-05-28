@@ -7,15 +7,11 @@
 import { FunctionDeclaration } from '@google/genai';
 import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
-import { parse } from 'shell-quote';
 import { spawn, execSync } from 'node:child_process';
-// TODO: remove this dependency once MCP support is built into genai SDK
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-type ToolParams = Record<string, unknown>;
+import { discoverMcpTools } from './mcp-client.js';
+import { DiscoveredMCPTool } from './mcp-tool.js';
 
-const MCP_TOOL_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+type ToolParams = Record<string, unknown>;
 
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
@@ -95,43 +91,6 @@ Signal: Signal number or \`(none)\` if no signal was received.
   }
 }
 
-export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
-  constructor(
-    private readonly mcpClient: Client,
-    readonly name: string,
-    readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
-    readonly serverToolName: string,
-    readonly timeout?: number,
-  ) {
-    description += `
-
-This MCP tool was discovered from a local MCP server using JSON RPC 2.0 over stdio transport protocol.
-When called, this tool will invoke the \`tools/call\` method for tool name \`${name}\`.
-MCP servers can be configured in project or user settings.
-Returns the MCP server response as a json string.
-`;
-    super(name, name, description, parameterSchema);
-  }
-
-  async execute(params: ToolParams): Promise<ToolResult> {
-    const result = await this.mcpClient.callTool(
-      {
-        name: this.serverToolName,
-        arguments: params,
-      },
-      undefined, // skip resultSchema to specify options (RequestOptions)
-      {
-        timeout: this.timeout ?? MCP_TOOL_DEFAULT_TIMEOUT_MSEC,
-      },
-    );
-    return {
-      llmContent: JSON.stringify(result, null, 2),
-      returnDisplay: JSON.stringify(result, null, 2),
-    };
-  }
-}
-
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private config: Config;
@@ -158,11 +117,13 @@ export class ToolRegistry {
    * Discovers tools from project, if a discovery command is configured.
    * Can be called multiple times to update discovered tools.
    */
-  discoverTools(): void {
+  async discoverTools(): Promise<void> {
     // remove any previously discovered tools
     for (const tool of this.tools.values()) {
-      if (tool instanceof DiscoveredTool) {
+      if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
+      } else {
+        // Keep manually registered tools
       }
     }
     // discover tools using discovery command, if configured
@@ -186,106 +147,7 @@ export class ToolRegistry {
       }
     }
     // discover tools using MCP servers, if configured
-    // convert mcpServerCommand (if any) to StdioServerParameters
-    const mcpServers = this.config.getMcpServers() || {};
-
-    if (this.config.getMcpServerCommand()) {
-      const cmd = this.config.getMcpServerCommand()!;
-      const args = parse(cmd, process.env) as string[];
-      if (args.some((arg) => typeof arg !== 'string')) {
-        throw new Error('failed to parse mcpServerCommand: ' + cmd);
-      }
-      // use generic server name 'mcp'
-      mcpServers['mcp'] = {
-        command: args[0],
-        args: args.slice(1),
-      };
-    }
-    for (const [mcpServerName, mcpServerConfig] of Object.entries(mcpServers)) {
-      (async () => {
-        const mcpClient = new Client({
-          name: 'mcp-client',
-          version: '0.0.1',
-        });
-        let transport;
-        if (mcpServerConfig.url) {
-          // SSE transport if URL is provided
-          transport = new SSEClientTransport(new URL(mcpServerConfig.url));
-        } else if (mcpServerConfig.command) {
-          // Stdio transport if command is provided
-          transport = new StdioClientTransport({
-            command: mcpServerConfig.command,
-            args: mcpServerConfig.args || [],
-            env: {
-              ...process.env,
-              ...(mcpServerConfig.env || {}),
-            } as Record<string, string>,
-            cwd: mcpServerConfig.cwd,
-            stderr: 'pipe',
-          });
-        } else {
-          console.error(
-            `MCP server '${mcpServerName}' has invalid configuration: missing both url (for SSE) and command (for stdio). Skipping.`,
-          );
-          return;
-        }
-        try {
-          await mcpClient.connect(transport);
-        } catch (error) {
-          console.error(
-            `failed to start or connect to MCP server '${mcpServerName}' ` +
-              `${JSON.stringify(mcpServerConfig)}; \n${error}`,
-          );
-          // Do not re-throw, let other MCP servers be discovered.
-          return; // Exit this async IIFE if connection failed
-        }
-        mcpClient.onerror = (error) => {
-          console.error('MCP ERROR', error.toString());
-        };
-        if (transport instanceof StdioClientTransport && !transport.stderr) {
-          throw new Error('transport missing stderr stream');
-        }
-        if (transport instanceof StdioClientTransport) {
-          transport.stderr!.on('data', (data) => {
-            // filter out INFO messages logged for each request received
-            if (!data.toString().includes('] INFO')) {
-              console.debug('MCP STDERR', data.toString());
-            }
-          });
-        }
-        const result = await mcpClient.listTools();
-        for (const tool of result.tools) {
-          // Recursively remove additionalProperties and $schema from the inputSchema
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This function recursively navigates a deeply nested and potentially heterogeneous JSON schema object. Using 'any' is a pragmatic choice here to avoid overly complex type definitions for all possible schema variations.
-          const removeSchemaProps = (obj: any) => {
-            if (typeof obj !== 'object' || obj === null) {
-              return;
-            }
-            if (Array.isArray(obj)) {
-              obj.forEach(removeSchemaProps);
-            } else {
-              delete obj.additionalProperties;
-              delete obj.$schema;
-              Object.values(obj).forEach(removeSchemaProps);
-            }
-          };
-          removeSchemaProps(tool.inputSchema);
-
-          this.registerTool(
-            new DiscoveredMCPTool(
-              mcpClient,
-              Object.keys(mcpServers).length > 1
-                ? mcpServerName + '__' + tool.name
-                : tool.name,
-              tool.description ?? '',
-              tool.inputSchema,
-              tool.name,
-              mcpServerConfig.timeout,
-            ),
-          );
-        }
-      })();
-    }
+    await discoverMcpTools(this.config, this);
   }
 
   /**

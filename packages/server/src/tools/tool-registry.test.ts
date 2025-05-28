@@ -14,11 +14,8 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import {
-  ToolRegistry,
-  DiscoveredTool,
-  DiscoveredMCPTool,
-} from './tool-registry.js';
+import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
+import { DiscoveredMCPTool } from './mcp-tool.js';
 import { Config } from '../config/config.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
@@ -347,7 +344,7 @@ describe('ToolRegistry', () => {
       toolRegistry = new ToolRegistry(config);
     });
 
-    it('should discover tools using discovery command', () => {
+    it('should discover tools using discovery command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
       const mockToolDeclarations: FunctionDeclaration[] = [
@@ -366,7 +363,7 @@ describe('ToolRegistry', () => {
         ),
       );
 
-      toolRegistry.discoverTools();
+      await toolRegistry.discoverTools();
 
       expect(execSync).toHaveBeenCalledWith(discoveryCommand);
       const discoveredTool = toolRegistry.getTool('discovered-tool-1');
@@ -376,7 +373,7 @@ describe('ToolRegistry', () => {
       expect(discoveredTool?.description).toContain(discoveryCommand);
     });
 
-    it('should remove previously discovered tools before discovering new ones', () => {
+    it('should remove previously discovered tools before discovering new ones', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
       mockExecSync.mockReturnValueOnce(
@@ -394,7 +391,7 @@ describe('ToolRegistry', () => {
           ]),
         ),
       );
-      toolRegistry.discoverTools();
+      await toolRegistry.discoverTools();
       expect(toolRegistry.getTool('old-discovered-tool')).toBeInstanceOf(
         DiscoveredTool,
       );
@@ -414,7 +411,7 @@ describe('ToolRegistry', () => {
           ]),
         ),
       );
-      toolRegistry.discoverTools();
+      await toolRegistry.discoverTools();
       expect(toolRegistry.getTool('old-discovered-tool')).toBeUndefined();
       expect(toolRegistry.getTool('new-discovered-tool')).toBeInstanceOf(
         DiscoveredTool,
@@ -457,8 +454,7 @@ describe('ToolRegistry', () => {
       });
       mockMcpClientInstance.connect.mockResolvedValue(undefined);
 
-      toolRegistry.discoverTools();
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for async operations
+      await toolRegistry.discoverTools();
 
       expect(Client).toHaveBeenCalledTimes(1);
       expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -511,8 +507,7 @@ describe('ToolRegistry', () => {
       });
       mockMcpClientInstance.connect.mockResolvedValue(undefined);
 
-      toolRegistry.discoverTools();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await toolRegistry.discoverTools();
 
       expect(Client).toHaveBeenCalledTimes(1);
       expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -544,8 +539,7 @@ describe('ToolRegistry', () => {
       // Need to await the async IIFE within discoverTools.
       // Since discoverTools itself isn't async, we can't directly await it.
       // We'll check the console.error mock.
-      toolRegistry.discoverTools();
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for async operations
+      await toolRegistry.discoverTools();
 
       expect(console.error).toHaveBeenCalledWith(
         `failed to start or connect to MCP server 'failing-mcp' ${JSON.stringify({ command: 'fail-cmd' })}; \nError: Connection failed`,
