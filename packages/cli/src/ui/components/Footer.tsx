@@ -7,11 +7,13 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { shortenPath, tildeifyPath, Config } from '@gemini-code/server';
+import { shortenPath, tildeifyPath } from '@gemini-code/server';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 
 interface FooterProps {
-  config: Config;
+  model: string;
+  targetDir: string;
+  branchName?: string;
   debugMode: boolean;
   debugMessage: string;
   cliVersion: string;
@@ -21,7 +23,9 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  config,
+  model,
+  targetDir,
+  branchName,
   debugMode,
   debugMessage,
   corgiMode,
@@ -31,7 +35,10 @@ export const Footer: React.FC<FooterProps> = ({
   <Box marginTop={1} justifyContent="space-between" width="100%">
     <Box>
       <Text color={Colors.LightBlue}>
-        {shortenPath(tildeifyPath(config.getTargetDir()), 70)}
+        {shortenPath(tildeifyPath(targetDir), 70)}
+        {branchName && (
+          <Text color={Colors.SubtleComment}> ({branchName}*)</Text>
+        )}
       </Text>
       {debugMode && (
         <Text color={Colors.AccentRed}>
@@ -62,7 +69,7 @@ export const Footer: React.FC<FooterProps> = ({
 
     {/* Right Section: Gemini Label and Console Summary */}
     <Box alignItems="center">
-      <Text color={Colors.AccentBlue}> {config.getModel()} </Text>
+      <Text color={Colors.AccentBlue}> {model} </Text>
       {corgiMode && (
         <Text>
           <Text color={Colors.SubtleComment}>| </Text>

@@ -35,7 +35,6 @@
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {},
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
     "@vitest/coverage-v8": "^3.1.1",
@@ -48,6 +47,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
     "lodash": "^4.17.21",
+    "memfs": "^4.17.2",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",

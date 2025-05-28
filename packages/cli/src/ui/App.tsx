@@ -42,6 +42,7 @@ import process from 'node:process';
 import { getErrorMessage, type Config } from '@gemini-code/server';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
+import { useGitBranchName } from './hooks/useGitBranchName.js';
 
 interface AppProps {
   config: Config;
@@ -269,6 +270,8 @@ export const App = ({
     return consoleMessages.filter((msg) => msg.type !== 'debug');
   }, [consoleMessages, config]);
 
+  const branchName = useGitBranchName(config.getTargetDir());
+
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
@@ -430,8 +433,10 @@ export const App = ({
           )}
 
           <Footer
-            config={config}
+            model={config.getModel()}
+            targetDir={config.getTargetDir()}
             debugMode={config.getDebugMode()}
+            branchName={branchName}
             debugMessage={debugMessage}
             cliVersion={cliVersion}
             corgiMode={corgiMode}
