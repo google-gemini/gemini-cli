@@ -25,7 +25,16 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
-    "bundle": "npm run generate && node_modules/.bin/esbuild packages/cli/index.ts --bundle --outfile=bundle/gemini.js --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);\" && bash scripts/copy_bundle_assets.sh"
+    "bundle": "npm run generate && node_modules/.bin/esbuild packages/cli/index.ts --bundle --outfile=bundle/gemini.js --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);\" && bash scripts/copy_bundle_assets.sh",
+    "build:cli": "npm run build --workspace packages/cli",
+    "build:server": "npm run build --workspace packages/server",
+    "build:packages": "npm run build:server && npm run build:cli",
+    "build:docker": "scripts/build_sandbox.sh -s",
+    "tag:docker": "docker tag gemini-code-sandbox:latest ${SANDBOX_IMAGE_REGISTRY:?SANDBOX_IMAGE_REGISTRY not set}/${SANDBOX_IMAGE_NAME:?SANDBOX_IMAGE_NAME not set}:$npm_package_version",
+    "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
+    "publish:sandbox": "scripts/publish-sandbox.sh",
+    "publish:npm": "npm publish --workspace @gemini-code/cli ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
+    "publish:release": "npm run build:packages && npm run build:docker && npm run tag:docker && npm run prepare:cli-packagejson && npm run publish:sandbox && npm run publish:npm"
   },
   "bin": {
     "gemini": "bundle/gemini.js"

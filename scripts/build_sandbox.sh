@@ -26,7 +26,7 @@ fi
 CMD=$(scripts/sandbox_command.sh)
 echo "using $CMD for sandboxing"
 
-IMAGE=gemini-code-sandbox
+IMAGE=gemini-code-sandbox:latest
 DOCKERFILE=Dockerfile
 
 SKIP_NPM_INSTALL_BUILD=false
