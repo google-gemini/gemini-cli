@@ -1,5 +1,7 @@
 FROM docker.io/library/node:20-slim
 
+# ENV SANDBOX="gemini-cli-sandbox"
+
 # install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
   man-db \
@@ -37,4 +39,5 @@ RUN npm install -g /usr/local/share/npm-global/gemini-code-cli.tgz /usr/local/sh
   && npm cache clean --force \
   && rm -f /usr/local/share/npm-global/gemini-code-{cli,server}.tgz
 
-ENTRYPOINT ["gemini"]
+# default entrypoint when none specified
+CMD ["gemini"]
