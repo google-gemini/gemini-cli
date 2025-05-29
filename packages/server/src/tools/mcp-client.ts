@@ -116,12 +116,25 @@ async function connectAndDiscover(
       };
       removeSchemaProps(tool.inputSchema);
 
+      // if there are multiple MCP servers, prefix tool name with mcpServerName to avoid collisions
+      let toolNameForModel = tool.name;
+      if (Object.keys(mcpServers).length > 1) {
+        toolNameForModel = mcpServerName + '__' + toolNameForModel;
+      }
+
+      // replace invalid characters (based on 400 error message) with underscores
+      toolNameForModel = toolNameForModel.replace(/[^a-zA-Z0-9_.-]/g, '_');
+
+      // if longer than 63 characters, replace middle with '___'
+      // note 400 error message says max length is 64, but actual limit seems to be 63
+      if (toolNameForModel.length > 63) {
+        toolNameForModel =
+          toolNameForModel.slice(0, 28) + '___' + toolNameForModel.slice(-32);
+      }
       toolRegistry.registerTool(
         new DiscoveredMCPTool(
           mcpClient,
-          Object.keys(mcpServers).length > 1
-            ? mcpServerName + '__' + tool.name
-            : tool.name,
+          toolNameForModel,
           tool.description ?? '',
           tool.inputSchema,
           tool.name,
