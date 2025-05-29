@@ -6,22 +6,20 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import { Config, ToolResult } from '@gemini-code/server';
-import { ToolCallStatus } from '../types.js'; // Adjusted import
-import { /* PartListUnion, */ Part } from '@google/genai'; // Removed PartListUnion
+import { Config } from '@gemini-code/server';
+import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import * as fsPromises from 'fs/promises'; // Import for mocking stat
-import type { Stats } from 'fs'; // Import Stats type for mocking
+import * as fsPromises from 'fs/promises';
+import type { Stats } from 'fs';
 
-// Mock Config and ToolRegistry
 const mockGetToolRegistry = vi.fn();
 const mockGetTargetDir = vi.fn();
 const mockConfig = {
   getToolRegistry: mockGetToolRegistry,
   getTargetDir: mockGetTargetDir,
+  isSandboxed: vi.fn(() => false),
 } as unknown as Config;
 
-// Mock read_many_files tool
 const mockReadManyFilesExecute = vi.fn();
 const mockReadManyFilesTool = {
   name: 'read_many_files',
@@ -31,7 +29,14 @@ const mockReadManyFilesTool = {
   getDescription: vi.fn((params) => `Read files: ${params.paths.join(', ')}`),
 };
 
-// Mock addItem from useHistoryManager
+const mockGlobExecute = vi.fn();
+const mockGlobTool = {
+  name: 'glob',
+  displayName: 'Glob Tool',
+  execute: mockGlobExecute,
+  getDescription: vi.fn(() => 'Glob tool description'),
+};
+
 const mockAddItem: Mock<UseHistoryManagerReturn['addItem']> = vi.fn();
 const mockOnDebugMessage: Mock<(message: string) => void> = vi.fn();
 
@@ -39,7 +44,7 @@ vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
   return {
     ...actual,
-    stat: vi.fn(), // Mock stat here
+    stat: vi.fn(),
   };
 });
 
@@ -52,20 +57,26 @@ describe('handleAtCommand', () => {
     mockGetTargetDir.mockReturnValue('/test/dir');
     mockGetToolRegistry.mockReturnValue({
       getTool: vi.fn((toolName: string) => {
-        if (toolName === 'read_many_files') {
-          return mockReadManyFilesTool;
-        }
+        if (toolName === 'read_many_files') return mockReadManyFilesTool;
+        if (toolName === 'glob') return mockGlobTool;
         return undefined;
       }),
     });
-    // Default mock for fs.stat if not overridden by a specific test
     vi.mocked(fsPromises.stat).mockResolvedValue({
       isDirectory: () => false,
-    } as unknown as Stats);
+    } as Stats);
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: '',
+      returnDisplay: '',
+    });
+    mockGlobExecute.mockResolvedValue({
+      llmContent: 'No files found',
+      returnDisplay: '',
+    });
   });
 
   afterEach(() => {
-    abortController.abort(); // Ensure any pending operations are cancelled
+    abortController.abort();
   });
 
   it('should pass through query if no @ command is present', async () => {
@@ -78,7 +89,6 @@ describe('handleAtCommand', () => {
       messageId: 123,
       signal: abortController.signal,
     });
-
     expect(mockAddItem).toHaveBeenCalledWith(
       { type: 'user', text: query },
       123,
@@ -88,28 +98,24 @@ describe('handleAtCommand', () => {
     expect(mockReadManyFilesExecute).not.toHaveBeenCalled();
   });
 
-  it('should pass through query if only a lone @ symbol is present', async () => {
+  it('should pass through original query if only a lone @ symbol is present', async () => {
     const queryWithSpaces = '  @  ';
-    // const trimmedQuery = queryWithSpaces.trim(); // Not needed for addItem expectation here
     const result = await handleAtCommand({
-      query: queryWithSpaces, // Pass the version with spaces to the function
+      query: queryWithSpaces,
       config: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 124,
       signal: abortController.signal,
     });
-
-    // For a lone '@', addItem is called with the *original untrimmed* query
     expect(mockAddItem).toHaveBeenCalledWith(
       { type: 'user', text: queryWithSpaces },
       124,
     );
-    // processedQuery should also be the original untrimmed version for lone @
     expect(result.processedQuery).toEqual([{ text: queryWithSpaces }]);
     expect(result.shouldProceed).toBe(true);
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, passing directly to LLM.',
+      'Lone @ detected, will be treated as text in the modified query.',
     );
   });
 
@@ -118,10 +124,11 @@ describe('handleAtCommand', () => {
     const query = `@${filePath}`;
     const fileContent = 'This is the file content.';
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: fileContent,
+      llmContent: `
+--- ${filePath} ---
+${fileContent}`,
       returnDisplay: 'Read 1 file.',
-    } as ToolResult);
-    // fs.stat will use the default mock (isDirectory: false)
+    });
 
     const result = await handleAtCommand({
       query,
@@ -131,7 +138,6 @@ describe('handleAtCommand', () => {
       messageId: 125,
       signal: abortController.signal,
     });
-
     expect(mockAddItem).toHaveBeenCalledWith(
       { type: 'user', text: query },
       125,
@@ -143,20 +149,16 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Read Many Files',
-            status: ToolCallStatus.Success,
-            resultDisplay: 'Read 1 file.',
-          }),
-        ]),
+        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
       }),
       125,
     );
     expect(result.processedQuery).toEqual([
-      '\n--- Content from: ${contentLabel} ---\n',
-      fileContent,
-      '\n--- End of content ---\n',
+      { text: `@${filePath}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${filePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
     ]);
     expect(result.shouldProceed).toBe(true);
   });
@@ -164,19 +166,17 @@ describe('handleAtCommand', () => {
   it('should process a valid directory path and convert to glob', async () => {
     const dirPath = 'path/to/dir';
     const query = `@${dirPath}`;
-    const dirContent = [
-      'Content of file 1.',
-      'Content of file 2.',
-      'Content of file 3.',
-    ];
+    const resolvedGlob = `${dirPath}/**`;
+    const fileContent = 'Directory content.';
     vi.mocked(fsPromises.stat).mockResolvedValue({
       isDirectory: () => true,
-    } as unknown as Stats);
-
+    } as Stats);
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: dirContent,
+      llmContent: `
+--- ${resolvedGlob} ---
+${fileContent}`,
       returnDisplay: 'Read directory contents.',
-    } as ToolResult);
+    });
 
     const result = await handleAtCommand({
       query,
@@ -186,41 +186,40 @@ describe('handleAtCommand', () => {
       messageId: 126,
       signal: abortController.signal,
     });
-
     expect(mockAddItem).toHaveBeenCalledWith(
       { type: 'user', text: query },
       126,
     );
     expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
-      { paths: [`${dirPath}/**`] }, // Expect glob pattern
+      { paths: [resolvedGlob] },
       abortController.signal,
     );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      `Path resolved to directory, using glob: ${dirPath}/**`,
-    );
-    expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'tool_group' }),
-      126,
+      `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
     );
     expect(result.processedQuery).toEqual([
-      '\n--- Content from: ${contentLabel} ---\n',
-      ...dirContent,
-      '\n--- End of content ---\n',
+      { text: `@${resolvedGlob}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${resolvedGlob}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
     ]);
     expect(result.shouldProceed).toBe(true);
   });
 
-  it('should process a valid image file path', async () => {
+  it('should process a valid image file path (as text content for now)', async () => {
     const imagePath = 'path/to/image.png';
     const query = `@${imagePath}`;
-    const imageData: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64imagedata' },
-    };
+    // For @-commands, read_many_files is expected to return text or structured text.
+    // If it were to return actual image Part, the test and handling would be different.
+    // Current implementation of read_many_files for images returns base64 in text.
+    const imageFileTextContent = '[base64 image data for path/to/image.png]';
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: [imageData],
+      llmContent: `
+--- ${imagePath} ---
+${imageFileTextContent}`,
       returnDisplay: 'Read 1 image.',
-    } as ToolResult);
-    // fs.stat will use the default mock (isDirectory: false)
+    });
 
     const result = await handleAtCommand({
       query,
@@ -230,47 +229,28 @@ describe('handleAtCommand', () => {
       messageId: 127,
       signal: abortController.signal,
     });
-
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      127,
-    );
-    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
-      { paths: [imagePath] },
-      abortController.signal,
-    );
-    expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'tool_group',
-        tools: expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Read Many Files',
-            status: ToolCallStatus.Success,
-            resultDisplay: 'Read 1 image.',
-          }),
-        ]),
-      }),
-      127,
-    );
     expect(result.processedQuery).toEqual([
-      '\n--- Content from: ${contentLabel} ---\n',
-      imageData,
-      '\n--- End of content ---\n',
+      { text: `@${imagePath}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${imagePath}:\n` },
+      { text: imageFileTextContent },
+      { text: '\n--- End of content ---' },
     ]);
     expect(result.shouldProceed).toBe(true);
   });
 
   it('should handle query with text before and after @command', async () => {
-    const textBefore = 'Explain this:';
+    const textBefore = 'Explain this: ';
     const filePath = 'doc.md';
-    const textAfter = 'in detail.';
-    const query = `${textBefore} @${filePath} ${textAfter}`;
+    const textAfter = ' in detail.';
+    const query = `${textBefore}@${filePath}${textAfter}`;
     const fileContent = 'Markdown content.';
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: fileContent,
+      llmContent: `
+--- ${filePath} ---
+${fileContent}`,
       returnDisplay: 'Read 1 doc.',
-    } as ToolResult);
-    // fs.stat will use the default mock (isDirectory: false)
+    });
 
     const result = await handleAtCommand({
       query,
@@ -280,17 +260,16 @@ describe('handleAtCommand', () => {
       messageId: 128,
       signal: abortController.signal,
     });
-
     expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query }, // Expect original query for addItem
+      { type: 'user', text: query },
       128,
     );
     expect(result.processedQuery).toEqual([
-      { text: textBefore },
-      '\n--- Content from: ${contentLabel} ---\n',
-      fileContent,
-      '\n--- End of content ---\n',
-      { text: textAfter },
+      { text: `${textBefore}@${filePath}${textAfter}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${filePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
     ]);
     expect(result.shouldProceed).toBe(true);
   });
@@ -301,10 +280,11 @@ describe('handleAtCommand', () => {
     const query = `@${rawPath}`;
     const fileContent = 'Content of file with space.';
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: fileContent,
+      llmContent: `
+--- ${unescapedPath} ---
+${fileContent}`,
       returnDisplay: 'Read 1 file.',
-    } as ToolResult);
-    // fs.stat will use the default mock (isDirectory: false)
+    });
 
     await handleAtCommand({
       query,
@@ -314,10 +294,196 @@ describe('handleAtCommand', () => {
       messageId: 129,
       signal: abortController.signal,
     });
-
     expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
-      { paths: [unescapedPath] }, // Expect unescaped path
+      { paths: [unescapedPath] },
       abortController.signal,
     );
+  });
+
+  it('should handle multiple @file references', async () => {
+    const file1 = 'file1.txt';
+    const content1 = 'Content file1';
+    const file2 = 'file2.md';
+    const content2 = 'Content file2';
+    const query = `@${file1} @${file2}`;
+
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: `
+--- ${file1} ---
+${content1}
+--- ${file2} ---
+${content2}`,
+      returnDisplay: 'Read 2 files.',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 130,
+      signal: abortController.signal,
+    });
+    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
+      { paths: [file1, file2] },
+      abortController.signal,
+    );
+    expect(result.processedQuery).toEqual([
+      { text: `@${file1} @${file2}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${file1}:\n` },
+      { text: content1 },
+      { text: `\nContent from @${file2}:\n` },
+      { text: content2 },
+      { text: '\n--- End of content ---' },
+    ]);
+    expect(result.shouldProceed).toBe(true);
+  });
+
+  it('should handle multiple @file references with interleaved text', async () => {
+    const text1 = 'Check ';
+    const file1 = 'f1.txt';
+    const content1 = 'C1';
+    const text2 = ' and ';
+    const file2 = 'f2.md';
+    const content2 = 'C2';
+    const text3 = ' please.';
+    const query = `${text1}@${file1}${text2}@${file2}${text3}`;
+
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: `
+--- ${file1} ---
+${content1}
+--- ${file2} ---
+${content2}`,
+      returnDisplay: 'Read 2 files.',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 131,
+      signal: abortController.signal,
+    });
+    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
+      { paths: [file1, file2] },
+      abortController.signal,
+    );
+    expect(result.processedQuery).toEqual([
+      { text: `${text1}@${file1}${text2}@${file2}${text3}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${file1}:\n` },
+      { text: content1 },
+      { text: `\nContent from @${file2}:\n` },
+      { text: content2 },
+      { text: '\n--- End of content ---' },
+    ]);
+    expect(result.shouldProceed).toBe(true);
+  });
+
+  it('should handle a mix of valid, invalid, and lone @ references', async () => {
+    const file1 = 'valid1.txt';
+    const content1 = 'Valid content 1';
+    const invalidFile = 'nonexistent.txt';
+    const query = `Look at @${file1} then @${invalidFile} and also just @ symbol, then @valid2.glob`;
+    const file2Glob = 'valid2.glob';
+    const resolvedFile2 = 'resolved/valid2.actual';
+    const content2 = 'Globbed content';
+
+    // Mock fs.stat for file1 (valid)
+    vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+      if (p.toString().endsWith(file1))
+        return { isDirectory: () => false } as Stats;
+      if (p.toString().endsWith(invalidFile))
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      // For valid2.glob, stat will fail, triggering glob
+      if (p.toString().endsWith(file2Glob))
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      return { isDirectory: () => false } as Stats; // Default
+    });
+
+    // Mock glob to find resolvedFile2 for valid2.glob
+    mockGlobExecute.mockImplementation(async (params) => {
+      if (params.pattern.includes('valid2.glob')) {
+        return {
+          llmContent: `Found files:\n${mockGetTargetDir()}/${resolvedFile2}`,
+          returnDisplay: 'Found 1 file',
+        };
+      }
+      return { llmContent: 'No files found', returnDisplay: '' };
+    });
+
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: `
+--- ${file1} ---
+${content1}
+--- ${resolvedFile2} ---
+${content2}`,
+      returnDisplay: 'Read 2 files.',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 132,
+      signal: abortController.signal,
+    });
+
+    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
+      { paths: [file1, resolvedFile2] },
+      abortController.signal,
+    );
+    expect(result.processedQuery).toEqual([
+      // Original query has @nonexistent.txt and @, but resolved has @resolved/valid2.actual
+      {
+        text: `Look at @${file1} then @${invalidFile} and also just @ symbol, then @${resolvedFile2}`,
+      },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${file1}:\n` },
+      { text: content1 },
+      { text: `\nContent from @${resolvedFile2}:\n` },
+      { text: content2 },
+      { text: '\n--- End of content ---' },
+    ]);
+    expect(result.shouldProceed).toBe(true);
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      `Path ${invalidFile} not found directly, attempting glob search.`,
+    );
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
+    );
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      'Lone @ detected, will be treated as text in the modified query.',
+    );
+  });
+
+  it('should return original query if all @paths are invalid or lone @', async () => {
+    const query = 'Check @nonexistent.txt and @ also';
+    vi.mocked(fsPromises.stat).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
+    mockGlobExecute.mockResolvedValue({
+      llmContent: 'No files found',
+      returnDisplay: '',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 133,
+      signal: abortController.signal,
+    });
+    expect(mockReadManyFilesExecute).not.toHaveBeenCalled();
+    // The modified query string will be "Check @nonexistent.txt and @ also" because no paths were resolved for reading.
+    expect(result.processedQuery).toEqual([
+      { text: 'Check @nonexistent.txt and @ also' },
+    ]);
+    expect(result.shouldProceed).toBe(true);
   });
 });

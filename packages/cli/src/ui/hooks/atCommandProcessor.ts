@@ -34,53 +34,82 @@ interface HandleAtCommandResult {
   shouldProceed: boolean;
 }
 
-/**
- * Parses a query string to find the first '@<path>' command,
- * handling \ escaped spaces within the path.
- */
-function parseAtCommand(
-  query: string,
-): { textBefore: string; atPath: string; textAfter: string } | null {
-  let atIndex = -1;
-  for (let i = 0; i < query.length; i++) {
-    if (query[i] === '@' && (i === 0 || query[i - 1] !== '\\')) {
-      atIndex = i;
-      break;
-    }
-  }
-
-  if (atIndex === -1) {
-    return null;
-  }
-
-  const textBefore = query.substring(0, atIndex).trim();
-  let pathEndIndex = atIndex + 1;
-  let inEscape = false;
-
-  while (pathEndIndex < query.length) {
-    const char = query[pathEndIndex];
-    if (inEscape) {
-      inEscape = false;
-    } else if (char === '\\') {
-      inEscape = true;
-    } else if (/\s/.test(char)) {
-      break;
-    }
-    pathEndIndex++;
-  }
-
-  const rawAtPath = query.substring(atIndex, pathEndIndex);
-  const textAfter = query.substring(pathEndIndex).trim();
-  const atPath = unescapePath(rawAtPath);
-
-  return { textBefore, atPath, textAfter };
+interface AtCommandPart {
+  type: 'text' | 'atPath';
+  content: string;
 }
 
 /**
- * Processes user input potentially containing an '@<path>' command.
- * If found, it attempts to read the specified file/directory using the
- * 'read_many_files' tool, adds the user query and tool result/error to history,
- * and prepares the content for the LLM.
+ * Parses a query string to find all '@<path>' commands and text segments.
+ * Handles \ escaped spaces within paths.
+ */
+function parseAllAtCommands(query: string): AtCommandPart[] {
+  const parts: AtCommandPart[] = [];
+  let currentIndex = 0;
+
+  while (currentIndex < query.length) {
+    let atIndex = -1;
+    let nextSearchIndex = currentIndex;
+    // Find next unescaped '@'
+    while (nextSearchIndex < query.length) {
+      if (
+        query[nextSearchIndex] === '@' &&
+        (nextSearchIndex === 0 || query[nextSearchIndex - 1] !== '\\')
+      ) {
+        atIndex = nextSearchIndex;
+        break;
+      }
+      nextSearchIndex++;
+    }
+
+    if (atIndex === -1) {
+      // No more @
+      if (currentIndex < query.length) {
+        parts.push({ type: 'text', content: query.substring(currentIndex) });
+      }
+      break;
+    }
+
+    // Add text before @
+    if (atIndex > currentIndex) {
+      parts.push({
+        type: 'text',
+        content: query.substring(currentIndex, atIndex),
+      });
+    }
+
+    // Parse @path
+    let pathEndIndex = atIndex + 1;
+    let inEscape = false;
+    while (pathEndIndex < query.length) {
+      const char = query[pathEndIndex];
+      if (inEscape) {
+        inEscape = false;
+      } else if (char === '\\') {
+        inEscape = true;
+      } else if (/\s/.test(char)) {
+        // Path ends at first whitespace not escaped
+        break;
+      }
+      pathEndIndex++;
+    }
+    const rawAtPath = query.substring(atIndex, pathEndIndex);
+    // unescapePath expects the @ symbol to be present, and will handle it.
+    const atPath = unescapePath(rawAtPath);
+    parts.push({ type: 'atPath', content: atPath });
+    currentIndex = pathEndIndex;
+  }
+  // Filter out empty text parts that might result from consecutive @paths or leading/trailing spaces
+  return parts.filter(
+    (part) => !(part.type === 'text' && part.content.trim() === ''),
+  );
+}
+
+/**
+ * Processes user input potentially containing one or more '@<path>' commands.
+ * If found, it attempts to read the specified files/directories using the
+ * 'read_many_files' tool. The user query is modified to include resolved paths,
+ * and the content of the files is appended in a structured block.
  *
  * @returns An object indicating whether the main hook should proceed with an
  *          LLM call and the processed query parts (including file content).
@@ -93,42 +122,25 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
-  const trimmedQuery = query.trim();
-  const parsedCommand = parseAtCommand(trimmedQuery);
+  const commandParts = parseAllAtCommands(query);
+  const atPathCommandParts = commandParts.filter(
+    (part) => part.type === 'atPath',
+  );
 
-  // If no @ command, add user query normally and proceed to LLM
-  if (!parsedCommand) {
+  if (atPathCommandParts.length === 0) {
     addItem({ type: 'user', text: query }, userMessageTimestamp);
     return { processedQuery: [{ text: query }], shouldProceed: true };
   }
 
-  const { textBefore, atPath, textAfter } = parsedCommand;
-
-  // Add the original user query to history first
   addItem({ type: 'user', text: query }, userMessageTimestamp);
 
-  // If the atPath is just "@", pass the original query to the LLM
-  if (atPath === '@') {
-    onDebugMessage('Lone @ detected, passing directly to LLM.');
-    return { processedQuery: [{ text: query }], shouldProceed: true };
-  }
-
-  const pathPart = atPath.substring(1); // Remove leading '@'
-
-  // This error condition is for cases where pathPart becomes empty *after* the initial "@" check,
-  // which is unlikely with the current parser but good for robustness.
-  if (!pathPart) {
-    addItem(
-      { type: 'error', text: 'Error: No valid path specified after @ symbol.' },
-      userMessageTimestamp,
-    );
-    return { processedQuery: null, shouldProceed: false };
-  }
-
-  const contentLabel = pathPart;
+  const pathSpecsToRead: string[] = [];
+  const atPathToResolvedSpecMap = new Map<string, string>();
+  const contentLabelsForDisplay: string[] = [];
 
   const toolRegistry = config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
+  const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {
     addItem(
@@ -138,127 +150,237 @@ export async function handleAtCommand({
     return { processedQuery: null, shouldProceed: false };
   }
 
-  // Determine path spec (file or directory glob)
-  let pathSpec = pathPart;
-  try {
-    const absolutePath = path.resolve(config.getTargetDir(), pathPart);
-    const stats = await fs.stat(absolutePath);
-    if (stats.isDirectory()) {
-      pathSpec = pathPart.endsWith('/') ? `${pathPart}**` : `${pathPart}/**`;
-      onDebugMessage(`Path resolved to directory, using glob: ${pathSpec}`);
-    } else {
-      onDebugMessage(`Path resolved to file: ${pathSpec}`);
-    }
-  } catch (error) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
+  for (const atPathPart of atPathCommandParts) {
+    const originalAtPath = atPathPart.content; // e.g., "@file.txt" or "@"
+
+    if (originalAtPath === '@') {
       onDebugMessage(
-        `Path ${pathPart} not found directly, attempting glob search.`,
+        'Lone @ detected, will be treated as text in the modified query.',
       );
-      const globTool = toolRegistry.getTool('glob');
-      if (globTool) {
-        try {
-          const globResult = await globTool.execute(
-            {
-              pattern: `**/*${pathPart}*`,
-              path: config.getTargetDir(), // Ensure glob searches from the root
-            },
-            signal,
-          );
-          // Assuming llmContent contains the list of files or a "no files found" message.
-          // And that paths are absolute.
-          if (
-            globResult.llmContent &&
-            typeof globResult.llmContent === 'string' &&
-            !globResult.llmContent.startsWith('No files found') &&
-            !globResult.llmContent.startsWith('Error:')
-          ) {
-            // Extract the first line after the header
-            const lines = globResult.llmContent.split('\n');
-            if (lines.length > 1 && lines[1]) {
-              const firstMatchAbsolute = lines[1].trim();
-              // Convert absolute path from glob to relative path for read_many_files
-              pathSpec = path.relative(
-                config.getTargetDir(),
-                firstMatchAbsolute,
-              );
-              onDebugMessage(
-                `Glob search found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
-              );
+      continue;
+    }
+
+    const pathName = originalAtPath.substring(1);
+    if (!pathName) {
+      // This case should ideally not be hit if parseAllAtCommands ensures content after @
+      // but as a safeguard:
+      addItem(
+        {
+          type: 'error',
+          text: `Error: Invalid @ command '${originalAtPath}'. No path specified.`,
+        },
+        userMessageTimestamp,
+      );
+      // Decide if this is a fatal error for the whole command or just skip this @ part
+      // For now, let's be strict and fail the command if one @path is malformed.
+      return { processedQuery: null, shouldProceed: false };
+    }
+
+    let currentPathSpec = pathName;
+    let resolvedSuccessfully = false;
+
+    try {
+      const absolutePath = path.resolve(config.getTargetDir(), pathName);
+      const stats = await fs.stat(absolutePath);
+      if (stats.isDirectory()) {
+        currentPathSpec = pathName.endsWith('/')
+          ? `${pathName}**`
+          : `${pathName}/**`;
+        onDebugMessage(
+          `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+        );
+      } else {
+        onDebugMessage(`Path ${pathName} resolved to file: ${currentPathSpec}`);
+      }
+      resolvedSuccessfully = true;
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        onDebugMessage(
+          `Path ${pathName} not found directly, attempting glob search.`,
+        );
+        if (globTool) {
+          try {
+            const globResult = await globTool.execute(
+              { pattern: `**/*${pathName}*`, path: config.getTargetDir() },
+              signal,
+            );
+            if (
+              globResult.llmContent &&
+              typeof globResult.llmContent === 'string' &&
+              !globResult.llmContent.startsWith('No files found') &&
+              !globResult.llmContent.startsWith('Error:')
+            ) {
+              const lines = globResult.llmContent.split('\n');
+              if (lines.length > 1 && lines[1]) {
+                const firstMatchAbsolute = lines[1].trim();
+                currentPathSpec = path.relative(
+                  config.getTargetDir(),
+                  firstMatchAbsolute,
+                );
+                onDebugMessage(
+                  `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
+                );
+                resolvedSuccessfully = true;
+              } else {
+                onDebugMessage(
+                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                );
+              }
             } else {
               onDebugMessage(
-                `Glob search for '**/*${pathPart}*' did not return a usable path. Proceeding with original: ${pathPart}`,
+                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
               );
-              // pathSpec remains pathPart
             }
-          } else {
-            onDebugMessage(
-              `Glob search for '**/*${pathPart}*' found no files or an error occurred. Proceeding with original: ${pathPart}`,
+          } catch (globError) {
+            console.error(
+              `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
             );
-            // pathSpec remains pathPart
+            onDebugMessage(
+              `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
+            );
           }
-        } catch (globError) {
-          console.error(
-            `Error during glob search: ${getErrorMessage(globError)}`,
-          );
+        } else {
           onDebugMessage(
-            `Error during glob search. Proceeding with original: ${pathPart}`,
+            `Glob tool not found. Path ${pathName} will be skipped.`,
           );
-          // pathSpec remains pathPart
         }
       } else {
-        onDebugMessage(
-          'Glob tool not found. Proceeding with original path: ${pathPart}',
+        console.error(
+          `Error stating path ${pathName}: ${getErrorMessage(error)}`,
         );
-        // pathSpec remains pathPart
+        onDebugMessage(
+          `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
+        );
       }
-    } else {
-      console.error(
-        `Error stating path ${pathPart}: ${getErrorMessage(error)}`,
-      );
-      onDebugMessage(
-        `Error stating path, proceeding with original: ${pathSpec}`,
-      );
+    }
+
+    if (resolvedSuccessfully) {
+      pathSpecsToRead.push(currentPathSpec);
+      atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
+      contentLabelsForDisplay.push(pathName);
     }
   }
 
-  const toolArgs = { paths: [pathSpec] };
+  // Construct the initial part of the query for the LLM
+  let initialQueryText = '';
+  for (let i = 0; i < commandParts.length; i++) {
+    const part = commandParts[i];
+    if (part.type === 'text') {
+      initialQueryText += part.content;
+    } else {
+      // type === 'atPath'
+      const resolvedSpec = atPathToResolvedSpecMap.get(part.content);
+      if (
+        i > 0 &&
+        initialQueryText.length > 0 &&
+        !initialQueryText.endsWith(' ') &&
+        resolvedSpec
+      ) {
+        // Add space if previous part was text and didn't end with space, or if previous was @path
+        const prevPart = commandParts[i - 1];
+        if (
+          prevPart.type === 'text' ||
+          (prevPart.type === 'atPath' &&
+            atPathToResolvedSpecMap.has(prevPart.content))
+        ) {
+          initialQueryText += ' ';
+        }
+      }
+      if (resolvedSpec) {
+        initialQueryText += `@${resolvedSpec}`;
+      } else {
+        // If not resolved for reading (e.g. lone @ or invalid path that was skipped),
+        // add the original @-string back, ensuring spacing if it's not the first element.
+        if (
+          i > 0 &&
+          initialQueryText.length > 0 &&
+          !initialQueryText.endsWith(' ') &&
+          !part.content.startsWith(' ')
+        ) {
+          initialQueryText += ' ';
+        }
+        initialQueryText += part.content;
+      }
+    }
+  }
+  initialQueryText = initialQueryText.trim();
+
+  // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
+  if (pathSpecsToRead.length === 0) {
+    onDebugMessage('No valid file paths found in @ commands to read.');
+    if (initialQueryText === '@' && query.trim() === '@') {
+      // If the only thing was a lone @, pass original query (which might have spaces)
+      return { processedQuery: [{ text: query }], shouldProceed: true };
+    } else if (!initialQueryText && query) {
+      // If all @-commands were invalid and no surrounding text, pass original query
+      return { processedQuery: [{ text: query }], shouldProceed: true };
+    }
+    // Otherwise, proceed with the (potentially modified) query text that doesn't involve file reading
+    return {
+      processedQuery: [{ text: initialQueryText || query }],
+      shouldProceed: true,
+    };
+  }
+
+  const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
+
+  const toolArgs = { paths: pathSpecsToRead };
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {
     const result = await readManyFilesTool.execute(toolArgs, signal);
-
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: readManyFilesTool.getDescription(toolArgs),
       status: ToolCallStatus.Success,
-      resultDisplay: result.returnDisplay,
+      resultDisplay:
+        result.returnDisplay ||
+        `Successfully read: ${contentLabelsForDisplay.join(', ')}`,
       confirmationDetails: undefined,
     };
 
-    // Prepare the query parts for the LLM
-    const processedQueryParts: PartUnion[] = [];
-    if (textBefore) {
-      processedQueryParts.push({ text: textBefore });
-    }
-
-    // Process the result from the tool
-    processedQueryParts.push('\n--- Content from: ${contentLabel} ---\n');
-    if (Array.isArray(result.llmContent)) {
-      for (const part of result.llmContent) {
-        processedQueryParts.push(part);
+    if (
+      result.llmContent &&
+      typeof result.llmContent === 'string' &&
+      result.llmContent.trim() !== ''
+    ) {
+      processedQueryParts.push({
+        text: '\n--- Content from referenced files ---',
+      });
+      const fileContentRegex =
+        /\n--- (.*?) ---\n([\s\S]*?)(?=\n--- .*? ---\n|$)/g;
+      let match;
+      const foundContentForSpecs = new Set<string>();
+      while ((match = fileContentRegex.exec(result.llmContent)) !== null) {
+        const filePathSpecInContent = match[1]; // This is a resolved pathSpec
+        const fileActualContent = match[2].trim();
+        if (pathSpecsToRead.includes(filePathSpecInContent)) {
+          // Ensure we only add content for paths we requested
+          processedQueryParts.push({
+            text: `\nContent from @${filePathSpecInContent}:\n`,
+          });
+          processedQueryParts.push({ text: fileActualContent });
+          foundContentForSpecs.add(filePathSpecInContent);
+        }
       }
+      // Check if any requested pathSpecs didn't yield content in the parsed block, could indicate an issue.
+      for (const requestedSpec of pathSpecsToRead) {
+        if (!foundContentForSpecs.has(requestedSpec)) {
+          onDebugMessage(
+            `Content for @${requestedSpec} was expected but not found in read_many_files output.`,
+          );
+          // Optionally add a note about missing content for this spec
+          // processedQueryParts.push({ text: `\nContent for @${requestedSpec} not found or empty.\n` });
+        }
+      }
+      processedQueryParts.push({ text: '\n--- End of content ---' });
     } else {
-      processedQueryParts.push(result.llmContent);
+      onDebugMessage(
+        'read_many_files tool returned no content or empty content.',
+      );
     }
-    processedQueryParts.push('\n--- End of content ---\n');
 
-    if (textAfter) {
-      processedQueryParts.push({ text: textAfter });
-    }
-    const processedQuery: PartListUnion = processedQueryParts;
-
-    // Add the successful tool result to history
     addItem(
       { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
         HistoryItem,
@@ -266,20 +388,16 @@ export async function handleAtCommand({
       >,
       userMessageTimestamp,
     );
-
-    return { processedQuery, shouldProceed: true };
+    return { processedQuery: processedQueryParts, shouldProceed: true };
   } catch (error: unknown) {
-    // Handle errors during tool execution
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: readManyFilesTool.getDescription(toolArgs),
       status: ToolCallStatus.Error,
-      resultDisplay: `Error reading ${contentLabel}: ${getErrorMessage(error)}`,
+      resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };
-
-    // Add the error tool result to history
     addItem(
       { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
         HistoryItem,
@@ -287,7 +405,6 @@ export async function handleAtCommand({
       >,
       userMessageTimestamp,
     );
-
     return { processedQuery: null, shouldProceed: false };
   }
 }
