@@ -16,7 +16,7 @@ import {
 } from 'vitest';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { Config } from '../config/config.js';
+import { Config, ConfigParameters } from '../config/config.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
 import { execSync, spawn } from 'node:child_process'; // Import spawn here
@@ -69,28 +69,32 @@ class MockTool extends BaseTool<{ param: string }, ToolResult> {
   }
 }
 
+const baseConfigParams: ConfigParameters = {
+  apiKey: 'test-api-key',
+  model: 'test-model',
+  sandbox: false,
+  targetDir: '/test/dir',
+  debugMode: false,
+  question: undefined,
+  fullContext: false,
+  coreTools: undefined,
+  toolDiscoveryCommand: undefined,
+  toolCallCommand: undefined,
+  mcpServerCommand: undefined,
+  mcpServers: undefined,
+  userAgent: 'TestAgent/1.0',
+  userMemory: '',
+  geminiMdFileCount: 0,
+  alwaysSkipModificationConfirmation: false,
+  vertexai: false,
+};
+
 describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
 
   beforeEach(() => {
-    // Provide a mock target directory for Config initialization
-    const mockTargetDir = '/test/dir';
-    config = new Config(
-      'test-api-key',
-      'test-model',
-      false, // sandbox
-      mockTargetDir, // targetDir
-      false, // debugMode
-      undefined, // question
-      false, // fullContext
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      'TestAgent/1.0', // userAgent
-    );
+    config = new Config(baseConfigParams); // Use base params
     toolRegistry = new ToolRegistry(config);
     vi.spyOn(console, 'warn').mockImplementation(() => {}); // Suppress console.warn
   });
@@ -208,27 +212,15 @@ describe('ToolRegistry', () => {
     const availableCoreToolClasses = [MockCoreToolAlpha, MockCoreToolBeta];
     let currentConfig: Config;
     let currentToolRegistry: ToolRegistry;
-    const mockTargetDir = '/test/dir'; // As used in outer scope
 
     // Helper to set up Config, ToolRegistry, and simulate core tool registration
     const setupRegistryAndSimulateRegistration = (
       coreToolsValueInConfig: string[] | undefined,
     ) => {
-      currentConfig = new Config(
-        'test-api-key',
-        'test-model',
-        false, // sandbox
-        mockTargetDir, // targetDir
-        false, // debugMode
-        undefined, // question
-        false, // fullContext
-        coreToolsValueInConfig, // coreTools setting being tested
-        undefined, // toolDiscoveryCommand
-        undefined, // toolCallCommand
-        undefined, // mcpServerCommand
-        undefined, // mcpServers
-        'TestAgent/1.0', // userAgent
-      );
+      currentConfig = new Config({
+        ...baseConfigParams, // Use base and override coreTools
+        coreTools: coreToolsValueInConfig,
+      });
 
       // We assume Config has a getter like getCoreTools() or stores it publicly.
       // For this test, we'll directly use coreToolsValueInConfig for the simulation logic,
@@ -560,22 +552,7 @@ describe('DiscoveredTool', () => {
   let mockSpawnInstance: Partial<ReturnType<typeof spawn>>;
 
   beforeEach(() => {
-    const mockTargetDir = '/test/dir';
-    config = new Config(
-      'test-api-key',
-      'test-model',
-      false, // sandbox
-      mockTargetDir, // targetDir
-      false, // debugMode
-      undefined, // question
-      false, // fullContext
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      'TestAgent/1.0', // userAgent
-    );
+    config = new Config(baseConfigParams); // Use base params
     vi.spyOn(config, 'getToolDiscoveryCommand').mockReturnValue(
       'discovery-cmd',
     );

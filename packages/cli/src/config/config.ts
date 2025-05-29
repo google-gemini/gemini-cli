@@ -12,6 +12,7 @@ import {
   loadEnvironment,
   createServerConfig,
   loadServerHierarchicalMemory,
+  ConfigParameters,
 } from '@gemini-code/server';
 import { Settings } from './settings.js';
 import { readPackageUp } from 'read-package-up';
@@ -134,25 +135,26 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   const apiKeyForServer = geminiApiKey || googleApiKey || '';
   const useVertexAI = hasGeminiApiKey ? false : undefined;
 
-  return createServerConfig(
-    apiKeyForServer,
-    argv.model || DEFAULT_GEMINI_MODEL,
-    argv.sandbox ?? settings.sandbox ?? false,
-    process.cwd(),
+  const configParams: ConfigParameters = {
+    apiKey: apiKeyForServer,
+    model: argv.model || DEFAULT_GEMINI_MODEL,
+    sandbox: argv.sandbox ?? settings.sandbox ?? false,
+    targetDir: process.cwd(),
     debugMode,
-    argv.prompt || '',
-    argv.all_files || false,
-    settings.coreTools || undefined,
-    settings.toolDiscoveryCommand,
-    settings.toolCallCommand,
-    settings.mcpServerCommand,
-    settings.mcpServers,
+    question: argv.prompt || '',
+    fullContext: argv.all_files || false,
+    coreTools: settings.coreTools || undefined,
+    toolDiscoveryCommand: settings.toolDiscoveryCommand,
+    toolCallCommand: settings.toolCallCommand,
+    mcpServerCommand: settings.mcpServerCommand,
+    mcpServers: settings.mcpServers,
     userAgent,
-    memoryContent,
-    fileCount,
-    undefined, // alwaysSkipModificationConfirmation - not set by CLI args directly
-    useVertexAI,
-  );
+    userMemory: memoryContent,
+    geminiMdFileCount: fileCount,
+    vertexai: useVertexAI,
+  };
+
+  return createServerConfig(configParams);
 }
 
 async function createUserAgent(): Promise<string> {

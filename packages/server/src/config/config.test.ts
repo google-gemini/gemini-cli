@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach /*, afterEach */ } from 'vitest'; // afterEach removed as it was unused
-import { Config, createServerConfig } from './config.js'; // Adjust import path
+import { Config, createServerConfig, ConfigParameters } from './config.js'; // Adjust import path
 import * as path from 'path';
 // import { ToolRegistry } from '../tools/tool-registry'; // ToolRegistry removed as it was unused
 
@@ -41,6 +41,17 @@ describe('Server Config (config.ts)', () => {
   const FULL_CONTEXT = false;
   const USER_AGENT = 'ServerTestAgent/1.0';
   const USER_MEMORY = 'Test User Memory';
+  const baseParams: ConfigParameters = {
+    apiKey: API_KEY,
+    model: MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    fullContext: FULL_CONTEXT,
+    userAgent: USER_AGENT,
+    userMemory: USER_MEMORY,
+  };
 
   beforeEach(() => {
     // Reset mocks if necessary
@@ -48,22 +59,7 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('Config constructor should store userMemory correctly', () => {
-    const config = new Config(
-      API_KEY,
-      MODEL,
-      SANDBOX,
-      TARGET_DIR,
-      DEBUG_MODE,
-      QUESTION,
-      FULL_CONTEXT,
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      USER_AGENT,
-      USER_MEMORY, // Pass memory here
-    );
+    const config = new Config(baseParams);
 
     expect(config.getUserMemory()).toBe(USER_MEMORY);
     // Verify other getters if needed
@@ -74,43 +70,15 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('Config constructor should default userMemory to empty string if not provided', () => {
-    const config = new Config(
-      API_KEY,
-      MODEL,
-      SANDBOX,
-      TARGET_DIR,
-      DEBUG_MODE,
-      QUESTION,
-      FULL_CONTEXT,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      USER_AGENT,
-      // No userMemory argument
-    );
+    const paramsWithoutMemory: ConfigParameters = { ...baseParams };
+    delete paramsWithoutMemory.userMemory;
+    const config = new Config(paramsWithoutMemory);
 
     expect(config.getUserMemory()).toBe('');
   });
 
   it('createServerConfig should pass userMemory to Config constructor', () => {
-    const config = createServerConfig(
-      API_KEY,
-      MODEL,
-      SANDBOX,
-      TARGET_DIR,
-      DEBUG_MODE,
-      QUESTION,
-      FULL_CONTEXT,
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      USER_AGENT,
-      USER_MEMORY, // Pass memory here
-    );
+    const config = createServerConfig(baseParams);
 
     // Check the result of the factory function
     expect(config).toBeInstanceOf(Config);
@@ -120,22 +88,9 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('createServerConfig should default userMemory if omitted', () => {
-    const config = createServerConfig(
-      API_KEY,
-      MODEL,
-      SANDBOX,
-      TARGET_DIR,
-      DEBUG_MODE,
-      QUESTION,
-      FULL_CONTEXT,
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      USER_AGENT,
-      // No userMemory argument
-    );
+    const paramsWithoutMemory: ConfigParameters = { ...baseParams };
+    delete paramsWithoutMemory.userMemory;
+    const config = createServerConfig(paramsWithoutMemory);
 
     expect(config).toBeInstanceOf(Config);
     expect(config.getUserMemory()).toBe(''); // Should default to empty string
@@ -144,22 +99,11 @@ describe('Server Config (config.ts)', () => {
   it('createServerConfig should resolve targetDir', () => {
     const relativeDir = './relative/path';
     const expectedResolvedDir = path.resolve(relativeDir);
-    const config = createServerConfig(
-      API_KEY,
-      MODEL,
-      SANDBOX,
-      relativeDir,
-      DEBUG_MODE,
-      QUESTION,
-      FULL_CONTEXT,
-      undefined, // coreTools
-      undefined, // toolDiscoveryCommand
-      undefined, // toolCallCommand
-      undefined, // mcpServerCommand
-      undefined, // mcpServers
-      USER_AGENT,
-      USER_MEMORY,
-    );
+    const paramsWithRelativeDir: ConfigParameters = {
+      ...baseParams,
+      targetDir: relativeDir,
+    };
+    const config = createServerConfig(paramsWithRelativeDir);
     expect(config.getTargetDir()).toBe(expectedResolvedDir);
   });
 });

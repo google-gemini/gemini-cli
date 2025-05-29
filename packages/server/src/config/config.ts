@@ -36,29 +36,66 @@ export class MCPServerConfig {
   ) {}
 }
 
+export interface ConfigParameters {
+  apiKey: string;
+  model: string;
+  sandbox: boolean | string;
+  targetDir: string;
+  debugMode: boolean;
+  question?: string;
+  fullContext?: boolean;
+  coreTools?: string[];
+  toolDiscoveryCommand?: string;
+  toolCallCommand?: string;
+  mcpServerCommand?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  userAgent: string;
+  userMemory?: string;
+  geminiMdFileCount?: number;
+  alwaysSkipModificationConfirmation?: boolean;
+  vertexai?: boolean;
+}
+
 export class Config {
   private toolRegistry: ToolRegistry;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly sandbox: boolean | string;
+  private readonly targetDir: string;
+  private readonly debugMode: boolean;
+  private readonly question: string | undefined;
+  private readonly fullContext: boolean;
+  private readonly coreTools: string[] | undefined;
+  private readonly toolDiscoveryCommand: string | undefined;
+  private readonly toolCallCommand: string | undefined;
+  private readonly mcpServerCommand: string | undefined;
+  private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly userAgent: string;
+  private userMemory: string;
+  private geminiMdFileCount: number;
+  private alwaysSkipModificationConfirmation: boolean;
+  private readonly vertexai: boolean | undefined;
 
-  constructor(
-    private readonly apiKey: string,
-    private readonly model: string,
-    private readonly sandbox: boolean | string,
-    private readonly targetDir: string,
-    private readonly debugMode: boolean,
-    private readonly question: string | undefined, // Keep undefined possibility
-    private readonly fullContext: boolean = false, // Default value here
-    private readonly coreTools: string[] | undefined,
-    private readonly toolDiscoveryCommand: string | undefined,
-    private readonly toolCallCommand: string | undefined,
-    private readonly mcpServerCommand: string | undefined,
-    private readonly mcpServers: Record<string, MCPServerConfig> | undefined,
-    private readonly userAgent: string,
-    private userMemory: string = '', // Made mutable for refresh
-    private geminiMdFileCount: number = 0,
-    private alwaysSkipModificationConfirmation: boolean = false,
-    private readonly vertexai?: boolean,
-  ) {
-    // toolRegistry still needs initialization based on the instance
+  constructor(params: ConfigParameters) {
+    this.apiKey = params.apiKey;
+    this.model = params.model;
+    this.sandbox = params.sandbox;
+    this.targetDir = path.resolve(params.targetDir);
+    this.debugMode = params.debugMode;
+    this.question = params.question;
+    this.fullContext = params.fullContext ?? false;
+    this.coreTools = params.coreTools;
+    this.toolDiscoveryCommand = params.toolDiscoveryCommand;
+    this.toolCallCommand = params.toolCallCommand;
+    this.mcpServerCommand = params.mcpServerCommand;
+    this.mcpServers = params.mcpServers;
+    this.userAgent = params.userAgent;
+    this.userMemory = params.userMemory ?? '';
+    this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+    this.alwaysSkipModificationConfirmation =
+      params.alwaysSkipModificationConfirmation ?? false;
+    this.vertexai = params.vertexai;
+
     this.toolRegistry = createToolRegistry(this);
   }
 
@@ -174,44 +211,12 @@ export function loadEnvironment(): void {
   dotenv.config({ path: envFilePath });
 }
 
-export function createServerConfig(
-  apiKey: string,
-  model: string,
-  sandbox: boolean | string,
-  targetDir: string,
-  debugMode: boolean,
-  question: string,
-  fullContext?: boolean,
-  coreTools?: string[],
-  toolDiscoveryCommand?: string,
-  toolCallCommand?: string,
-  mcpServerCommand?: string,
-  mcpServers?: Record<string, MCPServerConfig>,
-  userAgent?: string,
-  userMemory?: string,
-  geminiMdFileCount?: number,
-  alwaysSkipModificationConfirmation?: boolean,
-  vertexai?: boolean,
-): Config {
-  return new Config(
-    apiKey,
-    model,
-    sandbox,
-    path.resolve(targetDir),
-    debugMode,
-    question,
-    fullContext,
-    coreTools,
-    toolDiscoveryCommand,
-    toolCallCommand,
-    mcpServerCommand,
-    mcpServers,
-    userAgent ?? 'GeminiCLI/unknown', // Default user agent
-    userMemory ?? '',
-    geminiMdFileCount ?? 0,
-    alwaysSkipModificationConfirmation ?? false,
-    vertexai,
-  );
+export function createServerConfig(params: ConfigParameters): Config {
+  return new Config({
+    ...params,
+    targetDir: path.resolve(params.targetDir), // Ensure targetDir is resolved
+    userAgent: params.userAgent ?? 'GeminiCLI/unknown', // Default user agent
+  });
 }
 
 export function createToolRegistry(config: Config): ToolRegistry {
