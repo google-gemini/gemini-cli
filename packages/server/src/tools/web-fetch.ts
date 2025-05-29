@@ -4,18 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GoogleGenAI, GroundingMetadata } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { Config } from '../config/config.js';
+import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+
+// Interfaces for grounding metadata (similar to web-search.ts)
+interface GroundingChunkWeb {
+  uri?: string;
+  title?: string;
+}
+
+interface GroundingChunkItem {
+  web?: GroundingChunkWeb;
+}
+
+interface GroundingSupportSegment {
+  startIndex: number;
+  endIndex: number;
+  text?: string;
+}
+
+interface GroundingSupportItem {
+  segment?: GroundingSupportSegment;
+  groundingChunkIndices?: number[];
+}
 
 /**
  * Parameters for the WebFetch tool
  */
 export interface WebFetchToolParams {
   /**
-   * The URL to fetch content from.
+   * The prompt containing URL(s) (up to 20) and instructions for processing their content.
    */
-  url: string;
+  prompt: string;
 }
 
 /**
@@ -24,23 +48,32 @@ export interface WebFetchToolParams {
 export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
   static readonly Name: string = 'web_fetch';
 
-  constructor() {
+  private ai: GoogleGenAI;
+  private modelName: string;
+
+  constructor(private readonly config: Config) {
     super(
       WebFetchTool.Name,
       'WebFetch',
-      'Fetches text content from a given URL. Handles potential network errors and non-success HTTP status codes.',
+      "Processes content from URL(s) embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
       {
         properties: {
-          url: {
+          prompt: {
             description:
-              "The URL to fetch. Must be an absolute URL (e.g., 'https://example.com/file.txt').",
+              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
             type: 'string',
           },
         },
-        required: ['url'],
+        required: ['prompt'],
         type: 'object',
       },
     );
+
+    const apiKeyFromConfig = this.config.getApiKey();
+    this.ai = new GoogleGenAI({
+      apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
+    });
+    this.modelName = this.config.getModel();
   }
 
   validateParams(params: WebFetchToolParams): string | null {
@@ -53,21 +86,24 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     ) {
       return 'Parameters failed schema validation.';
     }
-    try {
-      const parsedUrl = new URL(params.url);
-      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-        return `Invalid URL protocol: "${parsedUrl.protocol}". Only 'http:' and 'https:' are supported.`;
-      }
-    } catch {
-      return `Invalid URL format: "${params.url}". Please provide a valid absolute URL (e.g., 'https://example.com').`;
+    if (!params.prompt || params.prompt.trim() === '') {
+      return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
+    }
+    if (
+      !params.prompt.includes('http://') &&
+      !params.prompt.includes('https://')
+    ) {
+      return "The 'prompt' must contain at least one valid URL (starting with http:// or https://).";
     }
     return null;
   }
 
   getDescription(params: WebFetchToolParams): string {
-    const displayUrl =
-      params.url.length > 80 ? params.url.substring(0, 77) + '...' : params.url;
-    return `Fetching content from ${displayUrl}`;
+    const displayPrompt =
+      params.prompt.length > 100
+        ? params.prompt.substring(0, 97) + '...'
+        : params.prompt;
+    return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
   async execute(
@@ -78,60 +114,136 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Error: ${validationError}`,
+        returnDisplay: validationError,
       };
     }
 
-    const url = params.url;
+    const userPrompt = params.prompt;
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'GeminiCode-ServerLogic/1.0',
+      const response = await this.ai.models.generateContent({
+        model: this.modelName,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: userPrompt }],
+          },
+        ],
+        config: {
+          tools: [{ urlContext: {} }],
         },
-        signal: AbortSignal.timeout(15000),
       });
 
-      if (!response.ok) {
-        const errorText = `Failed to fetch data from ${url}. Status: ${response.status} ${response.statusText}`;
-        return {
-          llmContent: `Error: ${errorText}`,
-          returnDisplay: `Error: ${errorText}`,
-        };
-      }
+      console.debug(
+        `[WebFetchTool] Full response for prompt "${userPrompt.substring(0, 50)}...":`,
+        JSON.stringify(response, null, 2),
+      );
 
-      // Basic check for text-based content types
-      const contentType = response.headers.get('content-type') || '';
+      let responseText = getResponseText(response) || '';
+      const urlContextMeta = response.candidates?.[0]?.urlContextMetadata;
+      const groundingMetadata = response.candidates?.[0]?.groundingMetadata as
+        | GroundingMetadata
+        | undefined;
+      const sources = groundingMetadata?.groundingChunks as
+        | GroundingChunkItem[]
+        | undefined;
+      const groundingSupports = groundingMetadata?.groundingSupports as
+        | GroundingSupportItem[]
+        | undefined;
+
+      // Error Handling
+      let processingError = false;
+      let errorDetail = 'An unknown error occurred during content processing.';
+
       if (
-        !contentType.includes('text/') &&
-        !contentType.includes('json') &&
-        !contentType.includes('xml')
+        urlContextMeta?.urlMetadata &&
+        urlContextMeta.urlMetadata.length > 0
       ) {
-        const errorText = `Unsupported content type: ${contentType} from ${url}`;
+        const allStatuses = urlContextMeta.urlMetadata.map(
+          (m) => m.urlRetrievalStatus,
+        );
+        if (allStatuses.every((s) => s !== 'URL_RETRIEVAL_STATUS_SUCCESS')) {
+          processingError = true;
+          errorDetail = `All URL retrieval attempts failed. Statuses: ${allStatuses.join(', ')}. API reported: "${responseText || 'No additional detail.'}"`;
+        }
+      } else if (!responseText.trim() && !sources?.length) {
+        // No URL metadata and no content/sources
+        processingError = true;
+        errorDetail =
+          'No content was returned and no URL metadata was available to determine fetch status.';
+      }
+
+      if (
+        !processingError &&
+        !responseText.trim() &&
+        (!sources || sources.length === 0)
+      ) {
+        // Successfully retrieved some URL (or no specific error from urlContextMeta), but no usable text or grounding data.
+        processingError = true;
+        errorDetail =
+          'URL(s) processed, but no substantive content or grounding information was found.';
+      }
+
+      if (processingError) {
+        const errorText = `Failed to process prompt and fetch URL data. ${errorDetail}`;
         return {
           llmContent: `Error: ${errorText}`,
           returnDisplay: `Error: ${errorText}`,
         };
       }
 
-      const data = await response.text();
-      const MAX_LLM_CONTENT_LENGTH = 200000; // Truncate large responses
-      const truncatedData =
-        data.length > MAX_LLM_CONTENT_LENGTH
-          ? data.substring(0, MAX_LLM_CONTENT_LENGTH) +
-            '\n... [Content truncated]'
-          : data;
+      const sourceListFormatted: string[] = [];
+      if (sources && sources.length > 0) {
+        sources.forEach((source: GroundingChunkItem, index: number) => {
+          const title = source.web?.title || 'Untitled';
+          const uri = source.web?.uri || 'Unknown URI'; // Fallback if URI is missing
+          sourceListFormatted.push(`[${index + 1}] ${title} (${uri})`);
+        });
 
-      const llmContent = data
-        ? `Fetched data from ${url}:\n\n${truncatedData}`
-        : `No text data fetched from ${url}. Status: ${response.status}`; // Adjusted message for clarity
+        if (groundingSupports && groundingSupports.length > 0) {
+          const insertions: Array<{ index: number; marker: string }> = [];
+          groundingSupports.forEach((support: GroundingSupportItem) => {
+            if (support.segment && support.groundingChunkIndices) {
+              const citationMarker = support.groundingChunkIndices
+                .map((chunkIndex: number) => `[${chunkIndex + 1}]`)
+                .join('');
+              insertions.push({
+                index: support.segment.endIndex,
+                marker: citationMarker,
+              });
+            }
+          });
+
+          insertions.sort((a, b) => b.index - a.index);
+          const responseChars = responseText.split('');
+          insertions.forEach((insertion) => {
+            responseChars.splice(insertion.index, 0, insertion.marker);
+          });
+          responseText = responseChars.join('');
+        }
+
+        if (sourceListFormatted.length > 0) {
+          responseText += `
+
+Sources:
+${sourceListFormatted.join('\n')}`;
+        }
+      }
+
+      const llmContent = responseText;
+
+      console.debug(
+        `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
+        llmContent,
+      );
 
       return {
         llmContent,
-        returnDisplay: `Fetched content from ${url}`,
+        returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
-      const errorMessage = `Failed to fetch data from ${url}. Error: ${getErrorMessage(error)}`;
+      const errorMessage = `Error processing web content for prompt "${userPrompt.substring(0, 50)}...": ${getErrorMessage(error)}`;
+      console.error(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,

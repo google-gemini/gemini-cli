@@ -241,7 +241,7 @@ export function createToolRegistry(config: Config): ToolRegistry {
   registerCoreTool(GlobTool, targetDir);
   registerCoreTool(EditTool, config);
   registerCoreTool(WriteFileTool, config);
-  registerCoreTool(WebFetchTool);
+  registerCoreTool(WebFetchTool, config);
   registerCoreTool(ReadManyFilesTool, targetDir);
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
