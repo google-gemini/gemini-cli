@@ -1,5 +1,5 @@
 {
-  "name": "gemini-code",
+  "name": "gemini-cli",
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
