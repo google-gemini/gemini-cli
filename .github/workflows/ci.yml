@@ -110,7 +110,7 @@ jobs:
     name: Post Coverage Comment
     runs-on: ubuntu-latest
     needs: test
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     continue-on-error: true
     permissions:
       contents: read # For checkout
