@@ -66,6 +66,7 @@
 (allow file-write*
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
+    (subpath (param "CACHE_DIR"))
     (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))

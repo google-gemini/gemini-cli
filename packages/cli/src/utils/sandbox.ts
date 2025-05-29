@@ -236,6 +236,8 @@ export async function start_sandbox(sandbox: string) {
       `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
       '-D',
       `HOME_DIR=${fs.realpathSync(os.homedir())}`,
+      '-D',
+      `CACHE_DIR=${fs.realpathSync(execSync(`getconf DARWIN_USER_CACHE_DIR`).toString().trim())}`,
       '-f',
       profileFile,
       'bash',
