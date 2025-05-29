@@ -35,7 +35,7 @@ shift $((OPTIND - 1))
 # note it can be string or boolean, and if missing jq will return null
 USER_SETTINGS_FILE="$HOME/.gemini/settings.json"
 if [ -z "${GEMINI_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
-    USER_SANDBOX_SETTING=$(jq -r '.sandbox' "$USER_SETTINGS_FILE")
+    USER_SANDBOX_SETTING=$(sed -e 's/\/\/.*//' -e 's/\/\*.*\*\///g' -e '/^[[:space:]]*\/\//d' "$USER_SETTINGS_FILE" | jq -r '.sandbox')
     if [ "$USER_SANDBOX_SETTING" != null ]; then
         GEMINI_SANDBOX=$USER_SANDBOX_SETTING
     fi
