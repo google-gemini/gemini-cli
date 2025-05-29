@@ -6,41 +6,19 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import { execSync } from 'node:child_process';
 
 // Assuming script is run from a package directory (e.g., packages/cli)
 const packageDir = process.cwd();
 const rootDir = path.join(packageDir, '..', '..'); // Go up two directories to find the repo root
 
-function getBaseVersion() {
+function getRepoVersion() {
   // Read root package.json
   const rootPackageJsonPath = path.join(rootDir, 'package.json');
   const rootPackage = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf8'));
-  return rootPackage.version;
+  return rootPackage.version; // This version is now expected to be the full version string
 }
 
-function getDefaultSuffix() {
-  // Get latest commit hash
-  const commitHash = execSync('git rev-parse --short HEAD', {
-    encoding: 'utf8',
-  }).trim();
-
-  // Append dev suffix with commit hash
-  return `dev-${commitHash}.0`;
-}
-
-const argv = yargs(hideBin(process.argv))
-  .option('suffix', {
-    type: 'string',
-    description: 'Set the package version suffix',
-  })
-  .parse();
-
-const baseVersion = getBaseVersion();
-const suffix = argv['suffix'] ?? getDefaultSuffix();
-const newVersion = `${baseVersion}${suffix.length ? '-' : ''}${suffix}`;
+const newVersion = getRepoVersion();
 console.log(`Setting package version to: ${newVersion}`);
 
 const packageJsonPath = path.join(packageDir, 'package.json');

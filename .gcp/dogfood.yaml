@@ -4,22 +4,21 @@ steps:
     entrypoint: 'npm'
     args: ['install']
 
-  # Step 2: Update version with build suffix
+  # Step 2: Update version in root package.json
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
-    entrypoint: 'npm'
+    entrypoint: 'bash'
     args:
-      [
-        'run',
-        'prerelease:version',
-        '--workspaces',
-        '--',
-        '--suffix="$SHORT_SHA.$_REVISION"',
-      ]
+      - -c # Use bash -c to allow for command substitution and string manipulation
+      - |
+        current_version=$(npm pkg get version | sed 's/"//g')
+        new_version="$${current_version}-$SHORT_SHA.$_REVISION"
+        npm pkg set "version=$${new_version}"
+        echo "Set root package.json version to: $${new_version}"
 
-  # Step 3: Bind dependencies to the new versions
+  # Step 3: Run prerelease:dev to update workspace versions and dependencies
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     entrypoint: 'npm'
-    args: ['run', 'prerelease:deps', '--workspaces']
+    args: ['run', 'prerelease:dev'] # This will run prerelease:version and prerelease:deps
 
   # Step 4: Authenticate for Docker and NPM
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
