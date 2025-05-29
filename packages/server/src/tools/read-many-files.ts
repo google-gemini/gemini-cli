@@ -402,7 +402,11 @@ Use this tool when the user's query implies needing the content of several files
       if (processedFilesRelativePaths.length === 0) {
         displayMessage += `No files were read and concatenated based on the criteria.\n`;
       }
-      displayMessage += `\n**Skipped ${skippedFiles.length} item(s) (up to 5 shown):**\n`;
+      if (skippedFiles.length <= 5) {
+        displayMessage += `\n**Skipped ${skippedFiles.length} item(s):**\n`;
+      } else {
+        displayMessage += `\n**Skipped ${skippedFiles.length} item(s) (first 5 shown):**\n`;
+      }
       skippedFiles
         .slice(0, 5)
         .forEach(

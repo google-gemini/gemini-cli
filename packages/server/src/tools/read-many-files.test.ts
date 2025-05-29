@@ -293,9 +293,7 @@ describe('ReadManyFilesTool', () => {
           (c) => typeof c === 'string' && c.includes('--- notes.txt ---'),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
-        '**Skipped 1 item(s) (up to 5 shown):**',
-      );
+      expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
       expect(result.returnDisplay).toContain(
         '- `document.pdf` (Reason: asset file (image/pdf) was not explicitly requested by name or extension)',
       );
