@@ -5,7 +5,6 @@
  */
 
 import {
-  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
@@ -57,7 +56,7 @@ export interface ToolCallRequestInfo {
 
 export interface ToolCallResponseInfo {
   callId: string;
-  responsePart: Part;
+  responseParts: PartListUnion;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
 }

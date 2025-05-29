@@ -7,13 +7,16 @@
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 import fg from 'fast-glob';
 import { GEMINI_MD_FILENAME } from './memoryTool.js';
-
+import {
+  detectFileType,
+  processSingleFileContent,
+  DEFAULT_ENCODING,
+} from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
-import mime from 'mime-types';
+
 /**
  * Parameters for the ReadManyFilesTool.
  */
@@ -98,8 +101,6 @@ const DEFAULT_EXCLUDES: string[] = [
   `**/${GEMINI_MD_FILENAME}`,
 ];
 
-// Default values for encoding and separator format
-const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 
 /**
@@ -256,11 +257,10 @@ Use this tool when the user's query implies needing the content of several files
     } = params;
 
     const toolBaseDir = this.targetDir;
-
     const filesToConsider = new Set<string>();
     const skippedFiles: Array<{ path: string; reason: string }> = [];
     const processedFilesRelativePaths: string[] = [];
-    const content: PartListUnion = [];
+    const contentParts: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
       ? [...DEFAULT_EXCLUDES, ...exclude]
@@ -315,69 +315,50 @@ Use this tool when the user's query implies needing the content of several files
       const relativePathForDisplay = path
         .relative(toolBaseDir, filePath)
         .replace(/\\/g, '/');
-      try {
-        const mimeType = mime.lookup(filePath);
-        if (
-          mimeType &&
-          (mimeType.startsWith('image/') || mimeType === 'application/pdf')
-        ) {
-          const fileExtension = path.extname(filePath);
-          const fileNameWithoutExtension = path.basename(
-            filePath,
-            fileExtension,
-          );
-          const requestedExplicitly = inputPatterns.some(
-            (pattern: string) =>
-              pattern.toLowerCase().includes(fileExtension) ||
-              pattern.includes(fileNameWithoutExtension),
-          );
 
-          if (!requestedExplicitly) {
-            skippedFiles.push({
-              path: relativePathForDisplay,
-              reason:
-                'asset file (image/pdf) was not explicitly requested by name or extension',
-            });
-            continue;
-          }
-          const contentBuffer = await fs.readFile(filePath);
-          const base64Data = contentBuffer.toString('base64');
-          content.push({
-            inlineData: {
-              data: base64Data,
-              mimeType,
-            },
+      const fileType = detectFileType(filePath);
+
+      if (fileType === 'image' || fileType === 'pdf') {
+        const fileExtension = path.extname(filePath).toLowerCase();
+        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
+        const requestedExplicitly = inputPatterns.some(
+          (pattern: string) =>
+            pattern.toLowerCase().includes(fileExtension) ||
+            pattern.includes(fileNameWithoutExtension),
+        );
+
+        if (!requestedExplicitly) {
+          skippedFiles.push({
+            path: relativePathForDisplay,
+            reason:
+              'asset file (image/pdf) was not explicitly requested by name or extension',
           });
-          processedFilesRelativePaths.push(relativePathForDisplay);
-        } else {
-          const contentBuffer = await fs.readFile(filePath);
-          // Basic binary detection: check for null bytes in the first 1KB
-          const sample = contentBuffer.subarray(
-            0,
-            Math.min(contentBuffer.length, 1024),
-          );
-          if (sample.includes(0)) {
-            skippedFiles.push({
-              path: relativePathForDisplay,
-              reason: 'appears to be binary',
-            });
-            continue;
-          }
-          // Using default encoding
-          const fileContent = contentBuffer.toString(DEFAULT_ENCODING);
-          // Using default separator format
+          continue;
+        }
+      }
+
+      // Use processSingleFileContent for all file types now
+      const fileReadResult = await processSingleFileContent(
+        filePath,
+        toolBaseDir,
+      );
+
+      if (fileReadResult.error) {
+        skippedFiles.push({
+          path: relativePathForDisplay,
+          reason: `Read error: ${fileReadResult.error}`,
+        });
+      } else {
+        if (typeof fileReadResult.llmContent === 'string') {
           const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
             '{filePath}',
             relativePathForDisplay,
           );
-          content.push(`${separator}\n\n${fileContent}\n\n`);
-          processedFilesRelativePaths.push(relativePathForDisplay);
+          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
+        } else {
+          contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
         }
-      } catch (error) {
-        skippedFiles.push({
-          path: relativePathForDisplay,
-          reason: `Read error: ${getErrorMessage(error)}`,
-        });
+        processedFilesRelativePaths.push(relativePathForDisplay);
       }
     }
 
@@ -422,13 +403,13 @@ Use this tool when the user's query implies needing the content of several files
       displayMessage += `No files were read and concatenated based on the criteria.\n`;
     }
 
-    if (content.length === 0) {
-      content.push(
+    if (contentParts.length === 0) {
+      contentParts.push(
         'No files matching the criteria were found or all were skipped.',
       );
     }
     return {
-      llmContent: content,
+      llmContent: contentParts,
       returnDisplay: displayMessage.trim(),
     };
   }

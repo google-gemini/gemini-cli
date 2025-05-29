@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
 import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
+import { isWithinRoot, processSingleFileContent } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -35,14 +35,12 @@ export interface ReadFileToolParams {
  */
 export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
-  private static readonly DEFAULT_MAX_LINES = 2000;
-  private static readonly MAX_LINE_LENGTH = 2000;
 
   constructor(private rootDirectory: string) {
     super(
       ReadFileTool.Name,
       'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles large files by allowing reading specific line ranges.',
+      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
       {
         properties: {
           path: {
@@ -52,12 +50,12 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           },
           offset: {
             description:
-              "Optional: The 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
             type: 'number',
           },
           limit: {
             description:
-              "Optional: Maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible).",
+              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: 'number',
           },
         },
@@ -68,28 +66,6 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     this.rootDirectory = path.resolve(rootDirectory);
   }
 
-  /**
-   * Checks if a path is within the root directory
-   * @param pathToCheck The path to check
-   * @returns True if the path is within the root directory, false otherwise
-   */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const normalizedPath = path.normalize(pathToCheck);
-    const normalizedRoot = path.normalize(this.rootDirectory);
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
-  }
-
-  /**
-   * Validates the parameters for the ReadFile tool
-   * @param params Parameters to validate
-   * @returns True if parameters are valid, false otherwise
-   */
   validateToolParams(params: ReadFileToolParams): string | null {
     if (
       this.schema.parameters &&
@@ -104,7 +80,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
-    if (!this.isWithinRoot(filePath)) {
+    if (!isWithinRoot(filePath, this.rootDirectory)) {
       return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
     }
     if (params.offset !== undefined && params.offset < 0) {
@@ -116,83 +92,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     return null;
   }
 
-  /**
-   * Determines if a file is likely binary based on content sampling
-   * @param filePath Path to the file
-   * @returns True if the file appears to be binary
-   */
-  private isBinaryFile(filePath: string): boolean {
-    try {
-      // Read the first 4KB of the file
-      const fd = fs.openSync(filePath, 'r');
-      const buffer = Buffer.alloc(4096);
-      const bytesRead = fs.readSync(fd, buffer, 0, 4096, 0);
-      fs.closeSync(fd);
-
-      // Check for null bytes or high concentration of non-printable characters
-      let nonPrintableCount = 0;
-      for (let i = 0; i < bytesRead; i++) {
-        // Null byte is a strong indicator of binary data
-        if (buffer[i] === 0) {
-          return true;
-        }
-
-        // Count non-printable characters
-        if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) {
-          nonPrintableCount++;
-        }
-      }
-
-      // If more than 30% are non-printable, likely binary
-      return nonPrintableCount / bytesRead > 0.3;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Detects the type of file based on extension and content
-   * @param filePath Path to the file
-   * @returns File type description
-   */
-  private detectFileType(filePath: string): string {
-    const ext = path.extname(filePath).toLowerCase();
-
-    // Common image formats
-    if (
-      ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].includes(ext)
-    ) {
-      return 'image';
-    }
-
-    // Other known binary formats
-    if (['.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.so'].includes(ext)) {
-      return 'binary';
-    }
-
-    // Check content for binary indicators
-    if (this.isBinaryFile(filePath)) {
-      return 'binary';
-    }
-
-    return 'text';
-  }
-
-  /**
-   * Gets a description of the file reading operation
-   * @param params Parameters for the file reading
-   * @returns A string describing the file being read
-   */
   getDescription(params: ReadFileToolParams): string {
     const relativePath = makeRelative(params.path, this.rootDirectory);
     return shortenPath(relativePath);
   }
 
-  /**
-   * Reads a file and returns its contents with line numbers
-   * @param params Parameters for the file reading
-   * @returns Result with file contents
-   */
   async execute(
     params: ReadFileToolParams,
     _signal: AbortSignal,
@@ -205,75 +109,23 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       };
     }
 
-    const filePath = params.path;
-    try {
-      if (!fs.existsSync(filePath)) {
-        return {
-          llmContent: `File not found: ${filePath}`,
-          returnDisplay: `File not found.`,
-        };
-      }
+    const result = await processSingleFileContent(
+      params.path,
+      this.rootDirectory,
+      params.offset,
+      params.limit,
+    );
 
-      const stats = fs.statSync(filePath);
-      if (stats.isDirectory()) {
-        return {
-          llmContent: `Path is a directory, not a file: ${filePath}`,
-          returnDisplay: `File is directory.`,
-        };
-      }
-
-      const fileType = this.detectFileType(filePath);
-      if (fileType !== 'text') {
-        return {
-          llmContent: `Binary file: ${filePath} (${fileType})`,
-          // For binary files, maybe returnDisplay should be empty or indicate binary?
-          // Keeping it empty for now.
-          returnDisplay: ``,
-        };
-      }
-
-      const content = fs.readFileSync(filePath, 'utf8');
-      const lines = content.split('\n');
-
-      const startLine = params.offset || 0;
-      const endLine = params.limit
-        ? startLine + params.limit
-        : Math.min(startLine + ReadFileTool.DEFAULT_MAX_LINES, lines.length);
-      const selectedLines = lines.slice(startLine, endLine);
-
-      let truncated = false;
-      const formattedLines = selectedLines.map((line) => {
-        let processedLine = line;
-        if (line.length > ReadFileTool.MAX_LINE_LENGTH) {
-          processedLine =
-            line.substring(0, ReadFileTool.MAX_LINE_LENGTH) + '... [truncated]';
-          truncated = true;
-        }
-
-        return processedLine;
-      });
-
-      const contentTruncated = endLine < lines.length || truncated;
-
-      let llmContent = '';
-      if (contentTruncated) {
-        llmContent += `[File truncated: showing lines ${startLine + 1}-${endLine} of ${lines.length} total lines. Use offset parameter to view more.]\n`;
-      }
-      llmContent += formattedLines.join('\n');
-
-      // Here, returnDisplay could potentially be enhanced, but for now,
-      // it's kept empty as the LLM content itself is descriptive.
+    if (result.error) {
       return {
-        llmContent,
-        returnDisplay: '',
-      };
-    } catch (error) {
-      const errorMsg = `Error reading file: ${error instanceof Error ? error.message : String(error)}`;
-
-      return {
-        llmContent: `Error reading file ${filePath}: ${errorMsg}`,
-        returnDisplay: `Failed to read file: ${errorMsg}`,
+        llmContent: result.error, // The detailed error for LLM
+        returnDisplay: result.returnDisplay, // User-friendly error
       };
     }
+
+    return {
+      llmContent: result.llmContent,
+      returnDisplay: result.returnDisplay,
+    };
   }
 }

@@ -25,17 +25,20 @@ All file system tools operate within a `rootDirectory` (usually the current work
 - **Tool Name:** `read_file`
 - **Display Name:** ReadFile
 - **File:** `read-file.ts`
-- **Description:** Reads and returns the content of a specified file. It can handle large files by allowing reading of specific line ranges and will attempt to detect and skip binary files.
+- **Description:** Reads and returns the content of a specified file. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges. Other binary file types are generally skipped.
 - **Parameters:**
   - `path` (string, required): The absolute path to the file to read.
-  - `offset` (number, optional): The 0-based line number to start reading from. Requires `limit` to be set.
-  - `limit` (number, optional): The maximum number of lines to read. If omitted, reads a default maximum (e.g., 2000 lines).
+  - `offset` (number, optional): For text files, the 0-based line number to start reading from. Requires `limit` to be set.
+  - `limit` (number, optional): For text files, the maximum number of lines to read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire file if feasible.
 - **Behavior:**
-  - Returns the content of the specified text file.
-  - If `offset` and `limit` are used, returns only that slice of lines.
-  - Indicates if the content was truncated due to line limits or line length limits.
-  - Attempts to identify binary files (images, executables) and returns a message indicating it's a binary file instead of its content.
-- **Output (`llmContent`):** The file content, potentially prefixed with a truncation message (e.g., `[File truncated: showing lines 1-100 of 500 total lines...]\nActual file content...`). For binary files: `Binary file: /path/to/image.png (image)`.
+  - For text files: Returns the content. If `offset` and `limit` are used, returns only that slice of lines. Indicates if content was truncated due to line limits or line length limits.
+  - For image and PDF files: Returns the file content as a base64 encoded data structure suitable for model consumption.
+  - For other binary files: Attempts to identify and skip them, returning a message indicating it's a generic binary file.
+- **Output:** (`llmContent`):
+  - For text files: The file content, potentially prefixed with a truncation message (e.g., `[File content truncated: showing lines 1-100 of 500 total lines...]\nActual file content...`).
+  - For image/PDF files: An object containing `inlineData` with `mimeType` and base64 `data` (e.g., `{ inlineData: { mimeType: 'image/png', data: 'base64encodedstring' } }`).
+  - For other binary files: A message like `Cannot display content of binary file: /path/to/data.bin`.
+- **Confirmation:** No.
 - **Confirmation:** No.
 
 ## 3. `write_file` (WriteFile)

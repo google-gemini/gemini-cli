@@ -41,6 +41,18 @@ import { useLogger } from './useLogger.js';
 import { useToolScheduler, mapToDisplay } from './useToolScheduler.js';
 import { GeminiChat } from '@gemini-code/server/src/core/geminiChat.js';
 
+export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
+  const resultParts: PartListUnion = [];
+  for (const item of list) {
+    if (Array.isArray(item)) {
+      resultParts.push(...item);
+    } else {
+      resultParts.push(item);
+    }
+  }
+  return resultParts;
+}
+
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
@@ -74,16 +86,16 @@ export const useGeminiStream = (
     (tools) => {
       if (tools.length) {
         addItem(mapToDisplay(tools), Date.now());
-        submitQuery(
-          tools
-            .filter(
-              (t) =>
-                t.status === 'error' ||
-                t.status === 'cancelled' ||
-                t.status === 'success',
-            )
-            .map((t) => t.response.responsePart),
-        );
+        const toolResponses = tools
+          .filter(
+            (t) =>
+              t.status === 'error' ||
+              t.status === 'cancelled' ||
+              t.status === 'success',
+          )
+          .map((t) => t.response.responseParts);
+
+        submitQuery(mergePartListUnions(toolResponses));
       }
     },
     config,
@@ -313,7 +325,7 @@ export const useGeminiStream = (
     };
     const responseInfo: ToolCallResponseInfo = {
       callId: request.callId,
-      responsePart: functionResponse,
+      responseParts: functionResponse,
       resultDisplay,
       error: new Error(declineMessage),
     };
