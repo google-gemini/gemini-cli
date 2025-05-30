@@ -12,6 +12,7 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
+  ToolMcpConfirmationDetails,
 } from '@gemini-code/server';
 import {
   RadioButtonSelect,
@@ -64,7 +65,7 @@ export const ToolConfirmationMessage: React.FC<
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
-  } else {
+  } else if (confirmationDetails.type === 'exec') {
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
 
@@ -85,6 +86,33 @@ export const ToolConfirmationMessage: React.FC<
       {
         label: `Yes, allow always "${executionProps.rootCommand} ..."`,
         value: ToolConfirmationOutcome.ProceedAlways,
+      },
+      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
+    );
+  } else {
+    // mcp tool confirmation
+    const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+
+    bodyContent = (
+      <Box flexDirection="column" paddingX={1} marginLeft={1}>
+        <Text color={Colors.AccentCyan}>MCP Server: {mcpProps.serverName}</Text>
+        <Text color={Colors.AccentCyan}>Tool: {mcpProps.toolName}</Text>
+      </Box>
+    );
+
+    question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
+    options.push(
+      {
+        label: 'Yes, allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+      },
+      {
+        label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+        value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
+      },
+      {
+        label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+        value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );

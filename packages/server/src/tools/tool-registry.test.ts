@@ -729,6 +729,7 @@ describe('DiscoveredMCPTool', () => {
   it('constructor should set up properties correctly and enhance description', () => {
     const tool = new DiscoveredMCPTool(
       mockMcpClient,
+      'mock-mcp-server',
       toolName,
       toolDescription,
       toolInputSchema,
@@ -744,6 +745,7 @@ describe('DiscoveredMCPTool', () => {
   it('execute should call mcpClient.callTool with correct params and return serialized result', async () => {
     const tool = new DiscoveredMCPTool(
       mockMcpClient,
+      'mock-mcp-server',
       toolName,
       toolDescription,
       toolInputSchema,

@@ -55,6 +55,7 @@ describe('DiscoveredMCPTool', () => {
     it('should set properties correctly and augment description', () => {
       const tool = new DiscoveredMCPTool(
         mockMcpClient,
+        'mock-mcp-server',
         toolName,
         baseDescription,
         inputSchema,
@@ -78,6 +79,7 @@ describe('DiscoveredMCPTool', () => {
       const customTimeout = 5000;
       const tool = new DiscoveredMCPTool(
         mockMcpClient,
+        'mock-mcp-server',
         toolName,
         baseDescription,
         inputSchema,
@@ -92,6 +94,7 @@ describe('DiscoveredMCPTool', () => {
     it('should call mcpClient.callTool with correct parameters and default timeout', async () => {
       const tool = new DiscoveredMCPTool(
         mockMcpClient,
+        'mock-mcp-server',
         toolName,
         baseDescription,
         inputSchema,
@@ -122,6 +125,7 @@ describe('DiscoveredMCPTool', () => {
       const customTimeout = 15000;
       const tool = new DiscoveredMCPTool(
         mockMcpClient,
+        'mock-mcp-server',
         toolName,
         baseDescription,
         inputSchema,
@@ -146,6 +150,7 @@ describe('DiscoveredMCPTool', () => {
     it('should propagate rejection if mcpClient.callTool rejects', async () => {
       const tool = new DiscoveredMCPTool(
         mockMcpClient,
+        'mock-mcp-server',
         toolName,
         baseDescription,
         inputSchema,

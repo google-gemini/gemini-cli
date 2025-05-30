@@ -212,12 +212,24 @@ export interface ToolExecuteConfirmationDetails {
   rootCommand: string;
 }
 
+export interface ToolMcpConfirmationDetails {
+  type: 'mcp';
+  title: string;
+  serverName: string;
+  toolName: string;
+  toolDisplayName: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void> | void;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
-  | ToolExecuteConfirmationDetails;
+  | ToolExecuteConfirmationDetails
+  | ToolMcpConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
-  ProceedOnce,
-  ProceedAlways,
-  Cancel,
+  ProceedOnce = 'proceed_once',
+  ProceedAlways = 'proceed_always',
+  ProceedAlwaysServer = 'proceed_always_server',
+  ProceedAlwaysTool = 'proceed_always_tool',
+  Cancel = 'cancel',
 }

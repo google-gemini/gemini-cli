@@ -5,20 +5,30 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { BaseTool, ToolResult } from './tools.js';
+import {
+  BaseTool,
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolMcpConfirmationDetails,
+} from './tools.js';
 
 type ToolParams = Record<string, unknown>;
 
 export const MCP_TOOL_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
+  private static readonly whitelist: Set<string> = new Set();
+
   constructor(
     private readonly mcpClient: Client,
+    private readonly serverName: string, // Added for server identification
     readonly name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
     readonly serverToolName: string,
     readonly timeout?: number,
+    readonly trust?: boolean,
   ) {
     description += `
 
@@ -35,6 +45,41 @@ Returns the MCP server response as a json string.
       false, // isOutputMarkdown
       false, // canUpdateOutput
     );
+  }
+
+  async shouldConfirmExecute(
+    _params: ToolParams,
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const serverWhitelistKey = this.serverName;
+    const toolWhitelistKey = `${this.serverName}.${this.serverToolName}`;
+
+    if (this.trust) {
+      return false; // server is trusted, no confirmation needed
+    }
+
+    if (
+      DiscoveredMCPTool.whitelist.has(serverWhitelistKey) ||
+      DiscoveredMCPTool.whitelist.has(toolWhitelistKey)
+    ) {
+      return false; // server and/or tool already whitelisted
+    }
+
+    const confirmationDetails: ToolMcpConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool Execution',
+      serverName: this.serverName,
+      toolName: this.serverToolName,
+      toolDisplayName: this.name,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
+          DiscoveredMCPTool.whitelist.add(serverWhitelistKey);
+        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
+          DiscoveredMCPTool.whitelist.add(toolWhitelistKey);
+        }
+      },
+    };
+    return confirmationDetails;
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {

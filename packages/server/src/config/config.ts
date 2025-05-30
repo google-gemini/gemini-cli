@@ -33,6 +33,7 @@ export class MCPServerConfig {
     readonly url?: string,
     // Common
     readonly timeout?: number,
+    readonly trust?: boolean,
   ) {}
 }
 

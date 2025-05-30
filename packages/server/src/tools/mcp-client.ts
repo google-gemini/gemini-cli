@@ -134,11 +134,13 @@ async function connectAndDiscover(
       toolRegistry.registerTool(
         new DiscoveredMCPTool(
           mcpClient,
+          mcpServerName,
           toolNameForModel,
           tool.description ?? '',
           tool.inputSchema,
           tool.name,
           mcpServerConfig.timeout,
+          mcpServerConfig.trust,
         ),
       );
     }
