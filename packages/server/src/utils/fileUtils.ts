@@ -236,7 +236,7 @@ export async function processSingleFileContent(
 
         return {
           llmContent: llmTextContent,
-          returnDisplay: `Read text file: ${relativePathForDisplay}${isTruncated ? ' (truncated)' : ''}`,
+          returnDisplay: isTruncated ? '(truncated)' : '',
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],
