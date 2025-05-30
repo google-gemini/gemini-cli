@@ -303,11 +303,13 @@ export async function start_sandbox(sandbox: string) {
   }
 
   // stop if image is missing
-  if (!execSync(`${sandbox} images -q ${image}`).toString().trim()) {
+  if (!(await ensureSandboxImageIsPresent(sandbox, image))) {
     const remedy = gcPath.includes('gemini-code/packages/')
-      ? 'Try `scripts/build_sandbox.sh` under gemini-code repo.'
-      : 'Please notify gemini-cli-dev@google.com.';
-    console.error(`ERROR: ${image} is missing. ${remedy}`);
+      ? 'Try running `BUILD_SANDBOX=1 gemini` or `scripts/build_sandbox.sh` under the gemini-code repo to build it locally, or check the image name and your network connection.'
+      : 'Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists.';
+    console.error(
+      `ERROR: Sandbox image '${image}' is missing or could not be pulled. ${remedy}`,
+    );
     process.exit(1);
   }
 
@@ -482,4 +484,108 @@ export async function start_sandbox(sandbox: string) {
   await new Promise((resolve) => {
     child.on('close', resolve);
   });
+}
+
+// Helper functions to ensure sandbox image is present
+async function imageExists(sandbox: string, image: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const args = ['images', '-q', image];
+    const checkProcess = spawn(sandbox, args);
+
+    let stdoutData = '';
+    if (checkProcess.stdout) {
+      checkProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+      });
+    }
+
+    checkProcess.on('error', (err) => {
+      console.warn(
+        `Failed to start '${sandbox}' command for image check: ${err.message}`,
+      );
+      resolve(false);
+    });
+
+    checkProcess.on('close', (code) => {
+      // Non-zero code might indicate docker daemon not running, etc.
+      // The primary success indicator is non-empty stdoutData.
+      if (code !== 0) {
+        // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
+      }
+      resolve(stdoutData.trim() !== '');
+    });
+  });
+}
+
+async function pullImage(sandbox: string, image: string): Promise<boolean> {
+  console.info(`Attempting to pull image ${image} using ${sandbox}...`);
+  return new Promise((resolve) => {
+    const args = ['pull', image];
+    const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
+
+    let stderrData = '';
+    if (pullProcess.stdout) {
+      pullProcess.stdout.on('data', (data) => {
+        console.info(data.toString().trim()); // Show pull progress
+      });
+    }
+    if (pullProcess.stderr) {
+      pullProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(data.toString().trim()); // Show pull errors/info from the command itself
+      });
+    }
+
+    pullProcess.on('error', (err) => {
+      console.warn(
+        `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
+      );
+      resolve(false);
+    });
+
+    pullProcess.on('close', (code) => {
+      if (code === 0) {
+        console.info(`Successfully pulled image ${image}.`);
+        resolve(true);
+      } else {
+        console.warn(
+          `Failed to pull image ${image}. '${sandbox} pull ${image}' exited with code ${code}.`,
+        );
+        if (stderrData.trim()) {
+          // Details already printed by the stderr listener above
+        }
+        resolve(false);
+      }
+    });
+  });
+}
+
+async function ensureSandboxImageIsPresent(
+  sandbox: string,
+  image: string,
+): Promise<boolean> {
+  console.info(`Checking for sandbox image: ${image}`);
+  if (await imageExists(sandbox, image)) {
+    console.info(`Sandbox image ${image} found locally.`);
+    return true;
+  }
+
+  console.info(`Sandbox image ${image} not found locally.`);
+  if (await pullImage(sandbox, image)) {
+    // After attempting to pull, check again to be certain
+    if (await imageExists(sandbox, image)) {
+      console.info(`Sandbox image ${image} is now available after pulling.`);
+      return true;
+    } else {
+      console.warn(
+        `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
+      );
+      return false;
+    }
+  }
+
+  console.error(
+    `Failed to obtain sandbox image ${image} after check and pull attempt.`,
+  );
+  return false; // Pull command failed or image still not present
 }
