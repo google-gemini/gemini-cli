@@ -37,22 +37,25 @@ This section guides contributors on how to build, modify, and understand the dev
 
 ### Setting Up the Development Environment
 
-- **Prerequisites:**
-  - Node.js (version 18 or higher).
-  - npm (usually comes with Node.js).
-  - Git.
-- **Cloning the Repository:**
-  ```bash
-  git clone https://github.com/google-gemini/gemini-cli.git # Or your fork's URL
-  cd gemini-cli
-  ```
-- **Installing Dependencies:**
-  ```bash
-  npm install
-  ```
-  This command will install all necessary dependencies defined in `package.json` for both the server and CLI packages, as well as root dependencies.
+**Prerequisites:**
+
+1. Install [Node 18+](https://nodejs.org/en/download)
+2. Git
 
 ### Build Process
+
+To clone the repository:
+
+```bash
+git clone https://github.com/google-gemini/gemini-cli.git # Or your fork's URL
+cd gemini-cli
+```
+
+To install dependencies defined in `package.json` as well as root dependencies:
+
+```bash
+npm install
+```
 
 To build the entire project (all packages):
 
@@ -61,6 +64,28 @@ npm run build
 ```
 
 This command typically compiles TypeScript to JavaScript, bundles assets, and prepares the packages for execution. Refer to `scripts/build.sh` and `package.json` scripts for more details on what happens during the build.
+
+### Enabling Sandboxing
+
+Container-based [sandboxing](#sandboxing) is highly recommended and requires, at a minimum, setting `GEMINI_SANDBOX=true` in your `~/.env` and ensuring a container engine (e.g. `docker` or `podmand`) is available. See [Sandboxing](#sandboxing) for details.
+
+To build both the `gemini` CLI utility and the sandbox container, run `build:all` from the root directory:
+
+```bash
+npm run build:all
+```
+
+To skip building the sandbox container, you can use `npm run build` instead.
+
+### Running
+
+To start the Gemini CLI from the source code (after building), run the following command from the root directory:
+
+```bash
+npm start
+```
+
+If you’d like to run the source build outside of the gemini-cli folder you can utilize `npm link path/to/gemini-cli/packages/cli` (see: [docs](https://docs.npmjs.com/cli/v9/commands/npm-link)) or `alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`
 
 ### Running Tests
 
@@ -82,6 +107,24 @@ npm run preflight
 
 This command usually runs ESLint, Prettier, and potentially other checks as defined in the project's `package.json`.
 
+#### Formatting
+
+To separately format the code in this project by running the following command from the root directory:
+
+```bash
+npm run format
+```
+
+This command uses Prettier to format the code according to the project's style guidelines.
+
+#### Linting
+
+To separately lint the code in this project, run the following command fro the root directory:
+
+```bash
+npm run lint
+```
+
 ### Coding Conventions
 
 - Please adhere to the coding style, patterns, and conventions used throughout the existing codebase.
@@ -97,3 +140,46 @@ This command usually runs ESLint, Prettier, and potentially other checks as defi
 - `scripts/`: Utility scripts for building, testing, and development tasks.
 
 For more detailed architecture, see `docs/architecture.md`.
+
+## Debugging
+
+To debug the CLI application using VS Code:
+
+1.  Start the CLI in debug mode from the root directory:
+    ```bash
+    npm run debug
+    ```
+    This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches. You can then open `chrome://inspect` in your Chrome browser to connect to the debugger.
+2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`).
+
+Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but the "Attach" method is generally recommended for debugging the main CLI entry point.
+
+To hit a breakpoint inside the sandbox container run:
+
+```bash
+DEBUG=1 gemini
+```
+
+## Sandboxing
+
+### MacOS Seatbelt
+
+On MacOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `minimal` profile (see `packages/cli/src/utils/sandbox-macos-minimal.sb`) that restricts writes to the project folder but otherwise allows all other operations by default. You can switch to a `strict` profile (see `.../sandbox-macos-strict.sb`) that declines operations by default by setting `SEATBELT_PROFILE=strict` in your environment or `.env` file. You can also switch to a custom profile `SEATBELT_PROFILE=<profile>` if you also create a file `.gemini/sandbox-macos-<profile>.sb` under your project settings directory `.gemini`.
+
+### Container-based Sandboxing (All Platforms)
+
+For stronger container-based sandboxing on MacOS or other platforms, you can set `GEMINI_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. The specified command (or if `true` then either `docker` or `podman`) must be installed on the host machine. Once enabled, `npm run build:all` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. The first build can take 20-30s (mostly due to downloading of the base image) but after that both build and start overhead should be minimal. Default builds (`npm run build`) will not rebuild the sandbox.
+
+Container-based sandboxing mounts the project directory (and system temp directory) with read-write access and is started/stopped/removed automatically as you start/stop Gemini CLI. Files created within the sandbox should be automatically mapped to your user/group on host machine. You can easily specify additional mounts, ports, or environment variables by setting `SANDBOX_{MOUNTS,PORTS,ENV}` as needed. You can also fully customize the sandbox for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or `.gemini/sandbox.bashrc` under your project settings directory `.gemini`.
+
+## Manual Publish
+
+We publish an artifact for each commit to our internal registry. But if you need to manually cut a local build, then run the following commands:
+
+```
+npm run clean
+npm install
+npm run auth
+npm run prerelease:dev
+npm publish --workspaces
+```
