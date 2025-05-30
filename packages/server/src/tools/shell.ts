@@ -200,21 +200,16 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     };
     shell.on('exit', exitHandler);
 
-    const abortHandler = () => {
+    const abortHandler = async () => {
       if (shell.pid && !exited) {
         try {
           // attempt to SIGTERM process group (negative PID)
-          // if SIGTERM fails after 200ms, attempt SIGKILL
+          // fall back to SIGKILL (to group) after 200ms
           process.kill(-shell.pid, 'SIGTERM');
-          setTimeout(() => {
-            try {
-              if (shell.pid && !exited) {
-                process.kill(-shell.pid, 'SIGKILL');
-              }
-            } catch (_e) {
-              console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
-            }
-          }, 200);
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          if (shell.pid && !exited) {
+            process.kill(-shell.pid, 'SIGKILL');
+          }
         } catch (_e) {
           // if group kill fails, fall back to killing just the main process
           try {

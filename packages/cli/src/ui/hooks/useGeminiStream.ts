@@ -161,7 +161,7 @@ export const useGeminiStream = (
     async (
       query: PartListUnion,
       userMessageTimestamp: number,
-      signal: AbortSignal,
+      abortSignal: AbortSignal,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -199,7 +199,7 @@ export const useGeminiStream = (
           return { queryToSend: null, shouldProceed: false }; // Handled by scheduling the tool
         }
 
-        if (shellModeActive && handleShellCommand(trimmedQuery, signal)) {
+        if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
           return { queryToSend: null, shouldProceed: false };
         }
 
@@ -211,7 +211,7 @@ export const useGeminiStream = (
             addItem,
             onDebugMessage,
             messageId: userMessageTimestamp,
-            signal,
+            signal: abortSignal,
           });
           if (!atCommandResult.shouldProceed) {
             return { queryToSend: null, shouldProceed: false };
@@ -493,12 +493,12 @@ export const useGeminiStream = (
       setShowHelp(false);
 
       abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
+      const abortSignal = abortControllerRef.current.signal;
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
-        signal,
+        abortSignal,
       );
 
       if (!shouldProceed || queryToSend === null) {
@@ -515,7 +515,7 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = client.sendMessageStream(chat, queryToSend, signal);
+        const stream = client.sendMessageStream(chat, queryToSend, abortSignal);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,

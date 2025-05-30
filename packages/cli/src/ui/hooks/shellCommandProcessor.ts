@@ -37,7 +37,7 @@ export const useShellCommandProcessor = (
    * @returns True if the query was handled as a shell command, false otherwise.
    */
   const handleShellCommand = useCallback(
-    (rawQuery: PartListUnion, signal?: AbortSignal): boolean => {
+    (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string') {
         return false;
       }
@@ -149,27 +149,19 @@ export const useShellCommandProcessor = (
             error = err;
           });
 
-          const abortHandler = () => {
+          const abortHandler = async () => {
             if (child.pid && !exited) {
               onDebugMessage(
                 `Aborting shell command (PID: ${child.pid}) due to signal.`,
               );
               try {
                 // attempt to SIGTERM process group (negative PID)
-                // if SIGTERM fails after 200ms, attempt SIGKILL
+                // fall back to SIGKILL (to group) after 200ms
                 process.kill(-child.pid, 'SIGTERM');
-                setTimeout(() => {
-                  // if SIGTERM fails, attempt SIGKILL
-                  try {
-                    if (child.pid && !exited) {
-                      process.kill(-child.pid, 'SIGKILL');
-                    }
-                  } catch (_e) {
-                    console.error(
-                      `failed to kill shell process ${child.pid}: ${_e}`,
-                    );
-                  }
-                }, 200);
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                if (child.pid && !exited) {
+                  process.kill(-child.pid, 'SIGKILL');
+                }
               } catch (_e) {
                 // if group kill fails, fall back to killing just the main process
                 try {
@@ -185,20 +177,11 @@ export const useShellCommandProcessor = (
             }
           };
 
-          if (signal) {
-            if (signal.aborted) {
-              abortHandler();
-              // No need to add listener if already aborted
-            } else {
-              signal.addEventListener('abort', abortHandler, { once: true });
-            }
-          }
+          abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-          child.on('exit', (code, processSignal) => {
+          child.on('exit', (code, signal) => {
             exited = true;
-            if (signal) {
-              signal.removeEventListener('abort', abortHandler);
-            }
+            abortSignal.removeEventListener('abort', abortHandler);
             setPendingHistoryItem(null);
             output = output.trim() || '(Command produced no output)';
             if (error) {
@@ -207,7 +190,7 @@ export const useShellCommandProcessor = (
             } else if (code !== null && code !== 0) {
               const text = `Command exited with code ${code}\n${output}`;
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
-            } else if (signal?.aborted) {
+            } else if (abortSignal.aborted) {
               addItemToHistory(
                 {
                   type: 'info',
@@ -215,9 +198,8 @@ export const useShellCommandProcessor = (
                 },
                 userMessageTimestamp,
               );
-            } else if (processSignal) {
-              const text = `Command terminated with signal ${processSignal}
-${output}`;
+            } else if (signal) {
+              const text = `Command terminated with signal ${signal}.\n${output}`;
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
             } else {
               addItemToHistory(

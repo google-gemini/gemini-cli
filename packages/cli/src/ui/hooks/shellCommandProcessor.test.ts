@@ -105,9 +105,10 @@ describe('useShellCommandProcessor', () => {
 
   it('should return false for non-string input', () => {
     const { result } = setupHook();
-    const handled = result.current.handleShellCommand([
-      { text: 'not a string' },
-    ] as PartListUnion);
+    const handled = result.current.handleShellCommand(
+      [{ text: 'not a string' }] as PartListUnion,
+      new AbortController().signal,
+    );
     expect(handled).toBe(false);
     expect(mockAddItemToHistory).not.toHaveBeenCalled();
   });
@@ -115,7 +116,10 @@ describe('useShellCommandProcessor', () => {
   it('should handle empty shell command', () => {
     const { result } = setupHook();
     act(() => {
-      const handled = result.current.handleShellCommand('');
+      const handled = result.current.handleShellCommand(
+        '',
+        new AbortController().signal,
+      );
       expect(handled).toBe(true);
     });
     expect(mockAddItemToHistory).toHaveBeenNthCalledWith(
@@ -144,7 +148,7 @@ describe('useShellCommandProcessor', () => {
     existsSyncSpy.mockReturnValue(false);
 
     await act(async () => {
-      result.current.handleShellCommand(command);
+      result.current.handleShellCommand(command, new AbortController().signal);
       await new Promise(process.nextTick);
     });
 
@@ -182,7 +186,7 @@ describe('useShellCommandProcessor', () => {
     existsSyncSpy.mockReturnValue(false);
 
     await act(async () => {
-      result.current.handleShellCommand(command);
+      result.current.handleShellCommand(command, new AbortController().signal);
       await new Promise(process.nextTick);
     });
     expect(mockAddItemToHistory).toHaveBeenNthCalledWith(
@@ -210,7 +214,7 @@ describe('useShellCommandProcessor', () => {
     existsSyncSpy.mockReturnValue(false);
 
     await act(async () => {
-      result.current.handleShellCommand(command);
+      result.current.handleShellCommand(command, new AbortController().signal);
       await new Promise(process.nextTick);
     });
     expect(mockAddItemToHistory).toHaveBeenNthCalledWith(
@@ -237,7 +241,7 @@ describe('useShellCommandProcessor', () => {
     existsSyncSpy.mockReturnValue(false);
 
     await act(async () => {
-      result.current.handleShellCommand(command);
+      result.current.handleShellCommand(command, new AbortController().signal);
       await new Promise(process.nextTick);
     });
     expect(mockAddItemToHistory).toHaveBeenNthCalledWith(
@@ -264,7 +268,7 @@ describe('useShellCommandProcessor', () => {
     existsSyncSpy.mockReturnValue(false);
 
     await act(async () => {
-      result.current.handleShellCommand(command);
+      result.current.handleShellCommand(command, new AbortController().signal);
       await new Promise(process.nextTick);
     });
 
