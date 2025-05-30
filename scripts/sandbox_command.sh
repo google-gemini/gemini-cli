@@ -32,11 +32,11 @@ done
 shift $((OPTIND - 1))
 
 # if GEMINI_SANDBOX is not set, see if it is set in user settings
-# note it can be string or boolean, and if missing jq will return null
+# note it can be string or boolean, and if missing `npx json` will return empty string
 USER_SETTINGS_FILE="$HOME/.gemini/settings.json"
 if [ -z "${GEMINI_SANDBOX:-}" ] && [ -f "$USER_SETTINGS_FILE" ]; then
-    USER_SANDBOX_SETTING=$(sed -e 's/\/\/.*//' -e 's/\/\*.*\*\///g' -e '/^[[:space:]]*\/\//d' "$USER_SETTINGS_FILE" | jq -r '.sandbox')
-    if [ "$USER_SANDBOX_SETTING" != null ]; then
+    USER_SANDBOX_SETTING=$(sed -e 's/\/\/.*//' -e 's/\/\*.*\*\///g' -e '/^[[:space:]]*\/\//d' "$USER_SETTINGS_FILE" | npx json 'sandbox')
+    if [ -n "$USER_SANDBOX_SETTING" ]; then
         GEMINI_SANDBOX=$USER_SANDBOX_SETTING
     fi
 fi

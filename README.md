@@ -57,7 +57,7 @@ As with most Node projects, major development scripts can be found in the `packa
 
 #### Dependencies
 
-The build toolchain requires `npm` and `jq` to be installed. You can use the `scripts/setup-dev.sh` script to install these prerequisites.
+The build toolchain requires `npm` to be installed. You can install it using `scripts/setup-dev.sh`.
 
 #### Enabling Sandboxing
 

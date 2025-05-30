@@ -60,6 +60,7 @@
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "json": "^11.0.0"
   }
 }
