@@ -27,7 +27,14 @@ When called, this tool will invoke the \`tools/call\` method for tool name \`${n
 MCP servers can be configured in project or user settings.
 Returns the MCP server response as a json string.
 `;
-    super(name, name, description, parameterSchema);
+    super(
+      name,
+      name,
+      description,
+      parameterSchema,
+      false, // isOutputMarkdown
+      false, // canUpdateOutput
+    );
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {
