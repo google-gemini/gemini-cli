@@ -23,10 +23,10 @@ const version = process.env.npm_package_version;
 
 // Get Docker registry and image name directly from PUBLISH_ environment variables.
 // These are expected to be set by the CI/build environment.
-const dockerRegistry = process.env.SANDBOX_IMAGE_REGISTRY;
-const dockerImageName = process.env.SANDBOX_IMAGE_NAME;
+const containerImageRegistry = process.env.SANDBOX_IMAGE_REGISTRY;
+const containerImageName = process.env.SANDBOX_IMAGE_NAME;
 
-if (!version || !dockerRegistry || !dockerImageName) {
+if (!version || !containerImageRegistry || !containerImageName) {
   console.error(
     'Error: Missing required environment variables. Need: ' +
       'npm_package_version, SANDBOX_IMAGE_REGISTRY, and SANDBOX_IMAGE_NAME.',
@@ -38,15 +38,13 @@ if (!version || !dockerRegistry || !dockerImageName) {
   process.exit(1);
 }
 
-const dockerImageUri = `${dockerRegistry}/${dockerImageName}:${version}`;
+const containerImageUri = `${containerImageRegistry}/${containerImageName}:${version}`;
 
 // Add or update fields in cliPackageJson.config to store this information
 if (!cliPackageJson.config) {
   cliPackageJson.config = {};
 }
-cliPackageJson.config.dockerImageUri = dockerImageUri;
-cliPackageJson.config.dockerRegistry = dockerRegistry;
-cliPackageJson.config.dockerImageName = dockerImageName;
+cliPackageJson.config.sandboxImageUri = containerImageUri;
 
 // Remove 'prepublishOnly' from scripts if it exists
 if (cliPackageJson.scripts && cliPackageJson.scripts.prepublishOnly) {
@@ -61,6 +59,6 @@ fs.writeFileSync(
 console.log(
   `Updated ${path.relative(process.cwd(), cliPackageJsonPath)} with Docker image details:`,
 );
-console.log(`  URI: ${dockerImageUri}`);
-console.log(`  Registry: ${dockerRegistry}`);
-console.log(`  Image Name: ${dockerImageName}`);
+console.log(`  URI: ${containerImageUri}`);
+console.log(`  Registry: ${containerImageRegistry}`);
+console.log(`  Image Name: ${containerImageName}`);

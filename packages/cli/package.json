@@ -25,6 +25,9 @@
   "files": [
     "dist"
   ],
+  "config": {
+    "sandboxImageUri": "gemini-cli-sandbox"
+  },
   "dependencies": {
     "@gemini-code/server": "0.1.0",
     "diff": "^7.0.0",
