@@ -313,6 +313,44 @@ export class GeminiChat {
     } else {
       this.history.push(userInput);
     }
-    this.history.push(...outputContents);
+
+    // Consolidate adjacent model roles in outputContents
+    const consolidatedOutputContents: Content[] = [];
+    for (const content of outputContents) {
+      const lastContent =
+        consolidatedOutputContents[consolidatedOutputContents.length - 1];
+      if (
+        lastContent &&
+        lastContent.role === 'model' &&
+        content.role === 'model' &&
+        lastContent.parts
+      ) {
+        lastContent.parts.push(...(content.parts || []));
+      } else {
+        consolidatedOutputContents.push(content);
+      }
+    }
+
+    if (consolidatedOutputContents.length > 0) {
+      const lastHistoryEntry = this.history[this.history.length - 1];
+      // Only merge if AFC history was NOT just added, to prevent merging with last AFC model turn.
+      const canMergeWithLastHistory =
+        !automaticFunctionCallingHistory ||
+        automaticFunctionCallingHistory.length === 0;
+
+      if (
+        canMergeWithLastHistory &&
+        lastHistoryEntry &&
+        lastHistoryEntry.role === 'model' &&
+        lastHistoryEntry.parts &&
+        consolidatedOutputContents[0].role === 'model'
+      ) {
+        lastHistoryEntry.parts.push(
+          ...(consolidatedOutputContents[0].parts || []),
+        );
+        consolidatedOutputContents.shift(); // Remove the first element as it's merged
+      }
+      this.history.push(...consolidatedOutputContents);
+    }
   }
 }
