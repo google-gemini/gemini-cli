@@ -42,7 +42,7 @@ Returns the MCP server response as a json string.
       name,
       description,
       parameterSchema,
-      false, // isOutputMarkdown
+      true, // isOutputMarkdown
       false, // canUpdateOutput
     );
   }
@@ -93,9 +93,10 @@ Returns the MCP server response as a json string.
         timeout: this.timeout ?? MCP_TOOL_DEFAULT_TIMEOUT_MSEC,
       },
     );
+    const output = '```json\n' + JSON.stringify(result, null, 2) + '\n```';
     return {
-      llmContent: JSON.stringify(result, null, 2),
-      returnDisplay: JSON.stringify(result, null, 2),
+      llmContent: output,
+      returnDisplay: output,
     };
   }
 }

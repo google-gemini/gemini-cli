@@ -116,7 +116,8 @@ describe('DiscoveredMCPTool', () => {
           timeout: MCP_TOOL_DEFAULT_TIMEOUT_MSEC,
         },
       );
-      const expectedOutput = JSON.stringify(expectedMcpResult, null, 2);
+      const expectedOutput =
+        '```json\n' + JSON.stringify(expectedMcpResult, null, 2) + '\n```';
       expect(result.llmContent).toBe(expectedOutput);
       expect(result.returnDisplay).toBe(expectedOutput);
     });

@@ -768,7 +768,8 @@ describe('DiscoveredMCPTool', () => {
         timeout: 10 * 60 * 1000,
       },
     );
-    const expectedOutput = JSON.stringify(mcpResult, null, 2);
+    const expectedOutput =
+      '```json\n' + JSON.stringify(mcpResult, null, 2) + '\n```';
     expect(result.llmContent).toBe(expectedOutput);
     expect(result.returnDisplay).toBe(expectedOutput);
   });
