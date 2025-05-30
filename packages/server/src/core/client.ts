@@ -23,6 +23,7 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 export class GeminiClient {
   private client: GoogleGenAI;
@@ -194,16 +195,20 @@ export class GeminiClient {
         ...config,
       };
 
-      const result = await this.client.models.generateContent({
-        model,
-        config: {
-          ...requestConfig,
-          systemInstruction,
-          responseSchema: schema,
-          responseMimeType: 'application/json',
-        },
-        contents,
-      });
+      const apiCall = () =>
+        this.client.models.generateContent({
+          model,
+          config: {
+            ...requestConfig,
+            systemInstruction,
+            responseSchema: schema,
+            responseMimeType: 'application/json',
+          },
+          contents,
+        });
+
+      const result = await retryWithBackoff(apiCall);
+
       const text = getResponseText(result);
       if (!text) {
         const error = new Error(

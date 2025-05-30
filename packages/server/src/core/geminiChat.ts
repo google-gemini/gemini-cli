@@ -16,6 +16,7 @@ import {
   GoogleGenAI,
   createUserContent,
 } from '@google/genai';
+import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 
 /**
@@ -152,11 +153,16 @@ export class GeminiChat {
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
-    const responsePromise = this.modelsModule.generateContent({
-      model: this.model,
-      contents: this.getHistory(true).concat(userContent),
-      config: { ...this.config, ...params.config },
-    });
+
+    const apiCall = () =>
+      this.modelsModule.generateContent({
+        model: this.model,
+        contents: this.getHistory(true).concat(userContent),
+        config: { ...this.config, ...params.config },
+      });
+
+    const responsePromise = retryWithBackoff(apiCall);
+
     this.sendPromise = (async () => {
       const response = await responsePromise;
       const outputContent = response.candidates?.[0]?.content;
@@ -216,19 +222,37 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
-    const streamResponse = this.modelsModule.generateContentStream({
-      model: this.model,
-      contents: this.getHistory(true).concat(userContent),
-      config: { ...this.config, ...params.config },
+
+    const apiCall = () =>
+      this.modelsModule.generateContentStream({
+        model: this.model,
+        contents: this.getHistory(true).concat(userContent),
+        config: { ...this.config, ...params.config },
+      });
+
+    // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
+    // for transient issues internally before yielding the async generator, this retry will re-initiate
+    // the stream. For simple 429/500 errors on initial call, this is fine.
+    // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
+    const streamResponse = await retryWithBackoff(apiCall, {
+      shouldRetry: (error: Error) => {
+        // Check error messages for status codes, or specific error names if known
+        if (error && error.message) {
+          if (error.message.includes('429')) return true;
+          if (error.message.match(/5\d{2}/)) return true;
+        }
+        return false; // Don't retry other errors by default
+      },
     });
+
     // Resolve the internal tracking of send completion promise - `sendPromise`
     // for both success and failure response. The actual failure is still
     // propagated by the `await streamResponse`.
-    this.sendPromise = streamResponse
+    this.sendPromise = Promise.resolve(streamResponse)
       .then(() => undefined)
       .catch(() => undefined);
-    const response = await streamResponse;
-    const result = this.processStreamResponse(response, userContent);
+
+    const result = this.processStreamResponse(streamResponse, userContent);
     return result;
   }
 

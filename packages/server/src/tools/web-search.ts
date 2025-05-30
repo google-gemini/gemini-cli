@@ -11,6 +11,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -121,13 +122,16 @@ export class WebSearchTool extends BaseTool<
     }
 
     try {
-      const response = await this.ai.models.generateContent({
-        model: this.modelName,
-        contents: [{ role: 'user', parts: [{ text: params.query }] }],
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      });
+      const apiCall = () =>
+        this.ai.models.generateContent({
+          model: this.modelName,
+          contents: [{ role: 'user', parts: [{ text: params.query }] }],
+          config: {
+            tools: [{ googleSearch: {} }],
+          },
+        });
+
+      const response = await retryWithBackoff(apiCall);
 
       const responseText = getResponseText(response);
       const groundingMetadata = response.candidates?.[0]?.groundingMetadata;

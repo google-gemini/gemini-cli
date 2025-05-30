@@ -10,6 +10,7 @@ import { BaseTool, ToolResult } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 // Interfaces for grounding metadata (similar to web-search.ts)
 interface GroundingChunkWeb {
@@ -121,18 +122,21 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     const userPrompt = params.prompt;
 
     try {
-      const response = await this.ai.models.generateContent({
-        model: this.modelName,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: userPrompt }],
+      const apiCall = () =>
+        this.ai.models.generateContent({
+          model: this.modelName,
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: userPrompt }],
+            },
+          ],
+          config: {
+            tools: [{ urlContext: {} }],
           },
-        ],
-        config: {
-          tools: [{ urlContext: {} }],
-        },
-      });
+        });
+
+      const response = await retryWithBackoff(apiCall);
 
       console.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(0, 50)}...":`,
