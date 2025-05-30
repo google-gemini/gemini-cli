@@ -541,6 +541,18 @@ export function mapToDisplay(
 ): HistoryItemToolGroup {
   const tools = Array.isArray(tool) ? tool : [tool];
   const toolsDisplays = tools.map((t): IndividualToolCallDisplay => {
+    // Determine if markdown rendering should be skipped for this tool
+    let renderOutputAsMarkdown = true; // Default to true
+    if (t.status === 'error') {
+      // For errors, the tool object might not be available, so check t.request.name
+      if (t.request.name === 'execute_bash_command') {
+        renderOutputAsMarkdown = false;
+      }
+    } else if ('tool' in t && t.tool?.name === 'execute_bash_command') {
+      // For other statuses, check t.tool.name if tool exists
+      renderOutputAsMarkdown = false;
+    }
+
     switch (t.status) {
       case 'success':
         return {
@@ -550,15 +562,17 @@ export function mapToDisplay(
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       case 'error':
         return {
           callId: t.request.callId,
-          name: t.request.name,
-          description: '',
+          name: t.request.name, // Use request.name as tool might be undefined
+          description: '', // No description available if tool is undefined
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       case 'cancelled':
         return {
@@ -568,6 +582,7 @@ export function mapToDisplay(
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       case 'awaiting_approval':
         return {
@@ -577,6 +592,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: t.confirmationDetails,
+          renderOutputAsMarkdown,
         };
       case 'executing':
         return {
@@ -586,6 +602,7 @@ export function mapToDisplay(
           resultDisplay: t.liveOutput ?? undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       case 'validating': // Add this case
         return {
@@ -595,6 +612,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       case 'scheduled':
         return {
@@ -604,6 +622,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
+          renderOutputAsMarkdown,
         };
       default: {
         // ensures every case is checked for above

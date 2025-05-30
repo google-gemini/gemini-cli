@@ -21,6 +21,7 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 export interface ToolMessageProps extends IndividualToolCallDisplay {
   availableTerminalHeight: number;
   emphasis?: TextEmphasis;
+  renderOutputAsMarkdown?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -30,6 +31,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   status,
   availableTerminalHeight,
   emphasis = 'medium',
+  renderOutputAsMarkdown = true,
 }) => {
   const contentHeightEstimate =
     availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT;
@@ -76,15 +78,22 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 </Text>
               </Box>
             )}
-            {typeof displayableResult === 'string' && (
-              <Box flexDirection="column">
-                <MarkdownDisplay
-                  text={displayableResult}
-                  isPending={false}
-                  availableTerminalHeight={availableTerminalHeight}
-                />
-              </Box>
-            )}
+            {typeof displayableResult === 'string' &&
+              renderOutputAsMarkdown && (
+                <Box flexDirection="column">
+                  <MarkdownDisplay
+                    text={displayableResult}
+                    isPending={false}
+                    availableTerminalHeight={availableTerminalHeight}
+                  />
+                </Box>
+              )}
+            {typeof displayableResult === 'string' &&
+              !renderOutputAsMarkdown && (
+                <Box flexDirection="column">
+                  <Text>{displayableResult}</Text>
+                </Box>
+              )}
             {typeof displayableResult !== 'string' && (
               <DiffRenderer
                 diffContent={displayableResult.fileDiff}

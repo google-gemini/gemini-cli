@@ -49,6 +49,7 @@ export interface IndividualToolCallDisplay {
   resultDisplay: ToolResultDisplay | undefined;
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
+  renderOutputAsMarkdown?: boolean;
 }
 
 export interface HistoryItemBase {
