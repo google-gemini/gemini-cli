@@ -34,6 +34,16 @@ export interface Tool<
   schema: FunctionDeclaration;
 
   /**
+   * Whether the tool's output should be rendered as markdown
+   */
+  isOutputMarkdown: boolean;
+
+  /**
+   * Whether the tool supports live (streaming) output
+   */
+  canUpdateOutput: boolean;
+
+  /**
    * Validates the parameters for the tool
    * Should be called from both `shouldConfirmExecute` and `execute`
    * `shouldConfirmExecute` should return false immediately if invalid
@@ -85,6 +95,8 @@ export abstract class BaseTool<
    * @param name Internal name of the tool (used for API calls)
    * @param displayName User-friendly display name of the tool
    * @param description Description of what the tool does
+   * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
+   * @param canUpdateOutput Whether the tool supports live (streaming) output
    * @param parameterSchema JSON Schema defining the parameters
    */
   constructor(
@@ -92,6 +104,8 @@ export abstract class BaseTool<
     readonly displayName: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
+    readonly isOutputMarkdown: boolean = true,
+    readonly canUpdateOutput: boolean = false,
   ) {}
 
   /**

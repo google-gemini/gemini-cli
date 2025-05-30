@@ -288,41 +288,40 @@ export function useToolScheduler(
           const callId = t.request.callId;
           setToolCalls(setStatus(t.request.callId, 'executing'));
 
-          const updateOutput =
-            t.tool.name === 'execute_bash_command'
-              ? (output: string) => {
-                  setPendingHistoryItem(
-                    (prevItem: HistoryItemWithoutId | null) => {
-                      if (prevItem?.type === 'tool_group') {
-                        return {
-                          ...prevItem,
-                          tools: prevItem.tools.map(
-                            (toolDisplay: IndividualToolCallDisplay) =>
-                              toolDisplay.callId === callId &&
-                              toolDisplay.status === ToolCallStatus.Executing
-                                ? {
-                                    ...toolDisplay,
-                                    resultDisplay: output,
-                                  }
-                                : toolDisplay,
-                          ),
-                        };
-                      }
-                      return prevItem;
-                    },
-                  );
-                  // Also update the toolCall itself so that mapToDisplay
-                  // can pick up the live output if the item is not pending
-                  // (e.g. if it's being re-rendered from history)
-                  setToolCalls((prevToolCalls) =>
-                    prevToolCalls.map((tc) =>
-                      tc.request.callId === callId && tc.status === 'executing'
-                        ? { ...tc, liveOutput: output }
-                        : tc,
-                    ),
-                  );
-                }
-              : undefined;
+          const updateOutput = t.tool.canUpdateOutput
+            ? (output: string) => {
+                setPendingHistoryItem(
+                  (prevItem: HistoryItemWithoutId | null) => {
+                    if (prevItem?.type === 'tool_group') {
+                      return {
+                        ...prevItem,
+                        tools: prevItem.tools.map(
+                          (toolDisplay: IndividualToolCallDisplay) =>
+                            toolDisplay.callId === callId &&
+                            toolDisplay.status === ToolCallStatus.Executing
+                              ? {
+                                  ...toolDisplay,
+                                  resultDisplay: output,
+                                }
+                              : toolDisplay,
+                        ),
+                      };
+                    }
+                    return prevItem;
+                  },
+                );
+                // Also update the toolCall itself so that mapToDisplay
+                // can pick up the live output if the item is not pending
+                // (e.g. if it's being re-rendered from history)
+                setToolCalls((prevToolCalls) =>
+                  prevToolCalls.map((tc) =>
+                    tc.request.callId === callId && tc.status === 'executing'
+                      ? { ...tc, liveOutput: output }
+                      : tc,
+                  ),
+                );
+              }
+            : undefined;
 
           t.tool
             .execute(t.request.args, signal, updateOutput)
@@ -541,18 +540,6 @@ export function mapToDisplay(
 ): HistoryItemToolGroup {
   const tools = Array.isArray(tool) ? tool : [tool];
   const toolsDisplays = tools.map((t): IndividualToolCallDisplay => {
-    // Determine if markdown rendering should be skipped for this tool
-    let renderOutputAsMarkdown = true; // Default to true
-    if (t.status === 'error') {
-      // For errors, the tool object might not be available, so check t.request.name
-      if (t.request.name === 'execute_bash_command') {
-        renderOutputAsMarkdown = false;
-      }
-    } else if ('tool' in t && t.tool?.name === 'execute_bash_command') {
-      // For other statuses, check t.tool.name if tool exists
-      renderOutputAsMarkdown = false;
-    }
-
     switch (t.status) {
       case 'success':
         return {
@@ -562,7 +549,7 @@ export function mapToDisplay(
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       case 'error':
         return {
@@ -572,7 +559,7 @@ export function mapToDisplay(
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: false,
         };
       case 'cancelled':
         return {
@@ -582,7 +569,7 @@ export function mapToDisplay(
           resultDisplay: t.response.resultDisplay,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       case 'awaiting_approval':
         return {
@@ -592,7 +579,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: t.confirmationDetails,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       case 'executing':
         return {
@@ -602,7 +589,7 @@ export function mapToDisplay(
           resultDisplay: t.liveOutput ?? undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       case 'validating': // Add this case
         return {
@@ -612,7 +599,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       case 'scheduled':
         return {
@@ -622,7 +609,7 @@ export function mapToDisplay(
           resultDisplay: undefined,
           status: mapStatus(t.status),
           confirmationDetails: undefined,
-          renderOutputAsMarkdown,
+          renderOutputAsMarkdown: t.tool.isOutputMarkdown,
         };
       default: {
         // ensures every case is checked for above
