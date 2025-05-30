@@ -37,7 +37,7 @@ export const useShellCommandProcessor = (
    * @returns True if the query was handled as a shell command, false otherwise.
    */
   const handleShellCommand = useCallback(
-    (rawQuery: PartListUnion): boolean => {
+    (rawQuery: PartListUnion, signal?: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string') {
         return false;
       }
@@ -120,6 +120,7 @@ export const useShellCommandProcessor = (
           const child = spawn('bash', ['-c', commandToExecute], {
             cwd: targetDir,
             stdio: ['ignore', 'pipe', 'pipe'],
+            detached: true, // Important for process group killing
           });
 
           let exited = false;
@@ -148,18 +149,75 @@ export const useShellCommandProcessor = (
             error = err;
           });
 
-          child.on('exit', (code, signal) => {
+          const abortHandler = () => {
+            if (child.pid && !exited) {
+              onDebugMessage(
+                `Aborting shell command (PID: ${child.pid}) due to signal.`,
+              );
+              try {
+                // attempt to SIGTERM process group (negative PID)
+                // if SIGTERM fails after 200ms, attempt SIGKILL
+                process.kill(-child.pid, 'SIGTERM');
+                setTimeout(() => {
+                  // if SIGTERM fails, attempt SIGKILL
+                  try {
+                    if (child.pid && !exited) {
+                      process.kill(-child.pid, 'SIGKILL');
+                    }
+                  } catch (_e) {
+                    console.error(
+                      `failed to kill shell process ${child.pid}: ${_e}`,
+                    );
+                  }
+                }, 200);
+              } catch (_e) {
+                // if group kill fails, fall back to killing just the main process
+                try {
+                  if (child.pid) {
+                    child.kill('SIGKILL');
+                  }
+                } catch (_e) {
+                  console.error(
+                    `failed to kill shell process ${child.pid}: ${_e}`,
+                  );
+                }
+              }
+            }
+          };
+
+          if (signal) {
+            if (signal.aborted) {
+              abortHandler();
+              // No need to add listener if already aborted
+            } else {
+              signal.addEventListener('abort', abortHandler, { once: true });
+            }
+          }
+
+          child.on('exit', (code, processSignal) => {
             exited = true;
+            if (signal) {
+              signal.removeEventListener('abort', abortHandler);
+            }
             setPendingHistoryItem(null);
             output = output.trim() || '(Command produced no output)';
             if (error) {
               const text = `${error.message.replace(commandToExecute, rawQuery)}\n${output}`;
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
-            } else if (code !== 0) {
+            } else if (code !== null && code !== 0) {
               const text = `Command exited with code ${code}\n${output}`;
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
-            } else if (signal) {
-              const text = `Command terminated with signal ${signal}\n${output}`;
+            } else if (signal?.aborted) {
+              addItemToHistory(
+                {
+                  type: 'info',
+                  text: `Command was cancelled.\n${output}`,
+                },
+                userMessageTimestamp,
+              );
+            } else if (processSignal) {
+              const text = `Command terminated with signal ${processSignal}
+${output}`;
               addItemToHistory({ type: 'error', text }, userMessageTimestamp);
             } else {
               addItemToHistory(

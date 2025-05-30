@@ -199,7 +199,7 @@ export const useGeminiStream = (
           return { queryToSend: null, shouldProceed: false }; // Handled by scheduling the tool
         }
 
-        if (shellModeActive && handleShellCommand(trimmedQuery)) {
+        if (shellModeActive && handleShellCommand(trimmedQuery, signal)) {
           return { queryToSend: null, shouldProceed: false };
         }
 
@@ -492,7 +492,7 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
       setShowHelp(false);
 
-      abortControllerRef.current ??= new AbortController();
+      abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(

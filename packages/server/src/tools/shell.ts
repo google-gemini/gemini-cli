@@ -25,8 +25,6 @@ export interface ShellToolParams {
 }
 import { spawn } from 'child_process';
 
-const OUTPUT_UPDATE_INTERVAL_MS = 1000;
-
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'execute_bash_command';
   private whitelist: Set<string> = new Set();
@@ -126,7 +124,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   async execute(
     params: ShellToolParams,
     abortSignal: AbortSignal,
-    updateOutput?: (output: string) => void,
+    onOutputChunk?: (chunk: string) => void,
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -157,19 +155,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let exited = false;
     let stdout = '';
     let output = '';
-    let lastUpdateTime = Date.now();
-
-    const appendOutput = (str: string) => {
-      output += str;
-      if (
-        updateOutput &&
-        Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
-      ) {
-        updateOutput(output);
-        lastUpdateTime = Date.now();
-      }
-    };
-
     shell.stdout.on('data', (data: Buffer) => {
       // continue to consume post-exit for background processes
       // removing listeners can overflow OS buffer and block subprocesses
@@ -177,7 +162,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (!exited) {
         const str = data.toString();
         stdout += str;
-        appendOutput(str);
+        output += str;
+        if (onOutputChunk) {
+          onOutputChunk(str);
+        }
       }
     });
 
@@ -186,7 +174,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (!exited) {
         const str = data.toString();
         stderr += str;
-        appendOutput(str);
+        output += str;
+        if (onOutputChunk) {
+          onOutputChunk(str);
+        }
       }
     });
 
@@ -210,16 +201,28 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     shell.on('exit', exitHandler);
 
     const abortHandler = () => {
-      if (shell.pid) {
+      if (shell.pid && !exited) {
         try {
-          // Kill the entire process group
+          // attempt to SIGTERM process group (negative PID)
+          // if SIGTERM fails after 200ms, attempt SIGKILL
           process.kill(-shell.pid, 'SIGTERM');
+          setTimeout(() => {
+            try {
+              if (shell.pid && !exited) {
+                process.kill(-shell.pid, 'SIGKILL');
+              }
+            } catch (_e) {
+              console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
+            }
+          }, 200);
         } catch (_e) {
-          // Fallback to killing the main process if group kill fails
+          // if group kill fails, fall back to killing just the main process
           try {
-            shell.kill('SIGKILL'); // or 'SIGTERM'
-          } catch (_killError) {
-            // Ignore errors if the process is already dead
+            if (shell.pid) {
+              shell.kill('SIGKILL');
+            }
+          } catch (_e) {
+            console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
           }
         }
       }
