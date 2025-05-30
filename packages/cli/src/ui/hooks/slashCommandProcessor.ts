@@ -7,11 +7,13 @@
 import { useCallback, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
 import open from 'open';
+import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { Config } from '@gemini-code/server';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { formatMemoryUsage } from '../utils/formatters.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -206,6 +208,7 @@ export const useSlashCommandProcessor = (
             sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
+          const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
           const diagnosticInfo = `
 ## Describe the bug
@@ -220,6 +223,7 @@ Add any other context about the problem here.
 *   **Operating System:** ${osVersion}
 *   **Sandbox Environment:** ${sandboxEnv}
 *   **Model Version:** ${modelVersion}
+*   **Memory Usage:** ${memoryUsage}
 `;
 
           let bugReportUrl =

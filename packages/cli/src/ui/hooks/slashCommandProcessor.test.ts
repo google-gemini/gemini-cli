@@ -9,9 +9,37 @@ const { mockProcessExit } = vi.hoisted(() => ({
 }));
 
 vi.mock('node:process', () => ({
+  default: {
+    exit: mockProcessExit,
+    cwd: vi.fn(() => '/mock/cwd'),
+    get env() {
+      return process.env;
+    }, // Use a getter to ensure current process.env is used
+    platform: 'test-platform',
+    version: 'test-node-version',
+    memoryUsage: vi.fn(() => ({
+      rss: 12345678,
+      heapTotal: 23456789,
+      heapUsed: 10234567,
+      external: 1234567,
+      arrayBuffers: 123456,
+    })),
+  },
+  // Provide top-level exports as well for compatibility
   exit: mockProcessExit,
   cwd: vi.fn(() => '/mock/cwd'),
-  env: { ...process.env },
+  get env() {
+    return process.env;
+  }, // Use a getter here too
+  platform: 'test-platform',
+  version: 'test-node-version',
+  memoryUsage: vi.fn(() => ({
+    rss: 12345678,
+    heapTotal: 23456789,
+    heapUsed: 10234567,
+    external: 1234567,
+    arrayBuffers: 123456,
+  })),
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -227,7 +255,7 @@ describe('useSlashCommandProcessor', () => {
       seatbeltProfileVar?: string,
     ) => {
       const cliVersion = 'test-version';
-      const osVersion = `${process.platform} ${process.version}`;
+      const osVersion = 'test-platform test-node-version';
       let sandboxEnvStr = 'no sandbox';
       if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {
         sandboxEnvStr = sandboxEnvVar.replace(/^gemini-(?:code-)?/, '');
@@ -235,6 +263,8 @@ describe('useSlashCommandProcessor', () => {
         sandboxEnvStr = `sandbox-exec (${seatbeltProfileVar || 'unknown'})`;
       }
       const modelVersion = 'test-model';
+      // Use the mocked memoryUsage value
+      const memoryUsage = '11.8 MB';
 
       const diagnosticInfo = `
 ## Describe the bug
@@ -249,6 +279,7 @@ Add any other context about the problem here.
 *   **Operating System:** ${osVersion}
 *   **Sandbox Environment:** ${sandboxEnvStr}
 *   **Model Version:** ${modelVersion}
+*   **Memory Usage:** ${memoryUsage}
 `;
       let url =
         'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.md';

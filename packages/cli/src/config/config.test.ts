@@ -7,16 +7,10 @@
 // packages/cli/src/config/config.test.ts
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-// import * as fsPromises from 'fs/promises';
-// import * as fsSync from 'fs';
 import * as os from 'os';
-// import * as path from 'path'; // Unused, so removing
-// import { readPackageUp } from 'read-package-up';
-// import {
-//   loadHierarchicalGeminiMemory,
-// } from './config';
-// import { Settings } from './settings';
-// import * as ServerConfig from '@gemini-code/server';
+import { loadCliConfig } from './config.js';
+import { Settings } from './settings.js';
+import * as ServerConfig from '@gemini-code/server';
 
 const MOCK_HOME_DIR = '/mock/home/user';
 
@@ -28,7 +22,92 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-// Further mocking of fs, read-package-up, etc. would go here if tests were active.
+vi.mock('read-package-up', () => ({
+  readPackageUp: vi.fn(() =>
+    Promise.resolve({ packageJson: { version: 'test-version' } }),
+  ),
+}));
+
+vi.mock('@gemini-code/server', async () => {
+  const actualServer = await vi.importActual<typeof ServerConfig>(
+    '@gemini-code/server',
+  );
+  return {
+    ...actualServer,
+    loadEnvironment: vi.fn(),
+    createServerConfig: vi.fn((params) => ({
+      // Mock the config object and its methods
+      getApiKey: () => params.apiKey,
+      getModel: () => params.model,
+      getSandbox: () => params.sandbox,
+      getTargetDir: () => params.targetDir,
+      getDebugMode: () => params.debugMode,
+      getQuestion: () => params.question,
+      getFullContext: () => params.fullContext,
+      getCoreTools: () => params.coreTools,
+      getToolDiscoveryCommand: () => params.toolDiscoveryCommand,
+      getToolCallCommand: () => params.toolCallCommand,
+      getMcpServerCommand: () => params.mcpServerCommand,
+      getMcpServers: () => params.mcpServers,
+      getUserAgent: () => params.userAgent,
+      getUserMemory: () => params.userMemory,
+      getGeminiMdFileCount: () => params.geminiMdFileCount,
+      getVertexAI: () => params.vertexai,
+      getShowMemoryUsage: () => params.showMemoryUsage, // Added for the test
+      // Add any other methods that are called on the config object
+      setUserMemory: vi.fn(),
+      setGeminiMdFileCount: vi.fn(),
+    })),
+    loadServerHierarchicalMemory: vi.fn(() =>
+      Promise.resolve({ memoryContent: '', fileCount: 0 }),
+    ),
+  };
+});
+
+describe('loadCliConfig', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME_DIR);
+    process.env.GEMINI_API_KEY = 'test-api-key'; // Ensure API key is set for tests
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should set showMemoryUsage to true when --memory flag is present', async () => {
+    process.argv = ['node', 'script.js', '--show_memory_usage'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings);
+    expect(config.getShowMemoryUsage()).toBe(true);
+  });
+
+  it('should set showMemoryUsage to false when --memory flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings);
+    expect(config.getShowMemoryUsage()).toBe(false);
+  });
+
+  it('should set showMemoryUsage to false by default from settings if CLI flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { showMemoryUsage: false };
+    const config = await loadCliConfig(settings);
+    expect(config.getShowMemoryUsage()).toBe(false);
+  });
+
+  it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
+    process.argv = ['node', 'script.js', '--show_memory_usage'];
+    const settings: Settings = { showMemoryUsage: false };
+    const config = await loadCliConfig(settings);
+    expect(config.getShowMemoryUsage()).toBe(true);
+  });
+});
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {

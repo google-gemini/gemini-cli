@@ -35,6 +35,7 @@ interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   all_files: boolean | undefined;
+  show_memory_usage: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -65,6 +66,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'a',
       type: 'boolean',
       description: 'Include ALL files in context?',
+      default: false,
+    })
+    .option('show_memory_usage', {
+      type: 'boolean',
+      description: 'Show memory usage in status bar',
       default: false,
     })
     .help()
@@ -152,6 +158,7 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     vertexai: useVertexAI,
+    showMemoryUsage: argv.show_memory_usage || false,
   };
 
   return createServerConfig(configParams);

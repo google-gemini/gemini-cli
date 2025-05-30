@@ -442,6 +442,9 @@ export const App = ({
             corgiMode={corgiMode}
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}
+            showMemoryUsage={
+              config.getDebugMode() || config.getShowMemoryUsage()
+            }
           />
         </Box>
       </Box>

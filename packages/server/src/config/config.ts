@@ -54,6 +54,7 @@ export interface ConfigParameters {
   geminiMdFileCount?: number;
   alwaysSkipModificationConfirmation?: boolean;
   vertexai?: boolean;
+  showMemoryUsage?: boolean;
 }
 
 export class Config {
@@ -75,6 +76,7 @@ export class Config {
   private geminiMdFileCount: number;
   private alwaysSkipModificationConfirmation: boolean;
   private readonly vertexai: boolean | undefined;
+  private readonly showMemoryUsage: boolean;
 
   constructor(params: ConfigParameters) {
     this.apiKey = params.apiKey;
@@ -95,6 +97,7 @@ export class Config {
     this.alwaysSkipModificationConfirmation =
       params.alwaysSkipModificationConfirmation ?? false;
     this.vertexai = params.vertexai;
+    this.showMemoryUsage = params.showMemoryUsage ?? false;
 
     this.toolRegistry = createToolRegistry(this);
   }
@@ -180,6 +183,10 @@ export class Config {
 
   getVertexAI(): boolean | undefined {
     return this.vertexai;
+  }
+
+  getShowMemoryUsage(): boolean {
+    return this.showMemoryUsage;
   }
 }
 

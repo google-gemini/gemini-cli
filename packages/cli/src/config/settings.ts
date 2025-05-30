@@ -27,6 +27,7 @@ export interface Settings {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  showMemoryUsage?: boolean;
   // Add other settings here.
 }
 

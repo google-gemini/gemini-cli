@@ -9,6 +9,8 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { shortenPath, tildeifyPath } from '@gemini-code/server';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
+import process from 'node:process';
+import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 
 interface FooterProps {
   model: string;
@@ -20,6 +22,7 @@ interface FooterProps {
   corgiMode: boolean;
   errorCount: number;
   showErrorDetails: boolean;
+  showMemoryUsage?: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -31,6 +34,7 @@ export const Footer: React.FC<FooterProps> = ({
   corgiMode,
   errorCount,
   showErrorDetails,
+  showMemoryUsage,
 }) => (
   <Box marginTop={1} justifyContent="space-between" width="100%">
     <Box>
@@ -86,6 +90,7 @@ export const Footer: React.FC<FooterProps> = ({
           <ConsoleSummaryDisplay errorCount={errorCount} />
         </Box>
       )}
+      {showMemoryUsage && <MemoryUsageDisplay />}
     </Box>
   </Box>
 );
