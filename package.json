@@ -34,7 +34,7 @@
     "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
     "publish:sandbox": "scripts/publish-sandbox.sh",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
-    "publish:release": "npm run build:packages && npm run build:docker && npm run tag:docker && npm run prepare:cli-packagejson && npm run publish:sandbox && npm run publish:npm"
+    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:docker && npm run tag:docker && npm run publish:sandbox && npm run publish:npm"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
