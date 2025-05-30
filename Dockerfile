@@ -1,6 +1,7 @@
 FROM docker.io/library/node:20-slim
 
-# ENV SANDBOX="gemini-cli-sandbox"
+ARG SANDBOX_NAME="gemini-cli-sandbox"
+ENV SANDBOX="$SANDBOX_NAME"
 
 # install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
