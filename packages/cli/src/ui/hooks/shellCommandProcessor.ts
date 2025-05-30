@@ -16,6 +16,8 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 
+const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
 /**
  * Hook to process shell commands (e.g., !ls, $pwd).
  * Executes the command in the target directory and adds output/errors to history.
@@ -122,16 +124,20 @@ export const useShellCommandProcessor = (
 
           let exited = false;
           let output = '';
+          let lastUpdateTime = Date.now();
           const handleOutput = (data: string) => {
             // continue to consume post-exit for background processes
             // removing listeners can overflow OS buffer and block subprocesses
             // destroying (e.g. child.stdout.destroy()) can terminate subprocesses via SIGPIPE
             if (!exited) {
               output += data;
-              setPendingHistoryItem({
-                type: 'info',
-                text: output,
-              });
+              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                setPendingHistoryItem({
+                  type: 'info',
+                  text: output,
+                });
+                lastUpdateTime = Date.now();
+              }
             }
           };
           child.stdout.on('data', handleOutput);

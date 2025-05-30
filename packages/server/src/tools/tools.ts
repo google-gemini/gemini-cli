@@ -68,7 +68,7 @@ export interface Tool<
   execute(
     params: TParams,
     signal: AbortSignal,
-    onOutputChunk?: (chunk: string) => void,
+    updateOutput?: (output: string) => void,
   ): Promise<TResult>;
 }
 
@@ -154,7 +154,7 @@ export abstract class BaseTool<
   abstract execute(
     params: TParams,
     signal: AbortSignal,
-    onOutputChunk?: (chunk: string) => void,
+    updateOutput?: (output: string) => void,
   ): Promise<TResult>;
 }
 

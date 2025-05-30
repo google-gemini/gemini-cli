@@ -288,11 +288,9 @@ export function useToolScheduler(
           const callId = t.request.callId;
           setToolCalls(setStatus(t.request.callId, 'executing'));
 
-          let accumulatedOutput = '';
-          const onOutputChunk =
+          const updateOutput =
             t.tool.name === 'execute_bash_command'
-              ? (chunk: string) => {
-                  accumulatedOutput += chunk;
+              ? (output: string) => {
                   setPendingHistoryItem(
                     (prevItem: HistoryItemWithoutId | null) => {
                       if (prevItem?.type === 'tool_group') {
@@ -304,7 +302,7 @@ export function useToolScheduler(
                               toolDisplay.status === ToolCallStatus.Executing
                                 ? {
                                     ...toolDisplay,
-                                    resultDisplay: accumulatedOutput,
+                                    resultDisplay: output,
                                   }
                                 : toolDisplay,
                           ),
@@ -319,7 +317,7 @@ export function useToolScheduler(
                   setToolCalls((prevToolCalls) =>
                     prevToolCalls.map((tc) =>
                       tc.request.callId === callId && tc.status === 'executing'
-                        ? { ...tc, liveOutput: accumulatedOutput }
+                        ? { ...tc, liveOutput: output }
                         : tc,
                     ),
                   );
@@ -327,7 +325,7 @@ export function useToolScheduler(
               : undefined;
 
           t.tool
-            .execute(t.request.args, signal, onOutputChunk)
+            .execute(t.request.args, signal, updateOutput)
             .then((result: ToolResult) => {
               if (signal.aborted) {
                 // TODO(jacobr): avoid stringifying the LLM content.
