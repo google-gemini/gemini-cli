@@ -47,7 +47,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const displayableResult = React.useMemo(
     () =>
       resultIsString
-        ? lines.slice(0, contentHeightEstimate).join('\n')
+        ? lines.slice(-contentHeightEstimate).join('\n')
         : resultDisplay,
     [lines, resultIsString, contentHeightEstimate, resultDisplay],
   );
@@ -66,8 +66,16 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {displayableResult && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%">
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
+            {hiddenLines > 0 && (
+              <Box>
+                <Text color={Colors.SubtleComment}>
+                  ... first {hiddenLines} line{hiddenLines === 1 ? '' : 's'}{' '}
+                  hidden ...
+                </Text>
+              </Box>
+            )}
             {typeof displayableResult === 'string' && (
               <Box flexDirection="column">
                 <MarkdownDisplay
@@ -82,14 +90,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 diffContent={displayableResult.fileDiff}
                 filename={displayableResult.fileName}
               />
-            )}
-            {hiddenLines > 0 && (
-              <Box>
-                <Text color={Colors.SubtleComment}>
-                  ... {hiddenLines} more line{hiddenLines === 1 ? '' : 's'}{' '}
-                  hidden ...
-                </Text>
-              </Box>
             )}
           </Box>
         </Box>
