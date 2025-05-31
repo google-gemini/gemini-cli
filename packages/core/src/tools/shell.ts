@@ -282,6 +282,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         `Exit Code: ${code ?? '(none)'}`,
         `Signal: ${processSignal ?? '(none)'}`,
         `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
+        `Process Group PGID: ${shell.pid ?? '(none)'}`,
       ].join('\n');
     }
 

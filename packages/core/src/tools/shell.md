@@ -1,6 +1,7 @@
 This tool executes a given shell command as `bash -c <command>`.
 Command can start background processes using `&`.
-Command itself is executed as a subprocess.
+Command is executed as a subprocess that leads its own process group.
+Command process group can be terminated as `kill -- -PGID` or signaled as `kill -s SIGNAL -- -PGID`.
 
 The following information is returned:
 
@@ -12,3 +13,4 @@ Error: Error or `(none)` if no error was reported for the subprocess.
 Exit Code: Exit code or `(none)` if terminated by signal.
 Signal: Signal number or `(none)` if no signal was received.
 Background PIDs: List of background processes started or `(none)`.
+Process Group PGID: Process group started or `(none)`
