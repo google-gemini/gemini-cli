@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach /*, afterEach */ } from 'vitest'; // afterEach removed as it was unused
-import { Config, createServerConfig, ConfigParameters } from './config.js'; // Adjust import path
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Config, createServerConfig, ConfigParameters } from './config.js';
 import * as path from 'path';
-// import { ToolRegistry } from '../tools/tool-registry'; // ToolRegistry removed as it was unused
+import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -30,6 +30,12 @@ vi.mock('../tools/shell');
 vi.mock('../tools/write-file');
 vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
+vi.mock('../tools/memoryTool', () => ({
+  MemoryTool: vi.fn(),
+  setGeminiMdFilename: vi.fn(),
+  getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
+  DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
+}));
 
 describe('Server Config (config.ts)', () => {
   const API_KEY = 'server-api-key';
@@ -105,5 +111,35 @@ describe('Server Config (config.ts)', () => {
     };
     const config = createServerConfig(paramsWithRelativeDir);
     expect(config.getTargetDir()).toBe(expectedResolvedDir);
+  });
+
+  it('createServerConfig should call setGeminiMdFilename with contextFileName if provided', () => {
+    const contextFileName = 'CUSTOM_AGENTS.md';
+    const paramsWithContextFile: ConfigParameters = {
+      ...baseParams,
+      contextFileName,
+    };
+    createServerConfig(paramsWithContextFile);
+    expect(mockSetGeminiMdFilename).toHaveBeenCalledWith(contextFileName);
+  });
+
+  it('createServerConfig should not call setGeminiMdFilename if contextFileName is not provided', () => {
+    createServerConfig(baseParams); // baseParams does not have contextFileName
+    expect(mockSetGeminiMdFilename).not.toHaveBeenCalled();
+  });
+
+  it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {
+    const contextFileName = 'CUSTOM_AGENTS.md';
+    const paramsWithContextFile: ConfigParameters = {
+      ...baseParams,
+      contextFileName,
+    };
+    new Config(paramsWithContextFile);
+    expect(mockSetGeminiMdFilename).toHaveBeenCalledWith(contextFileName);
+  });
+
+  it('Config constructor should not call setGeminiMdFilename if contextFileName is not provided', () => {
+    new Config(baseParams); // baseParams does not have contextFileName
+    expect(mockSetGeminiMdFilename).not.toHaveBeenCalled();
   });
 });

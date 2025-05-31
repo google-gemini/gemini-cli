@@ -8,7 +8,10 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { GEMINI_CONFIG_DIR, GEMINI_MD_FILENAME } from '../tools/memoryTool.js';
+import {
+  GEMINI_CONFIG_DIR,
+  getCurrentGeminiMdFilename,
+} from '../tools/memoryTool.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -92,7 +95,7 @@ async function collectDownwardGeminiFiles(
 
   if (debugMode)
     logger.debug(
-      `Scanning downward for ${GEMINI_MD_FILENAME} files in: ${directory} (scanned: ${scannedDirCount.count}/${maxScanDirs})`,
+      `Scanning downward for ${getCurrentGeminiMdFilename()} files in: ${directory} (scanned: ${scannedDirCount.count}/${maxScanDirs})`,
     );
   const collectedPaths: string[] = [];
   try {
@@ -113,18 +116,21 @@ async function collectDownwardGeminiFiles(
           maxScanDirs,
         );
         collectedPaths.push(...subDirPaths);
-      } else if (entry.isFile() && entry.name === GEMINI_MD_FILENAME) {
+      } else if (
+        entry.isFile() &&
+        entry.name === getCurrentGeminiMdFilename()
+      ) {
         try {
           await fs.access(fullPath, fsSync.constants.R_OK);
           collectedPaths.push(fullPath);
           if (debugMode)
             logger.debug(
-              `Found readable downward ${GEMINI_MD_FILENAME}: ${fullPath}`,
+              `Found readable downward ${getCurrentGeminiMdFilename()}: ${fullPath}`,
             );
         } catch {
           if (debugMode)
             logger.debug(
-              `Downward ${GEMINI_MD_FILENAME} not readable, skipping: ${fullPath}`,
+              `Downward ${getCurrentGeminiMdFilename()} not readable, skipping: ${fullPath}`,
             );
         }
       }
@@ -139,7 +145,7 @@ async function collectDownwardGeminiFiles(
 
 async function getGeminiMdFilePathsInternal(
   currentWorkingDirectory: string,
-  userHomePath: string, // Keep userHomePath as a parameter for clarity
+  userHomePath: string,
   debugMode: boolean,
 ): Promise<string[]> {
   const resolvedCwd = path.resolve(currentWorkingDirectory);
@@ -147,13 +153,13 @@ async function getGeminiMdFilePathsInternal(
   const globalMemoryPath = path.join(
     resolvedHome,
     GEMINI_CONFIG_DIR,
-    GEMINI_MD_FILENAME,
+    getCurrentGeminiMdFilename(),
   );
   const paths: string[] = [];
 
   if (debugMode)
     logger.debug(
-      `Searching for ${GEMINI_MD_FILENAME} starting from CWD: ${resolvedCwd}`,
+      `Searching for ${getCurrentGeminiMdFilename()} starting from CWD: ${resolvedCwd}`,
     );
   if (debugMode) logger.debug(`User home directory: ${resolvedHome}`);
 
@@ -162,12 +168,12 @@ async function getGeminiMdFilePathsInternal(
     paths.push(globalMemoryPath);
     if (debugMode)
       logger.debug(
-        `Found readable global ${GEMINI_MD_FILENAME}: ${globalMemoryPath}`,
+        `Found readable global ${getCurrentGeminiMdFilename()}: ${globalMemoryPath}`,
       );
   } catch {
     if (debugMode)
       logger.debug(
-        `Global ${GEMINI_MD_FILENAME} not found or not readable: ${globalMemoryPath}`,
+        `Global ${getCurrentGeminiMdFilename()} not found or not readable: ${globalMemoryPath}`,
       );
   }
 
@@ -186,7 +192,7 @@ async function getGeminiMdFilePathsInternal(
     // Loop until filesystem root or currentDir is empty
     if (debugMode) {
       logger.debug(
-        `Checking for ${GEMINI_MD_FILENAME} in (upward scan): ${currentDir}`,
+        `Checking for ${getCurrentGeminiMdFilename()} in (upward scan): ${currentDir}`,
       );
     }
 
@@ -201,7 +207,7 @@ async function getGeminiMdFilePathsInternal(
       break;
     }
 
-    const potentialPath = path.join(currentDir, GEMINI_MD_FILENAME);
+    const potentialPath = path.join(currentDir, getCurrentGeminiMdFilename());
     try {
       await fs.access(potentialPath, fsSync.constants.R_OK);
       // Add to upwardPaths only if it's not the already added globalMemoryPath
@@ -209,14 +215,14 @@ async function getGeminiMdFilePathsInternal(
         upwardPaths.unshift(potentialPath);
         if (debugMode) {
           logger.debug(
-            `Found readable upward ${GEMINI_MD_FILENAME}: ${potentialPath}`,
+            `Found readable upward ${getCurrentGeminiMdFilename()}: ${potentialPath}`,
           );
         }
       }
     } catch {
       if (debugMode) {
         logger.debug(
-          `Upward ${GEMINI_MD_FILENAME} not found or not readable in: ${currentDir}`,
+          `Upward ${getCurrentGeminiMdFilename()} not found or not readable in: ${currentDir}`,
         );
       }
     }
@@ -247,7 +253,7 @@ async function getGeminiMdFilePathsInternal(
   downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
   if (debugMode && downwardPaths.length > 0)
     logger.debug(
-      `Found downward ${GEMINI_MD_FILENAME} files (sorted): ${JSON.stringify(downwardPaths)}`,
+      `Found downward ${getCurrentGeminiMdFilename()} files (sorted): ${JSON.stringify(downwardPaths)}`,
     );
   // Add downward paths only if they haven't been included already (e.g. from upward scan)
   for (const dPath of downwardPaths) {
@@ -258,7 +264,7 @@ async function getGeminiMdFilePathsInternal(
 
   if (debugMode)
     logger.debug(
-      `Final ordered ${GEMINI_MD_FILENAME} paths to read: ${JSON.stringify(paths)}`,
+      `Final ordered ${getCurrentGeminiMdFilename()} paths to read: ${JSON.stringify(paths)}`,
     );
   return paths;
 }
@@ -279,7 +285,7 @@ async function readGeminiMdFiles(
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       logger.warn(
-        `Warning: Could not read ${GEMINI_MD_FILENAME} file at ${filePath}. Error: ${message}`,
+        `Warning: Could not read ${getCurrentGeminiMdFilename()} file at ${filePath}. Error: ${message}`,
       );
       results.push({ filePath, content: null }); // Still include it with null content
       if (debugMode) logger.debug(`Failed to read: ${filePath}`);

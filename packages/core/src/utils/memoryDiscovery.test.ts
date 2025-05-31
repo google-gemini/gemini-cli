@@ -4,22 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  // afterEach, // Removed unused import
-  Mocked,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, Mocked } from 'vitest';
 import * as fsPromises from 'fs/promises';
-import * as fsSync from 'fs'; // For constants
-import { Stats, Dirent } from 'fs'; // Import types directly from 'fs'
+import * as fsSync from 'fs';
+import { Stats, Dirent } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { loadServerHierarchicalMemory } from './memoryDiscovery.js';
-import { GEMINI_CONFIG_DIR, GEMINI_MD_FILENAME } from '../tools/memoryTool.js';
+import {
+  GEMINI_CONFIG_DIR,
+  setGeminiMdFilename,
+  getCurrentGeminiMdFilename,
+  DEFAULT_CONTEXT_FILENAME,
+} from '../tools/memoryTool.js';
+
+const ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST = DEFAULT_CONTEXT_FILENAME;
 
 // Mock the entire fs/promises module
 vi.mock('fs/promises');
@@ -29,8 +28,6 @@ vi.mock('fs', async (importOriginal) => {
   return {
     ...actual, // Spread actual to get all exports, including Stats and Dirent if they are classes/constructors
     constants: { ...actual.constants }, // Preserve constants
-    // Mock other fsSync functions if directly used by memoryDiscovery, e.g., existsSync
-    // existsSync: vi.fn(),
   };
 });
 vi.mock('os');
@@ -42,20 +39,29 @@ describe('loadServerHierarchicalMemory', () => {
   const CWD = '/test/project/src';
   const PROJECT_ROOT = '/test/project';
   const USER_HOME = '/test/userhome';
-  const GLOBAL_GEMINI_DIR = path.join(USER_HOME, GEMINI_CONFIG_DIR);
-  const GLOBAL_GEMINI_FILE = path.join(GLOBAL_GEMINI_DIR, GEMINI_MD_FILENAME);
+
+  let GLOBAL_GEMINI_DIR: string;
+  let GLOBAL_GEMINI_FILE: string; // Defined in beforeEach
 
   beforeEach(() => {
     vi.resetAllMocks();
-
+    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME); // Use defined const
     mockOs.homedir.mockReturnValue(USER_HOME);
+
+    // Define these here to use potentially reset/updated values from imports
+    GLOBAL_GEMINI_DIR = path.join(USER_HOME, GEMINI_CONFIG_DIR);
+    GLOBAL_GEMINI_FILE = path.join(
+      GLOBAL_GEMINI_DIR,
+      getCurrentGeminiMdFilename(), // Use current filename
+    );
+
     mockFs.stat.mockRejectedValue(new Error('File not found'));
     mockFs.readdir.mockResolvedValue([]);
     mockFs.readFile.mockRejectedValue(new Error('File not found'));
     mockFs.access.mockRejectedValue(new Error('File not found'));
   });
 
-  it('should return empty memory and count if no GEMINI.md files are found', async () => {
+  it('should return empty memory and count if no context files are found', async () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
@@ -64,15 +70,19 @@ describe('loadServerHierarchicalMemory', () => {
     expect(fileCount).toBe(0);
   });
 
-  it('should load only the global GEMINI.md if present and others are not', async () => {
+  it('should load only the global context file if present and others are not (default filename)', async () => {
+    const globalDefaultFile = path.join(
+      GLOBAL_GEMINI_DIR,
+      DEFAULT_CONTEXT_FILENAME,
+    );
     mockFs.access.mockImplementation(async (p) => {
-      if (p === GLOBAL_GEMINI_FILE) {
+      if (p === globalDefaultFile) {
         return undefined;
       }
       throw new Error('File not found');
     });
     mockFs.readFile.mockImplementation(async (p) => {
-      if (p === GLOBAL_GEMINI_FILE) {
+      if (p === globalDefaultFile) {
         return 'Global memory content';
       }
       throw new Error('File not found');
@@ -84,15 +94,157 @@ describe('loadServerHierarchicalMemory', () => {
     );
 
     expect(memoryContent).toBe(
-      `--- Context from: ${path.relative(CWD, GLOBAL_GEMINI_FILE)} ---\nGlobal memory content\n--- End of Context from: ${path.relative(CWD, GLOBAL_GEMINI_FILE)} ---`,
+      `--- Context from: ${path.relative(CWD, globalDefaultFile)} ---\nGlobal memory content\n--- End of Context from: ${path.relative(CWD, globalDefaultFile)} ---`,
     );
     expect(fileCount).toBe(1);
-    expect(mockFs.readFile).toHaveBeenCalledWith(GLOBAL_GEMINI_FILE, 'utf-8');
+    expect(mockFs.readFile).toHaveBeenCalledWith(globalDefaultFile, 'utf-8');
   });
 
-  it('should load GEMINI.md files by upward traversal from CWD to project root', async () => {
-    const projectRootGeminiFile = path.join(PROJECT_ROOT, GEMINI_MD_FILENAME);
-    const srcGeminiFile = path.join(CWD, GEMINI_MD_FILENAME);
+  it('should load only the global custom context file if present and filename is changed', async () => {
+    const customFilename = 'CUSTOM_AGENTS.md';
+    setGeminiMdFilename(customFilename);
+    const globalCustomFile = path.join(GLOBAL_GEMINI_DIR, customFilename);
+
+    mockFs.access.mockImplementation(async (p) => {
+      if (p === globalCustomFile) {
+        return undefined;
+      }
+      throw new Error('File not found');
+    });
+    mockFs.readFile.mockImplementation(async (p) => {
+      if (p === globalCustomFile) {
+        return 'Global custom memory';
+      }
+      throw new Error('File not found');
+    });
+
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      CWD,
+      false,
+    );
+
+    expect(memoryContent).toBe(
+      `--- Context from: ${path.relative(CWD, globalCustomFile)} ---\nGlobal custom memory\n--- End of Context from: ${path.relative(CWD, globalCustomFile)} ---`,
+    );
+    expect(fileCount).toBe(1);
+    expect(mockFs.readFile).toHaveBeenCalledWith(globalCustomFile, 'utf-8');
+  });
+
+  it('should load context files by upward traversal with custom filename', async () => {
+    const customFilename = 'PROJECT_CONTEXT.md';
+    setGeminiMdFilename(customFilename);
+    const projectRootCustomFile = path.join(PROJECT_ROOT, customFilename);
+    const srcCustomFile = path.join(CWD, customFilename);
+
+    mockFs.stat.mockImplementation(async (p) => {
+      if (p === path.join(PROJECT_ROOT, '.git')) {
+        return { isDirectory: () => true } as Stats;
+      }
+      throw new Error('File not found');
+    });
+
+    mockFs.access.mockImplementation(async (p) => {
+      if (p === projectRootCustomFile || p === srcCustomFile) {
+        return undefined;
+      }
+      throw new Error('File not found');
+    });
+
+    mockFs.readFile.mockImplementation(async (p) => {
+      if (p === projectRootCustomFile) {
+        return 'Project root custom memory';
+      }
+      if (p === srcCustomFile) {
+        return 'Src directory custom memory';
+      }
+      throw new Error('File not found');
+    });
+
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      CWD,
+      false,
+    );
+    const expectedContent =
+      `--- Context from: ${path.relative(CWD, projectRootCustomFile)} ---\nProject root custom memory\n--- End of Context from: ${path.relative(CWD, projectRootCustomFile)} ---\n\n` +
+      `--- Context from: ${customFilename} ---\nSrc directory custom memory\n--- End of Context from: ${customFilename} ---`;
+
+    expect(memoryContent).toBe(expectedContent);
+    expect(fileCount).toBe(2);
+    expect(mockFs.readFile).toHaveBeenCalledWith(
+      projectRootCustomFile,
+      'utf-8',
+    );
+    expect(mockFs.readFile).toHaveBeenCalledWith(srcCustomFile, 'utf-8');
+  });
+
+  it('should load context files by downward traversal with custom filename', async () => {
+    const customFilename = 'LOCAL_CONTEXT.md';
+    setGeminiMdFilename(customFilename);
+    const subDir = path.join(CWD, 'subdir');
+    const subDirCustomFile = path.join(subDir, customFilename);
+    const cwdCustomFile = path.join(CWD, customFilename);
+
+    mockFs.access.mockImplementation(async (p) => {
+      if (p === cwdCustomFile || p === subDirCustomFile) return undefined;
+      throw new Error('File not found');
+    });
+
+    mockFs.readFile.mockImplementation(async (p) => {
+      if (p === cwdCustomFile) return 'CWD custom memory';
+      if (p === subDirCustomFile) return 'Subdir custom memory';
+      throw new Error('File not found');
+    });
+
+    mockFs.readdir.mockImplementation((async (
+      p: fsSync.PathLike,
+    ): Promise<Dirent[]> => {
+      if (p === CWD) {
+        return [
+          {
+            name: customFilename,
+            isFile: () => true,
+            isDirectory: () => false,
+          } as Dirent,
+          {
+            name: 'subdir',
+            isFile: () => false,
+            isDirectory: () => true,
+          } as Dirent,
+        ] as Dirent[];
+      }
+      if (p === subDir) {
+        return [
+          {
+            name: customFilename,
+            isFile: () => true,
+            isDirectory: () => false,
+          } as Dirent,
+        ] as Dirent[];
+      }
+      return [] as Dirent[];
+    }) as unknown as typeof fsPromises.readdir);
+
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      CWD,
+      false,
+    );
+    const expectedContent =
+      `--- Context from: ${customFilename} ---\nCWD custom memory\n--- End of Context from: ${customFilename} ---\n\n` +
+      `--- Context from: ${path.join('subdir', customFilename)} ---\nSubdir custom memory\n--- End of Context from: ${path.join('subdir', customFilename)} ---`;
+
+    expect(memoryContent).toBe(expectedContent);
+    expect(fileCount).toBe(2);
+  });
+
+  it('should load ORIGINAL_GEMINI_MD_FILENAME files by upward traversal from CWD to project root', async () => {
+    const projectRootGeminiFile = path.join(
+      PROJECT_ROOT,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
+    const srcGeminiFile = path.join(
+      CWD,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
 
     mockFs.stat.mockImplementation(async (p) => {
       if (p === path.join(PROJECT_ROOT, '.git')) {
@@ -124,7 +276,7 @@ describe('loadServerHierarchicalMemory', () => {
     );
     const expectedContent =
       `--- Context from: ${path.relative(CWD, projectRootGeminiFile)} ---\nProject root memory\n--- End of Context from: ${path.relative(CWD, projectRootGeminiFile)} ---\n\n` +
-      `--- Context from: ${GEMINI_MD_FILENAME} ---\nSrc directory memory\n--- End of Context from: ${GEMINI_MD_FILENAME} ---`;
+      `--- Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---\nSrc directory memory\n--- End of Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---`;
 
     expect(memoryContent).toBe(expectedContent);
     expect(fileCount).toBe(2);
@@ -135,10 +287,16 @@ describe('loadServerHierarchicalMemory', () => {
     expect(mockFs.readFile).toHaveBeenCalledWith(srcGeminiFile, 'utf-8');
   });
 
-  it('should load GEMINI.md files by downward traversal from CWD', async () => {
+  it('should load ORIGINAL_GEMINI_MD_FILENAME files by downward traversal from CWD', async () => {
     const subDir = path.join(CWD, 'subdir');
-    const subDirGeminiFile = path.join(subDir, GEMINI_MD_FILENAME);
-    const cwdGeminiFile = path.join(CWD, GEMINI_MD_FILENAME);
+    const subDirGeminiFile = path.join(
+      subDir,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
+    const cwdGeminiFile = path.join(
+      CWD,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
 
     mockFs.access.mockImplementation(async (p) => {
       if (p === cwdGeminiFile || p === subDirGeminiFile) return undefined;
@@ -157,51 +315,71 @@ describe('loadServerHierarchicalMemory', () => {
       if (p === CWD) {
         return [
           {
-            name: GEMINI_MD_FILENAME,
+            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
             isFile: () => true,
             isDirectory: () => false,
-          },
-          { name: 'subdir', isFile: () => false, isDirectory: () => true },
+          } as Dirent,
+          {
+            name: 'subdir',
+            isFile: () => false,
+            isDirectory: () => true,
+          } as Dirent,
         ] as Dirent[];
       }
       if (p === subDir) {
         return [
           {
-            name: GEMINI_MD_FILENAME,
+            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
             isFile: () => true,
             isDirectory: () => false,
-          },
+          } as Dirent,
         ] as Dirent[];
       }
       return [] as Dirent[];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof fsPromises.readdir);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
     );
     const expectedContent =
-      `--- Context from: ${GEMINI_MD_FILENAME} ---\nCWD memory\n--- End of Context from: ${GEMINI_MD_FILENAME} ---\n\n` +
-      `--- Context from: ${path.join('subdir', GEMINI_MD_FILENAME)} ---\nSubdir memory\n--- End of Context from: ${path.join('subdir', GEMINI_MD_FILENAME)} ---`;
+      `--- Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---\nCWD memory\n--- End of Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---\n\n` +
+      `--- Context from: ${path.join('subdir', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---\nSubdir memory\n--- End of Context from: ${path.join('subdir', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---`;
 
     expect(memoryContent).toBe(expectedContent);
     expect(fileCount).toBe(2);
   });
 
-  it('should load and correctly order global, upward, and downward GEMINI.md files', async () => {
+  it('should load and correctly order global, upward, and downward ORIGINAL_GEMINI_MD_FILENAME files', async () => {
+    setGeminiMdFilename(ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST); // Explicitly set for this test
+
+    const globalFileToUse = path.join(
+      GLOBAL_GEMINI_DIR,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
     const projectParentDir = path.dirname(PROJECT_ROOT);
     const projectParentGeminiFile = path.join(
       projectParentDir,
-      GEMINI_MD_FILENAME,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
     );
-    const projectRootGeminiFile = path.join(PROJECT_ROOT, GEMINI_MD_FILENAME);
-    const cwdGeminiFile = path.join(CWD, GEMINI_MD_FILENAME);
+    const projectRootGeminiFile = path.join(
+      PROJECT_ROOT,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
+    const cwdGeminiFile = path.join(
+      CWD,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
     const subDir = path.join(CWD, 'sub');
-    const subDirGeminiFile = path.join(subDir, GEMINI_MD_FILENAME);
+    const subDirGeminiFile = path.join(
+      subDir,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
 
     mockFs.stat.mockImplementation(async (p) => {
       if (p === path.join(PROJECT_ROOT, '.git')) {
+        return { isDirectory: () => true } as Stats;
+      } else if (p === path.join(PROJECT_ROOT, '.gemini')) {
         return { isDirectory: () => true } as Stats;
       }
       throw new Error('File not found');
@@ -209,7 +387,7 @@ describe('loadServerHierarchicalMemory', () => {
 
     mockFs.access.mockImplementation(async (p) => {
       if (
-        p === GLOBAL_GEMINI_FILE ||
+        p === globalFileToUse || // Use the dynamically set global file path
         p === projectParentGeminiFile ||
         p === projectRootGeminiFile ||
         p === cwdGeminiFile ||
@@ -221,7 +399,7 @@ describe('loadServerHierarchicalMemory', () => {
     });
 
     mockFs.readFile.mockImplementation(async (p) => {
-      if (p === GLOBAL_GEMINI_FILE) return 'Global memory';
+      if (p === globalFileToUse) return 'Global memory'; // Use the dynamically set global file path
       if (p === projectParentGeminiFile) return 'Project parent memory';
       if (p === projectRootGeminiFile) return 'Project root memory';
       if (p === cwdGeminiFile) return 'CWD memory';
@@ -234,21 +412,24 @@ describe('loadServerHierarchicalMemory', () => {
     ): Promise<Dirent[]> => {
       if (p === CWD) {
         return [
-          { name: 'sub', isFile: () => false, isDirectory: () => true },
+          {
+            name: 'sub',
+            isFile: () => false,
+            isDirectory: () => true,
+          } as Dirent,
         ] as Dirent[];
       }
       if (p === subDir) {
         return [
           {
-            name: GEMINI_MD_FILENAME,
+            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
             isFile: () => true,
             isDirectory: () => false,
-          },
+          } as Dirent,
         ] as Dirent[];
       }
       return [] as Dirent[];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof fsPromises.readdir);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
@@ -258,8 +439,11 @@ describe('loadServerHierarchicalMemory', () => {
     const relPathGlobal = path.relative(CWD, GLOBAL_GEMINI_FILE);
     const relPathProjectParent = path.relative(CWD, projectParentGeminiFile);
     const relPathProjectRoot = path.relative(CWD, projectRootGeminiFile);
-    const relPathCwd = GEMINI_MD_FILENAME;
-    const relPathSubDir = path.join('sub', GEMINI_MD_FILENAME);
+    const relPathCwd = ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST;
+    const relPathSubDir = path.join(
+      'sub',
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    );
 
     const expectedContent = [
       `--- Context from: ${relPathGlobal} ---\nGlobal memory\n--- End of Context from: ${relPathGlobal} ---`,
@@ -275,11 +459,14 @@ describe('loadServerHierarchicalMemory', () => {
 
   it('should ignore specified directories during downward scan', async () => {
     const ignoredDir = path.join(CWD, 'node_modules');
-    const ignoredDirGeminiFile = path.join(ignoredDir, GEMINI_MD_FILENAME);
+    const ignoredDirGeminiFile = path.join(
+      ignoredDir,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
+    ); // Corrected
     const regularSubDir = path.join(CWD, 'my_code');
     const regularSubDirGeminiFile = path.join(
       regularSubDir,
-      GEMINI_MD_FILENAME,
+      ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
     );
 
     mockFs.access.mockImplementation(async (p) => {
@@ -303,38 +490,41 @@ describe('loadServerHierarchicalMemory', () => {
             name: 'node_modules',
             isFile: () => false,
             isDirectory: () => true,
-          },
-          { name: 'my_code', isFile: () => false, isDirectory: () => true },
+          } as Dirent,
+          {
+            name: 'my_code',
+            isFile: () => false,
+            isDirectory: () => true,
+          } as Dirent,
         ] as Dirent[];
       }
       if (p === regularSubDir) {
         return [
           {
-            name: GEMINI_MD_FILENAME,
+            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
             isFile: () => true,
             isDirectory: () => false,
-          },
+          } as Dirent,
         ] as Dirent[];
       }
       if (p === ignoredDir) {
         return [
           {
-            name: GEMINI_MD_FILENAME,
+            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
             isFile: () => true,
             isDirectory: () => false,
-          },
+          } as Dirent,
         ] as Dirent[];
       }
       return [] as Dirent[];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof fsPromises.readdir);
 
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
     );
 
-    const expectedContent = `--- Context from: ${path.join('my_code', GEMINI_MD_FILENAME)} ---\nMy code memory\n--- End of Context from: ${path.join('my_code', GEMINI_MD_FILENAME)} ---`;
+    const expectedContent = `--- Context from: ${path.join('my_code', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---\nMy code memory\n--- End of Context from: ${path.join('my_code', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---`;
 
     expect(memoryContent).toBe(expectedContent);
     expect(fileCount).toBe(1);
@@ -365,8 +555,7 @@ describe('loadServerHierarchicalMemory', () => {
       if (p.toString().startsWith(path.join(CWD, 'deep_dir_')))
         return [] as Dirent[];
       return [] as Dirent[];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof fsPromises.readdir);
     mockFs.access.mockRejectedValue(new Error('not found'));
 
     await loadServerHierarchicalMemory(CWD, true);

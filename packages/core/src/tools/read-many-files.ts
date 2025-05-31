@@ -9,7 +9,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'path';
 import fg from 'fast-glob';
-import { GEMINI_MD_FILENAME } from './memoryTool.js';
+import { getCurrentGeminiMdFilename } from './memoryTool.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -98,7 +98,7 @@ const DEFAULT_EXCLUDES: string[] = [
   '**/*.odp',
   '**/*.DS_Store',
   '**/.env',
-  `**/${GEMINI_MD_FILENAME}`,
+  `**/${getCurrentGeminiMdFilename()}`,
 ];
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';

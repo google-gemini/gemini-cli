@@ -36,6 +36,12 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
 
 ### Available Settings in `settings.json`:
 
+- **`contextFileName`** (string, optional):
+
+  - **Description:** Specifies the filename for context files (e.g., `GEMINI.md`, `AGENTS.md`).
+  - **Default:** `GEMINI.md`
+  - **Example:** `"contextFileName": "AGENTS.md"`
+
 - **`coreTools`** (array of strings, optional):
   - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict or customize the set of built-in tools.
   - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]`.
@@ -164,15 +170,15 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
 
-## 4. `GEMINI.md` Files (Hierarchical Instructional Context)
+## 4. Context Files (Hierarchical Instructional Context)
 
-While not strictly configuration for the CLI's _behavior_, `GEMINI.md` files are crucial for configuring the _instructional context_ (also referred to as "memory") provided to the Gemini model. This powerful feature allows you to give project-specific instructions, coding style guides, or any relevant background information to the AI, making its responses more tailored and accurate to your needs. The CLI includes UI elements, such as an indicator in the footer showing the number of loaded `GEMINI.md` files, to keep you informed about the active context.
+While not strictly configuration for the CLI's _behavior_, context files (defaulting to `GEMINI.md` but configurable via the `contextFileName` setting) are crucial for configuring the _instructional context_ (also referred to as "memory") provided to the Gemini model. This powerful feature allows you to give project-specific instructions, coding style guides, or any relevant background information to the AI, making its responses more tailored and accurate to your needs. The CLI includes UI elements, such as an indicator in the footer showing the number of loaded context files, to keep you informed about the active context.
 
 - **Purpose:** These Markdown files contain instructions, guidelines, or context that you want the Gemini model to be aware of during your interactions. The system is designed to manage this instructional context hierarchically.
 
-### Example `GEMINI.md` Content
+### Example Context File Content (e.g., `GEMINI.md`)
 
-Here's a conceptual example of what a `GEMINI.md` file at the root of a TypeScript project might contain:
+Here's a conceptual example of what a context file at the root of a TypeScript project might contain:
 
 ```markdown
 # Project: My Awesome TypeScript Library
@@ -203,25 +209,25 @@ Here's a conceptual example of what a `GEMINI.md` file at the root of a TypeScri
 - If a new dependency is required, please state the reason.
 ```
 
-This example demonstrates how you can provide general project context, specific coding conventions, and even notes about particular files or components. The more relevant and precise your `GEMINI.md` files are, the better the AI can assist you. Project-specific `GEMINI.md` files are highly encouraged to establish conventions and context.
+This example demonstrates how you can provide general project context, specific coding conventions, and even notes about particular files or components. The more relevant and precise your context files are, the better the AI can assist you. Project-specific context files are highly encouraged to establish conventions and context.
 
-- **Hierarchical Loading and Precedence:** The CLI implements a sophisticated hierarchical memory system by loading `GEMINI.md` files from several locations. Content from files lower in this list (more specific) typically overrides or supplements content from files higher up (more general). The exact concatenation order and final context can be inspected using the `/showmemory` command. The typical loading order is:
-  1.  **Global `GEMINI.md`:**
-      - Location: `~/.gemini/GEMINI.md` (in your user home directory).
+- **Hierarchical Loading and Precedence:** The CLI implements a sophisticated hierarchical memory system by loading context files (e.g., `GEMINI.md`) from several locations. Content from files lower in this list (more specific) typically overrides or supplements content from files higher up (more general). The exact concatenation order and final context can be inspected using the `/showmemory` command. The typical loading order is:
+  1.  **Global Context File:**
+      - Location: `~/.gemini/<contextFileName>` (e.g., `~/.gemini/GEMINI.md` in your user home directory).
       - Scope: Provides default instructions for all your projects.
-  2.  **Project Root & Ancestors `GEMINI.md`:**
-      - Location: The CLI searches for `GEMINI.md` in the current working directory and then in each parent directory up to either the project root (identified by a `.git` folder) or your home directory.
+  2.  **Project Root & Ancestors Context Files:**
+      - Location: The CLI searches for the configured context file in the current working directory and then in each parent directory up to either the project root (identified by a `.git` folder) or your home directory.
       - Scope: Provides context relevant to the entire project or a significant portion of it.
-  3.  **Sub-directory `GEMINI.md` (Contextual/Local):**
-      - Location: The CLI also scans for `GEMINI.md` files in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
+  3.  **Sub-directory Context Files (Contextual/Local):**
+      - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
       - Scope: Allows for highly specific instructions relevant to a particular component, module, or sub-section of your project.
-- **Concatenation & UI Indication:** The contents of all found `GEMINI.md` files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded `GEMINI.md` files, giving you a quick visual cue about the active instructional context.
+- **Concatenation & UI Indication:** The contents of all found context files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded context files, giving you a quick visual cue about the active instructional context.
 - **Commands for Memory Management:**
-  - Use `/memory refresh` to force a re-scan and reload of all `GEMINI.md` files from all configured locations. This updates the AI's instructional context.
+  - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.
   - See the [Commands documentation](./commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
 
-By understanding and utilizing these configuration layers and the hierarchical nature of `GEMINI.md` files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
+By understanding and utilizing these configuration layers and the hierarchical nature of context files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
 
 ## Theming
 

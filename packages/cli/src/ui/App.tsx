@@ -39,7 +39,11 @@ import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
-import { getErrorMessage, type Config } from '@gemini-code/core';
+import {
+  getErrorMessage,
+  type Config,
+  getCurrentGeminiMdFilename,
+} from '@gemini-code/core';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -398,7 +402,10 @@ export const App = ({
                     </Text>
                   ) : geminiMdFileCount > 0 ? (
                     <Text color={Colors.SubtleComment}>
-                      Using {geminiMdFileCount} GEMINI.md file
+                      Using {geminiMdFileCount}{' '}
+                      {settings.merged.contextFileName ||
+                        getCurrentGeminiMdFilename()}{' '}
+                      file
                       {geminiMdFileCount > 1 ? 's' : ''}
                     </Text>
                   ) : (

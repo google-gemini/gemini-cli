@@ -62,5 +62,6 @@
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2",
     "json": "^11.0.0"
-  }
+  },
+  "dependencies": {}
 }

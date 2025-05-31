@@ -5,7 +5,12 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
-import { MemoryTool } from './memoryTool.js';
+import {
+  MemoryTool,
+  setGeminiMdFilename,
+  getCurrentGeminiMdFilename,
+  DEFAULT_CONTEXT_FILENAME,
+} from './memoryTool.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -50,10 +55,33 @@ describe('MemoryTool', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Reset GEMINI_MD_FILENAME to its original value after each test
+    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+  });
+
+  describe('setGeminiMdFilename', () => {
+    it('should update currentGeminiMdFilename when a valid new name is provided', () => {
+      const newName = 'CUSTOM_CONTEXT.md';
+      setGeminiMdFilename(newName);
+      expect(getCurrentGeminiMdFilename()).toBe(newName);
+    });
+
+    it('should not update currentGeminiMdFilename if the new name is empty or whitespace', () => {
+      const initialName = getCurrentGeminiMdFilename(); // Get current before trying to change
+      setGeminiMdFilename('  ');
+      expect(getCurrentGeminiMdFilename()).toBe(initialName);
+
+      setGeminiMdFilename('');
+      expect(getCurrentGeminiMdFilename()).toBe(initialName);
+    });
   });
 
   describe('performAddMemoryEntry (static method)', () => {
-    const testFilePath = path.join('/mock/home', '.gemini', 'GEMINI.md');
+    const testFilePath = path.join(
+      '/mock/home',
+      '.gemini',
+      DEFAULT_CONTEXT_FILENAME, // Use the default for basic tests
+    );
 
     it('should create section and save a fact if file does not exist', async () => {
       mockFsAdapter.readFile.mockRejectedValue({ code: 'ENOENT' }); // Simulate file not found
@@ -168,7 +196,12 @@ describe('MemoryTool', () => {
     it('should call performAddMemoryEntry with correct parameters and return success', async () => {
       const params = { fact: 'The sky is blue' };
       const result = await memoryTool.execute(params, mockAbortSignal);
-      const expectedFilePath = path.join('/mock/home', '.gemini', 'GEMINI.md');
+      // Use getCurrentGeminiMdFilename for the default expectation before any setGeminiMdFilename calls in a test
+      const expectedFilePath = path.join(
+        '/mock/home',
+        '.gemini',
+        getCurrentGeminiMdFilename(), // This will be DEFAULT_CONTEXT_FILENAME unless changed by a test
+      );
 
       // For this test, we expect the actual fs methods to be passed
       const expectedFsArgument = {

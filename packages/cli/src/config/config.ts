@@ -13,6 +13,8 @@ import {
   createServerConfig,
   loadServerHierarchicalMemory,
   ConfigParameters,
+  setGeminiMdFilename as setServerGeminiMdFilename,
+  getCurrentGeminiMdFilename,
 } from '@gemini-code/core';
 import { Settings } from './settings.js';
 import { readPackageUp } from 'read-package-up';
@@ -132,6 +134,17 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
+  // Set the context filename in the server's memoryTool module BEFORE loading memory
+  // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
+  // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
+  // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
+  if (settings.contextFileName) {
+    setServerGeminiMdFilename(settings.contextFileName);
+  } else {
+    // Reset to default if not provided in settings.
+    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+  }
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
@@ -159,7 +172,8 @@ export async function loadCliConfig(settings: Settings): Promise<Config> {
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     vertexai: useVertexAI,
-    showMemoryUsage: argv.show_memory_usage || false,
+    showMemoryUsage:
+      argv.show_memory_usage || settings.showMemoryUsage || false,
   };
 
   return createServerConfig(configParams);

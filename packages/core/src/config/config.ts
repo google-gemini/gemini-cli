@@ -19,7 +19,7 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { MemoryTool } from '../tools/memoryTool.js';
+import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 
 export class MCPServerConfig {
@@ -56,6 +56,7 @@ export interface ConfigParameters {
   alwaysSkipModificationConfirmation?: boolean;
   vertexai?: boolean;
   showMemoryUsage?: boolean;
+  contextFileName?: string;
 }
 
 export class Config {
@@ -99,6 +100,10 @@ export class Config {
       params.alwaysSkipModificationConfirmation ?? false;
     this.vertexai = params.vertexai;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
+
+    if (params.contextFileName) {
+      setGeminiMdFilename(params.contextFileName);
+    }
 
     this.toolRegistry = createToolRegistry(this);
   }
