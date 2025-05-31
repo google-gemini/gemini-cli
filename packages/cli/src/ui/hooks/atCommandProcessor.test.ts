@@ -484,6 +484,77 @@ ${content2}`,
     expect(result.processedQuery).toEqual([
       { text: 'Check @nonexistent.txt and @ also' },
     ]);
+
+    expect(result.shouldProceed).toBe(true);
+  });
+
+  it('should process a file path case-insensitively', async () => {
+    // const actualFilePath = 'path/to/MyFile.txt'; // Unused, path in llmContent should match queryPath
+    const queryPath = 'path/to/myfile.txt'; // Different case
+    const query = `@${queryPath}`;
+    const fileContent = 'This is the case-insensitive file content.';
+
+    // Mock fs.stat to "find" MyFile.txt when looking for myfile.txt
+    // This simulates a case-insensitive file system or resolution
+    vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+      if (p.toString().toLowerCase().endsWith('myfile.txt')) {
+        return {
+          isDirectory: () => false,
+          // You might need to add other Stats properties if your code uses them
+        } as Stats;
+      }
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    });
+
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: `
+--- ${queryPath} ---
+${fileContent}`,
+      returnDisplay: 'Read 1 file.',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 134, // New messageId
+      signal: abortController.signal,
+    });
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      { type: 'user', text: query },
+      134,
+    );
+    // The atCommandProcessor resolves the path before calling read_many_files.
+    // We expect it to be called with the path that fs.stat "found".
+    // In a real case-insensitive FS, stat(myfile.txt) might return info for MyFile.txt.
+    // The key is that *a* valid path that points to the content is used.
+    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
+      // Depending on how path resolution and fs.stat mock interact,
+      // this could be queryPath or actualFilePath.
+      // For this test, we'll assume the processor uses the path that stat "succeeded" with.
+      // If the underlying fs/stat is truly case-insensitive, it might resolve to actualFilePath.
+      // If the mock is simpler, it might use queryPath if stat(queryPath) succeeds.
+      // The most important part is that *some* version of the path that leads to the content is used.
+      // Let's assume it uses the path from the query if stat confirms it exists (even if different case on disk)
+      { paths: [queryPath] },
+      abortController.signal,
+    );
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_group',
+        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+      }),
+      134,
+    );
+    expect(result.processedQuery).toEqual([
+      { text: `@${queryPath}` }, // Query uses the input path
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${queryPath}:\n` }, // Content display also uses input path
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
+    ]);
     expect(result.shouldProceed).toBe(true);
   });
 });

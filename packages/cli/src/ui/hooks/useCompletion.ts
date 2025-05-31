@@ -193,6 +193,7 @@ export function useCompletion(
         return [];
       }
 
+      const lowerSearchPrefix = searchPrefix.toLowerCase();
       let foundSuggestions: Suggestion[] = [];
       try {
         const entries = await fs.readdir(startDir, { withFileTypes: true });
@@ -200,7 +201,7 @@ export function useCompletion(
           if (foundSuggestions.length >= maxResults) break;
 
           const entryPathRelative = path.join(currentRelativePath, entry.name);
-          if (entry.name.startsWith(searchPrefix)) {
+          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
             foundSuggestions.push({
               label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
               value: escapePath(
@@ -217,7 +218,7 @@ export function useCompletion(
               foundSuggestions = foundSuggestions.concat(
                 await findFilesRecursively(
                   path.join(startDir, entry.name),
-                  searchPrefix,
+                  searchPrefix, // Pass original searchPrefix for recursive calls
                   entryPathRelative,
                   depth + 1,
                   maxDepth,
@@ -242,11 +243,12 @@ export function useCompletion(
           fetchedSuggestions = await findFilesRecursively(cwd, prefix);
         } else {
           // Original behavior: list files in the specific directory
+          const lowerPrefix = prefix.toLowerCase();
           const entries = await fs.readdir(baseDirAbsolute, {
             withFileTypes: true,
           });
           fetchedSuggestions = entries
-            .filter((entry) => entry.name.startsWith(prefix))
+            .filter((entry) => entry.name.toLowerCase().startsWith(lowerPrefix))
             .map((entry) => {
               const label = entry.isDirectory() ? entry.name + '/' : entry.name;
               return {
