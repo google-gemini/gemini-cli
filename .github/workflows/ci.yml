@@ -139,8 +139,8 @@ jobs:
         uses: ./.github/actions/post-coverage-comment # Path to the composite action directory
         with:
           cli_json_file: coverage_artifact/cli/coverage/coverage-summary.json
-          server_json_file: coverage_artifact/server/coverage/coverage-summary.json
+          core_json_file: coverage_artifact/core/coverage/coverage-summary.json
           cli_full_text_summary_file: coverage_artifact/cli/coverage/full-text-summary.txt
-          server_full_text_summary_file: coverage_artifact/server/coverage/full-text-summary.txt
+          server_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
           node_version: ${{ matrix.node-version }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
