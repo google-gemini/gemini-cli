@@ -37,14 +37,17 @@ export function useGitBranchName(cwd: string): string | undefined {
   useEffect(() => {
     fetchBranchName(); // Initial fetch
 
-    const gitHeadPath = path.join(cwd, '.git', 'HEAD');
+    const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
     let watcher: fs.FSWatcher | undefined;
 
     const setupWatcher = async () => {
       try {
-        await fsPromises.access(gitHeadPath, fs.constants.F_OK);
-        watcher = fs.watch(gitHeadPath, (eventType) => {
-          if (eventType === 'change') {
+        // Check if .git/logs/HEAD exists, as it might not in a new repo or orphaned head
+        await fsPromises.access(gitLogsHeadPath, fs.constants.F_OK);
+        watcher = fs.watch(gitLogsHeadPath, (eventType: string) => {
+          // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
+          if (eventType === 'change' || eventType === 'rename') {
+            // Handle rename just in case
             fetchBranchName();
           }
         });
