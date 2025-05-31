@@ -243,7 +243,7 @@ export function createToolRegistry(config: Config): ToolRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
     // check both the tool name (.Name) and the class name (.name)
-    if (!tools || tools.has(ToolClass.Name) || tools.has(ToolClass.name)) {
+    if (!tools || tools.has(ToolClass.Name)) {
       registry.registerTool(new ToolClass(...args));
     }
   };
