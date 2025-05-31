@@ -63,7 +63,7 @@ export const ansiTheme: ColorsTheme = {
   LightBlue: 'blue',
   AccentBlue: 'blue',
   AccentPurple: 'magenta',
-  AccentCyan: 'cynan',
+  AccentCyan: 'cyan',
   AccentGreen: 'green',
   AccentYellow: 'yellow',
   AccentRed: 'red',

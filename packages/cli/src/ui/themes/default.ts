@@ -6,8 +6,8 @@
 
 import { darkTheme, Theme } from './theme.js';
 
-export const VS2015: Theme = new Theme(
-  'VS2015',
+export const DefaultDark: Theme = new Theme(
+  'Default',
   'dark',
   {
     hljs: {

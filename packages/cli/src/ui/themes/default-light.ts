@@ -6,8 +6,8 @@
 
 import { lightTheme, Theme } from './theme.js';
 
-export const VS: Theme = new Theme(
-  'VS',
+export const DefaultLight: Theme = new Theme(
+  'Default Light',
   'light',
   {
     hljs: {
