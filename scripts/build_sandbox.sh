@@ -59,7 +59,7 @@ rm -f packages/cli/dist/gemini-code-cli-*.tgz
 npm pack -w @gemini-code/cli --pack-destination ./packages/cli/dist &>/dev/null
 # pack core
 echo "packing @gemini-code/core ..."
-rm -f packages/core/dist/gemini-code-server-*.tgz
+rm -f packages/core/dist/gemini-code-core-*.tgz
 npm pack -w @gemini-code/core --pack-destination ./packages/core/dist &>/dev/null
 # give node user (used during installation, see Dockerfile) access to these files
 chmod 755 packages/*/dist/gemini-code-*.tgz
