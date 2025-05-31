@@ -78,6 +78,7 @@ async function main() {
           startupWarnings={startupWarnings}
         />
       </React.StrictMode>,
+      { exitOnCtrlC: false },
     );
     return;
   }

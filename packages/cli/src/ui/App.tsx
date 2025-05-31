@@ -44,6 +44,8 @@ import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 
+const CTRL_C_PROMPT_DURATION_MS = 1000;
+
 interface AppProps {
   config: Config;
   settings: LoadedSettings;
@@ -77,17 +79,42 @@ export const App = ({
   const [corgiMode, setCorgiMode] = useState(false);
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+  const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
+  const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
     [consoleMessages],
   );
+
   useInput((input: string, key: InkKeyType) => {
     if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
       refreshStatic();
+    } else if (key.ctrl && (input === 'c' || input === 'C')) {
+      if (ctrlCPressedOnce) {
+        if (ctrlCTimerRef.current) {
+          clearTimeout(ctrlCTimerRef.current);
+        }
+        process.exit(0);
+      } else {
+        setCtrlCPressedOnce(true);
+        ctrlCTimerRef.current = setTimeout(() => {
+          setCtrlCPressedOnce(false);
+          ctrlCTimerRef.current = null;
+        }, CTRL_C_PROMPT_DURATION_MS);
+      }
     }
   });
+
+  useEffect(
+    () => () => {
+      if (ctrlCTimerRef.current) {
+        clearTimeout(ctrlCTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useConsolePatcher({
     onNewMessage: handleNewMessage,
@@ -365,11 +392,17 @@ export const App = ({
                   {process.env.GEMINI_SYSTEM_MD && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
-                  {geminiMdFileCount > 0 && (
+                  {ctrlCPressedOnce ? (
+                    <Text color={Colors.AccentYellow}>
+                      Press Ctrl+C again to exit.
+                    </Text>
+                  ) : geminiMdFileCount > 0 ? (
                     <Text color={Colors.SubtleComment}>
                       Using {geminiMdFileCount} GEMINI.md file
                       {geminiMdFileCount > 1 ? 's' : ''}
                     </Text>
+                  ) : (
+                    <Text> </Text> // Render an empty space to reserve height
                   )}
                 </Box>
                 <Box>
