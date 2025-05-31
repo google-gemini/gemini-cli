@@ -12,7 +12,7 @@ import {
   escapePath,
   unescapePath,
   getErrorMessage,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,

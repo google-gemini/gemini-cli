@@ -16,7 +16,7 @@ npm run preflight
 
 ## Writing Tests
 
-When writing tests look at existing tests in packages/server and packages/cli to conform with the conventions in those files.
+When writing tests look at existing tests in packages/core and packages/cli to conform with the conventions in those files.
 
 ## Git Repo
 

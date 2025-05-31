@@ -12,8 +12,8 @@ This guide provides solutions to common issues and debugging tips.
 
   - A: The CLI configuration is typically managed within `packages/cli/src/config/`. Refer to [CLI Configuration](./cli/configuration.md) for more details.
 
-- **Q: Where are the server configuration files stored?**
-  - A: The server configuration is typically managed within `packages/server/src/config/`. Refer to [Server Configuration](./server/configuration.md) for more details.
+- **Q: Where are the core configuration files stored?**
+  - A: The core configuration is typically managed within `packages/core/src/config/`. Refer to [Core Configuration](./core/configuration.md) for more details.
 
 ## Common Error Messages and Solutions
 
@@ -22,7 +22,7 @@ This guide provides solutions to common issues and debugging tips.
   - **Cause:** Another process is already using the port the server is trying to bind to.
   - **Solution:**
     1.  Stop the other process using the port.
-    2.  Configure the server to use a different port (see [`server/configuration.md`](./server/configuration.md)).
+    2.  Configure the server to use a different port (see [`core/configuration.md`](./core/configuration.md)).
 
 - **Error: Command not found (when using the CLI).**
 
@@ -50,7 +50,7 @@ This guide provides solutions to common issues and debugging tips.
   - Use the `--verbose` flag (if available) with CLI commands for more detailed output.
   - Check the CLI logs, often found in a user-specific configuration or cache directory.
 
-- **Server Debugging:**
+- **Core Debugging:**
 
   - Check the server console output for error messages or stack traces.
   - Increase log verbosity if configurable.

@@ -7,7 +7,7 @@
 import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {

@@ -13,7 +13,7 @@ import {
   createServerConfig,
   loadServerHierarchicalMemory,
   ConfigParameters,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import { Settings } from './settings.js';
 import { readPackageUp } from 'read-package-up';
 

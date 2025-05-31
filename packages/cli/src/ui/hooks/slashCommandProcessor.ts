@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { Config } from '@gemini-code/server';
+import { Config } from '@gemini-code/core';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';

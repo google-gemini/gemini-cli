@@ -1,5 +1,5 @@
 {
-  "name": "@gemini-code/server",
+  "name": "@gemini-code/core",
   "version": "0.1.0",
   "description": "Gemini CLI Server",
   "type": "module",

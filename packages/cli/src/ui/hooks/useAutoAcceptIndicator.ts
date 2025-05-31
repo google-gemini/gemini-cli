@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useInput } from 'ink';
-import type { Config } from '@gemini-code/server';
+import type { Config } from '@gemini-code/core';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;

@@ -22,7 +22,7 @@ import {
   ToolExecuteConfirmationDetails,
   ToolResultDisplay,
   ToolCallRequestInfo,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import { type PartListUnion, type Part } from '@google/genai';
 import {
   StreamingState,
@@ -39,7 +39,7 @@ import { useStateAndRef } from './useStateAndRef.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { useToolScheduler, mapToDisplay } from './useToolScheduler.js';
-import { GeminiChat } from '@gemini-code/server/src/core/geminiChat.js';
+import { GeminiChat } from '@gemini-code/core/src/core/geminiChat.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];

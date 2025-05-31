@@ -35,7 +35,7 @@ USER node
 
 # install gemini-cli and clean up
 COPY packages/cli/dist/gemini-code-cli-*.tgz /usr/local/share/npm-global/gemini-code-cli.tgz
-COPY packages/server/dist/gemini-code-server-*.tgz /usr/local/share/npm-global/gemini-code-server.tgz
+COPY packages/core/dist/gemini-code-server-*.tgz /usr/local/share/npm-global/gemini-code-server.tgz
 RUN npm install -g /usr/local/share/npm-global/gemini-code-cli.tgz /usr/local/share/npm-global/gemini-code-server.tgz \
   && npm cache clean --force \
   && rm -f /usr/local/share/npm-global/gemini-code-{cli,server}.tgz

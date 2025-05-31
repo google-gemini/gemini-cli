@@ -13,7 +13,7 @@ import {
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import {
   RadioButtonSelect,
   RadioSelectItem,

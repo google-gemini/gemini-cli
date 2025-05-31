@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { MCPServerConfig } from '@gemini-code/server/src/config/config.js';
+import { MCPServerConfig } from '@gemini-code/core/src/config/config.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';

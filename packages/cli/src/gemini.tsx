@@ -9,7 +9,7 @@ import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { GeminiClient } from '@gemini-code/server';
+import { GeminiClient } from '@gemini-code/core';
 import { readPackageUp } from 'read-package-up';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';

@@ -12,7 +12,7 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import {
   HistoryItem,
   IndividualToolCallDisplay,

@@ -1,19 +1,19 @@
-# Gemini CLI Server: Configuration
+# Gemini CLI Core: Configuration
 
-Configuration for the Gemini CLI server component (`packages/server`) is critical for its operation, dictating how it connects to the Gemini API, which model it uses, how tools are executed, and more. Many of these settings are shared with or derived from the main CLI configuration when the CLI initializes the server backend.
+Configuration for the Gemini CLI core component (`packages/core`) is critical for its operation, dictating how it connects to the Gemini API, which model it uses, how tools are executed, and more. Many of these settings are shared with or derived from the main CLI configuration when the CLI initializes the core backend.
 
 ## Primary Configuration Sources
 
-The server's configuration is primarily established when the `Config` object (from `packages/server/src/config/config.ts`) is instantiated. The values come from a combination of:
+The core's configuration is primarily established when the `Config` object (from `packages/core/src/config/config.ts`) is instantiated. The values come from a combination of:
 
-1.  **Hardcoded Defaults:** Fallback values defined within the server and CLI packages.
-2.  **Settings Files (`settings.json` via CLI):** Persistent settings that the CLI reads (User settings `~/.gemini/settings.json`, then Workspace settings `.gemini/settings.json`) and then passes relevant parts to the server configuration.
-3.  **Environment Variables (potentially from `.env` files):** System-wide or session-specific variables. The CLI loads `.env` files (checking current directory, then ancestors, then `~/.env`) and these variables influence the server config.
+1.  **Hardcoded Defaults:** Fallback values defined within the core and CLI packages.
+2.  **Settings Files (`settings.json` via CLI):** Persistent settings that the CLI reads (User settings `~/.gemini/settings.json`, then Workspace settings `.gemini/settings.json`) and then passes relevant parts to the core configuration.
+3.  **Environment Variables (potentially from `.env` files):** System-wide or session-specific variables. The CLI loads `.env` files (checking current directory, then ancestors, then `~/.env`) and these variables influence the core config.
 4.  **Command-Line Arguments (passed from CLI):** Settings chosen by the user at launch time, which have the highest precedence for many options.
 
-## Key Configuration Parameters for the Server
+## Key Configuration Parameters for the Core
 
-These are the main pieces of information the server `Config` object holds and uses:
+These are the main pieces of information the core `Config` object holds and uses:
 
 - **`apiKey` (string):**
 
@@ -23,7 +23,7 @@ These are the main pieces of information the server `Config` object holds and us
 - **`model` (string):**
 
   - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or a default value (e.g., `gemini-2.5-pro-preview-05-06`).
-  - **Purpose:** Specifies which Gemini model the server should use. (For Vertex AI model names and usage, refer to the main README.md).
+  - **Purpose:** Specifies which Gemini model the core should use. (For Vertex AI model names and usage, refer to the main README.md).
 
 - **`sandbox` (boolean | string):**
 
@@ -41,12 +41,12 @@ These are the main pieces of information the server `Config` object holds and us
 - **`debugMode` (boolean):**
 
   - **Source:** Command-line argument (`--debug_mode`) or environment variables (e.g., `DEBUG=true`, `DEBUG_MODE=true`).
-  - **Purpose:** Enables verbose logging within the server and its tools, which is helpful for development and troubleshooting.
+  - **Purpose:** Enables verbose logging within the core and its tools, which is helpful for development and troubleshooting.
 
 - **`question` (string | undefined):**
 
   - **Source:** Command-line argument (`--question`), usually when input is piped to the CLI.
-  - **Purpose:** Allows a direct question to be passed to the server for processing without interactive input.
+  - **Purpose:** Allows a direct question to be passed to the core for processing without interactive input.
 
 - **`fullContext` (boolean):**
 
@@ -65,20 +65,20 @@ These are the main pieces of information the server `Config` object holds and us
     - `env` (object, optional): Environment variables for the server process.
     - `cwd` (string, optional): Working directory for the server.
     - `timeout` (number, optional): Request timeout in milliseconds.
-  - **Behavior:** The server will attempt to connect to each configured MCP server. Tool names from these servers might be prefixed with the server alias to prevent naming collisions. The server may also adapt tool schemas from MCP servers for internal compatibility.
+  - **Behavior:** The core will attempt to connect to each configured MCP server. Tool names from these servers might be prefixed with the server alias to prevent naming collisions. The core may also adapt tool schemas from MCP servers for internal compatibility.
 - `mcpServerCommand` (string | undefined, **deprecated**):
 
   - **Source:** `settings.json` (`mcpServerCommand` key).
   - **Purpose:** Legacy setting for a single MCP server. Superseded by `mcpServers`.
 
-- `userAgent` (string):
+- **`userAgent` (string):**
 
   - **Source:** Automatically generated by the CLI, often including CLI package name, version, and Node.js environment details.
   - **Purpose:** Sent with API requests to help identify the client making requests to the Gemini API.
 
 - **`userMemory` (string):**
 
-  - **Source:** Loaded from the hierarchical `GEMINI.md` files by the CLI (Global, Project Root/Ancestors, Sub-directory) and passed to the server config.
+  - **Source:** Loaded from the hierarchical `GEMINI.md` files by the CLI (Global, Project Root/Ancestors, Sub-directory) and passed to the core config.
   - **Purpose:** Contains the combined instructional context provided to the Gemini model.
   - **Mutability:** This can be updated if the memory is refreshed by the user (e.g., via the `/memory refresh` command in the CLI).
 
@@ -88,7 +88,7 @@ These are the main pieces of information the server `Config` object holds and us
 
 ## Environment File (`.env`) Loading
 
-The CLI configuration logic, which precedes server initialization, includes loading an `.env` file. The search order is:
+The CLI configuration logic, which precedes core initialization, includes loading an `.env` file. The search order is:
 
 1.  `.env` in the current working directory.
 2.  `.env` in parent directories, up to the project root (containing `.git`) or home directory.
@@ -105,6 +105,6 @@ GEMINI_MODEL="gemini-1.5-flash-latest"
 
 ## Tool Registry Initialization
 
-Upon initialization, the server's `Config` object is also used to create and populate a `ToolRegistry`. This registry is then aware of the `targetDir` and `sandbox` settings, which are vital for the correct and secure operation of tools like `ReadFileTool`, `ShellTool`, etc. The `ToolRegistry` is responsible for making tool schemas available to the Gemini model and for executing tool calls.
+Upon initialization, the core's `Config` object is also used to create and populate a `ToolRegistry`. This registry is then aware of the `targetDir` and `sandbox` settings, which are vital for the correct and secure operation of tools like `ReadFileTool`, `ShellTool`, etc. The `ToolRegistry` is responsible for making tool schemas available to the Gemini model and for executing tool calls.
 
-Proper server configuration, derived from these various sources, is essential for the Gemini CLI to function correctly, securely, and according to the user's intent.
+Proper core configuration, derived from these various sources, is essential for the Gemini CLI to function correctly, securely, and according to the user's intent.

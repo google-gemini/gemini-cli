@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepublishOnly": "npm publish --workspace=@gemini-code/server",
+    "prepublishOnly": "npm publish --workspace=@gemini-code/core",
     "prepack": "npm run build"
   },
   "files": [
@@ -29,7 +29,7 @@
     "sandboxImageUri": "gemini-cli-sandbox"
   },
   "dependencies": {
-    "@gemini-code/server": "0.1.0",
+    "@gemini-code/core": "0.1.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "highlight.js": "^11.11.1",

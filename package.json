@@ -27,7 +27,7 @@
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
     "bundle": "npm run generate && node_modules/.bin/esbuild packages/cli/index.ts --bundle --outfile=bundle/gemini.js --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);\" && bash scripts/copy_bundle_assets.sh",
     "build:cli": "npm run build --workspace packages/cli",
-    "build:server": "npm run build --workspace packages/server",
+    "build:server": "npm run build --workspace packages/core",
     "build:packages": "npm run build:server && npm run build:cli",
     "build:docker": "scripts/build_sandbox.sh -s",
     "tag:docker": "docker tag gemini-cli-sandbox ${SANDBOX_IMAGE_REGISTRY:?SANDBOX_IMAGE_REGISTRY not set}/${SANDBOX_IMAGE_NAME:?SANDBOX_IMAGE_NAME not set}:$npm_package_version",

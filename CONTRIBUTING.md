@@ -95,7 +95,7 @@ To execute the test suite for the project:
 npm run test
 ```
 
-This will run tests located in the `packages/server` and `packages/cli` directories. Ensure tests pass before submitting any changes.
+This will run tests located in the `packages/core` and `packages/cli` directories. Ensure tests pass before submitting any changes.
 
 ### Linting and Preflight Checks
 

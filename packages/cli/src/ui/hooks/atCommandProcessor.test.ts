@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import { Config } from '@gemini-code/server';
+import { Config } from '@gemini-code/core';
 import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'fs/promises';

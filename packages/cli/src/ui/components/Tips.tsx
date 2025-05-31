@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { type Config } from '@gemini-code/server';
+import { type Config } from '@gemini-code/core';
 
 interface TipsProps {
   config: Config;

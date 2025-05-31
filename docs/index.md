@@ -4,7 +4,7 @@ This documentation provides a comprehensive guide to installing, using, and deve
 
 ## Overview
 
-The Gemini CLI is a tool designed to bring the capabilities of Gemini models to your terminal. It consists of a client-side application (`packages/cli`) that communicates with a local server (`packages/server`), which in turn interacts with the Gemini API. The CLI supports a variety of tools for file system operations, code execution, web fetching, and more, enhancing your workflow with AI-powered assistance.
+The Gemini CLI is a tool designed to bring the capabilities of Gemini models to your terminal. It consists of a client-side application (`packages/cli`) that communicates with a local server (`packages/core`), which in turn interacts with the Gemini API. The CLI supports a variety of tools for file system operations, code execution, web fetching, and more, enhancing your workflow with AI-powered assistance.
 
 ## Navigating the Documentation
 

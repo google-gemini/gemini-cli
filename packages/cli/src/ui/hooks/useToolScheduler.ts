@@ -12,7 +12,7 @@ import {
   Tool,
   ToolCallConfirmationDetails,
   ToolResult,
-} from '@gemini-code/server';
+} from '@gemini-code/core';
 import { Part, PartUnion, PartListUnion } from '@google/genai';
 import { useCallback, useEffect, useState } from 'react';
 import {

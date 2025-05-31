@@ -31,7 +31,7 @@ export default tseslint.config(
       'node_modules/*',
       'eslint.config.js',
       'packages/cli/dist/**',
-      'packages/server/dist/**',
+      'packages/core/dist/**',
       'eslint-rules/*',
       'bundle/**',
     ],

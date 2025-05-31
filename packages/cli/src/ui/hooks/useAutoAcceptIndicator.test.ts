@@ -16,14 +16,14 @@ import {
 import { renderHook, act } from '@testing-library/react';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
-import type { Config as ActualConfigType } from '@gemini-code/server';
+import type { Config as ActualConfigType } from '@gemini-code/core';
 import { useInput, type Key as InkKey } from 'ink';
 
 vi.mock('ink');
 
-vi.mock('@gemini-code/server', async () => {
+vi.mock('@gemini-code/core', async () => {
   const actualServerModule = (await vi.importActual(
-    '@gemini-code/server',
+    '@gemini-code/core',
   )) as Record<string, unknown>;
   return {
     ...actualServerModule,
@@ -31,7 +31,7 @@ vi.mock('@gemini-code/server', async () => {
   };
 });
 
-import { Config } from '@gemini-code/server';
+import { Config } from '@gemini-code/core';
 
 interface MockConfigInstanceShape {
   getAlwaysSkipModificationConfirmation: Mock<() => boolean>;

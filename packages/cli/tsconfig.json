@@ -8,5 +8,5 @@
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../server" }]
+  "references": [{ "path": "../core" }]
 }

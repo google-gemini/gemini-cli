@@ -56,7 +56,7 @@ import {
   type SlashCommandActionReturn,
 } from './slashCommandProcessor.js';
 import { MessageType } from '../types.js';
-import { type Config } from '@gemini-code/server';
+import { type Config } from '@gemini-code/core';
 
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
