@@ -26,182 +26,30 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug CLI Test: text-buffer",
+      "name": "Debug Test File",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
         "test",
         "-w",
-        "packages/cli",
+        "packages/cli", // Default to CLI, change if needed or prompt for package
         "--",
         "--inspect-brk=9229",
         "--no-file-parallelism",
-        "${workspaceFolder}/packages/cli/src/ui/components/shared/text-buffer.test.ts"
+        "${input:testFile}"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
-    },
+    }
+  ],
+  "inputs": [
     {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Server Test: read-many-files",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/core",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/core/src/tools/read-many-files.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug CLI Test: atCommandProcessor",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/cli",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/cli/src/ui/hooks/atCommandProcessor.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Server Test: read-file",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/core",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/core/src/tools/read-file.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Server Test: turn",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/core",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/core/src/core/turn.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Server Test: fileUtils",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/core",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/core/src/utils/fileUtils.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug useLoadingIndicator Test (CLI)",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/cli",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/cli/src/ui/hooks/useLoadingIndicator.test.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug LoadingIndicator Test (CLI)",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/cli",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug CLI Test: useGeminiStream",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "test",
-        "-w",
-        "packages/cli",
-        "--",
-        "--inspect-brk=9229",
-        "--no-file-parallelism",
-        "${workspaceFolder}/packages/cli/src/ui/hooks/useGeminiStream.test.tsx"
-      ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
+      "id": "testFile",
+      "type": "promptString",
+      "description": "Enter the path to the test file (e.g., ${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx)",
+      "default": "${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx"
     }
   ]
 }
