@@ -231,9 +231,17 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
           </Text>
         );
       } else if (
+        fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
         ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
           (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-        fullMatch.length > ITALIC_MARKER_LENGTH * 2
+        !/\w/.test(text.substring(match.index - 1, match.index)) &&
+        !/\w/.test(
+          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
+        ) &&
+        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
+        !/[./\\]\S/.test(
+          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
+        )
       ) {
         renderedNode = (
           <Text key={key} italic>
