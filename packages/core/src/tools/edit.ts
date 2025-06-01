@@ -42,6 +42,12 @@ export interface EditToolParams {
    * The text to replace it with
    */
   new_string: string;
+
+  /**
+   * Number of replacements expected. Defaults to 1 if not specified.
+   * Use when you want to replace multiple occurrences.
+   */
+  expected_replacements?: number;
 }
 
 interface CalculatedEdit {
@@ -69,14 +75,15 @@ export class EditTool extends BaseTool<EditToolParams, ToolResult> {
     super(
       EditTool.Name,
       'Edit',
-      `Replaces a single, unique occurrence of text within a file. This tool requires providing significant context around the change to ensure uniqueness and precise targeting. Always use the ${ReadFileTool} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool} tool to examine the file's current content before attempting a text replacement.
 
-Expectation for parameters:
+Expectation for required parameters:
 1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
 2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
 3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic.
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-**Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.`,
+**Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.,
+**Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
       {
         properties: {
           file_path: {
@@ -86,13 +93,19 @@ Expectation for parameters:
           },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. CRITICAL: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it), matches multiple locations, or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
             type: 'string',
           },
           new_string: {
             description:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
+          },
+          expected_replacements: {
+            type: 'number',
+            description:
+              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+            minimum: 1,
           },
         },
         required: ['file_path', 'old_string', 'new_string'],
@@ -178,7 +191,7 @@ Expectation for parameters:
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
-    const expectedReplacements = 1;
+    const expectedReplacements = params.expected_replacements ?? 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
@@ -311,7 +324,8 @@ Expectation for parameters:
       finalNewString = correctedEdit.params.new_string;
       occurrences = correctedEdit.occurrences;
 
-      if (occurrences === 0 || occurrences !== 1) {
+      const expectedReplacements = params.expected_replacements ?? 1;
+      if (occurrences === 0 || occurrences !== expectedReplacements) {
         return false;
       }
     } else {

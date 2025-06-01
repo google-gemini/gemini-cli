@@ -79,7 +79,7 @@ export async function ensureCorrectEdit(
   let finalOldString = originalParams.old_string;
   let occurrences = countOccurrences(currentContent, finalOldString);
 
-  if (occurrences === 1) {
+  if (occurrences === (originalParams.expected_replacements ?? 1)) {
     if (newStringPotentiallyEscaped) {
       finalNewString = await correctNewStringEscaping(
         client,
@@ -89,6 +89,29 @@ export async function ensureCorrectEdit(
       );
     }
   } else if (occurrences > 1) {
+    const expectedReplacements = originalParams.expected_replacements ?? 1;
+
+    // If user expects multiple replacements, return as-is
+    if (occurrences === expectedReplacements) {
+      const result: CorrectedEditResult = {
+        params: { ...originalParams },
+        occurrences,
+      };
+      editCorrectionCache.set(cacheKey, result);
+      return result;
+    }
+
+    // If user expects 1 but found multiple, try to correct (existing behavior)
+    if (expectedReplacements === 1) {
+      const result: CorrectedEditResult = {
+        params: { ...originalParams },
+        occurrences,
+      };
+      editCorrectionCache.set(cacheKey, result);
+      return result;
+    }
+
+    // If occurrences don't match expected, return as-is (will fail validation later)
     const result: CorrectedEditResult = {
       params: { ...originalParams },
       occurrences,
@@ -102,7 +125,7 @@ export async function ensureCorrectEdit(
     );
     occurrences = countOccurrences(currentContent, unescapedOldStringAttempt);
 
-    if (occurrences === 1) {
+    if (occurrences === (originalParams.expected_replacements ?? 1)) {
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped) {
         finalNewString = await correctNewString(
@@ -125,7 +148,7 @@ export async function ensureCorrectEdit(
         llmCorrectedOldString,
       );
 
-      if (llmOldOccurrences === 1) {
+      if (llmOldOccurrences === (originalParams.expected_replacements ?? 1)) {
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
@@ -165,6 +188,7 @@ export async function ensureCorrectEdit(
     finalOldString,
     finalNewString,
     currentContent,
+    originalParams,
   );
   finalOldString = targetString;
   finalNewString = pair;
@@ -508,6 +532,7 @@ function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
+  originalParams: EditToolParams,
 ) {
   const trimmedTargetString = target.trim();
   if (target.length !== trimmedTargetString.length) {
@@ -516,7 +541,9 @@ function trimPairIfPossible(
       trimmedTargetString,
     );
 
-    if (trimmedTargetOccurrences === 1) {
+    if (
+      trimmedTargetOccurrences === (originalParams.expected_replacements ?? 1)
+    ) {
       const trimmedReactiveString = trimIfTargetTrims.trim();
       return {
         targetString: trimmedTargetString,
