@@ -9,7 +9,6 @@ import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { GeminiClient } from '@gemini-code/core';
 import { readPackageUp } from 'read-package-up';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -17,14 +16,25 @@ import { sandbox_command, start_sandbox } from './utils/sandbox.js';
 import { loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
+import { runNonInteractive } from './nonInteractiveCli.js';
+import {
+  EditTool,
+  GlobTool,
+  GrepTool,
+  LSTool,
+  MemoryTool,
+  ReadFileTool,
+  ReadManyFilesTool,
+  ShellTool,
+  WebFetchTool,
+  WebSearchTool,
+  WriteFileTool,
+} from '@gemini-code/core';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function main() {
-  const settings = loadSettings(process.cwd());
-  const config = await loadCliConfig(settings.merged);
-
   // warn about deprecated environment variables
   if (process.env.GEMINI_CODE_MODEL) {
     console.warn('GEMINI_CODE_MODEL is deprecated. Use GEMINI_MODEL instead.');
@@ -42,6 +52,9 @@ async function main() {
     );
     process.env.GEMINI_SANDBOX_IMAGE = process.env.GEMINI_CODE_SANDBOX_IMAGE;
   }
+
+  const settings = loadSettings(process.cwd());
+  const config = await loadCliConfig(settings.merged);
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -92,26 +105,31 @@ async function main() {
     process.exit(1);
   }
 
-  // If not a TTY and we have initial input, process it directly
-  const geminiClient = new GeminiClient(config);
-  const chat = await geminiClient.startChat();
-  try {
-    for await (const event of geminiClient.sendMessageStream(
-      chat,
-      [{ text: input }],
-      new AbortController().signal,
-    )) {
-      if (event.type === 'content') {
-        process.stdout.write(event.value);
-      }
-      // We might need to handle other event types later, but for now, just content.
-    }
-    process.stdout.write('\n'); // Add a newline at the end
-    process.exit(0);
-  } catch (error) {
-    console.error('Error processing piped input:', error);
-    process.exit(1);
-  }
+  // Non-interactive mode handled by runNonInteractive
+  let existingCoreTools = config.getCoreTools();
+  existingCoreTools = existingCoreTools || [
+    ReadFileTool.Name,
+    LSTool.Name,
+    GrepTool.Name,
+    GlobTool.Name,
+    EditTool.Name,
+    WriteFileTool.Name,
+    WebFetchTool.Name,
+    WebSearchTool.Name,
+    ReadManyFilesTool.Name,
+    ShellTool.Name,
+    MemoryTool.Name,
+  ];
+  const interactiveTools = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+  const nonInteractiveTools = existingCoreTools.filter(
+    (tool) => !interactiveTools.includes(tool),
+  );
+  const nonInteractiveSettings = {
+    ...settings.merged,
+    coreTools: nonInteractiveTools,
+  };
+  const nonInteractiveConfig = await loadCliConfig(nonInteractiveSettings);
+  await runNonInteractive(nonInteractiveConfig, input);
 }
 
 // --- Global Unhandled Rejection Handler ---
