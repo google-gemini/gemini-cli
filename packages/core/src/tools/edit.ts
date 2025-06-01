@@ -126,7 +126,7 @@ Expectation for parameters:
    * @param params Parameters to validate
    * @returns Error message string or null if valid
    */
-  validateParams(params: EditToolParams): string | null {
+  validateToolParams(params: EditToolParams): string | null {
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -372,7 +372,7 @@ Expectation for parameters:
     params: EditToolParams,
     _signal: AbortSignal,
   ): Promise<ToolResult> {
-    const validationError = this.validateParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,

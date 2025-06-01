@@ -178,14 +178,14 @@ describe('EditTool', () => {
     });
   });
 
-  describe('validateParams', () => {
+  describe('validateToolParams', () => {
     it('should return null for valid params', () => {
       const params: EditToolParams = {
         file_path: path.join(rootDir, 'test.txt'),
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateParams(params)).toBeNull();
+      expect(tool.validateToolParams(params)).toBeNull();
     });
 
     it('should return error for relative path', () => {
@@ -194,7 +194,9 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateParams(params)).toMatch(/File path must be absolute/);
+      expect(tool.validateToolParams(params)).toMatch(
+        /File path must be absolute/,
+      );
     });
 
     it('should return error for path outside root', () => {
@@ -203,7 +205,7 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateParams(params)).toMatch(
+      expect(tool.validateToolParams(params)).toMatch(
         /File path must be within the root directory/,
       );
     });
