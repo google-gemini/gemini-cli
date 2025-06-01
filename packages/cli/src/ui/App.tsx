@@ -37,6 +37,7 @@ import { Tips } from './components/Tips.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
+import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
@@ -399,16 +400,15 @@ export const App = ({
                     <Text color={Colors.AccentYellow}>
                       Press Ctrl+C again to exit.
                     </Text>
-                  ) : geminiMdFileCount > 0 ? (
-                    <Text color={Colors.SubtleComment}>
-                      Using {geminiMdFileCount}{' '}
-                      {settings.merged.contextFileName ||
-                        getCurrentGeminiMdFilename()}{' '}
-                      file
-                      {geminiMdFileCount > 1 ? 's' : ''}
-                    </Text>
                   ) : (
-                    <Text> </Text> // Render an empty space to reserve height
+                    <ContextSummaryDisplay
+                      geminiMdFileCount={geminiMdFileCount}
+                      contextFileName={
+                        settings.merged.contextFileName ||
+                        getCurrentGeminiMdFilename()
+                      }
+                      mcpServers={config.getMcpServers()}
+                    />
                   )}
                 </Box>
                 <Box>

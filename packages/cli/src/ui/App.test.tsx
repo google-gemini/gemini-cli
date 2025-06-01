@@ -286,4 +286,45 @@ describe('App UI', () => {
     await Promise.resolve();
     expect(lastFrame()).not.toContain('ANY_FILE.MD');
   });
+
+  it('should display GEMINI.md and MCP server count when both are present', async () => {
+    mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+    mockConfig.getMcpServers.mockReturnValue({
+      server1: {} as MCPServerConfig,
+    });
+    mockConfig.getDebugMode.mockReturnValue(false);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        cliVersion="1.0.0"
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(lastFrame()).toContain('server');
+  });
+
+  it('should display only MCP server count when GEMINI.md count is 0', async () => {
+    mockConfig.getGeminiMdFileCount.mockReturnValue(0);
+    mockConfig.getMcpServers.mockReturnValue({
+      server1: {} as MCPServerConfig,
+      server2: {} as MCPServerConfig,
+    });
+    mockConfig.getDebugMode.mockReturnValue(false);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        cliVersion="1.0.0"
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using 2 MCP servers');
+  });
 });
