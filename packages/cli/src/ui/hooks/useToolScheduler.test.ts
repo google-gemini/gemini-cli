@@ -8,12 +8,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
-  useToolScheduler,
-  formatLlmContentForFunctionResponse,
+  useReactToolScheduler,
   mapToDisplay,
-  ToolCall,
-  Status as ToolCallStatusType, // Renamed to avoid conflict
-} from './useToolScheduler.js';
+} from './useReactToolScheduler.js';
 import {
   Part,
   PartListUnion,
@@ -29,6 +26,9 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallResponseInfo,
+  formatLlmContentForFunctionResponse, // Import from core
+  ToolCall, // Import from core
+  Status as ToolCallStatusType, // Import from core
 } from '@gemini-code/core';
 import {
   HistoryItemWithoutId,
@@ -205,7 +205,7 @@ describe('formatLlmContentForFunctionResponse', () => {
   });
 });
 
-describe('useToolScheduler', () => {
+describe('useReactToolScheduler', () => {
   // TODO(ntaylormullen): The following tests are skipped due to difficulties in
   // reliably testing the asynchronous state updates and interactions with timers.
   // These tests involve complex sequences of events, including confirmations,
@@ -276,7 +276,7 @@ describe('useToolScheduler', () => {
 
   const renderScheduler = () =>
     renderHook(() =>
-      useToolScheduler(
+      useReactToolScheduler(
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
@@ -367,7 +367,7 @@ describe('useToolScheduler', () => {
         request,
         response: expect.objectContaining({
           error: expect.objectContaining({
-            message: 'tool nonExistentTool does not exist',
+            message: 'Tool "nonExistentTool" not found in registry.',
           }),
         }),
       }),
@@ -1050,7 +1050,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
-      expectedName: baseTool.name,
+      expectedName: baseTool.displayName, // Changed from baseTool.name
       expectedDescription: '',
     },
     {

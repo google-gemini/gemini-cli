@@ -218,7 +218,7 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void> | void;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
 export type ToolCallConfirmationDetails =

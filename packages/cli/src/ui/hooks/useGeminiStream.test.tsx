@@ -9,11 +9,11 @@ import { mergePartListUnions } from './useGeminiStream.js';
 import { Part, PartListUnion } from '@google/genai';
 
 // Mock useToolScheduler
-vi.mock('./useToolScheduler', async () => {
-  const actual = await vi.importActual('./useToolScheduler');
+vi.mock('./useReactToolScheduler', async () => {
+  const actual = await vi.importActual('./useReactToolScheduler');
   return {
     ...actual, // We need mapToDisplay from actual
-    useToolScheduler: vi.fn(),
+    useReactToolScheduler: vi.fn(),
   };
 });
 

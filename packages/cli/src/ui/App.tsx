@@ -200,7 +200,6 @@ export const App = ({
   const { streamingState, submitQuery, initError, pendingHistoryItems } =
     useGeminiStream(
       addItem,
-      refreshStatic,
       setShowHelp,
       config,
       setDebugMessage,

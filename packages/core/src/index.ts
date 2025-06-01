@@ -13,8 +13,7 @@ export * from './core/logger.js';
 export * from './core/prompts.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
-// Potentially export types from turn.ts if needed externally
-// export { GeminiEventType } from './core/turn.js'; // Example
+export * from './core/coreToolScheduler.js';
 
 // Export utilities
 export * from './utils/paths.js';
