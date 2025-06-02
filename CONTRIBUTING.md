@@ -143,7 +143,7 @@ For more detailed architecture, see `docs/architecture.md`.
 
 ## Debugging
 
-To debug the CLI application using VS Code:
+### VS Code:
 
 1.  Start the CLI in debug mode from the root directory:
     ```bash
@@ -159,6 +159,34 @@ To hit a breakpoint inside the sandbox container run:
 ```bash
 DEBUG=1 gemini
 ```
+
+### React DevTools
+
+To debug the CLI's React-based UI, you can use React DevTools. Ink, the library used for the CLI's interface, is compatible with React DevTools version 4.x.
+
+1.  **Start the Gemini CLI in development mode:**
+
+    ```bash
+    DEV=true npm start
+    ```
+
+2.  **Install and run React DevTools version 4.28.5 (or the latest compatible 4.x version):**
+
+    You can either install it globally:
+
+    ```bash
+    npm install -g react-devtools@4.28.5
+    react-devtools
+    ```
+
+    Or run it directly using npx:
+
+    ```bash
+    npx react-devtools@4.28.5
+    ```
+
+    Your running CLI application should then connect to React DevTools.
+    ![](/docs/assets/connected_devtools.png)
 
 ## Sandboxing
 
