@@ -82,29 +82,29 @@ describe('loadCliConfig', () => {
   it('should set showMemoryUsage to true when --memory flag is present', async () => {
     process.argv = ['node', 'script.js', '--show_memory_usage'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings);
-    expect(config.getShowMemoryUsage()).toBe(true);
+    const result = await loadCliConfig(settings);
+    expect(result.config.getShowMemoryUsage()).toBe(true);
   });
 
   it('should set showMemoryUsage to false when --memory flag is not present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings);
-    expect(config.getShowMemoryUsage()).toBe(false);
+    const result = await loadCliConfig(settings);
+    expect(result.config.getShowMemoryUsage()).toBe(false);
   });
 
   it('should set showMemoryUsage to false by default from settings if CLI flag is not present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { showMemoryUsage: false };
-    const config = await loadCliConfig(settings);
-    expect(config.getShowMemoryUsage()).toBe(false);
+    const result = await loadCliConfig(settings);
+    expect(result.config.getShowMemoryUsage()).toBe(false);
   });
 
   it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
     process.argv = ['node', 'script.js', '--show_memory_usage'];
     const settings: Settings = { showMemoryUsage: false };
-    const config = await loadCliConfig(settings);
-    expect(config.getShowMemoryUsage()).toBe(true);
+    const result = await loadCliConfig(settings);
+    expect(result.config.getShowMemoryUsage()).toBe(true);
   });
 });
 

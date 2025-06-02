@@ -50,11 +50,19 @@ async function main() {
     console.warn(
       'GEMINI_CODE_SANDBOX_IMAGE is deprecated. Use GEMINI_SANDBOX_IMAGE_NAME instead.',
     );
-    process.env.GEMINI_SANDBOX_IMAGE = process.env.GEMINI_CODE_SANDBOX_IMAGE;
+    process.env.GEMINI_SANDBOX_IMAGE_NAME =
+      process.env.GEMINI_CODE_SANDBOX_IMAGE; // Corrected to GEMINI_SANDBOX_IMAGE_NAME
   }
 
   const settings = loadSettings(process.cwd());
-  const config = await loadCliConfig(settings.merged);
+  const { config, modelWasSwitched, originalModelBeforeSwitch, finalModel } =
+    await loadCliConfig(settings.merged);
+
+  if (modelWasSwitched && originalModelBeforeSwitch) {
+    console.log(
+      `[INFO] Your configured model (${originalModelBeforeSwitch}) was temporarily unavailable. Switched to ${finalModel} for this session.`,
+    );
+  }
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -128,8 +136,10 @@ async function main() {
     ...settings.merged,
     coreTools: nonInteractiveTools,
   };
-  const nonInteractiveConfig = await loadCliConfig(nonInteractiveSettings);
-  await runNonInteractive(nonInteractiveConfig, input);
+  const nonInteractiveConfigResult = await loadCliConfig(
+    nonInteractiveSettings,
+  ); // Ensure config is reloaded with non-interactive tools
+  await runNonInteractive(nonInteractiveConfigResult.config, input);
 }
 
 // --- Global Unhandled Rejection Handler ---

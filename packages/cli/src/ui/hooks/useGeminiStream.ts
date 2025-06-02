@@ -17,6 +17,7 @@ import {
   Config,
   MessageSenderType,
   ToolCallRequestInfo,
+  GeminiChat,
 } from '@gemini-code/core';
 import { type PartListUnion } from '@google/genai';
 import {
@@ -40,7 +41,6 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { GeminiChat } from '@gemini-code/core/src/core/geminiChat.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];

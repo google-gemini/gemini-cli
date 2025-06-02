@@ -7,6 +7,6 @@
     "types": ["node", "vitest/globals"]
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
-  "exclude": ["node_modules", "dist"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
   "references": [{ "path": "../core" }]
 }

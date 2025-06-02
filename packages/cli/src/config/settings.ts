@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { MCPServerConfig } from '@gemini-code/core/src/config/config.js';
+import { MCPServerConfig } from '@gemini-code/core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
