@@ -342,6 +342,10 @@ export class GeminiChat {
     // Consolidate adjacent model roles in outputContents
     const consolidatedOutputContents: Content[] = [];
     for (const content of outputContents) {
+      if (this.isThoughtContent(content)) {
+        continue;
+      }
+
       const lastContent =
         consolidatedOutputContents[consolidatedOutputContents.length - 1];
       if (this.isTextContent(lastContent) && this.isTextContent(content)) {
@@ -392,6 +396,19 @@ export class GeminiChat {
       content.parts.length > 0 &&
       typeof content.parts[0].text === 'string' &&
       content.parts[0].text !== ''
+    );
+  }
+
+  private isThoughtContent(
+    content: Content | undefined,
+  ): content is Content & { parts: [{ thought: boolean }, ...Part[]] } {
+    return !!(
+      content &&
+      content.role === 'model' &&
+      content.parts &&
+      content.parts.length > 0 &&
+      typeof content.parts[0].thought === 'boolean' &&
+      content.parts[0].thought === true
     );
   }
 }

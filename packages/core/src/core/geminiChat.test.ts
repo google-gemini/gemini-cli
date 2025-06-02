@@ -298,5 +298,79 @@ describe('GeminiChat', () => {
       expect(history[0]).toEqual(userInput);
       expect(history[1]).toEqual(modelOutput[0]);
     });
+
+    it('should skip "thought" content from modelOutput', () => {
+      const modelOutputWithThought: Content[] = [
+        { role: 'model', parts: [{ thought: true }, { text: 'Visible text' }] },
+        { role: 'model', parts: [{ text: 'Another visible text' }] },
+      ];
+      // @ts-expect-error Accessing private method for testing purposes
+      chat.recordHistory(userInput, modelOutputWithThought);
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // User input + consolidated model output
+      expect(history[0]).toEqual(userInput);
+      expect(history[1].role).toBe('model');
+      // The 'thought' part is skipped, 'Another visible text' becomes the first part.
+      expect(history[1].parts).toEqual([{ text: 'Another visible text' }]);
+    });
+
+    it('should skip "thought" content even if it is the only content', () => {
+      const modelOutputOnlyThought: Content[] = [
+        { role: 'model', parts: [{ thought: true }] },
+      ];
+      // @ts-expect-error Accessing private method for testing purposes
+      chat.recordHistory(userInput, modelOutputOnlyThought);
+      const history = chat.getHistory();
+      expect(history.length).toBe(1); // User input + default empty model part
+      expect(history[0]).toEqual(userInput);
+    });
+
+    it('should correctly consolidate text parts when a thought part is in between', () => {
+      const modelOutputMixed: Content[] = [
+        { role: 'model', parts: [{ text: 'Part 1.' }] },
+        {
+          role: 'model',
+          parts: [{ thought: true }, { text: 'Should be skipped' }],
+        },
+        { role: 'model', parts: [{ text: 'Part 2.' }] },
+      ];
+      // @ts-expect-error Accessing private method for testing purposes
+      chat.recordHistory(userInput, modelOutputMixed);
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      expect(history[0]).toEqual(userInput);
+      expect(history[1].role).toBe('model');
+      expect(history[1].parts).toEqual([{ text: 'Part 1.Part 2.' }]);
+    });
+
+    it('should handle multiple thought parts correctly', () => {
+      const modelOutputMultipleThoughts: Content[] = [
+        { role: 'model', parts: [{ thought: true }] },
+        { role: 'model', parts: [{ text: 'Visible 1' }] },
+        { role: 'model', parts: [{ thought: true }] },
+        { role: 'model', parts: [{ text: 'Visible 2' }] },
+      ];
+      // @ts-expect-error Accessing private method for testing purposes
+      chat.recordHistory(userInput, modelOutputMultipleThoughts);
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      expect(history[0]).toEqual(userInput);
+      expect(history[1].role).toBe('model');
+      expect(history[1].parts).toEqual([{ text: 'Visible 1Visible 2' }]);
+    });
+
+    it('should handle thought part at the end of outputContents', () => {
+      const modelOutputThoughtAtEnd: Content[] = [
+        { role: 'model', parts: [{ text: 'Visible text' }] },
+        { role: 'model', parts: [{ thought: true }] },
+      ];
+      // @ts-expect-error Accessing private method for testing purposes
+      chat.recordHistory(userInput, modelOutputThoughtAtEnd);
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      expect(history[0]).toEqual(userInput);
+      expect(history[1].role).toBe('model');
+      expect(history[1].parts).toEqual([{ text: 'Visible text' }]);
+    });
   });
 });
