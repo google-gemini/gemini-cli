@@ -64,10 +64,15 @@ export const Footer: React.FC<FooterProps> = ({
         </Text>
       ) : process.env.SANDBOX === 'sandbox-exec' ? (
         <Text color={Colors.AccentYellow}>
-          sandbox-exec ({process.env.SEATBELT_PROFILE})
+          sandbox-exec{' '}
+          <Text color={Colors.SubtleComment}>
+            ({process.env.SEATBELT_PROFILE})
+          </Text>
         </Text>
       ) : (
-        <Text color={Colors.AccentRed}>no sandbox (see README)</Text>
+        <Text color={Colors.AccentRed}>
+          no sandbox <Text color={Colors.SubtleComment}>(see README)</Text>
+        </Text>
       )}
     </Box>
 

@@ -94,16 +94,31 @@ export function colorizeCode(
   const activeTheme = themeManager.getActiveTheme();
 
   try {
-    const hastTree =
-      !language || !lowlight.registered(language)
-        ? lowlight.highlightAuto(codeToHighlight)
-        : lowlight.highlight(language, codeToHighlight);
-
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
+    const lines = codeToHighlight.split('\n');
+    const getHighlightedLines = (line: string) =>
+      !language || !lowlight.registered(language)
+        ? lowlight.highlightAuto(line)
+        : lowlight.highlight(language, line);
+
     return (
-      <Text color={activeTheme.defaultColor}>
-        {renderHastNode(hastTree, activeTheme, undefined)}
+      <Text>
+        {lines.map((line, index) => (
+          <Text key={index}>
+            <Text color={activeTheme.colors.SubtleComment}>
+              {`${String(index + 1).padStart(3, ' ')} `}
+            </Text>
+            <Text color={activeTheme.defaultColor}>
+              {renderHastNode(
+                getHighlightedLines(line),
+                activeTheme,
+                undefined,
+              )}
+            </Text>
+            {index < lines.length - 1 && '\n'}
+          </Text>
+        ))}
       </Text>
     );
   } catch (error) {
@@ -112,6 +127,20 @@ export function colorizeCode(
       error,
     );
     // Fallback to plain text with default color on error
-    return <Text color={activeTheme.defaultColor}>{codeToHighlight}</Text>;
+    // Also display line numbers in fallback
+    const lines = codeToHighlight.split('\n');
+    return (
+      <Text>
+        {lines.map((line, index) => (
+          <Text key={index}>
+            <Text color={activeTheme.colors.SubtleComment}>
+              {`${String(index + 1).padStart(3, ' ')} `}
+            </Text>
+            <Text color={activeTheme.defaultColor}>{line}</Text>
+            {index < lines.length - 1 && '\n'}
+          </Text>
+        ))}
+      </Text>
+    );
   }
 }

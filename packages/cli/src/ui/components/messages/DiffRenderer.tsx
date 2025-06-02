@@ -260,7 +260,7 @@ const renderDiffContent = (
 
         acc.push(
           <Box key={lineKey} flexDirection="row">
-            <Text color={Colors.Foreground}>{gutterNumStr.padEnd(4)} </Text>
+            <Text color={Colors.SubtleComment}>{gutterNumStr.padEnd(4)} </Text>
             <Text color={color} dimColor={dim}>
               {prefixSymbol}{' '}
             </Text>
