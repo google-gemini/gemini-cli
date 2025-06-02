@@ -43,21 +43,31 @@ fi
 
 # if GEMINI_SANDBOX is not set, try to source .env in case set there
 # allow .env to be in any ancestor directory (same as findEnvFile in config.ts)
+# prefer gemini-specific .env under .gemini folder (also same as in findEnvFile)
 if [ -z "${GEMINI_SANDBOX:-}" ]; then
     current_dir=$(pwd)
     dot_env_sourced=false
     while [ "$current_dir" != "/" ]; do
-        if [ -f "$current_dir/.env" ]; then
+        if [ -f "$current_dir/.gemini/.env" ]; then
+            source "$current_dir/.gemini/.env"
+            dot_env_sourced=true
+            break
+        elif [ -f "$current_dir/.env" ]; then
             source "$current_dir/.env"
             dot_env_sourced=true
             break
         fi
         current_dir=$(dirname "$current_dir")
     done
-    # if .env is not found in any ancestor directory, try ~/.env as fallback
-    if [ "$dot_env_sourced" = false ] && [ -f "$HOME/.env" ]; then
-        source "$HOME/.env"
-        dot_env_sourced=true
+    # if .env is not found in any ancestor directory, try home as fallback
+    if [ "$dot_env_sourced" = false ]; then
+        if [ -f "$HOME/.gemini/.env" ]; then
+            source "$HOME/.gemini/.env"
+            dot_env_sourced=true
+        elif [ -f "$HOME/.env" ]; then
+            source "$HOME/.env"
+            dot_env_sourced=true
+        fi
     fi
 fi
 

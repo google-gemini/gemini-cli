@@ -21,6 +21,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -204,13 +205,22 @@ export class Config {
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
+    // prefer gemini-specific .env under GEMINI_DIR
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    if (fs.existsSync(geminiEnvPath)) {
+      return geminiEnvPath;
+    }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
       return envPath;
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
-      // check ~/.env as fallback
+      // check .env under home as fallback, again preferring gemini-specific .env
+      const homeGeminiEnvPath = path.join(os.homedir(), GEMINI_DIR, '.env');
+      if (fs.existsSync(homeGeminiEnvPath)) {
+        return homeGeminiEnvPath;
+      }
       const homeEnvPath = path.join(os.homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
         return homeEnvPath;
