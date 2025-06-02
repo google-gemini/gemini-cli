@@ -76,3 +76,7 @@ Congratulations! You've successfully set up and run the Gemini CLI.
 - Explore the **[CLI Commands](./docs/cli/commands.md)** to learn about all available functionalities.
 - If you encounter any issues, check the **[Troubleshooting Guide](./docs/troubleshooting.md)**.
 - For more comprehensive documentation, please see the [full documentation here](./docs/index.md).
+
+## Gemini APIs
+
+This project leverages the Gemini APIs to provide AI capabilities. For details on the terms of service governing the Gemini API, please refer to the [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms).
