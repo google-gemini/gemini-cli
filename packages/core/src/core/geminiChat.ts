@@ -15,6 +15,7 @@ import {
   SendMessageParameters,
   GoogleGenAI,
   createUserContent,
+  Part,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -343,13 +344,13 @@ export class GeminiChat {
     for (const content of outputContents) {
       const lastContent =
         consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (
-        lastContent &&
-        lastContent.role === 'model' &&
-        content.role === 'model' &&
-        lastContent.parts
-      ) {
-        lastContent.parts.push(...(content.parts || []));
+      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
+        // If both current and last are text, combine their text into the lastContent's first part
+        // and append any other parts from the current content.
+        lastContent.parts[0].text += content.parts[0].text || '';
+        if (content.parts.length > 1) {
+          lastContent.parts.push(...content.parts.slice(1));
+        }
       } else {
         consolidatedOutputContents.push(content);
       }
@@ -357,24 +358,40 @@ export class GeminiChat {
 
     if (consolidatedOutputContents.length > 0) {
       const lastHistoryEntry = this.history[this.history.length - 1];
-      // Only merge if AFC history was NOT just added, to prevent merging with last AFC model turn.
       const canMergeWithLastHistory =
         !automaticFunctionCallingHistory ||
         automaticFunctionCallingHistory.length === 0;
 
       if (
         canMergeWithLastHistory &&
-        lastHistoryEntry &&
-        lastHistoryEntry.role === 'model' &&
-        lastHistoryEntry.parts &&
-        consolidatedOutputContents[0].role === 'model'
+        this.isTextContent(lastHistoryEntry) &&
+        this.isTextContent(consolidatedOutputContents[0])
       ) {
-        lastHistoryEntry.parts.push(
-          ...(consolidatedOutputContents[0].parts || []),
-        );
+        // If both current and last are text, combine their text into the lastHistoryEntry's first part
+        // and append any other parts from the current content.
+        lastHistoryEntry.parts[0].text +=
+          consolidatedOutputContents[0].parts[0].text || '';
+        if (consolidatedOutputContents[0].parts.length > 1) {
+          lastHistoryEntry.parts.push(
+            ...consolidatedOutputContents[0].parts.slice(1),
+          );
+        }
         consolidatedOutputContents.shift(); // Remove the first element as it's merged
       }
       this.history.push(...consolidatedOutputContents);
     }
+  }
+
+  private isTextContent(
+    content: Content | undefined,
+  ): content is Content & { parts: [{ text: string }, ...Part[]] } {
+    return !!(
+      content &&
+      content.role === 'model' &&
+      content.parts &&
+      content.parts.length > 0 &&
+      typeof content.parts[0].text === 'string' &&
+      content.parts[0].text !== ''
+    );
   }
 }
