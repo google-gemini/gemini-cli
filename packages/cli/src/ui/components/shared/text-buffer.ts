@@ -524,35 +524,33 @@ export function useTextBuffer({
       const normalised = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const parts = normalised.split('\n');
 
-      setLines((prevLines) => {
-        const newLines = [...prevLines];
-        const lineContent = currentLine(cursorRow);
-        const before = cpSlice(lineContent, 0, cursorCol);
-        const after = cpSlice(lineContent, cursorCol);
+      const newLines = [...lines];
+      const lineContent = currentLine(cursorRow);
+      const before = cpSlice(lineContent, 0, cursorCol);
+      const after = cpSlice(lineContent, cursorCol);
 
-        newLines[cursorRow] = before + parts[0];
+      newLines[cursorRow] = before + parts[0];
 
-        if (parts.length > 1) {
-          // Adjusted condition for inserting multiple lines
-          const remainingParts = parts.slice(1);
-          const lastPartOriginal = remainingParts.pop() ?? '';
-          newLines.splice(cursorRow + 1, 0, ...remainingParts);
-          newLines.splice(
-            cursorRow + parts.length - 1,
-            0,
-            lastPartOriginal + after,
-          );
-          setCursorRow((prev) => prev + parts.length - 1);
-          setCursorCol(cpLen(lastPartOriginal));
-        } else {
-          setCursorCol(cpLen(before) + cpLen(parts[0]));
-        }
-        return newLines;
-      });
+      if (parts.length > 1) {
+        // Adjusted condition for inserting multiple lines
+        const remainingParts = parts.slice(1);
+        const lastPartOriginal = remainingParts.pop() ?? '';
+        newLines.splice(cursorRow + 1, 0, ...remainingParts);
+        newLines.splice(
+          cursorRow + parts.length - 1,
+          0,
+          lastPartOriginal + after,
+        );
+        setCursorRow(cursorRow + parts.length - 1);
+        setCursorCol(cpLen(lastPartOriginal));
+      } else {
+        setCursorCol(cpLen(before) + cpLen(parts[0]));
+      }
+      setLines(newLines);
       setPreferredCol(null);
       return true;
     },
-    [pushUndo, cursorRow, cursorCol, currentLine, setPreferredCol],
+    [pushUndo, cursorRow, cursorCol, lines, currentLine, setPreferredCol],
   );
 
   const insert = useCallback(
@@ -1275,6 +1273,7 @@ export function useTextBuffer({
 
     setText,
     insert,
+    insertStr,
     newline,
     backspace,
     del,
@@ -1354,6 +1353,7 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string) => void;
+  insertStr: (str: string) => boolean;
   newline: () => void;
   backspace: () => void;
   del: () => void;
