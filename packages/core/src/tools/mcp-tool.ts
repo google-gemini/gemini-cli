@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   BaseTool,
   ToolResult,
@@ -12,17 +11,18 @@ import {
   ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
 } from './tools.js';
+import { CallableTool, Part, FunctionCall } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
 export const MCP_TOOL_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
-  private static readonly whitelist: Set<string> = new Set();
+  private static readonly allowlist: Set<string> = new Set();
 
   constructor(
-    private readonly mcpClient: Client,
-    private readonly serverName: string, // Added for server identification
+    private readonly mcpTool: CallableTool,
+    readonly serverName: string,
     readonly name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
@@ -30,13 +30,17 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly timeout?: number,
     readonly trust?: boolean,
   ) {
-    description += `
+    if (serverName !== 'mcp') {
+      // Add server name if not the generic 'mcp'
+      description += `
 
-This MCP tool was discovered from a local MCP server using JSON RPC 2.0 over stdio transport protocol.
-When called, this tool will invoke the \`tools/call\` method for tool name \`${name}\`.
-MCP servers can be configured in project or user settings.
-Returns the MCP server response as a json string.
-`;
+This MCP tool named '${serverToolName}' was discovered from an MCP server.`;
+    } else {
+      description += `
+
+This MCP tool named '${serverToolName}' was discovered from '${serverName}' MCP server.`;
+    }
+
     super(
       name,
       name,
@@ -51,31 +55,31 @@ Returns the MCP server response as a json string.
     _params: ToolParams,
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const serverWhitelistKey = this.serverName;
-    const toolWhitelistKey = `${this.serverName}.${this.serverToolName}`;
+    const serverAllowListKey = this.serverName;
+    const toolAllowListKey = `${this.serverName}.${this.serverToolName}`;
 
     if (this.trust) {
       return false; // server is trusted, no confirmation needed
     }
 
     if (
-      DiscoveredMCPTool.whitelist.has(serverWhitelistKey) ||
-      DiscoveredMCPTool.whitelist.has(toolWhitelistKey)
+      DiscoveredMCPTool.allowlist.has(serverAllowListKey) ||
+      DiscoveredMCPTool.allowlist.has(toolAllowListKey)
     ) {
-      return false; // server and/or tool already whitelisted
+      return false; // server and/or tool already allow listed
     }
 
     const confirmationDetails: ToolMcpConfirmationDetails = {
       type: 'mcp',
       title: 'Confirm MCP Tool Execution',
       serverName: this.serverName,
-      toolName: this.serverToolName,
-      toolDisplayName: this.name,
+      toolName: this.serverToolName, // Display original tool name in confirmation
+      toolDisplayName: this.name, // Display global registry name exposed to model and user
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-          DiscoveredMCPTool.whitelist.add(serverWhitelistKey);
+          DiscoveredMCPTool.allowlist.add(serverAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
-          DiscoveredMCPTool.whitelist.add(toolWhitelistKey);
+          DiscoveredMCPTool.allowlist.add(toolAllowListKey);
         }
       },
     };
@@ -83,20 +87,69 @@ Returns the MCP server response as a json string.
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {
-    const result = await this.mcpClient.callTool(
+    const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
-        arguments: params,
+        args: params,
       },
-      undefined, // skip resultSchema to specify options (RequestOptions)
-      {
-        timeout: this.timeout ?? MCP_TOOL_DEFAULT_TIMEOUT_MSEC,
-      },
-    );
-    const output = '```json\n' + JSON.stringify(result, null, 2) + '\n```';
+    ];
+
+    const responseParts: Part[] = await this.mcpTool.callTool(functionCalls);
+
+    const output = getStringifiedResultForDisplay(responseParts);
     return {
-      llmContent: output,
+      llmContent: responseParts,
       returnDisplay: output,
     };
   }
+}
+
+/**
+ * Processes an array of `Part` objects, primarily from a tool's execution result,
+ * to generate a user-friendly string representation, typically for display in a CLI.
+ *
+ * The `result` array can contain various types of `Part` objects:
+ * 1. `FunctionResponse` parts:
+ *    - If the `response.content` of a `FunctionResponse` is an array consisting solely
+ *      of `TextPart` objects, their text content is concatenated into a single string.
+ *      This is to present simple textual outputs directly.
+ *    - If `response.content` is an array but contains other types of `Part` objects (or a mix),
+ *      the `content` array itself is preserved. This handles structured data like JSON objects or arrays
+ *      returned by a tool.
+ *    - If `response.content` is not an array or is missing, the entire `functionResponse`
+ *      object is preserved.
+ * 2. Other `Part` types (e.g., `TextPart` directly in the `result` array):
+ *    - These are preserved as is.
+ *
+ * All processed parts are then collected into an array, which is JSON.stringify-ed
+ * with indentation and wrapped in a markdown JSON code block.
+ */
+function getStringifiedResultForDisplay(result: Part[]) {
+  if (!result || result.length === 0) {
+    return '```json\n[]\n```';
+  }
+
+  const processFunctionResponse = (part: Part) => {
+    if (part.functionResponse) {
+      const responseContent = part.functionResponse.response?.content;
+      if (responseContent && Array.isArray(responseContent)) {
+        // Check if all parts in responseContent are simple TextParts
+        const allTextParts = responseContent.every(
+          (p: Part) => p.text !== undefined,
+        );
+        if (allTextParts) {
+          return responseContent.map((p: Part) => p.text).join('');
+        }
+        // If not all simple text parts, return the array of these content parts for JSON stringification
+        return responseContent;
+      }
+
+      // If no content, or not an array, or not a functionResponse, stringify the whole functionResponse part for inspection
+      return part.functionResponse;
+    }
+    return part; // Fallback for unexpected structure or non-FunctionResponsePart
+  };
+
+  const processedResults = result.map(processFunctionResponse);
+  return '```json\n' + JSON.stringify(processedResults, null, 2) + '\n```';
 }
