@@ -530,7 +530,10 @@ export const useGeminiStream = (
       },
     );
 
-    if (completedAndReadyToSubmitTools.length > 0) {
+    if (
+      completedAndReadyToSubmitTools.length > 0 &&
+      completedAndReadyToSubmitTools.length === toolCalls.length
+    ) {
       const responsesToSend: PartListUnion[] =
         completedAndReadyToSubmitTools.map(
           (toolCall) => toolCall.response.responseParts,
