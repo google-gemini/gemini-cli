@@ -18,6 +18,8 @@ import {
 } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
+import stripAnsi from 'strip-ansi';
+
 export interface ShellToolParams {
   command: string;
   description?: string;
@@ -177,7 +179,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       // removing listeners can overflow OS buffer and block subprocesses
       // destroying (e.g. shell.stdout.destroy()) can terminate subprocesses via SIGPIPE
       if (!exited) {
-        const str = data.toString();
+        const str = stripAnsi(data.toString());
         stdout += str;
         appendOutput(str);
       }
@@ -186,7 +188,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     let stderr = '';
     shell.stderr.on('data', (data: Buffer) => {
       if (!exited) {
-        const str = data.toString();
+        const str = stripAnsi(data.toString());
         stderr += str;
         appendOutput(str);
       }

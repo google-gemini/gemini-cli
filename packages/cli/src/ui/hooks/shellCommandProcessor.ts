@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import stripAnsi from 'strip-ansi';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -126,12 +127,12 @@ export const useShellCommandProcessor = (
           let exited = false;
           let output = '';
           let lastUpdateTime = Date.now();
-          const handleOutput = (data: string) => {
+          const handleOutput = (data: Buffer) => {
             // continue to consume post-exit for background processes
             // removing listeners can overflow OS buffer and block subprocesses
             // destroying (e.g. child.stdout.destroy()) can terminate subprocesses via SIGPIPE
             if (!exited) {
-              output += data;
+              output += stripAnsi(data.toString());
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                 setPendingHistoryItem({
                   type: 'info',
