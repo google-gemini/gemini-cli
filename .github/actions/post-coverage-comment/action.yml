@@ -65,7 +65,7 @@ runs:
 
         # CLI Package - Collapsible Section (with full text summary from file)
         echo "<details>" >> "$comment_file"
-        echo "<summary>CLI Package - Full Text Report</summary>"
+        echo "<summary>CLI Package - Full Text Report</summary>" >> "$comment_file"
         echo "" >> "$comment_file"
         echo '```text' >> "$comment_file"
         if [ -f "$cli_full_text_summary_file" ]; then
@@ -74,12 +74,12 @@ runs:
           echo "CLI full-text-summary.txt not found at: $cli_full_text_summary_file" >> "$comment_file"
         fi
         echo '```' >> "$comment_file"
-        echo "</details>"
+        echo "</details>" >> "$comment_file"
         echo "" >> "$comment_file"
 
         # Core Package - Collapsible Section (with full text summary from file)
         echo "<details>" >> "$comment_file"
-        echo "<summary>Core Package - Full Text Report</summary>"
+        echo "<summary>Core Package - Full Text Report</summary>" >> "$comment_file"
         echo "" >> "$comment_file"
         echo '```text' >> "$comment_file"
         if [ -f "$core_full_text_summary_file" ]; then
@@ -88,7 +88,7 @@ runs:
           echo "Core full-text-summary.txt not found at: $core_full_text_summary_file" >> "$comment_file"
         fi
         echo '```' >> "$comment_file"
-        echo "</details>"
+        echo "</details>" >> "$comment_file"
         echo "" >> "$comment_file"
 
         echo "_For detailed HTML reports, please see the 'coverage-reports-${{ inputs.node_version }}' artifact from the main CI run._" >> "$comment_file"
