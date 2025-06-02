@@ -20,7 +20,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { ReadFileTool } from './read-file.js';
 import { GeminiClient } from '../core/client.js';
-import { Config } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 
@@ -281,7 +281,7 @@ Expectation for required parameters:
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getAlwaysSkipModificationConfirmation()) {
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
     const validationError = this.validateToolParams(params);
@@ -356,7 +356,7 @@ Expectation for required parameters:
       fileDiff,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.config.setAlwaysSkipModificationConfirmation(true);
+          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
       },
     };

@@ -7,7 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff';
-import { Config } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import {
   BaseTool,
   ToolResult,
@@ -143,7 +143,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
     params: WriteFileToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getAlwaysSkipModificationConfirmation()) {
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -186,7 +186,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       fileDiff,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.config.setAlwaysSkipModificationConfirmation(true);
+          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
       },
     };

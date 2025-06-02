@@ -16,7 +16,11 @@ import {
 import { renderHook, act } from '@testing-library/react';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
-import type { Config as ActualConfigType } from '@gemini-code/core';
+import {
+  Config,
+  Config as ActualConfigType,
+  ApprovalMode,
+} from '@gemini-code/core';
 import { useInput, type Key as InkKey } from 'ink';
 
 vi.mock('ink');
@@ -31,11 +35,9 @@ vi.mock('@gemini-code/core', async () => {
   };
 });
 
-import { Config } from '@gemini-code/core';
-
 interface MockConfigInstanceShape {
-  getAlwaysSkipModificationConfirmation: Mock<() => boolean>;
-  setAlwaysSkipModificationConfirmation: Mock<(value: boolean) => void>;
+  getApprovalMode: Mock<() => ApprovalMode>;
+  setApprovalMode: Mock<(value: ApprovalMode) => void>;
   getCoreTools: Mock<() => string[]>;
   getToolDiscoveryCommand: Mock<() => string | undefined>;
   getTargetDir: Mock<() => string>;
@@ -65,14 +67,16 @@ describe('useAutoAcceptIndicator', () => {
     (
       Config as unknown as MockedFunction<() => MockConfigInstanceShape>
     ).mockImplementation(() => {
-      const instanceGetAlwaysSkipMock = vi.fn();
-      const instanceSetAlwaysSkipMock = vi.fn();
+      const instanceGetApprovalModeMock = vi.fn();
+      const instanceSetApprovalModeMock = vi.fn();
 
       const instance: MockConfigInstanceShape = {
-        getAlwaysSkipModificationConfirmation:
-          instanceGetAlwaysSkipMock as Mock<() => boolean>,
-        setAlwaysSkipModificationConfirmation:
-          instanceSetAlwaysSkipMock as Mock<(value: boolean) => void>,
+        getApprovalMode: instanceGetApprovalModeMock as Mock<
+          () => ApprovalMode
+        >,
+        setApprovalMode: instanceSetApprovalModeMock as Mock<
+          (value: ApprovalMode) => void
+        >,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<
           () => string | undefined
@@ -101,8 +105,8 @@ describe('useAutoAcceptIndicator', () => {
           () => { discoverTools: Mock<() => void> }
         >,
       };
-      instanceSetAlwaysSkipMock.mockImplementation((value: boolean) => {
-        instanceGetAlwaysSkipMock.mockReturnValue(value);
+      instanceSetApprovalModeMock.mockImplementation((value: ApprovalMode) => {
+        instanceGetApprovalModeMock.mockReturnValue(value);
       });
       return instance;
     });
@@ -116,68 +120,99 @@ describe('useAutoAcceptIndicator', () => {
     mockConfigInstance = new (Config as any)() as MockConfigInstanceShape;
   });
 
-  it('should initialize with true if config.getAlwaysSkipModificationConfirmation returns true', () => {
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      true,
-    );
+  it('should initialize with ApprovalMode.AUTO_EDIT if config.getApprovalMode returns ApprovalMode.AUTO_EDIT', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
       }),
     );
-    expect(result.current).toBe(true);
-    expect(
-      mockConfigInstance.getAlwaysSkipModificationConfirmation,
-    ).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
   });
 
-  it('should initialize with false if config.getAlwaysSkipModificationConfirmation returns false', () => {
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      false,
-    );
+  it('should initialize with ApprovalMode.DEFAULT if config.getApprovalMode returns ApprovalMode.DEFAULT', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
       }),
     );
-    expect(result.current).toBe(false);
-    expect(
-      mockConfigInstance.getAlwaysSkipModificationConfirmation,
-    ).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
+    expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
   });
 
-  it('should toggle the indicator and update config when Shift+Tab is pressed', () => {
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      false,
-    );
+  it('should initialize with ApprovalMode.YOLO if config.getApprovalMode returns ApprovalMode.YOLO', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.YOLO);
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
       }),
     );
-    expect(result.current).toBe(false);
+    expect(result.current).toBe(ApprovalMode.YOLO);
+    expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('should toggle the indicator and update config when Shift+Tab or Ctrl+Y is pressed', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    const { result } = renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+      }),
+    );
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
 
     act(() => {
       capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
     });
-    expect(
-      mockConfigInstance.setAlwaysSkipModificationConfirmation,
-    ).toHaveBeenCalledWith(true);
-    expect(result.current).toBe(true);
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.AUTO_EDIT,
+    );
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+
+    act(() => {
+      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    expect(result.current).toBe(ApprovalMode.YOLO);
+
+    act(() => {
+      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
+    );
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
+
+    act(() => {
+      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    expect(result.current).toBe(ApprovalMode.YOLO);
 
     act(() => {
       capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
     });
-    expect(
-      mockConfigInstance.setAlwaysSkipModificationConfirmation,
-    ).toHaveBeenCalledWith(false);
-    expect(result.current).toBe(false);
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.AUTO_EDIT,
+    );
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+
+    act(() => {
+      capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
+    );
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
   });
 
-  it('should not toggle if only Tab, only Shift, or other keys are pressed', () => {
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      false,
-    );
+  it('should not toggle if only one key or other keys combinations are pressed', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
@@ -187,29 +222,41 @@ describe('useAutoAcceptIndicator', () => {
     act(() => {
       capturedUseInputHandler('', { tab: true, shift: false } as InkKey);
     });
-    expect(
-      mockConfigInstance.setAlwaysSkipModificationConfirmation,
-    ).not.toHaveBeenCalled();
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
       capturedUseInputHandler('', { tab: false, shift: true } as InkKey);
     });
-    expect(
-      mockConfigInstance.setAlwaysSkipModificationConfirmation,
-    ).not.toHaveBeenCalled();
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
       capturedUseInputHandler('a', { tab: false, shift: false } as InkKey);
     });
-    expect(
-      mockConfigInstance.setAlwaysSkipModificationConfirmation,
-    ).not.toHaveBeenCalled();
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+
+    act(() => {
+      capturedUseInputHandler('y', { tab: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+
+    act(() => {
+      capturedUseInputHandler('a', { ctrl: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+
+    act(() => {
+      capturedUseInputHandler('y', { shift: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+
+    act(() => {
+      capturedUseInputHandler('a', { ctrl: true, shift: true } as InkKey);
+    });
+    expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
   });
 
   it('should update indicator when config value changes externally (useEffect dependency)', () => {
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      false,
-    );
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     const { result, rerender } = renderHook(
       (props: { config: ActualConfigType }) => useAutoAcceptIndicator(props),
       {
@@ -218,16 +265,12 @@ describe('useAutoAcceptIndicator', () => {
         },
       },
     );
-    expect(result.current).toBe(false);
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
 
-    mockConfigInstance.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      true,
-    );
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
 
     rerender({ config: mockConfigInstance as unknown as ActualConfigType });
-    expect(result.current).toBe(true);
-    expect(
-      mockConfigInstance.getAlwaysSkipModificationConfirmation,
-    ).toHaveBeenCalledTimes(3);
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(3);
   });
 });

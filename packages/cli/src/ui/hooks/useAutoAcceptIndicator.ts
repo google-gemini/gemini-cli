@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useInput } from 'ink';
-import type { Config } from '@gemini-code/core';
+import { ApprovalMode, type Config } from '@gemini-code/core';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
@@ -14,8 +14,8 @@ export interface UseAutoAcceptIndicatorArgs {
 
 export function useAutoAcceptIndicator({
   config,
-}: UseAutoAcceptIndicatorArgs): boolean {
-  const currentConfigValue = config.getAlwaysSkipModificationConfirmation();
+}: UseAutoAcceptIndicatorArgs): ApprovalMode {
+  const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
     useState(currentConfigValue);
 
@@ -23,15 +23,25 @@ export function useAutoAcceptIndicator({
     setShowAutoAcceptIndicator(currentConfigValue);
   }, [currentConfigValue]);
 
-  useInput((_input, key) => {
-    if (key.tab && key.shift) {
-      const alwaysAcceptModificationConfirmations =
-        !config.getAlwaysSkipModificationConfirmation();
-      config.setAlwaysSkipModificationConfirmation(
-        alwaysAcceptModificationConfirmations,
-      );
+  useInput((input, key) => {
+    let nextApprovalMode: ApprovalMode | undefined;
+
+    if (key.ctrl && input === 'y') {
+      nextApprovalMode =
+        config.getApprovalMode() === ApprovalMode.YOLO
+          ? ApprovalMode.DEFAULT
+          : ApprovalMode.YOLO;
+    } else if (key.tab && key.shift) {
+      nextApprovalMode =
+        config.getApprovalMode() === ApprovalMode.AUTO_EDIT
+          ? ApprovalMode.DEFAULT
+          : ApprovalMode.AUTO_EDIT;
+    }
+
+    if (nextApprovalMode) {
+      config.setApprovalMode(nextApprovalMode);
       // Update local state immediately for responsiveness
-      setShowAutoAcceptIndicator(alwaysAcceptModificationConfirmations);
+      setShowAutoAcceptIndicator(nextApprovalMode);
     }
   });
 

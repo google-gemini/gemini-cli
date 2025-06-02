@@ -20,7 +20,7 @@ import {
   ToolEditConfirmationDetails,
 } from './tools.js';
 import { type EditToolParams } from './edit.js';
-import { Config } from '../config/config.js';
+import { ApprovalMode, Config } from '../config/config.js';
 import { ToolRegistry } from './tool-registry.js';
 import path from 'path';
 import fs from 'fs';
@@ -51,8 +51,8 @@ vi.mocked(ensureCorrectFileContent).mockImplementation(
 // Mock Config
 const mockConfigInternal = {
   getTargetDir: () => rootDir,
-  getAlwaysSkipModificationConfirmation: vi.fn(() => false),
-  setAlwaysSkipModificationConfirmation: vi.fn(),
+  getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+  setApprovalMode: vi.fn(),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -100,10 +100,8 @@ describe('WriteFileTool', () => {
     tool = new WriteFileTool(mockConfig);
 
     // Reset mocks before each test
-    mockConfigInternal.getAlwaysSkipModificationConfirmation.mockReturnValue(
-      false,
-    );
-    mockConfigInternal.setAlwaysSkipModificationConfirmation.mockClear();
+    mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    mockConfigInternal.setApprovalMode.mockClear();
     mockEnsureCorrectEdit.mockReset();
     mockEnsureCorrectFileContent.mockReset();
 

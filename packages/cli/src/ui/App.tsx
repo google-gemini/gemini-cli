@@ -44,6 +44,7 @@ import {
   getErrorMessage,
   type Config,
   getCurrentGeminiMdFilename,
+  ApprovalMode,
 } from '@gemini-code/core';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -412,9 +413,12 @@ export const App = ({
                   )}
                 </Box>
                 <Box>
-                  {showAutoAcceptIndicator && !shellModeActive && (
-                    <AutoAcceptIndicator />
-                  )}
+                  {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+                    !shellModeActive && (
+                      <AutoAcceptIndicator
+                        approvalMode={showAutoAcceptIndicator}
+                      />
+                    )}
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>

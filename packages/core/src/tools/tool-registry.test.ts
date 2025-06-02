@@ -16,7 +16,7 @@ import {
 } from 'vitest';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { Config, ConfigParameters } from '../config/config.js';
+import { ApprovalMode, Config, ConfigParameters } from '../config/config.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
 import { execSync, spawn } from 'node:child_process'; // Import spawn here
@@ -85,7 +85,7 @@ const baseConfigParams: ConfigParameters = {
   userAgent: 'TestAgent/1.0',
   userMemory: '',
   geminiMdFileCount: 0,
-  alwaysSkipModificationConfirmation: false,
+  approvalMode: ApprovalMode.DEFAULT,
   vertexai: false,
 };
 

@@ -12,6 +12,7 @@ import {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolRegistry,
+  ApprovalMode,
 } from '../index.js';
 import { Part, PartUnion, PartListUnion } from '@google/genai';
 
@@ -159,6 +160,7 @@ interface CoreToolSchedulerOptions {
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
+  approvalMode?: ApprovalMode;
 }
 
 export class CoreToolScheduler {
@@ -168,12 +170,14 @@ export class CoreToolScheduler {
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
+  private approvalMode: ApprovalMode;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.toolRegistry = options.toolRegistry;
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
+    this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
     this.abortController = new AbortController();
   }
 
@@ -324,29 +328,33 @@ export class CoreToolScheduler {
 
       const { request: reqInfo, tool: toolInstance } = toolCall;
       try {
-        const confirmationDetails = await toolInstance.shouldConfirmExecute(
-          reqInfo.args,
-          this.abortController.signal,
-        );
-
-        if (confirmationDetails) {
-          const originalOnConfirm = confirmationDetails.onConfirm;
-          const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-            ...confirmationDetails,
-            onConfirm: (outcome: ToolConfirmationOutcome) =>
-              this.handleConfirmationResponse(
-                reqInfo.callId,
-                originalOnConfirm,
-                outcome,
-              ),
-          };
-          this.setStatusInternal(
-            reqInfo.callId,
-            'awaiting_approval',
-            wrappedConfirmationDetails,
-          );
-        } else {
+        if (this.approvalMode === ApprovalMode.YOLO) {
           this.setStatusInternal(reqInfo.callId, 'scheduled');
+        } else {
+          const confirmationDetails = await toolInstance.shouldConfirmExecute(
+            reqInfo.args,
+            this.abortController.signal,
+          );
+
+          if (confirmationDetails) {
+            const originalOnConfirm = confirmationDetails.onConfirm;
+            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+              ...confirmationDetails,
+              onConfirm: (outcome: ToolConfirmationOutcome) =>
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  originalOnConfirm,
+                  outcome,
+                ),
+            };
+            this.setStatusInternal(
+              reqInfo.callId,
+              'awaiting_approval',
+              wrappedConfirmationDetails,
+            );
+          } else {
+            this.setStatusInternal(reqInfo.callId, 'scheduled');
+          }
         }
       } catch (error) {
         this.setStatusInternal(

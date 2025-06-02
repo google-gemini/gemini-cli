@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { render } from 'ink-testing-library';
 import { App } from './App.js';
 import { Config as ServerConfig, MCPServerConfig } from '@gemini-code/core';
-import type { ToolRegistry } from '@gemini-code/core';
+import { ApprovalMode, ToolRegistry } from '@gemini-code/core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 
 // Define a more complete mock server config based on actual Config
@@ -28,7 +28,7 @@ interface MockServerConfig {
   userAgent: string;
   userMemory: string;
   geminiMdFileCount: number;
-  alwaysSkipModificationConfirmation: boolean;
+  approvalMode: ApprovalMode;
   vertexai?: boolean;
   showMemoryUsage?: boolean;
 
@@ -50,8 +50,8 @@ interface MockServerConfig {
   setUserMemory: Mock<(newUserMemory: string) => void>;
   getGeminiMdFileCount: Mock<() => number>;
   setGeminiMdFileCount: Mock<(count: number) => void>;
-  getAlwaysSkipModificationConfirmation: Mock<() => boolean>;
-  setAlwaysSkipModificationConfirmation: Mock<(skip: boolean) => void>;
+  getApprovalMode: Mock<() => ApprovalMode>;
+  setApprovalMode: Mock<(skip: ApprovalMode) => void>;
   getVertexAI: Mock<() => boolean | undefined>;
   getShowMemoryUsage: Mock<() => boolean>;
 }
@@ -80,8 +80,7 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         userAgent: opts.userAgent || 'test-agent',
         userMemory: opts.userMemory || '',
         geminiMdFileCount: opts.geminiMdFileCount || 0,
-        alwaysSkipModificationConfirmation:
-          opts.alwaysSkipModificationConfirmation ?? false,
+        approvalMode: opts.approvalMode ?? ApprovalMode.DEFAULT,
         vertexai: opts.vertexai,
         showMemoryUsage: opts.showMemoryUsage ?? false,
 
@@ -105,10 +104,8 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         setUserMemory: vi.fn(),
         getGeminiMdFileCount: vi.fn(() => opts.geminiMdFileCount || 0),
         setGeminiMdFileCount: vi.fn(),
-        getAlwaysSkipModificationConfirmation: vi.fn(
-          () => opts.alwaysSkipModificationConfirmation ?? false,
-        ),
-        setAlwaysSkipModificationConfirmation: vi.fn(),
+        getApprovalMode: vi.fn(() => opts.approvalMode ?? ApprovalMode.DEFAULT),
+        setApprovalMode: vi.fn(),
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
       };
