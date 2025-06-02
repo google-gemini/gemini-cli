@@ -76,10 +76,12 @@ export async function ensureCorrectEdit(
     unescapeStringForGeminiBug(originalParams.new_string) !==
     originalParams.new_string;
 
+  const expectedReplacements = originalParams.expected_replacements ?? 1;
+
   let finalOldString = originalParams.old_string;
   let occurrences = countOccurrences(currentContent, finalOldString);
 
-  if (occurrences === (originalParams.expected_replacements ?? 1)) {
+  if (occurrences === expectedReplacements) {
     if (newStringPotentiallyEscaped) {
       finalNewString = await correctNewStringEscaping(
         client,
@@ -88,7 +90,7 @@ export async function ensureCorrectEdit(
         abortSignal,
       );
     }
-  } else if (occurrences > 1) {
+  } else if (occurrences > expectedReplacements) {
     const expectedReplacements = originalParams.expected_replacements ?? 1;
 
     // If user expects multiple replacements, return as-is
@@ -125,7 +127,7 @@ export async function ensureCorrectEdit(
     );
     occurrences = countOccurrences(currentContent, unescapedOldStringAttempt);
 
-    if (occurrences === (originalParams.expected_replacements ?? 1)) {
+    if (occurrences === expectedReplacements) {
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped) {
         finalNewString = await correctNewString(
@@ -148,7 +150,7 @@ export async function ensureCorrectEdit(
         llmCorrectedOldString,
       );
 
-      if (llmOldOccurrences === (originalParams.expected_replacements ?? 1)) {
+      if (llmOldOccurrences === expectedReplacements) {
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
@@ -188,7 +190,7 @@ export async function ensureCorrectEdit(
     finalOldString,
     finalNewString,
     currentContent,
-    originalParams,
+    expectedReplacements,
   );
   finalOldString = targetString;
   finalNewString = pair;
@@ -532,7 +534,7 @@ function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
-  originalParams: EditToolParams,
+  expectedReplacements: number,
 ) {
   const trimmedTargetString = target.trim();
   if (target.length !== trimmedTargetString.length) {
@@ -541,9 +543,7 @@ function trimPairIfPossible(
       trimmedTargetString,
     );
 
-    if (
-      trimmedTargetOccurrences === (originalParams.expected_replacements ?? 1)
-    ) {
+    if (trimmedTargetOccurrences === expectedReplacements) {
       const trimmedReactiveString = trimIfTargetTrims.trim();
       return {
         targetString: trimmedTargetString,
