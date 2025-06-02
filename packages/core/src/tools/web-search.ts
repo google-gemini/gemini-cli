@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI, GroundingMetadata } from '@google/genai';
+import { GroundingMetadata } from '@google/genai';
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
-import { retryWithBackoff } from '../utils/retry.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -64,9 +63,6 @@ export class WebSearchTool extends BaseTool<
 > {
   static readonly Name: string = 'google_web_search';
 
-  private ai: GoogleGenAI;
-  private modelName: string;
-
   constructor(private readonly config: Config) {
     super(
       WebSearchTool.Name,
@@ -83,13 +79,6 @@ export class WebSearchTool extends BaseTool<
         required: ['query'],
       },
     );
-
-    const apiKeyFromConfig = this.config.getApiKey();
-    // Initialize GoogleGenAI, allowing fallback to environment variables for API key
-    this.ai = new GoogleGenAI({
-      apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
-    });
-    this.modelName = this.config.getModel();
   }
 
   validateParams(params: WebSearchToolParams): string | null {
@@ -112,7 +101,10 @@ export class WebSearchTool extends BaseTool<
     return `Searching the web for: "${params.query}"`;
   }
 
-  async execute(params: WebSearchToolParams): Promise<WebSearchToolResult> {
+  async execute(
+    params: WebSearchToolParams,
+    signal: AbortSignal,
+  ): Promise<WebSearchToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
       return {
@@ -120,18 +112,14 @@ export class WebSearchTool extends BaseTool<
         returnDisplay: validationError,
       };
     }
+    const geminiClient = this.config.getGeminiClient();
 
     try {
-      const apiCall = () =>
-        this.ai.models.generateContent({
-          model: this.modelName,
-          contents: [{ role: 'user', parts: [{ text: params.query }] }],
-          config: {
-            tools: [{ googleSearch: {} }],
-          },
-        });
-
-      const response = await retryWithBackoff(apiCall);
+      const response = await geminiClient.generateContent(
+        [{ role: 'user', parts: [{ text: params.query }] }],
+        { tools: [{ googleSearch: {} }] },
+        signal,
+      );
 
       const responseText = getResponseText(response);
       const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
