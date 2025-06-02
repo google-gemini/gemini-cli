@@ -66,12 +66,42 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing command.
   - `<command>`: Specify custom command for container-based sandboxing.
 - **`toolDiscoveryCommand`** (string, advanced):
-  - Custom command for tool discovery (if applicable to your setup).
-  - Must return JSON array of tools of `function_declarations` type as in [Gemini REST API](https://ai.google.dev/gemini-api/docs/function-calling).
+  - Custom shell command for discovering tools from your project, if available.
+  - Must return on `stdout` a JSON array of [function declarations](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations).
+    - Tool wrappers, i.e. `[{ "function_declarations": [...] }, ...]`, are optional.
+    - Example for a single function `add_two_numbers(a, b)`:
+      ```
+      [
+        {
+          "name": "add_two_numbers",
+          "description": "Add two numbers.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "integer",
+                "description": "first number"
+              },
+              "b": {
+                "type": "integer",
+                "description": "second number"
+              }
+            },
+            "required": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+      ```
 - **`toolCallCommand`** (string, advanced):
-  - Custom command for executing tool calls (if applicable to your setup).
-  - Must take function name as first argument and function arguments as JSON on `stdin`
-  - Must return JSON result of funcation call on `stdout`.
+  - Custom shell command for calling a specific tool discovered via `toolDiscoveryCommand`.
+  - Must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
+  - Must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
+    - Example for `add_two_numbers` (see above): `{"a":1, "b":2}`
+  - Must return function output as JSON on `stdout`, analogous to [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
+    - Example for `add_two_numbers` (see above): `3` (for input `{"a":1, "b":2}` on `stdin`)
 - **`mcpServers`** (object, advanced):
   - Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools.
   - This is an object where each key is a unique server name (alias) and the value is an object defining that server's parameters:

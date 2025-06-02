@@ -137,10 +137,16 @@ export class ToolRegistry {
     // discover tools using discovery command, if configured
     const discoveryCmd = this.config.getToolDiscoveryCommand();
     if (discoveryCmd) {
-      // execute discovery command and extract function declarations
+      // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
       const functions: FunctionDeclaration[] = [];
       for (const tool of JSON.parse(execSync(discoveryCmd).toString().trim())) {
-        functions.push(...tool['function_declarations']);
+        if (tool['function_declarations']) {
+          functions.push(...tool['function_declarations']);
+        } else if (tool['functionDeclarations']) {
+          functions.push(...tool['functionDeclarations']);
+        } else if (tool['name']) {
+          functions.push(tool);
+        }
       }
       // register each function as a tool
       for (const func of functions) {
