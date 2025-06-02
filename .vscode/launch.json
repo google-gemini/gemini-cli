@@ -32,7 +32,7 @@
         "run",
         "test",
         "-w",
-        "packages/cli", // Default to CLI, change if needed or prompt for package
+        "packages",
         "--",
         "--inspect-brk=9229",
         "--no-file-parallelism",
