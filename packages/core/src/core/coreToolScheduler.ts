@@ -155,14 +155,14 @@ const createErrorResponse = (
 });
 
 interface CoreToolSchedulerOptions {
-  toolRegistry: ToolRegistry;
+  toolRegistry: Promise<ToolRegistry>;
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
 }
 
 export class CoreToolScheduler {
-  private toolRegistry: ToolRegistry;
+  private toolRegistry: Promise<ToolRegistry>;
   private toolCalls: ToolCall[] = [];
   private abortController: AbortController;
   private outputUpdateHandler?: OutputUpdateHandler;
@@ -295,10 +295,11 @@ export class CoreToolScheduler {
       );
     }
     const requestsToProcess = Array.isArray(request) ? request : [request];
+    const toolRegistry = await this.toolRegistry;
 
     const newToolCalls: ToolCall[] = requestsToProcess.map(
       (reqInfo): ToolCall => {
-        const toolInstance = this.toolRegistry.getTool(reqInfo.name);
+        const toolInstance = toolRegistry.getTool(reqInfo.name);
         if (!toolInstance) {
           return {
             status: 'error',

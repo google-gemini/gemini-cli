@@ -100,6 +100,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private discovery: Promise<void> | null = null;
   private config: Config;
 
   constructor(config: Config) {
@@ -121,7 +122,7 @@ export class ToolRegistry {
   }
 
   /**
-   * Discovers tools from project, if a discovery command is configured.
+   * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
    */
   async discoverTools(): Promise<void> {

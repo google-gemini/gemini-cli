@@ -70,13 +70,14 @@ export class GeminiClient {
           `.trim();
 
     const initialParts: Part[] = [{ text: context }];
+    const toolRegistry = await this.config.getToolRegistry();
 
     // Add full file context if the flag is set
     if (this.config.getFullContext()) {
       try {
-        const readManyFilesTool = this.config
-          .getToolRegistry()
-          .getTool('read_many_files') as ReadManyFilesTool;
+        const readManyFilesTool = toolRegistry.getTool(
+          'read_many_files',
+        ) as ReadManyFilesTool;
         if (readManyFilesTool) {
           // Read all files in the target directory
           const result = await readManyFilesTool.execute(
@@ -114,9 +115,8 @@ export class GeminiClient {
 
   async startChat(): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
-    const toolDeclarations = this.config
-      .getToolRegistry()
-      .getFunctionDeclarations();
+    const toolRegistry = await this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     const history: Content[] = [
       {

@@ -60,7 +60,7 @@ export interface ConfigParameters {
 }
 
 export class Config {
-  private toolRegistry: ToolRegistry;
+  private toolRegistry: Promise<ToolRegistry>;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly sandbox: boolean | string;
@@ -124,7 +124,7 @@ export class Config {
     return this.targetDir;
   }
 
-  getToolRegistry(): ToolRegistry {
+  async getToolRegistry(): Promise<ToolRegistry> {
     return this.toolRegistry;
   }
 
@@ -232,7 +232,7 @@ export function createServerConfig(params: ConfigParameters): Config {
   });
 }
 
-export function createToolRegistry(config: Config): ToolRegistry {
+export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
   const tools = config.getCoreTools()
@@ -259,6 +259,8 @@ export function createToolRegistry(config: Config): ToolRegistry {
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);
-  registry.discoverTools();
-  return registry;
+  return (async () => {
+    await registry.discoverTools();
+    return registry;
+  })();
 }

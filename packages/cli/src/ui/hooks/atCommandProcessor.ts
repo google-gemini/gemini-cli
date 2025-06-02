@@ -138,7 +138,7 @@ export async function handleAtCommand({
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
 
-  const toolRegistry = config.getToolRegistry();
+  const toolRegistry = await config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
   const globTool = toolRegistry.getTool('glob');
 
