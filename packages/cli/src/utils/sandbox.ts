@@ -16,6 +16,8 @@ import {
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 
+const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
+
 /**
  * Determines whether the sandbox container should be run with the current user's UID and GID.
  * This is often necessary on Linux systems (especially Debian/Ubuntu based) when using
@@ -79,7 +81,7 @@ async function getSandboxImageName(): Promise<string> {
   return (
     process.env.GEMINI_SANDBOX_IMAGE ??
     packageJsonConfig?.sandboxImageUri ??
-    'gemini-cli-sandbox'
+    LOCAL_DEV_SANDBOX_IMAGE_NAME
   );
 }
 
@@ -304,9 +306,10 @@ export async function start_sandbox(sandbox: string) {
 
   // stop if image is missing
   if (!(await ensureSandboxImageIsPresent(sandbox, image))) {
-    const remedy = gcPath.includes('gemini-code/packages/')
-      ? 'Try running `BUILD_SANDBOX=1 gemini` or `scripts/build_sandbox.sh` under the gemini-code repo to build it locally, or check the image name and your network connection.'
-      : 'Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists.';
+    const remedy =
+      image === LOCAL_DEV_SANDBOX_IMAGE_NAME
+        ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
+        : 'Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists.';
     console.error(
       `ERROR: Sandbox image '${image}' is missing or could not be pulled. ${remedy}`,
     );
@@ -571,6 +574,11 @@ async function ensureSandboxImageIsPresent(
   }
 
   console.info(`Sandbox image ${image} not found locally.`);
+  if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
+    // user needs to build the image themself
+    return false;
+  }
+
   if (await pullImage(sandbox, image)) {
     // After attempting to pull, check again to be certain
     if (await imageExists(sandbox, image)) {
