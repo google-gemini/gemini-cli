@@ -26,7 +26,8 @@
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
-    "shell-quote": "^1.8.2"
+    "shell-quote": "^1.8.2",
+    "strip-ansi": "^7.1.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
