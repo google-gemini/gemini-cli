@@ -269,19 +269,19 @@ export async function start_sandbox(sandbox: string) {
 
   console.error(`hopping into sandbox (command: ${sandbox}) ...`);
 
-  // determine full path for gemini-code to distinguish linked vs installed setting
+  // determine full path for gemini-cli to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
 
   const image = await getSandboxImageName();
   const workdir = process.cwd();
 
-  // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-code repo
-  // note this can only be done with binary linked from gemini-code repo
+  // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-cli repo
+  // note this can only be done with binary linked from gemini-cli repo
   if (process.env.BUILD_SANDBOX) {
-    if (!gcPath.includes('gemini-code/packages/')) {
+    if (!gcPath.includes('gemini-cli/packages/')) {
       console.error(
         'ERROR: cannot BUILD_SANDBOX using installed gemini binary; ' +
-          'run `npm link ./packages/cli` under gemini-code repo to switch to linked binary.',
+          'run `npm link ./packages/cli` under gemini-cli repo to switch to linked binary.',
       );
       process.exit(1);
     } else {
@@ -300,6 +300,10 @@ export async function start_sandbox(sandbox: string) {
       spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
         stdio: 'inherit',
         shell: true,
+        env: {
+          ...process.env,
+          GEMINI_SANDBOX: sandbox, // in case sandbox is enabled via flags (see config.ts under cli package)
+        },
       });
     }
   }
