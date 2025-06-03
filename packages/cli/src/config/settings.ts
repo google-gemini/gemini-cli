@@ -31,6 +31,7 @@ export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   showMemoryUsage?: boolean;
   contextFileName?: string;
+  title?: string;
   // Add other settings here.
 }
 
