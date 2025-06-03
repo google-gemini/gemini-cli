@@ -97,12 +97,7 @@ async function parseArguments(): Promise<CliArgs> {
     .alias('h', 'help')
     .strict().argv;
 
-  const finalArgv: CliArgs = {
-    ...argv,
-    sandbox: argv.sandbox,
-  };
-
-  return finalArgv;
+  return argv;
 }
 
 // This function is now a thin wrapper around the server's implementation.
