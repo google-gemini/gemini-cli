@@ -132,7 +132,7 @@ You are running outside of a sandbox container, directly on the user's system. F
 ${(function () {
   // note git repo can change so we need to check every time system prompt is generated
   const gitRootCmd = 'git rev-parse --show-toplevel 2>/dev/null || true';
-  const gitRoot = execSync(gitRootCmd).toString().trim();
+  const gitRoot = execSync(gitRootCmd)?.toString()?.trim();
   if (gitRoot) {
     return `
 # Git Repository

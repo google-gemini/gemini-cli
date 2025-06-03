@@ -254,7 +254,7 @@ export function createServerConfig(params: ConfigParameters): Config {
   });
 }
 
-export function createToolRegistry(config: Config): Promise<ToolRegistry> {
+function createToolRegistry(config: Config): Promise<ToolRegistry> {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
   const tools = config.getCoreTools()
@@ -281,8 +281,12 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);
-  return (async () => {
-    await registry.discoverTools();
-    return registry;
-  })();
+
+  // This is async, but we can't wait for it to finish because when we register
+  // discovered tools, we need to see if existing tools already exist in order to
+  // avoid duplicates.
+  registry.discoverTools();
+
+  // Maintain an async registry return so it's easy in the future to add async behavior to this instantiation.
+  return Promise.resolve(registry);
 }
