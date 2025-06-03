@@ -53,9 +53,10 @@ These are the main pieces of information the core `Config` object holds and uses
   - **Source:** Command-line argument (`--all_files`).
   - **Purpose:** If true, instructs relevant tools (like `read_many_files` when used implicitly by the model) to gather a broad context from the `targetDir`.
 
-- **`toolDiscoveryCommand` (string | undefined):**
+- **`toolDiscoveryCommand` (string | undefined):** see under [CLI settings](../cli/configuration.md#available-settings-in-settingsjson).
 
-- `toolCallCommand` (string | undefined):
+- **`toolCallCommand` (string | undefined)**: see under [CLI settings](../cli/configuration.md#available-settings-in-settingsjson).
+
 - `mcpServers` (object | undefined):
   - **Source:** `settings.json` (`mcpServers` key), passed from the CLI.
   - **Purpose:** Advanced setting for configuring connections to one or more Model-Context Protocol (MCP) servers. This allows the Gemini CLI to discover and utilize tools exposed by these external servers.
