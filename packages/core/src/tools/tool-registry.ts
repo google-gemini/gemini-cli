@@ -161,7 +161,11 @@ export class ToolRegistry {
       }
     }
     // discover tools using MCP servers, if configured
-    await discoverMcpTools(this.config);
+    await discoverMcpTools(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+    );
   }
 
   /**

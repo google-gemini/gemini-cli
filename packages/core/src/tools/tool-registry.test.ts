@@ -277,7 +277,11 @@ describe('ToolRegistry', () => {
 
       await toolRegistry.discoverTools();
 
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(config);
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        mcpServerConfigVal,
+        undefined,
+        toolRegistry,
+      );
       // We no longer check these as discoverMcpTools is mocked
       // expect(vi.mocked(mcpToTool)).toHaveBeenCalledTimes(1);
       // expect(Client).toHaveBeenCalledTimes(1);
@@ -302,7 +306,11 @@ describe('ToolRegistry', () => {
       );
 
       await toolRegistry.discoverTools();
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(config);
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        {},
+        'mcp-server-start-command --param',
+        toolRegistry,
+      );
     });
 
     it('should handle errors during MCP client connection gracefully and close transport', async () => {
@@ -314,7 +322,13 @@ describe('ToolRegistry', () => {
       mockMcpClientConnect.mockRejectedValue(new Error('Connection failed'));
 
       await toolRegistry.discoverTools();
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(config);
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        {
+          'failing-mcp': { command: 'fail-cmd' },
+        },
+        undefined,
+        toolRegistry,
+      );
       expect(toolRegistry.getAllTools()).toHaveLength(0);
     });
   });

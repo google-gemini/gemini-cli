@@ -8,15 +8,18 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { parse } from 'shell-quote';
-import { Config, MCPServerConfig } from '../config/config.js';
+import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
+import { ToolRegistry } from './tool-registry.js';
 
-export async function discoverMcpTools(config: Config): Promise<void> {
-  const mcpServers = config.getMcpServers() || {};
-
-  if (config.getMcpServerCommand()) {
-    const cmd = config.getMcpServerCommand()!;
+export async function discoverMcpTools(
+  mcpServers: Record<string, MCPServerConfig>,
+  mcpServerCommand: string | undefined,
+  toolRegistry: ToolRegistry,
+): Promise<void> {
+  if (mcpServerCommand) {
+    const cmd = mcpServerCommand;
     const args = parse(cmd, process.env) as string[];
     if (args.some((arg) => typeof arg !== 'string')) {
       throw new Error('failed to parse mcpServerCommand: ' + cmd);
@@ -30,7 +33,7 @@ export async function discoverMcpTools(config: Config): Promise<void> {
 
   const discoveryPromises = Object.entries(mcpServers).map(
     ([mcpServerName, mcpServerConfig]) =>
-      connectAndDiscover(mcpServerName, mcpServerConfig, config),
+      connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
   );
   await Promise.all(discoveryPromises);
 }
@@ -38,7 +41,7 @@ export async function discoverMcpTools(config: Config): Promise<void> {
 async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
-  config: Config,
+  toolRegistry: ToolRegistry,
 ): Promise<void> {
   let transport;
   if (mcpServerConfig.url) {
@@ -90,7 +93,6 @@ async function connectAndDiscover(
     });
   }
 
-  const toolRegistry = await config.getToolRegistry();
   try {
     const mcpCallableTool: CallableTool = mcpToTool(mcpClient);
     const discoveredToolFunctions = await mcpCallableTool.tool();

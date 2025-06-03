@@ -135,7 +135,11 @@ describe('discoverMcpTools', () => {
   });
 
   it('should do nothing if no MCP servers or command are configured', async () => {
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
     expect(mockConfig.getMcpServers).toHaveBeenCalledTimes(1);
     expect(mockConfig.getMcpServerCommand).toHaveBeenCalledTimes(1);
     expect(Client).not.toHaveBeenCalled();
@@ -161,7 +165,11 @@ describe('discoverMcpTools', () => {
     // In this case, listTools fails, so no tools are registered.
     // The default mock `mockReturnValue([])` from beforeEach should apply.
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(parse).toHaveBeenCalledWith(commandString, process.env);
     expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -204,7 +212,11 @@ describe('discoverMcpTools', () => {
       expect.any(DiscoveredMCPTool),
     ]);
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
       command: serverConfig.command,
@@ -239,7 +251,11 @@ describe('discoverMcpTools', () => {
       expect.any(DiscoveredMCPTool),
     ]);
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(SSEClientTransport).toHaveBeenCalledWith(new URL(serverConfig.url!));
     expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
@@ -317,7 +333,11 @@ describe('discoverMcpTools', () => {
       },
     );
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(3);
     const registeredArgs = mockToolRegistry.registerTool.mock.calls.map(
@@ -381,7 +401,11 @@ describe('discoverMcpTools', () => {
       expect.any(DiscoveredMCPTool),
     ]);
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -410,9 +434,13 @@ describe('discoverMcpTools', () => {
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(discoverMcpTools(mockConfig)).rejects.toThrow(
-      'Parsing failed',
-    );
+    await expect(
+      discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      ),
+    ).rejects.toThrow('Parsing failed');
     expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
     expect(console.error).not.toHaveBeenCalled();
   });
@@ -421,7 +449,11 @@ describe('discoverMcpTools', () => {
     mockConfig.getMcpServers.mockReturnValue({ 'bad-server': {} as any });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -442,7 +474,11 @@ describe('discoverMcpTools', () => {
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -463,7 +499,11 @@ describe('discoverMcpTools', () => {
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -483,7 +523,11 @@ describe('discoverMcpTools', () => {
       expect.any(DiscoveredMCPTool),
     ]);
 
-    await discoverMcpTools(mockConfig);
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
 
     const clientInstances = vi.mocked(Client).mock.results;
     expect(clientInstances.length).toBeGreaterThan(0);
