@@ -16,7 +16,7 @@ import {
 } from '@google/genai';
 import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import { Turn, ServerGeminiStreamEvent } from './turn.js';
+import { Turn, ServerGeminiStreamEvent, GeminiEventType } from './turn.js';
 import { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -173,7 +173,10 @@ export class GeminiClient {
       return;
     }
 
-    await this.tryCompressChat();
+    const compressed = await this.tryCompressChat();
+    if (compressed) {
+      yield { type: GeminiEventType.ChatCompressed };
+    }
     const chat = await this.chat;
     const turn = new Turn(chat);
     const resultStream = turn.run(request, signal);
@@ -325,7 +328,7 @@ export class GeminiClient {
     }
   }
 
-  private async tryCompressChat(): Promise<void> {
+  private async tryCompressChat(): Promise<boolean> {
     const chat = await this.chat;
     const history = chat.getHistory(true); // Get curated history
 
@@ -340,7 +343,7 @@ export class GeminiClient {
       console.warn(
         `Could not determine token count for model ${this.model}. Skipping compression check.`,
       );
-      return;
+      return false;
     }
     const tokenCount = totalTokens; // Now guaranteed to be a number
 
@@ -350,11 +353,11 @@ export class GeminiClient {
       console.warn(
         `No token limit defined for model ${this.model}. Skipping compression check.`,
       );
-      return;
+      return false;
     }
 
     if (tokenCount < 0.95 * limit) {
-      return;
+      return false;
     }
     const summarizationRequestMessage = {
       text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
@@ -372,5 +375,7 @@ export class GeminiClient {
         parts: [{ text: response.text }],
       },
     ]);
+
+    return true;
   }
 }

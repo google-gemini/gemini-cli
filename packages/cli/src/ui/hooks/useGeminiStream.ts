@@ -356,6 +356,18 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
+  const handleChatCompressionEvent = useCallback(
+    () =>
+      addItem(
+        {
+          type: 'info',
+          text: `IMPORTANT: this conversation approached the input token limit for ${config.getModel()}. We'll send a compressed context to the model for any future messages.`,
+        },
+        Date.now(),
+      ),
+    [addItem, config],
+  );
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -364,20 +376,35 @@ export const useGeminiStream = (
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
-        if (event.type === ServerGeminiEventType.Content) {
-          geminiMessageBuffer = handleContentEvent(
-            event.value,
-            geminiMessageBuffer,
-            userMessageTimestamp,
-          );
-        } else if (event.type === ServerGeminiEventType.ToolCallRequest) {
-          toolCallRequests.push(event.value);
-        } else if (event.type === ServerGeminiEventType.UserCancelled) {
-          handleUserCancelledEvent(userMessageTimestamp);
-          return StreamProcessingStatus.UserCancelled;
-        } else if (event.type === ServerGeminiEventType.Error) {
-          handleErrorEvent(event.value, userMessageTimestamp);
-          return StreamProcessingStatus.Error;
+        switch (event.type) {
+          case ServerGeminiEventType.Content:
+            geminiMessageBuffer = handleContentEvent(
+              event.value,
+              geminiMessageBuffer,
+              userMessageTimestamp,
+            );
+            break;
+          case ServerGeminiEventType.ToolCallRequest:
+            toolCallRequests.push(event.value);
+            break;
+          case ServerGeminiEventType.UserCancelled:
+            handleUserCancelledEvent(userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.Error:
+            handleErrorEvent(event.value, userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.ChatCompressed:
+            handleChatCompressionEvent();
+            break;
+          case ServerGeminiEventType.ToolCallConfirmation:
+          case ServerGeminiEventType.ToolCallResponse:
+            // do nothing
+            break;
+          default: {
+            // enforces exhaustive switch-case
+            const unreachable: never = event;
+            return unreachable;
+          }
         }
       }
       if (toolCallRequests.length > 0) {
@@ -390,6 +417,7 @@ export const useGeminiStream = (
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
+      handleChatCompressionEvent,
     ],
   );
 

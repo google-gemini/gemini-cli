@@ -42,6 +42,7 @@ export enum GeminiEventType {
   ToolCallConfirmation = 'tool_call_confirmation',
   UserCancelled = 'user_cancelled',
   Error = 'error',
+  ChatCompressed = 'chat_compressed',
 }
 
 export interface GeminiErrorEventValue {
@@ -95,6 +96,10 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export type ServerGeminiChatCompressedEvent = {
+  type: GeminiEventType.ChatCompressed;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -102,7 +107,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiToolCallResponseEvent
   | ServerGeminiToolCallConfirmationEvent
   | ServerGeminiUserCancelledEvent
-  | ServerGeminiErrorEvent;
+  | ServerGeminiErrorEvent
+  | ServerGeminiChatCompressedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
