@@ -26,6 +26,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { tokenLimit } from './tokenLimits.js';
 
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
@@ -172,6 +173,7 @@ export class GeminiClient {
       return;
     }
 
+    await this.tryCompressChat();
     const chat = await this.chat;
     const turn = new Turn(chat);
     const resultStream = turn.run(request, signal);
@@ -321,5 +323,54 @@ export class GeminiClient {
         `Failed to generate content with model ${modelToUse}: ${message}`,
       );
     }
+  }
+
+  private async tryCompressChat(): Promise<void> {
+    const chat = await this.chat;
+    const history = chat.getHistory(true); // Get curated history
+
+    // Count tokens using the models module from the GoogleGenAI client instance
+    const { totalTokens } = await this.client.models.countTokens({
+      model: this.model,
+      contents: history,
+    });
+
+    if (totalTokens === undefined) {
+      // If token count is undefined, we can't determine if we need to compress.
+      console.warn(
+        `Could not determine token count for model ${this.model}. Skipping compression check.`,
+      );
+      return;
+    }
+    const tokenCount = totalTokens; // Now guaranteed to be a number
+
+    const limit = tokenLimit(this.model);
+    if (!limit) {
+      // If no limit is defined for the model, we can't compress.
+      console.warn(
+        `No token limit defined for model ${this.model}. Skipping compression check.`,
+      );
+      return;
+    }
+
+    if (tokenCount < 0.95 * limit) {
+      return;
+    }
+    const summarizationRequestMessage = {
+      text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
+    };
+    const response = await chat.sendMessage({
+      message: summarizationRequestMessage,
+    });
+    this.chat = this.startChat([
+      {
+        role: 'user',
+        parts: [summarizationRequestMessage],
+      },
+      {
+        role: 'model',
+        parts: [{ text: response.text }],
+      },
+    ]);
   }
 }
