@@ -26,18 +26,23 @@ export const useThemeCommand = (
   const effectiveTheme = loadedSettings.merged.theme;
 
   // Initial state: Open dialog if no theme is set in either user or workspace settings
-  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
+  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(
+    effectiveTheme === undefined, // Open dialog if no theme is set initially
+  );
   // TODO: refactor how theme's are accessed to avoid requiring a forced render.
   const [, setForceRender] = useState(0);
 
   // Apply initial theme on component mount
   useEffect(() => {
-    if (!themeManager.setActiveTheme(effectiveTheme)) {
-      // If theme is not found during initial load, open the theme selection dialog and set error message
-      setIsThemeDialogOpen(true);
-      setThemeError(`Theme "${effectiveTheme}" not found.`);
-    } else {
-      setThemeError(null); // Clear any previous theme error on success
+    // Only try to set a theme if one is actually defined.
+    // If effectiveTheme was undefined, the dialog is already open due to useState above.
+    if (effectiveTheme !== undefined) {
+      if (!themeManager.setActiveTheme(effectiveTheme)) {
+        setIsThemeDialogOpen(true);
+        setThemeError(`Theme "${effectiveTheme}" not found.`);
+      } else {
+        setThemeError(null); // Clear any previous theme error on success
+      }
     }
   }, [effectiveTheme, setThemeError]); // Re-run if effectiveTheme or setThemeError changes
 

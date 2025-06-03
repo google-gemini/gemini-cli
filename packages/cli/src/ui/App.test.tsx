@@ -188,7 +188,8 @@ describe('App UI', () => {
     }
     mockConfig.getShowMemoryUsage.mockReturnValue(false); // Default for most tests
 
-    mockSettings = createMockSettings();
+    // Ensure a theme is set so the theme dialog does not appear.
+    mockSettings = createMockSettings({ theme: 'Default' });
   });
 
   afterEach(() => {
@@ -235,7 +236,10 @@ describe('App UI', () => {
   });
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
-    mockSettings = createMockSettings({ contextFileName: 'AGENTS.MD' });
+    mockSettings = createMockSettings({
+      contextFileName: 'AGENTS.MD',
+      theme: 'Default',
+    });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
@@ -253,7 +257,10 @@ describe('App UI', () => {
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
-    mockSettings = createMockSettings({ contextFileName: 'MY_NOTES.TXT' });
+    mockSettings = createMockSettings({
+      contextFileName: 'MY_NOTES.TXT',
+      theme: 'Default',
+    });
     mockConfig.getGeminiMdFileCount.mockReturnValue(3);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
@@ -271,7 +278,10 @@ describe('App UI', () => {
   });
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
-    mockSettings = createMockSettings({ contextFileName: 'ANY_FILE.MD' });
+    mockSettings = createMockSettings({
+      contextFileName: 'ANY_FILE.MD',
+      theme: 'Default',
+    });
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
@@ -327,5 +337,22 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain('Using 2 MCP servers');
+  });
+
+  it('should display theme dialog if no theme is set in settings', async () => {
+    mockSettings = createMockSettings({});
+    mockConfig.getDebugMode.mockReturnValue(false);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        cliVersion="1.0.0"
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(lastFrame()).toContain('Select Theme');
   });
 });
