@@ -17,7 +17,6 @@ import {
   Config,
   MessageSenderType,
   ToolCallRequestInfo,
-  GeminiChat,
 } from '@gemini-code/core';
 import { type PartListUnion } from '@google/genai';
 import {
@@ -76,7 +75,6 @@ export const useGeminiStream = (
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatSessionRef = useRef<GeminiChat | null>(null);
   const geminiClientRef = useRef<GeminiClient | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
@@ -256,31 +254,6 @@ export const useGeminiStream = (
     ],
   );
 
-  const ensureChatSession = useCallback(async (): Promise<{
-    client: GeminiClient | null;
-    chat: GeminiChat | null;
-  }> => {
-    const currentClient = geminiClientRef.current;
-    if (!currentClient) {
-      const errorMsg = 'Gemini client is not available.';
-      setInitError(errorMsg);
-      addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
-      return { client: null, chat: null };
-    }
-
-    if (!chatSessionRef.current) {
-      try {
-        chatSessionRef.current = await currentClient.startChat();
-      } catch (err: unknown) {
-        const errorMsg = `Failed to start chat: ${getErrorMessage(err)}`;
-        setInitError(errorMsg);
-        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
-        return { client: currentClient, chat: null };
-      }
-    }
-    return { client: currentClient, chat: chatSessionRef.current };
-  }, [addItem]);
-
   // --- Stream Event Handlers ---
 
   const handleContentEvent = useCallback(
@@ -444,9 +417,12 @@ export const useGeminiStream = (
         return;
       }
 
-      const { client, chat } = await ensureChatSession();
+      const client = geminiClientRef.current;
 
-      if (!client || !chat) {
+      if (!client) {
+        const errorMsg = 'Gemini client is not available.';
+        setInitError(errorMsg);
+        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
         return;
       }
 
@@ -454,7 +430,7 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = client.sendMessageStream(chat, queryToSend, abortSignal);
+        const stream = client.sendMessageStream(queryToSend, abortSignal);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -487,7 +463,6 @@ export const useGeminiStream = (
       streamingState,
       setShowHelp,
       prepareQueryForGemini,
-      ensureChatSession,
       processGeminiStreamEvents,
       pendingHistoryItemRef,
       addItem,

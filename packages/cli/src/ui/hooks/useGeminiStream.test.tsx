@@ -405,10 +405,9 @@ describe('useGeminiStream', () => {
       } as TrackedCancelledToolCall,
     ];
 
-    let hookResult: any;
-    await act(async () => {
-      hookResult = renderTestHook(simplifiedToolCalls);
-    });
+    const hookResult = await act(async () =>
+      renderTestHook(simplifiedToolCalls),
+    );
 
     const {
       mockMarkToolsAsSubmitted,
@@ -431,9 +430,8 @@ describe('useGeminiStream', () => {
       toolCall2ResponseParts,
     ]);
     expect(localMockSendMessageStream).toHaveBeenCalledWith(
-      expect.anything(),
       expectedMergedResponse,
-      expect.anything(),
+      expect.any(AbortSignal),
     );
   });
 });

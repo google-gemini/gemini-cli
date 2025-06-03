@@ -42,7 +42,7 @@ export async function runNonInteractive(
   const geminiClient = new GeminiClient(config);
   const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
-  const chat = await geminiClient.startChat();
+  const chat = await geminiClient.getChat();
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
 

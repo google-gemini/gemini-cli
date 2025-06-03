@@ -39,7 +39,7 @@ describe('runNonInteractive', () => {
       sendMessageStream: vi.fn(),
     };
     mockGeminiClient = {
-      startChat: vi.fn().mockResolvedValue(mockChat),
+      getChat: vi.fn().mockResolvedValue(mockChat),
     } as unknown as GeminiClient;
     mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
@@ -80,7 +80,6 @@ describe('runNonInteractive', () => {
 
     await runNonInteractive(mockConfig, 'Test input');
 
-    expect(mockGeminiClient.startChat).toHaveBeenCalled();
     expect(mockChat.sendMessageStream).toHaveBeenCalledWith({
       message: [{ text: 'Test input' }],
       config: {

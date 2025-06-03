@@ -27,6 +27,7 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 
 export class GeminiClient {
+  private chat: Promise<GeminiChat>;
   private client: GoogleGenAI;
   private model: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -50,6 +51,11 @@ export class GeminiClient {
       },
     });
     this.model = config.getModel();
+    this.chat = this.startChat();
+  }
+
+  getChat(): Promise<GeminiChat> {
+    return this.chat;
   }
 
   private async getEnvironment(): Promise<Part[]> {
@@ -114,12 +120,12 @@ export class GeminiClient {
     return initialParts;
   }
 
-  async startChat(): Promise<GeminiChat> {
+  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    const history: Content[] = [
+    const initialHistory: Content[] = [
       {
         role: 'user',
         parts: envParts,
@@ -129,6 +135,7 @@ export class GeminiClient {
         parts: [{ text: 'Got it. Thanks for the context!' }],
       },
     ];
+    const history = initialHistory.concat(extraHistory ?? []);
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -157,7 +164,6 @@ export class GeminiClient {
   }
 
   async *sendMessageStream(
-    chat: GeminiChat,
     request: PartListUnion,
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
@@ -166,6 +172,7 @@ export class GeminiClient {
       return;
     }
 
+    const chat = await this.chat;
     const turn = new Turn(chat);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
@@ -175,7 +182,7 @@ export class GeminiClient {
       const nextSpeakerCheck = await checkNextSpeaker(chat, this, signal);
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
-        yield* this.sendMessageStream(chat, nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
       }
     }
   }
