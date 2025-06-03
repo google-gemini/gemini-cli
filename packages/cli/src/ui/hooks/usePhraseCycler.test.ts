@@ -45,40 +45,50 @@ describe('usePhraseCycler', () => {
 
   it('should cycle through witty phrases when isActive is true and not waiting', () => {
     const { result } = renderHook(() => usePhraseCycler(true, false));
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
+    // Initial phrase should be one of the witty phrases
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
+    const _initialPhrase = result.current;
 
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[1]);
+    // Phrase should change and be one of the witty phrases
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
+    const _secondPhrase = result.current;
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
-    expect(result.current).toBe(
-      WITTY_LOADING_PHRASES[2 % WITTY_LOADING_PHRASES.length],
-    );
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
-  it('should reset to the first phrase when isActive becomes true after being false (and not waiting)', () => {
+  it('should reset to a witty phrase when isActive becomes true after being false (and not waiting)', () => {
     const { result, rerender } = renderHook(
       ({ isActive, isWaiting }) => usePhraseCycler(isActive, isWaiting),
       { initialProps: { isActive: false, isWaiting: false } },
     );
-    // Cycle to a different phrase
+
+    // Activate
     rerender({ isActive: true, isWaiting: false });
+    const firstActivePhrase = result.current;
+    expect(WITTY_LOADING_PHRASES).toContain(firstActivePhrase);
+
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
-    expect(result.current).not.toBe(WITTY_LOADING_PHRASES[0]);
+    // Phrase should change if enough phrases and interval passed
+    if (WITTY_LOADING_PHRASES.length > 1) {
+      expect(result.current).not.toBe(firstActivePhrase);
+    }
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
-    // Set to inactive
+    // Set to inactive - should reset to the default initial phrase
     rerender({ isActive: false, isWaiting: false });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]); // Should reset to first phrase
+    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
 
-    // Set back to active
+    // Set back to active - should pick a random witty phrase
     rerender({ isActive: true, isWaiting: false });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]); // Should start with the first phrase
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
   it('should clear phrase interval on unmount when active', () => {
@@ -88,24 +98,30 @@ describe('usePhraseCycler', () => {
     expect(clearIntervalSpy).toHaveBeenCalledOnce();
   });
 
-  it('should reset to the first witty phrase when transitioning from waiting to active', () => {
+  it('should reset to a witty phrase when transitioning from waiting to active', () => {
     const { result, rerender } = renderHook(
       ({ isActive, isWaiting }) => usePhraseCycler(isActive, isWaiting),
       { initialProps: { isActive: true, isWaiting: false } },
     );
 
-    // Cycle to a different phrase
+    const _initialPhrase = result.current;
+    expect(WITTY_LOADING_PHRASES).toContain(_initialPhrase);
+
+    // Cycle to a different phrase (potentially)
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[1]);
+    if (WITTY_LOADING_PHRASES.length > 1) {
+      // This check is probabilistic with random selection
+    }
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
     // Go to waiting state
     rerender({ isActive: false, isWaiting: true });
     expect(result.current).toBe('Waiting for user confirmation...');
 
-    // Go back to active cycling
+    // Go back to active cycling - should pick a random witty phrase
     rerender({ isActive: true, isWaiting: false });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 });

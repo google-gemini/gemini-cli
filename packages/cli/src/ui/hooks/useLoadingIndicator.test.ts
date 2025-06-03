@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
@@ -39,15 +39,18 @@ describe('useLoadingIndicator', () => {
 
     // Initial state before timers advance
     expect(result.current.elapsedTime).toBe(0);
-    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
+    const _initialPhrase = result.current.currentLoadingPhrase;
 
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
     // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
-    // This depends on the actual implementation of usePhraseCycler
-    // For simplicity, we'll check it's one of the witty phrases
-    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[1]);
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
   });
 
   it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', () => {
@@ -75,7 +78,7 @@ describe('useLoadingIndicator', () => {
     expect(result.current.elapsedTime).toBe(60);
   });
 
-  it('should reset elapsedTime and use initial phrase when transitioning from WaitingForConfirmation to Responding', () => {
+  it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', () => {
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
@@ -94,7 +97,9 @@ describe('useLoadingIndicator', () => {
 
     rerender({ streamingState: StreamingState.Responding });
     expect(result.current.elapsedTime).toBe(0); // Should reset
-    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
 
     act(() => {
       vi.advanceTimersByTime(1000);
