@@ -39,7 +39,15 @@ describe('EditTool', () => {
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
     mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(() => false),
       setApprovalMode: vi.fn(),

@@ -25,20 +25,20 @@ const mockSendMessageStream = vi
   .mockReturnValue((async function* () {})());
 const mockStartChat = vi.fn();
 
-vi.mock('@gemini-code/core', async (importOriginal) => {
-  const actualCoreModule = (await importOriginal()) as any;
-  const MockedGeminiClientClass = vi.fn().mockImplementation(function (
-    this: any,
-    _config: any,
-  ) {
+const MockedGeminiClientClass = vi.hoisted(() =>
+  vi.fn().mockImplementation(function (this: any, _config: any) {
     // _config
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
-  });
+  }),
+);
+
+vi.mock('@gemini-code/core', async (importOriginal) => {
+  const actualCoreModule = (await importOriginal()) as any;
   return {
     ...(actualCoreModule || {}),
-    GeminiClient: MockedGeminiClientClass,
-    // GeminiChat will be from actualCoreModule if it exists, otherwise undefined
+    GeminiClient: MockedGeminiClientClass, // Export the class for type checking or other direct uses
+    Config: actualCoreModule.Config, // Ensure Config is passed through
   };
 });
 
@@ -235,6 +235,14 @@ describe('useGeminiStream', () => {
 
     mockAddItem = vi.fn();
     mockSetShowHelp = vi.fn();
+    // Define the mock for getGeminiClient
+    const mockGetGeminiClient = vi.fn().mockImplementation(() => {
+      // MockedGeminiClientClass is defined in the module scope by the previous change.
+      // It will use the mockStartChat and mockSendMessageStream that are managed within beforeEach.
+      const clientInstance = new MockedGeminiClientClass(mockConfig);
+      return clientInstance;
+    });
+
     mockConfig = {
       apiKey: 'test-api-key',
       model: 'gemini-pro',
@@ -258,6 +266,7 @@ describe('useGeminiStream', () => {
       getToolRegistry: vi.fn(
         () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
       ),
+      getGeminiClient: mockGetGeminiClient,
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockReturnValue(false);

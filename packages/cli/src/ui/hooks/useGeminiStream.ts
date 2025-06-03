@@ -145,7 +145,7 @@ export const useGeminiStream = (
     setInitError(null);
     if (!geminiClientRef.current) {
       try {
-        geminiClientRef.current = new GeminiClient(config);
+        geminiClientRef.current = config.getGeminiClient();
       } catch (error: unknown) {
         const errorMsg = `Failed to initialize client: ${getErrorMessage(error) || 'Unknown error'}`;
         setInitError(errorMsg);

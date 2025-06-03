@@ -25,6 +25,7 @@ import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
@@ -158,8 +159,7 @@ export class GeminiClient {
         history,
         'startChat',
       );
-      const message = error instanceof Error ? error.message : 'Unknown error.';
-      throw new Error(`Failed to initialize chat: ${message}`);
+      throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
     }
   }
 

@@ -114,7 +114,7 @@ Expectation for required parameters:
     );
     this.config = config;
     this.rootDirectory = path.resolve(this.config.getTargetDir());
-    this.client = new GeminiClient(this.config);
+    this.client = config.getGeminiClient();
   }
 
   /**

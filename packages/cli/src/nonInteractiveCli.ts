@@ -6,7 +6,6 @@
 
 import {
   Config,
-  GeminiClient,
   ToolCallRequestInfo,
   executeToolCall,
   ToolRegistry,
@@ -39,7 +38,7 @@ export async function runNonInteractive(
   config: Config,
   input: string,
 ): Promise<void> {
-  const geminiClient = new GeminiClient(config);
+  const geminiClient = config.getGeminiClient();
   const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
   const chat = await geminiClient.getChat();

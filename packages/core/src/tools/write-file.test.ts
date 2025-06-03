@@ -53,6 +53,7 @@ const mockConfigInternal = {
   getTargetDir: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
+  getGeminiClient: vi.fn(), // Initialize as a plain mock function
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -96,6 +97,11 @@ describe('WriteFileTool', () => {
       mockConfig,
     ) as Mocked<GeminiClient>;
     vi.mocked(GeminiClient).mockImplementation(() => mockGeminiClientInstance);
+
+    // Now that mockGeminiClientInstance is initialized, set the mock implementation for getGeminiClient
+    mockConfigInternal.getGeminiClient.mockReturnValue(
+      mockGeminiClientInstance,
+    );
 
     tool = new WriteFileTool(mockConfig);
 

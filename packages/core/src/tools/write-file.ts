@@ -77,7 +77,7 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       },
     );
 
-    this.client = new GeminiClient(this.config);
+    this.client = this.config.getGeminiClient();
   }
 
   private isWithinRoot(pathToCheck: string): boolean {
