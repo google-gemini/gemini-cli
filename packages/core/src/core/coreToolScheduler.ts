@@ -128,6 +128,10 @@ export function formatLlmContentForFunctionResponse(
     additionalParts.push(contentToProcess);
   } else if (contentToProcess.text !== undefined) {
     functionResponseJson = { output: contentToProcess.text };
+  } else if (contentToProcess.functionResponse) {
+    functionResponseJson = JSON.parse(
+      JSON.stringify(contentToProcess.functionResponse),
+    );
   } else {
     functionResponseJson = { status: 'Tool execution succeeded.' };
     additionalParts.push(contentToProcess);

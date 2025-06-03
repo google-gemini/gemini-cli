@@ -96,10 +96,9 @@ This MCP tool named '${serverToolName}' was discovered from '${serverName}' MCP 
 
     const responseParts: Part[] = await this.mcpTool.callTool(functionCalls);
 
-    const output = getStringifiedResultForDisplay(responseParts);
     return {
       llmContent: responseParts,
-      returnDisplay: output,
+      returnDisplay: getStringifiedResultForDisplay(responseParts),
     };
   }
 }
