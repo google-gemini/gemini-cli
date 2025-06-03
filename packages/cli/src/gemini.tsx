@@ -116,12 +116,8 @@ async function main() {
   }
 
   // Non-interactive mode handled by runNonInteractive
-  const nonInteractiveConfigResult = await loadNonInteractiveConfig(
-    config,
-    settings,
-  );
+  const nonInteractiveConfig = await loadNonInteractiveConfig(config, settings);
 
-  const nonInteractiveConfig = nonInteractiveConfigResult;
   await runNonInteractive(nonInteractiveConfig, input);
   process.exit(0);
 }
