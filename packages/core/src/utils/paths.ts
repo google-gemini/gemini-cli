@@ -51,14 +51,15 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
   }
 
   const firstDir = segments[0];
+  const lastSegment = segments[segments.length - 1];
   const startComponent = root + firstDir;
 
   const endPartSegments: string[] = [];
-  // Base length: startComponent + separator + "..."
-  let currentLength = startComponent.length + separator.length + 3;
+  // Base length: separator + "..." + lastDir
+  let currentLength = separator.length + lastSegment.length;
 
   // Iterate backwards through segments (excluding the first one)
-  for (let i = segments.length - 1; i >= 1; i--) {
+  for (let i = segments.length - 2; i >= 0; i--) {
     const segment = segments[i];
     // Length needed if we add this segment: current + separator + segment
     const lengthWithSegment = currentLength + separator.length + segment.length;
@@ -67,27 +68,23 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
       endPartSegments.unshift(segment); // Add to the beginning of the end part
       currentLength = lengthWithSegment;
     } else {
-      // Adding this segment would exceed maxLen
       break;
     }
   }
 
-  // Construct the final path
-  let result = startComponent + separator + '...';
-  if (endPartSegments.length > 0) {
-    result += separator + endPartSegments.join(separator);
+  let result = endPartSegments.join(separator) + separator + lastSegment;
+
+  if (currentLength > maxLen) {
+    return result;
   }
 
-  // As a final check, if the result is somehow still too long (e.g., startComponent + ... is too long)
-  // fallback to simple truncation of the original path
+  // Construct the final path
+  result = startComponent + separator + result;
+
+  // As a final check, if the result is somehow still too long
+  // truncate the result string from the beginning, prefixing with "...".
   if (result.length > maxLen) {
-    const keepLen = Math.floor((maxLen - 3) / 2);
-    if (keepLen <= 0) {
-      return filePath.substring(0, maxLen - 3) + '...';
-    }
-    const start = filePath.substring(0, keepLen);
-    const end = filePath.substring(filePath.length - keepLen);
-    return `${start}...${end}`;
+    return '...' + result.substring(result.length - maxLen - 3);
   }
 
   return result;
