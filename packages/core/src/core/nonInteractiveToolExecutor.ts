@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Part } from '@google/genai';
 import {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolRegistry,
   ToolResult,
 } from '../index.js';
-import { formatLlmContentForFunctionResponse } from './coreToolScheduler.js';
+import { convertToFunctionResponse } from './coreToolScheduler.js';
 
 /**
  * Executes a single tool call non-interactively.
@@ -54,20 +53,15 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(toolResult.llmContent);
-
-    const functionResponsePart: Part = {
-      functionResponse: {
-        name: toolCallRequest.name,
-        id: toolCallRequest.callId,
-        response: functionResponseJson,
-      },
-    };
+    const response = convertToFunctionResponse(
+      toolCallRequest.name,
+      toolCallRequest.callId,
+      toolResult.llmContent,
+    );
 
     return {
       callId: toolCallRequest.callId,
-      responseParts: [functionResponsePart, ...additionalParts],
+      responseParts: response,
       resultDisplay: toolResult.returnDisplay,
       error: undefined,
     };

@@ -81,15 +81,13 @@ describe('executeToolCall', () => {
     expect(response.callId).toBe('call1');
     expect(response.error).toBeUndefined();
     expect(response.resultDisplay).toBe('Success!');
-    expect(response.responseParts).toEqual([
-      {
-        functionResponse: {
-          name: 'testTool',
-          id: 'call1',
-          response: { output: 'Tool executed successfully' },
-        },
+    expect(response.responseParts).toEqual({
+      functionResponse: {
+        name: 'testTool',
+        id: 'call1',
+        response: { output: 'Tool executed successfully' },
       },
-    ]);
+    });
   });
 
   it('should return an error if tool is not found', async () => {
@@ -225,7 +223,7 @@ describe('executeToolCall', () => {
           name: 'testTool',
           id: 'call5',
           response: {
-            status: 'Binary content of type image/png was processed.',
+            output: 'Binary content of type image/png was processed.',
           },
         },
       },

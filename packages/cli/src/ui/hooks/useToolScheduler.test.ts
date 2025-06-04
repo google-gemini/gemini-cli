@@ -11,12 +11,7 @@ import {
   useReactToolScheduler,
   mapToDisplay,
 } from './useReactToolScheduler.js';
-import {
-  Part,
-  PartListUnion,
-  PartUnion,
-  FunctionResponse,
-} from '@google/genai';
+import { PartUnion, FunctionResponse } from '@google/genai';
 import {
   Config,
   ToolCallRequestInfo,
@@ -26,7 +21,6 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallResponseInfo,
-  formatLlmContentForFunctionResponse, // Import from core
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode, // Import from core
@@ -92,120 +86,6 @@ const mockToolRequiresConfirmation: Tool = {
     }),
   ),
 };
-
-describe('formatLlmContentForFunctionResponse', () => {
-  it('should handle simple string llmContent', () => {
-    const llmContent = 'Simple text output';
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({ output: 'Simple text output' });
-    expect(additionalParts).toEqual([]);
-  });
-
-  it('should handle llmContent as a single Part with text', () => {
-    const llmContent: Part = { text: 'Text from Part object' };
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({ output: 'Text from Part object' });
-    expect(additionalParts).toEqual([]);
-  });
-
-  it('should handle llmContent as a PartListUnion array with a single text Part', () => {
-    const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({ output: 'Text from array' });
-    expect(additionalParts).toEqual([]);
-  });
-
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Binary content of type image/png was processed.',
-    });
-    expect(additionalParts).toEqual([llmContent]);
-  });
-
-  it('should handle llmContent with fileData', () => {
-    const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
-    };
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Binary content of type application/pdf was processed.',
-    });
-    expect(additionalParts).toEqual([llmContent]);
-  });
-
-  it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
-    const llmContent: PartListUnion = [
-      { text: 'Some textual description' },
-      { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
-      { text: 'Another text part' },
-    ];
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Tool execution succeeded.',
-    });
-    expect(additionalParts).toEqual(llmContent);
-  });
-
-  it('should handle llmContent as an array with a single inlineData Part', () => {
-    const llmContent: PartListUnion = [
-      { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
-    ];
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Binary content of type image/gif was processed.',
-    });
-    expect(additionalParts).toEqual(llmContent);
-  });
-
-  it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
-    const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Tool execution succeeded.',
-    });
-    expect(additionalParts).toEqual([llmContent]);
-  });
-
-  it('should handle empty string llmContent', () => {
-    const llmContent = '';
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({ output: '' });
-    expect(additionalParts).toEqual([]);
-  });
-
-  it('should handle llmContent as an empty array', () => {
-    const llmContent: PartListUnion = [];
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Tool execution succeeded.',
-    });
-    expect(additionalParts).toEqual([]);
-  });
-
-  it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
-    const llmContent: Part = {}; // An empty part object
-    const { functionResponseJson, additionalParts } =
-      formatLlmContentForFunctionResponse(llmContent);
-    expect(functionResponseJson).toEqual({
-      status: 'Tool execution succeeded.',
-    });
-    expect(additionalParts).toEqual([llmContent]);
-  });
-});
 
 describe('useReactToolScheduler in YOLO Mode', () => {
   let onComplete: Mock;
@@ -289,13 +169,13 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         request,
         response: expect.objectContaining({
           resultDisplay: 'YOLO Formatted tool output',
-          responseParts: expect.arrayContaining([
-            expect.objectContaining({
-              functionResponse: expect.objectContaining({
-                response: { output: expectedOutput },
-              }),
-            }),
-          ]),
+          responseParts: {
+            functionResponse: {
+              id: 'yoloCall',
+              name: 'mockToolRequiresConfirmation',
+              response: { output: expectedOutput },
+            },
+          },
         }),
       }),
     ]);
@@ -433,13 +313,13 @@ describe('useReactToolScheduler', () => {
         request,
         response: expect.objectContaining({
           resultDisplay: 'Formatted tool output',
-          responseParts: expect.arrayContaining([
-            expect.objectContaining({
-              functionResponse: expect.objectContaining({
-                response: { output: 'Tool output' },
-              }),
-            }),
-          ]),
+          responseParts: {
+            functionResponse: {
+              id: 'call1',
+              name: 'mockTool',
+              response: { output: 'Tool output' },
+            },
+          },
         }),
       }),
     ]);
@@ -917,13 +797,13 @@ describe('useReactToolScheduler', () => {
       request: requests[0],
       response: expect.objectContaining({
         resultDisplay: 'Display 1',
-        responseParts: expect.arrayContaining([
-          expect.objectContaining({
-            functionResponse: expect.objectContaining({
-              response: { output: 'Output 1' },
-            }),
-          }),
-        ]),
+        responseParts: {
+          functionResponse: {
+            id: 'multi1',
+            name: 'tool1',
+            response: { output: 'Output 1' },
+          },
+        },
       }),
     });
     expect(call2Result).toMatchObject({
@@ -931,13 +811,13 @@ describe('useReactToolScheduler', () => {
       request: requests[1],
       response: expect.objectContaining({
         resultDisplay: 'Display 2',
-        responseParts: expect.arrayContaining([
-          expect.objectContaining({
-            functionResponse: expect.objectContaining({
-              response: { output: 'Output 2' },
-            }),
-          }),
-        ]),
+        responseParts: {
+          functionResponse: {
+            id: 'multi2',
+            name: 'tool2',
+            response: { output: 'Output 2' },
+          },
+        },
       }),
     });
     expect(result.current[0]).toEqual([]);

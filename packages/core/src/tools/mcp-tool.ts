@@ -149,6 +149,13 @@ function getStringifiedResultForDisplay(result: Part[]) {
     return part; // Fallback for unexpected structure or non-FunctionResponsePart
   };
 
-  const processedResults = result.map(processFunctionResponse);
+  const processedResults =
+    result.length === 1
+      ? processFunctionResponse(result[0])
+      : result.map(processFunctionResponse);
+  if (typeof processedResults === 'string') {
+    return processedResults;
+  }
+
   return '```json\n' + JSON.stringify(processedResults, null, 2) + '\n```';
 }

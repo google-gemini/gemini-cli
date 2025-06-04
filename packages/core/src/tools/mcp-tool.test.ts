@@ -138,12 +138,7 @@ describe('DiscoveredMCPTool', () => {
       const stringifiedResponseContent = JSON.stringify(
         mockToolSuccessResultObject,
       );
-      // getStringifiedResultForDisplay joins text parts, then wraps the array of processed parts in JSON
-      const expectedDisplayOutput =
-        '```json\n' +
-        JSON.stringify([stringifiedResponseContent], null, 2) +
-        '\n```';
-      expect(toolResult.returnDisplay).toBe(expectedDisplayOutput);
+      expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
 
     it('should handle empty result from getStringifiedResultForDisplay', async () => {

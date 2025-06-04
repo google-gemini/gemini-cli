@@ -14,7 +14,8 @@ import {
   ToolRegistry,
   ApprovalMode,
 } from '../index.js';
-import { Part, PartUnion, PartListUnion } from '@google/genai';
+import { Part, PartListUnion } from '@google/genai';
+import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -96,51 +97,79 @@ export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
 /**
  * Formats tool output for a Gemini FunctionResponse.
  */
-export function formatLlmContentForFunctionResponse(
-  llmContent: PartListUnion,
-): {
-  functionResponseJson: Record<string, string>;
-  additionalParts: PartUnion[];
-} {
-  const additionalParts: PartUnion[] = [];
-  let functionResponseJson: Record<string, string>;
+function createFunctionResponsePart(
+  callId: string,
+  toolName: string,
+  output: string,
+): Part {
+  return {
+    functionResponse: {
+      id: callId,
+      name: toolName,
+      response: { output },
+    },
+  };
+}
 
+export function convertToFunctionResponse(
+  toolName: string,
+  callId: string,
+  llmContent: PartListUnion,
+): PartListUnion {
   const contentToProcess =
     Array.isArray(llmContent) && llmContent.length === 1
       ? llmContent[0]
       : llmContent;
 
   if (typeof contentToProcess === 'string') {
-    functionResponseJson = { output: contentToProcess };
-  } else if (Array.isArray(contentToProcess)) {
-    functionResponseJson = {
-      status: 'Tool execution succeeded.',
-    };
-    additionalParts.push(...contentToProcess);
-  } else if (contentToProcess.inlineData || contentToProcess.fileData) {
+    return createFunctionResponsePart(callId, toolName, contentToProcess);
+  }
+
+  if (Array.isArray(contentToProcess)) {
+    const functionResponse = createFunctionResponsePart(
+      callId,
+      toolName,
+      'Tool execution succeeded.',
+    );
+    return [functionResponse, ...contentToProcess];
+  }
+
+  // After this point, contentToProcess is a single Part object.
+  if (contentToProcess.functionResponse) {
+    if (contentToProcess.functionResponse.response?.content) {
+      const stringifiedOutput =
+        getResponseTextFromParts(
+          contentToProcess.functionResponse.response.content as Part[],
+        ) || '';
+      return createFunctionResponsePart(callId, toolName, stringifiedOutput);
+    }
+    // It's a functionResponse that we should pass through as is.
+    return contentToProcess;
+  }
+
+  if (contentToProcess.inlineData || contentToProcess.fileData) {
     const mimeType =
       contentToProcess.inlineData?.mimeType ||
       contentToProcess.fileData?.mimeType ||
       'unknown';
-    functionResponseJson = {
-      status: `Binary content of type ${mimeType} was processed.`,
-    };
-    additionalParts.push(contentToProcess);
-  } else if (contentToProcess.text !== undefined) {
-    functionResponseJson = { output: contentToProcess.text };
-  } else if (contentToProcess.functionResponse) {
-    functionResponseJson = JSON.parse(
-      JSON.stringify(contentToProcess.functionResponse),
+    const functionResponse = createFunctionResponsePart(
+      callId,
+      toolName,
+      `Binary content of type ${mimeType} was processed.`,
     );
-  } else {
-    functionResponseJson = { status: 'Tool execution succeeded.' };
-    additionalParts.push(contentToProcess);
+    return [functionResponse, contentToProcess];
   }
 
-  return {
-    functionResponseJson,
-    additionalParts,
-  };
+  if (contentToProcess.text !== undefined) {
+    return createFunctionResponsePart(callId, toolName, contentToProcess.text);
+  }
+
+  // Default case for other kinds of parts.
+  return createFunctionResponsePart(
+    callId,
+    toolName,
+    'Tool execution succeeded.',
+  );
 }
 
 const createErrorResponse = (
@@ -452,20 +481,15 @@ export class CoreToolScheduler {
               return;
             }
 
-            const { functionResponseJson, additionalParts } =
-              formatLlmContentForFunctionResponse(toolResult.llmContent);
-
-            const functionResponsePart: Part = {
-              functionResponse: {
-                name: toolName,
-                id: callId,
-                response: functionResponseJson,
-              },
-            };
+            const response = convertToFunctionResponse(
+              toolName,
+              callId,
+              toolResult.llmContent,
+            );
 
             const successResponse: ToolCallResponseInfo = {
               callId,
-              responseParts: [functionResponsePart, ...additionalParts],
+              responseParts: response,
               resultDisplay: toolResult.returnDisplay,
               error: undefined,
             };
