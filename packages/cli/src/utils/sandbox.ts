@@ -320,9 +320,14 @@ export async function start_sandbox(sandbox: string) {
     process.exit(1);
   }
 
-  // use interactive tty mode and auto-remove container on exit
+  // use interactive mode and auto-remove container on exit
   // run init binary inside container to forward signals & reap zombies
-  const args = ['run', '-it', '--rm', '--init', '--workdir', workdir];
+  const args = ['run', '-i', '--rm', '--init', '--workdir', workdir];
+
+  // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
+  if (process.stdin.isTTY) {
+    args.push('-t');
+  }
 
   // mount current directory as working directory in sandbox (set via --workdir)
   args.push('--volume', `${process.cwd()}:${workdir}`);
