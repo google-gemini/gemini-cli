@@ -161,7 +161,28 @@ export const useSlashCommandProcessor = (
           }
         },
       },
-
+      {
+        name: 'tools',
+        description: 'list available tools',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const toolRegistry = await config?.getToolRegistry();
+          const tools = toolRegistry?.getAllTools();
+          if (!tools) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not retrieve tools.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+          const toolList = tools.map((tool) => tool.name);
+          addMessage({
+            type: MessageType.INFO,
+            content: `Available tools:\n\n${toolList.join('\n')}`,
+            timestamp: new Date(),
+          });
+        },
+      },
       {
         name: 'corgi',
         action: (_mainCommand, _subCommand, _args) => {

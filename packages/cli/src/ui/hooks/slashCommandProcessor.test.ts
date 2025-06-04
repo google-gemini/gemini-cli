@@ -329,4 +329,102 @@ Add any other context about the problem here.
       expect(commandResult).toBe(true);
     });
   });
+
+  describe('/tools command', () => {
+    it('should show an error if tool registry is not available', async () => {
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue(undefined),
+      } as unknown as Config;
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = handleSlashCommand('/tools');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Could not retrieve tools.',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show an error if getAllTools returns undefined', async () => {
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getAllTools: vi.fn().mockReturnValue(undefined),
+        }),
+      } as unknown as Config;
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = handleSlashCommand('/tools');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Could not retrieve tools.',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should display available tools when tools are found', async () => {
+      const mockTools = [{ name: 'tool1' }, { name: 'tool2' }];
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getAllTools: vi.fn().mockReturnValue(mockTools),
+        }),
+      } as unknown as Config;
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = handleSlashCommand('/tools');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Available tools:\n\ntool1\ntool2',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should display a message when no tools are available', async () => {
+      const mockTools: unknown[] = [];
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getAllTools: vi.fn().mockReturnValue(mockTools),
+        }),
+      } as unknown as Config;
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = handleSlashCommand('/tools');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Available tools:\n\n',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+  });
 });
