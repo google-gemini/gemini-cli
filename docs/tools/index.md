@@ -6,7 +6,7 @@ The Gemini CLI is equipped with a powerful set of built-in tools that the Gemini
 
 In the context of the Gemini CLI, tools are specific functions or modules that the Gemini model can request to be executed. For example, if you ask Gemini to "Summarize the contents of `my_document.txt`," the model will likely identify the need to read that file and will request the execution of the `read_file` tool.
 
-The server component (`packages/core`) manages these tools, presents their definitions (schemas) to the Gemini model, executes them when requested, and returns the results to the model for further processing into a user-facing response.
+The core component (`packages/core`) manages these tools, presents their definitions (schemas) to the Gemini model, executes them when requested, and returns the results to the model for further processing into a user-facing response.
 
 ## Why are Tools Important?
 
@@ -19,12 +19,12 @@ The server component (`packages/core`) manages these tools, presents their defin
 ## How Tools are Used
 
 1.  You provide a prompt to the Gemini CLI.
-2.  The CLI sends the prompt to the server.
-3.  The server, along with your prompt and conversation history, sends a list of available tools and their descriptions/schemas to the Gemini API.
+2.  The CLI sends the prompt to the core.
+3.  The core, along with your prompt and conversation history, sends a list of available tools and their descriptions/schemas to the Gemini API.
 4.  The Gemini model analyzes your request. If it determines that a tool is needed, its response will include a request to execute a specific tool with certain parameters.
-5.  The server receives this tool request, validates it, and (often after user confirmation for sensitive operations) executes the tool.
+5.  The core receives this tool request, validates it, and (often after user confirmation for sensitive operations) executes the tool.
 6.  The output from the tool is sent back to the Gemini model.
-7.  The Gemini model uses the tool's output to formulate its final answer, which is then sent back through the server to the CLI and displayed to you.
+7.  The Gemini model uses the tool's output to formulate its final answer, which is then sent back through the core to the CLI and displayed to you.
 
 You will typically see messages in the CLI indicating when a tool is being called and whether it succeeded or failed.
 

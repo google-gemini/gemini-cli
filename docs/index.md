@@ -15,10 +15,10 @@ This documentation is organized into the following sections:
   - **[CLI Introduction](./cli/index.md):** An overview of the command-line interface.
   - **[Commands](./cli/commands.md):** Detailed descriptions of all available CLI commands.
   - **[Configuration](./cli/configuration.md):** How to configure the CLI.
-- **Server Details:**
-  - **[Server Introduction](./server/index.md):** An overview of the server component.
-  - **[Configuration](./server/configuration.md):** How to configure the server.
-  - **[Tools API](./server/tools-api.md):** Information on how the server manages and exposes tools.
+- **Core Details:**
+  - **[Core Introduction](./core/index.md):** An overview of the core component.
+  - **[Configuration](./core/configuration.md):** How to configure the core.
+  - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
 - **Tools:**
   - **[Tools Overview](./tools/index.md):** A general look at the available tools.
   - **[File System Tools](./tools/file-system.md):** Documentation for tools like `read_file`, `write_file`, etc.
