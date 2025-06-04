@@ -43,8 +43,22 @@ export function useHistory(): UseHistoryManagerReturn {
     (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number): number => {
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
-      setHistory((prevHistory) => [...prevHistory, newItem]);
-      return id; // Return the generated ID
+
+      setHistory((prevHistory) => {
+        if (prevHistory.length > 0) {
+          const lastItem = prevHistory[prevHistory.length - 1];
+          // Prevent adding duplicate consecutive user messages
+          if (
+            lastItem.type === 'user' &&
+            newItem.type === 'user' &&
+            lastItem.text === newItem.text
+          ) {
+            return prevHistory; // Don't add the duplicate
+          }
+        }
+        return [...prevHistory, newItem];
+      });
+      return id; // Return the generated ID (even if not added, to keep signature)
     },
     [getNextMessageId],
   );

@@ -138,4 +138,65 @@ describe('useHistoryManager', () => {
 
     expect(result.current.history).toEqual([]);
   });
+
+  it('should not add consecutive duplicate user messages', () => {
+    const { result } = renderHook(() => useHistory());
+    const timestamp = Date.now();
+    const itemData1: Omit<HistoryItem, 'id'> = {
+      type: 'user', // Replaced HistoryItemType.User
+      text: 'Duplicate message',
+    };
+    const itemData2: Omit<HistoryItem, 'id'> = {
+      type: 'user', // Replaced HistoryItemType.User
+      text: 'Duplicate message',
+    };
+    const itemData3: Omit<HistoryItem, 'id'> = {
+      type: 'gemini', // Replaced HistoryItemType.Gemini
+      text: 'Gemini response',
+    };
+    const itemData4: Omit<HistoryItem, 'id'> = {
+      type: 'user', // Replaced HistoryItemType.User
+      text: 'Another user message',
+    };
+
+    act(() => {
+      result.current.addItem(itemData1, timestamp);
+      result.current.addItem(itemData2, timestamp + 1); // Same text, different timestamp
+      result.current.addItem(itemData3, timestamp + 2);
+      result.current.addItem(itemData4, timestamp + 3);
+    });
+
+    expect(result.current.history).toHaveLength(3);
+    expect(result.current.history[0].text).toBe('Duplicate message');
+    expect(result.current.history[1].text).toBe('Gemini response');
+    expect(result.current.history[2].text).toBe('Another user message');
+  });
+
+  it('should add duplicate user messages if they are not consecutive', () => {
+    const { result } = renderHook(() => useHistory());
+    const timestamp = Date.now();
+    const itemData1: Omit<HistoryItem, 'id'> = {
+      type: 'user', // Replaced HistoryItemType.User
+      text: 'Message 1',
+    };
+    const itemData2: Omit<HistoryItem, 'id'> = {
+      type: 'gemini', // Replaced HistoryItemType.Gemini
+      text: 'Gemini response',
+    };
+    const itemData3: Omit<HistoryItem, 'id'> = {
+      type: 'user', // Replaced HistoryItemType.User
+      text: 'Message 1', // Duplicate text, but not consecutive
+    };
+
+    act(() => {
+      result.current.addItem(itemData1, timestamp);
+      result.current.addItem(itemData2, timestamp + 1);
+      result.current.addItem(itemData3, timestamp + 2);
+    });
+
+    expect(result.current.history).toHaveLength(3);
+    expect(result.current.history[0].text).toBe('Message 1');
+    expect(result.current.history[1].text).toBe('Gemini response');
+    expect(result.current.history[2].text).toBe('Message 1');
+  });
 });

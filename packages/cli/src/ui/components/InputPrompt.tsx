@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Text, Box, useInput, useStdin } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -19,7 +19,7 @@ import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 import { Config } from '@gemini-code/core';
 
-interface InputPromptProps {
+export interface InputPromptProps {
   onSubmit: (value: string) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
@@ -54,6 +54,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
   const suggestionsWidth = Math.max(60, Math.floor(terminalSize.columns * 0.8));
 
+  const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
   const { stdin, setRawMode } = useStdin();
 
   const buffer = useTextBuffer({
@@ -84,13 +86,34 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [onSubmit, buffer, resetCompletionState],
   );
 
+  const customSetTextAndResetCompletionSignal = useCallback(
+    (newText: string) => {
+      buffer.setText(newText);
+      setJustNavigatedHistory(true);
+    },
+    [buffer, setJustNavigatedHistory],
+  );
+
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
     isActive: !completion.showSuggestions,
     currentQuery: buffer.text,
-    onChange: buffer.setText,
+    onChange: customSetTextAndResetCompletionSignal,
   });
+
+  // Effect to reset completion if history navigation just occurred and set the text
+  useEffect(() => {
+    if (justNavigatedHistory) {
+      resetCompletionState();
+      setJustNavigatedHistory(false);
+    }
+  }, [
+    justNavigatedHistory,
+    buffer.text,
+    resetCompletionState,
+    setJustNavigatedHistory,
+  ]);
 
   const completionSuggestions = completion.suggestions;
   const handleAutocomplete = useCallback(
@@ -276,8 +299,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Standard arrow navigation within the buffer
       if (key.upArrow && !completion.showSuggestions) {
         if (
-          buffer.visualCursor[0] === 0 &&
-          buffer.visualScrollRow === 0 &&
+          (buffer.allVisualLines.length === 1 || // Always navigate for single line
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0)) &&
           inputHistory.navigateUp
         ) {
           inputHistory.navigateUp();
@@ -288,7 +311,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (key.downArrow && !completion.showSuggestions) {
         if (
-          buffer.visualCursor[0] === buffer.allVisualLines.length - 1 &&
+          (buffer.allVisualLines.length === 1 || // Always navigate for single line
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1) &&
           inputHistory.navigateDown
         ) {
           inputHistory.navigateDown();
