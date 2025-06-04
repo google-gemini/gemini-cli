@@ -103,7 +103,7 @@ export function ThemeDialog({
       width="100%"
     >
       {/* Left Column: Selection */}
-      <Box flexDirection="column" width="50%" paddingRight={2}>
+      <Box flexDirection="column" width="45%" paddingRight={2}>
         <Text bold={focusedSection === 'theme'}>
           {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
           <Text color={Colors.SubtleComment}>{otherScopeModifiedMessage}</Text>
@@ -133,13 +133,13 @@ export function ThemeDialog({
 
         <Box marginTop={1}>
           <Text color={Colors.SubtleComment}>
-            (Use ↑/↓ arrows and Enter to select, Tab to change focus)
+            (Use Enter to select, Tab to change focus)
           </Text>
         </Box>
       </Box>
 
       {/* Right Column: Preview */}
-      <Box flexDirection="column" width="50%" paddingLeft={3}>
+      <Box flexDirection="column" width="55%" paddingLeft={2}>
         <Text bold>Preview</Text>
         <Box
           borderStyle="single"
@@ -148,9 +148,11 @@ export function ThemeDialog({
           flexDirection="column"
         >
           {colorizeCode(
-            `# Source code
-print("Hello, World!")
-`,
+            `def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
             'python',
           )}
           <Box marginTop={1} />

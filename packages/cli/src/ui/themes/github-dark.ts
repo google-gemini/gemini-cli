@@ -4,97 +4,93 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { darkTheme, Theme } from './theme.js';
 
-export const GitHub: Theme = new Theme(
+export const GitHubDark: Theme = new Theme(
   'GitHub',
-  'light',
+  'dark',
   {
     hljs: {
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      color: '#333',
-      background: '#f8f8f8',
+      color: '#d1d5da',
+      background: '#24292e',
     },
     'hljs-comment': {
-      color: '#998',
+      color: '#6A737D',
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#998',
+      color: '#6A737D',
       fontStyle: 'italic',
     },
     'hljs-keyword': {
-      color: '#333',
+      color: '#F97583',
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: '#333',
+      color: '#F97583',
       fontWeight: 'bold',
     },
     'hljs-subst': {
-      color: '#333',
-      fontWeight: 'normal',
+      color: '#e1e4e8',
     },
     'hljs-number': {
-      color: '#008080',
+      color: '#79B8FF',
     },
     'hljs-literal': {
-      color: '#008080',
+      color: '#79B8FF',
     },
     'hljs-variable': {
-      color: '#008080',
+      color: '#FFAB70',
     },
     'hljs-template-variable': {
-      color: '#008080',
+      color: '#FFAB70',
     },
     'hljs-tag .hljs-attr': {
-      color: '#008080',
+      color: '#FFAB70',
     },
     'hljs-string': {
-      color: '#d14',
+      color: '#9ECBFF',
     },
     'hljs-doctag': {
-      color: '#d14',
+      color: '#9ECBFF',
     },
     'hljs-title': {
-      color: '#900',
+      color: '#B392F0',
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: '#900',
+      color: '#B392F0',
       fontWeight: 'bold',
     },
     'hljs-selector-id': {
-      color: '#900',
+      color: '#B392F0',
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#458',
+      color: '#85E89D',
       fontWeight: 'bold',
     },
     'hljs-class .hljs-title': {
-      color: '#458',
+      color: '#85E89D',
       fontWeight: 'bold',
     },
     'hljs-tag': {
-      color: '#000080',
-      fontWeight: 'normal',
+      color: '#85E89D',
     },
     'hljs-name': {
-      color: '#000080',
-      fontWeight: 'normal',
+      color: '#85E89D',
     },
     'hljs-attribute': {
-      color: '#000080',
-      fontWeight: 'normal',
+      color: '#79B8FF',
     },
     'hljs-regexp': {
-      color: '#009926',
+      color: '#DBEDFF',
     },
     'hljs-link': {
-      color: '#009926',
+      color: '#DBEDFF',
     },
     'hljs-symbol': {
       color: '#990073',
@@ -103,20 +99,22 @@ export const GitHub: Theme = new Theme(
       color: '#990073',
     },
     'hljs-built_in': {
-      color: '#0086b3',
+      color: '#79B8FF',
     },
     'hljs-builtin-name': {
-      color: '#0086b3',
+      color: '#79B8FF',
     },
     'hljs-meta': {
-      color: '#999',
+      color: '#79B8FF',
       fontWeight: 'bold',
     },
     'hljs-deletion': {
-      background: '#fdd',
+      background: '#86181D',
+      color: '#FDAEB7',
     },
     'hljs-addition': {
-      background: '#dfd',
+      background: '#144620',
+      color: '#85E89D',
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -125,5 +123,5 @@ export const GitHub: Theme = new Theme(
       fontWeight: 'bold',
     },
   },
-  lightTheme,
+  darkTheme,
 );

@@ -97,6 +97,7 @@ export function colorizeCode(
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
     const lines = codeToHighlight.split('\n');
+    const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     const getHighlightedLines = (line: string) =>
       !language || !lowlight.registered(language)
         ? lowlight.highlightAuto(line)
@@ -107,7 +108,7 @@ export function colorizeCode(
         {lines.map((line, index) => (
           <Text key={index}>
             <Text color={activeTheme.colors.SubtleComment}>
-              {`${String(index + 1).padStart(3, ' ')} `}
+              {`${String(index + 1).padStart(padWidth, ' ')} `}
             </Text>
             <Text color={activeTheme.defaultColor}>
               {renderHastNode(
@@ -129,14 +130,15 @@ export function colorizeCode(
     // Fallback to plain text with default color on error
     // Also display line numbers in fallback
     const lines = codeToHighlight.split('\n');
+    const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     return (
       <Text>
         {lines.map((line, index) => (
           <Text key={index}>
-            <Text color={activeTheme.colors.SubtleComment}>
-              {`${String(index + 1).padStart(3, ' ')} `}
+            <Text color={activeTheme.defaultColor}>
+              {`${String(index + 1).padStart(padWidth, ' ')} `}
             </Text>
-            <Text color={activeTheme.defaultColor}>{line}</Text>
+            <Text color={activeTheme.colors.SubtleComment}>{line}</Text>
             {index < lines.length - 1 && '\n'}
           </Text>
         ))}

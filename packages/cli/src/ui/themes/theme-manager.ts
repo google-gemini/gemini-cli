@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { AyuDark } from './ayu.js';
+import { AyuLight } from './ayu-light.js';
 import { AtomOneDark } from './atom-one-dark.js';
 import { Dracula } from './dracula.js';
-import { GitHub } from './github.js';
+import { GitHubDark } from './github-dark.js';
+import { GitHubLight } from './github-light.js';
 import { GoogleCode } from './googlecode.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
@@ -28,11 +31,14 @@ class ThemeManager {
 
   constructor() {
     this.availableThemes = [
+      AyuDark,
+      AyuLight,
       AtomOneDark,
       Dracula,
-      DefaultLight, // Light mode.
+      DefaultLight,
       DefaultDark,
-      GitHub,
+      GitHubDark,
+      GitHubLight,
       GoogleCode,
       XCode,
       ANSI,
