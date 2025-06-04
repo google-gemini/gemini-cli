@@ -84,13 +84,6 @@ jobs:
       # upload paths were relative to the workspace root.
       # Example: if uploaded `packages/cli/dist`, it will be at `./packages/cli/dist`.
 
-      - name: Clean node_modules and lockfile
-        run: |
-          rm -rf node_modules package-lock.json
-
-      - name: Reinstall dependencies
-        run: npm install
-
       - name: Install dependencies for testing
         run: npm ci # Install fresh dependencies using the downloaded package-lock.json
 
