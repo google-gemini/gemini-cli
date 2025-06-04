@@ -31,6 +31,10 @@ export enum ApprovalMode {
   YOLO = 'yolo',
 }
 
+export interface AccessibilitySettings {
+  disableLoadingPhrases?: boolean;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -66,6 +70,7 @@ export interface ConfigParameters {
   vertexai?: boolean;
   showMemoryUsage?: boolean;
   contextFileName?: string;
+  accessibility?: AccessibilitySettings;
   fileFilteringRespectGitIgnore?: boolean;
   fileFilteringAllowBuildArtifacts?: boolean;
 }
@@ -90,6 +95,7 @@ export class Config {
   private approvalMode: ApprovalMode;
   private readonly vertexai: boolean | undefined;
   private readonly showMemoryUsage: boolean;
+  private readonly accessibility: AccessibilitySettings;
   private readonly geminiClient: GeminiClient;
   private readonly fileFilteringRespectGitIgnore: boolean;
   private readonly fileFilteringAllowBuildArtifacts: boolean;
@@ -114,6 +120,7 @@ export class Config {
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.vertexai = params.vertexai;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
+    this.accessibility = params.accessibility ?? {};
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
     this.fileFilteringAllowBuildArtifacts =
@@ -212,6 +219,10 @@ export class Config {
 
   getShowMemoryUsage(): boolean {
     return this.showMemoryUsage;
+  }
+
+  getAccessibility(): AccessibilitySettings {
+    return this.accessibility;
   }
 
   getGeminiClient(): GeminiClient {

@@ -214,6 +214,7 @@ export async function loadCliConfig(
     vertexai: useVertexAI,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
+    accessibility: settings.accessibility,
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
     fileFilteringAllowBuildArtifacts:

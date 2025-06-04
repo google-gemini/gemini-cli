@@ -399,7 +399,11 @@ export const App = ({
           ) : (
             <>
               <LoadingIndicator
-                currentLoadingPhrase={currentLoadingPhrase}
+                currentLoadingPhrase={
+                  config.getAccessibility()?.disableLoadingPhrases
+                    ? undefined
+                    : currentLoadingPhrase
+                }
                 elapsedTime={elapsedTime}
               />
               <Box

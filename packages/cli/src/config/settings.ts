@@ -21,6 +21,10 @@ export enum SettingScope {
   Workspace = 'Workspace',
 }
 
+export interface AccessibilitySettings {
+  disableLoadingPhrases?: boolean;
+}
+
 export interface Settings {
   theme?: string;
   sandbox?: boolean | string;
@@ -32,6 +36,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   contextFileName?: string;
   title?: string;
+  accessibility?: AccessibilitySettings;
 
   // Git-aware file filtering settings
   fileFiltering?: {

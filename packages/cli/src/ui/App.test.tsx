@@ -12,6 +12,7 @@ import {
   MCPServerConfig,
   ApprovalMode,
   ToolRegistry,
+  AccessibilitySettings,
 } from '@gemini-code/core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 
@@ -35,6 +36,7 @@ interface MockServerConfig {
   approvalMode: ApprovalMode;
   vertexai?: boolean;
   showMemoryUsage?: boolean;
+  accessibility?: AccessibilitySettings;
 
   getApiKey: Mock<() => string>;
   getModel: Mock<() => string>;
@@ -58,6 +60,7 @@ interface MockServerConfig {
   setApprovalMode: Mock<(skip: ApprovalMode) => void>;
   getVertexAI: Mock<() => boolean | undefined>;
   getShowMemoryUsage: Mock<() => boolean>;
+  getAccessibility: Mock<() => AccessibilitySettings>;
 }
 
 // Mock @gemini-code/core and its Config class
@@ -87,6 +90,7 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         approvalMode: opts.approvalMode ?? ApprovalMode.DEFAULT,
         vertexai: opts.vertexai,
         showMemoryUsage: opts.showMemoryUsage ?? false,
+        accessibility: opts.accessibility ?? {},
 
         getApiKey: vi.fn(() => opts.apiKey || 'test-key'),
         getModel: vi.fn(() => opts.model || 'test-model-in-mock-factory'),
@@ -112,6 +116,7 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         setApprovalMode: vi.fn(),
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
+        getAccessibility: vi.fn(() => opts.accessibility ?? {}),
       };
     });
   return {
