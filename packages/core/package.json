@@ -26,12 +26,14 @@
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
+    "minimatch": "^10.0.0",
     "shell-quote": "^1.8.2",
     "strip-ansi": "^7.1.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "@types/minimatch": "^5.1.2",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },

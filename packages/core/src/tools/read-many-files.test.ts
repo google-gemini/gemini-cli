@@ -9,6 +9,8 @@ import type { Mock } from 'vitest';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { Config } from '../config/config.js';
 import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
@@ -19,6 +21,18 @@ describe('ReadManyFilesTool', () => {
   let tempDirOutsideRoot: string;
   let mockReadFileFn: Mock;
 
+  // Mock config for testing
+  const mockConfig = {
+    getFileService: async () => {
+      const service = new FileDiscoveryService(tempRootDir);
+      await service.initialize({ respectGitIgnore: true });
+      return service;
+    },
+    getFileFilteringRespectGitIgnore: () => true,
+    getFileFilteringCustomIgnorePatterns: () => [],
+    getFileFilteringAllowBuildArtifacts: () => false,
+  } as Partial<Config> as Config;
+
   beforeEach(async () => {
     tempRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-many-files-root-'),
@@ -26,7 +40,7 @@ describe('ReadManyFilesTool', () => {
     tempDirOutsideRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-many-files-external-'),
     );
-    tool = new ReadManyFilesTool(tempRootDir);
+    tool = new ReadManyFilesTool(tempRootDir, mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;
     mockReadFileFn.mockReset();

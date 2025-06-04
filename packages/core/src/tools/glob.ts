@@ -10,6 +10,7 @@ import fg from 'fast-glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
+import { Config } from '../config/config.js';
 
 /**
  * Parameters for the GlobTool
@@ -29,6 +30,11 @@ export interface GlobToolParams {
    * Whether the search should be case-sensitive (optional, defaults to false)
    */
   case_sensitive?: boolean;
+
+  /**
+   * Whether to respect .gitignore patterns (optional, defaults to true)
+   */
+  respect_git_ignore?: boolean;
 }
 
 /**
@@ -40,7 +46,10 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
    * Creates a new instance of the GlobLogic
    * @param rootDirectory Root directory to ground this tool in.
    */
-  constructor(private rootDirectory: string) {
+  constructor(
+    private rootDirectory: string,
+    private config: Config,
+  ) {
     super(
       GlobTool.Name,
       'FindFiles',
@@ -60,6 +69,11 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
           case_sensitive: {
             description:
               'Optional: Whether the search should be case-sensitive. Defaults to false.',
+            type: 'boolean',
+          },
+          respect_git_ignore: {
+            description:
+              'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
             type: 'boolean',
           },
         },
@@ -167,6 +181,12 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         params.path || '.',
       );
 
+      // Get centralized file discovery service
+      const respectGitIgnore =
+        params.respect_git_ignore ??
+        this.config.getFileFilteringRespectGitIgnore();
+      const fileDiscovery = await this.config.getFileService();
+
       const entries = await fg(params.pattern, {
         cwd: searchDirAbsolute,
         absolute: true,
@@ -179,25 +199,57 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         suppressErrors: true,
       });
 
-      if (!entries || entries.length === 0) {
+      // Apply git-aware filtering if enabled and in git repository
+      let filteredEntries = entries;
+      let gitIgnoredCount = 0;
+
+      if (respectGitIgnore && fileDiscovery.isGitRepository()) {
+        const allPaths = entries.map((entry) => entry.path);
+        const relativePaths = allPaths.map((p) =>
+          path.relative(this.rootDirectory, p),
+        );
+        const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
+          respectGitIgnore,
+        });
+        const filteredAbsolutePaths = new Set(
+          filteredRelativePaths.map((p) => path.resolve(this.rootDirectory, p)),
+        );
+
+        filteredEntries = entries.filter((entry) =>
+          filteredAbsolutePaths.has(entry.path),
+        );
+        gitIgnoredCount = entries.length - filteredEntries.length;
+      }
+
+      if (!filteredEntries || filteredEntries.length === 0) {
+        let message = `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`;
+        if (gitIgnoredCount > 0) {
+          message += ` (${gitIgnoredCount} files were git-ignored)`;
+        }
         return {
-          llmContent: `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`,
+          llmContent: message,
           returnDisplay: `No files found`,
         };
       }
 
-      entries.sort((a, b) => {
+      filteredEntries.sort((a, b) => {
         const mtimeA = a.stats?.mtime?.getTime() ?? 0;
         const mtimeB = b.stats?.mtime?.getTime() ?? 0;
         return mtimeB - mtimeA;
       });
 
-      const sortedAbsolutePaths = entries.map((entry) => entry.path);
+      const sortedAbsolutePaths = filteredEntries.map((entry) => entry.path);
       const fileListDescription = sortedAbsolutePaths.join('\n');
       const fileCount = sortedAbsolutePaths.length;
 
+      let resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}`;
+      if (gitIgnoredCount > 0) {
+        resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
+      }
+      resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
+
       return {
-        llmContent: `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}, sorted by modification time (newest first):\n${fileListDescription}`,
+        llmContent: resultMessage,
         returnDisplay: `Found ${fileCount} matching file(s)`,
       };
     } catch (error) {

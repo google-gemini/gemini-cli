@@ -11,16 +11,30 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { Config } from '../config/config.js';
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
   let globTool: GlobTool;
   const abortSignal = new AbortController().signal;
 
+  // Mock config for testing
+  const mockConfig = {
+    getFileService: async () => {
+      const service = new FileDiscoveryService(tempRootDir);
+      await service.initialize({ respectGitIgnore: true });
+      return service;
+    },
+    getFileFilteringRespectGitIgnore: () => true,
+    getFileFilteringCustomIgnorePatterns: () => [],
+    getFileFilteringAllowBuildArtifacts: () => false,
+  } as Partial<Config> as Config;
+
   beforeEach(async () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
-    globTool = new GlobTool(tempRootDir);
+    globTool = new GlobTool(tempRootDir, mockConfig);
 
     // Create some test files and directories within this root
     // Top-level files
@@ -214,7 +228,7 @@ describe('GlobTool', () => {
     it("should return error if search path resolves outside the tool's root directory", () => {
       // Create a globTool instance specifically for this test, with a deeper root
       const deeperRootDir = path.join(tempRootDir, 'sub');
-      const specificGlobTool = new GlobTool(deeperRootDir);
+      const specificGlobTool = new GlobTool(deeperRootDir, mockConfig);
       // const params: GlobToolParams = { pattern: '*.txt', path: '..' }; // This line is unused and will be removed.
       // This should be fine as tempRootDir is still within the original tempRootDir (the parent of deeperRootDir)
       // Let's try to go further up.

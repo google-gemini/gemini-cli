@@ -214,6 +214,10 @@ export async function loadCliConfig(
     vertexai: useVertexAI,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
+    // Git-aware file filtering settings
+    fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+    fileFilteringAllowBuildArtifacts:
+      settings.fileFiltering?.allowBuildArtifacts,
   };
 
   const config = createServerConfig(configParams);

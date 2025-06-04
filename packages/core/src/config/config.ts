@@ -23,6 +23,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -65,6 +66,8 @@ export interface ConfigParameters {
   vertexai?: boolean;
   showMemoryUsage?: boolean;
   contextFileName?: string;
+  fileFilteringRespectGitIgnore?: boolean;
+  fileFilteringAllowBuildArtifacts?: boolean;
 }
 
 export class Config {
@@ -88,6 +91,9 @@ export class Config {
   private readonly vertexai: boolean | undefined;
   private readonly showMemoryUsage: boolean;
   private readonly geminiClient: GeminiClient;
+  private readonly fileFilteringRespectGitIgnore: boolean;
+  private readonly fileFilteringAllowBuildArtifacts: boolean;
+  private fileDiscoveryService: FileDiscoveryService | null = null;
 
   constructor(params: ConfigParameters) {
     this.apiKey = params.apiKey;
@@ -108,6 +114,10 @@ export class Config {
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.vertexai = params.vertexai;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
+    this.fileFilteringRespectGitIgnore =
+      params.fileFilteringRespectGitIgnore ?? true;
+    this.fileFilteringAllowBuildArtifacts =
+      params.fileFilteringAllowBuildArtifacts ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -207,6 +217,25 @@ export class Config {
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
   }
+
+  getFileFilteringRespectGitIgnore(): boolean {
+    return this.fileFilteringRespectGitIgnore;
+  }
+
+  getFileFilteringAllowBuildArtifacts(): boolean {
+    return this.fileFilteringAllowBuildArtifacts;
+  }
+
+  async getFileService(): Promise<FileDiscoveryService> {
+    if (!this.fileDiscoveryService) {
+      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
+      await this.fileDiscoveryService.initialize({
+        respectGitIgnore: this.fileFilteringRespectGitIgnore,
+        includeBuildArtifacts: this.fileFilteringAllowBuildArtifacts,
+      });
+    }
+    return this.fileDiscoveryService;
+  }
 }
 
 function findEnvFile(startDir: string): string | null {
@@ -270,14 +299,14 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
     }
   };
 
-  registerCoreTool(LSTool, targetDir);
+  registerCoreTool(LSTool, targetDir, config);
   registerCoreTool(ReadFileTool, targetDir);
   registerCoreTool(GrepTool, targetDir);
-  registerCoreTool(GlobTool, targetDir);
+  registerCoreTool(GlobTool, targetDir, config);
   registerCoreTool(EditTool, config);
   registerCoreTool(WriteFileTool, config);
   registerCoreTool(WebFetchTool, config);
-  registerCoreTool(ReadManyFilesTool, targetDir);
+  registerCoreTool(ReadManyFilesTool, targetDir, config);
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);

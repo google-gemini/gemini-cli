@@ -68,6 +68,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     config.getTargetDir(),
     isAtCommand(buffer.text) || isSlashCommand(buffer.text),
     slashCommands,
+    config,
   );
 
   const resetCompletionState = completion.resetCompletionState;

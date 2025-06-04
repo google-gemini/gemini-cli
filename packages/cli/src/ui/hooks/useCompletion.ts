@@ -12,6 +12,7 @@ import {
   escapePath,
   unescapePath,
   getErrorMessage,
+  Config,
 } from '@gemini-code/core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -37,6 +38,7 @@ export function useCompletion(
   cwd: string,
   isActive: boolean,
   slashCommands: SlashCommand[],
+  config?: Config,
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
@@ -184,6 +186,7 @@ export function useCompletion(
     const findFilesRecursively = async (
       startDir: string,
       searchPrefix: string,
+      fileDiscovery: { shouldIgnoreFile: (path: string) => boolean } | null,
       currentRelativePath = '',
       depth = 0,
       maxDepth = 10, // Limit recursion depth
@@ -201,6 +204,19 @@ export function useCompletion(
           if (foundSuggestions.length >= maxResults) break;
 
           const entryPathRelative = path.join(currentRelativePath, entry.name);
+          const entryPathFromRoot = path.relative(
+            cwd,
+            path.join(startDir, entry.name),
+          );
+
+          // Check if this entry should be ignored by git-aware filtering
+          if (
+            fileDiscovery &&
+            fileDiscovery.shouldIgnoreFile(entryPathFromRoot)
+          ) {
+            continue;
+          }
+
           if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
             foundSuggestions.push({
               label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
@@ -219,6 +235,7 @@ export function useCompletion(
                 await findFilesRecursively(
                   path.join(startDir, entry.name),
                   searchPrefix, // Pass original searchPrefix for recursive calls
+                  fileDiscovery,
                   entryPathRelative,
                   depth + 1,
                   maxDepth,
@@ -237,25 +254,48 @@ export function useCompletion(
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
+
+      // Get centralized file discovery service if config is available
+      const fileDiscovery = config ? await config.getFileService() : null;
+
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
         if (partialPath.indexOf('/') === -1 && prefix) {
-          fetchedSuggestions = await findFilesRecursively(cwd, prefix);
+          fetchedSuggestions = await findFilesRecursively(
+            cwd,
+            prefix,
+            fileDiscovery,
+          );
         } else {
           // Original behavior: list files in the specific directory
           const lowerPrefix = prefix.toLowerCase();
           const entries = await fs.readdir(baseDirAbsolute, {
             withFileTypes: true,
           });
-          fetchedSuggestions = entries
-            .filter((entry) => entry.name.toLowerCase().startsWith(lowerPrefix))
-            .map((entry) => {
-              const label = entry.isDirectory() ? entry.name + '/' : entry.name;
-              return {
-                label,
-                value: escapePath(label), // Value for completion should be just the name part
-              };
-            });
+
+          // Filter entries using git-aware filtering
+          const filteredEntries = [];
+          for (const entry of entries) {
+            if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
+
+            const relativePath = path.relative(
+              cwd,
+              path.join(baseDirAbsolute, entry.name),
+            );
+            if (fileDiscovery && fileDiscovery.shouldIgnoreFile(relativePath)) {
+              continue;
+            }
+
+            filteredEntries.push(entry);
+          }
+
+          fetchedSuggestions = filteredEntries.map((entry) => {
+            const label = entry.isDirectory() ? entry.name + '/' : entry.name;
+            return {
+              label,
+              value: escapePath(label), // Value for completion should be just the name part
+            };
+          });
         }
 
         // Sort by depth, then directories first, then alphabetically
@@ -307,7 +347,7 @@ export function useCompletion(
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
-  }, [query, cwd, isActive, resetCompletionState, slashCommands]);
+  }, [query, cwd, isActive, resetCompletionState, slashCommands, config]);
 
   return {
     suggestions,

@@ -161,6 +161,7 @@ export const useSlashCommandProcessor = (
           }
         },
       },
+
       {
         name: 'corgi',
         action: (_mainCommand, _subCommand, _args) => {

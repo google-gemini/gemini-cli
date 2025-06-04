@@ -134,9 +134,14 @@ export async function handleAtCommand({
 
   addItem({ type: 'user', text: query }, userMessageTimestamp);
 
+  // Get centralized file discovery service
+  const fileDiscovery = await config.getFileService();
+  const respectGitIgnore = config.getFileFilteringRespectGitIgnore();
+
   const pathSpecsToRead: string[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
+  const ignoredPaths: string[] = [];
 
   const toolRegistry = await config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
@@ -174,6 +179,16 @@ export async function handleAtCommand({
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
       return { processedQuery: null, shouldProceed: false };
+    }
+
+    // Check if path should be ignored by git
+    if (fileDiscovery.shouldIgnoreFile(pathName)) {
+      const reason = respectGitIgnore
+        ? 'git-ignored and will be skipped'
+        : 'ignored by custom patterns';
+      onDebugMessage(`Path ${pathName} is ${reason}.`);
+      ignoredPaths.push(pathName);
+      continue;
     }
 
     let currentPathSpec = pathName;
@@ -305,6 +320,14 @@ export async function handleAtCommand({
   }
   initialQueryText = initialQueryText.trim();
 
+  // Inform user about ignored paths
+  if (ignoredPaths.length > 0) {
+    const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
+    onDebugMessage(
+      `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
+    );
+  }
+
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
   if (pathSpecsToRead.length === 0) {
     onDebugMessage('No valid file paths found in @ commands to read.');
@@ -324,7 +347,10 @@ export async function handleAtCommand({
 
   const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
 
-  const toolArgs = { paths: pathSpecsToRead };
+  const toolArgs = {
+    paths: pathSpecsToRead,
+    respectGitIgnore, // Use configuration setting
+  };
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {
