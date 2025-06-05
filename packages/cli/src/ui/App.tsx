@@ -337,7 +337,7 @@ export const App = ({
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header title={process.env.CLI_TITLE} />
+              <Header />
               <Tips config={config} />
             </Box>,
             ...history.map((h) => (
