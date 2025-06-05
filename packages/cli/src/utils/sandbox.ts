@@ -285,11 +285,10 @@ export async function start_sandbox(sandbox: string) {
   const image = await getSandboxImageName(isCustomProjectSandbox);
   const workdir = process.cwd();
 
-  // if BUILD_SANDBOX is set or project-specific sandbox.Dockerfile provided,
-  // then call scripts/build_sandbox.sh under gemini-cli repo
+  // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-cli repo
   //
   // note this can only be done with binary linked from gemini-cli repo
-  if (process.env.BUILD_SANDBOX || isCustomProjectSandbox) {
+  if (process.env.BUILD_SANDBOX) {
     if (!gcPath.includes('gemini-cli/packages/')) {
       console.error(
         'ERROR: cannot build sandbox using installed gemini binary; ' +

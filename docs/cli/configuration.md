@@ -77,7 +77,7 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - See the [Theming section in README.md](../../README.md#theming) for available theme names.
 - **`sandbox`** (boolean or string):
   - Controls whether and how to use sandboxing for tool execution.
-  - If a `.gemini/sandbox.Dockerfile` exists in your project, it will be used to build a custom sandbox image based on `gemini-cli-sandbox`.
+  - If a `.gemini/sandbox.Dockerfile` exists in your project, it will be used to build a custom sandbox image.
   - `true`: Enable default sandbox (see [README](../../README.md) for behavior).
   - `false`: Disable sandboxing (WARNING: this is inherently unsafe).
   - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing command.
@@ -289,7 +289,7 @@ Sandboxing is disabled by default, but you can enable it in a few ways:
 
 By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
 
-For project-specific sandboxing needs, you can create a custom Dockerfile at `.gemini/sandbox.Dockerfile` in your project's root directory. This Dockerfile should be based on the base sandbox image:
+For project-specific sandboxing needs, you can create a custom Dockerfile at `.gemini/sandbox.Dockerfile` in your project's root directory. This Dockerfile can be based on the base sandbox image:
 
 ```dockerfile
 FROM gemini-cli-sandbox
@@ -300,7 +300,11 @@ FROM gemini-cli-sandbox
 # COPY ./my-config /app/my-config
 ```
 
-When `.gemini/sandbox.Dockerfile` exists, the CLI will automatically build and use a custom image for your project.
+When `.gemini/sandbox.Dockerfile` exists, you can use `BUILD_SANDBOX` environment variable when running Gemini CLI to automatically build the custom sandbox image:
+
+```bash
+BUILD_SANDBOX=1 gemini -s
+```
 
 ## Theming
 
