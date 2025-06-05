@@ -308,9 +308,8 @@ export async function start_sandbox(sandbox: string) {
         console.error(`using ${projectSandboxDockerfile} for sandbox`);
         buildArgs += `-s -f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
       }
-      spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
+      execSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
         stdio: 'inherit',
-        shell: true,
         env: {
           ...process.env,
           GEMINI_SANDBOX: sandbox, // in case sandbox is enabled via flags (see config.ts under cli package)

@@ -76,36 +76,26 @@ if [ -n "${VERBOSE:-}" ]; then
     BUILD_STDOUT="/dev/stdout"
 fi
 
-# initialize build arg array from BUILD_SANDBOX_FLAGS
-read -r -a build_args <<<"${BUILD_SANDBOX_FLAGS:-}"
-
 build_image() {
-    local -n build_args=$1
-
     if [[ "$CMD" == "podman" ]]; then
         # use empty --authfile to skip unnecessary auth refresh overhead
-        $CMD build --authfile=<(echo '{}') "${build_args[@]}" >$BUILD_STDOUT
+        $CMD build --authfile=<(echo '{}') "$@" >$BUILD_STDOUT
     elif [[ "$CMD" == "docker" ]]; then
-        # use config directory to skip unnecessary auth refresh overhead
-        $CMD --config=".docker" buildx build "${build_args[@]}" >$BUILD_STDOUT
+        $CMD --config=".docker" buildx build "$@" >$BUILD_STDOUT
     else
-        $CMD build "${build_args[@]}" >$BUILD_STDOUT
+        $CMD build "$@" >$BUILD_STDOUT
     fi
 }
 
-# build container images & prune older unused images
-
 echo "building $BASE_IMAGE ... (can be slow first time)"
-base_image_build_args=(${build_args[@]})
-base_image_build_args+=(-f "$BASE_DOCKERFILE" -t "$BASE_IMAGE" .)
-build_image base_image_build_args
+# shellcheck disable=SC2086 # allow globbing and word splitting for BUILD_SANDBOX_FLAGS
+build_image ${BUILD_SANDBOX_FLAGS:-} -f "$BASE_DOCKERFILE" -t "$BASE_IMAGE" .
 echo "built $BASE_IMAGE"
 
 if [[ -n "$CUSTOM_DOCKERFILE" && -n "$CUSTOM_IMAGE" ]]; then
     echo "building $CUSTOM_IMAGE ... (can be slow first time)"
-    custom_image_build_args=(${build_args[@]})
-    custom_image_build_args+=(-f "$CUSTOM_DOCKERFILE" -t "$CUSTOM_IMAGE" .)
-    build_image custom_image_build_args
+    # shellcheck disable=SC2086 # allow globbing and word splitting for BUILD_SANDBOX_FLAGS
+    build_image ${BUILD_SANDBOX_FLAGS:-} -f "$CUSTOM_DOCKERFILE" -t "$CUSTOM_IMAGE" .
     echo "built $CUSTOM_IMAGE"
 fi
 
