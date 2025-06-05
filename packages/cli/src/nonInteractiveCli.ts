@@ -94,9 +94,19 @@ export async function runNonInteractive(
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            toolResponseParts.push(...(toolResponse.responseParts as Part[]));
-          } else {
-            toolResponseParts.push(...(toolResponse.responseParts as Part[]));
+          }
+
+          if (toolResponse.responseParts) {
+            const parts = Array.isArray(toolResponse.responseParts)
+              ? toolResponse.responseParts
+              : [toolResponse.responseParts];
+            for (const part of parts) {
+              if (typeof part === 'string') {
+                toolResponseParts.push({ text: part });
+              } else if (part) {
+                toolResponseParts.push(part);
+              }
+            }
           }
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
