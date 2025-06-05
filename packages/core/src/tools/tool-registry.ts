@@ -53,28 +53,51 @@ Signal: Signal number or \`(none)\` if no signal was received.
     const child = spawn(callCommand, [this.name]);
     child.stdin.write(JSON.stringify(params));
     child.stdin.end();
+
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (data) => {
-      stdout += data?.toString();
-    });
-    child.stderr.on('data', (data) => {
-      stderr += data?.toString();
-    });
     let error: Error | null = null;
-    child.on('error', (err: Error) => {
-      error = err;
-    });
     let code: number | null = null;
     let signal: NodeJS.Signals | null = null;
-    child.on(
-      'close',
-      (_code: number | null, _signal: NodeJS.Signals | null) => {
+
+    await new Promise<void>((resolve) => {
+      const onStdout = (data: Buffer) => {
+        stdout += data?.toString();
+      };
+
+      const onStderr = (data: Buffer) => {
+        stderr += data?.toString();
+      };
+
+      const onError = (err: Error) => {
+        error = err;
+      };
+
+      const onClose = (
+        _code: number | null,
+        _signal: NodeJS.Signals | null,
+      ) => {
         code = _code;
         signal = _signal;
-      },
-    );
-    await new Promise((resolve) => child.on('close', resolve));
+        cleanup();
+        resolve();
+      };
+
+      const cleanup = () => {
+        child.stdout.removeListener('data', onStdout);
+        child.stderr.removeListener('data', onStderr);
+        child.removeListener('error', onError);
+        child.removeListener('close', onClose);
+        if (child.connected) {
+          child.disconnect();
+        }
+      };
+
+      child.stdout.on('data', onStdout);
+      child.stderr.on('data', onStderr);
+      child.on('error', onError);
+      child.on('close', onClose);
+    });
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {

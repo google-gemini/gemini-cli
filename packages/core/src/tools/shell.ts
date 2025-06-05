@@ -257,9 +257,11 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     abortSignal.addEventListener('abort', abortHandler);
 
     // wait for the shell to exit
-    await new Promise((resolve) => shell.on('exit', resolve));
-
-    abortSignal.removeEventListener('abort', abortHandler);
+    try {
+      await new Promise((resolve) => shell.on('exit', resolve));
+    } finally {
+      abortSignal.removeEventListener('abort', abortHandler);
+    }
 
     // parse pids (pgrep output) from temporary file and remove it
     const backgroundPIDs: number[] = [];

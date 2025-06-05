@@ -9,19 +9,31 @@ export async function readStdin(): Promise<string> {
     let data = '';
     process.stdin.setEncoding('utf8');
 
-    process.stdin.on('readable', () => {
+    const onReadable = () => {
       let chunk;
       while ((chunk = process.stdin.read()) !== null) {
         data += chunk;
       }
-    });
+    };
 
-    process.stdin.on('end', () => {
+    const onEnd = () => {
+      cleanup();
       resolve(data);
-    });
+    };
 
-    process.stdin.on('error', (err) => {
+    const onError = (err: Error) => {
+      cleanup();
       reject(err);
-    });
+    };
+
+    const cleanup = () => {
+      process.stdin.removeListener('readable', onReadable);
+      process.stdin.removeListener('end', onEnd);
+      process.stdin.removeListener('error', onError);
+    };
+
+    process.stdin.on('readable', onReadable);
+    process.stdin.on('end', onEnd);
+    process.stdin.on('error', onError);
   });
 }

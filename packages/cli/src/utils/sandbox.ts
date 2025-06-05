@@ -536,28 +536,28 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
 
     let stderrData = '';
-    if (pullProcess.stdout) {
-      pullProcess.stdout.on('data', (data) => {
-        console.info(data.toString().trim()); // Show pull progress
-      });
-    }
-    if (pullProcess.stderr) {
-      pullProcess.stderr.on('data', (data) => {
-        stderrData += data.toString();
-        console.error(data.toString().trim()); // Show pull errors/info from the command itself
-      });
-    }
 
-    pullProcess.on('error', (err) => {
+    const onStdoutData = (data: Buffer) => {
+      console.info(data.toString().trim()); // Show pull progress
+    };
+
+    const onStderrData = (data: Buffer) => {
+      stderrData += data.toString();
+      console.error(data.toString().trim()); // Show pull errors/info from the command itself
+    };
+
+    const onError = (err: Error) => {
       console.warn(
         `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
       );
+      cleanup();
       resolve(false);
-    });
+    };
 
-    pullProcess.on('close', (code) => {
+    const onClose = (code: number | null) => {
       if (code === 0) {
         console.info(`Successfully pulled image ${image}.`);
+        cleanup();
         resolve(true);
       } else {
         console.warn(
@@ -566,9 +566,33 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
         if (stderrData.trim()) {
           // Details already printed by the stderr listener above
         }
+        cleanup();
         resolve(false);
       }
-    });
+    };
+
+    const cleanup = () => {
+      if (pullProcess.stdout) {
+        pullProcess.stdout.removeListener('data', onStdoutData);
+      }
+      if (pullProcess.stderr) {
+        pullProcess.stderr.removeListener('data', onStderrData);
+      }
+      pullProcess.removeListener('error', onError);
+      pullProcess.removeListener('close', onClose);
+      if (pullProcess.connected) {
+        pullProcess.disconnect();
+      }
+    };
+
+    if (pullProcess.stdout) {
+      pullProcess.stdout.on('data', onStdoutData);
+    }
+    if (pullProcess.stderr) {
+      pullProcess.stderr.on('data', onStderrData);
+    }
+    pullProcess.on('error', onError);
+    pullProcess.on('close', onClose);
   });
 }
 

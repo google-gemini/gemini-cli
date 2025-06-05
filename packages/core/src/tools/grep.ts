@@ -461,8 +461,8 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
             const stdoutChunks: Buffer[] = [];
             const stderrChunks: Buffer[] = [];
 
-            child.stdout.on('data', (chunk) => stdoutChunks.push(chunk));
-            child.stderr.on('data', (chunk) => {
+            const onData = (chunk: Buffer) => stdoutChunks.push(chunk);
+            const onStderr = (chunk: Buffer) => {
               const stderrStr = chunk.toString();
               // Suppress common harmless stderr messages
               if (
@@ -471,15 +471,17 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
               ) {
                 stderrChunks.push(chunk);
               }
-            });
-            child.on('error', (err) =>
-              reject(new Error(`Failed to start system grep: ${err.message}`)),
-            );
-            child.on('close', (code) => {
+            };
+            const onError = (err: Error) => {
+              cleanup();
+              reject(new Error(`Failed to start system grep: ${err.message}`));
+            };
+            const onClose = (code: number | null) => {
               const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
               const stderrData = Buffer.concat(stderrChunks)
                 .toString('utf8')
                 .trim();
+              cleanup();
               if (code === 0) resolve(stdoutData);
               else if (code === 1)
                 resolve(''); // No matches
@@ -492,7 +494,22 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
                   );
                 else resolve(''); // Exit code > 1 but no stderr, likely just suppressed errors
               }
-            });
+            };
+
+            const cleanup = () => {
+              child.stdout.removeListener('data', onData);
+              child.stderr.removeListener('data', onStderr);
+              child.removeListener('error', onError);
+              child.removeListener('close', onClose);
+              if (child.connected) {
+                child.disconnect();
+              }
+            };
+
+            child.stdout.on('data', onData);
+            child.stderr.on('data', onStderr);
+            child.on('error', onError);
+            child.on('close', onClose);
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: unknown) {
