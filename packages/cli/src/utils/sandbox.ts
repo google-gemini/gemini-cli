@@ -73,7 +73,9 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
   return false; // Default to false if no other condition is met
 }
 
-async function getSandboxImageName(): Promise<string> {
+async function getSandboxImageName(
+  isCustomProjectSandbox: boolean,
+): Promise<string> {
   const packageJsonResult = await readPackageUp();
   const packageJsonConfig = packageJsonResult?.packageJson.config as
     | { sandboxImageUri?: string }
@@ -81,7 +83,9 @@ async function getSandboxImageName(): Promise<string> {
   return (
     process.env.GEMINI_SANDBOX_IMAGE ??
     packageJsonConfig?.sandboxImageUri ??
-    LOCAL_DEV_SANDBOX_IMAGE_NAME
+    (isCustomProjectSandbox
+      ? LOCAL_DEV_SANDBOX_IMAGE_NAME + '-' + path.basename(path.resolve())
+      : LOCAL_DEV_SANDBOX_IMAGE_NAME)
   );
 }
 
@@ -272,15 +276,23 @@ export async function start_sandbox(sandbox: string) {
   // determine full path for gemini-cli to distinguish linked vs installed setting
   const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
 
-  const image = await getSandboxImageName();
+  const projectSandboxDockerfile = path.join(
+    SETTINGS_DIRECTORY_NAME,
+    'sandbox.Dockerfile',
+  );
+  const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
+
+  const image = await getSandboxImageName(isCustomProjectSandbox);
   const workdir = process.cwd();
 
-  // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-cli repo
+  // if BUILD_SANDBOX is set or project-specific sandbox.Dockerfile provided,
+  // then call scripts/build_sandbox.sh under gemini-cli repo
+  //
   // note this can only be done with binary linked from gemini-cli repo
-  if (process.env.BUILD_SANDBOX) {
+  if (process.env.BUILD_SANDBOX || isCustomProjectSandbox) {
     if (!gcPath.includes('gemini-cli/packages/')) {
       console.error(
-        'ERROR: cannot BUILD_SANDBOX using installed gemini binary; ' +
+        'ERROR: cannot build sandbox using installed gemini binary; ' +
           'run `npm link ./packages/cli` under gemini-cli repo to switch to linked binary.',
       );
       process.exit(1);
@@ -293,9 +305,9 @@ export async function start_sandbox(sandbox: string) {
         SETTINGS_DIRECTORY_NAME,
         'sandbox.Dockerfile',
       );
-      if (fs.existsSync(projectSandboxDockerfile)) {
+      if (isCustomProjectSandbox) {
         console.error(`using ${projectSandboxDockerfile} for sandbox`);
-        buildArgs += `-f ${path.resolve(projectSandboxDockerfile)}`;
+        buildArgs += `-s -f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
       }
       spawnSync(`cd ${gcRoot} && scripts/build_sandbox.sh ${buildArgs}`, {
         stdio: 'inherit',

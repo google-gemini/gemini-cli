@@ -77,6 +77,7 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - See the [Theming section in README.md](../../README.md#theming) for available theme names.
 - **`sandbox`** (boolean or string):
   - Controls whether and how to use sandboxing for tool execution.
+  - If a `.gemini/sandbox.Dockerfile` exists in your project, it will be used to build a custom sandbox image based on `gemini-cli-sandbox`.
   - `true`: Enable default sandbox (see [README](../../README.md) for behavior).
   - `false`: Disable sandboxing (WARNING: this is inherently unsafe).
   - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing command.
@@ -275,6 +276,31 @@ This example demonstrates how you can provide general project context, specific 
   - See the [Commands documentation](./commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical nature of context files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
+
+## Sandboxing
+
+The Gemini CLI can execute potentially unsafe operations (like shell commands and file modifications) within a sandboxed environment to protect your system.
+
+Sandboxing is disabled by default, but you can enable it in a few ways:
+
+- Using `--sandbox` or `-s` flag.
+- Setting `GEMINI_SANDBOX` environment variable.
+- Sandbox is enabled in `--yolo` mode by default.
+
+By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
+
+For project-specific sandboxing needs, you can create a custom Dockerfile at `.gemini/sandbox.Dockerfile` in your project's root directory. This Dockerfile should be based on the base sandbox image:
+
+```dockerfile
+FROM gemini-cli-sandbox
+
+# Add your custom dependencies or configurations here
+# For example:
+# RUN apt-get update && apt-get install -y some-package
+# COPY ./my-config /app/my-config
+```
+
+When `.gemini/sandbox.Dockerfile` exists, the CLI will automatically build and use a custom image for your project.
 
 ## Theming
 
