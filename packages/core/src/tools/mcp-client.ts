@@ -67,6 +67,7 @@ async function connectAndDiscover(
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
+    timeout: mcpServerConfig.timeout,
   });
 
   try {
