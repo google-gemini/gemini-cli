@@ -65,6 +65,7 @@ enum StreamProcessingStatus {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
+  geminiClient: GeminiClient | null,
   addItem: UseHistoryManagerReturn['addItem'],
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   config: Config,
@@ -76,7 +77,6 @@ export const useGeminiStream = (
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const geminiClientRef = useRef<GeminiClient | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -141,19 +141,6 @@ export const useGeminiStream = (
     }
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
-
-  useEffect(() => {
-    setInitError(null);
-    if (!geminiClientRef.current) {
-      try {
-        geminiClientRef.current = config.getGeminiClient();
-      } catch (error: unknown) {
-        const errorMsg = `Failed to initialize client: ${getErrorMessage(error) || 'Unknown error'}`;
-        setInitError(errorMsg);
-        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
-      }
-    }
-  }, [config, addItem]);
 
   useInput((_input, key) => {
     if (streamingState !== StreamingState.Idle && key.escape) {
@@ -450,9 +437,7 @@ export const useGeminiStream = (
         return;
       }
 
-      const client = geminiClientRef.current;
-
-      if (!client) {
+      if (!geminiClient) {
         const errorMsg = 'Gemini client is not available.';
         setInitError(errorMsg);
         addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
@@ -463,7 +448,7 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = client.sendMessageStream(queryToSend, abortSignal);
+        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -501,6 +486,7 @@ export const useGeminiStream = (
       addItem,
       setPendingHistoryItem,
       setInitError,
+      geminiClient,
     ],
   );
 

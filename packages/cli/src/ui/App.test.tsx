@@ -117,6 +117,7 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
+        getGeminiClient: vi.fn(() => ({})),
       };
     });
   return {

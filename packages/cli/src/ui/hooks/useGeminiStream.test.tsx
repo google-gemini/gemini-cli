@@ -304,6 +304,7 @@ describe('useGeminiStream', () => {
 
     const { result, rerender } = renderHook(() =>
       useGeminiStream(
+        mockConfig.getGeminiClient(),
         mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
         mockSetShowHelp,
         mockConfig,
