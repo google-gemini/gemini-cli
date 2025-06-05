@@ -547,4 +547,57 @@ describe('EditTool', () => {
       );
     });
   });
+
+  describe('getDescription', () => {
+    it('should return "No file changes to..." if old_string and new_string are the same', () => {
+      const testFileName = 'test.txt';
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, testFileName),
+        old_string: 'identical_string',
+        new_string: 'identical_string',
+      };
+      // shortenPath will be called internally, resulting in just the file name
+      expect(tool.getDescription(params)).toBe(
+        `No file changes to ${testFileName}`,
+      );
+    });
+
+    it('should return a snippet of old and new strings if they are different', () => {
+      const testFileName = 'test.txt';
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, testFileName),
+        old_string: 'this is the old string value',
+        new_string: 'this is the new string value',
+      };
+      // shortenPath will be called internally, resulting in just the file name
+      // The snippets are truncated at 30 chars + '...'
+      expect(tool.getDescription(params)).toBe(
+        `${testFileName}: this is the old string value => this is the new string value`,
+      );
+    });
+
+    it('should handle very short strings correctly in the description', () => {
+      const testFileName = 'short.txt';
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, testFileName),
+        old_string: 'old',
+        new_string: 'new',
+      };
+      expect(tool.getDescription(params)).toBe(`${testFileName}: old => new`);
+    });
+
+    it('should truncate long strings in the description', () => {
+      const testFileName = 'long.txt';
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, testFileName),
+        old_string:
+          'this is a very long old string that will definitely be truncated',
+        new_string:
+          'this is a very long new string that will also be truncated',
+      };
+      expect(tool.getDescription(params)).toBe(
+        `${testFileName}: this is a very long old string... => this is a very long new string...`,
+      );
+    });
+  });
 });

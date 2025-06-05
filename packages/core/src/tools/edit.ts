@@ -379,6 +379,9 @@ Expectation for required parameters:
       params.new_string.split('\n')[0].substring(0, 30) +
       (params.new_string.length > 30 ? '...' : '');
 
+    if (params.old_string === params.new_string) {
+      return `No file changes to ${shortenPath(relativePath)}`;
+    }
     return `${shortenPath(relativePath)}: ${oldStringSnippet} => ${newStringSnippet}`;
   }
 

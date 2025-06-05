@@ -46,6 +46,7 @@
   ],
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
+    "@types/minimatch": "^5.1.2",
     "@vitest/coverage-v8": "^3.1.1",
     "esbuild": "^0.25.4",
     "eslint": "^9.24.0",
@@ -55,13 +56,12 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
+    "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",
-    "yargs": "^17.7.2",
-    "json": "^11.0.0"
-  },
-  "dependencies": {}
+    "yargs": "^17.7.2"
+  }
 }
