@@ -40,7 +40,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       {currentLoadingPhrase && (
         <Text color={Colors.AccentPurple}>{currentLoadingPhrase}</Text>
       )}
-      <Text color={Colors.SubtleComment}>
+      <Text color={Colors.Gray}>
         {streamingState === StreamingState.WaitingForConfirmation
           ? ''
           : ` (esc to cancel, ${elapsedTime}s)`}

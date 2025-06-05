@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+
+const ayuLightColors: ColorsTheme = {
+  type: 'light',
+  Background: '#f8f9fa',
+  Foreground: '#5c6166',
+  LightBlue: '#55b4d4',
+  AccentBlue: '#399ee6',
+  AccentPurple: '#a37acc',
+  AccentCyan: '#4cbf99',
+  AccentGreen: '#86b300',
+  AccentYellow: '#f2ae49',
+  AccentRed: '#f07171',
+  Comment: '#ABADB1',
+  Gray: '#CCCFD3',
+  GradientColors: lightTheme.GradientColors,
+};
 
 export const AyuLight: Theme = new Theme(
   'Ayu Light',
@@ -14,84 +30,84 @@ export const AyuLight: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: '#f8f9fa',
-      color: '#5c6166',
+      background: ayuLightColors.Background,
+      color: ayuLightColors.Foreground,
     },
     'hljs-comment': {
-      color: '#787b80',
+      color: ayuLightColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#4cbf99',
+      color: ayuLightColors.AccentCyan,
       fontStyle: 'italic',
     },
     'hljs-string': {
-      color: '#86b300',
+      color: ayuLightColors.AccentGreen,
     },
     'hljs-constant': {
-      color: '#4cbf99',
+      color: ayuLightColors.AccentCyan,
     },
     'hljs-number': {
-      color: '#a37acc',
+      color: ayuLightColors.AccentPurple,
     },
     'hljs-keyword': {
-      color: '#fa8d3e',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-selector-tag': {
-      color: '#fa8d3e',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-attribute': {
-      color: '#f2ae49',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-variable': {
-      color: '#5c6166',
+      color: ayuLightColors.Foreground,
     },
     'hljs-variable.language': {
-      color: '#55b4d4',
+      color: ayuLightColors.LightBlue,
       fontStyle: 'italic',
     },
     'hljs-title': {
-      color: '#399ee6',
+      color: ayuLightColors.AccentBlue,
     },
     'hljs-section': {
-      color: '#86b300',
+      color: ayuLightColors.AccentGreen,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#55b4d4',
+      color: ayuLightColors.LightBlue,
     },
     'hljs-class .hljs-title': {
-      color: '#399ee6',
+      color: ayuLightColors.AccentBlue,
     },
     'hljs-tag': {
-      color: '#55b4d4',
+      color: ayuLightColors.LightBlue,
     },
     'hljs-name': {
-      color: '#399ee6',
+      color: ayuLightColors.AccentBlue,
     },
     'hljs-builtin-name': {
-      color: '#f2ae49',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-meta': {
-      color: '#e6ba7e',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-symbol': {
-      color: '#f07171',
+      color: ayuLightColors.AccentRed,
     },
     'hljs-bullet': {
-      color: '#f2ae49',
+      color: ayuLightColors.AccentYellow,
     },
     'hljs-regexp': {
-      color: '#4cbf99',
+      color: ayuLightColors.AccentCyan,
     },
     'hljs-link': {
-      color: '#55b4d4',
+      color: ayuLightColors.LightBlue,
     },
     'hljs-deletion': {
-      color: '#ff7383',
+      color: ayuLightColors.AccentRed,
     },
     'hljs-addition': {
-      color: '#6cbf43',
+      color: ayuLightColors.AccentGreen,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -100,20 +116,20 @@ export const AyuLight: Theme = new Theme(
       fontWeight: 'bold',
     },
     'hljs-literal': {
-      color: '#4cbf99',
+      color: ayuLightColors.AccentCyan,
     },
     'hljs-built_in': {
-      color: '#f07171',
+      color: ayuLightColors.AccentRed,
     },
     'hljs-doctag': {
-      color: '#d14',
+      color: ayuLightColors.AccentRed,
     },
     'hljs-template-variable': {
-      color: '#008080',
+      color: ayuLightColors.AccentCyan,
     },
     'hljs-selector-id': {
-      color: '#900',
+      color: ayuLightColors.AccentRed,
     },
   },
-  lightTheme,
+  ayuLightColors,
 );

@@ -4,11 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme } from './theme.js';
+import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+
+const ansiColors: ColorsTheme = {
+  type: 'dark',
+  Background: 'black',
+  Foreground: 'white',
+  LightBlue: 'bluebright',
+  AccentBlue: '#0000FF',
+  AccentPurple: 'magenta',
+  AccentCyan: 'cyan',
+  AccentGreen: 'green',
+  AccentYellow: 'yellow',
+  AccentRed: 'red',
+  Comment: 'gray',
+  Gray: 'gray',
+  GradientColors: darkTheme.GradientColors, // Fallback
+};
 
 export const ANSI: Theme = new Theme(
   'ANSI',
-  'dark',
+  'dark', // Consistent with its color palette base
   {
     hljs: {
       display: 'block',
@@ -135,5 +151,5 @@ export const ANSI: Theme = new Theme(
       color: 'yellow', // Mapped from #D7BA7D
     },
   },
-  darkTheme,
+  ansiColors,
 );

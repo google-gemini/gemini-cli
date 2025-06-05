@@ -27,13 +27,12 @@ export const DetailedMessagesDisplay: React.FC<
       flexDirection="column"
       marginTop={1}
       borderStyle="round"
-      borderColor={Colors.SubtleComment}
+      borderColor={Colors.Gray}
       paddingX={1}
     >
       <Box marginBottom={1}>
         <Text bold color={Colors.Foreground}>
-          Debug Console{' '}
-          <Text color={Colors.SubtleComment}>(ctrl+O to close)</Text>
+          Debug Console <Text color={Colors.Gray}>(ctrl+O to close)</Text>
         </Text>
       </Box>
       {messages.map((msg, index) => {
@@ -50,7 +49,7 @@ export const DetailedMessagesDisplay: React.FC<
             icon = '\u2716'; // Heavy multiplication x (✖)
             break;
           case 'debug':
-            textColor = Colors.SubtleComment; // Or Colors.Gray
+            textColor = Colors.Gray; // Or Colors.Gray
             icon = '\u1F50D'; // Left-pointing magnifying glass (????)
             break;
           case 'log':
@@ -65,7 +64,7 @@ export const DetailedMessagesDisplay: React.FC<
             <Text color={textColor} wrap="wrap">
               {msg.content}
               {msg.count && msg.count > 1 && (
-                <Text color={Colors.SubtleComment}> (x{msg.count})</Text>
+                <Text color={Colors.Gray}> (x{msg.count})</Text>
               )}
             </Text>
           </Box>

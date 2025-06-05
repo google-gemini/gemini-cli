@@ -107,7 +107,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
   if (parsedLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.SubtleComment} padding={1}>
+      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -162,7 +162,7 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.SubtleComment} padding={1}>
+      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -217,7 +217,7 @@ const renderDiffContent = (
               borderRight={false}
               borderLeft={false}
               borderStyle="double"
-              borderColor={Colors.SubtleComment}
+              borderColor={Colors.Gray}
             ></Box>,
           );
         }
@@ -260,7 +260,7 @@ const renderDiffContent = (
 
         acc.push(
           <Box key={lineKey} flexDirection="row">
-            <Text color={Colors.SubtleComment}>{gutterNumStr.padEnd(4)} </Text>
+            <Text color={Colors.Gray}>{gutterNumStr.padEnd(4)} </Text>
             <Text color={color} dimColor={dim}>
               {prefixSymbol}{' '}
             </Text>

@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme } from './theme.js';
+import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+
+const draculaColors: ColorsTheme = {
+  type: 'dark',
+  Background: '#282a36',
+  Foreground: '#f8f8f2',
+  LightBlue: '#8be9fd',
+  AccentBlue: '#8be9fd',
+  AccentPurple: '#ff79c6',
+  AccentCyan: '#8be9fd',
+  AccentGreen: '#50fa7b',
+  AccentYellow: '#f1fa8c',
+  AccentRed: '#ff5555',
+  Comment: '#6272a4',
+  Gray: '#6272a4',
+  GradientColors: darkTheme.GradientColors,
+};
 
 export const Dracula: Theme = new Theme(
   'Dracula',
@@ -14,81 +30,81 @@ export const Dracula: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: '#282a36',
-      color: '#f8f8f2',
+      background: draculaColors.Background,
+      color: draculaColors.Foreground,
     },
     'hljs-keyword': {
-      color: '#8be9fd',
+      color: draculaColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: '#8be9fd',
+      color: draculaColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-literal': {
-      color: '#8be9fd',
+      color: draculaColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: '#8be9fd',
+      color: draculaColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-link': {
-      color: '#8be9fd',
+      color: draculaColors.AccentBlue,
     },
     'hljs-function .hljs-keyword': {
-      color: '#ff79c6',
+      color: draculaColors.AccentPurple,
     },
     'hljs-subst': {
-      color: '#f8f8f2',
+      color: draculaColors.Foreground,
     },
     'hljs-string': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-title': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
       fontWeight: 'bold',
     },
     'hljs-name': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
       fontWeight: 'bold',
     },
     'hljs-attribute': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-symbol': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-bullet': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-addition': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentGreen,
     },
     'hljs-variable': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-template-tag': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-template-variable': {
-      color: '#f1fa8c',
+      color: draculaColors.AccentYellow,
     },
     'hljs-comment': {
-      color: '#6272a4',
+      color: draculaColors.Comment,
     },
     'hljs-quote': {
-      color: '#6272a4',
+      color: draculaColors.Comment,
     },
     'hljs-deletion': {
-      color: '#6272a4',
+      color: draculaColors.AccentRed,
     },
     'hljs-meta': {
-      color: '#6272a4',
+      color: draculaColors.Comment,
     },
     'hljs-doctag': {
       fontWeight: 'bold',
@@ -100,5 +116,5 @@ export const Dracula: Theme = new Theme(
       fontStyle: 'italic',
     },
   },
-  darkTheme,
+  draculaColors,
 );

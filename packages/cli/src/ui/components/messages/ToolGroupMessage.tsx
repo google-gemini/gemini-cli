@@ -25,7 +25,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
-  const borderColor = hasPending ? Colors.AccentYellow : Colors.SubtleComment;
+  const borderColor = hasPending ? Colors.AccentYellow : Colors.Gray;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 

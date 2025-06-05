@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+
+const githubLightColors: ColorsTheme = {
+  type: 'light',
+  Background: '#f8f8f8',
+  Foreground: '#24292E',
+  LightBlue: '#0086b3',
+  AccentBlue: '#458',
+  AccentPurple: '#900',
+  AccentCyan: '#009926',
+  AccentGreen: '#008080',
+  AccentYellow: '#990073',
+  AccentRed: '#d14',
+  Comment: '#998',
+  Gray: '#999',
+  GradientColors: lightTheme.GradientColors,
+};
 
 export const GitHubLight: Theme = new Theme(
   'GitHub Light',
@@ -14,102 +30,102 @@ export const GitHubLight: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      color: '#24292E',
-      background: '#f8f8f8',
+      color: githubLightColors.Foreground,
+      background: githubLightColors.Background,
     },
     'hljs-comment': {
-      color: '#998',
+      color: githubLightColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#998',
+      color: githubLightColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-keyword': {
-      color: '#333',
+      color: githubLightColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: '#333',
+      color: githubLightColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-subst': {
-      color: '#333',
+      color: githubLightColors.Foreground,
       fontWeight: 'normal',
     },
     'hljs-number': {
-      color: '#008080',
+      color: githubLightColors.AccentGreen,
     },
     'hljs-literal': {
-      color: '#008080',
+      color: githubLightColors.AccentGreen,
     },
     'hljs-variable': {
-      color: '#008080',
+      color: githubLightColors.AccentGreen,
     },
     'hljs-template-variable': {
-      color: '#008080',
+      color: githubLightColors.AccentGreen,
     },
     'hljs-tag .hljs-attr': {
-      color: '#008080',
+      color: githubLightColors.AccentGreen,
     },
     'hljs-string': {
-      color: '#d14',
+      color: githubLightColors.AccentRed,
     },
     'hljs-doctag': {
-      color: '#d14',
+      color: githubLightColors.AccentRed,
     },
     'hljs-title': {
-      color: '#900',
+      color: githubLightColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: '#900',
+      color: githubLightColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-selector-id': {
-      color: '#900',
+      color: githubLightColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#458',
+      color: githubLightColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-class .hljs-title': {
-      color: '#458',
+      color: githubLightColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-tag': {
-      color: '#000080',
+      color: githubLightColors.AccentBlue,
       fontWeight: 'normal',
     },
     'hljs-name': {
-      color: '#000080',
+      color: githubLightColors.AccentBlue,
       fontWeight: 'normal',
     },
     'hljs-attribute': {
-      color: '#000080',
+      color: githubLightColors.AccentBlue,
       fontWeight: 'normal',
     },
     'hljs-regexp': {
-      color: '#009926',
+      color: githubLightColors.AccentCyan,
     },
     'hljs-link': {
-      color: '#009926',
+      color: githubLightColors.AccentCyan,
     },
     'hljs-symbol': {
-      color: '#990073',
+      color: githubLightColors.AccentYellow,
     },
     'hljs-bullet': {
-      color: '#990073',
+      color: githubLightColors.AccentYellow,
     },
     'hljs-built_in': {
-      color: '#0086b3',
+      color: githubLightColors.LightBlue,
     },
     'hljs-builtin-name': {
-      color: '#0086b3',
+      color: githubLightColors.LightBlue,
     },
     'hljs-meta': {
-      color: '#999',
+      color: githubLightColors.Gray,
       fontWeight: 'bold',
     },
     'hljs-deletion': {
@@ -125,5 +141,5 @@ export const GitHubLight: Theme = new Theme(
       fontWeight: 'bold',
     },
   },
-  lightTheme,
+  githubLightColors,
 );

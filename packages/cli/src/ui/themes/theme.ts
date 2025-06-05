@@ -19,7 +19,7 @@ export interface ColorsTheme {
   AccentGreen: string;
   AccentYellow: string;
   AccentRed: string;
-  SubtleComment: string;
+  Comment: string;
   Gray: string;
   GradientColors?: string[];
 }
@@ -35,8 +35,8 @@ export const lightTheme: ColorsTheme = {
   AccentGreen: '#3CA84B',
   AccentYellow: '#D5A40A',
   AccentRed: '#DD4C4C',
-  SubtleComment: '#9CA3AF',
-  Gray: 'gray',
+  Comment: '#008000',
+  Gray: '#B7BECC',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -51,8 +51,8 @@ export const darkTheme: ColorsTheme = {
   AccentGreen: '#A6E3A1',
   AccentYellow: '#F9E2AF',
   AccentRed: '#F38BA8',
-  SubtleComment: '#6C7086',
-  Gray: 'gray',
+  Comment: '#6C7086',
+  Gray: '#6C7086',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -67,7 +67,7 @@ export const ansiTheme: ColorsTheme = {
   AccentGreen: 'green',
   AccentYellow: 'yellow',
   AccentRed: 'red',
-  SubtleComment: 'gray',
+  Comment: 'gray',
   Gray: 'gray',
 };
 

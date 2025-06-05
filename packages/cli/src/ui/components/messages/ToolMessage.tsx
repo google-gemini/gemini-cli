@@ -72,7 +72,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           <Box flexDirection="column">
             {hiddenLines > 0 && (
               <Box>
-                <Text color={Colors.SubtleComment}>
+                <Text color={Colors.Gray}>
                   ... first {hiddenLines} line{hiddenLines === 1 ? '' : 's'}{' '}
                   hidden ...
                 </Text>
@@ -162,7 +162,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
       case 'medium':
         return Colors.Foreground;
       case 'low':
-        return Colors.SubtleComment;
+        return Colors.Gray;
       default: {
         const exhaustiveCheck: never = emphasis;
         return exhaustiveCheck;
@@ -178,7 +178,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
-        <Text color={Colors.SubtleComment}>{description}</Text>
+        <Text color={Colors.Gray}>{description}</Text>
       </Text>
     </Box>
   );

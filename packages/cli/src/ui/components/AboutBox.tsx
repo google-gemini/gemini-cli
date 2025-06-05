@@ -24,7 +24,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
 }) => (
   <Box
     borderStyle="round"
-    borderColor={Colors.SubtleComment}
+    borderColor={Colors.Gray}
     flexDirection="column"
     padding={1}
     marginY={1}

@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme } from './theme.js';
+import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+
+const githubDarkColors: ColorsTheme = {
+  type: 'dark',
+  Background: '#24292e',
+  Foreground: '#d1d5da',
+  LightBlue: '#79B8FF',
+  AccentBlue: '#79B8FF',
+  AccentPurple: '#B392F0',
+  AccentCyan: '#9ECBFF',
+  AccentGreen: '#85E89D',
+  AccentYellow: '#FFAB70',
+  AccentRed: '#F97583',
+  Comment: '#6A737D',
+  Gray: '#6A737D',
+  GradientColors: darkTheme.GradientColors,
+};
 
 export const GitHubDark: Theme = new Theme(
   'GitHub',
@@ -14,107 +30,107 @@ export const GitHubDark: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      color: '#d1d5da',
-      background: '#24292e',
+      color: githubDarkColors.Foreground,
+      background: githubDarkColors.Background,
     },
     'hljs-comment': {
-      color: '#6A737D',
+      color: githubDarkColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#6A737D',
+      color: githubDarkColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-keyword': {
-      color: '#F97583',
+      color: githubDarkColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: '#F97583',
+      color: githubDarkColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-subst': {
-      color: '#e1e4e8',
+      color: githubDarkColors.Foreground,
     },
     'hljs-number': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
     },
     'hljs-literal': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
     },
     'hljs-variable': {
-      color: '#FFAB70',
+      color: githubDarkColors.AccentYellow,
     },
     'hljs-template-variable': {
-      color: '#FFAB70',
+      color: githubDarkColors.AccentYellow,
     },
     'hljs-tag .hljs-attr': {
-      color: '#FFAB70',
+      color: githubDarkColors.AccentYellow,
     },
     'hljs-string': {
-      color: '#9ECBFF',
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-doctag': {
-      color: '#9ECBFF',
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-title': {
-      color: '#B392F0',
+      color: githubDarkColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: '#B392F0',
+      color: githubDarkColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-selector-id': {
-      color: '#B392F0',
+      color: githubDarkColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#85E89D',
+      color: githubDarkColors.AccentGreen,
       fontWeight: 'bold',
     },
     'hljs-class .hljs-title': {
-      color: '#85E89D',
+      color: githubDarkColors.AccentGreen,
       fontWeight: 'bold',
     },
     'hljs-tag': {
-      color: '#85E89D',
+      color: githubDarkColors.AccentGreen,
     },
     'hljs-name': {
-      color: '#85E89D',
+      color: githubDarkColors.AccentGreen,
     },
     'hljs-attribute': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
     },
     'hljs-regexp': {
-      color: '#DBEDFF',
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-link': {
-      color: '#DBEDFF',
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-symbol': {
-      color: '#990073',
+      color: githubDarkColors.AccentPurple,
     },
     'hljs-bullet': {
-      color: '#990073',
+      color: githubDarkColors.AccentPurple,
     },
     'hljs-built_in': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
     },
     'hljs-builtin-name': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
     },
     'hljs-meta': {
-      color: '#79B8FF',
+      color: githubDarkColors.LightBlue,
       fontWeight: 'bold',
     },
     'hljs-deletion': {
       background: '#86181D',
-      color: '#FDAEB7',
+      color: githubDarkColors.AccentRed,
     },
     'hljs-addition': {
       background: '#144620',
-      color: '#85E89D',
+      color: githubDarkColors.AccentGreen,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -123,5 +139,5 @@ export const GitHubDark: Theme = new Theme(
       fontWeight: 'bold',
     },
   },
-  darkTheme,
+  githubDarkColors,
 );

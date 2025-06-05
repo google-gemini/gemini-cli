@@ -121,7 +121,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           break;
         case 4:
           headerNode = (
-            <Text italic color={Colors.SubtleComment}>
+            <Text italic color={Colors.Gray}>
               <RenderInline text={headerText} />
             </Text>
           );
@@ -358,9 +358,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
         // Not enough space to even show the message meaningfully
         return (
           <Box padding={CODE_BLOCK_PADDING}>
-            <Text color={Colors.SubtleComment}>
-              ... code is being written ...
-            </Text>
+            <Text color={Colors.Gray}>... code is being written ...</Text>
           </Box>
         );
       }
@@ -372,7 +370,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
       return (
         <Box flexDirection="column" padding={CODE_BLOCK_PADDING}>
           {colorizedTruncatedCode}
-          <Text color={Colors.SubtleComment}>... generating more ...</Text>
+          <Text color={Colors.Gray}>... generating more ...</Text>
         </Box>
       );
     }

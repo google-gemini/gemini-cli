@@ -38,8 +38,8 @@ export const Colors: ColorsTheme = {
   get AccentRed() {
     return themeManager.getActiveTheme().colors.AccentRed;
   },
-  get SubtleComment() {
-    return themeManager.getActiveTheme().colors.SubtleComment;
+  get Comment() {
+    return themeManager.getActiveTheme().colors.Comment;
   },
   get Gray() {
     return themeManager.getActiveTheme().colors.Gray;

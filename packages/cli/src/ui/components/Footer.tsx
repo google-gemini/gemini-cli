@@ -40,9 +40,7 @@ export const Footer: React.FC<FooterProps> = ({
     <Box>
       <Text color={Colors.LightBlue}>
         {shortenPath(tildeifyPath(targetDir), 70)}
-        {branchName && (
-          <Text color={Colors.SubtleComment}> ({branchName}*)</Text>
-        )}
+        {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
       </Text>
       {debugMode && (
         <Text color={Colors.AccentRed}>
@@ -65,13 +63,11 @@ export const Footer: React.FC<FooterProps> = ({
       ) : process.env.SANDBOX === 'sandbox-exec' ? (
         <Text color={Colors.AccentYellow}>
           sandbox-exec{' '}
-          <Text color={Colors.SubtleComment}>
-            ({process.env.SEATBELT_PROFILE})
-          </Text>
+          <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
         </Text>
       ) : (
         <Text color={Colors.AccentRed}>
-          no sandbox <Text color={Colors.SubtleComment}>(see README)</Text>
+          no sandbox <Text color={Colors.Gray}>(see README)</Text>
         </Text>
       )}
     </Box>
@@ -81,7 +77,7 @@ export const Footer: React.FC<FooterProps> = ({
       <Text color={Colors.AccentBlue}> {model} </Text>
       {corgiMode && (
         <Text>
-          <Text color={Colors.SubtleComment}>| </Text>
+          <Text color={Colors.Gray}>| </Text>
           <Text color={Colors.AccentRed}>▼</Text>
           <Text color={Colors.Foreground}>(´</Text>
           <Text color={Colors.AccentRed}>ᴥ</Text>
@@ -91,7 +87,7 @@ export const Footer: React.FC<FooterProps> = ({
       )}
       {!showErrorDetails && errorCount > 0 && (
         <Box>
-          <Text color={Colors.SubtleComment}>| </Text>
+          <Text color={Colors.Gray}>| </Text>
           <ConsoleSummaryDisplay errorCount={errorCount} />
         </Box>
       )}

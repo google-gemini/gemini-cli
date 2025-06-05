@@ -14,86 +14,86 @@ export const DefaultLight: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: 'white',
-      color: 'black',
+      background: lightTheme.Background,
+      color: lightTheme.Foreground,
     },
     'hljs-comment': {
-      color: '#008000',
+      color: lightTheme.Comment,
     },
     'hljs-quote': {
-      color: '#008000',
+      color: lightTheme.Comment,
     },
     'hljs-variable': {
-      color: '#008000',
+      color: lightTheme.Foreground,
     },
     'hljs-keyword': {
-      color: '#00f',
+      color: lightTheme.AccentBlue,
     },
     'hljs-selector-tag': {
-      color: '#00f',
+      color: lightTheme.AccentBlue,
     },
     'hljs-built_in': {
-      color: '#00f',
+      color: lightTheme.AccentBlue,
     },
     'hljs-name': {
-      color: '#00f',
+      color: lightTheme.AccentBlue,
     },
     'hljs-tag': {
-      color: '#00f',
+      color: lightTheme.AccentBlue,
     },
     'hljs-string': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-title': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-section': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-attribute': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-literal': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-template-tag': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-template-variable': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-type': {
-      color: '#a31515',
+      color: lightTheme.AccentRed,
     },
     'hljs-addition': {
-      color: '#a31515',
+      color: lightTheme.AccentGreen,
     },
     'hljs-deletion': {
-      color: '#2b91af',
+      color: lightTheme.AccentRed,
     },
     'hljs-selector-attr': {
-      color: '#2b91af',
+      color: lightTheme.AccentCyan,
     },
     'hljs-selector-pseudo': {
-      color: '#2b91af',
+      color: lightTheme.AccentCyan,
     },
     'hljs-meta': {
-      color: '#2b91af',
+      color: lightTheme.AccentCyan,
     },
     'hljs-doctag': {
-      color: '#808080',
+      color: lightTheme.Gray,
     },
     'hljs-attr': {
-      color: '#f00',
+      color: lightTheme.AccentRed,
     },
     'hljs-symbol': {
-      color: '#00b0e8',
+      color: lightTheme.AccentCyan,
     },
     'hljs-bullet': {
-      color: '#00b0e8',
+      color: lightTheme.AccentCyan,
     },
     'hljs-link': {
-      color: '#00b0e8',
+      color: lightTheme.AccentCyan,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',

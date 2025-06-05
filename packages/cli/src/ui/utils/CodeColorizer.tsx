@@ -107,7 +107,7 @@ export function colorizeCode(
       <Text>
         {lines.map((line, index) => (
           <Text key={index}>
-            <Text color={activeTheme.colors.SubtleComment}>
+            <Text color={activeTheme.colors.Gray}>
               {`${String(index + 1).padStart(padWidth, ' ')} `}
             </Text>
             <Text color={activeTheme.defaultColor}>
@@ -138,7 +138,7 @@ export function colorizeCode(
             <Text color={activeTheme.defaultColor}>
               {`${String(index + 1).padStart(padWidth, ' ')} `}
             </Text>
-            <Text color={activeTheme.colors.SubtleComment}>{line}</Text>
+            <Text color={activeTheme.colors.Gray}>{line}</Text>
             {index < lines.length - 1 && '\n'}
           </Text>
         ))}

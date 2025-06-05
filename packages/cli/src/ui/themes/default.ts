@@ -14,101 +14,101 @@ export const DefaultDark: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: '#1E1E1E',
-      color: '#DCDCDC',
+      background: darkTheme.Background,
+      color: darkTheme.Foreground,
     },
     'hljs-keyword': {
-      color: '#569CD6',
+      color: darkTheme.AccentBlue,
     },
     'hljs-literal': {
-      color: '#569CD6',
+      color: darkTheme.AccentBlue,
     },
     'hljs-symbol': {
-      color: '#569CD6',
+      color: darkTheme.AccentBlue,
     },
     'hljs-name': {
-      color: '#569CD6',
+      color: darkTheme.AccentBlue,
     },
     'hljs-link': {
-      color: '#569CD6',
+      color: darkTheme.AccentBlue,
       textDecoration: 'underline',
     },
     'hljs-built_in': {
-      color: '#4EC9B0',
+      color: darkTheme.AccentCyan,
     },
     'hljs-type': {
-      color: '#4EC9B0',
+      color: darkTheme.AccentCyan,
     },
     'hljs-number': {
-      color: '#B8D7A3',
+      color: darkTheme.AccentGreen,
     },
     'hljs-class': {
-      color: '#B8D7A3',
+      color: darkTheme.AccentGreen,
     },
     'hljs-string': {
-      color: '#D69D85',
+      color: darkTheme.AccentYellow,
     },
     'hljs-meta-string': {
-      color: '#D69D85',
+      color: darkTheme.AccentYellow,
     },
     'hljs-regexp': {
-      color: '#9A5334',
+      color: darkTheme.AccentRed,
     },
     'hljs-template-tag': {
-      color: '#9A5334',
+      color: darkTheme.AccentRed,
     },
     'hljs-subst': {
-      color: '#DCDCDC',
+      color: darkTheme.Foreground,
     },
     'hljs-function': {
-      color: '#DCDCDC',
+      color: darkTheme.Foreground,
     },
     'hljs-title': {
-      color: '#DCDCDC',
+      color: darkTheme.Foreground,
     },
     'hljs-params': {
-      color: '#DCDCDC',
+      color: darkTheme.Foreground,
     },
     'hljs-formula': {
-      color: '#DCDCDC',
+      color: darkTheme.Foreground,
     },
     'hljs-comment': {
-      color: '#57A64A',
+      color: darkTheme.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#57A64A',
+      color: darkTheme.Comment,
       fontStyle: 'italic',
     },
     'hljs-doctag': {
-      color: '#608B4E',
+      color: darkTheme.Comment,
     },
     'hljs-meta': {
-      color: '#9B9B9B',
+      color: darkTheme.Gray,
     },
     'hljs-meta-keyword': {
-      color: '#9B9B9B',
+      color: darkTheme.Gray,
     },
     'hljs-tag': {
-      color: '#9B9B9B',
+      color: darkTheme.Gray,
     },
     'hljs-variable': {
-      color: '#BD63C5',
+      color: darkTheme.AccentPurple,
     },
     'hljs-template-variable': {
-      color: '#BD63C5',
+      color: darkTheme.AccentPurple,
     },
     'hljs-attr': {
-      color: '#9CDCFE',
+      color: darkTheme.LightBlue,
     },
     'hljs-attribute': {
-      color: '#9CDCFE',
+      color: darkTheme.LightBlue,
     },
     'hljs-builtin-name': {
-      color: '#9CDCFE',
+      color: darkTheme.LightBlue,
     },
     'hljs-section': {
-      color: 'gold',
+      color: darkTheme.AccentYellow,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -117,22 +117,22 @@ export const DefaultDark: Theme = new Theme(
       fontWeight: 'bold',
     },
     'hljs-bullet': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-selector-tag': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-selector-id': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-selector-class': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-selector-attr': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-selector-pseudo': {
-      color: '#D7BA7D',
+      color: darkTheme.AccentYellow,
     },
     'hljs-addition': {
       backgroundColor: '#144212',

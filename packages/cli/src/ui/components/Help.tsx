@@ -31,7 +31,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
     {commands
       .filter((command) => command.description)
       .map((command: SlashCommand) => (
-        <Text key={command.name} color={Colors.SubtleComment}>
+        <Text key={command.name} color={Colors.Gray}>
           <Text bold color={Colors.AccentPurple}>
             {' '}
             /{command.name}
@@ -39,7 +39,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
           {command.description && ' - ' + command.description}
         </Text>
       ))}
-    <Text color={Colors.SubtleComment}>
+    <Text color={Colors.Gray}>
       <Text bold color={Colors.AccentPurple}>
         {' '}
         !{' '}

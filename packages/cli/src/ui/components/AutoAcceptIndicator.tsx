@@ -40,7 +40,7 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
     <Box>
       <Text color={textColor}>
         {textContent}
-        {subText && <Text color={Colors.SubtleComment}>{subText}</Text>}
+        {subText && <Text color={Colors.Gray}>{subText}</Text>}
       </Text>
     </Box>
   );

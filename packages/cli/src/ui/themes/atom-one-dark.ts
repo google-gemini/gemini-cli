@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme } from './theme.js';
+import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+
+const atomOneDarkColors: ColorsTheme = {
+  type: 'dark',
+  Background: '#282c34',
+  Foreground: '#abb2bf',
+  LightBlue: '#61aeee',
+  AccentBlue: '#61aeee',
+  AccentPurple: '#c678dd',
+  AccentCyan: '#56b6c2',
+  AccentGreen: '#98c379',
+  AccentYellow: '#e6c07b',
+  AccentRed: '#e06c75',
+  Comment: '#5c6370',
+  Gray: '#5c6370',
+  GradientColors: darkTheme.GradientColors,
+};
 
 export const AtomOneDark: Theme = new Theme(
   'Atom One',
@@ -14,107 +30,107 @@ export const AtomOneDark: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      color: '#abb2bf',
-      background: '#282c34',
+      color: atomOneDarkColors.Foreground,
+      background: atomOneDarkColors.Background,
     },
     'hljs-comment': {
-      color: '#5c6370',
+      color: atomOneDarkColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#5c6370',
+      color: atomOneDarkColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-doctag': {
-      color: '#c678dd',
+      color: atomOneDarkColors.AccentPurple,
     },
     'hljs-keyword': {
-      color: '#c678dd',
+      color: atomOneDarkColors.AccentPurple,
     },
     'hljs-formula': {
-      color: '#c678dd',
+      color: atomOneDarkColors.AccentPurple,
     },
     'hljs-section': {
-      color: '#e06c75',
+      color: atomOneDarkColors.AccentRed,
     },
     'hljs-name': {
-      color: '#e06c75',
+      color: atomOneDarkColors.AccentRed,
     },
     'hljs-selector-tag': {
-      color: '#e06c75',
+      color: atomOneDarkColors.AccentRed,
     },
     'hljs-deletion': {
-      color: '#e06c75',
+      color: atomOneDarkColors.AccentRed,
     },
     'hljs-subst': {
-      color: '#e06c75',
+      color: atomOneDarkColors.AccentRed,
     },
     'hljs-literal': {
-      color: '#56b6c2',
+      color: atomOneDarkColors.AccentCyan,
     },
     'hljs-string': {
-      color: '#98c379',
+      color: atomOneDarkColors.AccentGreen,
     },
     'hljs-regexp': {
-      color: '#98c379',
+      color: atomOneDarkColors.AccentGreen,
     },
     'hljs-addition': {
-      color: '#98c379',
+      color: atomOneDarkColors.AccentGreen,
     },
     'hljs-attribute': {
-      color: '#98c379',
+      color: atomOneDarkColors.AccentGreen,
     },
     'hljs-meta-string': {
-      color: '#98c379',
+      color: atomOneDarkColors.AccentGreen,
     },
     'hljs-built_in': {
-      color: '#e6c07b',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-class .hljs-title': {
-      color: '#e6c07b',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-attr': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-variable': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-template-variable': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-type': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-selector-class': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-selector-attr': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-selector-pseudo': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-number': {
-      color: '#d19a66',
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-symbol': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
     },
     'hljs-bullet': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
     },
     'hljs-link': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
       textDecoration: 'underline',
     },
     'hljs-meta': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
     },
     'hljs-selector-id': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
     },
     'hljs-title': {
-      color: '#61aeee',
+      color: atomOneDarkColors.AccentBlue,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -123,5 +139,5 @@ export const AtomOneDark: Theme = new Theme(
       fontWeight: 'bold',
     },
   },
-  darkTheme,
+  atomOneDarkColors,
 );

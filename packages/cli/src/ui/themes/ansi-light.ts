@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+
+const ansiLightColors: ColorsTheme = {
+  type: 'light',
+  Background: 'white',
+  Foreground: 'black',
+  LightBlue: 'blue',
+  AccentBlue: 'blue',
+  AccentPurple: 'purple',
+  AccentCyan: 'cyan',
+  AccentGreen: 'green',
+  AccentYellow: 'orange',
+  AccentRed: 'red',
+  Comment: 'gray',
+  Gray: 'gray',
+  GradientColors: lightTheme.GradientColors,
+};
 
 export const ANSILight: Theme = new Theme(
   'ANSI Light',
@@ -126,5 +142,5 @@ export const ANSILight: Theme = new Theme(
       color: 'orange',
     },
   },
-  lightTheme,
+  ansiLightColors,
 );

@@ -97,7 +97,7 @@ export function ThemeDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.SubtleComment}
+      borderColor={Colors.Gray}
       flexDirection="row"
       padding={1}
       width="100%"
@@ -106,7 +106,7 @@ export function ThemeDialog({
       <Box flexDirection="column" width="45%" paddingRight={2}>
         <Text bold={focusedSection === 'theme'}>
           {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
-          <Text color={Colors.SubtleComment}>{otherScopeModifiedMessage}</Text>
+          <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
         </Text>
         <RadioButtonSelect
           key={selectInputKey}
@@ -132,7 +132,7 @@ export function ThemeDialog({
         </Box>
 
         <Box marginTop={1}>
-          <Text color={Colors.SubtleComment}>
+          <Text color={Colors.Gray}>
             (Use Enter to select, Tab to change focus)
           </Text>
         </Box>
@@ -143,12 +143,13 @@ export function ThemeDialog({
         <Text bold>Preview</Text>
         <Box
           borderStyle="single"
-          borderColor={Colors.SubtleComment}
+          borderColor={Colors.Gray}
           padding={1}
           flexDirection="column"
         >
           {colorizeCode(
-            `def fibonacci(n):
+            `# function
+def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b

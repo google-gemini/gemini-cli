@@ -4,105 +4,121 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+
+const xcodeColors: ColorsTheme = {
+  type: 'light',
+  Background: '#fff',
+  Foreground: 'black',
+  LightBlue: '#0E0EFF',
+  AccentBlue: '#1c00cf',
+  AccentPurple: '#aa0d91',
+  AccentCyan: '#3F6E74',
+  AccentGreen: '#007400',
+  AccentYellow: '#836C28',
+  AccentRed: '#c41a16',
+  Comment: '#007400',
+  Gray: '#c0c0c0',
+  GradientColors: darkTheme.GradientColors,
+};
 
 export const XCode: Theme = new Theme(
-  'XCode',
+  'Xcode',
   'light',
   {
     hljs: {
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: '#fff',
-      color: 'black',
+      background: xcodeColors.Background,
+      color: xcodeColors.Foreground,
     },
     'xml .hljs-meta': {
-      color: '#c0c0c0',
+      color: xcodeColors.Gray,
     },
     'hljs-comment': {
-      color: '#007400',
+      color: xcodeColors.Comment,
     },
     'hljs-quote': {
-      color: '#007400',
+      color: xcodeColors.Comment,
     },
     'hljs-tag': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-attribute': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-keyword': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-selector-tag': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-literal': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-name': {
-      color: '#aa0d91',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-variable': {
-      color: '#3F6E74',
+      color: xcodeColors.AccentCyan,
     },
     'hljs-template-variable': {
-      color: '#3F6E74',
+      color: xcodeColors.AccentCyan,
     },
     'hljs-code': {
-      color: '#c41a16',
+      color: xcodeColors.AccentRed,
     },
     'hljs-string': {
-      color: '#c41a16',
+      color: xcodeColors.AccentRed,
     },
     'hljs-meta-string': {
-      color: '#c41a16',
+      color: xcodeColors.AccentRed,
     },
     'hljs-regexp': {
-      color: '#0E0EFF',
+      color: xcodeColors.LightBlue,
     },
     'hljs-link': {
-      color: '#0E0EFF',
+      color: xcodeColors.LightBlue,
     },
     'hljs-title': {
-      color: '#1c00cf',
+      color: xcodeColors.AccentBlue,
     },
     'hljs-symbol': {
-      color: '#1c00cf',
+      color: xcodeColors.AccentBlue,
     },
     'hljs-bullet': {
-      color: '#1c00cf',
+      color: xcodeColors.AccentBlue,
     },
     'hljs-number': {
-      color: '#1c00cf',
+      color: xcodeColors.AccentBlue,
     },
     'hljs-section': {
-      color: '#643820',
+      color: xcodeColors.AccentYellow,
     },
     'hljs-meta': {
-      color: '#643820',
+      color: xcodeColors.AccentYellow,
     },
     'hljs-class .hljs-title': {
-      color: '#5c2699',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-type': {
-      color: '#5c2699',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-built_in': {
-      color: '#5c2699',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-builtin-name': {
-      color: '#5c2699',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-params': {
-      color: '#5c2699',
+      color: xcodeColors.AccentPurple,
     },
     'hljs-attr': {
-      color: '#836C28',
+      color: xcodeColors.AccentYellow,
     },
     'hljs-subst': {
-      color: '#000',
+      color: xcodeColors.Foreground,
     },
     'hljs-formula': {
       backgroundColor: '#eee',
@@ -115,10 +131,10 @@ export const XCode: Theme = new Theme(
       backgroundColor: '#ffc8bd',
     },
     'hljs-selector-id': {
-      color: '#9b703f',
+      color: xcodeColors.AccentYellow,
     },
     'hljs-selector-class': {
-      color: '#9b703f',
+      color: xcodeColors.AccentYellow,
     },
     'hljs-doctag': {
       fontWeight: 'bold',
@@ -130,5 +146,5 @@ export const XCode: Theme = new Theme(
       fontStyle: 'italic',
     },
   },
-  lightTheme,
+  xcodeColors,
 );

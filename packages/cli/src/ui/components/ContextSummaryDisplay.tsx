@@ -47,5 +47,5 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     summaryText += mcpText;
   }
 
-  return <Text color={Colors.SubtleComment}>{summaryText}</Text>;
+  return <Text color={Colors.Gray}>{summaryText}</Text>;
 };

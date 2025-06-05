@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+
+const googleCodeColors: ColorsTheme = {
+  type: 'light',
+  Background: 'white',
+  Foreground: 'black',
+  LightBlue: '#066',
+  AccentBlue: '#008',
+  AccentPurple: '#606',
+  AccentCyan: '#066',
+  AccentGreen: '#080',
+  AccentYellow: '#660',
+  AccentRed: '#800',
+  Comment: '#5f6368',
+  Gray: lightTheme.Gray,
+  GradientColors: lightTheme.GradientColors,
+};
 
 export const GoogleCode: Theme = new Theme(
   'Google Code',
@@ -14,100 +30,100 @@ export const GoogleCode: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: 'white',
-      color: 'black',
+      background: googleCodeColors.Background,
+      color: googleCodeColors.Foreground,
     },
     'hljs-comment': {
-      color: '#800',
+      color: googleCodeColors.AccentRed,
     },
     'hljs-quote': {
-      color: '#800',
+      color: googleCodeColors.AccentRed,
     },
     'hljs-keyword': {
-      color: '#008',
+      color: googleCodeColors.AccentBlue,
     },
     'hljs-selector-tag': {
-      color: '#008',
+      color: googleCodeColors.AccentBlue,
     },
     'hljs-section': {
-      color: '#008',
+      color: googleCodeColors.AccentBlue,
     },
     'hljs-title': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-name': {
-      color: '#008',
+      color: googleCodeColors.AccentBlue,
     },
     'hljs-variable': {
-      color: '#660',
+      color: googleCodeColors.AccentYellow,
     },
     'hljs-template-variable': {
-      color: '#660',
+      color: googleCodeColors.AccentYellow,
     },
     'hljs-string': {
-      color: '#080',
+      color: googleCodeColors.AccentGreen,
     },
     'hljs-selector-attr': {
-      color: '#080',
+      color: googleCodeColors.AccentGreen,
     },
     'hljs-selector-pseudo': {
-      color: '#080',
+      color: googleCodeColors.AccentGreen,
     },
     'hljs-regexp': {
-      color: '#080',
+      color: googleCodeColors.AccentGreen,
     },
     'hljs-literal': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-symbol': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-bullet': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-meta': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-number': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-link': {
-      color: '#066',
+      color: googleCodeColors.AccentCyan,
     },
     'hljs-doctag': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-attr': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-built_in': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-builtin-name': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-params': {
-      color: '#606',
+      color: googleCodeColors.AccentPurple,
     },
     'hljs-attribute': {
-      color: '#000',
+      color: googleCodeColors.Foreground,
     },
     'hljs-subst': {
-      color: '#000',
+      color: googleCodeColors.Foreground,
     },
     'hljs-formula': {
       backgroundColor: '#eee',
       fontStyle: 'italic',
     },
     'hljs-selector-id': {
-      color: '#9B703F',
+      color: googleCodeColors.AccentYellow,
     },
     'hljs-selector-class': {
-      color: '#9B703F',
+      color: googleCodeColors.AccentYellow,
     },
     'hljs-addition': {
       backgroundColor: '#baeeba',
@@ -122,5 +138,5 @@ export const GoogleCode: Theme = new Theme(
       fontStyle: 'italic',
     },
   },
-  lightTheme,
+  googleCodeColors,
 );
