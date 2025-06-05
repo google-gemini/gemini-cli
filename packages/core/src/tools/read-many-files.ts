@@ -119,6 +119,7 @@ export class ReadManyFilesTool extends BaseTool<
   ToolResult
 > {
   static readonly Name: string = 'read_many_files';
+  private readonly geminiIgnorePatterns: string[];
 
   /**
    * Creates an instance of ReadManyFilesTool.
@@ -190,6 +191,7 @@ Use this tool when the user's query implies needing the content of several files
       parameterSchema,
     );
     this.targetDir = path.resolve(targetDir);
+    this.geminiIgnorePatterns = config.getGeminiIgnorePatterns() || [];
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
@@ -242,12 +244,26 @@ Use this tool when the user's query implies needing the content of several files
     const allPatterns = [...params.paths, ...(params.include || [])];
     const pathDesc = `using patterns: \`${allPatterns.join('`, `')}\` (within target directory: \`${this.targetDir}\`)`;
 
-    let effectiveExcludes =
-      params.useDefaultExcludes !== false ? [...DEFAULT_EXCLUDES] : [];
-    if (params.exclude && params.exclude.length > 0) {
-      effectiveExcludes = [...effectiveExcludes, ...params.exclude];
+    // Determine the final list of exclusion patterns exactly as in execute method
+    const paramExcludes = params.exclude || [];
+    const paramUseDefaultExcludes = params.useDefaultExcludes !== false;
+
+    const finalExclusionPatternsForDescription: string[] =
+      paramUseDefaultExcludes
+        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
+        : [...paramExcludes, ...this.geminiIgnorePatterns];
+
+    let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
+
+    // Add a note if .geminiignore patterns contributed to the final list of exclusions
+    if (this.geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = this.geminiIgnorePatterns.filter((p) =>
+        finalExclusionPatternsForDescription.includes(p),
+      ).length;
+      if (geminiPatternsInEffect > 0) {
+        excludeDesc += ` (includes ${geminiPatternsInEffect} from .geminiignore)`;
+      }
     }
-    const excludeDesc = `Excluding: ${effectiveExcludes.length > 0 ? `patterns like \`${effectiveExcludes.slice(0, 2).join('`, `')}${effectiveExcludes.length > 2 ? '...`' : '`'}` : 'none explicitly (beyond default non-text file avoidance).'}`;
 
     return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace('{filePath}', 'path/to/file.ext')}".`;
   }
@@ -285,8 +301,8 @@ Use this tool when the user's query implies needing the content of several files
     const contentParts: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
-      ? [...DEFAULT_EXCLUDES, ...exclude]
-      : [...exclude];
+      ? [...DEFAULT_EXCLUDES, ...exclude, ...this.geminiIgnorePatterns]
+      : [...exclude, ...this.geminiIgnorePatterns];
 
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {

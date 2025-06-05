@@ -123,6 +123,7 @@ export interface LoadCliConfigResult {
 
 export async function loadCliConfig(
   settings: Settings,
+  geminiIgnorePatterns: string[],
 ): Promise<LoadCliConfigResult> {
   loadEnvironment();
 
@@ -211,6 +212,7 @@ export async function loadCliConfig(
     vertexai: useVertexAI,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
+    geminiIgnorePatterns,
     accessibility: settings.accessibility,
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,

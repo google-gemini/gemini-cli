@@ -10,6 +10,7 @@ import * as fileUtils from '../utils/fileUtils.js';
 import path from 'path';
 import os from 'os';
 import fs from 'fs'; // For actual fs operations in setup
+import { Config } from '../config/config.js';
 
 // Mock fileUtils.processSingleFileContent
 vi.mock('../utils/fileUtils', async () => {
@@ -33,7 +34,10 @@ describe('ReadFileTool', () => {
     tempRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-file-tool-root-'),
     );
-    tool = new ReadFileTool(tempRootDir);
+    const mockConfigInstance = {
+      getGeminiIgnorePatterns: () => ['**/foo.bar', 'foo.baz', 'foo.*'],
+    } as Config;
+    tool = new ReadFileTool(tempRootDir, mockConfigInstance);
     mockProcessSingleFileContent.mockReset();
   });
 
@@ -223,6 +227,16 @@ describe('ReadFileTool', () => {
         10,
         5,
       );
+    });
+
+    it('should return error if path is ignored by a .geminiignore pattern', async () => {
+      const params: ReadFileToolParams = {
+        path: path.join(tempRootDir, 'foo.bar'),
+      };
+      const result = await tool.execute(params, abortSignal);
+      expect(result.returnDisplay).toContain('foo.bar');
+      expect(result.returnDisplay).toContain('foo.*');
+      expect(result.returnDisplay).not.toContain('foo.baz');
     });
   });
 });

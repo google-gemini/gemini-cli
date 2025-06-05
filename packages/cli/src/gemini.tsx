@@ -17,6 +17,7 @@ import { LoadedSettings, loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import { loadGeminiIgnorePatterns } from './utils/loadIgnorePatterns.js';
 import {
   ApprovalMode,
   Config,
@@ -56,9 +57,12 @@ async function main() {
       process.env.GEMINI_CODE_SANDBOX_IMAGE; // Corrected to GEMINI_SANDBOX_IMAGE_NAME
   }
 
-  const settings = loadSettings(process.cwd());
+  const workspaceRoot = process.cwd();
+  const settings = loadSettings(workspaceRoot);
+  const geminiIgnorePatterns = loadGeminiIgnorePatterns(workspaceRoot);
+
   const { config, modelWasSwitched, originalModelBeforeSwitch, finalModel } =
-    await loadCliConfig(settings.merged);
+    await loadCliConfig(settings.merged, geminiIgnorePatterns);
 
   // Initialize centralized FileDiscoveryService
   await config.getFileService();
@@ -150,6 +154,7 @@ main().catch((error) => {
   }
   process.exit(1);
 });
+
 async function loadNonInteractiveConfig(
   config: Config,
   settings: LoadedSettings,
@@ -185,6 +190,7 @@ async function loadNonInteractiveConfig(
   };
   const nonInteractiveConfigResult = await loadCliConfig(
     nonInteractiveSettings,
+    config.getGeminiIgnorePatterns(),
   );
   return nonInteractiveConfigResult.config;
 }

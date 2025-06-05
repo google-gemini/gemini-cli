@@ -10,10 +10,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { Config } from '../config/config.js';
 import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
+import { Config } from '../config/config.js';
 
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
@@ -31,6 +31,7 @@ describe('ReadManyFilesTool', () => {
     getFileFilteringRespectGitIgnore: () => true,
     getFileFilteringCustomIgnorePatterns: () => [],
     getFileFilteringAllowBuildArtifacts: () => false,
+    getGeminiIgnorePatterns: () => ['**/foo.bar', 'foo.baz', 'foo.*'],
   } as Partial<Config> as Config;
 
   beforeEach(async () => {
@@ -366,6 +367,17 @@ describe('ReadManyFilesTool', () => {
           },
         },
       ]);
+    });
+
+    it('should return error if path is ignored by a .geminiignore pattern', async () => {
+      createFile('foo.bar', '');
+      createFile('qux/foo.baz', '');
+      createFile('foo.quux', '');
+      const params = { paths: ['foo.bar', 'qux/foo.baz', 'foo.quux'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.returnDisplay).not.toContain('foo.bar');
+      expect(result.returnDisplay).toContain('qux/foo.baz');
+      expect(result.returnDisplay).not.toContain('foo.quux');
     });
   });
 });

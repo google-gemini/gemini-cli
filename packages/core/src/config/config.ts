@@ -70,6 +70,7 @@ export interface ConfigParameters {
   vertexai?: boolean;
   showMemoryUsage?: boolean;
   contextFileName?: string;
+  geminiIgnorePatterns?: string[];
   accessibility?: AccessibilitySettings;
   fileFilteringRespectGitIgnore?: boolean;
   fileFilteringAllowBuildArtifacts?: boolean;
@@ -97,6 +98,7 @@ export class Config {
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly geminiClient: GeminiClient;
+  private readonly geminiIgnorePatterns: string[] = [];
   private readonly fileFilteringRespectGitIgnore: boolean;
   private readonly fileFilteringAllowBuildArtifacts: boolean;
   private fileDiscoveryService: FileDiscoveryService | null = null;
@@ -128,6 +130,9 @@ export class Config {
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
+    }
+    if (params.geminiIgnorePatterns) {
+      this.geminiIgnorePatterns = params.geminiIgnorePatterns;
     }
 
     this.toolRegistry = createToolRegistry(this);
@@ -229,6 +234,10 @@ export class Config {
     return this.geminiClient;
   }
 
+  getGeminiIgnorePatterns(): string[] {
+    return this.geminiIgnorePatterns;
+  }
+
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFilteringRespectGitIgnore;
   }
@@ -311,7 +320,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   };
 
   registerCoreTool(LSTool, targetDir, config);
-  registerCoreTool(ReadFileTool, targetDir);
+  registerCoreTool(ReadFileTool, targetDir, config);
   registerCoreTool(GrepTool, targetDir);
   registerCoreTool(GlobTool, targetDir, config);
   registerCoreTool(EditTool, config);
