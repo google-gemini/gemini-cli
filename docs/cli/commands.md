@@ -16,7 +16,7 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
   - **Description:** Clears the entire terminal screen, including the visible session history and scrollback within the CLI.
   - **Action:** Wipes the terminal display. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
 
-- **`/theme`**
+- [**`/theme`**](./themes.md)
 
   - **Description:** Allows you to change the visual theme of the Gemini CLI.
   - **Action:** Opens a dialog or prompt to select from available themes.

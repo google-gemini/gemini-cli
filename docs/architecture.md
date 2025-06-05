@@ -13,7 +13,7 @@ The Gemini CLI is primarily composed of two main packages, along with a suite of
       - Input processing (parsing commands, text prompts).
       - History management.
       - Display rendering (including Markdown, code highlighting, and tool messages).
-      - Theme and UI customization.
+      - [Theme and UI customization](./cli/themes.md).
       - Communication with the Core package.
       - Manages user configuration settings specific to the CLI.
 
