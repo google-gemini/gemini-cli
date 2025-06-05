@@ -243,6 +243,62 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.contextFileName).toBeUndefined();
     });
 
+    it('should load telemetry setting from user settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = { telemetry: true };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.telemetry).toBe(true);
+    });
+
+    it('should load telemetry setting from workspace settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = { telemetry: false };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.telemetry).toBe(false);
+    });
+
+    it('should prioritize workspace telemetry setting over user setting', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = { telemetry: true };
+      const workspaceSettingsContent = { telemetry: false };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.telemetry).toBe(false);
+    });
+
+    it('should have telemetry as undefined if not in any settings file', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
+      (fs.readFileSync as Mock).mockReturnValue('{}');
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.telemetry).toBeUndefined();
+    });
+
     it('should handle JSON parsing errors gracefully', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       (fs.readFileSync as Mock).mockImplementation(

@@ -44,3 +44,6 @@ export * from './tools/memoryTool.js';
 export * from './tools/shell.js';
 export * from './tools/web-search.js';
 export * from './tools/read-many-files.js';
+
+// Export telemetry functions
+export * from './telemetry/index.js';

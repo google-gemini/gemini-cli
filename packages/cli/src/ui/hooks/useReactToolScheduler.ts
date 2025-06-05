@@ -20,6 +20,7 @@ import {
   Tool,
   ToolCall,
   Status as CoreStatus,
+  logToolCall,
 } from '@gemini-code/core';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import {
@@ -108,6 +109,30 @@ export function useReactToolScheduler(
     const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = (
       completedToolCalls,
     ) => {
+      completedToolCalls.forEach((call) => {
+        let success = false;
+        let errorMessage: string | undefined;
+        let duration = 0;
+
+        if (call.status === 'success') {
+          success = true;
+        }
+        if (
+          call.status === 'error' &&
+          typeof call.response.resultDisplay === 'string'
+        ) {
+          errorMessage = call.response.resultDisplay;
+        }
+        duration = call.durationMs || 0;
+
+        logToolCall({
+          function_name: call.request.name,
+          function_args: call.request.args,
+          duration_ms: duration,
+          success,
+          error: errorMessage,
+        });
+      });
       onComplete(completedToolCalls);
     };
 

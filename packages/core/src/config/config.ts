@@ -24,6 +24,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { initializeTelemetry } from '../telemetry/index.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -72,6 +73,8 @@ export interface ConfigParameters {
   contextFileName?: string;
   geminiIgnorePatterns?: string[];
   accessibility?: AccessibilitySettings;
+  telemetry?: boolean;
+  telemetryLogUserPromptsEnabled?: boolean;
   fileFilteringRespectGitIgnore?: boolean;
   fileFilteringAllowBuildArtifacts?: boolean;
 }
@@ -97,6 +100,9 @@ export class Config {
   private readonly vertexai: boolean | undefined;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
+  private readonly telemetry: boolean;
+  private readonly telemetryLogUserPromptsEnabled: boolean;
+  private readonly telemetryOtlpEndpoint: string;
   private readonly geminiClient: GeminiClient;
   private readonly geminiIgnorePatterns: string[] = [];
   private readonly fileFilteringRespectGitIgnore: boolean;
@@ -123,6 +129,11 @@ export class Config {
     this.vertexai = params.vertexai;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
+    this.telemetry = params.telemetry ?? false;
+    this.telemetryLogUserPromptsEnabled =
+      params.telemetryLogUserPromptsEnabled ?? true;
+    this.telemetryOtlpEndpoint =
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317';
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
     this.fileFilteringAllowBuildArtifacts =
@@ -137,6 +148,10 @@ export class Config {
 
     this.toolRegistry = createToolRegistry(this);
     this.geminiClient = new GeminiClient(this);
+
+    if (this.telemetry) {
+      initializeTelemetry(this);
+    }
   }
 
   getApiKey(): string {
@@ -228,6 +243,18 @@ export class Config {
 
   getAccessibility(): AccessibilitySettings {
     return this.accessibility;
+  }
+
+  getTelemetryEnabled(): boolean {
+    return this.telemetry;
+  }
+
+  getTelemetryLogUserPromptsEnabled(): boolean {
+    return this.telemetryLogUserPromptsEnabled;
+  }
+
+  getTelemetryOtlpEndpoint(): string {
+    return this.telemetryOtlpEndpoint;
   }
 
   getGeminiClient(): GeminiClient {

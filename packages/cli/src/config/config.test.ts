@@ -53,6 +53,7 @@ vi.mock('@gemini-code/core', async () => {
       getGeminiMdFileCount: () => params.geminiMdFileCount,
       getVertexAI: () => params.vertexai,
       getShowMemoryUsage: () => params.showMemoryUsage, // Added for the test
+      getTelemetry: () => params.telemetry,
       // Add any other methods that are called on the config object
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
@@ -105,6 +106,72 @@ describe('loadCliConfig', () => {
     const settings: Settings = { showMemoryUsage: false };
     const result = await loadCliConfig(settings);
     expect(result.config.getShowMemoryUsage()).toBe(true);
+  });
+});
+
+describe('loadCliConfig telemetry', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME_DIR);
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should set telemetry to false by default when no flag or setting is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(false);
+  });
+
+  it('should set telemetry to true when --telemetry flag is present', async () => {
+    process.argv = ['node', 'script.js', '--telemetry'];
+    const settings: Settings = {};
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(true);
+  });
+
+  it('should set telemetry to false when --no-telemetry flag is present', async () => {
+    process.argv = ['node', 'script.js', '--no-telemetry'];
+    const settings: Settings = {};
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(false);
+  });
+
+  it('should use telemetry value from settings if CLI flag is not present (settings true)', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: true };
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(true);
+  });
+
+  it('should use telemetry value from settings if CLI flag is not present (settings false)', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: false };
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(false);
+  });
+
+  it('should prioritize --telemetry CLI flag (true) over settings (false)', async () => {
+    process.argv = ['node', 'script.js', '--telemetry'];
+    const settings: Settings = { telemetry: false };
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(true);
+  });
+
+  it('should prioritize --no-telemetry CLI flag (false) over settings (true)', async () => {
+    process.argv = ['node', 'script.js', '--no-telemetry'];
+    const settings: Settings = { telemetry: true };
+    const result = await loadCliConfig(settings);
+    expect(result.config.getTelemetry()).toBe(false);
   });
 });
 

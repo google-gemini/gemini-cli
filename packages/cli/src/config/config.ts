@@ -45,6 +45,7 @@ interface CliArgs {
   all_files: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  telemetry: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -88,6 +89,10 @@ async function parseArguments(): Promise<CliArgs> {
       description:
         'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
       default: false,
+    })
+    .option('telemetry', {
+      type: 'boolean',
+      description: 'Enable telemetry?',
     })
     .version() // This will enable the --version flag based on package.json
     .help()
@@ -214,6 +219,10 @@ export async function loadCliConfig(
       argv.show_memory_usage || settings.showMemoryUsage || false,
     geminiIgnorePatterns,
     accessibility: settings.accessibility,
+    telemetry:
+      argv.telemetry !== undefined
+        ? argv.telemetry
+        : (settings.telemetry ?? false),
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
     fileFilteringAllowBuildArtifacts:

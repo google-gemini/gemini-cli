@@ -21,18 +21,21 @@ export type ValidatingToolCall = {
   status: 'validating';
   request: ToolCallRequestInfo;
   tool: Tool;
+  startTime?: number;
 };
 
 export type ScheduledToolCall = {
   status: 'scheduled';
   request: ToolCallRequestInfo;
   tool: Tool;
+  startTime?: number;
 };
 
 export type ErroredToolCall = {
   status: 'error';
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
+  durationMs?: number;
 };
 
 export type SuccessfulToolCall = {
@@ -40,6 +43,7 @@ export type SuccessfulToolCall = {
   request: ToolCallRequestInfo;
   tool: Tool;
   response: ToolCallResponseInfo;
+  durationMs?: number;
 };
 
 export type ExecutingToolCall = {
@@ -47,6 +51,7 @@ export type ExecutingToolCall = {
   request: ToolCallRequestInfo;
   tool: Tool;
   liveOutput?: string;
+  startTime?: number;
 };
 
 export type CancelledToolCall = {
@@ -54,6 +59,7 @@ export type CancelledToolCall = {
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool: Tool;
+  durationMs?: number;
 };
 
 export type WaitingToolCall = {
@@ -61,6 +67,7 @@ export type WaitingToolCall = {
   request: ToolCallRequestInfo;
   tool: Tool;
   confirmationDetails: ToolCallConfirmationDetails;
+  startTime?: number;
 };
 
 export type Status = ToolCall['status'];
@@ -246,40 +253,69 @@ export class CoreToolScheduler {
     this.toolCalls = this.toolCalls.map((currentCall) => {
       if (
         currentCall.request.callId !== targetCallId ||
-        currentCall.status === 'error'
+        currentCall.status === 'success' ||
+        currentCall.status === 'error' ||
+        currentCall.status === 'cancelled'
       ) {
         return currentCall;
       }
 
-      const callWithToolContext = currentCall as ToolCall & { tool: Tool };
+      // currentCall is a non-terminal state here and should have startTime and tool.
+      const existingStartTime = currentCall.startTime;
+      const toolInstance = (
+        currentCall as
+          | ValidatingToolCall
+          | ScheduledToolCall
+          | ExecutingToolCall
+          | WaitingToolCall
+      ).tool;
 
       switch (newStatus) {
-        case 'success':
+        case 'success': {
+          const durationMs = existingStartTime
+            ? Date.now() - existingStartTime
+            : undefined;
           return {
-            ...callWithToolContext,
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'success',
             response: auxiliaryData as ToolCallResponseInfo,
+            durationMs,
           } as SuccessfulToolCall;
-        case 'error':
+        }
+        case 'error': {
+          const durationMs = existingStartTime
+            ? Date.now() - existingStartTime
+            : undefined;
           return {
             request: currentCall.request,
             status: 'error',
             response: auxiliaryData as ToolCallResponseInfo,
+            durationMs,
           } as ErroredToolCall;
+        }
         case 'awaiting_approval':
           return {
-            ...callWithToolContext,
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'awaiting_approval',
             confirmationDetails: auxiliaryData as ToolCallConfirmationDetails,
+            startTime: existingStartTime,
           } as WaitingToolCall;
         case 'scheduled':
           return {
-            ...callWithToolContext,
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'scheduled',
+            startTime: existingStartTime,
           } as ScheduledToolCall;
-        case 'cancelled':
+        case 'cancelled': {
+          const durationMs = existingStartTime
+            ? Date.now() - existingStartTime
+            : undefined;
           return {
-            ...callWithToolContext,
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'cancelled',
             response: {
               callId: currentCall.request.callId,
@@ -295,16 +331,22 @@ export class CoreToolScheduler {
               resultDisplay: undefined,
               error: undefined,
             },
+            durationMs,
           } as CancelledToolCall;
+        }
         case 'validating':
           return {
-            ...(currentCall as ValidatingToolCall),
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'validating',
+            startTime: existingStartTime,
           } as ValidatingToolCall;
         case 'executing':
           return {
-            ...callWithToolContext,
+            request: currentCall.request,
+            tool: toolInstance,
             status: 'executing',
+            startTime: existingStartTime,
           } as ExecutingToolCall;
         default: {
           const exhaustiveCheck: never = newStatus;
@@ -345,9 +387,15 @@ export class CoreToolScheduler {
               reqInfo,
               new Error(`Tool "${reqInfo.name}" not found in registry.`),
             ),
+            durationMs: 0,
           };
         }
-        return { status: 'validating', request: reqInfo, tool: toolInstance };
+        return {
+          status: 'validating',
+          request: reqInfo,
+          tool: toolInstance,
+          startTime: Date.now(),
+        };
       },
     );
 

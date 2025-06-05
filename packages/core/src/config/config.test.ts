@@ -48,6 +48,7 @@ describe('Server Config (config.ts)', () => {
   const FULL_CONTEXT = false;
   const USER_AGENT = 'ServerTestAgent/1.0';
   const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY = false;
   const baseParams: ConfigParameters = {
     apiKey: API_KEY,
     model: MODEL,
@@ -58,6 +59,7 @@ describe('Server Config (config.ts)', () => {
     fullContext: FULL_CONTEXT,
     userAgent: USER_AGENT,
     userMemory: USER_MEMORY,
+    telemetry: TELEMETRY,
   };
 
   beforeEach(() => {
@@ -159,6 +161,56 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
     expect(config.getFileFilteringAllowBuildArtifacts()).toBe(true);
+  });
+
+  it('Config constructor should set telemetry to true when provided as true', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: true,
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(true);
+  });
+
+  it('Config constructor should set telemetry to false when provided as false', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: false,
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(false);
+  });
+
+  it('Config constructor should default telemetry to default value if not provided', () => {
+    const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+    delete paramsWithoutTelemetry.telemetry;
+    const config = new Config(paramsWithoutTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
+  });
+
+  it('createServerConfig should pass telemetry to Config constructor when true', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: true,
+    };
+    const config = createServerConfig(paramsWithTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(true);
+  });
+
+  it('createServerConfig should pass telemetry to Config constructor when false', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: false,
+    };
+    const config = createServerConfig(paramsWithTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(false);
+  });
+
+  it('createServerConfig should default telemetry (to false via Config constructor) if omitted', () => {
+    const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+    delete paramsWithoutTelemetry.telemetry;
+    const config = createServerConfig(paramsWithoutTelemetry);
+    expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
   });
 
   it('should have a getFileService method that returns FileDiscoveryService', async () => {

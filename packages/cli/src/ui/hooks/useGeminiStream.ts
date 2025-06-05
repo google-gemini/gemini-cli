@@ -17,6 +17,7 @@ import {
   Config,
   MessageSenderType,
   ToolCallRequestInfo,
+  logUserPrompt,
 } from '@gemini-code/core';
 import { type PartListUnion } from '@google/genai';
 import {
@@ -178,6 +179,10 @@ export const useGeminiStream = (
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
+        logUserPrompt(config, {
+          prompt: trimmedQuery,
+          prompt_char_count: trimmedQuery.length,
+        });
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 

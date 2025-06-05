@@ -36,6 +36,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   contextFileName?: string;
   accessibility?: AccessibilitySettings;
+  telemetry?: boolean;
 
   // Git-aware file filtering settings
   fileFiltering?: {
