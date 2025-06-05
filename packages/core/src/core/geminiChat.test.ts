@@ -5,13 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  Content,
-  GoogleGenAI,
-  Models,
-  GenerateContentConfig,
-  Part,
-} from '@google/genai';
+import { Content, Models, GenerateContentConfig, Part } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
 
 // Mocks
@@ -23,10 +17,6 @@ const mockModelsModule = {
   batchEmbedContents: vi.fn(),
 } as unknown as Models;
 
-const mockGoogleGenAI = {
-  getGenerativeModel: vi.fn().mockReturnValue(mockModelsModule),
-} as unknown as GoogleGenAI;
-
 describe('GeminiChat', () => {
   let chat: GeminiChat;
   const model = 'gemini-pro';
@@ -35,7 +25,7 @@ describe('GeminiChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset history for each test by creating a new instance
-    chat = new GeminiChat(mockGoogleGenAI, mockModelsModule, model, config, []);
+    chat = new GeminiChat(mockModelsModule, model, config, []);
   });
 
   afterEach(() => {
@@ -129,19 +119,8 @@ describe('GeminiChat', () => {
       // @ts-expect-error Accessing private method for testing purposes
       chat.recordHistory(userInput, newModelOutput); // userInput here is for the *next* turn, but history is already primed
 
-      // const history = chat.getHistory(); // Removed unused variable to satisfy linter
-      // The recordHistory will push the *new* userInput first, then the consolidated newModelOutput.
-      // However, the consolidation logic for *outputContents* itself should run, and then the merge with *existing* history.
-      // Let's adjust the test to reflect how recordHistory is used: it adds the current userInput, then the model's response to it.
-
       // Reset and set up a more realistic scenario for merging with existing history
-      chat = new GeminiChat(
-        mockGoogleGenAI,
-        mockModelsModule,
-        model,
-        config,
-        [],
-      );
+      chat = new GeminiChat(mockModelsModule, model, config, []);
       const firstUserInput: Content = {
         role: 'user',
         parts: [{ text: 'First user input' }],
@@ -184,7 +163,7 @@ describe('GeminiChat', () => {
         role: 'model',
         parts: [{ text: 'Initial model answer.' }],
       };
-      chat = new GeminiChat(mockGoogleGenAI, mockModelsModule, model, config, [
+      chat = new GeminiChat(mockModelsModule, model, config, [
         initialUser,
         initialModel,
       ]);

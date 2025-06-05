@@ -10,15 +10,14 @@
 import {
   GenerateContentResponse,
   Content,
-  Models,
   GenerateContentConfig,
   SendMessageParameters,
-  GoogleGenAI,
   createUserContent,
   Part,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { ContentGenerator } from './contentGenerator.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -120,8 +119,7 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
 
   constructor(
-    private readonly apiClient: GoogleGenAI,
-    private readonly modelsModule: Models,
+    private readonly contentGenerator: ContentGenerator,
     private readonly model: string,
     private readonly config: GenerateContentConfig = {},
     private history: Content[] = [],
@@ -156,7 +154,7 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
 
     const apiCall = () =>
-      this.modelsModule.generateContent({
+      this.contentGenerator.generateContent({
         model: this.model,
         contents: this.getHistory(true).concat(userContent),
         config: { ...this.config, ...params.config },
@@ -225,7 +223,7 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
 
     const apiCall = () =>
-      this.modelsModule.generateContentStream({
+      this.contentGenerator.generateContentStream({
         model: this.model,
         contents: this.getHistory(true).concat(userContent),
         config: { ...this.config, ...params.config },

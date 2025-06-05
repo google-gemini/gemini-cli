@@ -32,10 +32,11 @@ import {
   logApiResponse,
   logApiError,
 } from '../telemetry/index.js';
+import { ContentGenerator } from './contentGenerator.js';
 
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
-  private client: GoogleGenAI;
+  private contentGenerator: ContentGenerator;
   private model: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -48,7 +49,7 @@ export class GeminiClient {
     const apiKeyFromConfig = config.getApiKey();
     const vertexaiFlag = config.getVertexAI();
 
-    this.client = new GoogleGenAI({
+    const googleGenAI = new GoogleGenAI({
       apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
       vertexai: vertexaiFlag,
       httpOptions: {
@@ -57,6 +58,7 @@ export class GeminiClient {
         },
       },
     });
+    this.contentGenerator = googleGenAI.models;
     this.model = config.getModel();
     this.chat = this.startChat();
   }
@@ -148,8 +150,7 @@ export class GeminiClient {
       const systemInstruction = getCoreSystemPrompt(userMemory);
 
       return new GeminiChat(
-        this.client,
-        this.client.models,
+        this.contentGenerator,
         this.model,
         {
           systemInstruction,
@@ -285,7 +286,7 @@ export class GeminiClient {
 
       let inputTokenCount = 0;
       try {
-        const { totalTokens } = await this.client.models.countTokens({
+        const { totalTokens } = await this.contentGenerator.countTokens({
           model,
           contents,
         });
@@ -300,7 +301,7 @@ export class GeminiClient {
       this._logApiRequest(model, inputTokenCount);
 
       const apiCall = () =>
-        this.client.models.generateContent({
+        this.contentGenerator.generateContent({
           model,
           config: {
             ...requestConfig,
@@ -400,7 +401,7 @@ export class GeminiClient {
 
       let inputTokenCount = 0;
       try {
-        const { totalTokens } = await this.client.models.countTokens({
+        const { totalTokens } = await this.contentGenerator.countTokens({
           model: modelToUse,
           contents,
         });
@@ -415,7 +416,7 @@ export class GeminiClient {
       this._logApiRequest(modelToUse, inputTokenCount);
 
       const apiCall = () =>
-        this.client.models.generateContent({
+        this.contentGenerator.generateContent({
           model: modelToUse,
           config: requestConfig,
           contents,
@@ -453,8 +454,7 @@ export class GeminiClient {
     const chat = await this.chat;
     const history = chat.getHistory(true); // Get curated history
 
-    // Count tokens using the models module from the GoogleGenAI client instance
-    const { totalTokens } = await this.client.models.countTokens({
+    const { totalTokens } = await this.contentGenerator.countTokens({
       model: this.model,
       contents: history,
     });
