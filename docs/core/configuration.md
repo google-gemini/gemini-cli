@@ -22,7 +22,7 @@ These are the main pieces of information the core `Config` object holds and uses
 
 - **`model` (string):**
 
-  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or a default value (e.g., `gemini-2.5-pro-preview-05-06`).
+  - **Source:** Command-line argument (`--model`), environment variable (`GEMINI_MODEL`), or a default value (e.g., `gemini-2.5-pro-preview-06-05`).
   - **Purpose:** Specifies which Gemini model the core should use. (For Vertex AI model names and usage, refer to the main README.md).
 
 - **`sandbox` (boolean | string):**

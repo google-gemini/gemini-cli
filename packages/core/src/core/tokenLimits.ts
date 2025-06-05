@@ -17,6 +17,7 @@ export function tokenLimit(model: Model): TokenCount {
       return 2_097_152;
     case 'gemini-1.5-flash':
     case 'gemini-2.5-pro-preview-05-06':
+    case 'gemini-2.5-pro-preview-06-05':
     case 'gemini-2.5-flash-preview-05-20':
     case 'gemini-2.0-flash':
       return 1_048_576;
