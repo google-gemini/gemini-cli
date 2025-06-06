@@ -4,6 +4,7 @@
 
 # gemini-code settings
 .gemini/
+!gemini/config.yaml
 
 # Dependency directory
 node_modules
