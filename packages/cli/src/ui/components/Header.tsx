@@ -18,15 +18,19 @@ const asciiArtLogo = `
  ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝
 `;
 
-export const Header: React.FC = () => (
+interface HeaderProps {
+  title?: string;
+}
+
+export const Header: React.FC<HeaderProps> = ({ title = asciiArtLogo }) => (
   <>
     <Box marginBottom={1} alignItems="flex-start">
       {Colors.GradientColors ? (
         <Gradient colors={Colors.GradientColors}>
-          <Text>{asciiArtLogo}</Text>
+          <Text>{title}</Text>
         </Gradient>
       ) : (
-        <Text>{asciiArtLogo}</Text>
+        <Text>{title}</Text>
       )}
     </Box>
   </>
