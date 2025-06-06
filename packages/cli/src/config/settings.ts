@@ -110,6 +110,15 @@ function resolveEnvVarsInString(value: string): string {
 }
 
 function resolveEnvVarsInObject<T>(obj: T): T {
+  if (
+    obj === null ||
+    obj === undefined ||
+    typeof obj === 'boolean' ||
+    typeof obj === 'number'
+  ) {
+    return obj;
+  }
+
   if (typeof obj === 'string') {
     return resolveEnvVarsInString(obj) as unknown as T;
   }
@@ -118,7 +127,7 @@ function resolveEnvVarsInObject<T>(obj: T): T {
     return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
   }
 
-  if (obj && typeof obj === 'object') {
+  if (typeof obj === 'object') {
     const newObj = { ...obj } as T;
     for (const key in newObj) {
       if (Object.prototype.hasOwnProperty.call(newObj, key)) {

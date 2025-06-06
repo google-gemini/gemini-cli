@@ -482,6 +482,57 @@ describe('Settings Loading and Merging', () => {
       delete process.env.ITEM_1;
       delete process.env.ITEM_2;
     });
+
+    it('should correctly pass through null, boolean, and number types, and handle undefined properties', () => {
+      process.env.MY_ENV_STRING = 'env_string_value';
+      process.env.MY_ENV_STRING_NESTED = 'env_string_nested_value';
+
+      const userSettingsContent = {
+        nullVal: null,
+        trueVal: true,
+        falseVal: false,
+        numberVal: 123.45,
+        stringVal: '$MY_ENV_STRING',
+        nestedObj: {
+          nestedNull: null,
+          nestedBool: true,
+          nestedNum: 0,
+          nestedString: 'literal',
+          anotherEnv: '${MY_ENV_STRING_NESTED}',
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.user.settings.nullVal).toBeNull();
+      expect(settings.user.settings.trueVal).toBe(true);
+      expect(settings.user.settings.falseVal).toBe(false);
+      expect(settings.user.settings.numberVal).toBe(123.45);
+      expect(settings.user.settings.stringVal).toBe('env_string_value');
+      expect(settings.user.settings.undefinedVal).toBeUndefined();
+
+      expect(settings.user.settings.nestedObj.nestedNull).toBeNull();
+      expect(settings.user.settings.nestedObj.nestedBool).toBe(true);
+      expect(settings.user.settings.nestedObj.nestedNum).toBe(0);
+      expect(settings.user.settings.nestedObj.nestedString).toBe('literal');
+      expect(settings.user.settings.nestedObj.anotherEnv).toBe(
+        'env_string_nested_value',
+      );
+
+      delete process.env.MY_ENV_STRING;
+      delete process.env.MY_ENV_STRING_NESTED;
+    });
   });
 
   describe('LoadedSettings class', () => {
@@ -518,6 +569,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       loadedSettings.setValue(SettingScope.Workspace, 'theme', 'ocean');
+
       expect(loadedSettings.workspace.settings.theme).toBe('ocean');
       expect(loadedSettings.merged.theme).toBe('ocean');
     });
