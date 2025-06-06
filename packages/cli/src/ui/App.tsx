@@ -136,7 +136,7 @@ export const App = ({
     openThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
-  } = useThemeCommand(settings, setThemeError);
+  } = useThemeCommand(settings, setThemeError, addItem);
 
   useEffect(() => {
     if (config) {

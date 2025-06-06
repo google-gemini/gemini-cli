@@ -17,6 +17,8 @@ import { XCode } from './xcode.js';
 import { Theme, ThemeType } from './theme.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
+import { NoColorTheme } from './no-color.js';
+import process from 'node:process';
 
 export interface ThemeDisplay {
   name: string;
@@ -110,6 +112,9 @@ class ThemeManager {
    * Returns the currently active theme object.
    */
   getActiveTheme(): Theme {
+    if (process.env.NO_COLOR) {
+      return NoColorTheme;
+    }
     return this.activeTheme;
   }
 }

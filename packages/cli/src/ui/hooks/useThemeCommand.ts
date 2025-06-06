@@ -7,6 +7,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import { type HistoryItem, MessageType } from '../types.js';
+import process from 'node:process';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -21,34 +23,55 @@ interface UseThemeCommandReturn {
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
+  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseThemeCommandReturn => {
   // Determine the effective theme
   const effectiveTheme = loadedSettings.merged.theme;
 
   // Initial state: Open dialog if no theme is set in either user or workspace settings
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(
-    effectiveTheme === undefined, // Open dialog if no theme is set initially
+    effectiveTheme === undefined && !process.env.NO_COLOR,
   );
   // TODO: refactor how theme's are accessed to avoid requiring a forced render.
   const [, setForceRender] = useState(0);
 
   // Apply initial theme on component mount
   useEffect(() => {
-    // Only try to set a theme if one is actually defined.
-    // If effectiveTheme was undefined, the dialog is already open due to useState above.
-    if (effectiveTheme !== undefined) {
-      if (!themeManager.setActiveTheme(effectiveTheme)) {
-        setIsThemeDialogOpen(true);
-        setThemeError(`Theme "${effectiveTheme}" not found.`);
-      } else {
-        setThemeError(null); // Clear any previous theme error on success
+    if (effectiveTheme === undefined) {
+      if (process.env.NO_COLOR) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Theme configuration unavailable due to NO_COLOR env variable.',
+          },
+          Date.now(),
+        );
       }
+      // If no theme is set and NO_COLOR is not set, the dialog is already open.
+      return;
     }
-  }, [effectiveTheme, setThemeError]); // Re-run if effectiveTheme or setThemeError changes
+
+    if (!themeManager.setActiveTheme(effectiveTheme)) {
+      setIsThemeDialogOpen(true);
+      setThemeError(`Theme "${effectiveTheme}" not found.`);
+    } else {
+      setThemeError(null);
+    }
+  }, [effectiveTheme, setThemeError, addItem]); // Re-run if effectiveTheme or setThemeError changes
 
   const openThemeDialog = useCallback(() => {
+    if (process.env.NO_COLOR) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'Theme configuration unavailable due to NO_COLOR env variable.',
+        },
+        Date.now(),
+      );
+      return;
+    }
     setIsThemeDialogOpen(true);
-  }, []);
+  }, [addItem]);
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {

@@ -15,6 +15,7 @@ import {
   AccessibilitySettings,
 } from '@gemini-code/core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
+import process from 'node:process';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -345,20 +346,52 @@ describe('App UI', () => {
     expect(lastFrame()).toContain('Using 2 MCP servers');
   });
 
-  it('should display theme dialog if no theme is set in settings', async () => {
-    mockSettings = createMockSettings({});
-    mockConfig.getDebugMode.mockReturnValue(false);
-    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+  describe('when no theme is set', () => {
+    let originalNoColor: string | undefined;
 
-    const { lastFrame, unmount } = render(
-      <App
-        config={mockConfig as unknown as ServerConfig}
-        settings={mockSettings}
-        cliVersion="1.0.0"
-      />,
-    );
-    currentUnmount = unmount;
+    beforeEach(() => {
+      originalNoColor = process.env.NO_COLOR;
+      // Ensure no theme is set for these tests
+      mockSettings = createMockSettings({});
+      mockConfig.getDebugMode.mockReturnValue(false);
+      mockConfig.getShowMemoryUsage.mockReturnValue(false);
+    });
 
-    expect(lastFrame()).toContain('Select Theme');
+    afterEach(() => {
+      process.env.NO_COLOR = originalNoColor;
+    });
+
+    it('should display theme dialog if NO_COLOR is not set', async () => {
+      delete process.env.NO_COLOR;
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          cliVersion="1.0.0"
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(lastFrame()).toContain('Select Theme');
+    });
+
+    it('should display a message if NO_COLOR is set', async () => {
+      process.env.NO_COLOR = 'true';
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          cliVersion="1.0.0"
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(lastFrame()).toContain(
+        'Theme configuration unavailable due to NO_COLOR env variable.',
+      );
+      expect(lastFrame()).not.toContain('Select Theme');
+    });
   });
 });
