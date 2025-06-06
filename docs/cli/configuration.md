@@ -23,6 +23,8 @@ The Gemini CLI uses `settings.json` files for persistent configuration. There ar
   - **Location:** `.gemini/settings.json` within your project's root directory.
   - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override User settings.
 
+**Note on Environment Variables in Settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
+
 ### The `.gemini` Directory in Your Project
 
 When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information, this `.gemini` directory is used.
@@ -145,7 +147,14 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
         "command": "node",
         "args": ["mcp_server.js"],
         "cwd": "./mcp_tools/node"
-      }
+      },
+      "myDockerServer": {
+        "command": "docker",
+        "args": ["run", "i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
+        "env": {
+          "API_KEY": "$MY_API_TOKEN"
+        }
+      },
     }
     ```
   - **`mcpServerCommand`** (string, advanced, **deprecated**):

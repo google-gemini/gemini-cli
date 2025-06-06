@@ -98,6 +98,39 @@ export class LoadedSettings {
   }
 }
 
+function resolveEnvVarsInString(value: string): string {
+  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
+  return value.replace(envVarRegex, (match, varName1, varName2) => {
+    const varName = varName1 || varName2;
+    if (process && process.env && typeof process.env[varName] === 'string') {
+      return process.env[varName]!;
+    }
+    return match;
+  });
+}
+
+function resolveEnvVarsInObject<T>(obj: T): T {
+  if (typeof obj === 'string') {
+    return resolveEnvVarsInString(obj) as unknown as T;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
+  }
+
+  if (obj && typeof obj === 'object') {
+    const newObj = { ...obj } as T;
+    for (const key in newObj) {
+      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
+        newObj[key] = resolveEnvVarsInObject(newObj[key]);
+      }
+    }
+    return newObj;
+  }
+
+  return obj;
+}
+
 /**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
@@ -110,7 +143,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
-      userSettings = JSON.parse(stripJsonComments(userContent)) as Settings;
+      const parsedUserSettings = JSON.parse(
+        stripJsonComments(userContent),
+      ) as Settings;
+      userSettings = resolveEnvVarsInObject(parsedUserSettings);
       // Support legacy theme names
       if (userSettings.theme && userSettings.theme === 'VS') {
         userSettings.theme = DefaultLight.name;
@@ -132,9 +168,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
       const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-      workspaceSettings = JSON.parse(
+      const parsedWorkspaceSettings = JSON.parse(
         stripJsonComments(projectContent),
       ) as Settings;
+      workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
       if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
         workspaceSettings.theme = DefaultLight.name;
       } else if (
