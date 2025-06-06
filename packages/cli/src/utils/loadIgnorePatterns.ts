@@ -51,9 +51,6 @@ export function loadGeminiIgnorePatterns(workspaceRoot: string): string[] {
     ) {
       if (error.code === 'ENOENT') {
         // .geminiignore not found, which is fine.
-        console.log(
-          '[INFO] No .geminiignore file found. Proceeding without custom ignore patterns.',
-        );
       } else {
         // Other error reading the file (e.g., permissions)
         console.warn(

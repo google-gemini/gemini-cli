@@ -128,9 +128,7 @@ describe('loadGeminiIgnorePatterns', () => {
 
     const patterns = loadGeminiIgnorePatterns(tempDir);
     expect(patterns).toEqual([]);
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '[INFO] No .geminiignore file found. Proceeding without custom ignore patterns.',
-    );
+    expect(consoleLogSpy).not.toHaveBeenCalled();
     expect(mockedFsReadFileSync).toHaveBeenCalledWith(ignoreFilePath, 'utf-8');
   });
 
