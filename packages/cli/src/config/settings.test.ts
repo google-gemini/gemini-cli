@@ -96,6 +96,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({});
+      expect(settings.errors.length).toBe(0);
     });
 
     it('should load user settings if only user file exists', () => {
@@ -300,27 +301,61 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should handle JSON parsing errors gracefully', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (mockFsExistsSync as Mock).mockReturnValue(true); // Both files "exist"
+      const invalidJsonContent = 'invalid json';
+      const userReadError = new SyntaxError(
+        "Expected ',' or '}' after property value in JSON at position 10",
+      );
+      const workspaceReadError = new SyntaxError(
+        'Unexpected token i in JSON at position 0',
+      );
+
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          // Make it return invalid json for the paths it will try to read
-          if (p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return 'invalid json';
-          return '';
+          if (p === USER_SETTINGS_PATH) {
+            // Simulate JSON.parse throwing for user settings
+            vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+              throw userReadError;
+            });
+            return invalidJsonContent; // Content that would cause JSON.parse to throw
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            // Simulate JSON.parse throwing for workspace settings
+            vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+              throw workspaceReadError;
+            });
+            return invalidJsonContent;
+          }
+          return '{}'; // Default for other reads
         },
       );
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
+      // Check that settings are empty due to parsing errors
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({});
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
 
-      consoleErrorSpy.mockRestore();
+      // Check that error objects are populated in settings.errors
+      expect(settings.errors).toBeDefined();
+      // Assuming both user and workspace files cause errors and are added in order
+      expect(settings.errors.length).toEqual(2);
+
+      const userError = settings.errors.find(
+        (e) => e.path === USER_SETTINGS_PATH,
+      );
+      expect(userError).toBeDefined();
+      expect(userError?.message).toBe(userReadError.message);
+
+      const workspaceError = settings.errors.find(
+        (e) => e.path === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      expect(workspaceError).toBeDefined();
+      expect(workspaceError?.message).toBe(workspaceReadError.message);
+
+      // Restore JSON.parse mock if it was spied on specifically for this test
+      vi.restoreAllMocks(); // Or more targeted restore if needed
     });
 
     it('should resolve environment variables in user settings', () => {
@@ -585,13 +620,14 @@ describe('Settings Loading and Merging', () => {
         'MY_AGENTS.md',
       );
       expect(loadedSettings.merged.contextFileName).toBe('MY_AGENTS.md');
-      expect(loadedSettings.merged.theme).toBe('matrix');
+      expect(loadedSettings.merged.theme).toBe('matrix'); // User setting should still be there
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         MOCK_WORKSPACE_SETTINGS_PATH,
         JSON.stringify({ contextFileName: 'MY_AGENTS.md' }, null, 2),
         'utf-8',
       );
 
+      // Workspace theme overrides user theme
       loadedSettings.setValue(SettingScope.Workspace, 'theme', 'ocean');
 
       expect(loadedSettings.workspace.settings.theme).toBe('ocean');

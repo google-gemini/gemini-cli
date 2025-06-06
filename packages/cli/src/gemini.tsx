@@ -37,7 +37,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-async function main() {
+export async function main() {
   // warn about deprecated environment variables
   if (process.env.GEMINI_CODE_MODEL) {
     console.warn('GEMINI_CODE_MODEL is deprecated. Use GEMINI_MODEL instead.');
@@ -60,6 +60,18 @@ async function main() {
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
   const geminiIgnorePatterns = loadGeminiIgnorePatterns(workspaceRoot);
+
+  if (settings.errors.length > 0) {
+    for (const error of settings.errors) {
+      let errorMessage = `Error in ${error.path}: ${error.message}`;
+      if (!process.env.NO_COLOR) {
+        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+      }
+      console.error(errorMessage);
+      console.error(`Please fix ${error.path} and try again.`);
+    }
+    process.exit(1);
+  }
 
   const { config, modelWasSwitched, originalModelBeforeSwitch, finalModel } =
     await loadCliConfig(settings.merged, geminiIgnorePatterns);
@@ -141,17 +153,6 @@ process.on('unhandledRejection', (reason, _promise) => {
     console.error(reason);
   }
   // Exit for genuinely unhandled errors
-  process.exit(1);
-});
-
-// --- Global Entry Point ---
-main().catch((error) => {
-  console.error('An unexpected critical error occurred:');
-  if (error instanceof Error) {
-    console.error(error.message);
-  } else {
-    console.error(String(error));
-  }
   process.exit(1);
 });
 

@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { MCPServerConfig } from '@gemini-code/core';
+import { MCPServerConfig, getErrorMessage } from '@gemini-code/core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
@@ -47,19 +47,30 @@ export interface Settings {
   // Add other settings here.
 }
 
+export interface SettingsError {
+  message: string;
+  path: string;
+}
+
 export interface SettingsFile {
   settings: Settings;
   path: string;
 }
 export class LoadedSettings {
-  constructor(user: SettingsFile, workspace: SettingsFile) {
+  constructor(
+    user: SettingsFile,
+    workspace: SettingsFile,
+    errors: SettingsError[],
+  ) {
     this.user = user;
     this.workspace = workspace;
+    this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
+  readonly errors: SettingsError[];
 
   private _merged: Settings;
 
@@ -147,6 +158,7 @@ function resolveEnvVarsInObject<T>(obj: T): T {
 export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
+  const settingsErrors: SettingsError[] = [];
 
   // Load user settings
   try {
@@ -163,8 +175,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         userSettings.theme = DefaultDark.name;
       }
     }
-  } catch (error) {
-    console.error('Error reading user settings file:', error);
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: USER_SETTINGS_PATH,
+    });
   }
 
   const workspaceSettingsPath = path.join(
@@ -190,13 +205,23 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         workspaceSettings.theme = DefaultDark.name;
       }
     }
-  } catch (error) {
-    console.error('Error reading workspace settings file:', error);
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: workspaceSettingsPath,
+    });
   }
 
   return new LoadedSettings(
-    { path: USER_SETTINGS_PATH, settings: userSettings },
-    { path: workspaceSettingsPath, settings: workspaceSettings },
+    {
+      path: USER_SETTINGS_PATH,
+      settings: userSettings,
+    },
+    {
+      path: workspaceSettingsPath,
+      settings: workspaceSettings,
+    },
+    settingsErrors,
   );
 }
 
