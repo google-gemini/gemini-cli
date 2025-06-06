@@ -34,5 +34,6 @@ The Gemini CLI (`packages/cli`) is the primary way users interact with the Gemin
 - **[Commands](./commands.md):** A detailed reference for all built-in CLI commands (e.g., `/help`, `/history`, `/theme`).
 - **[Configuration](./configuration.md):** Understand how to configure various aspects of the CLI.
 - **[Themes](./themes.md)**: A guide to customizing the CLI's appearance with different themes.
+- **[Tutorials](tutorials.md)**: A guide for mastering use of the CLI to automate your development tasks.
 
 This documentation will help you become proficient in using the Gemini CLI for a wide range of tasks.
