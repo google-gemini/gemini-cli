@@ -7,6 +7,9 @@
 import { useState, useEffect, useRef } from 'react';
 
 export const WITTY_LOADING_PHRASES = [
+  "I'm Feeling Lucky",
+  'Painting the serifs back on...',
+  'Navigating the slime mold...',
   'Consulting the digital spirits...',
   'Reticulating splines...',
   'Warming up the AI hamsters...',
