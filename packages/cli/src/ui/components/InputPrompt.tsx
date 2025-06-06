@@ -39,7 +39,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onClearScreen,
   config,
   slashCommands,
-  placeholder = 'Type your message or @path/to/file',
+  placeholder = '  Type your message or @path/to/file',
   height = 10,
   focus = true,
   widthFraction,
@@ -349,7 +349,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
-            <Text color={Colors.Gray}>{placeholder}</Text>
+            focus ? (
+              <Text>
+                {chalk.inverse(placeholder.slice(0, 1))}
+                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+              </Text>
+            ) : (
+              <Text color={Colors.Gray}>{placeholder}</Text>
+            )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
