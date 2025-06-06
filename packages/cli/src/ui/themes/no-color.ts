@@ -17,7 +17,7 @@ const noColorColorsTheme: ColorsTheme = {
   AccentGreen: '',
   AccentYellow: '',
   AccentRed: '',
-  SubtleComment: '',
+  Comment: '',
   Gray: '',
 };
 
