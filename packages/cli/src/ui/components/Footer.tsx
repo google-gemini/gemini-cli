@@ -18,7 +18,6 @@ interface FooterProps {
   branchName?: string;
   debugMode: boolean;
   debugMessage: string;
-  cliVersion: string;
   corgiMode: boolean;
   errorCount: number;
   showErrorDetails: boolean;

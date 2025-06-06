@@ -501,7 +501,6 @@ export const App = ({
             debugMode={config.getDebugMode()}
             branchName={branchName}
             debugMessage={debugMessage}
-            cliVersion={cliVersion}
             corgiMode={corgiMode}
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}

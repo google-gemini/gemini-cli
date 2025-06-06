@@ -18,11 +18,11 @@ import {
   ApprovalMode,
 } from '@gemini-code/core';
 import { Settings } from './settings.js';
-import { readPackageUp } from 'read-package-up';
 import {
   getEffectiveModel,
   type EffectiveModelCheckResult,
 } from '../utils/modelCheck.js';
+import { getCliVersion } from '../utils/version.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -239,15 +239,6 @@ export async function loadCliConfig(
 }
 
 async function createUserAgent(): Promise<string> {
-  try {
-    const packageJsonInfo = await readPackageUp({ cwd: import.meta.url });
-    const cliVersion = packageJsonInfo?.packageJson.version || 'unknown';
-    return `GeminiCLI/${cliVersion} Node.js/${process.version} (${process.platform}; ${process.arch})`;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn(
-      `Could not determine package version for User-Agent: ${message}`,
-    );
-    return `GeminiCLI/unknown Node.js/${process.version} (${process.platform}; ${process.arch})`;
-  }
+  const cliVersion = await getCliVersion();
+  return `GeminiCLI/${cliVersion} Node.js/${process.version} (${process.platform}; ${process.arch})`;
 }

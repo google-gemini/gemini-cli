@@ -9,9 +9,7 @@ import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { readPackageUp } from 'read-package-up';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { getCliVersion } from './utils/version.js';
 import { sandbox_command, start_sandbox } from './utils/sandbox.js';
 import { LoadedSettings, loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -33,9 +31,6 @@ import {
   WebSearchTool,
   WriteFileTool,
 } from '@gemini-code/core';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export async function main() {
   // warn about deprecated environment variables
@@ -107,9 +102,7 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
-    const readUpResult = await readPackageUp({ cwd: __dirname });
-    const cliVersion =
-      process.env.CLI_VERSION || readUpResult?.packageJson.version || 'unknown';
+    const cliVersion = await getCliVersion();
 
     render(
       <React.StrictMode>
