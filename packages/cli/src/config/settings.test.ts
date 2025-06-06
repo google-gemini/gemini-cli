@@ -533,6 +533,30 @@ describe('Settings Loading and Merging', () => {
       delete process.env.MY_ENV_STRING;
       delete process.env.MY_ENV_STRING_NESTED;
     });
+
+    it('should resolve multiple concatenated environment variables in a single string value', () => {
+      process.env.TEST_HOST = 'myhost';
+      process.env.TEST_PORT = '9090';
+      const userSettingsContent = {
+        serverAddress: '${TEST_HOST}:${TEST_PORT}/api',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.user.settings.serverAddress).toBe('myhost:9090/api');
+
+      delete process.env.TEST_HOST;
+      delete process.env.TEST_PORT;
+    });
   });
 
   describe('LoadedSettings class', () => {
