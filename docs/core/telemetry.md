@@ -21,13 +21,17 @@ Add this line to enable telemetry by in workspace (`.gemini/settings.json`) or u
 
 ```json
 {
-  "telemetry": true
+  "telemetry": {
+    "enabled": true
+  }
 }
 ```
 
+You can also control telemetry with the `GEMINI_TELEMETRY_ENABLED` environment variable.
+
 #### Mode 1: Console Output (Default)
 
-If you only set `"telemetry": true` and do nothing else, the CLI will output all telemetry data directly to your console. This is the simplest way to inspect events, metrics, and traces without any external tools.
+If you only set `"enabled": true` and do nothing else, the CLI will output all telemetry data directly to your console. This is the simplest way to inspect events, metrics, and traces without any external tools.
 
 #### Mode 2: Sending to a Collector
 

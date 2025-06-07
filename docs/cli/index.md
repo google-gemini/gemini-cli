@@ -1,10 +1,6 @@
 # Gemini CLI
 
-Welcome to the documentation for the Gemini CLI. This section provides an overview of the CLI's features, how to interact with it, and how to customize your experience.
-
-## What is the Gemini CLI?
-
-The Gemini CLI (`packages/cli`) is the primary way users interact with the Gemini AI model and its associated tools directly from their terminal. It offers an interactive Read-Eval-Print Loop (REPL) environment where you can send prompts to Gemini, receive responses, and see the results of any tools Gemini uses to fulfill your requests.
+The Gemini CLI (`packages/cli`) is the primary way users interact with the Gemini AI model and its associated tools directly from their terminal. For a general overview of the Gemini CLI, see the [main documentation page](../index.md).
 
 ## Core Features
 
@@ -36,4 +32,20 @@ The Gemini CLI (`packages/cli`) is the primary way users interact with the Gemin
 - **[Themes](./themes.md)**: A guide to customizing the CLI's appearance with different themes.
 - **[Tutorials](tutorials.md)**: A guide for mastering use of the CLI to automate your development tasks.
 
-This documentation will help you become proficient in using the Gemini CLI for a wide range of tasks.
+## Non-Interactive Mode
+
+The Gemini CLI can be run in a non-interactive mode, which is useful for scripting and automation. In this mode, you can pipe input to the CLI and it will execute the command and exit.
+
+To use the non-interactive mode, you can pipe a command to the CLI. For example:
+
+```bash
+echo "What is fine tuning?" | gemini
+```
+
+You can achieve the same result with the `--prompt` or `p` argument. For example:
+
+```bash
+gemini -p "What is fine tuning?"
+```
+
+In both cases this will execute the command and print the output to the console.

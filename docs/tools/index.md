@@ -43,7 +43,9 @@ The built-in tools can be broadly categorized as follows:
 
 - **[File System Tools](./file-system.md):** For interacting with files and directories (reading, writing, listing, searching, etc.).
 - **[Shell Tool](./shell.md):** For executing shell commands.
-- **[Web Fetch Tool](./web.md):** For retrieving content from URLs.
+- **[Web Fetch Tool](./web-fetch.md):** For retrieving content from URLs.
+- **[Web Search Tool](./web-search.md):** For searching the web.
 - **[Multi-File Read Tool](./multi-file.md):** A specialized tool for reading content from multiple files or directories, often used by the `@` command.
+- **[Memory Tool](./memory.md):** For saving and recalling information across sessions.
 
 Understanding the available tools and how they work will help you make the most effective use of the Gemini CLI.

@@ -32,14 +32,16 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
     - **`refresh`**:
       - **Description:** Reloads the hierarchical instructional context (memory) from all `GEMINI.md` files found in the configured locations (global, project/ancestors, and sub-directories). This command updates the AI's understanding based on the latest `GEMINI.md` content.
       - **Action:** The CLI re-scans for all relevant `GEMINI.md` files and rebuilds its instructional memory. The number of loaded files is typically indicated in the CLI footer.
-    - **`delete_all_added`**:
-      - **Description:** Removes all ad-hoc memory entries that were added during the current session via `/memory add`. This does not affect memory loaded from `GEMINI.md` files.
-      - **Action:** All user-added memory entries for the current session are cleared.
-  - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](./configuration.md#4-geminimd-files-hierarchical-instructional-context).
+    - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](./configuration.md#4-geminimd-files-hierarchical-instructional-context).
 
 - **`/quit`** (or **`/exit`**)
+
   - **Description:** Exits the Gemini CLI application.
   - **Action:** Terminates the CLI process.
+
+- **`/tools`**
+  - **Description:** Displays a list of all the tools that are currently available to the model.
+  - **Action:** Outputs a list of the available tools.
 
 ## At Commands (`@`)
 
