@@ -126,6 +126,7 @@ class MockTool extends BaseTool<{ param: string }, ToolResult> {
 const baseConfigParams: ConfigParameters = {
   apiKey: 'test-api-key',
   model: 'test-model',
+  embeddingModel: 'test-embedding-model',
   sandbox: false,
   targetDir: '/test/dir',
   debugMode: false,

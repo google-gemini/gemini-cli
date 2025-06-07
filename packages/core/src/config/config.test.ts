@@ -48,9 +48,11 @@ describe('Server Config (config.ts)', () => {
   const USER_AGENT = 'ServerTestAgent/1.0';
   const USER_MEMORY = 'Test User Memory';
   const TELEMETRY = false;
+  const EMBEDDING_MODEL = 'gemini-embedding';
   const baseParams: ConfigParameters = {
     apiKey: API_KEY,
     model: MODEL,
+    embeddingModel: EMBEDDING_MODEL,
     sandbox: SANDBOX,
     targetDir: TARGET_DIR,
     debugMode: DEBUG_MODE,

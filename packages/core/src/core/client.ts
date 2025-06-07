@@ -5,6 +5,8 @@
  */
 
 import {
+  EmbedContentResponse,
+  EmbedContentParameters,
   GenerateContentConfig,
   GoogleGenAI,
   Part,
@@ -38,6 +40,7 @@ export class GeminiClient {
   private chat: Promise<GeminiChat>;
   private contentGenerator: ContentGenerator;
   private model: string;
+  private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
@@ -60,6 +63,7 @@ export class GeminiClient {
     });
     this.contentGenerator = googleGenAI.models;
     this.model = config.getModel();
+    this.embeddingModel = config.getEmbeddingModel();
     this.chat = this.startChat();
   }
 
@@ -448,6 +452,40 @@ export class GeminiClient {
         `Failed to generate content with model ${modelToUse}: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  async generateEmbedding(texts: string[]): Promise<number[][]> {
+    if (!texts || texts.length === 0) {
+      return [];
+    }
+    const embedModelParams: EmbedContentParameters = {
+      model: this.embeddingModel,
+      contents: texts,
+    };
+    const embedContentResponse: EmbedContentResponse =
+      await this.contentGenerator.embedContent(embedModelParams);
+    if (
+      !embedContentResponse.embeddings ||
+      embedContentResponse.embeddings.length === 0
+    ) {
+      throw new Error('No embeddings found in API response.');
+    }
+
+    if (embedContentResponse.embeddings.length !== texts.length) {
+      throw new Error(
+        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
+      );
+    }
+
+    return embedContentResponse.embeddings.map((embedding, index) => {
+      const values = embedding.values;
+      if (!values || values.length === 0) {
+        throw new Error(
+          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
+        );
+      }
+      return values;
+    });
   }
 
   private async tryCompressChat(): Promise<boolean> {

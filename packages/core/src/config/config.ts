@@ -55,6 +55,7 @@ export class MCPServerConfig {
 export interface ConfigParameters {
   apiKey: string;
   model: string;
+  embeddingModel: string;
   sandbox: boolean | string;
   targetDir: string;
   debugMode: boolean;
@@ -84,6 +85,7 @@ export class Config {
   private toolRegistry: Promise<ToolRegistry>;
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly embeddingModel: string;
   private readonly sandbox: boolean | string;
   private readonly targetDir: string;
   private readonly debugMode: boolean;
@@ -113,6 +115,7 @@ export class Config {
   constructor(params: ConfigParameters) {
     this.apiKey = params.apiKey;
     this.model = params.model;
+    this.embeddingModel = params.embeddingModel;
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.debugMode = params.debugMode;
@@ -161,6 +164,10 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getEmbeddingModel(): string {
+    return this.embeddingModel;
   }
 
   getSandbox(): boolean | string {

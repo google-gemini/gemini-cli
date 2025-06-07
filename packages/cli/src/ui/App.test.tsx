@@ -38,6 +38,7 @@ interface MockServerConfig {
   vertexai?: boolean;
   showMemoryUsage?: boolean;
   accessibility?: AccessibilitySettings;
+  embeddingModel: string;
 
   getApiKey: Mock<() => string>;
   getModel: Mock<() => string>;
@@ -92,6 +93,7 @@ vi.mock('@gemini-code/core', async (importOriginal) => {
         vertexai: opts.vertexai,
         showMemoryUsage: opts.showMemoryUsage ?? false,
         accessibility: opts.accessibility ?? {},
+        embeddingModel: opts.embeddingModel || 'test-embedding-model',
 
         getApiKey: vi.fn(() => opts.apiKey || 'test-key'),
         getModel: vi.fn(() => opts.model || 'test-model-in-mock-factory'),
@@ -178,7 +180,8 @@ describe('App UI', () => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
       apiKey: 'test-key',
-      model: 'test-model-in-options',
+      model: 'test-model',
+      embeddingModel: 'test-embedding-model',
       sandbox: false,
       targetDir: '/test/dir',
       debugMode: false,

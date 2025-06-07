@@ -33,6 +33,7 @@ const logger = {
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro-preview-06-05';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash-preview-05-20';
+export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 interface CliArgs {
   model: string | undefined;
@@ -177,6 +178,7 @@ export async function loadCliConfig(
   const configParams: ConfigParameters = {
     apiKey: apiKeyForServer,
     model: modelToUse,
+    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: argv.sandbox ?? settings.sandbox ?? argv.yolo ?? false,
     targetDir: process.cwd(),
     debugMode,

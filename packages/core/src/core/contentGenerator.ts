@@ -9,6 +9,8 @@ import {
   GenerateContentResponse,
   GenerateContentParameters,
   CountTokensParameters,
+  EmbedContentResponse,
+  EmbedContentParameters,
 } from '@google/genai';
 
 /**
@@ -24,4 +26,6 @@ export interface ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
+
+  embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 }
