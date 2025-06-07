@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'fs';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, Box, useInput, useStdin } from 'ink';
 import { Colors } from '../colors.js';
@@ -58,11 +59,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { stdin, setRawMode } = useStdin();
 
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height, width: effectiveWidth },
     stdin,
     setRawMode,
+    isValidPath,
   });
 
   const completion = useCompletion(
