@@ -19,7 +19,7 @@ set -euo pipefail
 # note this includes the case where sandbox-exec (seatbelt) is used
 # this happens most commonly when user runs `npm run build:all` without enabling sandboxing
 if ! scripts/sandbox_command.sh -q || [ "$(scripts/sandbox_command.sh)" == "sandbox-exec" ]; then
-    echo "WARNING: container-based sandboxing is disabled (see README.md#sandboxing)"
+    echo "WARNING: container-based sandboxing is disabled (see CONTRIBUTING.md#enabling-sandboxing)"
     exit 0
 fi
 
