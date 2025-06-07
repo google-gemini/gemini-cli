@@ -41,22 +41,7 @@ All file system tools operate within a `rootDirectory` (usually the current work
 - **Confirmation:** No.
 - **Confirmation:** No.
 
-## 3. `write_file` (WriteFile)
-
-- **Tool Name:** `write_file`
-- **Display Name:** WriteFile
-- **File:** `write-file.ts`
-- **Description:** Writes content to a specified file. If the file exists, it will be overwritten. If it doesn't exist, it (and any necessary parent directories) will be created.
-- **Parameters:**
-  - `file_path` (string, required): The absolute path to the file to write to.
-  - `content` (string, required): The content to write into the file.
-- **Behavior:**
-  - Writes the provided `content` to the `file_path`.
-  - Creates parent directories if they don't exist.
-- **Output (`llmContent`):** A success message, e.g., `Successfully overwrote file: /path/to/your/file.txt` or `Successfully created and wrote to new file: /path/to/new/file.txt`.
-- **Confirmation:** Yes. Shows a diff of changes and asks for user approval before writing.
-
-## 4. `glob` (FindFiles)
+## 3. `glob` (FindFiles)
 
 - **Tool Name:** `glob`
 - **Display Name:** FindFiles
@@ -72,7 +57,7 @@ All file system tools operate within a `rootDirectory` (usually the current work
 - **Output (`llmContent`):** A message like: `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **Confirmation:** No.
 
-## 5. `search_file_content` (SearchText)
+## 4. `search_file_content` (SearchText)
 
 - **Tool Name:** `search_file_content`
 - **Display Name:** SearchText
@@ -99,32 +84,23 @@ All file system tools operate within a `rootDirectory` (usually the current work
   ```
 - **Confirmation:** No.
 
-## 6. `replace` (Edit)
+## 5. `edit_file` (EditFile)
 
-- **Tool Name:** `replace`
-- **Display Name:** Edit
+- **Tool Name:** `edit_file`
+- **Display Name:** EditFile
 - **File:** `edit.ts`
-- **Description:** Replaces a single, unique occurrence of text within a file. This tool is designed for precise, targeted changes and requires significant context around the `old_string` to ensure it modifies the correct location. It can also be used to create new files if `old_string` is empty and the `file_path` does not exist.
+- **Description:** Modifies files with precise text replacements or creates new files. Supports batch operations for making multiple edits to the same file efficiently. This tool is designed for precise, targeted changes.
 - **Parameters:**
   - `file_path` (string, required): The absolute path to the file to modify.
-  - `old_string` (string, required): The exact literal text to replace. **CRITICAL:** This string must uniquely identify the single instance to change. It should include at least 3 lines of context _before_ and _after_ the target text, matching whitespace and indentation precisely. If `old_string` is empty, the tool attempts to create a new file at `file_path` with `new_string` as content.
-  - `new_string` (string, required): The exact literal text to replace `old_string` with.
+  - `edits` (array, required): Array of edit operations. Each edit contains `old_string` and `new_string`.
+  - `expected_replacements` (number, optional): Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.
 - **Behavior:**
-  - If `old_string` is empty and `file_path` does not exist, creates a new file with `new_string` as content.
-  - If `old_string` is provided, it reads the `file_path` and attempts to find exactly one occurrence of `old_string`.
-  - If one occurrence is found, it replaces it with `new_string`.
-  - **Enhanced Reliability (Multi-Stage Edit Correction):** To significantly improve the success rate of edits, especially when the model-provided `old_string` might not be perfectly precise, the tool incorporates a multi-stage edit correction mechanism.
-    - If the initial `old_string` isn't found or matches multiple locations, the tool can leverage the Gemini model to iteratively refine `old_string` (and potentially `new_string`).
-    - This self-correction process attempts to identify the unique segment the model intended to modify, making the `replace` operation more robust even with slightly imperfect initial context from the AI.
-  - **Failure Conditions:** Despite the correction mechanism, the tool will fail if:
-    - `file_path` is not absolute or is outside the root directory.
-    - `old_string` is not empty, but the `file_path` does not exist.
-    - `old_string` is empty, but the `file_path` already exists.
-    - `old_string` is not found in the file after attempts to correct it.
-    - `old_string` is found multiple times, and the self-correction mechanism cannot resolve it to a single, unambiguous match.
-- **Output (`llmContent`):**
-  - On success: `Successfully modified file: /path/to/file.txt (1 replacements).` or `Created new file: /path/to/new_file.txt with provided content.`
-  - On failure: An error message explaining the reason (e.g., `Failed to edit, 0 occurrences found...`, `Failed to edit, expected 1 occurrences but found 2...`).
+  - **Modifying existing files**: Replaces exact text matches. File must exist unless the first edit has an empty `old_string` (indicating file creation).
+  - **Creating new files**: Use an empty `old_string` in the first edit to create a new file with `new_string` as the content.
+  - **Batch editing**: Applies multiple changes in sequence to the same file.
+  - **Enhanced Reliability**: Incorporates multi-stage edit correction to improve success rates when initial text matches aren't perfect.
+  - **Context Requirements**: Each `old_string` must uniquely identify the target location with sufficient context (typically 3+ lines before and after).
+- **Output (`llmContent`):** Reports number of edits applied, attempted, and any failures with specific error details for troubleshooting.
 - **Confirmation:** Yes. Shows a diff of the proposed changes and asks for user approval before writing to the file.
 
 These file system tools provide a robust foundation for the Gemini CLI to understand and interact with your local project context.

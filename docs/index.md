@@ -21,7 +21,7 @@ This documentation is organized into the following sections:
   - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
 - **Tools:**
   - **[Tools Overview](./tools/index.md):** A general look at the available tools.
-  - **[File System Tools](./tools/file-system.md):** Documentation for tools like `read_file`, `write_file`, etc.
+  - **[File System Tools](./tools/file-system.md):** Documentation for tools like `read_file`, `edit_file`, etc.
   - **[Shell Tool](./tools/shell.md):** Using the `execute_bash_command` tool.
   - **[Web Fetch Tool](./tools/web.md):** Using the `web_fetch` tool.
   - **[Multi-File Read Tool](./tools/multi-file.md):** Using the `read_many_files` tool.

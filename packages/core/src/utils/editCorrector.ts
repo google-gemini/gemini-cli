@@ -61,10 +61,16 @@ export interface CorrectedEditResult {
  */
 export async function ensureCorrectEdit(
   currentContent: string,
-  originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
+  originalParams: EditToolParams & { old_string: string; new_string: string },
   client: GeminiClient,
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
+  // Ensure we have required old_string and new_string
+  if (!originalParams.old_string || !originalParams.new_string) {
+    throw new Error(
+      'old_string and new_string are required for edit correction',
+    );
+  }
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
   const cachedResult = editCorrectionCache.get(cacheKey);
   if (cachedResult) {
@@ -96,7 +102,11 @@ export async function ensureCorrectEdit(
     // If user expects multiple replacements, return as-is
     if (occurrences === expectedReplacements) {
       const result: CorrectedEditResult = {
-        params: { ...originalParams },
+        params: {
+          file_path: originalParams.file_path,
+          old_string: originalParams.old_string!,
+          new_string: originalParams.new_string!,
+        },
         occurrences,
       };
       editCorrectionCache.set(cacheKey, result);
@@ -106,7 +116,11 @@ export async function ensureCorrectEdit(
     // If user expects 1 but found multiple, try to correct (existing behavior)
     if (expectedReplacements === 1) {
       const result: CorrectedEditResult = {
-        params: { ...originalParams },
+        params: {
+          file_path: originalParams.file_path,
+          old_string: originalParams.old_string!,
+          new_string: originalParams.new_string!,
+        },
         occurrences,
       };
       editCorrectionCache.set(cacheKey, result);
@@ -115,7 +129,11 @@ export async function ensureCorrectEdit(
 
     // If occurrences don't match expected, return as-is (will fail validation later)
     const result: CorrectedEditResult = {
-      params: { ...originalParams },
+      params: {
+        file_path: originalParams.file_path,
+        old_string: finalOldString,
+        new_string: finalNewString,
+      },
       occurrences,
     };
     editCorrectionCache.set(cacheKey, result);
@@ -169,7 +187,11 @@ export async function ensureCorrectEdit(
       } else {
         // LLM correction also failed for old_string
         const result: CorrectedEditResult = {
-          params: { ...originalParams },
+          params: {
+            file_path: originalParams.file_path,
+            old_string: finalOldString,
+            new_string: finalNewString,
+          },
           occurrences: 0, // Explicitly 0 as LLM failed
         };
         editCorrectionCache.set(cacheKey, result);
@@ -178,7 +200,11 @@ export async function ensureCorrectEdit(
     } else {
       // Unescaping old_string resulted in > 1 occurrences
       const result: CorrectedEditResult = {
-        params: { ...originalParams },
+        params: {
+          file_path: originalParams.file_path,
+          old_string: finalOldString,
+          new_string: finalNewString,
+        },
         occurrences, // This will be > 1
       };
       editCorrectionCache.set(cacheKey, result);

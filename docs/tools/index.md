@@ -30,7 +30,7 @@ You will typically see messages in the CLI indicating when a tool is being calle
 
 ## Security and Confirmation
 
-Many tools, especially those that can modify your file system or execute commands (`write_file`, `edit`, `execute_bash_command`), are designed with safety in mind. The Gemini CLI will typically:
+Many tools, especially those that can modify your file system or execute commands (`edit_file`, `execute_bash_command`), are designed with safety in mind. The Gemini CLI will typically:
 
 - **Require Confirmation:** Prompt you before executing potentially sensitive operations, showing you what action is about to be taken.
 - **Utilize Sandboxing:** All tools are subject to restrictions enforced by sandboxing (see [README](../../README.md#sandboxing)).

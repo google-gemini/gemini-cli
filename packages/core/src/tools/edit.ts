@@ -18,11 +18,11 @@ import {
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { ReadFileTool } from './read-file.js';
 import { GeminiClient } from '../core/client.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { ReadFileTool } from './read-file.js';
 
 /**
  * Parameters for the Edit tool
@@ -34,14 +34,12 @@ export interface EditToolParams {
   file_path: string;
 
   /**
-   * The text to replace
+   * Array of edits to apply
    */
-  old_string: string;
-
-  /**
-   * The text to replace it with
-   */
-  new_string: string;
+  edits: Array<{
+    old_string: string;
+    new_string: string;
+  }>;
 
   /**
    * Number of replacements expected. Defaults to 1 if not specified.
@@ -50,18 +48,29 @@ export interface EditToolParams {
   expected_replacements?: number;
 }
 
-interface CalculatedEdit {
-  currentContent: string | null;
-  newContent: string;
-  occurrences: number;
-  error?: { display: string; raw: string };
-  isNewFile: boolean;
+interface EditResult extends ToolResult {
+  editsApplied: number;
+  editsAttempted: number;
+  editsFailed: number;
+  failedEdits?: Array<{
+    index: number;
+    oldString: string;
+    newString: string;
+    error: string;
+  }>;
+}
+
+interface FailedEdit {
+  index: number;
+  oldString: string;
+  newString: string;
+  error: string;
 }
 
 /**
  * Implementation of the Edit tool logic
  */
-export class EditTool extends BaseTool<EditToolParams, ToolResult> {
+export class EditTool extends BaseTool<EditToolParams, EditResult> {
   static readonly Name = 'replace';
   private readonly config: Config;
   private readonly rootDirectory: string;
@@ -74,8 +83,8 @@ export class EditTool extends BaseTool<EditToolParams, ToolResult> {
   constructor(config: Config) {
     super(
       EditTool.Name,
-      'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool} tool to examine the file's current content before attempting a text replacement.
+      'EditFile',
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool also supports batch editing with multiple edits in a single operation. Requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
 
 Expectation for required parameters:
 1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
@@ -91,15 +100,26 @@ Expectation for required parameters:
               "The absolute path to the file to modify. Must start with '/'.",
             type: 'string',
           },
-          old_string: {
+          edits: {
             description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: 'string',
-          },
-          new_string: {
-            description:
-              'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: 'string',
+              'Array of edit operations to apply. Each edit should have old_string and new_string properties.',
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                old_string: {
+                  description:
+                    'The exact literal text to replace, preferably unescaped. CRITICAL: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely.',
+                  type: 'string',
+                },
+                new_string: {
+                  description:
+                    'The exact literal text to replace old_string with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+                  type: 'string',
+                },
+              },
+              required: ['old_string', 'new_string'],
+            },
           },
           expected_replacements: {
             type: 'number',
@@ -108,7 +128,7 @@ Expectation for required parameters:
             minimum: 1,
           },
         },
-        required: ['file_path', 'old_string', 'new_string'],
+        required: ['file_path', 'edits'],
         type: 'object',
       },
     );
@@ -158,6 +178,11 @@ Expectation for required parameters:
       return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
     }
 
+    // Validate that edits array is provided and not empty
+    if (!params.edits || params.edits.length === 0) {
+      return 'Must provide "edits" array with at least one edit.';
+    }
+
     return null;
   }
 
@@ -182,95 +207,124 @@ Expectation for required parameters:
   }
 
   /**
-   * Calculates the potential outcome of an edit operation.
-   * @param params Parameters for the edit operation
-   * @returns An object describing the potential edit outcome
-   * @throws File system errors if reading the file fails unexpectedly (e.g., permissions)
+   * Applies multiple edits to file content in sequence
+   * @param params Edit parameters
+   * @param abortSignal Abort signal for cancellation
+   * @returns Result with detailed edit metrics
    */
-  private async calculateEdit(
+  private async applyMultipleEdits(
     params: EditToolParams,
     abortSignal: AbortSignal,
-  ): Promise<CalculatedEdit> {
-    const expectedReplacements = params.expected_replacements ?? 1;
+  ): Promise<{
+    newContent: string;
+    editsApplied: number;
+    editsAttempted: number;
+    editsFailed: number;
+    failedEdits: FailedEdit[];
+    isNewFile: boolean;
+    originalContent: string | null;
+  }> {
+    // Read current file content or determine if this is a new file
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
-    let finalNewString = params.new_string;
-    let finalOldString = params.old_string;
-    let occurrences = 0;
-    let error: { display: string; raw: string } | undefined = undefined;
 
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
       fileExists = true;
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {
-        // Rethrow unexpected FS errors (permissions, etc.)
         throw err;
       }
-      fileExists = false;
     }
 
-    if (params.old_string === '' && !fileExists) {
-      // Creating a new file
+    // If file doesn't exist and first edit has empty old_string, it's file creation
+    if (!fileExists && params.edits[0].old_string === '') {
       isNewFile = true;
+      currentContent = '';
     } else if (!fileExists) {
-      // Trying to edit a non-existent file (and old_string is not empty)
-      error = {
-        display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
-        raw: `File not found: ${params.file_path}`,
-      };
-    } else if (currentContent !== null) {
-      // Editing an existing file
-      const correctedEdit = await ensureCorrectEdit(
-        currentContent,
-        params,
-        this.client,
-        abortSignal,
-      );
-      finalOldString = correctedEdit.params.old_string;
-      finalNewString = correctedEdit.params.new_string;
-      occurrences = correctedEdit.occurrences;
-
-      if (params.old_string === '') {
-        // Error: Trying to create a file that already exists
-        error = {
-          display: `Failed to edit. Attempted to create a file that already exists.`,
-          raw: `File already exists, cannot create: ${params.file_path}`,
-        };
-      } else if (occurrences === 0) {
-        error = {
-          display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
-        };
-      } else if (occurrences !== expectedReplacements) {
-        error = {
-          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
-        };
-      }
-    } else {
-      // Should not happen if fileExists and no exception was thrown, but defensively:
-      error = {
-        display: `Failed to read content of file.`,
-        raw: `Failed to read content of existing file: ${params.file_path}`,
-      };
+      throw new Error(`File does not exist: ${params.file_path}`);
+    } else if (fileExists && params.edits[0].old_string === '') {
+      // Protect against accidentally creating a file that already exists
+      throw new Error(`File already exists: ${params.file_path}`);
     }
 
-    const newContent = this._applyReplacement(
-      currentContent,
-      finalOldString,
-      finalNewString,
-      isNewFile,
-    );
+    const expectedReplacements = params.expected_replacements ?? 1;
 
-    return {
-      currentContent,
-      newContent,
-      occurrences,
-      error,
+    const result = {
+      newContent: currentContent || '',
+      editsApplied: 0,
+      editsAttempted: params.edits.length,
+      editsFailed: 0,
+      failedEdits: [] as FailedEdit[],
       isNewFile,
+      originalContent: currentContent,
     };
+
+    // Apply each edit
+    for (let i = 0; i < params.edits.length; i++) {
+      const edit = params.edits[i];
+
+      // Handle new file creation with empty old_string
+      if (isNewFile && edit.old_string === '') {
+        result.newContent = edit.new_string;
+        result.editsApplied++;
+        continue;
+      }
+
+      // Use edit corrector for better matching
+      try {
+        const correctedEdit = await ensureCorrectEdit(
+          result.newContent,
+          {
+            ...params,
+            old_string: edit.old_string,
+            new_string: edit.new_string,
+          },
+          this.client,
+          abortSignal,
+        );
+
+        // Handle both single and multiple replacements based on expected_replacements
+        if (expectedReplacements === 1 && correctedEdit.occurrences === 1) {
+          result.newContent = result.newContent.replace(
+            correctedEdit.params.old_string,
+            correctedEdit.params.new_string,
+          );
+          result.editsApplied++;
+        } else if (
+          expectedReplacements > 1 &&
+          correctedEdit.occurrences === expectedReplacements
+        ) {
+          result.newContent = result.newContent.replaceAll(
+            correctedEdit.params.old_string,
+            correctedEdit.params.new_string,
+          );
+          result.editsApplied++;
+        } else {
+          result.editsFailed++;
+          result.failedEdits.push({
+            index: i,
+            oldString: edit.old_string,
+            newString: edit.new_string,
+            error:
+              correctedEdit.occurrences === 0
+                ? 'String not found'
+                : `Expected ${expectedReplacements} occurrences but found ${correctedEdit.occurrences}`,
+          });
+        }
+      } catch (error) {
+        result.editsFailed++;
+        result.failedEdits.push({
+          index: i,
+          oldString: edit.old_string,
+          newString: edit.new_string,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -291,98 +345,89 @@ Expectation for required parameters:
       );
       return false;
     }
-    let currentContent: string | null = null;
-    let fileExists = false;
-    let finalNewString = params.new_string;
-    let finalOldString = params.old_string;
-    let occurrences = 0;
 
     try {
-      currentContent = fs.readFileSync(params.file_path, 'utf8');
-      fileExists = true;
-    } catch (err: unknown) {
-      if (isNodeError(err) && err.code === 'ENOENT') {
-        fileExists = false;
-      } else {
-        console.error(`Error reading file for confirmation diff: ${err}`);
+      // Calculate what the edits would produce
+      const editResult = await this.applyMultipleEdits(params, abortSignal);
+
+      // Don't show confirmation if no edits would be applied
+      if (editResult.editsApplied === 0 && !editResult.isNewFile) {
         return false;
       }
-    }
 
-    if (params.old_string === '' && !fileExists) {
-      // Creating new file, newContent is just params.new_string
-    } else if (!fileExists) {
-      return false; // Cannot edit non-existent file if old_string is not empty
-    } else if (currentContent !== null) {
-      const correctedEdit = await ensureCorrectEdit(
-        currentContent,
-        params,
-        this.client,
-        abortSignal,
-      );
-      finalOldString = correctedEdit.params.old_string;
-      finalNewString = correctedEdit.params.new_string;
-      occurrences = correctedEdit.occurrences;
-
-      const expectedReplacements = params.expected_replacements ?? 1;
-      if (occurrences === 0 || occurrences !== expectedReplacements) {
-        return false;
-      }
-    } else {
-      return false; // Should not happen
-    }
-
-    const isNewFileScenario = params.old_string === '' && !fileExists;
-    const newContent = this._applyReplacement(
-      currentContent,
-      finalOldString,
-      finalNewString,
-      isNewFileScenario,
-    );
-
-    const fileName = path.basename(params.file_path);
-    const fileDiff = Diff.createPatch(
-      fileName,
-      currentContent ?? '',
-      newContent,
-      'Current',
-      'Proposed',
-      DEFAULT_DIFF_OPTIONS,
-    );
-    const confirmationDetails: ToolEditConfirmationDetails = {
-      type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
-      fileName,
-      fileDiff,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+      // Read current content for diff comparison
+      let currentContent: string | null = null;
+      try {
+        currentContent = fs.readFileSync(params.file_path, 'utf8');
+      } catch (err: unknown) {
+        if (isNodeError(err) && err.code === 'ENOENT') {
+          currentContent = '';
+        } else {
+          console.error(`Error reading file for confirmation diff: ${err}`);
+          return false;
         }
-      },
-    };
-    return confirmationDetails;
+      }
+
+      // Generate diff for confirmation
+      const fileName = path.basename(params.file_path);
+      const fileDiff = Diff.createPatch(
+        fileName,
+        currentContent || '',
+        editResult.newContent,
+        'Current',
+        'Proposed',
+        DEFAULT_DIFF_OPTIONS,
+      );
+
+      const editsCount = params.edits.length;
+      const title =
+        editsCount > 1
+          ? `Confirm ${editsCount} Edits: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`
+          : `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+
+      const confirmationDetails: ToolEditConfirmationDetails = {
+        type: 'edit',
+        title,
+        fileName,
+        fileDiff,
+        onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+            this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+          }
+        },
+      };
+      return confirmationDetails;
+    } catch (error) {
+      console.error(`Error generating confirmation diff: ${error}`);
+      return false;
+    }
   }
 
   getDescription(params: EditToolParams): string {
-    if (!params.file_path || !params.old_string || !params.new_string) {
+    if (!params.file_path) {
       return `Model did not provide valid parameters for edit tool`;
     }
     const relativePath = makeRelative(params.file_path, this.rootDirectory);
-    if (params.old_string === '') {
-      return `Create ${shortenPath(relativePath)}`;
+
+    if (!params.edits || params.edits.length === 0) {
+      return `Edit ${shortenPath(relativePath)}`;
     }
 
-    const oldStringSnippet =
-      params.old_string.split('\n')[0].substring(0, 30) +
-      (params.old_string.length > 30 ? '...' : '');
-    const newStringSnippet =
-      params.new_string.split('\n')[0].substring(0, 30) +
-      (params.new_string.length > 30 ? '...' : '');
-
-    if (params.old_string === params.new_string) {
-      return `No file changes to ${shortenPath(relativePath)}`;
+    if (params.edits.length === 1) {
+      const edit = params.edits[0];
+      if (edit.old_string === '') {
+        return `Create ${shortenPath(relativePath)}`;
+      }
+      const oldSnippet =
+        edit.old_string.split('\n')[0].substring(0, 30) +
+        (edit.old_string.length > 30 ? '...' : '');
+      const newSnippet =
+        edit.new_string.split('\n')[0].substring(0, 30) +
+        (edit.new_string.length > 30 ? '...' : '');
+      return `${shortenPath(relativePath)}: ${oldSnippet} => ${newSnippet}`;
+    } else {
+      return `Edit ${shortenPath(relativePath)} (${params.edits.length} edits)`;
     }
-    return `${shortenPath(relativePath)}: ${oldStringSnippet} => ${newStringSnippet}`;
   }
 
   /**
@@ -392,69 +437,79 @@ Expectation for required parameters:
    */
   async execute(
     params: EditToolParams,
-    _signal: AbortSignal,
-  ): Promise<ToolResult> {
+    abortSignal: AbortSignal,
+  ): Promise<EditResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
         returnDisplay: `Error: ${validationError}`,
-      };
-    }
-
-    let editData: CalculatedEdit;
-    try {
-      editData = await this.calculateEdit(params, _signal);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      return {
-        llmContent: `Error preparing edit: ${errorMsg}`,
-        returnDisplay: `Error preparing edit: ${errorMsg}`,
-      };
-    }
-
-    if (editData.error) {
-      return {
-        llmContent: editData.error.raw,
-        returnDisplay: `Error: ${editData.error.display}`,
+        editsApplied: 0,
+        editsAttempted: 0,
+        editsFailed: 1,
       };
     }
 
     try {
+      const editResult = await this.applyMultipleEdits(params, abortSignal);
+
+      // Apply the changes to the file
       this.ensureParentDirectoriesExist(params.file_path);
-      fs.writeFileSync(params.file_path, editData.newContent, 'utf8');
+      fs.writeFileSync(params.file_path, editResult.newContent, 'utf8');
 
+      // Generate appropriate response messages
       let displayResult: ToolResultDisplay;
-      if (editData.isNewFile) {
+      let llmContent: string;
+
+      if (editResult.isNewFile) {
         displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
-      } else {
-        // Generate diff for display, even though core logic doesn't technically need it
-        // The CLI wrapper will use this part of the ToolResult
+        llmContent = `Created new file: ${params.file_path}`;
+      } else if (editResult.editsApplied > 0) {
+        // Generate diff for display using original content before writing
         const fileName = path.basename(params.file_path);
+        // Use the original content from before the edit was applied
+        const originalContent = editResult.originalContent || '';
         const fileDiff = Diff.createPatch(
           fileName,
-          editData.currentContent ?? '', // Should not be null here if not isNewFile
-          editData.newContent,
+          originalContent,
+          editResult.newContent,
           'Current',
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
         displayResult = { fileDiff, fileName };
+        llmContent = `Successfully applied ${editResult.editsApplied}/${editResult.editsAttempted} edits to ${params.file_path}`;
+      } else {
+        displayResult = `No edits applied to ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+        llmContent = `Failed to apply any edits to ${params.file_path}`;
       }
 
-      const llmSuccessMessage = editData.isNewFile
-        ? `Created new file: ${params.file_path} with provided content.`
-        : `Successfully modified file: ${params.file_path} (${editData.occurrences} replacements).`;
+      // Add details about failed edits
+      if (editResult.editsFailed > 0) {
+        const failureDetails = editResult.failedEdits
+          .map((f) => `Edit ${f.index + 1}: ${f.error}`)
+          .join('; ');
+        llmContent += `. Failed edits: ${failureDetails}`;
+      }
 
       return {
-        llmContent: llmSuccessMessage,
+        llmContent,
         returnDisplay: displayResult,
+        editsApplied: editResult.editsApplied,
+        editsAttempted: editResult.editsAttempted,
+        editsFailed: editResult.editsFailed,
+        failedEdits: editResult.failedEdits,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      const editsAttempted = params.edits.length;
+
       return {
-        llmContent: `Error executing edit: ${errorMsg}`,
-        returnDisplay: `Error writing file: ${errorMsg}`,
+        llmContent: `Error executing edits: ${errorMsg}`,
+        returnDisplay: `Error: ${errorMsg}`,
+        editsApplied: 0,
+        editsAttempted,
+        editsFailed: editsAttempted,
       };
     }
   }
