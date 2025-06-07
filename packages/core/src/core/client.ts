@@ -8,7 +8,6 @@ import {
   EmbedContentResponse,
   EmbedContentParameters,
   GenerateContentConfig,
-  GoogleGenAI,
   Part,
   SchemaUnion,
   PartListUnion,
@@ -34,7 +33,10 @@ import {
   logApiResponse,
   logApiError,
 } from '../telemetry/index.js';
-import { ContentGenerator } from './contentGenerator.js';
+import {
+  ContentGenerator,
+  createContentGenerator,
+} from './contentGenerator.js';
 
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
@@ -48,20 +50,9 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(private config: Config) {
-    const userAgent = config.getUserAgent();
-    const apiKeyFromConfig = config.getApiKey();
-    const vertexaiFlag = config.getVertexAI();
-
-    const googleGenAI = new GoogleGenAI({
-      apiKey: apiKeyFromConfig === '' ? undefined : apiKeyFromConfig,
-      vertexai: vertexaiFlag,
-      httpOptions: {
-        headers: {
-          'User-Agent': userAgent,
-        },
-      },
-    });
-    this.contentGenerator = googleGenAI.models;
+    this.contentGenerator = createContentGenerator(
+      this.config.getContentGeneratorConfig(),
+    );
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
     this.chat = this.startChat();

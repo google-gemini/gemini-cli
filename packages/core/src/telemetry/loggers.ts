@@ -45,7 +45,7 @@ export function logCliConfiguration(config: Config): void {
       typeof config.getSandbox() === 'string' ? true : config.getSandbox(),
     core_tools_enabled: (config.getCoreTools() ?? []).join(','),
     approval_mode: config.getApprovalMode(),
-    vertex_ai_enabled: config.getVertexAI() ?? false,
+    vertex_ai_enabled: !!config.getContentGeneratorConfig().vertexai,
     log_user_prompts_enabled: config.getTelemetryLogUserPromptsEnabled(),
     file_filtering_respect_git_ignore:
       config.getFileFilteringRespectGitIgnore(),

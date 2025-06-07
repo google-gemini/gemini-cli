@@ -64,7 +64,7 @@ export function initializeTelemetry(config: Config): void {
     return;
   }
 
-  const geminiCliVersion = config.getUserAgent() || 'unknown';
+  const geminiCliVersion = config.getContentGeneratorConfig().userAgent;
   const resource = new Resource({
     [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
     [SemanticResourceAttributes.SERVICE_VERSION]: geminiCliVersion,

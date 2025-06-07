@@ -14,6 +14,7 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
+  ContentGeneratorConfig,
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
@@ -121,6 +122,62 @@ export async function loadCliConfig(
 ): Promise<Config> {
   loadEnvironment();
 
+  const argv = await parseArguments();
+  const debugMode = argv.debug || false;
+
+  // Set the context filename in the server's memoryTool module BEFORE loading memory
+  // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
+  // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
+  // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
+  if (settings.contextFileName) {
+    setServerGeminiMdFilename(settings.contextFileName);
+  } else {
+    // Reset to default if not provided in settings.
+    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+  }
+
+  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
+  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
+    process.cwd(),
+    debugMode,
+  );
+
+  const contentGeneratorConfig = await createContentGeneratorConfig(argv);
+
+  return new Config({
+    contentGeneratorConfig,
+    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+    sandbox: argv.sandbox ?? settings.sandbox ?? argv.yolo ?? false,
+    targetDir: process.cwd(),
+    debugMode,
+    question: argv.prompt || '',
+    fullContext: argv.all_files || false,
+    coreTools: settings.coreTools || undefined,
+    toolDiscoveryCommand: settings.toolDiscoveryCommand,
+    toolCallCommand: settings.toolCallCommand,
+    mcpServerCommand: settings.mcpServerCommand,
+    mcpServers: settings.mcpServers,
+    userMemory: memoryContent,
+    geminiMdFileCount: fileCount,
+    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    showMemoryUsage:
+      argv.show_memory_usage || settings.showMemoryUsage || false,
+    geminiIgnorePatterns,
+    accessibility: settings.accessibility,
+    telemetry:
+      argv.telemetry !== undefined
+        ? argv.telemetry
+        : (settings.telemetry ?? false),
+    // Git-aware file filtering settings
+    fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+    fileFilteringAllowBuildArtifacts:
+      settings.fileFiltering?.allowBuildArtifacts,
+  });
+}
+
+async function createContentGeneratorConfig(
+  argv: CliArgs,
+): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -144,65 +201,16 @@ export async function loadCliConfig(
     process.exit(1);
   }
 
-  const argv = await parseArguments();
-  const debugMode = argv.debug || false;
+  const config: ContentGeneratorConfig = {
+    model: argv.model || DEFAULT_GEMINI_MODEL,
+    apiKey: geminiApiKey || googleApiKey || '',
+    vertexai: hasGeminiApiKey ? false : undefined,
+    userAgent: `GeminiCLI/${getCliVersion()}/(${process.platform}; ${process.arch})`,
+  };
 
-  // Set the context filename in the server's memoryTool module BEFORE loading memory
-  // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
-  // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
-  // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.contextFileName) {
-    setServerGeminiMdFilename(settings.contextFileName);
-  } else {
-    // Reset to default if not provided in settings.
-    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+  if (config.apiKey) {
+    config.model = await getEffectiveModel(config.apiKey, config.model);
   }
 
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
-    debugMode,
-  );
-
-  const userAgent = `GeminiCLI/${getCliVersion()}/(${process.platform}; ${process.arch})`;
-  const apiKeyForServer = geminiApiKey || googleApiKey || '';
-  const useVertexAI = hasGeminiApiKey ? false : undefined;
-
-  let modelToUse = argv.model || DEFAULT_GEMINI_MODEL;
-  if (apiKeyForServer) {
-    modelToUse = await getEffectiveModel(apiKeyForServer, modelToUse);
-  }
-
-  return new Config({
-    apiKey: apiKeyForServer,
-    model: modelToUse,
-    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
-    sandbox: argv.sandbox ?? settings.sandbox ?? argv.yolo ?? false,
-    targetDir: process.cwd(),
-    debugMode,
-    question: argv.prompt || '',
-    fullContext: argv.all_files || false,
-    coreTools: settings.coreTools || undefined,
-    toolDiscoveryCommand: settings.toolDiscoveryCommand,
-    toolCallCommand: settings.toolCallCommand,
-    mcpServerCommand: settings.mcpServerCommand,
-    mcpServers: settings.mcpServers,
-    userAgent,
-    userMemory: memoryContent,
-    geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
-    vertexai: useVertexAI,
-    showMemoryUsage:
-      argv.show_memory_usage || settings.showMemoryUsage || false,
-    geminiIgnorePatterns,
-    accessibility: settings.accessibility,
-    telemetry:
-      argv.telemetry !== undefined
-        ? argv.telemetry
-        : (settings.telemetry ?? false),
-    // Git-aware file filtering settings
-    fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-    fileFilteringAllowBuildArtifacts:
-      settings.fileFiltering?.allowBuildArtifacts,
-  });
+  return config;
 }

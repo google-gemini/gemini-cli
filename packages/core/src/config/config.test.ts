@@ -50,15 +50,17 @@ describe('Server Config (config.ts)', () => {
   const TELEMETRY = false;
   const EMBEDDING_MODEL = 'gemini-embedding';
   const baseParams: ConfigParameters = {
-    apiKey: API_KEY,
-    model: MODEL,
+    contentGeneratorConfig: {
+      apiKey: API_KEY,
+      model: MODEL,
+      userAgent: USER_AGENT,
+    },
     embeddingModel: EMBEDDING_MODEL,
     sandbox: SANDBOX,
     targetDir: TARGET_DIR,
     debugMode: DEBUG_MODE,
     question: QUESTION,
     fullContext: FULL_CONTEXT,
-    userAgent: USER_AGENT,
     userMemory: USER_MEMORY,
     telemetry: TELEMETRY,
   };
@@ -73,10 +75,7 @@ describe('Server Config (config.ts)', () => {
 
     expect(config.getUserMemory()).toBe(USER_MEMORY);
     // Verify other getters if needed
-    expect(config.getApiKey()).toBe(API_KEY);
-    expect(config.getModel()).toBe(MODEL);
     expect(config.getTargetDir()).toBe(path.resolve(TARGET_DIR)); // Check resolved path
-    expect(config.getUserAgent()).toBe(USER_AGENT);
   });
 
   it('Config constructor should default userMemory to empty string if not provided', () => {

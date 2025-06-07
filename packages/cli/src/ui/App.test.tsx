@@ -179,13 +179,15 @@ describe('App UI', () => {
   beforeEach(() => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
-      apiKey: 'test-key',
-      model: 'test-model',
+      contentGeneratorConfig: {
+        apiKey: 'test-key',
+        model: 'test-model',
+        userAgent: 'test-agent',
+      },
       embeddingModel: 'test-embedding-model',
       sandbox: false,
       targetDir: '/test/dir',
       debugMode: false,
-      userAgent: 'test-agent',
       userMemory: '',
       geminiMdFileCount: 0,
       showMemoryUsage: false,

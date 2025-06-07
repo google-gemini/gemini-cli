@@ -77,6 +77,11 @@ describe('Gemini Client (client.ts)', () => {
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(() => {
       const mock = {
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          model: 'test-model',
+          apiKey: 'test-key',
+          vertexai: false,
+        }),
         getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
         getModel: vi.fn().mockReturnValue('test-model'),
         getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
