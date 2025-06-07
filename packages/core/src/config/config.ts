@@ -316,10 +316,9 @@ function findEnvFile(startDir: string): string | null {
 
 export function loadEnvironment(): void {
   const envFilePath = findEnvFile(process.cwd());
-  if (!envFilePath) {
-    return;
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath });
   }
-  dotenv.config({ path: envFilePath });
 }
 
 export function createServerConfig(params: ConfigParameters): Config {

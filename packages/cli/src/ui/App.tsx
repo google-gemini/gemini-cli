@@ -55,16 +55,10 @@ const CTRL_C_PROMPT_DURATION_MS = 1000;
 interface AppProps {
   config: Config;
   settings: LoadedSettings;
-  cliVersion: string;
   startupWarnings?: string[];
 }
 
-export const App = ({
-  config,
-  settings,
-  cliVersion,
-  startupWarnings = [],
-}: AppProps) => {
+export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const { history, addItem, clearItems } = useHistory();
   const {
     consoleMessages,
@@ -196,7 +190,6 @@ export const App = ({
     openThemeDialog,
     performMemoryRefresh,
     toggleCorgiMode,
-    cliVersion,
   );
 
   const { streamingState, submitQuery, initError, pendingHistoryItems } =

@@ -217,7 +217,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -234,7 +233,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -255,7 +253,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -276,7 +273,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -297,7 +293,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -317,7 +312,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -338,7 +332,6 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
-        cliVersion="1.0.0"
       />,
     );
     currentUnmount = unmount;
@@ -368,7 +361,6 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
-          cliVersion="1.0.0"
         />,
       );
       currentUnmount = unmount;
@@ -383,7 +375,6 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
-          cliVersion="1.0.0"
         />,
       );
       currentUnmount = unmount;

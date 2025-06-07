@@ -115,7 +115,6 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockPerformMemoryRefresh,
         mockCorgiMode,
-        'test-version',
       ),
     );
     return result.current;
@@ -253,8 +252,8 @@ describe('useSlashCommandProcessor', () => {
       description?: string,
       sandboxEnvVar?: string,
       seatbeltProfileVar?: string,
+      cliVersion?: string,
     ) => {
-      const cliVersion = 'test-version';
       const osVersion = 'test-platform test-node-version';
       let sandboxEnvStr = 'no sandbox';
       if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {
@@ -293,12 +292,14 @@ Add any other context about the problem here.
     it('should call open with the correct GitHub issue URL and return true', async () => {
       process.env.SANDBOX = 'gemini-sandbox';
       process.env.SEATBELT_PROFILE = 'test_profile';
+      process.env.CLI_VERSION = 'test-version';
       const { handleSlashCommand } = getProcessor();
       const bugDescription = 'This is a test bug';
       const expectedUrl = getExpectedUrl(
         bugDescription,
         process.env.SANDBOX,
         process.env.SEATBELT_PROFILE,
+        process.env.CLI_VERSION,
       );
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {

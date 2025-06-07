@@ -9,7 +9,6 @@ import { render } from 'ink';
 import { App } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { getCliVersion } from './utils/version.js';
 import { sandbox_command, start_sandbox } from './utils/sandbox.js';
 import { LoadedSettings, loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -101,14 +100,11 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
-    const cliVersion = await getCliVersion();
-
     render(
       <React.StrictMode>
         <App
           config={config}
           settings={settings}
-          cliVersion={cliVersion}
           startupWarnings={startupWarnings}
         />
       </React.StrictMode>,

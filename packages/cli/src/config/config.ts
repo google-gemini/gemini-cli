@@ -175,7 +175,7 @@ export async function loadCliConfig(
     debugMode,
   );
 
-  const userAgent = await createUserAgent();
+  const userAgent = `GeminiCLI/${getCliVersion()}/(${process.platform}; ${process.arch})`;
   const apiKeyForServer = geminiApiKey || googleApiKey || '';
   const useVertexAI = hasGeminiApiKey ? false : undefined;
 
@@ -193,8 +193,6 @@ export async function loadCliConfig(
       originalModel = checkResult.originalModelIfSwitched;
       modelToUse = checkResult.effectiveModel;
     }
-  } else {
-    // logger.debug('API key not available during config load. Skipping model availability check.');
   }
 
   const configParams: ConfigParameters = {
@@ -236,9 +234,4 @@ export async function loadCliConfig(
     originalModelBeforeSwitch: originalModel,
     finalModel: modelToUse,
   };
-}
-
-async function createUserAgent(): Promise<string> {
-  const cliVersion = await getCliVersion();
-  return `GeminiCLI/${cliVersion} Node.js/${process.version} (${process.platform}; ${process.arch})`;
 }

@@ -14,6 +14,7 @@ import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
+import { getCliVersion } from '../../utils/version.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -46,7 +47,6 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   performMemoryRefresh: () => Promise<void>,
   toggleCorgiMode: () => void,
-  cliVersion: string,
 ) => {
   const addMessage = useCallback(
     (message: Message) => {
@@ -193,7 +193,7 @@ export const useSlashCommandProcessor = (
         name: 'about',
         description: 'Show version info',
         action: (_mainCommand, _subCommand, _args) => {
-          const osVersion = `${process.platform} ${process.version}`;
+          const osVersion = process.platform;
           let sandboxEnv = 'no sandbox';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
             sandboxEnv = process.env.SANDBOX;
@@ -201,7 +201,7 @@ export const useSlashCommandProcessor = (
             sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
-
+          const cliVersion = getCliVersion();
           addMessage({
             type: MessageType.ABOUT,
             timestamp: new Date(),
@@ -231,6 +231,7 @@ export const useSlashCommandProcessor = (
           }
           const modelVersion = config?.getModel() || 'Unknown';
           const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+          const cliVersion = getCliVersion();
 
           const diagnosticInfo = `
 ## Describe the bug
@@ -299,7 +300,6 @@ Add any other context about the problem here.
       addMessage,
       toggleCorgiMode,
       config,
-      cliVersion,
     ],
   );
 
