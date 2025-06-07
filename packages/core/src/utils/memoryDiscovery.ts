@@ -56,17 +56,29 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
         return currentDir;
       }
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error) {
-        const fsError = error as { code: string; message: string };
-        if (fsError.code !== 'ENOENT') {
+      // Don't log ENOENT errors as they're expected when .git doesn't exist
+      // Also don't log errors in test environments, which often have mocked fs
+      const isENOENT =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: string }).code === 'ENOENT';
+
+      // Only log unexpected errors in non-test environments
+      // process.env.NODE_ENV === 'test' or VITEST are common test indicators
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+
+      if (!isENOENT && !isTestEnv) {
+        if (typeof error === 'object' && error !== null && 'code' in error) {
+          const fsError = error as { code: string; message: string };
           logger.warn(
             `Error checking for .git directory at ${gitPath}: ${fsError.message}`,
           );
+        } else {
+          logger.warn(
+            `Non-standard error checking for .git directory at ${gitPath}: ${String(error)}`,
+          );
         }
-      } else {
-        logger.warn(
-          `Non-standard error checking for .git directory at ${gitPath}: ${String(error)}`,
-        );
       }
     }
     const parentDir = path.dirname(currentDir);
@@ -136,8 +148,12 @@ async function collectDownwardGeminiFiles(
       }
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Error scanning directory ${directory}: ${message}`);
+    // Only log warnings in non-test environments
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+    if (!isTestEnv) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`Error scanning directory ${directory}: ${message}`);
+    }
     if (debugMode) logger.debug(`Failed to scan directory: ${directory}`);
   }
   return collectedPaths;
@@ -283,10 +299,13 @@ async function readGeminiMdFiles(
           `Successfully read: ${filePath} (Length: ${content.length})`,
         );
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        `Warning: Could not read ${getCurrentGeminiMdFilename()} file at ${filePath}. Error: ${message}`,
-      );
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+      if (!isTestEnv) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(
+          `Warning: Could not read ${getCurrentGeminiMdFilename()} file at ${filePath}. Error: ${message}`,
+        );
+      }
       results.push({ filePath, content: null }); // Still include it with null content
       if (debugMode) logger.debug(`Failed to read: ${filePath}`);
     }

@@ -45,6 +45,10 @@ describe('loadServerHierarchicalMemory', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // Set environment variables to indicate test environment
+    process.env.NODE_ENV = 'test';
+    process.env.VITEST = 'true';
+
     setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME); // Use defined const
     mockOs.homedir.mockReturnValue(USER_HOME);
 

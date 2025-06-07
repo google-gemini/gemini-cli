@@ -185,7 +185,9 @@ describe('GlobTool', () => {
     });
 
     it('should return error if pattern is missing (schema validation)', () => {
-      const params = { path: '.' } as unknown as GlobToolParams;
+      // Need to correctly define this as an object without pattern
+      const params = { path: '.' };
+      // @ts-expect-error - We're intentionally creating invalid params for testing
       expect(globTool.validateToolParams(params)).toContain(
         'Parameters failed schema validation',
       );
@@ -209,7 +211,8 @@ describe('GlobTool', () => {
       const params = {
         pattern: '*.ts',
         path: 123,
-      } as unknown as GlobToolParams;
+      };
+      // @ts-expect-error - We're intentionally creating invalid params for testing
       expect(globTool.validateToolParams(params)).toContain(
         'Parameters failed schema validation',
       );
@@ -219,7 +222,8 @@ describe('GlobTool', () => {
       const params = {
         pattern: '*.ts',
         case_sensitive: 'true',
-      } as unknown as GlobToolParams;
+      };
+      // @ts-expect-error - We're intentionally creating invalid params for testing
       expect(globTool.validateToolParams(params)).toContain(
         'Parameters failed schema validation',
       );

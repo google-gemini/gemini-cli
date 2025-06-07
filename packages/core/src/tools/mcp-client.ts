@@ -13,6 +13,83 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
 
+/**
+ * Enum representing the connection status of an MCP server
+ */
+export enum MCPServerStatus {
+  /** Server is disconnected or experiencing errors */
+  DISCONNECTED = 'disconnected',
+  /** Server is in the process of connecting */
+  CONNECTING = 'connecting',
+  /** Server is connected and ready to use */
+  CONNECTED = 'connected',
+}
+
+/**
+ * Map to track the status of each MCP server within the core package
+ */
+const mcpServerStatusesInternal: Map<string, MCPServerStatus> = new Map();
+
+/**
+ * Event listeners for MCP server status changes
+ */
+type StatusChangeListener = (
+  serverName: string,
+  status: MCPServerStatus,
+) => void;
+const statusChangeListeners: StatusChangeListener[] = [];
+
+/**
+ * Add a listener for MCP server status changes
+ */
+export function addMCPStatusChangeListener(
+  listener: StatusChangeListener,
+): void {
+  statusChangeListeners.push(listener);
+}
+
+/**
+ * Remove a listener for MCP server status changes
+ */
+export function removeMCPStatusChangeListener(
+  listener: StatusChangeListener,
+): void {
+  const index = statusChangeListeners.indexOf(listener);
+  if (index !== -1) {
+    statusChangeListeners.splice(index, 1);
+  }
+}
+
+/**
+ * Update the status of an MCP server
+ */
+function updateMCPServerStatus(
+  serverName: string,
+  status: MCPServerStatus,
+): void {
+  mcpServerStatusesInternal.set(serverName, status);
+  // Notify all listeners
+  for (const listener of statusChangeListeners) {
+    listener(serverName, status);
+  }
+}
+
+/**
+ * Get the current status of an MCP server
+ */
+export function getMCPServerStatus(serverName: string): MCPServerStatus {
+  return (
+    mcpServerStatusesInternal.get(serverName) || MCPServerStatus.DISCONNECTED
+  );
+}
+
+/**
+ * Get all MCP server statuses
+ */
+export function getAllMCPServerStatuses(): Map<string, MCPServerStatus> {
+  return new Map(mcpServerStatusesInternal);
+}
+
 export async function discoverMcpTools(
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
@@ -43,6 +120,9 @@ async function connectAndDiscover(
   mcpServerConfig: MCPServerConfig,
   toolRegistry: ToolRegistry,
 ): Promise<void> {
+  // Initialize the server status as connecting
+  updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
+
   let transport;
   if (mcpServerConfig.url) {
     transport = new SSEClientTransport(new URL(mcpServerConfig.url));
@@ -61,6 +141,8 @@ async function connectAndDiscover(
     console.error(
       `MCP server '${mcpServerName}' has invalid configuration: missing both url (for SSE) and command (for stdio). Skipping.`,
     );
+    // Update status to disconnected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     return;
   }
 
@@ -72,16 +154,22 @@ async function connectAndDiscover(
 
   try {
     await mcpClient.connect(transport);
+    // Connection successful
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
   } catch (error) {
     console.error(
       `failed to start or connect to MCP server '${mcpServerName}' ` +
         `${JSON.stringify(mcpServerConfig)}; \n${error}`,
     );
+    // Update status to disconnected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     return;
   }
 
   mcpClient.onerror = (error) => {
     console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+    // Update status to disconnected on error
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   };
 
   if (transport instanceof StdioClientTransport && transport.stderr) {
@@ -110,6 +198,8 @@ async function connectAndDiscover(
       } else if (transport instanceof SSEClientTransport) {
         await transport.close();
       }
+      // Update status to disconnected
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
       return;
     }
 
@@ -168,6 +258,8 @@ async function connectAndDiscover(
     ) {
       await transport.close();
     }
+    // Update status to disconnected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
 
   // If no tools were registered from this MCP server, the following 'if' block
@@ -184,6 +276,8 @@ async function connectAndDiscover(
       transport instanceof SSEClientTransport
     ) {
       await transport.close();
+      // Update status to disconnected
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     }
   }
 }
