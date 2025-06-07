@@ -30,17 +30,6 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly timeout?: number,
     readonly trust?: boolean,
   ) {
-    if (serverName !== 'mcp') {
-      // Add server name if not the generic 'mcp'
-      description += `
-
-This MCP tool named '${serverToolName}' was discovered from an MCP server.`;
-    } else {
-      description += `
-
-This MCP tool named '${serverToolName}' was discovered from '${serverName}' MCP server.`;
-    }
-
     super(
       name,
       name,

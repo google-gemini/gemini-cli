@@ -52,7 +52,7 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('constructor', () => {
-    it('should set properties correctly and augment description (non-generic server)', () => {
+    it('should set properties correctly (non-generic server)', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName, // serverName is 'mock-mcp-server', not 'mcp'
@@ -64,14 +64,13 @@ describe('DiscoveredMCPTool', () => {
 
       expect(tool.name).toBe(toolNameForModel);
       expect(tool.schema.name).toBe(toolNameForModel);
-      const expectedDescription = `${baseDescription}\n\nThis MCP tool named '${serverToolName}' was discovered from an MCP server.`;
-      expect(tool.schema.description).toBe(expectedDescription);
+      expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toEqual(inputSchema);
       expect(tool.serverToolName).toBe(serverToolName);
       expect(tool.timeout).toBeUndefined();
     });
 
-    it('should set properties correctly and augment description (generic "mcp" server)', () => {
+    it('should set properties correctly (generic "mcp" server)', () => {
       const genericServerName = 'mcp';
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
@@ -81,8 +80,7 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         serverToolName,
       );
-      const expectedDescription = `${baseDescription}\n\nThis MCP tool named '${serverToolName}' was discovered from '${genericServerName}' MCP server.`;
-      expect(tool.schema.description).toBe(expectedDescription);
+      expect(tool.schema.description).toBe(baseDescription);
     });
 
     it('should accept and store a custom timeout', () => {

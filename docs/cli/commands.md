@@ -11,6 +11,19 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
   - **Description:** Displays help information about the Gemini CLI, including available commands and their usage.
   - **Action:** Opens a help dialog or section within the CLI.
 
+- **`/mcp`** (Toggle descriptions: **Ctrl+T**)
+
+  - **Description:** Lists configured Model Context Protocol (MCP) servers and their available tools.
+  - **Action:** Displays a formatted list of MCP servers with connection status indicators, server details, and available tools.
+  - **Sub-commands:**
+    - **`desc`** or **`descriptions`**:
+      - **Description:** Shows detailed descriptions for MCP servers and tools.
+      - **Action:** Displays each tool's name with its full description, formatted for readability.
+    - **`nodesc`** or **`nodescriptions`**:
+      - **Description:** Hides tool descriptions, showing only the tool names.
+      - **Action:** Displays a compact list with only tool names.
+  - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between showing and hiding tool descriptions.
+
 - **`/clear`** (Shortcut: **Ctrl+L**)
 
   - **Description:** Clears the entire terminal screen, including the visible session history and scrollback within the CLI.

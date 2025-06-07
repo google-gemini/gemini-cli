@@ -49,7 +49,7 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import open from 'open';
 import {
   useSlashCommandProcessor,
@@ -107,7 +107,7 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessor = () => {
+  const getProcessor = (showToolDescriptions: boolean = false) => {
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
@@ -119,6 +119,7 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockPerformMemoryRefresh,
         mockCorgiMode,
+        showToolDescriptions,
       ),
     );
     return result.current;
@@ -571,17 +572,82 @@ Add any other context about the problem here.
       // Check that the message contains details about both servers and their tools
       const message = mockAddItem.mock.calls[1][0].text;
       // Server 1 - Connected (green dot)
-      expect(message).toContain('🟢 server1 (2 tools):');
-      expect(message).toContain('server1_tool1');
-      expect(message).toContain('server1_tool2');
+      expect(message).toContain('🟢 \u001b[1mserver1\u001b[0m (2 tools)');
+      expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
+      expect(message).toContain('\u001b[36mserver1_tool2\u001b[0m');
 
       // Server 2 - Connecting (yellow dot)
-      expect(message).toContain('🟡 server2 (1 tools):');
-      expect(message).toContain('server2_tool1');
+      expect(message).toContain('🟡 \u001b[1mserver2\u001b[0m (1 tools)');
+      expect(message).toContain('\u001b[36mserver2_tool1\u001b[0m');
 
       // Server 3 - No status, should default to Disconnected (red dot)
-      expect(message).toContain('🔴 server3 (1 tools):');
-      expect(message).toContain('server3_tool1');
+      expect(message).toContain('🔴 \u001b[1mserver3\u001b[0m (1 tools)');
+      expect(message).toContain('\u001b[36mserver3_tool1\u001b[0m');
+
+      expect(commandResult).toBe(true);
+    });
+
+    it('should display tool descriptions when showToolDescriptions is true', async () => {
+      // Mock MCP servers configuration with server description
+      const mockMcpServers = {
+        server1: {
+          command: 'cmd1',
+          description: 'This is a server description',
+        },
+      };
+
+      // Setup getMCPServerStatus mock implementation
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        return MCPServerStatus.DISCONNECTED;
+      });
+
+      // Mock tools from server with descriptions
+      const mockServerTools = [
+        { name: 'tool1', description: 'This is tool 1 description' },
+        { name: 'tool2', description: 'This is tool 2 description' },
+      ];
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue(mockServerTools),
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor(true);
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configured MCP servers and tools:'),
+        }),
+        expect.any(Number),
+      );
+
+      const message = mockAddItem.mock.calls[1][0].text;
+
+      // Check that server description is included (with ANSI color codes)
+      expect(message).toContain('\u001b[1mserver1\u001b[0m (2 tools)');
+      expect(message).toContain(
+        '\u001b[32mThis is a server description\u001b[0m',
+      );
+
+      // Check that tool descriptions are included (with ANSI color codes)
+      expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      expect(message).toContain(
+        '\u001b[32mThis is tool 1 description\u001b[0m',
+      );
+      expect(message).toContain('\u001b[36mtool2\u001b[0m');
+      expect(message).toContain(
+        '\u001b[32mThis is tool 2 description\u001b[0m',
+      );
 
       expect(commandResult).toBe(true);
     });
@@ -636,9 +702,9 @@ Add any other context about the problem here.
 
       // Check that the message contains details about both servers and their tools
       const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('🟢 server1 (1 tools):');
-      expect(message).toContain('server1_tool1');
-      expect(message).toContain('🔴 server2 (0 tools):');
+      expect(message).toContain('🟢 \u001b[1mserver1\u001b[0m (1 tools)');
+      expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
+      expect(message).toContain('🔴 \u001b[1mserver2\u001b[0m (0 tools)');
       expect(message).toContain('No tools available');
 
       expect(commandResult).toBe(true);

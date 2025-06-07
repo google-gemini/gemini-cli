@@ -79,6 +79,8 @@ export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [corgiMode, setCorgiMode] = useState(false);
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+  const [showToolDescriptions, setShowToolDescriptions] =
+    useState<boolean>(false);
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -87,44 +89,6 @@ export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     [consoleMessages],
   );
 
-  useInput((input: string, key: InkKeyType) => {
-    if (key.ctrl && input === 'o') {
-      setShowErrorDetails((prev) => !prev);
-      refreshStatic();
-    } else if (key.ctrl && (input === 'c' || input === 'C')) {
-      if (ctrlCPressedOnce) {
-        if (ctrlCTimerRef.current) {
-          clearTimeout(ctrlCTimerRef.current);
-        }
-        process.exit(0);
-      } else {
-        setCtrlCPressedOnce(true);
-        ctrlCTimerRef.current = setTimeout(() => {
-          setCtrlCPressedOnce(false);
-          ctrlCTimerRef.current = null;
-        }, CTRL_C_PROMPT_DURATION_MS);
-      }
-    }
-  });
-
-  useEffect(
-    () => () => {
-      if (ctrlCTimerRef.current) {
-        clearTimeout(ctrlCTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  useConsolePatcher({
-    onNewMessage: handleNewMessage,
-    debugMode: config.getDebugMode(),
-  });
-
-  const toggleCorgiMode = useCallback(() => {
-    setCorgiMode((prev) => !prev);
-  }, []);
-
   const {
     isThemeDialogOpen,
     openThemeDialog,
@@ -132,11 +96,9 @@ export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
 
-  useEffect(() => {
-    if (config) {
-      setGeminiMdFileCount(config.getGeminiMdFileCount());
-    }
-  }, [config]);
+  const toggleCorgiMode = useCallback(() => {
+    setCorgiMode((prev) => !prev);
+  }, []);
 
   const performMemoryRefresh = useCallback(async () => {
     addItem(
@@ -190,7 +152,60 @@ export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     performMemoryRefresh,
     toggleCorgiMode,
+    showToolDescriptions,
   );
+
+  useInput((input: string, key: InkKeyType) => {
+    if (key.ctrl && input === 'o') {
+      setShowErrorDetails((prev) => !prev);
+      refreshStatic();
+    } else if (key.ctrl && input === 't') {
+      // Toggle showing tool descriptions
+      const newValue = !showToolDescriptions;
+      setShowToolDescriptions(newValue);
+      refreshStatic();
+
+      // Re-execute the MCP command to show/hide descriptions
+      const mcpServers = config.getMcpServers();
+      if (Object.keys(mcpServers || {}).length > 0) {
+        // Pass description flag based on the new value
+        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+      }
+    } else if (key.ctrl && (input === 'c' || input === 'C')) {
+      if (ctrlCPressedOnce) {
+        if (ctrlCTimerRef.current) {
+          clearTimeout(ctrlCTimerRef.current);
+        }
+        process.exit(0);
+      } else {
+        setCtrlCPressedOnce(true);
+        ctrlCTimerRef.current = setTimeout(() => {
+          setCtrlCPressedOnce(false);
+          ctrlCTimerRef.current = null;
+        }, CTRL_C_PROMPT_DURATION_MS);
+      }
+    }
+  });
+
+  useEffect(
+    () => () => {
+      if (ctrlCTimerRef.current) {
+        clearTimeout(ctrlCTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  useConsolePatcher({
+    onNewMessage: handleNewMessage,
+    debugMode: config.getDebugMode(),
+  });
+
+  useEffect(() => {
+    if (config) {
+      setGeminiMdFileCount(config.getGeminiMdFileCount());
+    }
+  }, [config]);
 
   const { streamingState, submitQuery, initError, pendingHistoryItems } =
     useGeminiStream(
@@ -422,6 +437,7 @@ export const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                         getCurrentGeminiMdFilename()
                       }
                       mcpServers={config.getMcpServers()}
+                      showToolDescriptions={showToolDescriptions}
                     />
                   )}
                 </Box>
