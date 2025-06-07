@@ -18,10 +18,7 @@ import {
   ApprovalMode,
 } from '@gemini-code/core';
 import { Settings } from './settings.js';
-import {
-  getEffectiveModel,
-  type EffectiveModelCheckResult,
-} from '../utils/modelCheck.js';
+import { getEffectiveModel } from '../utils/modelCheck.js';
 import { getCliVersion } from '../utils/version.js';
 
 // Simple console logger for now - replace with actual logger if available
@@ -119,17 +116,10 @@ export async function loadHierarchicalGeminiMemory(
   return loadServerHierarchicalMemory(currentWorkingDirectory, debugMode);
 }
 
-export interface LoadCliConfigResult {
-  config: Config;
-  modelWasSwitched: boolean;
-  originalModelBeforeSwitch?: string;
-  finalModel: string;
-}
-
 export async function loadCliConfig(
   settings: Settings,
   geminiIgnorePatterns: string[],
-): Promise<LoadCliConfigResult> {
+): Promise<Config> {
   loadEnvironment();
 
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -180,19 +170,8 @@ export async function loadCliConfig(
   const useVertexAI = hasGeminiApiKey ? false : undefined;
 
   let modelToUse = argv.model || DEFAULT_GEMINI_MODEL;
-  let modelSwitched = false;
-  let originalModel: string | undefined = undefined;
-
   if (apiKeyForServer) {
-    const checkResult: EffectiveModelCheckResult = await getEffectiveModel(
-      apiKeyForServer,
-      modelToUse,
-    );
-    if (checkResult.switched) {
-      modelSwitched = true;
-      originalModel = checkResult.originalModelIfSwitched;
-      modelToUse = checkResult.effectiveModel;
-    }
+    modelToUse = await getEffectiveModel(apiKeyForServer, modelToUse);
   }
 
   const configParams: ConfigParameters = {
@@ -227,11 +206,5 @@ export async function loadCliConfig(
       settings.fileFiltering?.allowBuildArtifacts,
   };
 
-  const config = createServerConfig(configParams);
-  return {
-    config,
-    modelWasSwitched: modelSwitched,
-    originalModelBeforeSwitch: originalModel,
-    finalModel: modelToUse,
-  };
+  return createServerConfig(configParams);
 }

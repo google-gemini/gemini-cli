@@ -5,10 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  getEffectiveModel,
-  type EffectiveModelCheckResult,
-} from './modelCheck.js';
+import { getEffectiveModel } from './modelCheck.js';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -45,13 +42,10 @@ describe('getEffectiveModel', () => {
   });
 
   describe('when currentConfiguredModel is not DEFAULT_GEMINI_MODEL', () => {
-    it('should return the currentConfiguredModel and switched: false without fetching', async () => {
+    it('should return the currentConfiguredModel without fetching', async () => {
       const customModel = 'custom-model-name';
       const result = await getEffectiveModel(apiKey, customModel);
-      expect(result).toEqual({
-        effectiveModel: customModel,
-        switched: false,
-      });
+      expect(result).toEqual(customModel);
       expect(fetch).not.toHaveBeenCalled();
     });
   });
@@ -62,15 +56,8 @@ describe('getEffectiveModel', () => {
         ok: false,
         status: 429,
       });
-      const result: EffectiveModelCheckResult = await getEffectiveModel(
-        apiKey,
-        DEFAULT_GEMINI_MODEL,
-      );
-      expect(result).toEqual({
-        effectiveModel: DEFAULT_GEMINI_FLASH_MODEL,
-        switched: true,
-        originalModelIfSwitched: DEFAULT_GEMINI_MODEL,
-      });
+      const result = await getEffectiveModel(apiKey, DEFAULT_GEMINI_MODEL);
+      expect(result).toEqual(DEFAULT_GEMINI_FLASH_MODEL);
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch).toHaveBeenCalledWith(
         `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_GEMINI_MODEL}:generateContent?key=${apiKey}`,
@@ -84,10 +71,7 @@ describe('getEffectiveModel', () => {
         status: 200,
       });
       const result = await getEffectiveModel(apiKey, DEFAULT_GEMINI_MODEL);
-      expect(result).toEqual({
-        effectiveModel: DEFAULT_GEMINI_MODEL,
-        switched: false,
-      });
+      expect(result).toEqual(DEFAULT_GEMINI_MODEL);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
@@ -97,20 +81,14 @@ describe('getEffectiveModel', () => {
         status: 500,
       });
       const result = await getEffectiveModel(apiKey, DEFAULT_GEMINI_MODEL);
-      expect(result).toEqual({
-        effectiveModel: DEFAULT_GEMINI_MODEL,
-        switched: false,
-      });
+      expect(result).toEqual(DEFAULT_GEMINI_MODEL);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should return DEFAULT_GEMINI_MODEL if fetch throws a network error', async () => {
       (fetch as vi.Mock).mockRejectedValueOnce(new Error('Network error'));
       const result = await getEffectiveModel(apiKey, DEFAULT_GEMINI_MODEL);
-      expect(result).toEqual({
-        effectiveModel: DEFAULT_GEMINI_MODEL,
-        switched: false,
-      });
+      expect(result).toEqual(DEFAULT_GEMINI_MODEL);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
@@ -146,10 +124,7 @@ describe('getEffectiveModel', () => {
 
       expect(mockAbort).toHaveBeenCalledTimes(0); // setTimeout calls controller.abort(), not our direct mockAbort
       expect(abortControllerInstance.abort).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({
-        effectiveModel: DEFAULT_GEMINI_MODEL,
-        switched: false,
-      });
+      expect(result).toEqual(DEFAULT_GEMINI_MODEL);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 

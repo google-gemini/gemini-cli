@@ -9,12 +9,6 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '../config/config.js';
 
-export interface EffectiveModelCheckResult {
-  effectiveModel: string;
-  switched: boolean;
-  originalModelIfSwitched?: string;
-}
-
 /**
  * Checks if the default "pro" model is rate-limited and returns a fallback "flash"
  * model if necessary. This function is designed to be silent.
@@ -26,10 +20,10 @@ export interface EffectiveModelCheckResult {
 export async function getEffectiveModel(
   apiKey: string,
   currentConfiguredModel: string,
-): Promise<EffectiveModelCheckResult> {
+): Promise<string> {
   if (currentConfiguredModel !== DEFAULT_GEMINI_MODEL) {
     // Only check if the user is trying to use the specific pro model we want to fallback from.
-    return { effectiveModel: currentConfiguredModel, switched: false };
+    return currentConfiguredModel;
   }
 
   const modelToTest = DEFAULT_GEMINI_MODEL;
@@ -59,17 +53,16 @@ export async function getEffectiveModel(
     clearTimeout(timeoutId);
 
     if (response.status === 429) {
-      return {
-        effectiveModel: fallbackModel,
-        switched: true,
-        originalModelIfSwitched: modelToTest,
-      };
+      console.log(
+        `[INFO] Your configured model (${modelToTest}) was temporarily unavailable. Switched to ${fallbackModel} for this session.`,
+      );
+      return fallbackModel;
     }
     // For any other case (success, other error codes), we stick to the original model.
-    return { effectiveModel: currentConfiguredModel, switched: false };
+    return currentConfiguredModel;
   } catch (_error) {
     clearTimeout(timeoutId);
     // On timeout or any other fetch error, stick to the original model.
-    return { effectiveModel: currentConfiguredModel, switched: false };
+    return currentConfiguredModel;
   }
 }

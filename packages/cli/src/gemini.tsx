@@ -66,17 +66,10 @@ export async function main() {
     process.exit(1);
   }
 
-  const { config, modelWasSwitched, originalModelBeforeSwitch, finalModel } =
-    await loadCliConfig(settings.merged, geminiIgnorePatterns);
+  const config = await loadCliConfig(settings.merged, geminiIgnorePatterns);
 
   // Initialize centralized FileDiscoveryService
   await config.getFileService();
-
-  if (modelWasSwitched && originalModelBeforeSwitch) {
-    console.log(
-      `[INFO] Your configured model (${originalModelBeforeSwitch}) was temporarily unavailable. Switched to ${finalModel} for this session.`,
-    );
-  }
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -176,9 +169,8 @@ async function loadNonInteractiveConfig(
     ...settings.merged,
     coreTools: nonInteractiveTools,
   };
-  const nonInteractiveConfigResult = await loadCliConfig(
+  return await loadCliConfig(
     nonInteractiveSettings,
     config.getGeminiIgnorePatterns(),
   );
-  return nonInteractiveConfigResult.config;
 }
