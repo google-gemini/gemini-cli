@@ -34,7 +34,7 @@ vi.mock('@gemini-code/core', async () => {
   return {
     ...actualServer,
     loadEnvironment: vi.fn(),
-    createServerConfig: vi.fn((params) => ({
+    Config: vi.fn((params) => ({
       // Mock the config object and its methods
       getApiKey: () => params.apiKey,
       getModel: () => params.model,

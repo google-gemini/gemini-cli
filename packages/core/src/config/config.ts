@@ -126,7 +126,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
-    this.userAgent = params.userAgent;
+    this.userAgent = params.userAgent ?? 'GeminiCLI/unknown';
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
@@ -327,14 +327,6 @@ export function loadEnvironment(): void {
   if (envFilePath) {
     dotenv.config({ path: envFilePath });
   }
-}
-
-export function createServerConfig(params: ConfigParameters): Config {
-  return new Config({
-    ...params,
-    targetDir: path.resolve(params.targetDir), // Ensure targetDir is resolved
-    userAgent: params.userAgent ?? 'GeminiCLI/unknown', // Default user agent
-  });
 }
 
 export function createToolRegistry(config: Config): Promise<ToolRegistry> {

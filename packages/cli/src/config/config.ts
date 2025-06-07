@@ -10,9 +10,7 @@ import process from 'node:process';
 import {
   Config,
   loadEnvironment,
-  createServerConfig,
   loadServerHierarchicalMemory,
-  ConfigParameters,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -175,7 +173,7 @@ export async function loadCliConfig(
     modelToUse = await getEffectiveModel(apiKeyForServer, modelToUse);
   }
 
-  const configParams: ConfigParameters = {
+  return new Config({
     apiKey: apiKeyForServer,
     model: modelToUse,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -206,7 +204,5 @@ export async function loadCliConfig(
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
     fileFilteringAllowBuildArtifacts:
       settings.fileFiltering?.allowBuildArtifacts,
-  };
-
-  return createServerConfig(configParams);
+  });
 }

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Config, createServerConfig, ConfigParameters } from './config.js';
+import { Config, ConfigParameters } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 
@@ -87,51 +87,6 @@ describe('Server Config (config.ts)', () => {
     expect(config.getUserMemory()).toBe('');
   });
 
-  it('createServerConfig should pass userMemory to Config constructor', () => {
-    const config = createServerConfig(baseParams);
-
-    // Check the result of the factory function
-    expect(config).toBeInstanceOf(Config);
-    expect(config.getUserMemory()).toBe(USER_MEMORY);
-    expect(config.getApiKey()).toBe(API_KEY);
-    expect(config.getUserAgent()).toBe(USER_AGENT);
-  });
-
-  it('createServerConfig should default userMemory if omitted', () => {
-    const paramsWithoutMemory: ConfigParameters = { ...baseParams };
-    delete paramsWithoutMemory.userMemory;
-    const config = createServerConfig(paramsWithoutMemory);
-
-    expect(config).toBeInstanceOf(Config);
-    expect(config.getUserMemory()).toBe(''); // Should default to empty string
-  });
-
-  it('createServerConfig should resolve targetDir', () => {
-    const relativeDir = './relative/path';
-    const expectedResolvedDir = path.resolve(relativeDir);
-    const paramsWithRelativeDir: ConfigParameters = {
-      ...baseParams,
-      targetDir: relativeDir,
-    };
-    const config = createServerConfig(paramsWithRelativeDir);
-    expect(config.getTargetDir()).toBe(expectedResolvedDir);
-  });
-
-  it('createServerConfig should call setGeminiMdFilename with contextFileName if provided', () => {
-    const contextFileName = 'CUSTOM_AGENTS.md';
-    const paramsWithContextFile: ConfigParameters = {
-      ...baseParams,
-      contextFileName,
-    };
-    createServerConfig(paramsWithContextFile);
-    expect(mockSetGeminiMdFilename).toHaveBeenCalledWith(contextFileName);
-  });
-
-  it('createServerConfig should not call setGeminiMdFilename if contextFileName is not provided', () => {
-    createServerConfig(baseParams); // baseParams does not have contextFileName
-    expect(mockSetGeminiMdFilename).not.toHaveBeenCalled();
-  });
-
   it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {
     const contextFileName = 'CUSTOM_AGENTS.md';
     const paramsWithContextFile: ConfigParameters = {
@@ -186,31 +141,6 @@ describe('Server Config (config.ts)', () => {
     const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
     delete paramsWithoutTelemetry.telemetry;
     const config = new Config(paramsWithoutTelemetry);
-    expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
-  });
-
-  it('createServerConfig should pass telemetry to Config constructor when true', () => {
-    const paramsWithTelemetry: ConfigParameters = {
-      ...baseParams,
-      telemetry: true,
-    };
-    const config = createServerConfig(paramsWithTelemetry);
-    expect(config.getTelemetryEnabled()).toBe(true);
-  });
-
-  it('createServerConfig should pass telemetry to Config constructor when false', () => {
-    const paramsWithTelemetry: ConfigParameters = {
-      ...baseParams,
-      telemetry: false,
-    };
-    const config = createServerConfig(paramsWithTelemetry);
-    expect(config.getTelemetryEnabled()).toBe(false);
-  });
-
-  it('createServerConfig should default telemetry (to false via Config constructor) if omitted', () => {
-    const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
-    delete paramsWithoutTelemetry.telemetry;
-    const config = createServerConfig(paramsWithoutTelemetry);
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
   });
 
