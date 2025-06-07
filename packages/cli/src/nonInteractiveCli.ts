@@ -9,7 +9,7 @@ import {
   ToolCallRequestInfo,
   executeToolCall,
   ToolRegistry,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import {
   Content,
   Part,

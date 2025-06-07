@@ -12,7 +12,7 @@
       "type": "node",
       // fix source mapping when debugging in sandbox using global installation
       // note this does not interfere when remoteRoot is also ${workspaceFolder}/packages
-      "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-code",
+      "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-cli",
       "localRoot": "${workspaceFolder}/packages"
     },
     {

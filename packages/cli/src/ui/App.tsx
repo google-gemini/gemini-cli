@@ -45,7 +45,7 @@ import {
   type Config,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';

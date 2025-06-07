@@ -17,7 +17,7 @@ import process from 'node:process';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
-import { Config } from '@gemini-code/core';
+import { Config } from '@gemini-cli/core';
 
 export interface InputPromptProps {
   onSubmit: (value: string) => void;

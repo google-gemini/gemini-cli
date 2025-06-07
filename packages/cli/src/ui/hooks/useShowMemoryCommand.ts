@@ -5,7 +5,7 @@
  */
 
 import { Message, MessageType } from '../types.js';
-import { Config } from '@gemini-code/core';
+import { Config } from '@gemini-cli/core';
 
 export function createShowMemoryAction(
   config: Config | null,

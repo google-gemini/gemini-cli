@@ -6,7 +6,7 @@
 
 import { randomUUID } from 'crypto';
 
-export const SERVICE_NAME = 'gemini-code';
+export const SERVICE_NAME = 'gemini-cli';
 export const sessionId = randomUUID();
 
 export const EVENT_USER_PROMPT = 'gemini_code.user_prompt';

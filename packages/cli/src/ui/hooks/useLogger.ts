@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Logger } from '@gemini-code/core';
+import { Logger } from '@gemini-cli/core';
 
 /**
  * Hook to manage the logger instance.

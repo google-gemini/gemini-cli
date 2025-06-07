@@ -8,11 +8,11 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { tmpdir } from 'os';
-import { Config, ConfigParameters } from '@gemini-code/core';
+import { Config, ConfigParameters } from '@gemini-cli/core';
 
 // Mock file discovery service and tool registry
-vi.mock('@gemini-code/core', async () => {
-  const actual = await vi.importActual('@gemini-code/core');
+vi.mock('@gemini-cli/core', async () => {
+  const actual = await vi.importActual('@gemini-cli/core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn().mockImplementation(() => ({

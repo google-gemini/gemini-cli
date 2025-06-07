@@ -24,7 +24,7 @@ import {
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode, // Import from core
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import {
   HistoryItemWithoutId,
   ToolCallStatus,
@@ -32,8 +32,8 @@ import {
 } from '../types.js';
 
 // Mocks
-vi.mock('@gemini-code/core', async () => {
-  const actual = await vi.importActual('@gemini-code/core');
+vi.mock('@gemini-cli/core', async () => {
+  const actual = await vi.importActual('@gemini-cli/core');
   return {
     ...actual,
     ToolRegistry: vi.fn(),

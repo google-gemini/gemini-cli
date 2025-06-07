@@ -60,15 +60,15 @@ fi
 
 # prepare global installation files for prod builds
 # pack cli
-echo "packing @gemini-code/cli ..."
-rm -f packages/cli/dist/gemini-code-cli-*.tgz
-npm pack -w @gemini-code/cli --pack-destination ./packages/cli/dist &>/dev/null
+echo "packing @gemini-cli/cli ..."
+rm -f packages/cli/dist/gemini-cli-cli-*.tgz
+npm pack -w @gemini-cli/cli --pack-destination ./packages/cli/dist &>/dev/null
 # pack core
-echo "packing @gemini-code/core ..."
-rm -f packages/core/dist/gemini-code-core-*.tgz
-npm pack -w @gemini-code/core --pack-destination ./packages/core/dist &>/dev/null
+echo "packing @gemini-cli/core ..."
+rm -f packages/core/dist/gemini-cli-core-*.tgz
+npm pack -w @gemini-cli/core --pack-destination ./packages/core/dist &>/dev/null
 # give node user (used during installation, see Dockerfile) access to these files
-chmod 755 packages/*/dist/gemini-code-*.tgz
+chmod 755 packages/*/dist/gemini-cli-*.tgz
 
 # redirect build output to /dev/null unless VERBOSE is set
 BUILD_STDOUT="/dev/null"

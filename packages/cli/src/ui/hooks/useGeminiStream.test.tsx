@@ -15,7 +15,7 @@ import {
   TrackedExecutingToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { Config } from '@gemini-code/core';
+import { Config } from '@gemini-cli/core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -33,7 +33,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
   }),
 );
 
-vi.mock('@gemini-code/core', async (importOriginal) => {
+vi.mock('@gemini-cli/core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...(actualCoreModule || {}),

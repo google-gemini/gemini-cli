@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
 import { loadCliConfig } from './config.js';
 import { Settings } from './settings.js';
-import * as ServerConfig from '@gemini-code/core';
+import * as ServerConfig from '@gemini-cli/core';
 
 const MOCK_HOME_DIR = '/mock/home/user';
 
@@ -28,9 +28,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@gemini-code/core', async () => {
+vi.mock('@gemini-cli/core', async () => {
   const actualServer =
-    await vi.importActual<typeof ServerConfig>('@gemini-code/core');
+    await vi.importActual<typeof ServerConfig>('@gemini-cli/core');
   return {
     ...actualServer,
     loadEnvironment: vi.fn(),

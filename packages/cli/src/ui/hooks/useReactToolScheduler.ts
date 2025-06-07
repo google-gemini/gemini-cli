@@ -21,7 +21,7 @@ import {
   ToolCall,
   Status as CoreStatus,
   logToolCall,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import { useCallback, useState, useMemo } from 'react';
 import {
   HistoryItemToolGroup,

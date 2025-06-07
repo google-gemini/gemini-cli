@@ -13,7 +13,7 @@ import {
   unescapePath,
   getErrorMessage,
   Config,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,

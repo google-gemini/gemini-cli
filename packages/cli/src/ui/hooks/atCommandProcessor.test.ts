@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import type { Mocked } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import { Config, FileDiscoveryService } from '@gemini-code/core';
+import { Config, FileDiscoveryService } from '@gemini-cli/core';
 import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'fs/promises';
@@ -52,8 +52,8 @@ vi.mock('fs/promises', async () => {
   };
 });
 
-vi.mock('@gemini-code/core', async () => {
-  const actual = await vi.importActual('@gemini-code/core');
+vi.mock('@gemini-cli/core', async () => {
+  const actual = await vi.importActual('@gemini-cli/core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn(),

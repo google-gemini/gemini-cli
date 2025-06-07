@@ -28,7 +28,7 @@ import {
   ShellTool,
   WebFetchTool,
   WebSearchTool,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 
 export async function main() {
   // warn about deprecated environment variables

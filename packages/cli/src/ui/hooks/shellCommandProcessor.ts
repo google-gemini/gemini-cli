@@ -8,7 +8,7 @@ import { spawn } from 'child_process';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { exec as ExecType } from 'child_process';
 import { useCallback } from 'react';
-import { Config } from '@gemini-code/core';
+import { Config } from '@gemini-cli/core';
 import { type PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import crypto from 'crypto';

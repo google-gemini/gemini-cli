@@ -24,7 +24,7 @@ steps:
 
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     entrypoint: 'npm'
-    args: ['publish', '--tag=head', '--dry-run', '--workspace=@gemini-code/cli']
+    args: ['publish', '--tag=head', '--dry-run', '--workspace=@gemini-cli/cli']
 
 options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

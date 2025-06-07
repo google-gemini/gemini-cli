@@ -60,7 +60,7 @@ import {
   type Config,
   MCPServerStatus,
   getMCPServerStatus,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
@@ -451,7 +451,7 @@ Add any other context about the problem here.
   describe('/mcp command', () => {
     beforeEach(() => {
       // Mock the core module with getMCPServerStatus
-      vi.mock('@gemini-code/core', async (importOriginal) => {
+      vi.mock('@gemini-cli/core', async (importOriginal) => {
         const actual = await importOriginal();
         return {
           ...actual,

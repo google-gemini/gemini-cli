@@ -18,7 +18,7 @@ import {
   MessageSenderType,
   ToolCallRequestInfo,
   logUserPrompt,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import { type PartListUnion } from '@google/genai';
 import {
   StreamingState,

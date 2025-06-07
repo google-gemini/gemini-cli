@@ -14,7 +14,7 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
 import { getCliVersion } from '../utils/version.js';

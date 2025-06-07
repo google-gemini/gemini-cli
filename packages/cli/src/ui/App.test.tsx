@@ -13,7 +13,7 @@ import {
   ApprovalMode,
   ToolRegistry,
   AccessibilitySettings,
-} from '@gemini-code/core';
+} from '@gemini-cli/core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 
@@ -65,9 +65,9 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
 }
 
-// Mock @gemini-code/core and its Config class
-vi.mock('@gemini-code/core', async (importOriginal) => {
-  const actualCore = await importOriginal<typeof import('@gemini-code/core')>();
+// Mock @gemini-cli/core and its Config class
+vi.mock('@gemini-cli/core', async (importOriginal) => {
+  const actualCore = await importOriginal<typeof import('@gemini-cli/core')>();
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {

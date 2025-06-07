@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { Config, MCPServerStatus, getMCPServerStatus } from '@gemini-code/core';
+import { Config, MCPServerStatus, getMCPServerStatus } from '@gemini-cli/core';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
@@ -114,7 +114,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'help',
         altName: '?',
-        description: 'for help on gemini-code',
+        description: 'for help on gemini-cli',
         action: (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Opening help.');
           setShowHelp(true);
