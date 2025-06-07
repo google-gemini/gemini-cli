@@ -11,7 +11,7 @@ import os from 'os';
 import pathMod from 'path';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import stringWidth from 'string-width';
-import { unescapePath } from '@gemini-code/core';
+import { unescapePath } from '@gemini-cli/core';
 
 export type Direction =
   | 'left'
