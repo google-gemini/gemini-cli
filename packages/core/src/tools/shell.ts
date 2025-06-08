@@ -30,7 +30,7 @@ import { spawn } from 'child_process';
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
-  static readonly Name: string = 'execute_bash_command';
+  static Name: string = 'execute_bash_command';
   private whitelist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {

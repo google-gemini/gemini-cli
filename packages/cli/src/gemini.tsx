@@ -28,6 +28,7 @@ import {
   ShellTool,
   WebFetchTool,
   WebSearchTool,
+  WriteFileTool,
 } from '@gemini-cli/core';
 
 export async function main() {
@@ -155,13 +156,14 @@ async function loadNonInteractiveConfig(
     GrepTool.Name,
     GlobTool.Name,
     EditTool.Name,
+    WriteFileTool.Name,
     WebFetchTool.Name,
     WebSearchTool.Name,
     ReadManyFilesTool.Name,
     ShellTool.Name,
     MemoryTool.Name,
   ];
-  const interactiveTools = [ShellTool.Name, EditTool.Name];
+  const interactiveTools = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
   const nonInteractiveTools = existingCoreTools.filter(
     (tool) => !interactiveTools.includes(tool),
   );
