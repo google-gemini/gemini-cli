@@ -13,16 +13,16 @@ interface DiffCommand {
   args: string[];
 }
 
-export function checkHasEditor(editor: EditorType): boolean {
-  const commandExists = (cmd: string): boolean => {
-    try {
-      execSync(`which ${cmd}`, { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  };
+function commandExists(cmd: string): boolean {
+  try {
+    execSync(`which ${cmd}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
+export function checkHasEditor(editor: EditorType): boolean {
   if (editor === 'vscode') {
     return commandExists('code');
   } else if (editor === 'vim') {
