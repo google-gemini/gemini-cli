@@ -28,6 +28,7 @@ import {
   ToolCallStatus,
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
+import { parseAndFormatApiError } from '../utils/errorParsing.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -467,7 +468,9 @@ export const useGeminiStream = (
           addItem(
             {
               type: MessageType.ERROR,
-              text: `[Stream Error: ${getErrorMessage(error) || 'Unknown error'}]`,
+              text: parseAndFormatApiError(
+                getErrorMessage(error) || 'Unknown error',
+              ),
             },
             userMessageTimestamp,
           );
