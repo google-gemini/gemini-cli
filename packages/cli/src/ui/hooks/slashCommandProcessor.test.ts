@@ -423,8 +423,8 @@ Add any other context about the problem here.
     it('should display only Gemini CLI tools (filtering out MCP tools)', async () => {
       // Create mock tools - some with serverName property (MCP tools) and some without (Gemini CLI tools)
       const mockTools = [
-        { name: 'tool1' },
-        { name: 'tool2' },
+        { name: 'tool1', displayName: 'Tool1' },
+        { name: 'tool2', displayName: 'Tool2' },
         { name: 'mcp_tool1', serverName: 'mcp-server1' },
         { name: 'mcp_tool2', serverName: 'mcp-server1' },
       ];
@@ -447,7 +447,7 @@ Add any other context about the problem here.
         2,
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Available Gemini CLI tools:\n\ntool1\ntool2',
+          text: 'Available Gemini CLI tools:\n\nTool1\nTool2',
         }),
         expect.any(Number),
       );

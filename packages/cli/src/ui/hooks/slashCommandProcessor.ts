@@ -350,7 +350,7 @@ export const useSlashCommandProcessor = (
 
           // Filter out MCP tools by checking if they have a serverName property
           const geminiTools = tools.filter((tool) => !('serverName' in tool));
-          const geminiToolList = geminiTools.map((tool) => tool.name);
+          const geminiToolList = geminiTools.map((tool) => tool.displayName);
 
           addMessage({
             type: MessageType.INFO,
