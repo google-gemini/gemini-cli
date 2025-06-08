@@ -54,7 +54,6 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history does not start with a user turn.
  * @throws Error if the history contains an invalid role.
  */
-// hello keith
 function validateHistory(history: Content[]) {
   // Empty history is valid.
   if (history.length === 0) {
@@ -148,7 +147,6 @@ export class GeminiChat {
    * console.log(response.text);
    * ```
    */
-  // hello keith
   async sendMessage(
     params: SendMessageParameters,
   ): Promise<GenerateContentResponse> {
@@ -218,7 +216,6 @@ export class GeminiChat {
    * }
    * ```
    */
-  // hello keith
   async sendMessageStream(
     params: SendMessageParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
@@ -281,7 +278,6 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    *     chat session.
    */
-  // hello keith
   getHistory(curated: boolean = false): Content[] {
     const history = curated
       ? extractCuratedHistory(this.history)
