@@ -8,6 +8,7 @@
 
 const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
+const mockOpenDiff = vi.hoisted(() => vi.fn());
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
@@ -19,6 +20,10 @@ vi.mock('../core/client.js', () => ({
   })),
 }));
 
+vi.mock('../utils/editor.js', () => ({
+  openDiff: mockOpenDiff,
+}));
+
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
 import { FileDiff } from './tools.js';
@@ -27,6 +32,7 @@ import fs from 'fs';
 import os from 'os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
+import { ToolConfirmationOutcome } from './tools.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -713,6 +719,142 @@ function makeRequest() {
       expect(tool.getDescription(params)).toBe(
         `${testFileName}: this is a very long old string... => this is a very long new string...`,
       );
+    });
+  });
+
+  describe('onModify', () => {
+    const testFile = 'some_file.txt';
+    let filePath: string;
+    const diffDir = path.join(os.tmpdir(), 'gemini-cli-edit-tool-diffs');
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+      mockOpenDiff.mockClear();
+    });
+
+    afterEach(() => {
+      fs.rmSync(diffDir, { recursive: true, force: true });
+    });
+
+    it('should create temporary files, call openDiff, and return updated params with diff', async () => {
+      const originalContent = 'original content';
+      const params: EditToolParams = {
+        file_path: filePath,
+        edits: [
+          { old_string: originalContent, new_string: 'modified content' },
+        ],
+      };
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      const result = await tool.onModify(
+        params,
+        new AbortController().signal,
+        ToolConfirmationOutcome.ModifyVSCode,
+      );
+
+      expect(mockOpenDiff).toHaveBeenCalledTimes(1);
+      const [oldPath, newPath] = mockOpenDiff.mock.calls[0];
+      expect(oldPath).toMatch(
+        /gemini-cli-edit-tool-diffs[/\\]gemini-cli-edit-some_file\.txt-old-\d+/,
+      );
+      expect(newPath).toMatch(
+        /gemini-cli-edit-tool-diffs[/\\]gemini-cli-edit-some_file\.txt-new-\d+/,
+      );
+
+      expect(result).toBeDefined();
+      expect(result!.updatedParams).toEqual({
+        file_path: filePath,
+        edits: [
+          { old_string: originalContent, new_string: 'modified content' },
+        ],
+      });
+      expect(result!.updatedDiff).toEqual(`Index: some_file.txt
+===================================================================
+--- some_file.txt\tCurrent
++++ some_file.txt\tProposed
+@@ -1,1 +1,1 @@
+-original content
+\\ No newline at end of file
++modified content
+\\ No newline at end of file
+`);
+
+      // Verify temp files are cleaned up
+      expect(fs.existsSync(oldPath)).toBe(false);
+      expect(fs.existsSync(newPath)).toBe(false);
+    });
+
+    it('should handle non-existent files and return updated params', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        edits: [{ old_string: '', new_string: 'new file content' }],
+      };
+
+      const result = await tool.onModify(
+        params,
+        new AbortController().signal,
+        ToolConfirmationOutcome.ModifyVSCode,
+      );
+
+      expect(mockOpenDiff).toHaveBeenCalledTimes(1);
+
+      const [oldPath, newPath] = mockOpenDiff.mock.calls[0];
+
+      expect(result).toBeDefined();
+      expect(result!.updatedParams).toEqual({
+        file_path: filePath,
+        edits: [{ old_string: '', new_string: 'new file content' }],
+      });
+      expect(result!.updatedDiff).toContain('new file content');
+
+      // Verify temp files are cleaned up
+      expect(fs.existsSync(oldPath)).toBe(false);
+      expect(fs.existsSync(newPath)).toBe(false);
+    });
+
+    it('should clean up previous temp files before creating new ones', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        edits: [{ old_string: 'old', new_string: 'new' }],
+      };
+
+      fs.writeFileSync(filePath, 'some old content', 'utf8');
+
+      // Call onModify first time
+      const result1 = await tool.onModify(
+        params,
+        new AbortController().signal,
+        ToolConfirmationOutcome.ModifyVSCode,
+      );
+      const firstCall = mockOpenDiff.mock.calls[0];
+      const firstOldPath = firstCall[0];
+      const firstNewPath = firstCall[1];
+
+      expect(result1).toBeDefined();
+      expect(fs.existsSync(firstOldPath)).toBe(false);
+      expect(fs.existsSync(firstNewPath)).toBe(false);
+
+      // Ensure different timestamps so that the file names are different for testing.
+      await new Promise((resolve) => setTimeout(resolve, 2));
+
+      const result2 = await tool.onModify(
+        params,
+        new AbortController().signal,
+        ToolConfirmationOutcome.ModifyVSCode,
+      );
+      const secondCall = mockOpenDiff.mock.calls[1];
+      const secondOldPath = secondCall[0];
+      const secondNewPath = secondCall[1];
+
+      // Call onModify second time
+      expect(result2).toBeDefined();
+      expect(fs.existsSync(secondOldPath)).toBe(false);
+      expect(fs.existsSync(secondNewPath)).toBe(false);
+
+      // Verify different file names were used
+      expect(firstOldPath).not.toBe(secondOldPath);
+      expect(firstNewPath).not.toBe(secondNewPath);
     });
   });
 });

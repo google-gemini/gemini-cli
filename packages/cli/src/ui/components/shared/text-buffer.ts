@@ -1440,7 +1440,7 @@ export interface TextBuffer {
     key: Record<string, boolean>,
   ) => boolean;
   /**
-   * Opens the current buffer contents in the user’s preferred terminal text
+   * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
    * until the editor exits, then reloads the file and replaces the in‑memory
    * buffer with whatever the user saved.
@@ -1451,7 +1451,7 @@ export interface TextBuffer {
    *
    * Note: We purposefully rely on the *synchronous* spawn API so that the
    * calling process genuinely waits for the editor to close before
-   * continuing.  This mirrors Git’s behaviour and simplifies downstream
+   * continuing.  This mirrors Git's behaviour and simplifies downstream
    * control‑flow (callers can simply `await` the Promise).
    */
   openInExternalEditor: (opts?: { editor?: string }) => Promise<void>;

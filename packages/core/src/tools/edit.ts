@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import * as Diff from 'diff';
 import {
   BaseTool,
@@ -22,6 +23,7 @@ import { GeminiClient } from '../core/client.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { openDiff } from '../utils/editor.js';
 import { ReadFileTool } from './read-file.js';
 
 /**
@@ -75,6 +77,8 @@ export class EditTool extends BaseTool<EditToolParams, EditResult> {
   private readonly config: Config;
   private readonly rootDirectory: string;
   private readonly client: GeminiClient;
+  private tempOldDiffPath?: string;
+  private tempNewDiffPath?: string;
 
   /**
    * Creates a new instance of the EditLogic
@@ -511,6 +515,142 @@ Expectation for required parameters:
         editsAttempted,
         editsFailed: editsAttempted,
       };
+    }
+  }
+
+  /**
+   * Creates temp files for the current and proposed file contents and opens a diff tool.
+   * When the diff tool is closed, the tool will check if the file has been modified and provide the updated params.
+   * @returns Updated params and diff if the file has been modified, undefined otherwise.
+   */
+  async onModify(
+    params: EditToolParams,
+    _abortSignal: AbortSignal,
+    outcome: ToolConfirmationOutcome,
+  ): Promise<
+    { updatedParams: EditToolParams; updatedDiff: string } | undefined
+  > {
+    const { oldPath, newPath } = this.createTempFiles(params);
+    this.tempOldDiffPath = oldPath;
+    this.tempNewDiffPath = newPath;
+
+    await openDiff(
+      this.tempOldDiffPath,
+      this.tempNewDiffPath,
+      outcome === ToolConfirmationOutcome.ModifyVSCode ? 'vscode' : 'vim',
+    );
+    return await this.getUpdatedParamsIfModified(params, _abortSignal);
+  }
+
+  private async getUpdatedParamsIfModified(
+    params: EditToolParams,
+    _abortSignal: AbortSignal,
+  ): Promise<
+    { updatedParams: EditToolParams; updatedDiff: string } | undefined
+  > {
+    if (!this.tempOldDiffPath || !this.tempNewDiffPath) return undefined;
+    let oldContent = '';
+    let newContent = '';
+    try {
+      oldContent = fs.readFileSync(this.tempOldDiffPath, 'utf8');
+    } catch (err) {
+      if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
+      oldContent = '';
+    }
+    try {
+      newContent = fs.readFileSync(this.tempNewDiffPath, 'utf8');
+    } catch (err) {
+      if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
+      newContent = '';
+    }
+
+    // Combine the edits into a single edit
+    const updatedParams: EditToolParams = {
+      ...params,
+      edits: [
+        {
+          old_string: oldContent,
+          new_string: newContent,
+        },
+      ],
+    };
+
+    const updatedDiff = Diff.createPatch(
+      path.basename(params.file_path),
+      oldContent,
+      newContent,
+      'Current',
+      'Proposed',
+      DEFAULT_DIFF_OPTIONS,
+    );
+
+    this.deleteTempFiles();
+    return { updatedParams, updatedDiff };
+  }
+
+  private createTempFiles(params: EditToolParams): Record<string, string> {
+    this.deleteTempFiles();
+
+    const tempDir = os.tmpdir();
+    const diffDir = path.join(tempDir, 'gemini-cli-edit-tool-diffs');
+
+    if (!fs.existsSync(diffDir)) {
+      fs.mkdirSync(diffDir, { recursive: true });
+    }
+
+    const fileName = path.basename(params.file_path);
+    const timestamp = Date.now();
+    const tempOldPath = path.join(
+      diffDir,
+      `gemini-cli-edit-${fileName}-old-${timestamp}`,
+    );
+    const tempNewPath = path.join(
+      diffDir,
+      `gemini-cli-edit-${fileName}-new-${timestamp}`,
+    );
+
+    let currentContent = '';
+    try {
+      currentContent = fs.readFileSync(params.file_path, 'utf8');
+    } catch (err) {
+      if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
+      currentContent = '';
+    }
+
+    let proposedContent = currentContent;
+    for (const edit of params.edits) {
+      proposedContent = this._applyReplacement(
+        proposedContent,
+        edit.old_string,
+        edit.new_string,
+        edit.old_string === '' && currentContent === '',
+      );
+    }
+
+    fs.writeFileSync(tempOldPath, currentContent, 'utf8');
+    fs.writeFileSync(tempNewPath, proposedContent, 'utf8');
+    return {
+      oldPath: tempOldPath,
+      newPath: tempNewPath,
+    };
+  }
+
+  private deleteTempFiles(): void {
+    try {
+      if (this.tempOldDiffPath) {
+        fs.unlinkSync(this.tempOldDiffPath);
+        this.tempOldDiffPath = undefined;
+      }
+    } catch {
+      console.error(`Error deleting temp diff file: `, this.tempOldDiffPath);
+    }
+    try {
+      if (this.tempNewDiffPath) {
+        fs.unlinkSync(this.tempNewDiffPath);
+        this.tempNewDiffPath = undefined;
+      }
+    } catch {
+      console.error(`Error deleting temp diff file: `, this.tempNewDiffPath);
     }
   }
 

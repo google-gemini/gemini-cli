@@ -15,17 +15,20 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
+import { Config } from '@gemini-cli/core';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight: number;
   isPending: boolean;
+  config?: Config;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
   availableTerminalHeight,
   isPending,
+  config,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -60,6 +63,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         toolCalls={item.tools}
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
+        config={config}
       />
     )}
   </Box>

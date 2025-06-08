@@ -13,6 +13,8 @@ import {
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
+  checkHasEditor,
+  Config,
 } from '@gemini-cli/core';
 import {
   RadioButtonSelect,
@@ -21,11 +23,12 @@ import {
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
+  config?: Config;
 }
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
-> = ({ confirmationDetails }) => {
+> = ({ confirmationDetails, config }) => {
   const { onConfirm } = confirmationDetails;
 
   useInput((_, key) => {
@@ -44,6 +47,24 @@ export const ToolConfirmationMessage: React.FC<
   >();
 
   if (confirmationDetails.type === 'edit') {
+    if (confirmationDetails.isModifying) {
+      return (
+        <Box
+          minWidth="90%"
+          borderStyle="round"
+          borderColor={Colors.Gray}
+          justifyContent="space-around"
+          padding={1}
+          overflow="hidden"
+        >
+          <Text>Modify in progress: </Text>
+          <Text color={Colors.AccentGreen}>
+            Save and close external editor to continue
+          </Text>
+        </Box>
+      );
+    }
+
     // Body content is now the DiffRenderer, passing filename to it
     // The bordered box is removed from here and handled within DiffRenderer
     bodyContent = (
@@ -63,8 +84,28 @@ export const ToolConfirmationMessage: React.FC<
         label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
-      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
+
+    // Conditionally add editor options if editors are installed
+    const notUsingSandbox = !process.env.SANDBOX;
+    const externalEditorsEnabled =
+      config?.getEnableModifyWithExternalEditors() ?? false;
+
+    if (checkHasEditor('vscode') && notUsingSandbox && externalEditorsEnabled) {
+      options.push({
+        label: 'Modify with VS Code',
+        value: ToolConfirmationOutcome.ModifyVSCode,
+      });
+    }
+
+    if (checkHasEditor('vim') && externalEditorsEnabled) {
+      options.push({
+        label: 'Modify with vim',
+        value: ToolConfirmationOutcome.ModifyVim,
+      });
+    }
+
+    options.push({ label: 'No (esc)', value: ToolConfirmationOutcome.Cancel });
   } else if (confirmationDetails.type === 'exec') {
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;

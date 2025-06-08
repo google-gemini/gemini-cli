@@ -13,6 +13,8 @@ import {
   ToolResult,
   ToolRegistry,
   ApprovalMode,
+  EditTool,
+  EditToolParams,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -358,6 +360,16 @@ export class CoreToolScheduler {
     this.checkAndNotifyCompletion();
   }
 
+  private setArgsInternal(targetCallId: string, args: unknown): void {
+    this.toolCalls = this.toolCalls.map((call) => {
+      if (call.request.callId !== targetCallId) return call;
+      return {
+        ...call,
+        request: { ...call.request, args: args as Record<string, unknown> },
+      };
+    });
+  }
+
   private isRunning(): boolean {
     return this.toolCalls.some(
       (call) =>
@@ -471,6 +483,33 @@ export class CoreToolScheduler {
         'cancelled',
         'User did not allow tool call',
       );
+    } else if (
+      outcome === ToolConfirmationOutcome.ModifyVSCode ||
+      outcome === ToolConfirmationOutcome.ModifyVim
+    ) {
+      const waitingToolCall = toolCall as WaitingToolCall;
+      if (waitingToolCall?.confirmationDetails?.type === 'edit') {
+        const editTool = waitingToolCall.tool as EditTool;
+        this.setStatusInternal(callId, 'awaiting_approval', {
+          ...waitingToolCall.confirmationDetails,
+          isModifying: true,
+        });
+
+        const modifyResults = await editTool.onModify(
+          waitingToolCall.request.args as unknown as EditToolParams,
+          this.abortController.signal,
+          outcome,
+        );
+
+        if (modifyResults) {
+          this.setArgsInternal(callId, modifyResults.updatedParams);
+          this.setStatusInternal(callId, 'awaiting_approval', {
+            ...waitingToolCall.confirmationDetails,
+            fileDiff: modifyResults.updatedDiff,
+            isModifying: false,
+          });
+        }
+      }
     } else {
       this.setStatusInternal(callId, 'scheduled');
     }
