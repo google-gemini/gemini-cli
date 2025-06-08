@@ -8,7 +8,7 @@
   "scripts": {
     "generate": "scripts/generate-git-commit-info.sh",
     "build": "scripts/build.sh",
-    "build:sandbox": "scripts/build_sandbox.sh",
+    "build:sandbox": "scripts/build_sandbox.sh -s",
     "build:all": "npm run build && npm run build:sandbox",
     "clean": "scripts/clean.sh",
     "prepare": "npm run bundle",
