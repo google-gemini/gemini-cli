@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { render } from 'ink';
-import { App } from './ui/App.js';
+import { AppWrapper } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { sandbox_command, start_sandbox } from './utils/sandbox.js';
@@ -95,7 +95,7 @@ export async function main() {
   if (process.stdin.isTTY && input?.length === 0) {
     render(
       <React.StrictMode>
-        <App
+        <AppWrapper
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}

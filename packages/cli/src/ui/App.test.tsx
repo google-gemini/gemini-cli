@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { render } from 'ink-testing-library';
-import { App } from './App.js';
+import { AppWrapper as App } from './App.js';
 import {
   Config as ServerConfig,
   MCPServerConfig,
