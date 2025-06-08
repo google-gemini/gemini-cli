@@ -306,7 +306,7 @@ export async function start_sandbox(sandbox: string) {
       );
       if (isCustomProjectSandbox) {
         console.error(`using ${projectSandboxDockerfile} for sandbox`);
-        buildArgs += `-s -f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
+        buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
       }
       execSync(`cd ${gcRoot} && scripts/build_sandbox.sh -s ${buildArgs}`, {
         stdio: 'inherit',
