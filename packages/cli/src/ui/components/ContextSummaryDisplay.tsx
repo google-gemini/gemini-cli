@@ -52,7 +52,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       if (showToolDescriptions) {
         summaryText += ' (Ctrl+T to hide descriptions)';
       } else {
-        summaryText += ' (ctrl+t for details)';
+        summaryText += ' (Ctrl+T to view descriptions)';
       }
     }
   }
