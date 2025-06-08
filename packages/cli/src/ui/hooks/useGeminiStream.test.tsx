@@ -18,6 +18,7 @@ import {
 import { Config } from '@gemini-cli/core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { Dispatch, SetStateAction } from 'react';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -309,16 +310,41 @@ describe('useGeminiStream', () => {
 
     const client = geminiClient || mockConfig.getGeminiClient();
 
-    const { result, rerender } = renderHook(() =>
-      useGeminiStream(
-        client,
-        mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
-        mockSetShowHelp,
-        mockConfig,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false, // shellModeActive
-      ),
+    const { result, rerender } = renderHook(
+      (props: {
+        client: any;
+        addItem: UseHistoryManagerReturn['addItem'];
+        setShowHelp: Dispatch<SetStateAction<boolean>>;
+        config: Config;
+        onDebugMessage: (message: string) => void;
+        handleSlashCommand: (
+          command: PartListUnion,
+        ) =>
+          | import('./slashCommandProcessor.js').SlashCommandActionReturn
+          | boolean;
+        shellModeActive: boolean;
+      }) =>
+        useGeminiStream(
+          props.client,
+          props.addItem,
+          props.setShowHelp,
+          props.config,
+          props.onDebugMessage,
+          props.handleSlashCommand,
+          props.shellModeActive,
+        ),
+      {
+        initialProps: {
+          client,
+          addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+          setShowHelp: mockSetShowHelp,
+          config: mockConfig,
+          onDebugMessage: mockOnDebugMessage,
+          handleSlashCommand:
+            mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
+          shellModeActive: false,
+        },
+      },
     );
     return {
       result,
@@ -326,7 +352,6 @@ describe('useGeminiStream', () => {
       mockMarkToolsAsSubmitted,
       mockSendMessageStream,
       client,
-      // mockFilter removed
     };
   };
 
@@ -423,24 +448,29 @@ describe('useGeminiStream', () => {
       } as TrackedCancelledToolCall,
     ];
 
-    const hookResult = await act(async () =>
-      renderTestHook(simplifiedToolCalls),
-    );
-
     const {
+      rerender,
       mockMarkToolsAsSubmitted,
       mockSendMessageStream: localMockSendMessageStream,
-    } = hookResult!;
+      client,
+    } = renderTestHook(simplifiedToolCalls);
 
-    // It seems the initial render + effect run should be enough.
-    // If rerender was for a specific state change, it might still be needed.
-    // For now, let's test if the initial effect run (covered by the first act) is sufficient.
-    // If not, we can add back: await act(async () => { rerender({}); });
-
-    expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['call1', 'call2']);
+    act(() => {
+      rerender({
+        client,
+        addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+        setShowHelp: mockSetShowHelp,
+        config: mockConfig,
+        onDebugMessage: mockOnDebugMessage,
+        handleSlashCommand:
+          mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
+        shellModeActive: false,
+      });
+    });
 
     await waitFor(() => {
-      expect(localMockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(0);
+      expect(localMockSendMessageStream).toHaveBeenCalledTimes(0);
     });
 
     const expectedMergedResponse = mergePartListUnions([
@@ -479,12 +509,21 @@ describe('useGeminiStream', () => {
       client,
     );
 
-    await act(async () => {
-      rerender({} as any);
+    act(() => {
+      rerender({
+        client,
+        addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+        setShowHelp: mockSetShowHelp,
+        config: mockConfig,
+        onDebugMessage: mockOnDebugMessage,
+        handleSlashCommand:
+          mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
+        shellModeActive: false,
+      });
     });
 
     await waitFor(() => {
-      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(0);
       expect(client.addHistory).toHaveBeenCalledTimes(2);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',

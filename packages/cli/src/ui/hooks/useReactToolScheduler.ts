@@ -32,8 +32,8 @@ import {
 
 export type ScheduleFn = (
   request: ToolCallRequestInfo | ToolCallRequestInfo[],
+  signal: AbortSignal,
 ) => void;
-export type CancelFn = (reason?: string) => void;
 export type MarkToolsAsSubmittedFn = (callIds: string[]) => void;
 
 export type TrackedScheduledToolCall = ScheduledToolCall & {
@@ -69,7 +69,7 @@ export function useReactToolScheduler(
   setPendingHistoryItem: React.Dispatch<
     React.SetStateAction<HistoryItemWithoutId | null>
   >,
-): [TrackedToolCall[], ScheduleFn, CancelFn, MarkToolsAsSubmittedFn] {
+): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
   >([]);
@@ -172,15 +172,11 @@ export function useReactToolScheduler(
   );
 
   const schedule: ScheduleFn = useCallback(
-    async (request: ToolCallRequestInfo | ToolCallRequestInfo[]) => {
-      scheduler.schedule(request);
-    },
-    [scheduler],
-  );
-
-  const cancel: CancelFn = useCallback(
-    (reason: string = 'unspecified') => {
-      scheduler.cancelAll(reason);
+    async (
+      request: ToolCallRequestInfo | ToolCallRequestInfo[],
+      signal: AbortSignal,
+    ) => {
+      scheduler.schedule(request, signal);
     },
     [scheduler],
   );
@@ -198,7 +194,7 @@ export function useReactToolScheduler(
     [],
   );
 
-  return [toolCallsForDisplay, schedule, cancel, markToolsAsSubmitted];
+  return [toolCallsForDisplay, schedule, markToolsAsSubmitted];
 }
 
 /**

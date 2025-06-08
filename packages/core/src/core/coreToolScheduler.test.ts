@@ -4,9 +4,110 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { convertToFunctionResponse } from './coreToolScheduler.js';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi } from 'vitest';
+import {
+  CoreToolScheduler,
+  ToolCall,
+  ValidatingToolCall,
+} from './coreToolScheduler.js';
+import {
+  BaseTool,
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+  ToolResult,
+} from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
+import { convertToFunctionResponse } from './coreToolScheduler.js';
+
+class MockTool extends BaseTool<Record<string, unknown>, ToolResult> {
+  shouldConfirm = false;
+  executeFn = vi.fn();
+
+  constructor(name = 'mockTool') {
+    super(name, name, 'A mock tool', {});
+  }
+
+  async shouldConfirmExecute(
+    _params: Record<string, unknown>,
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.shouldConfirm) {
+      return {
+        type: 'exec',
+        title: 'Confirm Mock Tool',
+        command: 'do_thing',
+        rootCommand: 'do_thing',
+        onConfirm: async () => {},
+      };
+    }
+    return false;
+  }
+
+  async execute(
+    params: Record<string, unknown>,
+    _abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    this.executeFn(params);
+    return { llmContent: 'Tool executed', returnDisplay: 'Tool executed' };
+  }
+}
+
+describe('CoreToolScheduler', () => {
+  it('should cancel a tool call if the signal is aborted before confirmation', async () => {
+    const mockTool = new MockTool();
+    mockTool.shouldConfirm = true;
+    const toolRegistry = {
+      getTool: () => mockTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {} as any,
+      config: {} as any,
+      registerTool: () => {},
+      getToolByName: () => mockTool,
+      getToolByDisplayName: () => mockTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const scheduler = new CoreToolScheduler({
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+    });
+
+    const abortController = new AbortController();
+    const request = { callId: '1', name: 'mockTool', args: {} };
+
+    abortController.abort();
+    await scheduler.schedule([request], abortController.signal);
+
+    const _waitingCall = onToolCallsUpdate.mock
+      .calls[1][0][0] as ValidatingToolCall;
+    const confirmationDetails = await mockTool.shouldConfirmExecute(
+      {},
+      abortController.signal,
+    );
+    if (confirmationDetails) {
+      await scheduler.handleConfirmationResponse(
+        '1',
+        confirmationDetails.onConfirm,
+        ToolConfirmationOutcome.ProceedOnce,
+        abortController.signal,
+      );
+    }
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('cancelled');
+  });
+});
 
 describe('convertToFunctionResponse', () => {
   const toolName = 'testTool';

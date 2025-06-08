@@ -162,6 +162,13 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       };
     }
 
+    if (abortSignal.aborted) {
+      return {
+        llmContent: 'Command was cancelled by user before it could start.',
+        returnDisplay: 'Command cancelled by user.',
+      };
+    }
+
     // wrap command to append subprocess pids (via pgrep) to temporary file
     const tempFileName = `shell_pgrep_${crypto.randomBytes(6).toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);

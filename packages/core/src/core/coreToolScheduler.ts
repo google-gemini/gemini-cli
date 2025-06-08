@@ -208,7 +208,6 @@ interface CoreToolSchedulerOptions {
 export class CoreToolScheduler {
   private toolRegistry: Promise<ToolRegistry>;
   private toolCalls: ToolCall[] = [];
-  private abortController: AbortController;
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
@@ -220,7 +219,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
-    this.abortController = new AbortController();
   }
 
   private setStatusInternal(
@@ -379,6 +377,7 @@ export class CoreToolScheduler {
 
   async schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
+    signal: AbortSignal,
   ): Promise<void> {
     if (this.isRunning()) {
       throw new Error(
@@ -426,7 +425,7 @@ export class CoreToolScheduler {
         } else {
           const confirmationDetails = await toolInstance.shouldConfirmExecute(
             reqInfo.args,
-            this.abortController.signal,
+            signal,
           );
 
           if (confirmationDetails) {
@@ -438,6 +437,7 @@ export class CoreToolScheduler {
                   reqInfo.callId,
                   originalOnConfirm,
                   outcome,
+                  signal,
                 ),
             };
             this.setStatusInternal(
@@ -460,7 +460,7 @@ export class CoreToolScheduler {
         );
       }
     }
-    this.attemptExecutionOfScheduledCalls();
+    this.attemptExecutionOfScheduledCalls(signal);
     this.checkAndNotifyCompletion();
   }
 
@@ -468,6 +468,7 @@ export class CoreToolScheduler {
     callId: string,
     originalOnConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>,
     outcome: ToolConfirmationOutcome,
+    signal: AbortSignal,
   ): Promise<void> {
     const toolCall = this.toolCalls.find(
       (c) => c.request.callId === callId && c.status === 'awaiting_approval',
@@ -477,7 +478,7 @@ export class CoreToolScheduler {
       await originalOnConfirm(outcome);
     }
 
-    if (outcome === ToolConfirmationOutcome.Cancel) {
+    if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       this.setStatusInternal(
         callId,
         'cancelled',
@@ -497,7 +498,7 @@ export class CoreToolScheduler {
 
         const modifyResults = await editTool.onModify(
           waitingToolCall.request.args as unknown as EditToolParams,
-          this.abortController.signal,
+          signal,
           outcome,
         );
 
@@ -513,10 +514,10 @@ export class CoreToolScheduler {
     } else {
       this.setStatusInternal(callId, 'scheduled');
     }
-    this.attemptExecutionOfScheduledCalls();
+    this.attemptExecutionOfScheduledCalls(signal);
   }
 
-  private attemptExecutionOfScheduledCalls(): void {
+  private attemptExecutionOfScheduledCalls(signal: AbortSignal): void {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
@@ -553,17 +554,13 @@ export class CoreToolScheduler {
             : undefined;
 
         scheduledCall.tool
-          .execute(
-            scheduledCall.request.args,
-            this.abortController.signal,
-            liveOutputCallback,
-          )
+          .execute(scheduledCall.request.args, signal, liveOutputCallback)
           .then((toolResult: ToolResult) => {
-            if (this.abortController.signal.aborted) {
+            if (signal.aborted) {
               this.setStatusInternal(
                 callId,
                 'cancelled',
-                this.abortController.signal.reason || 'Execution aborted.',
+                'User cancelled tool execution.',
               );
               return;
             }
@@ -613,27 +610,8 @@ export class CoreToolScheduler {
       if (this.onAllToolCallsComplete) {
         this.onAllToolCallsComplete(completedCalls);
       }
-      this.abortController = new AbortController();
       this.notifyToolCallsUpdate();
     }
-  }
-
-  cancelAll(reason: string = 'User initiated cancellation.'): void {
-    if (!this.abortController.signal.aborted) {
-      this.abortController.abort(reason);
-    }
-    this.abortController = new AbortController();
-
-    const callsToCancel = [...this.toolCalls];
-    callsToCancel.forEach((call) => {
-      if (
-        call.status !== 'error' &&
-        call.status !== 'success' &&
-        call.status !== 'cancelled'
-      ) {
-        this.setStatusInternal(call.request.callId, 'cancelled', reason);
-      }
-    });
   }
 
   private notifyToolCallsUpdate(): void {
