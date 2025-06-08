@@ -287,6 +287,15 @@ export class GeminiChat {
     return structuredClone(history);
   }
 
+  /**
+   * Adds a new entry to the chat history.
+   *
+   * @param content - The content to add to the history.
+   */
+  addHistory(content: Content): void {
+    this.history.push(content);
+  }
+
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,

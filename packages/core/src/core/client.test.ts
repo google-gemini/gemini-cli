@@ -219,4 +219,22 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
   });
+
+  describe('addHistory', () => {
+    it('should call chat.addHistory with the provided content', async () => {
+      const mockChat = {
+        addHistory: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      client['chat'] = Promise.resolve(mockChat as any);
+
+      const newContent = {
+        role: 'user',
+        parts: [{ text: 'New history item' }],
+      };
+      await client.addHistory(newContent);
+
+      expect(mockChat.addHistory).toHaveBeenCalledWith(newContent);
+    });
+  });
 });

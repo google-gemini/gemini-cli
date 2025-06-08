@@ -58,6 +58,11 @@ export class GeminiClient {
     this.chat = this.startChat();
   }
 
+  async addHistory(content: Content) {
+    const chat = await this.chat;
+    chat.addHistory(content);
+  }
+
   getChat(): Promise<GeminiChat> {
     return this.chat;
   }

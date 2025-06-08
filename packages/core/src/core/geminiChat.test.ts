@@ -352,4 +352,34 @@ describe('GeminiChat', () => {
       expect(history[1].parts).toEqual([{ text: 'Visible text' }]);
     });
   });
+
+  describe('addHistory', () => {
+    it('should add a new content item to the history', () => {
+      const newContent: Content = {
+        role: 'user',
+        parts: [{ text: 'A new message' }],
+      };
+      chat.addHistory(newContent);
+      const history = chat.getHistory();
+      expect(history.length).toBe(1);
+      expect(history[0]).toEqual(newContent);
+    });
+
+    it('should add multiple items correctly', () => {
+      const content1: Content = {
+        role: 'user',
+        parts: [{ text: 'Message 1' }],
+      };
+      const content2: Content = {
+        role: 'model',
+        parts: [{ text: 'Message 2' }],
+      };
+      chat.addHistory(content1);
+      chat.addHistory(content2);
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      expect(history[0]).toEqual(content1);
+      expect(history[1]).toEqual(content2);
+    });
+  });
 });

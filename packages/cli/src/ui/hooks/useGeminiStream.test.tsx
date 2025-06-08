@@ -30,6 +30,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     // _config
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
+    this.addHistory = vi.fn();
   }),
 );
 
@@ -267,6 +268,7 @@ describe('useGeminiStream', () => {
         () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
       ),
       getGeminiClient: mockGetGeminiClient,
+      addHistory: vi.fn(),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockReturnValue(false);
@@ -294,7 +296,10 @@ describe('useGeminiStream', () => {
       .mockReturnValue((async function* () {})());
   });
 
-  const renderTestHook = (initialToolCalls: TrackedToolCall[] = []) => {
+  const renderTestHook = (
+    initialToolCalls: TrackedToolCall[] = [],
+    geminiClient?: any,
+  ) => {
     mockUseReactToolScheduler.mockReturnValue([
       initialToolCalls,
       mockScheduleToolCalls,
@@ -302,9 +307,11 @@ describe('useGeminiStream', () => {
       mockMarkToolsAsSubmitted,
     ]);
 
+    const client = geminiClient || mockConfig.getGeminiClient();
+
     const { result, rerender } = renderHook(() =>
       useGeminiStream(
-        mockConfig.getGeminiClient(),
+        client,
         mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
         mockSetShowHelp,
         mockConfig,
@@ -318,6 +325,7 @@ describe('useGeminiStream', () => {
       rerender,
       mockMarkToolsAsSubmitted,
       mockSendMessageStream,
+      client,
       // mockFilter removed
     };
   };
@@ -443,5 +451,45 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
     );
+  });
+
+  it('should handle all tool calls being cancelled', async () => {
+    const toolCalls: TrackedToolCall[] = [
+      {
+        request: { callId: '1', name: 'testTool', args: {} },
+        status: 'cancelled',
+        response: {
+          callId: '1',
+          responseParts: [{ text: 'cancelled' }],
+          error: undefined,
+          resultDisplay: 'Tool 1 cancelled display',
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          name: 'testTool',
+          description: 'desc',
+          getDescription: vi.fn(),
+        } as any,
+      },
+    ];
+
+    const client = new MockedGeminiClientClass(mockConfig);
+    const { mockMarkToolsAsSubmitted, rerender } = renderTestHook(
+      toolCalls,
+      client,
+    );
+
+    await act(async () => {
+      rerender({} as any);
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
+      expect(client.addHistory).toHaveBeenCalledTimes(2);
+      expect(client.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: [{ text: 'cancelled' }],
+      });
+    });
   });
 });
