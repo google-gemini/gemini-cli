@@ -5,6 +5,9 @@ ENV SANDBOX="$SANDBOX_NAME"
 
 # install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
+  python3 \
+  make \
+  g++ \
   man-db \
   curl \
   dnsutils \

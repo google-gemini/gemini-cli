@@ -209,7 +209,7 @@ function entrypoint(workdir: string): string[] {
     process.env.NODE_ENV === 'development'
       ? process.env.DEBUG
         ? 'npm run debug --'
-        : 'npm run start --'
+        : 'npm rebuild && npm run start --'
       : process.env.DEBUG // for production binary debugging
         ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini)`
         : 'gemini';

@@ -97,6 +97,29 @@ npm run test
 
 This will run tests located in the `packages/core` and `packages/cli` directories. Ensure tests pass before submitting any changes.
 
+#### Important Note for Sandbox Users on macOS/Windows
+
+This project uses native dependencies (e.g., `tree-sitter`) that are compiled for a specific operating system.
+
+When you run the application in the development sandbox via `npm start`, these dependencies are automatically rebuilt for the container's Linux environment.
+
+Because of this, if you then try to run `npm run test` directly on your host machine (e.g., macOS), the tests will fail with an error similar to `dlopen` or `not a valid mach-o file`. This is because the test runner on your Mac cannot load the Linux-compiled dependencies from your `node_modules` folder.
+
+#### The Solution:
+
+To fix this, you must rebuild the native dependencies for your host machine's architecture before running the tests.
+
+```bash
+npm rebuild
+```
+
+#### Recommended Workflow:
+
+1. After using the sandboxed `npm start`, and before you want to run tests locally, run `npm rebuild` in your terminal.
+2. Then, run `npm run test` as usual.
+
+You will need to repeat the npm rebuild step any time you switch from running the sandboxed application back to running local tests.
+
 ### Linting and Preflight Checks
 
 To ensure code quality, formatting consistency, and run final checks before committing:
