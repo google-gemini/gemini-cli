@@ -88,16 +88,39 @@ describe('useGitBranchName', () => {
     expect(result.current).toBeUndefined();
   });
 
-  it('should return undefined if branch is HEAD (detached state)', async () => {
+  it('should return short commit hash if branch is HEAD (detached state)', async () => {
     (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
-      (_command, _options, callback) => {
-        callback?.(null, 'HEAD\n', '');
+      (command, _options, callback) => {
+        if (command === 'git rev-parse --abbrev-ref HEAD') {
+          callback?.(null, 'HEAD\n', '');
+        } else if (command === 'git rev-parse --short HEAD') {
+          callback?.(null, 'a1b2c3d\n', '');
+        }
         return new EventEmitter() as ChildProcess;
       },
     );
 
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
-    expect(result.current).toBeUndefined();
+    await act(async () => {
+      vi.runAllTimers();
+      rerender();
+    });
+    expect(result.current).toBe('a1b2c3d');
+  });
+
+  it('should return undefined if branch is HEAD and getting commit hash fails', async () => {
+    (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
+      (command, _options, callback) => {
+        if (command === 'git rev-parse --abbrev-ref HEAD') {
+          callback?.(null, 'HEAD\n', '');
+        } else if (command === 'git rev-parse --short HEAD') {
+          callback?.(new Error('Git error'), '', 'error output');
+        }
+        return new EventEmitter() as ChildProcess;
+      },
+    );
+
+    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
     await act(async () => {
       vi.runAllTimers();
       rerender();

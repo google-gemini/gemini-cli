@@ -27,7 +27,17 @@ export function useGitBranchName(cwd: string): string | undefined {
           if (branch && branch !== 'HEAD') {
             setBranchName(branch);
           } else {
-            setBranchName(undefined);
+            exec(
+              'git rev-parse --short HEAD',
+              { cwd },
+              (error, stdout, _stderr) => {
+                if (error) {
+                  setBranchName(undefined);
+                  return;
+                }
+                setBranchName(stdout.toString().trim());
+              },
+            );
           }
         },
       ),
