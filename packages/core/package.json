@@ -21,20 +21,20 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^1.0.1",
+    "@google/genai": "^1.4.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.52.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.52.0",
+    "@opentelemetry/instrumentation-http": "^0.52.0",
+    "@opentelemetry/sdk-node": "^0.52.0",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.0",
     "shell-quote": "^1.8.2",
-    "strip-ansi": "^7.1.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/sdk-node": "^0.52.0",
-    "@opentelemetry/exporter-trace-otlp-grpc": "^0.52.0",
-    "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
-    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.52.0",
-    "@opentelemetry/instrumentation-http": "^0.52.0"
+    "strip-ansi": "^7.1.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
