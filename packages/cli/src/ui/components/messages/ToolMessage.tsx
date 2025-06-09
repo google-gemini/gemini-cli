@@ -15,6 +15,8 @@ import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
 const STATUS_INDICATOR_WIDTH = 3;
+const MIN_LINES_SHOWN = 2; // show at least this many lines
+const MIN_LINES_HIDDEN = 3; // hide at least this many lines (or don't hide any)
 
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
@@ -33,14 +35,20 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
-  const contentHeightEstimate =
-    availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT;
   const resultIsString =
     typeof resultDisplay === 'string' && resultDisplay.trim().length > 0;
   const lines = React.useMemo(
     () => (resultIsString ? resultDisplay.split('\n') : []),
     [resultIsString, resultDisplay],
   );
+  let contentHeightEstimate = Math.max(
+    availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
+    MIN_LINES_SHOWN + 1, // enforce minimum lines shown
+  );
+  // enforce minimum lines hidden (don't hide any otherwise)
+  if (lines.length - contentHeightEstimate < MIN_LINES_HIDDEN) {
+    contentHeightEstimate = lines.length;
+  }
 
   // Truncate the overall string content if it's too long.
   // MarkdownRenderer will handle specific truncation for code blocks within this content.
@@ -53,7 +61,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         : resultDisplay,
     [lines, resultIsString, contentHeightEstimate, resultDisplay],
   );
-  const hiddenLines = lines.length - contentHeightEstimate;
+  const hiddenLines = Math.max(0, lines.length - contentHeightEstimate);
 
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
