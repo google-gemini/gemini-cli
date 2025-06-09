@@ -114,6 +114,6 @@ The `!` prefix provides a powerful way to interact with your system's shell dire
     - Type your shell commands (e.g., `cd my_project`, `npm run dev`, `cat file.txt`).
     - Type `!` and press Enter again to exit Shell Mode.
 
-- **Caution for all `!` usage:** Be mindful of the commands you execute, as they have the same permissions and impact as if you ran them directly in your terminal. The Shell Mode feature does not inherently add extra sandboxing beyond what's already configured for the underlying `execute_bash_command` tool.
+- **Caution for all `!` usage:** Be mindful of the commands you execute, as they have the same permissions and impact as if you ran them directly in your terminal. The Shell Mode feature does not inherently add extra sandboxing beyond what's already configured for the underlying `run_shell_command` tool.
 
 This integrated shell capability allows for seamless switching between AI-assisted tasks and direct system interaction.

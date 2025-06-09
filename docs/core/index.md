@@ -47,7 +47,7 @@ The CLI and Core typically communicate over a local interface (e.g., standard in
 The core plays a vital role in security:
 
 - **API Key Management:** It handles the `GEMINI_API_KEY` and ensures it is used securely when communicating with the Gemini API.
-- **Tool Execution:** When tools interact with the local system (e.g., `execute_bash_command`), the core (and its underlying tool implementations) must do so with appropriate caution, often involving sandboxing mechanisms to prevent unintended side effects.
+- **Tool Execution:** When tools interact with the local system (e.g., `run_shell_command`), the core (and its underlying tool implementations) must do so with appropriate caution, often involving sandboxing mechanisms to prevent unintended side effects.
 
 ## Chat History Compression
 

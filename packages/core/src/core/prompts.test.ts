@@ -18,7 +18,7 @@ vi.mock('../tools/read-many-files', () => ({
   ReadManyFilesTool: { Name: 'read_many_files' },
 }));
 vi.mock('../tools/shell', () => ({
-  ShellTool: { Name: 'execute_bash_command' },
+  ShellTool: { Name: 'run_shell_command' },
 }));
 vi.mock('../tools/write-file', () => ({
   WriteFileTool: { Name: 'write_file' },

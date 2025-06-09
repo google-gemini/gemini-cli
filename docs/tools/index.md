@@ -11,7 +11,7 @@ The core component (`packages/core`) manages these tools, presents their definit
 ## Why are Tools Important?
 
 - **Access to Local Information:** Tools allow Gemini to access your local file system, read file contents, list directories, etc.
-- **Execution of Commands:** With tools like `execute_bash_command`, Gemini can run shell commands (with appropriate safety measures and user confirmation).
+- **Execution of Commands:** With tools like `run_shell_command`, Gemini can run shell commands (with appropriate safety measures and user confirmation).
 - **Interaction with the Web:** Tools can fetch content from URLs.
 - **Action Taking:** Tools can modify files, write new files, or perform other actions on your system (again, typically with safeguards).
 - **Grounding Responses:** By using tools to fetch real-time or specific local data, Gemini's responses can be more accurate, relevant, and grounded in your actual context.
@@ -30,7 +30,7 @@ You will typically see messages in the CLI indicating when a tool is being calle
 
 ## Security and Confirmation
 
-Many tools, especially those that can modify your file system or execute commands (`write_file`, `edit`, `execute_bash_command`), are designed with safety in mind. The Gemini CLI will typically:
+Many tools, especially those that can modify your file system or execute commands (`write_file`, `edit`, `run_shell_command`), are designed with safety in mind. The Gemini CLI will typically:
 
 - **Require Confirmation:** Prompt you before executing potentially sensitive operations, showing you what action is about to be taken.
 - **Utilize Sandboxing:** All tools are subject to restrictions enforced by sandboxing (see [README](../../README.md#sandboxing)).

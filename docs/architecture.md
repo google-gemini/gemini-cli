@@ -44,7 +44,7 @@ A typical interaction with the Gemini CLI follows this general flow:
 5.  **Tool Execution (if applicable):**
     - If the Gemini API requests a tool, the Core package prepares to execute it.
     - **User Confirmation for Potentially Impactful Tools:** If the requested tool can modify the file system (e.g., file edits, writes) or execute shell commands, the CLI (`packages/cli`) displays a confirmation prompt to the user. This prompt details the tool and its arguments, and the user must approve the execution. Read-only operations (e.g., reading files, listing directories) may not always require this explicit confirmation step.
-    - If confirmed (or if confirmation is not required for the specific tool), the Core package identifies and executes the relevant tool (e.g., `read_file`, `execute_bash_command`).
+    - If confirmed (or if confirmation is not required for the specific tool), the Core package identifies and executes the relevant tool (e.g., `read_file`, `run_shell_command`).
     - The tool performs its action (e.g., reads a file from the disk).
     - The result of the tool execution is sent back to the Gemini API by the Core.
     - The Gemini API processes the tool result and generates a final response.

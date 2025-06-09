@@ -70,7 +70,7 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - **Default:** `false` (users will be prompted for most tool calls).
   - **Behavior:**
     - If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe. An indicator may be shown in the UI when auto-accept is active.
-    - Potentially destructive or system-modifying tools (like `execute_bash_command` or `write_file`) will likely still require confirmation regardless of this setting.
+    - Potentially destructive or system-modifying tools (like `run_shell_command` or `write_file`) will likely still require confirmation regardless of this setting.
   - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):

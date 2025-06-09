@@ -59,7 +59,7 @@ This guide provides solutions to common issues and debugging tips.
 - **Tool Issues:**
 
   - If a specific tool is failing, try to isolate the issue by running the simplest possible version of the command or operation the tool performs.
-  - For `execute_bash_command`, ensure the command works directly in your shell first.
+  - For `run_shell_command`, ensure the command works directly in your shell first.
   - For file system tools, double-check paths and permissions.
 
 - **Pre-flight Checks:**

@@ -2,7 +2,7 @@
 
 This document provides details on the shell tool.
 
-## `execute_bash_command`
+## `run_shell_command`
 
 - **Purpose:** Executes a given shell command using `bash -c <command>`. This tool is essential for interacting with the underlying operating system, running scripts, or performing command-line operations.
 - **Arguments:**
@@ -24,15 +24,15 @@ This document provides details on the shell tool.
 - **Examples:**
   - Listing files in the current directory:
     ```
-    execute_bash_command(command="ls -la")
+    run_shell_command(command="ls -la")
     ```
   - Running a script in a specific directory:
     ```
-    execute_bash_command(command="./my_script.sh", directory="scripts", description="Run my custom script")
+    run_shell_command(command="./my_script.sh", directory="scripts", description="Run my custom script")
     ```
   - Starting a background server:
     ```
-    execute_bash_command(command="npm run dev &", description="Start development server in background")
+    run_shell_command(command="npm run dev &", description="Start development server in background")
     ```
 - **Important Notes:**
   - **Security:** Be cautious when executing commands, especially those constructed from user input, to prevent security vulnerabilities.
