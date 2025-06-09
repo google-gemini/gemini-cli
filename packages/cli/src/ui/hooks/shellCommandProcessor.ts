@@ -43,13 +43,23 @@ export const useShellCommandProcessor = (
         return false;
       }
 
-      // wrap command to write pwd to temporary file
-      let commandToExecute = rawQuery.trim();
-      const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
-      const pwdFilePath = path.join(os.tmpdir(), pwdFileName);
-      if (!commandToExecute.endsWith('&')) commandToExecute += ';';
-      // note here we could also restore a previous pwd with `cd {cwd}; { ... }`
-      commandToExecute = `{ ${commandToExecute} }; __code=$?; pwd >${pwdFilePath}; exit $__code`;
+      const isWindows = os.platform() === 'win32';
+      let commandToExecute: string;
+      let pwdFilePath: string | undefined;
+
+      if (isWindows) {
+        commandToExecute = rawQuery;
+      } else {
+        // wrap command to write pwd to temporary file
+        let command = rawQuery.trim();
+        const pwdFileName = `shell_pwd_${crypto
+          .randomBytes(6)
+          .toString('hex')}.tmp`;
+        pwdFilePath = path.join(os.tmpdir(), pwdFileName);
+        if (!command.endsWith('&')) command += ';';
+        // note here we could also restore a previous pwd with `cd {cwd}; { ... }`
+        commandToExecute = `{ ${command} }; __code=$?; pwd >${pwdFilePath}; exit $__code`;
+      }
 
       const userMessageTimestamp = Date.now();
       addItemToHistory(
@@ -101,7 +111,7 @@ export const useShellCommandProcessor = (
                   userMessageTimestamp,
                 );
               }
-              if (fs.existsSync(pwdFilePath)) {
+              if (pwdFilePath && fs.existsSync(pwdFilePath)) {
                 const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
                 if (pwd !== targetDir) {
                   addItemToHistory(
@@ -118,11 +128,16 @@ export const useShellCommandProcessor = (
             },
           );
         } else {
-          const child = spawn('bash', ['-c', commandToExecute], {
-            cwd: targetDir,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            detached: true, // Important for process group killing
-          });
+          const child = isWindows
+            ? spawn('cmd.exe', ['/c', commandToExecute], {
+                cwd: targetDir,
+                stdio: ['ignore', 'pipe', 'pipe'],
+              })
+            : spawn('bash', ['-c', commandToExecute], {
+                cwd: targetDir,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                detached: true, // Important for process group killing
+              });
 
           let exited = false;
           let output = '';
@@ -155,24 +170,29 @@ export const useShellCommandProcessor = (
               onDebugMessage(
                 `Aborting shell command (PID: ${child.pid}) due to signal.`,
               );
-              try {
-                // attempt to SIGTERM process group (negative PID)
-                // fall back to SIGKILL (to group) after 200ms
-                process.kill(-child.pid, 'SIGTERM');
-                await new Promise((resolve) => setTimeout(resolve, 200));
-                if (child.pid && !exited) {
-                  process.kill(-child.pid, 'SIGKILL');
-                }
-              } catch (_e) {
-                // if group kill fails, fall back to killing just the main process
+              if (os.platform() === 'win32') {
+                // For Windows, use taskkill to kill the process tree
+                spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+              } else {
                 try {
-                  if (child.pid) {
-                    child.kill('SIGKILL');
+                  // attempt to SIGTERM process group (negative PID)
+                  // fall back to SIGKILL (to group) after 200ms
+                  process.kill(-child.pid, 'SIGTERM');
+                  await new Promise((resolve) => setTimeout(resolve, 200));
+                  if (child.pid && !exited) {
+                    process.kill(-child.pid, 'SIGKILL');
                   }
                 } catch (_e) {
-                  console.error(
-                    `failed to kill shell process ${child.pid}: ${_e}`,
-                  );
+                  // if group kill fails, fall back to killing just the main process
+                  try {
+                    if (child.pid) {
+                      child.kill('SIGKILL');
+                    }
+                  } catch (_e) {
+                    console.error(
+                      `failed to kill shell process ${child.pid}: ${_e}`,
+                    );
+                  }
                 }
               }
             }
@@ -208,7 +228,7 @@ export const useShellCommandProcessor = (
                 userMessageTimestamp,
               );
             }
-            if (fs.existsSync(pwdFilePath)) {
+            if (pwdFilePath && fs.existsSync(pwdFilePath)) {
               const pwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
               if (pwd !== targetDir) {
                 addItemToHistory(

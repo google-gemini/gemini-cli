@@ -11,10 +11,23 @@ import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
 import { readPackageUp } from 'read-package-up';
+import commandExists from 'command-exists';
 import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
+
+function getContainerPath(hostPath: string): string {
+  if (os.platform() !== 'win32') {
+    return hostPath;
+  }
+  const withForwardSlashes = hostPath.replace(/\\/g, '/');
+  const match = withForwardSlashes.match(/^([A-Z]):\/(.*)/i);
+  if (match) {
+    return `/${match[1].toLowerCase()}/${match[2]}`;
+  }
+  return hostPath;
+}
 
 const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 
@@ -98,9 +111,9 @@ export function sandbox_command(sandbox?: string | boolean): string {
 
   if (sandbox === true) {
     // look for docker or podman, in that order
-    if (execSync('command -v docker || true').toString().trim()) {
+    if (commandExists.sync('docker')) {
       return 'docker'; // Set sandbox to 'docker' if found
-    } else if (execSync('command -v podman || true').toString().trim()) {
+    } else if (commandExists.sync('podman')) {
       return 'podman'; // Set sandbox to 'podman' if found
     } else {
       console.error(
@@ -111,7 +124,7 @@ export function sandbox_command(sandbox?: string | boolean): string {
     }
   } else if (sandbox) {
     // confirm that specfied command exists
-    if (execSync(`command -v ${sandbox} || true`).toString().trim()) {
+    if (commandExists.sync(sandbox)) {
       return sandbox;
     } else {
       console.error(
@@ -124,7 +137,7 @@ export function sandbox_command(sandbox?: string | boolean): string {
     // unless SEATBELT_PROFILE is set to 'none', which we allow as an escape hatch
     if (
       os.platform() === 'darwin' &&
-      execSync('command -v sandbox-exec || true').toString().trim() &&
+      commandExists.sync('sandbox-exec') &&
       process.env.SEATBELT_PROFILE !== 'none'
     ) {
       return 'sandbox-exec';
@@ -150,71 +163,68 @@ function ports(): string[] {
 }
 
 function entrypoint(workdir: string): string[] {
-  // set up bash command to be run inside container
-  // start with setting up PATH and PYTHONPATH with optional suffixes from host
-  const bashCmds = [];
+  const isWindows = os.platform() === 'win32';
+  const containerWorkdir = getContainerPath(workdir);
+  const shellCmds = [];
+  const pathSeparator = isWindows ? ';' : ':';
 
-  // copy any paths in PATH that are under working directory in sandbox
-  // note we can't just pass these as --env since that would override base PATH
-  // instead we construct a suffix and append as part of bashCmd below
   let pathSuffix = '';
   if (process.env.PATH) {
-    const paths = process.env.PATH.split(':');
-    for (const path of paths) {
-      if (path.startsWith(workdir)) {
-        pathSuffix += `:${path}`;
+    const paths = process.env.PATH.split(pathSeparator);
+    for (const p of paths) {
+      const containerPath = getContainerPath(p);
+      if (
+        containerPath.toLowerCase().startsWith(containerWorkdir.toLowerCase())
+      ) {
+        pathSuffix += `:${containerPath}`;
       }
     }
   }
   if (pathSuffix) {
-    bashCmds.push(`export PATH="$PATH${pathSuffix}";`); // suffix includes leading ':'
+    shellCmds.push(`export PATH="$PATH${pathSuffix}";`);
   }
 
-  // copy any paths in PYTHONPATH that are under working directory in sandbox
-  // note we can't just pass these as --env since that would override base PYTHONPATH
-  // instead we construct a suffix and append as part of bashCmd below
   let pythonPathSuffix = '';
   if (process.env.PYTHONPATH) {
-    const paths = process.env.PYTHONPATH.split(':');
-    for (const path of paths) {
-      if (path.startsWith(workdir)) {
-        pythonPathSuffix += `:${path}`;
+    const paths = process.env.PYTHONPATH.split(pathSeparator);
+    for (const p of paths) {
+      const containerPath = getContainerPath(p);
+      if (
+        containerPath.toLowerCase().startsWith(containerWorkdir.toLowerCase())
+      ) {
+        pythonPathSuffix += `:${containerPath}`;
       }
     }
   }
   if (pythonPathSuffix) {
-    bashCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`); // suffix includes leading ':'
+    shellCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`);
   }
 
-  // source sandbox.bashrc if exists under project settings directory
   const projectSandboxBashrc = path.join(
     SETTINGS_DIRECTORY_NAME,
     'sandbox.bashrc',
   );
   if (fs.existsSync(projectSandboxBashrc)) {
-    bashCmds.push(`source ${projectSandboxBashrc};`);
+    shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
 
-  // also set up redirects (via socat) so servers can listen on localhost instead of 0.0.0.0
   ports().forEach((p) =>
-    bashCmds.push(
+    shellCmds.push(
       `socat TCP4-LISTEN:${p},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${p} 2> /dev/null &`,
     ),
   );
 
-  // append remaining args (bash -c "gemini cli_args...")
-  // cli_args need to be quoted before being inserted into bash_cmd
   const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
   const cliCmd =
     process.env.NODE_ENV === 'development'
       ? process.env.DEBUG
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
-      : process.env.DEBUG // for production binary debugging
+      : process.env.DEBUG
         ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini)`
         : 'gemini';
 
-  const args = [...bashCmds, cliCmd, ...cliArgs];
+  const args = [...shellCmds, cliCmd, ...cliArgs];
 
   return ['bash', '-c', args.join(' ')];
 }
@@ -259,7 +269,7 @@ export async function start_sandbox(sandbox: string) {
       `CACHE_DIR=${fs.realpathSync(execSync(`getconf DARWIN_USER_CACHE_DIR`).toString().trim())}`,
       '-f',
       profileFile,
-      'bash',
+      'sh',
       '-c',
       [
         `SANDBOX=sandbox-exec`,
@@ -274,7 +284,7 @@ export async function start_sandbox(sandbox: string) {
   console.error(`hopping into sandbox (command: ${sandbox}) ...`);
 
   // determine full path for gemini-cli to distinguish linked vs installed setting
-  const gcPath = execSync(`realpath $(which gemini)`).toString().trim();
+  const gcPath = fs.realpathSync(process.argv[1]);
 
   const projectSandboxDockerfile = path.join(
     SETTINGS_DIRECTORY_NAME,
@@ -283,7 +293,8 @@ export async function start_sandbox(sandbox: string) {
   const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
   const image = await getSandboxImageName(isCustomProjectSandbox);
-  const workdir = process.cwd();
+  const workdir = path.resolve(process.cwd());
+  const containerWorkdir = getContainerPath(workdir);
 
   // if BUILD_SANDBOX is set, then call scripts/build_sandbox.sh under gemini-cli repo
   //
@@ -332,7 +343,7 @@ export async function start_sandbox(sandbox: string) {
 
   // use interactive mode and auto-remove container on exit
   // run init binary inside container to forward signals & reap zombies
-  const args = ['run', '-i', '--rm', '--init', '--workdir', workdir];
+  const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
 
   // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
   if (process.stdin.isTTY) {
@@ -340,25 +351,25 @@ export async function start_sandbox(sandbox: string) {
   }
 
   // mount current directory as working directory in sandbox (set via --workdir)
-  args.push('--volume', `${process.cwd()}:${workdir}`);
+  args.push('--volume', `${workdir}:${containerWorkdir}`);
 
   // mount user settings directory inside container, after creating if missing
   // note user/home changes inside sandbox and we mount at BOTH paths for consistency
   const userSettingsDirOnHost = USER_SETTINGS_DIR;
-  const userSettingsDirInSandbox = `/home/node/${SETTINGS_DIRECTORY_NAME}`;
+  const userSettingsDirInSandbox = getContainerPath(userSettingsDirOnHost);
   if (!fs.existsSync(userSettingsDirOnHost)) {
     fs.mkdirSync(userSettingsDirOnHost);
   }
-  args.push('--volume', `${userSettingsDirOnHost}:${userSettingsDirOnHost}`);
+  args.push('--volume', `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`);
   if (userSettingsDirInSandbox !== userSettingsDirOnHost) {
     args.push(
       '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
+      `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
     );
   }
 
-  // mount os.tmpdir() as /tmp inside container
-  args.push('--volume', `${os.tmpdir()}:/tmp`);
+  // mount os.tmpdir() as os.tmpdir() inside container
+  args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
 
   // mount paths listed in SANDBOX_MOUNTS
   if (process.env.SANDBOX_MOUNTS) {
@@ -401,13 +412,10 @@ export async function start_sandbox(sandbox: string) {
   // name container after image, plus numeric suffix to avoid conflicts
   const imageName = parseImageName(image);
   let index = 0;
-  while (
-    execSync(
-      `${sandbox} ps -a --format "{{.Names}}" | grep "${imageName}-${index}" || true`,
-    )
-      .toString()
-      .trim()
-  ) {
+  const containerNameCheck = execSync(`${sandbox} ps -a --format "{{.Names}}"`)
+    .toString()
+    .trim();
+  while (containerNameCheck.includes(`${imageName}-${index}`)) {
     index++;
   }
   const containerName = `${imageName}-${index}`;
@@ -435,7 +443,9 @@ export async function start_sandbox(sandbox: string) {
   // also mount-replace VIRTUAL_ENV directory with <project_settings>/sandbox.venv
   // sandbox can then set up this new VIRTUAL_ENV directory using sandbox.bashrc (see below)
   // directory will be empty if not set up, which is still preferable to having host binaries
-  if (process.env.VIRTUAL_ENV?.startsWith(workdir)) {
+  if (
+    process.env.VIRTUAL_ENV?.toLowerCase().startsWith(workdir.toLowerCase())
+  ) {
     const sandboxVenvPath = path.resolve(
       SETTINGS_DIRECTORY_NAME,
       'sandbox.venv',
@@ -443,8 +453,14 @@ export async function start_sandbox(sandbox: string) {
     if (!fs.existsSync(sandboxVenvPath)) {
       fs.mkdirSync(sandboxVenvPath, { recursive: true });
     }
-    args.push('--volume', `${sandboxVenvPath}:${process.env.VIRTUAL_ENV}`);
-    args.push('--env', `VIRTUAL_ENV=${process.env.VIRTUAL_ENV}`);
+    args.push(
+      '--volume',
+      `${sandboxVenvPath}:${getContainerPath(process.env.VIRTUAL_ENV)}`,
+    );
+    args.push(
+      '--env',
+      `VIRTUAL_ENV=${getContainerPath(process.env.VIRTUAL_ENV)}`,
+    );
   }
 
   // copy additional environment variables from SANDBOX_ENV
@@ -498,13 +514,24 @@ export async function start_sandbox(sandbox: string) {
   // spawn child and let it inherit stdio
   const child = spawn(sandbox, args, {
     stdio: 'inherit',
-    detached: true,
+    detached: os.platform() !== 'win32',
+  });
+
+  child.on('error', (err) => {
+    console.error('Sandbox process error:', err);
   });
 
   // uncomment this line (and comment the await on following line) to let parent exit
   // child.unref();
-  await new Promise((resolve) => {
-    child.on('close', resolve);
+  await new Promise<void>((resolve) => {
+    child.on('close', (code, signal) => {
+      if (code !== 0) {
+        console.log(
+          `Sandbox process exited with code: ${code}, signal: ${signal}`,
+        );
+      }
+      resolve();
+    });
   });
 }
 

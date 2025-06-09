@@ -21,7 +21,11 @@ describe('checkHasEditor', () => {
   it('should return true for vscode if "code" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
     expect(checkHasEditor('vscode')).toBe(true);
-    expect(execSync).toHaveBeenCalledWith('which code', { stdio: 'ignore' });
+    const expectedCommand =
+      process.platform === 'win32' ? 'where.exe code.cmd' : 'command -v code';
+    expect(execSync).toHaveBeenCalledWith(expectedCommand, {
+      stdio: 'ignore',
+    });
   });
 
   it('should return false for vscode if "code" command does not exist', () => {
@@ -34,7 +38,11 @@ describe('checkHasEditor', () => {
   it('should return true for vim if "vim" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
     expect(checkHasEditor('vim')).toBe(true);
-    expect(execSync).toHaveBeenCalledWith('which vim', { stdio: 'ignore' });
+    const expectedCommand =
+      process.platform === 'win32' ? 'where.exe vim' : 'command -v vim';
+    expect(execSync).toHaveBeenCalledWith(expectedCommand, {
+      stdio: 'ignore',
+    });
   });
 
   it('should return false for vim if "vim" command does not exist', () => {

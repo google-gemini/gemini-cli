@@ -1,0 +1,61 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law_or_agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { spawn, execSync } from 'child_process';
+import { join } from 'path';
+
+const root = join(import.meta.dirname, '..');
+
+// check build status, write warnings to file for app to display if needed
+execSync('node ./scripts/check-build-status.js', {
+  stdio: 'inherit',
+  cwd: root,
+});
+
+// if debugging is enabled and sandboxing is disabled, use --inspect-brk flag
+// note with sandboxing this flag is passed to the binary inside the sandbox
+// inside sandbox SANDBOX should be set and sandbox_command.js should fail
+const nodeArgs = [];
+try {
+  execSync('node scripts/sandbox_command.js -q', {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  if (process.env.DEBUG) {
+    if (process.env.SANDBOX) {
+      const port = process.env.DEBUG_PORT || '9229';
+      nodeArgs.push(`--inspect-brk=0.0.0.0:${port}`);
+    } else {
+      nodeArgs.push('--inspect-brk');
+    }
+  }
+} catch {
+  // ignore
+}
+
+nodeArgs.push('./packages/cli');
+nodeArgs.push(...process.argv.slice(2));
+
+const env = {
+  ...process.env,
+  CLI_VERSION: 'development',
+  DEV: 'true',
+};
+
+spawn('node', nodeArgs, { stdio: 'inherit', env });

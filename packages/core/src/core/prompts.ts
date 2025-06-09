@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { LSTool } from '../tools/ls.js';
@@ -131,8 +132,15 @@ You are running outside of a sandbox container, directly on the user's system. F
 
 ${(function () {
   // note git repo can change so we need to check every time system prompt is generated
-  const gitRootCmd = 'git rev-parse --show-toplevel 2>/dev/null || true';
-  const gitRoot = execSync(gitRootCmd)?.toString()?.trim();
+  const isWindows = os.platform() === 'win32';
+  const devNull = isWindows ? 'NUL' : '/dev/null';
+  const gitRootCmd = `git rev-parse --show-toplevel 2>${devNull}`;
+  let gitRoot = '';
+  try {
+    gitRoot = execSync(gitRootCmd)?.toString()?.trim();
+  } catch (_e) {
+    // ignore
+  }
   if (gitRoot) {
     return `
 # Git Repository

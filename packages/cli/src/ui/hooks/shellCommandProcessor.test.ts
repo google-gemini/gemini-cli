@@ -44,8 +44,10 @@ vi.mock('path', () => ({
 vi.mock('os', () => ({
   default: {
     tmpdir: vi.fn(() => '/tmp'),
+    platform: vi.fn(() => 'linux'),
   },
   tmpdir: vi.fn(() => '/tmp'),
+  platform: vi.fn(() => 'linux'),
 }));
 
 // Configure the fs mock to use new vi.fn() instances created within the factory

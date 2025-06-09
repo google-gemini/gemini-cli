@@ -206,6 +206,8 @@ Expectation for required parameters:
 
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
+      // Normalize line endings to LF for consistent processing.
+      currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {
@@ -303,6 +305,8 @@ Expectation for required parameters:
 
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
+      // Normalize line endings to LF for consistent processing.
+      currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
       if (isNodeError(err) && err.code === 'ENOENT') {

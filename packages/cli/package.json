@@ -8,7 +8,7 @@
     "gemini": "dist/index.js"
   },
   "scripts": {
-    "build": "../../scripts/build_package.sh",
+    "build": "node ../../scripts/build_package.js",
     "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
@@ -29,7 +29,7 @@
     "sandboxImageUri": "gemini-cli-sandbox"
   },
   "dependencies": {
-    "@gemini-cli/core": "0.1.0",
+    "@gemini-cli/core": "file:../core",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "highlight.js": "^11.11.1",
@@ -48,6 +48,7 @@
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
+    "command-exists": "^1.2.9",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "@types/react": "^18.3.1",
     "@types/shell-quote": "^1.7.5",
     "@types/yargs": "^17.0.32",
+    "@types/command-exists": "^1.2.3",
     "ink-testing-library": "^4.0.0",
     "jsdom": "^26.1.0",
     "typescript": "^5.3.3",

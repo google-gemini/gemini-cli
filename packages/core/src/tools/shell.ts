@@ -169,20 +169,35 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       };
     }
 
-    // wrap command to append subprocess pids (via pgrep) to temporary file
-    const tempFileName = `shell_pgrep_${crypto.randomBytes(6).toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    const isWindows = os.platform() === 'win32';
 
-    let command = params.command.trim();
-    if (!command.endsWith('&')) command += ';';
-    command = `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+    // pgrep is not available on Windows, so we can't get background PIDs
+    const command = isWindows
+      ? params.command
+      : (() => {
+          // wrap command to append subprocess pids (via pgrep) to temporary file
+          const tempFileName = `shell_pgrep_${crypto
+            .randomBytes(6)
+            .toString('hex')}.tmp`;
+          const tempFilePath = path.join(os.tmpdir(), tempFileName);
+
+          let command = params.command.trim();
+          if (!command.endsWith('&')) command += ';';
+          return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+        })();
 
     // spawn command in specified directory (or project root if not specified)
-    const shell = spawn('bash', ['-c', command], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-      cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
-    });
+    const shell = isWindows
+      ? spawn('cmd.exe', ['/c', command], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
+          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+        })
+      : spawn('bash', ['-c', command], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: true, // ensure subprocess starts its own process group (esp. in Linux)
+          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+        });
 
     let exited = false;
     let stdout = '';
@@ -241,22 +256,27 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     const abortHandler = async () => {
       if (shell.pid && !exited) {
-        try {
-          // attempt to SIGTERM process group (negative PID)
-          // fall back to SIGKILL (to group) after 200ms
-          process.kill(-shell.pid, 'SIGTERM');
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          if (shell.pid && !exited) {
-            process.kill(-shell.pid, 'SIGKILL');
-          }
-        } catch (_e) {
-          // if group kill fails, fall back to killing just the main process
+        if (os.platform() === 'win32') {
+          // For Windows, use taskkill to kill the process tree
+          spawn('taskkill', ['/pid', shell.pid.toString(), '/f', '/t']);
+        } else {
           try {
-            if (shell.pid) {
-              shell.kill('SIGKILL');
+            // attempt to SIGTERM process group (negative PID)
+            // fall back to SIGKILL (to group) after 200ms
+            process.kill(-shell.pid, 'SIGTERM');
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            if (shell.pid && !exited) {
+              process.kill(-shell.pid, 'SIGKILL');
             }
           } catch (_e) {
-            console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
+            // if group kill fails, fall back to killing just the main process
+            try {
+              if (shell.pid) {
+                shell.kill('SIGKILL');
+              }
+            } catch (_e) {
+              console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
+            }
           }
         }
       }
@@ -272,25 +292,31 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     // parse pids (pgrep output) from temporary file and remove it
     const backgroundPIDs: number[] = [];
-    if (fs.existsSync(tempFilePath)) {
-      const pgrepLines = fs
-        .readFileSync(tempFilePath, 'utf8')
-        .split('\n')
-        .filter(Boolean);
-      for (const line of pgrepLines) {
-        if (!/^\d+$/.test(line)) {
-          console.error(`pgrep: ${line}`);
+    if (os.platform() !== 'win32') {
+      const tempFileName = `shell_pgrep_${crypto
+        .randomBytes(6)
+        .toString('hex')}.tmp`;
+      const tempFilePath = path.join(os.tmpdir(), tempFileName);
+      if (fs.existsSync(tempFilePath)) {
+        const pgrepLines = fs
+          .readFileSync(tempFilePath, 'utf8')
+          .split('\n')
+          .filter(Boolean);
+        for (const line of pgrepLines) {
+          if (!/^\d+$/.test(line)) {
+            console.error(`pgrep: ${line}`);
+          }
+          const pid = Number(line);
+          // exclude the shell subprocess pid
+          if (pid !== shell.pid) {
+            backgroundPIDs.push(pid);
+          }
         }
-        const pid = Number(line);
-        // exclude the shell subprocess pid
-        if (pid !== shell.pid) {
-          backgroundPIDs.push(pid);
+        fs.unlinkSync(tempFilePath);
+      } else {
+        if (!abortSignal.aborted) {
+          console.error('missing pgrep output');
         }
-      }
-      fs.unlinkSync(tempFilePath);
-    } else {
-      if (!abortSignal.aborted) {
-        console.error('missing pgrep output');
       }
     }
 

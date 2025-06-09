@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
 import {
@@ -32,7 +32,7 @@ describe('useLoadingIndicator', () => {
     expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
   });
 
-  it('should reflect values when Responding', () => {
+  it('should reflect values when Responding', async () => {
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Responding),
     );
@@ -42,29 +42,33 @@ describe('useLoadingIndicator', () => {
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
     );
-    const _initialPhrase = result.current.currentLoadingPhrase;
+    const initialPhrase = result.current.currentLoadingPhrase;
 
-    act(() => {
-      vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
     });
+
     // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
+    expect(result.current.currentLoadingPhrase).not.toBe(initialPhrase);
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
     );
   });
 
-  it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', () => {
+  it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', async () => {
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(60000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
     });
     expect(result.current.elapsedTime).toBe(60);
 
-    rerender({ streamingState: StreamingState.WaitingForConfirmation });
+    act(() => {
+      rerender({ streamingState: StreamingState.WaitingForConfirmation });
+    });
 
     expect(result.current.currentLoadingPhrase).toBe(
       'Waiting for user confirmation...',
@@ -72,60 +76,66 @@ describe('useLoadingIndicator', () => {
     expect(result.current.elapsedTime).toBe(60); // Elapsed time should be retained
 
     // Timer should not advance further
-    act(() => {
-      vi.advanceTimersByTime(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.elapsedTime).toBe(60);
   });
 
-  it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', () => {
+  it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', async () => {
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(5000); // 5s
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000); // 5s
     });
     expect(result.current.elapsedTime).toBe(5);
 
-    rerender({ streamingState: StreamingState.WaitingForConfirmation });
+    act(() => {
+      rerender({ streamingState: StreamingState.WaitingForConfirmation });
+    });
     expect(result.current.elapsedTime).toBe(5);
     expect(result.current.currentLoadingPhrase).toBe(
       'Waiting for user confirmation...',
     );
 
-    rerender({ streamingState: StreamingState.Responding });
+    act(() => {
+      rerender({ streamingState: StreamingState.Responding });
+    });
     expect(result.current.elapsedTime).toBe(0); // Should reset
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
     );
 
-    act(() => {
-      vi.advanceTimersByTime(1000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
     });
     expect(result.current.elapsedTime).toBe(1);
   });
 
-  it('should reset timer and phrase when streamingState changes from Responding to Idle', () => {
+  it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(10000); // 10s
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000); // 10s
     });
     expect(result.current.elapsedTime).toBe(10);
 
-    rerender({ streamingState: StreamingState.Idle });
+    act(() => {
+      rerender({ streamingState: StreamingState.Idle });
+    });
 
     expect(result.current.elapsedTime).toBe(0);
     expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
 
     // Timer should not advance
-    act(() => {
-      vi.advanceTimersByTime(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.elapsedTime).toBe(0);
   });
