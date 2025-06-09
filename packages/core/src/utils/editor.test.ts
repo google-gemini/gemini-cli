@@ -35,6 +35,36 @@ describe('checkHasEditor', () => {
     expect(checkHasEditor('vscode')).toBe(false);
   });
 
+  it('should return true for windsurf if "windsurf" command exists', () => {
+    (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/windsurf'));
+    expect(checkHasEditor('windsurf')).toBe(true);
+    expect(execSync).toHaveBeenCalledWith('command -v windsurf', {
+      stdio: 'ignore',
+    });
+  });
+
+  it('should return false for windsurf if "windsurf" command does not exist', () => {
+    (execSync as Mock).mockImplementation(() => {
+      throw new Error();
+    });
+    expect(checkHasEditor('windsurf')).toBe(false);
+  });
+
+  it('should return true for cursor if "cursor" command exists', () => {
+    (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/cursor'));
+    expect(checkHasEditor('cursor')).toBe(true);
+    expect(execSync).toHaveBeenCalledWith('command -v cursor', {
+      stdio: 'ignore',
+    });
+  });
+
+  it('should return false for cursor if "cursor" command does not exist', () => {
+    (execSync as Mock).mockImplementation(() => {
+      throw new Error();
+    });
+    expect(checkHasEditor('cursor')).toBe(false);
+  });
+
   it('should return true for vim if "vim" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
     expect(checkHasEditor('vim')).toBe(true);
@@ -71,7 +101,7 @@ describe('getDiffCommand', () => {
 
   it('should return null for an unsupported editor', () => {
     // @ts-expect-error Testing unsupported editor
-    const command = getDiffCommand('old.txt', 'new.txt', 'nano');
+    const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
     expect(command).toBeNull();
   });
 });

@@ -6,7 +6,7 @@
 
 import { execSync, spawn } from 'child_process';
 
-type EditorType = 'vscode' | 'vim';
+export type EditorType = 'vscode' | 'windsurf' | 'cursor' | 'vim';
 
 interface DiffCommand {
   command: string;
@@ -25,15 +25,18 @@ function commandExists(cmd: string): boolean {
   }
 }
 
+const editorCommands: Record<EditorType, { win32: string; default: string }> = {
+  vscode: { win32: 'code.cmd', default: 'code' },
+  windsurf: { win32: 'windsurf', default: 'windsurf' },
+  cursor: { win32: 'cursor', default: 'cursor' },
+  vim: { win32: 'vim', default: 'vim' },
+};
+
 export function checkHasEditor(editor: EditorType): boolean {
-  if (editor === 'vscode') {
-    return process.platform === 'win32'
-      ? commandExists('code.cmd')
-      : commandExists('code');
-  } else if (editor === 'vim') {
-    return commandExists('vim');
-  }
-  return false;
+  const commandConfig = editorCommands[editor];
+  const command =
+    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  return commandExists(command);
 }
 
 /**
@@ -48,6 +51,16 @@ export function getDiffCommand(
     case 'vscode':
       return {
         command: 'code',
+        args: ['--wait', '--diff', oldPath, newPath],
+      };
+    case 'windsurf':
+      return {
+        command: 'windsurf',
+        args: ['--wait', '--diff', oldPath, newPath],
+      };
+    case 'cursor':
+      return {
+        command: 'cursor',
         args: ['--wait', '--diff', oldPath, newPath],
       };
     case 'vim':

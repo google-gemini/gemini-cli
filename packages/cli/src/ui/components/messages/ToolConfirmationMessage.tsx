@@ -98,6 +98,24 @@ export const ToolConfirmationMessage: React.FC<
       });
     }
 
+    if (
+      checkHasEditor('windsurf') &&
+      notUsingSandbox &&
+      externalEditorsEnabled
+    ) {
+      options.push({
+        label: 'Modify with Windsurf',
+        value: ToolConfirmationOutcome.ModifyWindsurf,
+      });
+    }
+
+    if (checkHasEditor('cursor') && notUsingSandbox && externalEditorsEnabled) {
+      options.push({
+        label: 'Modify with Cursor',
+        value: ToolConfirmationOutcome.ModifyCursor,
+      });
+    }
+
     if (checkHasEditor('vim') && externalEditorsEnabled) {
       options.push({
         label: 'Modify with vim',
