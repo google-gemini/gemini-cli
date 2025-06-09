@@ -36,8 +36,8 @@ vi.mock('@gemini-cli/core', async () => {
     loadEnvironment: vi.fn(),
     Config: vi.fn((params) => ({
       // Mock the config object and its methods
-      getApiKey: () => params.apiKey,
-      getModel: () => params.model,
+      getApiKey: () => params.contentGeneratorConfig.apiKey,
+      getModel: () => params.contentGeneratorConfig.model,
       getSandbox: () => params.sandbox,
       getTargetDir: () => params.targetDir,
       getDebugMode: () => params.debugMode,
@@ -51,7 +51,7 @@ vi.mock('@gemini-cli/core', async () => {
       getUserAgent: () => params.userAgent,
       getUserMemory: () => params.userMemory,
       getGeminiMdFileCount: () => params.geminiMdFileCount,
-      getVertexAI: () => params.vertexai,
+      getVertexAI: () => params.contentGeneratorConfig.vertexai,
       getShowMemoryUsage: () => params.showMemoryUsage, // Added for the test
       getTelemetry: () => params.telemetry,
       // Add any other methods that are called on the config object
@@ -172,6 +172,50 @@ describe('loadCliConfig telemetry', () => {
     const settings: Settings = { telemetry: true };
     const config = await loadCliConfig(settings, []);
     expect(config.getTelemetry()).toBe(false);
+  });
+});
+
+describe('API Key Handling', () => {
+  const originalEnv = { ...process.env };
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    process.argv = ['node', 'script.js'];
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    process.argv = originalArgv;
+  });
+
+  it('should use GEMINI_API_KEY from env', async () => {
+    process.env.GEMINI_API_KEY = 'gemini-key';
+    delete process.env.GOOGLE_API_KEY;
+
+    const settings: Settings = {};
+    const result = await loadCliConfig(settings, []);
+    expect(result.getApiKey()).toBe('gemini-key');
+  });
+
+  it('should use GOOGLE_API_KEY and warn when both GOOGLE_API_KEY and GEMINI_API_KEY are set', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    process.env.GEMINI_API_KEY = 'gemini-key';
+    process.env.GOOGLE_API_KEY = 'google-key';
+
+    const settings: Settings = {};
+    const result = await loadCliConfig(settings, []);
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Both GEMINI_API_KEY and GOOGLE_API_KEY are set. Using GOOGLE_API_KEY.',
+    );
+    expect(result.getApiKey()).toBe('google-key');
+
+    consoleWarnSpy.mockRestore();
   });
 });
 

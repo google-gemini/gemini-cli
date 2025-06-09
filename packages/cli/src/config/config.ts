@@ -188,6 +188,11 @@ async function createContentGeneratorConfig(
   const hasVertexProjectLocationConfig =
     !!googleCloudProject && !!googleCloudLocation;
 
+  if (hasGeminiApiKey && hasGoogleApiKey) {
+    logger.warn(
+      'Both GEMINI_API_KEY and GOOGLE_API_KEY are set. Using GOOGLE_API_KEY.',
+    );
+  }
   if (!hasGeminiApiKey && !hasGoogleApiKey && !hasVertexProjectLocationConfig) {
     logger.error(
       'No valid API authentication configuration found. Please set ONE of the following combinations in your environment variables or .env file:\n' +
@@ -203,7 +208,7 @@ async function createContentGeneratorConfig(
 
   const config: ContentGeneratorConfig = {
     model: argv.model || DEFAULT_GEMINI_MODEL,
-    apiKey: geminiApiKey || googleApiKey || '',
+    apiKey: googleApiKey || geminiApiKey || '',
     vertexai: hasGeminiApiKey ? false : undefined,
   };
 
