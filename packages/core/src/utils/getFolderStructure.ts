@@ -8,6 +8,8 @@ import * as fs from 'fs/promises';
 import { Dirent } from 'fs';
 import * as path from 'path';
 import { getErrorMessage, isNodeError } from './errors.js';
+import { GitIgnoreParser, GitIgnoreFilter } from './gitIgnoreParser.js';
+import { isGitRepository } from './gitUtils.js';
 
 const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';
@@ -23,13 +25,18 @@ interface FolderStructureOptions {
   ignoredFolders?: Set<string>;
   /** Optional regex to filter included files by name. */
   fileIncludePattern?: RegExp;
+  /** Whether to respect .gitignore patterns. Defaults to true. */
+  respectGitIgnore?: boolean;
+  /** The root of the project, used for gitignore resolution. */
+  projectRoot?: string;
 }
 
 // Define a type for the merged options where fileIncludePattern remains optional
 type MergedFolderStructureOptions = Required<
-  Omit<FolderStructureOptions, 'fileIncludePattern'>
+  Omit<FolderStructureOptions, 'fileIncludePattern' | 'projectRoot'>
 > & {
   fileIncludePattern?: RegExp;
+  projectRoot?: string;
 };
 
 /** Represents the full, unfiltered information about a folder and its contents. */
@@ -52,6 +59,7 @@ interface FullFolderInfo {
 async function readFullStructure(
   rootPath: string,
   options: MergedFolderStructureOptions,
+  gitIgnoreFilter: GitIgnoreFilter | null,
 ): Promise<FullFolderInfo | null> {
   const rootName = path.basename(rootPath);
   const rootNode: FullFolderInfo = {
@@ -119,6 +127,12 @@ async function readFullStructure(
           break;
         }
         const fileName = entry.name;
+        const filePath = path.join(currentPath, fileName);
+        if (gitIgnoreFilter) {
+          if (gitIgnoreFilter.isIgnored(filePath)) {
+            continue;
+          }
+        }
         if (
           !options.fileIncludePattern ||
           options.fileIncludePattern.test(fileName)
@@ -148,7 +162,14 @@ async function readFullStructure(
         const subFolderName = entry.name;
         const subFolderPath = path.join(currentPath, subFolderName);
 
-        if (options.ignoredFolders.has(subFolderName)) {
+        let isIgnoredByGit = false;
+        if (gitIgnoreFilter) {
+          if (gitIgnoreFilter.isIgnored(subFolderPath)) {
+            isIgnoredByGit = true;
+          }
+        }
+
+        if (options.ignoredFolders.has(subFolderName) || isIgnoredByGit) {
           const ignoredSubFolder: FullFolderInfo = {
             name: subFolderName,
             path: subFolderPath,
@@ -275,11 +296,26 @@ export async function getFolderStructure(
     maxItems: options?.maxItems ?? MAX_ITEMS,
     ignoredFolders: options?.ignoredFolders ?? DEFAULT_IGNORED_FOLDERS,
     fileIncludePattern: options?.fileIncludePattern,
+    respectGitIgnore: options?.respectGitIgnore ?? true,
+    projectRoot: options?.projectRoot ?? resolvedPath,
   };
+
+  let gitIgnoreFilter: GitIgnoreFilter | null = null;
+  if (mergedOptions.respectGitIgnore && mergedOptions.projectRoot) {
+    if (isGitRepository(mergedOptions.projectRoot)) {
+      const parser = new GitIgnoreParser(mergedOptions.projectRoot);
+      await parser.initialize();
+      gitIgnoreFilter = parser;
+    }
+  }
 
   try {
     // 1. Read the structure using BFS, respecting maxItems
-    const structureRoot = await readFullStructure(resolvedPath, mergedOptions);
+    const structureRoot = await readFullStructure(
+      resolvedPath,
+      mergedOptions,
+      gitIgnoreFilter,
+    );
 
     if (!structureRoot) {
       return `Error: Could not read directory "${resolvedPath}". Check path and permissions.`;
@@ -317,7 +353,8 @@ export async function getFolderStructure(
     const summary =
       `Showing up to ${mergedOptions.maxItems} items (files + folders). ${disclaimer}`.trim();
 
-    return `${summary}\n\n${displayPath}/\n${structureLines.join('\n')}`;
+    const output = `${summary}\n\n${displayPath}/\n${structureLines.join('\n')}`;
+    return output;
   } catch (error: unknown) {
     console.error(`Error getting folder structure for ${resolvedPath}:`, error);
     return `Error processing directory "${resolvedPath}": ${getErrorMessage(error)}`;
