@@ -35,18 +35,18 @@ export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
   vertexai?: boolean;
-  userAgent: string;
 };
 
 export function createContentGenerator(
   config: ContentGeneratorConfig,
 ): ContentGenerator {
+  const version = process.env.CLI_VERSION || process.version;
   const googleGenAI = new GoogleGenAI({
     apiKey: config.apiKey === '' ? undefined : config.apiKey,
     vertexai: config.vertexai,
     httpOptions: {
       headers: {
-        'User-Agent': config.userAgent,
+        'User-Agent': `GeminiCLI/${version}/(${process.platform}; ${process.arch})`,
       },
     },
   });

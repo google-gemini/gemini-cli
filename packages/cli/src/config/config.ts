@@ -18,7 +18,6 @@ import {
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
-import { getCliVersion } from '../utils/version.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -206,7 +205,6 @@ async function createContentGeneratorConfig(
     model: argv.model || DEFAULT_GEMINI_MODEL,
     apiKey: geminiApiKey || googleApiKey || '',
     vertexai: hasGeminiApiKey ? false : undefined,
-    userAgent: `GeminiCLI/${getCliVersion()}/(${process.platform}; ${process.arch})`,
   };
 
   if (config.apiKey) {

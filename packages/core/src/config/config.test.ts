@@ -46,7 +46,6 @@ describe('Server Config (config.ts)', () => {
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
   const FULL_CONTEXT = false;
-  const USER_AGENT = 'ServerTestAgent/1.0';
   const USER_MEMORY = 'Test User Memory';
   const TELEMETRY = false;
   const EMBEDDING_MODEL = 'gemini-embedding';
@@ -54,7 +53,6 @@ describe('Server Config (config.ts)', () => {
     contentGeneratorConfig: {
       apiKey: API_KEY,
       model: MODEL,
-      userAgent: USER_AGENT,
     },
     embeddingModel: EMBEDDING_MODEL,
     sandbox: SANDBOX,

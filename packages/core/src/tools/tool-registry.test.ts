@@ -128,7 +128,6 @@ const baseConfigParams: ConfigParameters = {
     model: 'test-model',
     apiKey: 'test-api-key',
     vertexai: false,
-    userAgent: 'TestAgent/1.0',
   },
   embeddingModel: 'test-embedding-model',
   sandbox: false,

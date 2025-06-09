@@ -182,7 +182,6 @@ describe('App UI', () => {
       contentGeneratorConfig: {
         apiKey: 'test-key',
         model: 'test-model',
-        userAgent: 'test-agent',
       },
       embeddingModel: 'test-embedding-model',
       sandbox: false,
