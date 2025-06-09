@@ -52,15 +52,6 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Gets patterns that would be ignored for debugging/transparency
-   */
-  getIgnoreInfo(): { gitIgnored: string[] } {
-    return {
-      gitIgnored: this.gitIgnoreFilter?.getIgnoredPatterns() || [],
-    };
-  }
-
-  /**
    * Checks if a single file should be ignored
    */
   shouldIgnoreFile(

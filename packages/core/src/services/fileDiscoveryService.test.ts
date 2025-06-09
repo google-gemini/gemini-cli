@@ -140,33 +140,6 @@ describe('FileDiscoveryService', () => {
     });
   });
 
-  describe('getIgnoreInfo', () => {
-    beforeEach(async () => {
-      await service.initialize();
-    });
-
-    it('should return git ignored patterns', () => {
-      const info = service.getIgnoreInfo();
-
-      expect(info.gitIgnored).toEqual(['.git/**', 'node_modules/**']);
-    });
-
-    it('should return empty arrays when git ignore parser is not initialized', async () => {
-      const uninitializedService = new FileDiscoveryService(mockProjectRoot);
-      const info = uninitializedService.getIgnoreInfo();
-
-      expect(info.gitIgnored).toEqual([]);
-    });
-
-    it('should handle git ignore parser returning null patterns', async () => {
-      mockGitIgnoreParser.getIgnoredPatterns.mockReturnValue([] as string[]);
-
-      const info = service.getIgnoreInfo();
-
-      expect(info.gitIgnored).toEqual([]);
-    });
-  });
-
   describe('isGitRepository', () => {
     it('should return true when isGitRepo is explicitly set to true in options', () => {
       const result = service.isGitRepository({ isGitRepo: true });
