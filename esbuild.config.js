@@ -16,14 +16,5 @@ esbuild
     banner: {
       js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },
-    external: [
-      'tree-sitter',
-      'tree-sitter-c-sharp',
-      'tree-sitter-go',
-      'tree-sitter-java',
-      'tree-sitter-python',
-      'tree-sitter-rust',
-      'tree-sitter-typescript',
-    ],
   })
   .catch(() => process.exit(1));

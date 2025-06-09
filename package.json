@@ -25,7 +25,7 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
-    "bundle": "npm run generate && node esbuild.config.js",
+    "bundle": "npm run generate && node esbuild.config.js && bash scripts/copy_bundle_assets.sh",
     "build:cli": "npm run build --workspace packages/cli",
     "build:core": "npm run build --workspace packages/core",
     "build:packages": "npm run build:core && npm run build:cli",
@@ -42,8 +42,7 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE",
-    "node_modules/tree-sitter-*/build/Release/*.node"
+    "LICENSE"
   ],
   "devDependencies": {
     "@types/micromatch": "^4.0.9",
@@ -65,14 +64,5 @@
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
-  },
-  "dependencies": {
-    "tree-sitter": "^0.21.0",
-    "tree-sitter-c-sharp": "^0.21.0",
-    "tree-sitter-go": "^0.21.0",
-    "tree-sitter-java": "^0.21.0",
-    "tree-sitter-python": "^0.21.0",
-    "tree-sitter-rust": "^0.21.0",
-    "tree-sitter-typescript": "^0.21.0"
   }
 }
