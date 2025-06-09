@@ -66,7 +66,7 @@ export const Footer: React.FC<FooterProps> = ({
         </Text>
       ) : (
         <Text color={Colors.AccentRed}>
-          no sandbox <Text color={Colors.Gray}>(see README)</Text>
+          no sandbox <Text color={Colors.Gray}>(see docs)</Text>
         </Text>
       )}
     </Box>

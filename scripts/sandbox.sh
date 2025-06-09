@@ -16,7 +16,7 @@
 set -euo pipefail
 
 if ! scripts/sandbox_command.sh -q; then
-    echo "ERROR: sandboxing disabled. See README.md to enable sandboxing."
+    echo "ERROR: sandboxing disabled. See docs to enable sandboxing."
     exit 1
 fi
 
