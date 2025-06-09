@@ -4,11 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GlobTool, GlobToolParams } from './glob.js';
+import {
+  GlobTool,
+  GlobToolParams,
+  sortFileEntries,
+  GlobFileEntry,
+} from './glob.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 // import { ToolResult } from './tools.js'; // ToolResult is implicitly used by execute
 import path from 'path';
 import fs from 'fs/promises';
+import { Stats } from 'fs';
 import os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -261,5 +267,118 @@ describe('GlobTool', () => {
         'Search path is not a directory',
       );
     });
+  });
+});
+
+describe('sortFileEntries', () => {
+  const nowTimestamp = new Date('2024-01-15T12:00:00.000Z').getTime();
+  const oneDayInMs = 24 * 60 * 60 * 1000;
+
+  const createFileEntry = (path: string, mtimeDate: Date): GlobFileEntry => ({
+    path,
+    stats: { mtime: mtimeDate } as Stats,
+  });
+
+  it('should sort a mix of recent and older files correctly', () => {
+    const recentTime1 = new Date(nowTimestamp - 1 * 60 * 60 * 1000); // 1 hour ago
+    const recentTime2 = new Date(nowTimestamp - 2 * 60 * 60 * 1000); // 2 hours ago
+    const olderTime1 = new Date(
+      nowTimestamp - (oneDayInMs + 1 * 60 * 60 * 1000),
+    ); // 25 hours ago
+    const olderTime2 = new Date(
+      nowTimestamp - (oneDayInMs + 2 * 60 * 60 * 1000),
+    ); // 26 hours ago
+
+    const entries: GlobFileEntry[] = [
+      createFileEntry('older_zebra.txt', olderTime2),
+      createFileEntry('recent_alpha.txt', recentTime1),
+      createFileEntry('older_apple.txt', olderTime1),
+      createFileEntry('recent_beta.txt', recentTime2),
+      createFileEntry('older_banana.txt', olderTime1), // Same mtime as apple
+    ];
+
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    const sortedPaths = sorted.map((e) => e.path);
+
+    expect(sortedPaths).toEqual([
+      'recent_alpha.txt', // Recent, newest
+      'recent_beta.txt', // Recent, older
+      'older_apple.txt', // Older, alphabetical
+      'older_banana.txt', // Older, alphabetical
+      'older_zebra.txt', // Older, alphabetical
+    ]);
+  });
+
+  it('should sort only recent files by mtime descending', () => {
+    const recentTime1 = new Date(nowTimestamp - 1000); // Newest
+    const recentTime2 = new Date(nowTimestamp - 2000);
+    const recentTime3 = new Date(nowTimestamp - 3000); // Oldest recent
+
+    const entries: GlobFileEntry[] = [
+      createFileEntry('c.txt', recentTime2),
+      createFileEntry('a.txt', recentTime3),
+      createFileEntry('b.txt', recentTime1),
+    ];
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    expect(sorted.map((e) => e.path)).toEqual(['b.txt', 'c.txt', 'a.txt']);
+  });
+
+  it('should sort only older files alphabetically by path', () => {
+    const olderTime = new Date(nowTimestamp - 2 * oneDayInMs); // All equally old
+    const entries: GlobFileEntry[] = [
+      createFileEntry('zebra.txt', olderTime),
+      createFileEntry('apple.txt', olderTime),
+      createFileEntry('banana.txt', olderTime),
+    ];
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    expect(sorted.map((e) => e.path)).toEqual([
+      'apple.txt',
+      'banana.txt',
+      'zebra.txt',
+    ]);
+  });
+
+  it('should handle an empty array', () => {
+    const entries: GlobFileEntry[] = [];
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    expect(sorted).toEqual([]);
+  });
+
+  it('should correctly sort files when mtimes are identical for older files', () => {
+    const olderTime = new Date(nowTimestamp - 2 * oneDayInMs);
+    const entries: GlobFileEntry[] = [
+      createFileEntry('b.txt', olderTime),
+      createFileEntry('a.txt', olderTime),
+    ];
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    expect(sorted.map((e) => e.path)).toEqual(['a.txt', 'b.txt']);
+  });
+
+  it('should correctly sort files when mtimes are identical for recent files (maintaining mtime sort)', () => {
+    const recentTime = new Date(nowTimestamp - 1000);
+    const entries: GlobFileEntry[] = [
+      createFileEntry('b.txt', recentTime),
+      createFileEntry('a.txt', recentTime),
+    ];
+    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
+    expect(sorted.map((e) => e.path)).toContain('a.txt');
+    expect(sorted.map((e) => e.path)).toContain('b.txt');
+    expect(sorted.length).toBe(2);
+  });
+
+  it('should use recencyThresholdMs parameter correctly', () => {
+    const justOverThreshold = new Date(nowTimestamp - (1000 + 1)); // Barely older
+    const justUnderThreshold = new Date(nowTimestamp - (1000 - 1)); // Barely recent
+    const customThresholdMs = 1000; // 1 second
+
+    const entries: GlobFileEntry[] = [
+      createFileEntry('older_file.txt', justOverThreshold),
+      createFileEntry('recent_file.txt', justUnderThreshold),
+    ];
+    const sorted = sortFileEntries(entries, nowTimestamp, customThresholdMs);
+    expect(sorted.map((e) => e.path)).toEqual([
+      'recent_file.txt',
+      'older_file.txt',
+    ]);
   });
 });

@@ -12,6 +12,42 @@ import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
 
+// Type definition for file entries returned by fast-glob with stats: true
+export interface GlobFileEntry {
+  path: string;
+  stats?: fs.Stats;
+}
+
+/**
+ * Sorts file entries based on recency and then alphabetically.
+ * Recent files (modified within recencyThresholdMs) are listed first, newest to oldest.
+ * Older files are listed after recent ones, sorted alphabetically by path.
+ */
+export function sortFileEntries(
+  entries: GlobFileEntry[],
+  nowTimestamp: number,
+  recencyThresholdMs: number,
+): GlobFileEntry[] {
+  const sortedEntries = [...entries];
+  sortedEntries.sort((a, b) => {
+    const mtimeA = a.stats?.mtime?.getTime() ?? 0;
+    const mtimeB = b.stats?.mtime?.getTime() ?? 0;
+    const aIsRecent = nowTimestamp - mtimeA < recencyThresholdMs;
+    const bIsRecent = nowTimestamp - mtimeB < recencyThresholdMs;
+
+    if (aIsRecent && bIsRecent) {
+      return mtimeB - mtimeA;
+    } else if (aIsRecent) {
+      return -1;
+    } else if (bIsRecent) {
+      return 1;
+    } else {
+      return a.path.localeCompare(b.path);
+    }
+  });
+  return sortedEntries;
+}
+
 /**
  * Parameters for the GlobTool
  */
@@ -232,13 +268,18 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         };
       }
 
-      filteredEntries.sort((a, b) => {
-        const mtimeA = a.stats?.mtime?.getTime() ?? 0;
-        const mtimeB = b.stats?.mtime?.getTime() ?? 0;
-        return mtimeB - mtimeA;
-      });
+      // Set filtering such that we first show the most recent files
+      const oneDayInMs = 24 * 60 * 60 * 1000;
+      const nowTimestamp = new Date().getTime();
 
-      const sortedAbsolutePaths = filteredEntries.map((entry) => entry.path);
+      // Sort the filtered entries using the new helper function
+      const sortedEntries = sortFileEntries(
+        filteredEntries as GlobFileEntry[], // Cast because fast-glob's Entry type is generic
+        nowTimestamp,
+        oneDayInMs,
+      );
+
+      const sortedAbsolutePaths = sortedEntries.map((entry) => entry.path);
       const fileListDescription = sortedAbsolutePaths.join('\n');
       const fileCount = sortedAbsolutePaths.length;
 
