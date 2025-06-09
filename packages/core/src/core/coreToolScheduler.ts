@@ -486,6 +486,8 @@ export class CoreToolScheduler {
       );
     } else if (
       outcome === ToolConfirmationOutcome.ModifyVSCode ||
+      outcome === ToolConfirmationOutcome.ModifyWindsurf ||
+      outcome === ToolConfirmationOutcome.ModifyCursor ||
       outcome === ToolConfirmationOutcome.ModifyVim
     ) {
       const waitingToolCall = toolCall as WaitingToolCall;
