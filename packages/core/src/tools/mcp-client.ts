@@ -13,6 +13,8 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
 
+export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+
 /**
  * Enum representing the connection status of an MCP server
  */
@@ -149,11 +151,24 @@ async function connectAndDiscover(
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
-    timeout: mcpServerConfig.timeout,
   });
 
+  // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
+  // TODO: remove this hack once GenAI SDK does callTool with request options
+  if ('callTool' in mcpClient) {
+    const origCallTool = mcpClient.callTool.bind(mcpClient);
+    mcpClient.callTool = function (params, resultSchema, options) {
+      return origCallTool(params, resultSchema, {
+        ...options,
+        timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      });
+    };
+  }
+
   try {
-    await mcpClient.connect(transport);
+    await mcpClient.connect(transport, {
+      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    });
     // Connection successful
     updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
   } catch (error) {
@@ -242,7 +257,7 @@ async function connectAndDiscover(
           funcDecl.description ?? '',
           parameterSchema,
           funcDecl.name,
-          mcpServerConfig.timeout,
+          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
         ),
       );

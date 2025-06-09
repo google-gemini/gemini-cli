@@ -924,7 +924,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Error display tool not found',
       expectedName: baseRequest.name,
-      expectedDescription: '',
+      expectedDescription: JSON.stringify(baseRequest.args),
     },
     {
       name: 'error tool execution failed',
@@ -940,7 +940,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
       expectedName: baseTool.displayName, // Changed from baseTool.name
-      expectedDescription: '',
+      expectedDescription: baseTool.getDescription(baseRequest.args),
     },
     {
       name: 'cancelled',
@@ -986,14 +986,7 @@ describe('mapToDisplay', () => {
         expect(toolDisplay.resultDisplay).toBe(expectedResultDisplay);
 
         expect(toolDisplay.name).toBe(expectedName);
-
-        if (status === 'error' && !extraProps?.tool) {
-          expect(toolDisplay.description).toBe('');
-        } else {
-          expect(toolDisplay.description).toBe(
-            expectedDescription ?? baseTool.getDescription(baseRequest.args),
-          );
-        }
+        expect(toolDisplay.description).toBe(expectedDescription);
 
         expect(toolDisplay.renderOutputAsMarkdown).toBe(
           extraProps?.tool?.isOutputMarkdown ?? false,

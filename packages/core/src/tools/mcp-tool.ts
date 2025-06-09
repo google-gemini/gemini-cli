@@ -15,8 +15,6 @@ import { CallableTool, Part, FunctionCall } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
-export const MCP_TOOL_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
-
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   private static readonly allowlist: Set<string> = new Set();
 

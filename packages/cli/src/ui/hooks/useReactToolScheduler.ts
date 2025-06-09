@@ -249,10 +249,8 @@ export function mapToDisplay(
           trackedCall.request.args,
         );
         renderOutputAsMarkdown = currentToolInstance.isOutputMarkdown;
-      }
-
-      if (trackedCall.status === 'error') {
-        description = '';
+      } else if ('request' in trackedCall && 'args' in trackedCall.request) {
+        description = JSON.stringify(trackedCall.request.args);
       }
 
       const baseDisplayProperties: Omit<
