@@ -28,9 +28,26 @@ export enum MCPServerStatus {
 }
 
 /**
+ * Enum representing the overall MCP discovery state
+ */
+export enum MCPDiscoveryState {
+  /** Discovery has not started yet */
+  NOT_STARTED = 'not_started',
+  /** Discovery is currently in progress */
+  IN_PROGRESS = 'in_progress',
+  /** Discovery has completed (with or without errors) */
+  COMPLETED = 'completed',
+}
+
+/**
  * Map to track the status of each MCP server within the core package
  */
 const mcpServerStatusesInternal: Map<string, MCPServerStatus> = new Map();
+
+/**
+ * Track the overall MCP discovery state
+ */
+let mcpDiscoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
 
 /**
  * Event listeners for MCP server status changes
@@ -92,29 +109,48 @@ export function getAllMCPServerStatuses(): Map<string, MCPServerStatus> {
   return new Map(mcpServerStatusesInternal);
 }
 
+/**
+ * Get the current MCP discovery state
+ */
+export function getMCPDiscoveryState(): MCPDiscoveryState {
+  return mcpDiscoveryState;
+}
+
 export async function discoverMcpTools(
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
   toolRegistry: ToolRegistry,
 ): Promise<void> {
-  if (mcpServerCommand) {
-    const cmd = mcpServerCommand;
-    const args = parse(cmd, process.env) as string[];
-    if (args.some((arg) => typeof arg !== 'string')) {
-      throw new Error('failed to parse mcpServerCommand: ' + cmd);
-    }
-    // use generic server name 'mcp'
-    mcpServers['mcp'] = {
-      command: args[0],
-      args: args.slice(1),
-    };
-  }
+  // Set discovery state to in progress
+  mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
 
-  const discoveryPromises = Object.entries(mcpServers).map(
-    ([mcpServerName, mcpServerConfig]) =>
-      connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
-  );
-  await Promise.all(discoveryPromises);
+  try {
+    if (mcpServerCommand) {
+      const cmd = mcpServerCommand;
+      const args = parse(cmd, process.env) as string[];
+      if (args.some((arg) => typeof arg !== 'string')) {
+        throw new Error('failed to parse mcpServerCommand: ' + cmd);
+      }
+      // use generic server name 'mcp'
+      mcpServers['mcp'] = {
+        command: args[0],
+        args: args.slice(1),
+      };
+    }
+
+    const discoveryPromises = Object.entries(mcpServers).map(
+      ([mcpServerName, mcpServerConfig]) =>
+        connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
+    );
+    await Promise.all(discoveryPromises);
+
+    // Mark discovery as completed
+    mcpDiscoveryState = MCPDiscoveryState.COMPLETED;
+  } catch (error) {
+    // Still mark as completed even with errors
+    mcpDiscoveryState = MCPDiscoveryState.COMPLETED;
+    throw error;
+  }
 }
 
 async function connectAndDiscover(
@@ -172,9 +208,19 @@ async function connectAndDiscover(
     // Connection successful
     updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
   } catch (error) {
+    // Create a safe config object that excludes sensitive information
+    const safeConfig = {
+      command: mcpServerConfig.command,
+      url: mcpServerConfig.url,
+      cwd: mcpServerConfig.cwd,
+      timeout: mcpServerConfig.timeout,
+      trust: mcpServerConfig.trust,
+      // Exclude args and env which may contain sensitive data
+    };
+
     console.error(
       `failed to start or connect to MCP server '${mcpServerName}' ` +
-        `${JSON.stringify(mcpServerConfig)}; \n${error}`,
+        `${JSON.stringify(safeConfig)}; \n${error}`,
     );
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
