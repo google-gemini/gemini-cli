@@ -356,7 +356,9 @@ export async function start_sandbox(sandbox: string) {
   // mount user settings directory inside container, after creating if missing
   // note user/home changes inside sandbox and we mount at BOTH paths for consistency
   const userSettingsDirOnHost = USER_SETTINGS_DIR;
-  const userSettingsDirInSandbox = getContainerPath(userSettingsDirOnHost);
+  const userSettingsDirInSandbox = getContainerPath(
+    `/home/node/${SETTINGS_DIRECTORY_NAME}`,
+  );
   if (!fs.existsSync(userSettingsDirOnHost)) {
     fs.mkdirSync(userSettingsDirOnHost);
   }
