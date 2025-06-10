@@ -19,6 +19,7 @@ This documentation is organized into the following sections:
   - **[CLI Introduction](./cli/index.md):** An overview of the command-line interface.
   - **[Commands](./cli/commands.md):** Detailed descriptions of all available CLI commands.
   - **[Configuration](./cli/configuration.md):** How to configure the CLI.
+  - **[Extensions](./extension.md):** How to extend the CLI with new functionality.
 - **Core Details:**
   - **[Core Introduction](./core/index.md):** An overview of the core component.
   - **[Configuration](./core/configuration.md):** How to configure the core.

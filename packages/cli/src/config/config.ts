@@ -18,6 +18,7 @@ import {
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
+import { ExtensionConfig } from './extension.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -117,6 +118,7 @@ export async function loadHierarchicalGeminiMemory(
 
 export async function loadCliConfig(
   settings: Settings,
+  extensions: ExtensionConfig[],
   geminiIgnorePatterns: string[],
 ): Promise<Config> {
   loadEnvironment();
@@ -143,6 +145,8 @@ export async function loadCliConfig(
 
   const contentGeneratorConfig = await createContentGeneratorConfig(argv);
 
+  const mcpServers = mergeMcpServers(settings, extensions);
+
   let sandbox = argv.sandbox ?? settings.sandbox;
   if (argv.yolo) {
     sandbox = false;
@@ -160,7 +164,7 @@ export async function loadCliConfig(
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
-    mcpServers: settings.mcpServers,
+    mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
@@ -178,6 +182,22 @@ export async function loadCliConfig(
       settings.fileFiltering?.allowBuildArtifacts,
     enableModifyWithExternalEditors: settings.enableModifyWithExternalEditors,
   });
+}
+
+function mergeMcpServers(settings: Settings, extensions: ExtensionConfig[]) {
+  const mcpServers = settings.mcpServers || {};
+  for (const extension of extensions) {
+    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
+      if (mcpServers[key]) {
+        logger.warn(
+          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+        );
+        return;
+      }
+      mcpServers[key] = server;
+    });
+  }
+  return mcpServers;
 }
 
 async function createContentGeneratorConfig(
