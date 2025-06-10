@@ -170,4 +170,42 @@ index abc..def 100644
     expect(output).toContain('context line 5');
     expect(output).toContain('context line 11');
   });
+
+  it('should correctly render a diff with multiple hunks and a gap indicator', () => {
+    const diffWithMultipleHunks = `
+diff --git a/multi.js b/multi.js
+index 123..789 100644
+--- a/multi.js
++++ b/multi.js
+@@ -1,3 +1,3 @@
+ console.log('first hunk');
+-const oldVar = 1;
++const newVar = 1;
+ console.log('end of first hunk');
+@@ -20,3 +20,3 @@
+ console.log('second hunk');
+-const anotherOld = 'test';
++const anotherNew = 'test';
+ console.log('end of second hunk');
+`;
+    const { lastFrame } = render(
+      <DiffRenderer diffContent={diffWithMultipleHunks} filename="multi.js" />,
+    );
+    const output = lastFrame();
+
+    // Check for content from the first hunk
+    expect(output).toContain("1      console.log('first hunk');");
+    expect(output).toContain('2    - const oldVar = 1;');
+    expect(output).toContain('2    + const newVar = 1;');
+    expect(output).toContain("3      console.log('end of first hunk');");
+
+    // Check for the gap indicator between hunks
+    expect(output).toContain('═');
+
+    // Check for content from the second hunk
+    expect(output).toContain("20     console.log('second hunk');");
+    expect(output).toContain("21   - const anotherOld = 'test';");
+    expect(output).toContain("21   + const anotherNew = 'test';");
+    expect(output).toContain("22     console.log('end of second hunk');");
+  });
 });
