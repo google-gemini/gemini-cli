@@ -490,35 +490,42 @@ Add any other context about the problem here.
       },
       {
         name: 'save',
-        description: 'save conversation checkpoint',
-        action: async (_mainCommand, _subCommand, _args) => {
+        description: 'save conversation checkpoint. Usage: /save [tag]',
+        action: async (_mainCommand, subCommand, _args) => {
+          const tag = (subCommand || '').trim();
           const logger = new Logger();
           await logger.initialize();
           const chat = await config?.getGeminiClient()?.getChat();
           const history = chat?.getHistory() || [];
           if (history.length > 0) {
-            logger.saveCheckpoint(chat?.getHistory() || []);
+            await logger.saveCheckpoint(chat?.getHistory() || [], tag);
+            addMessage({
+              type: MessageType.INFO,
+              content: `Conversation checkpoint saved${tag ? ' with tag: ' + tag : ''}.`,
+              timestamp: new Date(),
+            });
           } else {
             addMessage({
               type: MessageType.INFO,
               content: 'No conversation found to save.',
               timestamp: new Date(),
             });
-            return;
           }
         },
       },
       {
         name: 'resume',
-        description: 'resume from last conversation checkpoint',
-        action: async (_mainCommand, _subCommand, _args) => {
+        description:
+          'resume from conversation checkpoint. Usage: /resume [tag]',
+        action: async (_mainCommand, subCommand, _args) => {
+          const tag = (subCommand || '').trim();
           const logger = new Logger();
           await logger.initialize();
-          const conversation = await logger.loadCheckpoint();
+          const conversation = await logger.loadCheckpoint(tag);
           if (conversation.length === 0) {
             addMessage({
               type: MessageType.INFO,
-              content: 'No saved conversation found.',
+              content: `No saved checkpoint found${tag ? ' with tag: ' + tag : ''}.`,
               timestamp: new Date(),
             });
             return;
