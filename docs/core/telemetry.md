@@ -10,6 +10,8 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 
 You can enable telemetry in multiple ways. [Configuration](configuration.md) is primarily managed via the `.gemini/settings.json` file and environment variables, but CLI flags can override these settings for a specific session.
 
+> **A Note on Sandbox Mode:** Telemetry is not compatible with sandbox mode at this time. Turn off sandbox mode before enabling telemetry. Tracked in #894.
+
 **Order of Precedence:**
 
 1.  **CLI Flag (`--telemetry`):** These override all other settings for the current session.
@@ -17,13 +19,12 @@ You can enable telemetry in multiple ways. [Configuration](configuration.md) is 
 3.  **User Settings File (`~/.gemini/settings.json`):** If not set by a flag or workspace settings, the value from this global user file is used.
 4.  **Default:** If telemetry is not configured by a flag or in any settings file, it is disabled.
 
-Add this line to enable telemetry by in workspace (`.gemini/settings.json`) or user (`~/.gemini/settings.json`) settings:
+Add these lines to enable telemetry by in workspace (`.gemini/settings.json`) or user (`~/.gemini/settings.json`) settings:
 
 ```json
 {
-  "telemetry": {
-    "enabled": true
-  }
+  "telemetry": true,
+  "sandbox": false
 }
 ```
 
@@ -50,6 +51,14 @@ Learn more about OTEL exporter standard configuration in [documentation][otel-co
 ## Running an OTEL Collector
 
 An OTEL Collector is a service that receives, processes, and exports telemetry data. Below are common setups.
+
+### Configurations
+
+Create a folder for the OTEL configurations:
+
+```
+mkdir .gemini/otel
+```
 
 ### Local
 
@@ -122,7 +131,17 @@ This setup sends all telemetry to Google Cloud for robust, long-term analysis.
 - **APIs Enabled**: Cloud Trace, Cloud Monitoring, Cloud Logging.
 - **Authentication**: A Service Account with the roles `Cloud Trace Agent`, `Monitoring Metric Writer`, and `Logs Writer`. Ensure your environment is authenticated (e.g., via `gcloud auth application-default login` or a service account key file).
 
-**2. Create a Configuration File**
+**2. Set environment variables**
+
+Set the `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_VERTEXAI` environment variables:
+
+```bash
+GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
+GOOGLE_GENAI_USE_VERTEXAI=true
+```
+
+**3. Create a Configuration File**
 
 Create `.gemini/otel/collector-gcp.yaml`:
 
@@ -162,7 +181,7 @@ service:
 EOF
 ```
 
-**3. Run the Collector**
+**4. Run the Collector**
 
 This command mounts your Google Cloud credentials into the container.
 
@@ -171,7 +190,8 @@ If using application default credentials:
 ```bash
 docker run --rm --name otel-collector-gcp \
   -p 4317:4317 \
-  -v "/home/user/.config/gcloud/application_default_credentials.json":/etc/gcp/credentials.json \
+  --user "$(id -u):$(id -g)" \
+  -v "$HOME/.config/gcloud/application_default_credentials.json":/etc/gcp/credentials.json \
   -e "GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json" \
   -v "$(pwd)/.gemini/otel/collector-gcp.yaml":/etc/otelcol-contrib/config.yaml \
   otel/opentelemetry-collector-contrib:latest --config /etc/otelcol-contrib/config.yaml
@@ -190,7 +210,7 @@ docker run --rm --name otel-collector-gcp \
 
 Your telemetry data will now appear in Cloud Trace, Monitoring, and Logging.
 
-**3. Stop the Collector**
+**5. Stop the Collector**
 
 ```bash
 docker stop otel-collector-gcp
