@@ -111,7 +111,7 @@ function buildImage(imageName, dockerfile) {
 
   execSync(
     `${buildCommand} ${process.env.BUILD_SANDBOX_FLAGS || ''} -f "${dockerfile}" -t "${imageName}" .`,
-    { stdio: buildStdout },
+    { stdio: buildStdout, shell: '/bin/bash' },
   );
   console.log(`built ${imageName}`);
 }
