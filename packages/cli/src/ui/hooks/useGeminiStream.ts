@@ -42,6 +42,7 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -82,6 +83,7 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const logger = useLogger();
+  const { startNewTurn, addUsage } = useSessionStats();
 
   const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
     useReactToolScheduler(
@@ -390,6 +392,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent();
             break;
+          case ServerGeminiEventType.UsageMetadata:
+            addUsage(event.value);
+            break;
           case ServerGeminiEventType.ToolCallConfirmation:
           case ServerGeminiEventType.ToolCallResponse:
             // do nothing
@@ -412,11 +417,12 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      addUsage,
     ],
   );
 
   const submitQuery = useCallback(
-    async (query: PartListUnion) => {
+    async (query: PartListUnion, options?: { isContinuation: boolean }) => {
       if (
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation
@@ -425,6 +431,10 @@ export const useGeminiStream = (
 
       const userMessageTimestamp = Date.now();
       setShowHelp(false);
+
+      if (!options?.isContinuation) {
+        startNewTurn();
+      }
 
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
@@ -491,6 +501,7 @@ export const useGeminiStream = (
       setPendingHistoryItem,
       setInitError,
       geminiClient,
+      startNewTurn,
     ],
   );
 
@@ -576,7 +587,9 @@ export const useGeminiStream = (
       );
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-      submitQuery(mergePartListUnions(responsesToSend));
+      submitQuery(mergePartListUnions(responsesToSend), {
+        isContinuation: true,
+      });
     }
   }, [
     toolCalls,
