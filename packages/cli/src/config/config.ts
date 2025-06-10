@@ -235,6 +235,7 @@ async function createContentGeneratorConfig(
     model: argv.model || DEFAULT_GEMINI_MODEL,
     apiKey: googleApiKey || geminiApiKey || '',
     vertexai: hasGeminiApiKey ? false : undefined,
+    codeAssist: !!process.env.GEMINI_CODE_ASSIST,
   };
 
   if (config.apiKey) {

@@ -273,7 +273,9 @@ describe('Gemini Client (client.ts)', () => {
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
       };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      client['contentGenerator'] = Promise.resolve(
+        mockGenerator as ContentGenerator,
+      );
 
       // Act
       const stream = client.sendMessageStream(
