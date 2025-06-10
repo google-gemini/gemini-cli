@@ -239,6 +239,8 @@ describe('Turn', () => {
           candidates: [{ content: { parts: [{ text: 'First response' }] } }],
           usageMetadata: mockMetadata1,
         } as unknown as GenerateContentResponse;
+        // Add a small delay to ensure apiTimeMs is > 0
+        await new Promise((resolve) => setTimeout(resolve, 10));
         yield {
           functionCalls: [{ name: 'aTool' }],
           usageMetadata: mockMetadata2,
@@ -262,7 +264,10 @@ describe('Turn', () => {
       expect(metadataEvent.type).toBe(GeminiEventType.UsageMetadata);
 
       // The value should be the *last* metadata object received.
-      expect(metadataEvent.value).toEqual(mockMetadata2);
+      expect(metadataEvent.value).toEqual(
+        expect.objectContaining(mockMetadata2),
+      );
+      expect(metadataEvent.value.apiTimeMs).toBeGreaterThan(0);
 
       // Also check the public getter
       expect(turn.getUsageMetadata()).toEqual(mockMetadata2);

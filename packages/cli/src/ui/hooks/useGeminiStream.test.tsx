@@ -598,5 +598,18 @@ describe('useGeminiStream', () => {
       expect(mockStartNewTurn).toHaveBeenCalledTimes(1);
       expect(mockAddUsage).not.toHaveBeenCalled();
     });
+
+    it('should not call startNewTurn for a slash command', async () => {
+      mockHandleSlashCommand.mockReturnValue(true);
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/stats');
+      });
+
+      expect(mockStartNewTurn).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
   });
 });
