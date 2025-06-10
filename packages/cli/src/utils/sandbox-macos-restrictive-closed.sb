@@ -76,15 +76,12 @@
     (literal "/dev/null")
 )
 
-;; allow outbound network connections
-(allow network-outbound)
-
-;; allow inbound network connections to debugging port
-(allow network-inbound (local ip (string-append "*:" "9229")))
-
 ;; allow communication with sysmond for process listing (e.g. for pgrep)
 (allow mach-lookup (global-name "com.apple.sysmond"))
 
 ;; enable terminal access required by ink
 ;; fixes setRawMode EPERM failure (at node:tty:81:24)
 (allow file-ioctl (regex #"^/dev/tty.*"))
+
+;; allow inbound network traffic on debugger port
+(allow network-inbound (local ip "localhost:9229"))

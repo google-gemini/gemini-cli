@@ -1,0 +1,90 @@
+(version 1)
+
+;; deny everything by default
+(deny default)
+
+;; allow reading files from anywhere on host
+(allow file-read*)
+
+;; allow exec/fork (children inherit policy)
+(allow process-exec)
+(allow process-fork)
+
+;; allow signals to self, e.g. SIGPIPE on write to closed pipe
+(allow signal (target self))
+
+;; allow read access to specific information about system
+;; from https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=7b3962fe2e5fc9e2ee58000dc8fbf3429d84d3bd
+(allow sysctl-read
+  (sysctl-name "hw.activecpu")
+  (sysctl-name "hw.busfrequency_compat")
+  (sysctl-name "hw.byteorder")
+  (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat")
+  (sysctl-name "hw.cpufamily")
+  (sysctl-name "hw.cpufrequency_compat")
+  (sysctl-name "hw.cputype")
+  (sysctl-name "hw.l1dcachesize_compat")
+  (sysctl-name "hw.l1icachesize_compat")
+  (sysctl-name "hw.l2cachesize_compat")
+  (sysctl-name "hw.l3cachesize_compat")
+  (sysctl-name "hw.logicalcpu_max")
+  (sysctl-name "hw.machine")
+  (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.nperflevels")
+  (sysctl-name "hw.optional.arm.FEAT_BF16")
+  (sysctl-name "hw.optional.arm.FEAT_DotProd")
+  (sysctl-name "hw.optional.arm.FEAT_FCMA")
+  (sysctl-name "hw.optional.arm.FEAT_FHM")
+  (sysctl-name "hw.optional.arm.FEAT_FP16")
+  (sysctl-name "hw.optional.arm.FEAT_I8MM")
+  (sysctl-name "hw.optional.arm.FEAT_JSCVT")
+  (sysctl-name "hw.optional.arm.FEAT_LSE")
+  (sysctl-name "hw.optional.arm.FEAT_RDM")
+  (sysctl-name "hw.optional.arm.FEAT_SHA512")
+  (sysctl-name "hw.optional.armv8_2_sha512")
+  (sysctl-name "hw.packages")
+  (sysctl-name "hw.pagesize_compat")
+  (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "hw.tbfrequency_compat")
+  (sysctl-name "hw.vectorunit")
+  (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfilesperproc")
+  (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease")
+  (sysctl-name "kern.ostype")
+  (sysctl-name "kern.osvariant_status")
+  (sysctl-name "kern.osversion")
+  (sysctl-name "kern.secure_kernel")
+  (sysctl-name "kern.usrstack64")
+  (sysctl-name "kern.version")
+  (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name-prefix "hw.perflevel")
+)
+
+;; allow writes to specific paths
+(allow file-write*
+    (subpath (param "TARGET_DIR"))
+    (subpath (param "TMP_DIR"))
+    (subpath (param "CACHE_DIR"))
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (subpath (string-append (param "HOME_DIR") "/.npm"))
+    (subpath (string-append (param "HOME_DIR") "/.cache"))
+    (subpath (string-append (param "HOME_DIR") "/.gitconfig"))
+    (literal "/dev/stdout")
+    (literal "/dev/stderr")
+    (literal "/dev/null")
+)
+
+;; allow communication with sysmond for process listing (e.g. for pgrep)
+(allow mach-lookup (global-name "com.apple.sysmond"))
+
+;; enable terminal access required by ink
+;; fixes setRawMode EPERM failure (at node:tty:81:24)
+(allow file-ioctl (regex #"^/dev/tty.*"))
+
+;; allow inbound network traffic on debugger port
+(allow network-inbound (local ip "localhost:9229"))
+
+;; allow all outbound network traffic
+(allow network-outbound)

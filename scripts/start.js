@@ -33,11 +33,12 @@ execSync('node ./scripts/check-build-status.js', {
 // inside sandbox SANDBOX should be set and sandbox_command.js should fail
 const nodeArgs = [];
 try {
-  execSync('node scripts/sandbox_command.js -q', {
-    stdio: 'inherit',
+  const sandboxCommand = execSync('node scripts/sandbox_command.js', {
     cwd: root,
-  });
-  if (process.env.DEBUG) {
+  })
+    .toString()
+    .trim();
+  if (process.env.DEBUG && !sandboxCommand) {
     if (process.env.SANDBOX) {
       const port = process.env.DEBUG_PORT || '9229';
       nodeArgs.push(`--inspect-brk=0.0.0.0:${port}`);
