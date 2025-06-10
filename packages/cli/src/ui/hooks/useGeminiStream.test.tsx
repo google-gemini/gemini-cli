@@ -96,6 +96,15 @@ vi.mock('./useLogger.js', () => ({
   }),
 }));
 
+const mockStartNewTurn = vi.fn();
+const mockAddUsage = vi.fn();
+vi.mock('../contexts/SessionContext.js', () => ({
+  useSessionStats: vi.fn(() => ({
+    startNewTurn: mockStartNewTurn,
+    addUsage: mockAddUsage,
+  })),
+}));
+
 vi.mock('./slashCommandProcessor.js', () => ({
   handleSlashCommand: vi.fn().mockReturnValue(false),
 }));
@@ -529,6 +538,65 @@ describe('useGeminiStream', () => {
         role: 'user',
         parts: [{ text: 'cancelled' }],
       });
+    });
+  });
+
+  describe('Session Stats Integration', () => {
+    it('should call startNewTurn and addUsage for a simple prompt', async () => {
+      const mockMetadata = { totalTokenCount: 123 };
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Response' };
+        yield { type: 'usage_metadata', value: mockMetadata };
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('Hello, world!');
+      });
+
+      expect(mockStartNewTurn).toHaveBeenCalledTimes(1);
+      expect(mockAddUsage).toHaveBeenCalledTimes(1);
+      expect(mockAddUsage).toHaveBeenCalledWith(mockMetadata);
+    });
+
+    it('should only call addUsage for a tool continuation prompt', async () => {
+      const mockMetadata = { totalTokenCount: 456 };
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Final Answer' };
+        yield { type: 'usage_metadata', value: mockMetadata };
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery([{ text: 'tool response' }], {
+          isContinuation: true,
+        });
+      });
+
+      expect(mockStartNewTurn).not.toHaveBeenCalled();
+      expect(mockAddUsage).toHaveBeenCalledTimes(1);
+      expect(mockAddUsage).toHaveBeenCalledWith(mockMetadata);
+    });
+
+    it('should not call addUsage if the stream contains no usage metadata', async () => {
+      // Arrange: A stream that yields content but never a usage_metadata event
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Some response text' };
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('Query with no usage data');
+      });
+
+      expect(mockStartNewTurn).toHaveBeenCalledTimes(1);
+      expect(mockAddUsage).not.toHaveBeenCalled();
     });
   });
 });

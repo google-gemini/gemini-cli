@@ -13,14 +13,32 @@ import {
   GoogleGenAI,
 } from '@google/genai';
 import { GeminiClient } from './client.js';
+import { ContentGenerator } from './contentGenerator.js';
+import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
+import { Turn } from './turn.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
 const mockGenerateContentFn = vi.fn();
 const mockEmbedContentFn = vi.fn();
+const mockTurnRunFn = vi.fn();
 
 vi.mock('@google/genai');
+vi.mock('./turn', () => {
+  // Define a mock class that has the same shape as the real Turn
+  class MockTurn {
+    pendingToolCalls = [];
+    // The run method is a property that holds our mock function
+    run = mockTurnRunFn;
+
+    constructor() {
+      // The constructor can be empty or do some mock setup
+    }
+  }
+  // Export the mock class as 'Turn'
+  return { Turn: MockTurn };
+});
 
 vi.mock('../config/config.js');
 vi.mock('./prompts');
@@ -235,6 +253,46 @@ describe('Gemini Client (client.ts)', () => {
       await client.addHistory(newContent);
 
       expect(mockChat.addHistory).toHaveBeenCalledWith(newContent);
+    });
+  });
+
+  describe('sendMessageStream', () => {
+    it('should return the turn instance after the stream is complete', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = Promise.resolve(mockChat as GeminiChat);
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+      );
+
+      // Consume the stream manually to get the final return value.
+      let finalResult: Turn | undefined;
+      while (true) {
+        const result = await stream.next();
+        if (result.done) {
+          finalResult = result.value;
+          break;
+        }
+      }
+
+      // Assert
+      expect(finalResult).toBeInstanceOf(Turn);
     });
   });
 });

@@ -61,13 +61,13 @@ import {
   MCPServerStatus,
   getMCPServerStatus,
 } from '@gemini-cli/core';
-import { useSession } from '../contexts/SessionContext.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
 
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
-  useSession: vi.fn(),
+  useSessionStats: vi.fn(),
 }));
 
 vi.mock('./useShowMemoryCommand.js', () => ({
@@ -89,7 +89,7 @@ describe('useSlashCommandProcessor', () => {
   let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
-  const mockUseSession = useSession as Mock;
+  const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
     mockAddItem = vi.fn();
@@ -105,8 +105,19 @@ describe('useSlashCommandProcessor', () => {
       getModel: vi.fn(() => 'test-model'),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
-    mockUseSession.mockReturnValue({
-      startTime: new Date('2025-01-01T00:00:00.000Z'),
+    mockUseSessionStats.mockReturnValue({
+      stats: {
+        sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
+        cumulative: {
+          turnCount: 0,
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0,
+          cachedContentTokenCount: 0,
+          toolUsePromptTokenCount: 0,
+          thoughtsTokenCount: 0,
+        },
+      },
     });
 
     (open as Mock).mockClear();
@@ -240,29 +251,55 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('/stats command', () => {
-    it('should show the session duration', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-
-      // Mock current time
-      const mockDate = new Date('2025-01-01T00:01:05.000Z');
-      vi.setSystemTime(mockDate);
-
-      await act(async () => {
-        commandResult = handleSlashCommand('/stats');
+    it('should show detailed session statistics', async () => {
+      // Arrange
+      mockUseSessionStats.mockReturnValue({
+        stats: {
+          sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
+          cumulative: {
+            totalTokenCount: 900,
+            promptTokenCount: 200,
+            candidatesTokenCount: 400,
+            cachedContentTokenCount: 100,
+            turnCount: 1,
+            toolUsePromptTokenCount: 50,
+            thoughtsTokenCount: 150,
+          },
+        },
       });
 
+      const { handleSlashCommand } = getProcessor();
+      const mockDate = new Date('2025-01-01T01:02:03.000Z'); // 1h 2m 3s duration
+      vi.setSystemTime(mockDate);
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats');
+      });
+
+      // Assert
+      const expectedContent = [
+        `  ⎿ Total duration (wall): 1h 2m 3s`,
+        `    Total Token usage:`,
+        `         Turns: 1`,
+        `         Total: 900`,
+        `             ├─ Input: 200`,
+        `             ├─ Output: 400`,
+        `             ├─ Cached: 100`,
+        `             └─ Overhead: 200`,
+        `                  ├─ Model thoughts: 150`,
+        `                  └─ Tool-use prompts: 50`,
+      ].join('\n');
+
       expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
+        2, // Called after the user message
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Session duration: 1m 5s',
+          text: expectedContent,
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
 
-      // Restore system time
       vi.useRealTimers();
     });
   });
