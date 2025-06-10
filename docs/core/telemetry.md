@@ -6,7 +6,7 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 
 [OpenTelemetry]: https://opentelemetry.io/
 
-## Quick Start: Enabling Telemetry
+## Enabling Telemetry
 
 You can enable telemetry in multiple ways. [Configuration](configuration.md) is primarily managed via the `.gemini/settings.json` file and environment variables, but CLI flags can override these settings for a specific session.
 
@@ -28,31 +28,23 @@ Add these lines to enable telemetry by in workspace (`.gemini/settings.json`) or
 }
 ```
 
-#### Mode 1: Console Output (Default)
+## Running an OTEL Collector
 
-If you only set `"telemetry": true` and do nothing else, the CLI will output all telemetry data directly to your console. This is the simplest way to inspect events, metrics, and traces without any external tools.
-
-#### Mode 2: Sending to a Collector
-
-To send data to a local or remote OpenTelemetry collector, set the following environment variable:
-
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-```
-
+An OTEL Collector is a service that receives, processes, and exports telemetry data.
 The CLI sends data using the OTLP/gRPC protocol.
 
 Learn more about OTEL exporter standard configuration in [documentation][otel-config-docs].
 
 [otel-config-docs]: https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/
 
-## Running an OTEL Collector
+### Configuration
 
-An OTEL Collector is a service that receives, processes, and exports telemetry data. Below are common setups.
+1. Install [otelcol-contrib] or use [docker]
 
-### Configurations
+[otelcol-contrib]: https://github.com/open-telemetry/opentelemetry-collector-contrib
+[docker]: https://www.docker.com/
 
-Create a folder for the OTEL configurations:
+2. Create a folder for the OTEL configurations:
 
 ```
 mkdir .gemini/otel
@@ -60,7 +52,8 @@ mkdir .gemini/otel
 
 ### Local
 
-This setup prints all telemetry from the Gemini CLI to your terminal using a local Docker container.
+This is the simplest way to inspect events, metrics, and traces without any external tools.
+This setup prints all telemetry from the Gemini CLI to your terminal using a local collector.
 
 **1. Create a Configuration File**
 
@@ -104,20 +97,39 @@ EOF
 
 **2. Run the Collector**
 
-In your terminal, run this Docker command:
+You can run the collector using `docker` or using the `otelcol-contrib` binary directly.
 
-```bash
-docker run --rm --name otel-collector-local \
-  -p 4317:4317 \
-  -v "$(pwd)/.gemini/otel/collector-local.yaml":/etc/otelcol-contrib/config.yaml \
-  otel/opentelemetry-collector-contrib:latest
-```
+**_Option 1: Use Docker_**
 
-**3. Stop the Collector**
+This is the simplest method if you have Docker installed.
 
-```bash
-docker stop otel-collector-local
-```
+1.  **Run the Collector**:
+
+    ```bash
+    docker run --rm --name otel-collector-local \
+      -p 4317:4317 \
+      -v "$(pwd)/.gemini/otel/collector-local.yaml":/etc/otelcol-contrib/config.yaml \
+      otel/opentelemetry-collector-contrib:latest
+    ```
+
+2.  **Stop the Collector**:
+    ```bash
+    docker stop otel-collector-local
+    ```
+
+**_Option 2: Use `otelcol-contrib`_**
+
+Use this method if you prefer not to use Docker.
+
+1.  **Run the Collector**:
+    Once installed, run the collector with the configuration file you created earlier:
+
+    ```bash
+    ./otelcol-contrib --config="$(pwd)/.gemini/otel/collector-local.yaml"
+    ```
+
+2.  **Stop the Collector**:
+    Press `Ctrl+C` in the terminal where the collector is running.
 
 ### Google Cloud
 
@@ -181,38 +193,60 @@ EOF
 
 **4. Run the Collector**
 
-This command mounts your Google Cloud credentials into the container.
+You can run the collector for Google Cloud using either Docker or a locally installed `otelcol` binary.
 
-If using application default credentials:
+**_Option 1: Use Docker _**
 
-```bash
-docker run --rm --name otel-collector-gcp \
-  -p 4317:4317 \
-  --user "$(id -u):$(id -g)" \
-  -v "$HOME/.config/gcloud/application_default_credentials.json":/etc/gcp/credentials.json \
-  -e "GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json" \
-  -v "$(pwd)/.gemini/otel/collector-gcp.yaml":/etc/otelcol-contrib/config.yaml \
-  otel/opentelemetry-collector-contrib:latest --config /etc/otelcol-contrib/config.yaml
-```
+This method encapsulates the collector and its dependencies within a container.
 
-If using sevice account key:
+1.  **Run the Collector**:
+    Choose the command that matches your authentication method.
 
-```bash
-docker run --rm --name otel-collector-gcp \
-  -p 4317:4317 \
-  -v "/path/to/your/sa-key.json":/etc/gcp/sa-key.json:ro \
-  -e "GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json" \
-  -v "$(pwd)/.gemini/otel/collector-gcp.yaml":/etc/otelcol-contrib/config.yaml \
-  otel/opentelemetry-collector-contrib:latest --config /etc/otelcol-contrib/config.yaml
-```
+    - **If using Application Default Credentials (`gcloud auth application-default login`)**:
 
-Your telemetry data will now appear in Cloud Trace, Monitoring, and Logging.
+      ```bash
+      docker run --rm --name otel-collector-gcp \
+        -p 4317:4317 \
+        --user "$(id -u):$(id -g)" \
+        -v "$HOME/.config/gcloud/application_default_credentials.json":/etc/gcp/credentials.json:ro \
+        -e "GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json" \
+        -v "$(pwd)/.gemini/otel/collector-gcp.yaml":/etc/otelcol-contrib/config.yaml \
+        otel/opentelemetry-collector-contrib:latest --config /etc/otelcol-contrib/config.yaml
+      ```
 
-**5. Stop the Collector**
+    - **If using a Service Account Key File**:
+      ```bash
+      docker run --rm --name otel-collector-gcp \
+        -p 4317:4317 \
+        -v "/path/to/your/sa-key.json":/etc/gcp/sa-key.json:ro \
+        -e "GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json" \
+        -v "$(pwd)/.gemini/otel/collector-gcp.yaml":/etc/otelcol-contrib/config.yaml \
+        otel/opentelemetry-collector-contrib:latest --config /etc/otelcol-contrib/config.yaml
+      ```
 
-```bash
-docker stop otel-collector-gcp
-```
+2.  **Check Status**:
+    Your telemetry data will now appear in Google Cloud Trace, Monitoring, and Logging.
+
+3.  **Stop the Collector**:
+    ```bash
+    docker stop otel-collector-gcp
+    ```
+
+**_Option 2: Use `otelcol-contrib`_**
+
+Use this method if you prefer not to use Docker.
+
+1.  **Run the Collector**:
+
+    ```bash
+    ./otelcol-contrib --config="file:$(pwd)/.gemini/otel/collector-gcp.yaml"
+    ```
+
+2.  **Check Status**:
+    Your telemetry data will now appear in Google Cloud Trace, Monitoring, and Logging.
+
+3.  **Stop the Collector**:
+    Press `Ctrl+C` in the terminal where the collector is running.
 
 ---
 
