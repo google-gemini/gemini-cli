@@ -426,23 +426,96 @@ describe('Logger', () => {
     });
   });
 
+  describe('saveCheckpoint', () => {
+    const conversation: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      { role: 'model', parts: [{ text: 'Hi there' }] },
+    ];
+
+    it('should save a checkpoint to the default file when no tag is provided', async () => {
+      await logger.saveCheckpoint(conversation);
+      const fileContent = await fs.readFile(TEST_CHECKPOINT_FILE_PATH, 'utf-8');
+      expect(JSON.parse(fileContent)).toEqual(conversation);
+    });
+
+    it('should save a checkpoint to a tagged file when a tag is provided', async () => {
+      const tag = 'my-test-tag';
+      await logger.saveCheckpoint(conversation, tag);
+      const taggedFilePath = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
+      );
+      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
+      expect(JSON.parse(fileContent)).toEqual(conversation);
+      // cleanup
+      await fs.unlink(taggedFilePath);
+    });
+
+    it('should not throw if logger is not initialized', async () => {
+      const uninitializedLogger = new Logger();
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(
+        uninitializedLogger.saveCheckpoint(conversation),
+      ).resolves.not.toThrow();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
+      );
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('loadCheckpoint', () => {
-    it('should load and parse a valid checkpoint file', async () => {
-      const conversation: Content[] = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-        { role: 'model', parts: [{ text: 'Hi there' }] },
-      ];
+    const conversation: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      { role: 'model', parts: [{ text: 'Hi there' }] },
+    ];
+
+    beforeEach(async () => {
+      // Create a default checkpoint for some tests
       await fs.writeFile(
         TEST_CHECKPOINT_FILE_PATH,
         JSON.stringify(conversation),
       );
-      const loadedCheckpoint = await logger.loadCheckpoint();
-      expect(loadedCheckpoint).toEqual(conversation);
     });
 
-    it('should return an empty array if the checkpoint file does not exist', async () => {
-      const loadedCheckpoint = await logger.loadCheckpoint();
-      expect(loadedCheckpoint).toEqual([]);
+    it('should load from the default checkpoint file when no tag is provided', async () => {
+      const loaded = await logger.loadCheckpoint();
+      expect(loaded).toEqual(conversation);
+    });
+
+    it('should load from a tagged checkpoint file when a tag is provided', async () => {
+      const tag = 'my-load-tag';
+      const taggedConversation = [
+        ...conversation,
+        { role: 'user', parts: [{ text: 'Another message' }] },
+      ];
+      const taggedFilePath = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
+      );
+      await fs.writeFile(taggedFilePath, JSON.stringify(taggedConversation));
+
+      const loaded = await logger.loadCheckpoint(tag);
+      expect(loaded).toEqual(taggedConversation);
+
+      // cleanup
+      await fs.unlink(taggedFilePath);
+    });
+
+    it('should return an empty array if a tagged checkpoint file does not exist', async () => {
+      const loaded = await logger.loadCheckpoint('non-existent-tag');
+      expect(loaded).toEqual([]);
+    });
+
+    it('should return an empty array if the default checkpoint file does not exist', async () => {
+      await fs.unlink(TEST_CHECKPOINT_FILE_PATH); // Ensure it's gone
+      const loaded = await logger.loadCheckpoint();
+      expect(loaded).toEqual([]);
     });
 
     it('should return an empty array if the file contains invalid JSON', async () => {
