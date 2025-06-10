@@ -16,10 +16,17 @@ import {
 import { Logger, MessageSenderType, LogEntry } from './logger.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { Content } from '@google/genai';
 
 const GEMINI_DIR = '.gemini';
 const LOG_FILE_NAME = 'logs.json';
+const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 const TEST_LOG_FILE_PATH = path.join(process.cwd(), GEMINI_DIR, LOG_FILE_NAME);
+const TEST_CHECKPOINT_FILE_PATH = path.join(
+  process.cwd(),
+  GEMINI_DIR,
+  CHECKPOINT_FILE_NAME,
+);
 
 async function cleanupLogFile() {
   try {
@@ -30,10 +37,21 @@ async function cleanupLogFile() {
     }
   }
   try {
+    await fs.unlink(TEST_CHECKPOINT_FILE_PATH);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      // Other errors during unlink are ignored for cleanup purposes
+    }
+  }
+  try {
     const geminiDirPath = path.join(process.cwd(), GEMINI_DIR);
     const dirContents = await fs.readdir(geminiDirPath);
     for (const file of dirContents) {
-      if (file.startsWith(LOG_FILE_NAME + '.') && file.endsWith('.bak')) {
+      if (
+        (file.startsWith(LOG_FILE_NAME + '.') ||
+          file.startsWith(CHECKPOINT_FILE_NAME + '.')) &&
+        file.endsWith('.bak')
+      ) {
         try {
           await fs.unlink(path.join(geminiDirPath, file));
         } catch (_e) {
@@ -405,6 +423,53 @@ describe('Logger', () => {
       const messages = await uninitializedLogger.getPreviousUserMessages();
       expect(messages).toEqual([]);
       uninitializedLogger.close();
+    });
+  });
+
+  describe('loadCheckpoint', () => {
+    it('should load and parse a valid checkpoint file', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+      ];
+      await fs.writeFile(
+        TEST_CHECKPOINT_FILE_PATH,
+        JSON.stringify(conversation),
+      );
+      const loadedCheckpoint = await logger.loadCheckpoint();
+      expect(loadedCheckpoint).toEqual(conversation);
+    });
+
+    it('should return an empty array if the checkpoint file does not exist', async () => {
+      const loadedCheckpoint = await logger.loadCheckpoint();
+      expect(loadedCheckpoint).toEqual([]);
+    });
+
+    it('should return an empty array if the file contains invalid JSON', async () => {
+      await fs.writeFile(TEST_CHECKPOINT_FILE_PATH, 'invalid json');
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const loadedCheckpoint = await logger.loadCheckpoint();
+      expect(loadedCheckpoint).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to read or parse checkpoint file'),
+        expect.any(SyntaxError),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should return an empty array if logger is not initialized', async () => {
+      const uninitializedLogger = new Logger();
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const loadedCheckpoint = await uninitializedLogger.loadCheckpoint();
+      expect(loadedCheckpoint).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
+      );
+      consoleErrorSpy.mockRestore();
     });
   });
 

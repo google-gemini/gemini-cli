@@ -6,9 +6,11 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { Content } from '@google/genai';
 
 const GEMINI_DIR = '.gemini';
 const LOG_FILE_NAME = 'logs.json';
+const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 
 export enum MessageSenderType {
   USER = 'user',
@@ -24,6 +26,7 @@ export interface LogEntry {
 
 export class Logger {
   private logFilePath: string | undefined;
+  private checkpointFilePath: string | undefined;
   private sessionId: number | undefined;
   private messageId = 0; // Instance-specific counter for the next messageId
   private initialized = false;
@@ -92,6 +95,7 @@ export class Logger {
     this.sessionId = Math.floor(Date.now() / 1000);
     const geminiDir = path.resolve(process.cwd(), GEMINI_DIR);
     this.logFilePath = path.join(geminiDir, LOG_FILE_NAME);
+    this.checkpointFilePath = path.join(geminiDir, CHECKPOINT_FILE_NAME);
 
     try {
       await fs.mkdir(geminiDir, { recursive: true });
@@ -229,9 +233,61 @@ export class Logger {
     }
   }
 
+  async saveCheckpoint(conversation: Content[]): Promise<void> {
+    if (!this.initialized || !this.checkpointFilePath) {
+      console.error(
+        'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
+      );
+      return;
+    }
+
+    try {
+      await fs.writeFile(
+        this.checkpointFilePath,
+        JSON.stringify(conversation, null),
+        'utf-8',
+      );
+    } catch (error) {
+      console.error('Error writing to checkpoint file:', error);
+    }
+  }
+
+  async loadCheckpoint(): Promise<Content[]> {
+    if (!this.initialized || !this.checkpointFilePath) {
+      console.error(
+        'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
+      );
+      return [];
+    }
+
+    try {
+      const fileContent = await fs.readFile(this.checkpointFilePath, 'utf-8');
+      const parsedContent = JSON.parse(fileContent);
+      if (!Array.isArray(parsedContent)) {
+        console.warn(
+          `Checkpoint file at ${this.checkpointFilePath} is not a valid JSON array. Returning empty checkpoint.`,
+        );
+        return [];
+      }
+      return parsedContent as Content[];
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        // File doesn't exist, which is fine. Return empty array.
+        return [];
+      }
+      console.error(
+        `Failed to read or parse checkpoint file ${this.checkpointFilePath}:`,
+        error,
+      );
+      return [];
+    }
+  }
+
   close(): void {
     this.initialized = false;
     this.logFilePath = undefined;
+    this.checkpointFilePath = undefined;
     this.logs = [];
     this.sessionId = undefined;
     this.messageId = 0;

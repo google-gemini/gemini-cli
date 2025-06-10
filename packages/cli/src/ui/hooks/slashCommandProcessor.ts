@@ -11,10 +11,11 @@ import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import {
   Config,
-  MCPServerStatus,
-  getMCPServerStatus,
-  getMCPDiscoveryState,
+  Logger,
   MCPDiscoveryState,
+  MCPServerStatus,
+  getMCPDiscoveryState,
+  getMCPServerStatus,
 } from '@gemini-cli/core';
 import { Message, MessageType, HistoryItemWithoutId } from '../types.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -485,6 +486,76 @@ Add any other context about the problem here.
               });
             }
           })();
+        },
+      },
+      {
+        name: 'save',
+        description: 'save conversation checkpoint',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const logger = new Logger();
+          await logger.initialize();
+          const chat = await config?.getGeminiClient()?.getChat();
+          const history = chat?.getHistory() || [];
+          if (history.length > 0) {
+            logger.saveCheckpoint(chat?.getHistory() || []);
+          } else {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No conversation found to save.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+        },
+      },
+      {
+        name: 'resume',
+        description: 'resume from last conversation checkpoint',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const logger = new Logger();
+          await logger.initialize();
+          const conversation = await logger.loadCheckpoint();
+          if (conversation.length === 0) {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No saved conversation found.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+          const chat = await config?.getGeminiClient()?.getChat();
+          clearItems();
+          let i = 0;
+          const rolemap: { [key: string]: MessageType } = {
+            user: MessageType.USER,
+            model: MessageType.GEMINI,
+          };
+          for (const item of conversation) {
+            i += 1;
+            const text =
+              item.parts
+                ?.filter((m) => !!m.text)
+                .map((m) => m.text)
+                .join('') || '';
+            if (i <= 2) {
+              // Skip system prompt back and forth.
+              continue;
+            }
+            if (!text) {
+              // Parsing Part[] back to various non-text output not yet implemented.
+              continue;
+            }
+            addItem(
+              {
+                type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+                text,
+              } as HistoryItemWithoutId,
+              i,
+            );
+            chat?.addHistory(item);
+          }
+          console.clear();
+          refreshStatic();
         },
       },
       {

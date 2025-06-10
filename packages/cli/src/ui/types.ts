@@ -131,7 +131,7 @@ export enum MessageType {
   USER = 'user',
   ABOUT = 'about',
   STATS = 'stats',
-  // Add GEMINI if needed by other commands
+  GEMINI = 'gemini',
 }
 
 // Simplified message structure for internal feedback
