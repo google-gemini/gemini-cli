@@ -496,7 +496,7 @@ export async function start_sandbox(sandbox: string) {
   // if using proxy, switch to internal networking through proxy
   if (proxy) {
     execSync(
-      `${sandbox} network exists ${SANDBOX_NETWORK_NAME} || ${sandbox} network create --internal ${SANDBOX_NETWORK_NAME}`,
+      `${sandbox} network inspect ${SANDBOX_NETWORK_NAME} || ${sandbox} network create --internal ${SANDBOX_NETWORK_NAME}`,
     );
     args.push('--network', SANDBOX_NETWORK_NAME);
     // if proxy command is set, create a separate network w/ host access (i.e. non-internal)
@@ -504,7 +504,7 @@ export async function start_sandbox(sandbox: string) {
     // this allows proxy to work even on rootless podman on macos with host<->vm<->container isolation
     if (proxyCommand) {
       execSync(
-        `${sandbox} network exists ${SANDBOX_PROXY_NAME} || ${sandbox} network create ${SANDBOX_PROXY_NAME}`,
+        `${sandbox} network inspect ${SANDBOX_PROXY_NAME} || ${sandbox} network create ${SANDBOX_PROXY_NAME}`,
       );
     }
   }
