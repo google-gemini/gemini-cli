@@ -82,12 +82,15 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
+      processors: [batch]
       exporters: [debug]
     metrics:
       receivers: [otlp]
+      processors: [batch]
       exporters: [debug]
     logs:
       receivers: [otlp]
+      processors: [batch]
       exporters: [debug]
 EOF
 ```
@@ -138,7 +141,6 @@ processors:
 exporters:
   googlecloud:
     project: "${GOOGLE_CLOUD_PROJECT}"
-    trace:
     metric:
       prefix: "custom.googleapis.com/gemini_code"
     log:
