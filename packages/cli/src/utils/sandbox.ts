@@ -102,49 +102,46 @@ async function getSandboxImageName(
   );
 }
 
-// node.js equivalent of scripts/sandbox_command.sh
 export function sandbox_command(sandbox?: string | boolean): string {
   // note environment variable takes precedence over argument (from command line or settings)
   sandbox = process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? sandbox;
   if (sandbox === '1' || sandbox === 'true') sandbox = true;
   else if (sandbox === '0' || sandbox === 'false') sandbox = false;
 
-  if (sandbox === true) {
-    // look for docker or podman, in that order
-    if (commandExists.sync('docker')) {
-      return 'docker'; // Set sandbox to 'docker' if found
-    } else if (commandExists.sync('podman')) {
-      return 'podman'; // Set sandbox to 'podman' if found
-    } else {
-      console.error(
-        'ERROR: failed to determine command for sandbox; ' +
-          'install docker or podman or specify command in GEMINI_SANDBOX',
-      );
-      process.exit(1);
-    }
-  } else if (sandbox) {
+  if (sandbox === false) {
+    return '';
+  }
+
+  if (typeof sandbox === 'string' && sandbox !== '') {
     // confirm that specfied command exists
     if (commandExists.sync(sandbox)) {
       return sandbox;
-    } else {
-      console.error(
-        `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
-      );
-      process.exit(1);
     }
-  } else {
-    // if we are on macOS (Darwin) and sandbox-exec is available, use that for minimal sandboxing
-    // unless SEATBELT_PROFILE is set to 'none', which we allow as an escape hatch
-    if (
-      os.platform() === 'darwin' &&
-      commandExists.sync('sandbox-exec') &&
-      process.env.SEATBELT_PROFILE !== 'none'
-    ) {
-      return 'sandbox-exec';
-    }
-
-    return ''; // no sandbox
+    console.error(
+      `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
+    );
+    process.exit(1);
   }
+
+  // look for seatbelt, docker, or podman, in that order
+  if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
+    return 'sandbox-exec';
+  } else if (commandExists.sync('docker')) {
+    return 'docker';
+  } else if (commandExists.sync('podman')) {
+    return 'podman';
+  }
+
+  // throw an error if user requested sandbox but no command was found
+  if (sandbox === true) {
+    console.error(
+      'ERROR: GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
+        'install docker or podman or specify command in GEMINI_SANDBOX',
+    );
+    process.exit(1);
+  }
+
+  return '';
 }
 
 // docker does not allow container names to contain ':' or '/', so we
