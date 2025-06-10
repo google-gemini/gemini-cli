@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<StatsDisplay /> > renders correctly with given stats and duration 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Stats                                                                                           │
+│                                                                                                  │
+│  Last Turn                                        Cumulative (10 Turns)                          │
+│                                                                                                  │
+│  Input Tokens                              100    Input Tokens                            1,000  │
+│  Output Tokens                             200    Output Tokens                           2,000  │
+│  Tool Use Tokens                            20    Tool Use Tokens                           200  │
+│  Thoughts Tokens                            30    Thoughts Tokens                           300  │
+│  Cached Tokens                              50    Cached Tokens                     500 (14.3%)  │
+│  ─────────────────────────────────────────────    ─────────────────────────────────────────────  │
+│  Total Tokens                              350    Total Tokens                            3,500  │
+│                                                                                                  │
+│  Turn Duration (API)                      1.2s    Total duration (API)                    50.2s  │
+│                                                   Total duration (wall)              1h 23m 45s  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<StatsDisplay /> > renders zero state correctly 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Stats                                                                                           │
+│                                                                                                  │
+│  Last Turn                                        Cumulative (0 Turns)                           │
+│                                                                                                  │
+│  Input Tokens                                0    Input Tokens                                0  │
+│  Output Tokens                               0    Output Tokens                               0  │
+│  Tool Use Tokens                             0    Tool Use Tokens                             0  │
+│  Thoughts Tokens                             0    Thoughts Tokens                             0  │
+│  Cached Tokens                               0    Cached Tokens                               0  │
+│  ─────────────────────────────────────────────    ─────────────────────────────────────────────  │
+│  Total Tokens                                0    Total Tokens                                0  │
+│                                                                                                  │
+│  Turn Duration (API)                        0s    Total duration (API)                       0s  │
+│                                                   Total duration (wall)                      0s  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

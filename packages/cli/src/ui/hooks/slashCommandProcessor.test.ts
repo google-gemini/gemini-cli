@@ -255,18 +255,19 @@ describe('useSlashCommandProcessor', () => {
   describe('/stats command', () => {
     it('should show detailed session statistics', async () => {
       // Arrange
+      const cumulativeStats = {
+        totalTokenCount: 900,
+        promptTokenCount: 200,
+        candidatesTokenCount: 400,
+        cachedContentTokenCount: 100,
+        turnCount: 1,
+        toolUsePromptTokenCount: 50,
+        thoughtsTokenCount: 150,
+      };
       mockUseSessionStats.mockReturnValue({
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-          cumulative: {
-            totalTokenCount: 900,
-            promptTokenCount: 200,
-            candidatesTokenCount: 400,
-            cachedContentTokenCount: 100,
-            turnCount: 1,
-            toolUsePromptTokenCount: 50,
-            thoughtsTokenCount: 150,
-          },
+          cumulative: cumulativeStats,
         },
       });
 
@@ -280,24 +281,12 @@ describe('useSlashCommandProcessor', () => {
       });
 
       // Assert
-      const expectedContent = [
-        `  ⎿ Total duration (wall): 1h 2m 3s`,
-        `    Total Token usage:`,
-        `         Turns: 1`,
-        `         Total: 900`,
-        `             ├─ Input: 200`,
-        `             ├─ Output: 400`,
-        `             ├─ Cached: 100`,
-        `             └─ Overhead: 200`,
-        `                  ├─ Model thoughts: 150`,
-        `                  └─ Tool-use prompts: 50`,
-      ].join('\n');
-
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2, // Called after the user message
         expect.objectContaining({
-          type: MessageType.INFO,
-          text: expectedContent,
+          type: MessageType.STATS,
+          stats: cumulativeStats,
+          duration: '1h 2m 3s',
         }),
         expect.any(Number),
       );

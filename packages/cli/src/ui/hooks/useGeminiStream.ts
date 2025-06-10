@@ -432,10 +432,6 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
       setShowHelp(false);
 
-      if (!options?.isContinuation) {
-        startNewTurn();
-      }
-
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
 
@@ -447,6 +443,10 @@ export const useGeminiStream = (
 
       if (!shouldProceed || queryToSend === null) {
         return;
+      }
+
+      if (!options?.isContinuation) {
+        startNewTurn();
       }
 
       if (!geminiClient) {

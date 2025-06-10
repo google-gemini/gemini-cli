@@ -104,7 +104,7 @@ export type ServerGeminiChatCompressedEvent = {
 
 export type ServerGeminiUsageMetadataEvent = {
   type: GeminiEventType.UsageMetadata;
-  value: GenerateContentResponseUsageMetadata;
+  value: GenerateContentResponseUsageMetadata & { apiTimeMs?: number };
 };
 
 // The original union type, now composed of the individual types
@@ -137,6 +137,7 @@ export class Turn {
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    const startTime = Date.now();
     try {
       const responseStream = await this.chat.sendMessageStream({
         message: req,
@@ -174,9 +175,10 @@ export class Turn {
       }
 
       if (this.lastUsageMetadata) {
+        const durationMs = Date.now() - startTime;
         yield {
           type: GeminiEventType.UsageMetadata,
-          value: this.lastUsageMetadata,
+          value: { ...this.lastUsageMetadata, apiTimeMs: durationMs },
         };
       }
     } catch (error) {
