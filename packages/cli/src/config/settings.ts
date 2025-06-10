@@ -45,6 +45,9 @@ export interface Settings {
     allowBuildArtifacts?: boolean;
   };
 
+  // UI setting. Does not display the ANSI-controlled terminal title.
+  hideWindowTitle?: boolean;
+
   // Add other settings here.
 }
 

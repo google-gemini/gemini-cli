@@ -9,6 +9,8 @@ import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
+import { fileURLToPath } from 'node:url';
+import { dirname, basename } from 'node:path';
 import { sandbox_command, start_sandbox } from './utils/sandbox.js';
 import { LoadedSettings, loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -31,7 +33,14 @@ import {
   WriteFileTool,
 } from '@gemini-cli/core';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export async function main() {
+  const workspaceRoot = process.cwd();
+  const settings = loadSettings(workspaceRoot);
+  setWindowTitle(basename(workspaceRoot), settings);
+
   // warn about deprecated environment variables
   if (process.env.GEMINI_CODE_MODEL) {
     console.warn('GEMINI_CODE_MODEL is deprecated. Use GEMINI_MODEL instead.');
@@ -51,8 +60,6 @@ export async function main() {
       process.env.GEMINI_CODE_SANDBOX_IMAGE; // Corrected to GEMINI_SANDBOX_IMAGE_NAME
   }
 
-  const workspaceRoot = process.cwd();
-  const settings = loadSettings(workspaceRoot);
   const geminiIgnorePatterns = loadGeminiIgnorePatterns(workspaceRoot);
 
   if (settings.errors.length > 0) {
@@ -121,6 +128,16 @@ export async function main() {
 
   await runNonInteractive(nonInteractiveConfig, input);
   process.exit(0);
+}
+
+function setWindowTitle(title: string, settings: LoadedSettings) {
+  if (!settings.merged.hideWindowTitle) {
+    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+
+    process.on('exit', () => {
+      process.stdout.write(`\x1b]2;\x07`);
+    });
+  }
 }
 
 // --- Global Unhandled Rejection Handler ---
