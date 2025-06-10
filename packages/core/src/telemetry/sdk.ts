@@ -8,6 +8,7 @@ import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
+import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { Resource } from '@opentelemetry/resources';
@@ -75,14 +76,23 @@ export function initializeTelemetry(config: Config): void {
   const useOtlp = !!grpcParsedEndpoint;
 
   const spanExporter = useOtlp
-    ? new OTLPTraceExporter({ url: grpcParsedEndpoint })
+    ? new OTLPTraceExporter({
+        url: grpcParsedEndpoint,
+        compression: CompressionAlgorithm.GZIP,
+      })
     : new ConsoleSpanExporter();
   const logExporter = useOtlp
-    ? new OTLPLogExporter({ url: grpcParsedEndpoint })
+    ? new OTLPLogExporter({
+        url: grpcParsedEndpoint,
+        compression: CompressionAlgorithm.GZIP,
+      })
     : new ConsoleLogRecordExporter();
   const metricReader = useOtlp
     ? new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({ url: grpcParsedEndpoint }),
+        exporter: new OTLPMetricExporter({
+          url: grpcParsedEndpoint,
+          compression: CompressionAlgorithm.GZIP,
+        }),
         exportIntervalMillis: 10000,
       })
     : new PeriodicExportingMetricReader({
