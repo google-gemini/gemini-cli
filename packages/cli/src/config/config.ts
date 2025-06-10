@@ -143,10 +143,15 @@ export async function loadCliConfig(
 
   const contentGeneratorConfig = await createContentGeneratorConfig(argv);
 
+  let sandbox = argv.sandbox ?? settings.sandbox;
+  if (argv.yolo) {
+    sandbox = false;
+  }
+
   return new Config({
     contentGeneratorConfig,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
-    sandbox: argv.sandbox ?? settings.sandbox ?? argv.yolo ?? false,
+    sandbox,
     targetDir: process.cwd(),
     debugMode,
     question: argv.prompt || '',
