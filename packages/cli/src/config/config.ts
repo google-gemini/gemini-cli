@@ -91,7 +91,7 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Enable telemetry?',
     })
-    .version() // This will enable the --version flag based on package.json
+    .version(process.env.CLI_VERSION || '0.0.0') // This will enable the --version flag based on package.json
     .help()
     .alias('h', 'help')
     .strict().argv;
