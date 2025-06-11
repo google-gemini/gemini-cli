@@ -55,6 +55,7 @@ export class MCPServerConfig {
 }
 
 export interface ConfigParameters {
+  sessionId: string;
   contentGeneratorConfig: ContentGeneratorConfig;
   embeddingModel: string;
   sandbox?: boolean | string;
@@ -83,6 +84,7 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry: Promise<ToolRegistry>;
+  private readonly sessionId: string;
   private readonly contentGeneratorConfig: ContentGeneratorConfig;
   private readonly embeddingModel: string;
   private readonly sandbox: boolean | string | undefined;
@@ -111,6 +113,7 @@ export class Config {
   private fileDiscoveryService: FileDiscoveryService | null = null;
 
   constructor(params: ConfigParameters) {
+    this.sessionId = params.sessionId;
     this.contentGeneratorConfig = params.contentGeneratorConfig;
     this.embeddingModel = params.embeddingModel;
     this.sandbox = params.sandbox;
@@ -153,6 +156,10 @@ export class Config {
     if (this.telemetry) {
       initializeTelemetry(this);
     }
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {

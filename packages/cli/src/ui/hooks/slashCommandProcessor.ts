@@ -493,7 +493,7 @@ Add any other context about the problem here.
         description: 'save conversation checkpoint. Usage: /save [tag]',
         action: async (_mainCommand, subCommand, _args) => {
           const tag = (subCommand || '').trim();
-          const logger = new Logger();
+          const logger = new Logger(config?.getSessionId() || '');
           await logger.initialize();
           const chat = await config?.getGeminiClient()?.getChat();
           const history = chat?.getHistory() || [];
@@ -519,7 +519,7 @@ Add any other context about the problem here.
           'resume from conversation checkpoint. Usage: /resume [tag]',
         action: async (_mainCommand, subCommand, _args) => {
           const tag = (subCommand || '').trim();
-          const logger = new Logger();
+          const logger = new Logger(config?.getSessionId() || '');
           await logger.initialize();
           const conversation = await logger.loadCheckpoint(tag);
           if (conversation.length === 0) {

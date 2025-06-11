@@ -21,11 +21,12 @@ describe('GeminiChat', () => {
   let chat: GeminiChat;
   const model = 'gemini-pro';
   const config: GenerateContentConfig = {};
+  const sessionId = 'test-session-id';
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset history for each test by creating a new instance
-    chat = new GeminiChat(mockModelsModule, model, config, []);
+    chat = new GeminiChat(mockModelsModule, model, sessionId, config, []);
   });
 
   afterEach(() => {
@@ -120,7 +121,7 @@ describe('GeminiChat', () => {
       chat.recordHistory(userInput, newModelOutput); // userInput here is for the *next* turn, but history is already primed
 
       // Reset and set up a more realistic scenario for merging with existing history
-      chat = new GeminiChat(mockModelsModule, model, config, []);
+      chat = new GeminiChat(mockModelsModule, model, sessionId, config, []);
       const firstUserInput: Content = {
         role: 'user',
         parts: [{ text: 'First user input' }],
@@ -163,7 +164,7 @@ describe('GeminiChat', () => {
         role: 'model',
         parts: [{ text: 'Initial model answer.' }],
       };
-      chat = new GeminiChat(mockModelsModule, model, config, [
+      chat = new GeminiChat(mockModelsModule, model, sessionId, config, [
         initialUser,
         initialModel,
       ]);

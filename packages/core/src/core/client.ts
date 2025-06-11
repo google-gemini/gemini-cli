@@ -162,6 +162,7 @@ export class GeminiClient {
       return new GeminiChat(
         await this.contentGenerator,
         this.model,
+        this.config.getSessionId(),
         {
           systemInstruction,
           ...this.generateContentConfig,

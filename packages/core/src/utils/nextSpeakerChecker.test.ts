@@ -71,6 +71,7 @@ describe('checkNextSpeaker', () => {
     chatInstance = new GeminiChat(
       mockModelsInstance, // This is the instance returned by mockGoogleGenAIInstance.getGenerativeModel
       'gemini-pro', // model name
+      'test-session-id',
       {},
       [], // initial history
     );

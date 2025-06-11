@@ -31,6 +31,7 @@ import {
   WebFetchTool,
   WebSearchTool,
   WriteFileTool,
+  sessionId,
 } from '@gemini-cli/core';
 
 export async function main() {
@@ -57,6 +58,7 @@ export async function main() {
     settings.merged,
     extensions,
     geminiIgnorePatterns,
+    sessionId,
   );
 
   // Initialize centralized FileDiscoveryService
@@ -180,5 +182,6 @@ async function loadNonInteractiveConfig(
     nonInteractiveSettings,
     extensions,
     config.getGeminiIgnorePatterns(),
+    config.getSessionId(),
   );
 }
