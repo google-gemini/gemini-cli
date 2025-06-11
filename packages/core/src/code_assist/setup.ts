@@ -7,6 +7,8 @@
 import { ClientMetadata, OnboardUserRequest } from './types.js';
 import { CcpaServer } from './ccpaServer.js';
 import { OAuth2Client } from 'google-auth-library';
+import { GaxiosError } from 'gaxios';
+import { clearCachedCredentials } from './oauth2.js';
 
 /**
  *
@@ -38,13 +40,27 @@ export async function setupUser(
     cloudaicompanionProject: loadRes.cloudaicompanionProject || '',
     metadata: clientMetadata,
   };
+  try {
+    // Poll onboardUser until long running operation is complete.
+    let lroRes = await ccpaServer.onboardUser(onboardReq);
+    while (!lroRes.done) {
+      await new Promise((f) => setTimeout(f, 5000));
+      lroRes = await ccpaServer.onboardUser(onboardReq);
+    }
 
-  // Poll onboardUser until long running operation is complete.
-  let lroRes = await ccpaServer.onboardUser(onboardReq);
-  while (!lroRes.done) {
-    await new Promise((f) => setTimeout(f, 5000));
-    lroRes = await ccpaServer.onboardUser(onboardReq);
+    return lroRes.response?.cloudaicompanionProject?.id || '';
+  } catch (e) {
+    if (e instanceof GaxiosError) {
+      const detail = e.response?.data?.error?.details[0].detail;
+      if (detail && detail.includes('projectID is empty')) {
+        await clearCachedCredentials();
+        console.log(
+          '\n\nEnterprise users must specify GOOGLE_CLOUD_PROJECT ' +
+            'in your environment variables or .env file.\n\n',
+        );
+        process.exit(1);
+      }
+    }
+    throw e;
   }
-
-  return lroRes.response?.cloudaicompanionProject?.id || '';
 }

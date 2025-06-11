@@ -80,6 +80,10 @@ export async function main() {
     }
   }
 
+  // When using Code Assist this triggers the Oauth login.
+  // Do this now, before sandboxing, so web redirect works.
+  await config.getGeminiClient().getChat();
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
     const sandbox = sandbox_command(config.getSandbox());
