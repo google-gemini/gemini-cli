@@ -25,7 +25,7 @@ import {
 } from './types.js';
 import {
   recordApiErrorMetrics,
-  recordApiRequestMetrics,
+  recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordToolCallMetrics,
 } from './metrics.js';
@@ -120,11 +120,11 @@ export function logApiRequest(
   };
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `API request to ${event.model}. Tokens: ${event.prompt_token_count}.`,
+    body: `API request to ${event.model}. Tokens: ${event.input_token_count}.`,
     attributes,
   };
   logger.emit(logRecord);
-  recordApiRequestMetrics(event.model, event.prompt_token_count);
+  recordTokenUsageMetrics(event.model, event.input_token_count, 'input');
 }
 
 export function logApiError(
@@ -188,4 +188,12 @@ export function logApiResponse(
     event.status_code,
     event.error,
   );
+  recordTokenUsageMetrics(event.model, event.output_token_count, 'output');
+  recordTokenUsageMetrics(
+    event.model,
+    event.cached_content_token_count,
+    'cache',
+  );
+  recordTokenUsageMetrics(event.model, event.thoughts_token_count, 'thought');
+  recordTokenUsageMetrics(event.model, event.tool_token_count, 'tool');
 }

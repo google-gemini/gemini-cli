@@ -338,6 +338,7 @@ These are numerical measurements of behavior over time.
   - **Attributes**:
     - `model`
 
-- `gemini_cli.token.input.count` (Counter, Int): Counts the total number of input tokens sent to the API.
+- `gemini_cli.token.usage` (Counter, Int): Counts the number of tokens used.
   - **Attributes**:
     - `model`
+    - `type` (string: "input", "output", "thought", "cache", or "tool")
