@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme } from './theme.js';
 
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
@@ -19,7 +19,7 @@ const atomOneDarkColors: ColorsTheme = {
   AccentRed: '#e06c75',
   Comment: '#5c6370',
   Gray: '#5c6370',
-  GradientColors: darkTheme.GradientColors,
+  GradientColors: ['#61aeee', '#98c379'],
 };
 
 export const AtomOneDark: Theme = new Theme(

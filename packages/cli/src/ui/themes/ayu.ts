@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme } from './theme.js';
 
 const ayuDarkColors: ColorsTheme = {
   type: 'dark',
@@ -19,7 +19,7 @@ const ayuDarkColors: ColorsTheme = {
   AccentRed: '#F26D78',
   Comment: '#646A71',
   Gray: '##3D4149',
-  GradientColors: darkTheme.GradientColors,
+  GradientColors: ['#FFB454', '#F26D78'],
 };
 
 export const AyuDark: Theme = new Theme(

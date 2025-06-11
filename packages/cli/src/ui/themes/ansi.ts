@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme } from './theme.js';
 
 const ansiColors: ColorsTheme = {
   type: 'dark',
@@ -19,7 +19,7 @@ const ansiColors: ColorsTheme = {
   AccentRed: 'red',
   Comment: 'gray',
   Gray: 'gray',
-  GradientColors: darkTheme.GradientColors, // Fallback
+  GradientColors: ['cyan', 'green'],
 };
 
 export const ANSI: Theme = new Theme(

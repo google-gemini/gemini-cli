@@ -19,7 +19,7 @@ const googleCodeColors: ColorsTheme = {
   AccentRed: '#800',
   Comment: '#5f6368',
   Gray: lightTheme.Gray,
-  GradientColors: lightTheme.GradientColors,
+  GradientColors: ['#066', '#606'],
 };
 
 export const GoogleCode: Theme = new Theme(
