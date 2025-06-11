@@ -18,6 +18,7 @@ import {
 import { Config } from '@gemini-cli/core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { HistoryItem } from '../types.js';
 import { Dispatch, SetStateAction } from 'react';
 
 // --- MOCKS ---
@@ -38,9 +39,9 @@ const MockedGeminiClientClass = vi.hoisted(() =>
 vi.mock('@gemini-cli/core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
-    ...(actualCoreModule || {}),
-    GeminiClient: MockedGeminiClientClass, // Export the class for type checking or other direct uses
-    Config: actualCoreModule.Config, // Ensure Config is passed through
+    ...actualCoreModule,
+    GitService: vi.fn(),
+    GeminiClient: MockedGeminiClientClass,
   };
 });
 
@@ -277,11 +278,13 @@ describe('useGeminiStream', () => {
       getToolRegistry: vi.fn(
         () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
       ),
+      getProjectRoot: vi.fn(() => '/test/dir'),
+      getCheckpointEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
       addHistory: vi.fn(),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
-    mockHandleSlashCommand = vi.fn().mockReturnValue(false);
+    mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
 
     // Mock return value for useReactToolScheduler
     mockScheduleToolCalls = vi.fn();
@@ -322,19 +325,22 @@ describe('useGeminiStream', () => {
     const { result, rerender } = renderHook(
       (props: {
         client: any;
+        history: HistoryItem[];
         addItem: UseHistoryManagerReturn['addItem'];
         setShowHelp: Dispatch<SetStateAction<boolean>>;
         config: Config;
         onDebugMessage: (message: string) => void;
         handleSlashCommand: (
-          command: PartListUnion,
-        ) =>
+          cmd: PartListUnion,
+        ) => Promise<
           | import('./slashCommandProcessor.js').SlashCommandActionReturn
-          | boolean;
+          | boolean
+        >;
         shellModeActive: boolean;
       }) =>
         useGeminiStream(
           props.client,
+          props.history,
           props.addItem,
           props.setShowHelp,
           props.config,
@@ -345,12 +351,17 @@ describe('useGeminiStream', () => {
       {
         initialProps: {
           client,
+          history: [],
           addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
           setShowHelp: mockSetShowHelp,
           config: mockConfig,
           onDebugMessage: mockOnDebugMessage,
-          handleSlashCommand:
-            mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
+          handleSlashCommand: mockHandleSlashCommand as unknown as (
+            cmd: PartListUnion,
+          ) => Promise<
+            | import('./slashCommandProcessor.js').SlashCommandActionReturn
+            | boolean
+          >,
           shellModeActive: false,
         },
       },
@@ -467,7 +478,8 @@ describe('useGeminiStream', () => {
     act(() => {
       rerender({
         client,
-        addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+        history: [],
+        addItem: mockAddItem,
         setShowHelp: mockSetShowHelp,
         config: mockConfig,
         onDebugMessage: mockOnDebugMessage,
@@ -521,7 +533,8 @@ describe('useGeminiStream', () => {
     act(() => {
       rerender({
         client,
-        addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+        history: [],
+        addItem: mockAddItem,
         setShowHelp: mockSetShowHelp,
         config: mockConfig,
         onDebugMessage: mockOnDebugMessage,

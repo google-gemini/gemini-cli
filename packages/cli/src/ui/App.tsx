@@ -66,7 +66,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
-  const { history, addItem, clearItems } = useHistory();
+  const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
     handleNewMessage,
@@ -151,8 +151,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
     config,
+    history,
     addItem,
     clearItems,
+    loadHistory,
     refreshStatic,
     setShowHelp,
     setDebugMessage,
@@ -217,6 +219,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const { streamingState, submitQuery, initError, pendingHistoryItems } =
     useGeminiStream(
       config.getGeminiClient(),
+      history,
       addItem,
       setShowHelp,
       config,
@@ -512,7 +515,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               )}
             </Box>
           )}
-
           <Footer
             model={config.getModel()}
             targetDir={config.getTargetDir()}

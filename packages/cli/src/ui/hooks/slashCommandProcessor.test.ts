@@ -65,6 +65,14 @@ import {
 } from '@gemini-cli/core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 
+vi.mock('@gemini-code/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@gemini-code/core')>();
+  return {
+    ...actual,
+    GitService: vi.fn(),
+  };
+});
+
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
@@ -84,6 +92,7 @@ vi.mock('open', () => ({
 describe('useSlashCommandProcessor', () => {
   let mockAddItem: ReturnType<typeof vi.fn>;
   let mockClearItems: ReturnType<typeof vi.fn>;
+  let mockLoadHistory: ReturnType<typeof vi.fn>;
   let mockRefreshStatic: ReturnType<typeof vi.fn>;
   let mockSetShowHelp: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
@@ -96,6 +105,7 @@ describe('useSlashCommandProcessor', () => {
   beforeEach(() => {
     mockAddItem = vi.fn();
     mockClearItems = vi.fn();
+    mockLoadHistory = vi.fn();
     mockRefreshStatic = vi.fn();
     mockSetShowHelp = vi.fn();
     mockOnDebugMessage = vi.fn();
@@ -105,6 +115,8 @@ describe('useSlashCommandProcessor', () => {
       getDebugMode: vi.fn(() => false),
       getSandbox: vi.fn(() => 'test-sandbox'),
       getModel: vi.fn(() => 'test-model'),
+      getProjectRoot: vi.fn(() => '/test/dir'),
+      getCheckpointEnabled: vi.fn(() => true),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -133,8 +145,10 @@ describe('useSlashCommandProcessor', () => {
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
+        [],
         mockAddItem,
         mockClearItems,
+        mockLoadHistory,
         mockRefreshStatic,
         mockSetShowHelp,
         mockOnDebugMessage,
@@ -153,7 +167,7 @@ describe('useSlashCommandProcessor', () => {
       const fact = 'Remember this fact';
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand(`/memory add ${fact}`);
+        commandResult = await handleSlashCommand(`/memory add ${fact}`);
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -187,7 +201,7 @@ describe('useSlashCommandProcessor', () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/memory add ');
+        commandResult = await handleSlashCommand('/memory add ');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -211,7 +225,7 @@ describe('useSlashCommandProcessor', () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/memory show');
+        commandResult = await handleSlashCommand('/memory show');
       });
       expect(
         ShowMemoryCommandModule.createShowMemoryAction,
@@ -226,7 +240,7 @@ describe('useSlashCommandProcessor', () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/memory refresh');
+        commandResult = await handleSlashCommand('/memory refresh');
       });
       expect(mockPerformMemoryRefresh).toHaveBeenCalled();
       expect(commandResult).toBe(true);
@@ -238,7 +252,7 @@ describe('useSlashCommandProcessor', () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/memory foobar');
+        commandResult = await handleSlashCommand('/memory foobar');
       });
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
@@ -300,7 +314,7 @@ describe('useSlashCommandProcessor', () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/help');
+        commandResult = await handleSlashCommand('/help');
       });
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
       expect(commandResult).toBe(true);
@@ -373,7 +387,7 @@ Add any other context about the problem here.
       );
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand(`/bug ${bugDescription}`);
+        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
       });
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
@@ -387,7 +401,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/unknowncommand');
+        commandResult = await handleSlashCommand('/unknowncommand');
       });
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
@@ -410,7 +424,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/tools');
+        commandResult = await handleSlashCommand('/tools');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -434,7 +448,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/tools');
+        commandResult = await handleSlashCommand('/tools');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -467,7 +481,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/tools');
+        commandResult = await handleSlashCommand('/tools');
       });
 
       // Should only show tool1 and tool2, not the MCP tools
@@ -499,7 +513,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/tools');
+        commandResult = await handleSlashCommand('/tools');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -545,7 +559,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -571,7 +585,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -633,7 +647,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -706,7 +720,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor(true);
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -780,7 +794,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       expect(mockAddItem).toHaveBeenNthCalledWith(
@@ -846,7 +860,7 @@ Add any other context about the problem here.
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
-        commandResult = handleSlashCommand('/mcp');
+        commandResult = await handleSlashCommand('/mcp');
       });
 
       const message = mockAddItem.mock.calls[1][0].text;

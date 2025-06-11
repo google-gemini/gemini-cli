@@ -20,6 +20,7 @@ export interface UseHistoryManagerReturn {
     updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
   ) => void;
   clearItems: () => void;
+  loadHistory: (newHistory: HistoryItem[]) => void;
 }
 
 /**
@@ -36,6 +37,10 @@ export function useHistory(): UseHistoryManagerReturn {
   const getNextMessageId = useCallback((baseTimestamp: number): number => {
     messageIdCounterRef.current += 1;
     return baseTimestamp + messageIdCounterRef.current;
+  }, []);
+
+  const loadHistory = useCallback((newHistory: HistoryItem[]) => {
+    setHistory(newHistory);
   }, []);
 
   // Adds a new item to the history state with a unique ID.
@@ -101,5 +106,6 @@ export function useHistory(): UseHistoryManagerReturn {
     addItem,
     updateItem,
     clearItems,
+    loadHistory,
   };
 }
