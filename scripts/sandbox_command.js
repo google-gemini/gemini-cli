@@ -63,13 +63,6 @@ if (!geminiSandbox) {
   geminiSandbox = process.env.GEMINI_SANDBOX;
 }
 
-if (process.env.GEMINI_CODE_SANDBOX) {
-  console.warn(
-    'WARNING: GEMINI_CODE_SANDBOX is deprecated. Use GEMINI_SANDBOX instead.',
-  );
-  geminiSandbox = process.env.GEMINI_CODE_SANDBOX;
-}
-
 geminiSandbox = (geminiSandbox || '').toLowerCase();
 
 const commandExists = (cmd) => {
