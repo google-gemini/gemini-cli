@@ -19,8 +19,10 @@
 
 import { spawn, execSync } from 'child_process';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 
 const root = join(import.meta.dirname, '..');
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
 
 // check build status, write warnings to file for app to display if needed
 execSync('node ./scripts/check-build-status.js', {
@@ -56,7 +58,7 @@ nodeArgs.push(...process.argv.slice(2));
 
 const env = {
   ...process.env,
-  CLI_VERSION: 'development',
+  CLI_VERSION: pkg.version,
   DEV: 'true',
 };
 
