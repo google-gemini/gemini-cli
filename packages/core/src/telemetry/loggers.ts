@@ -195,6 +195,9 @@ export function logApiResponse(
     'event.name': EVENT_API_RESPONSE,
     'event.timestamp': new Date().toISOString(),
   };
+  if (event.response_text) {
+    attributes.response_text = event.response_text;
+  }
   if (event.error) {
     attributes['error.message'] = event.error;
   } else if (event.status_code) {
