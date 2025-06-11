@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import { CumulativeStats } from '../contexts/SessionContext.js';
+import { FormattedStats, StatRow, StatsColumn } from './Stats.js';
 
 // --- Constants ---
 
@@ -21,89 +22,6 @@ interface StatsDisplayProps {
   lastTurnStats: CumulativeStats;
   duration: string;
 }
-
-interface FormattedStats {
-  inputTokens: number;
-  outputTokens: number;
-  toolUseTokens: number;
-  thoughtsTokens: number;
-  cachedTokens: number;
-  totalTokens: number;
-}
-
-// --- Helper Components ---
-
-/**
- * Renders a single row with a colored label on the left and a value on the right.
- */
-const StatRow: React.FC<{
-  label: string;
-  value: string | number;
-  valueColor?: string;
-}> = ({ label, value, valueColor }) => (
-  <Box justifyContent="space-between">
-    <Text color={Colors.LightBlue}>{label}</Text>
-    <Text color={valueColor}>{value}</Text>
-  </Box>
-);
-
-/**
- * Renders a full column for either "Last Turn" or "Cumulative" stats.
- */
-const StatsColumn: React.FC<{
-  title: string;
-  stats: FormattedStats;
-  isCumulative?: boolean;
-}> = ({ title, stats, isCumulative = false }) => {
-  const cachedDisplay =
-    isCumulative && stats.totalTokens > 0
-      ? `${stats.cachedTokens.toLocaleString()} (${((stats.cachedTokens / stats.totalTokens) * 100).toFixed(1)}%)`
-      : stats.cachedTokens.toLocaleString();
-
-  const cachedColor =
-    isCumulative && stats.cachedTokens > 0 ? Colors.AccentGreen : undefined;
-
-  return (
-    <Box flexDirection="column" width={COLUMN_WIDTH}>
-      <Text bold>{title}</Text>
-      <Box marginTop={1} flexDirection="column">
-        <StatRow
-          label="Input Tokens"
-          value={stats.inputTokens.toLocaleString()}
-        />
-        <StatRow
-          label="Output Tokens"
-          value={stats.outputTokens.toLocaleString()}
-        />
-        <StatRow
-          label="Tool Use Tokens"
-          value={stats.toolUseTokens.toLocaleString()}
-        />
-        <StatRow
-          label="Thoughts Tokens"
-          value={stats.thoughtsTokens.toLocaleString()}
-        />
-        <StatRow
-          label="Cached Tokens"
-          value={cachedDisplay}
-          valueColor={cachedColor}
-        />
-        {/* Divider Line */}
-        <Box
-          borderTop={true}
-          borderLeft={false}
-          borderRight={false}
-          borderBottom={false}
-          borderStyle="single"
-        />
-        <StatRow
-          label="Total Tokens"
-          value={stats.totalTokens.toLocaleString()}
-        />
-      </Box>
-    </Box>
-  );
-};
 
 // --- Main Component ---
 
@@ -143,11 +61,16 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       </Text>
 
       <Box flexDirection="row" justifyContent="space-between" marginTop={1}>
-        <StatsColumn title="Last Turn" stats={lastTurnFormatted} />
+        <StatsColumn
+          title="Last Turn"
+          stats={lastTurnFormatted}
+          width={COLUMN_WIDTH}
+        />
         <StatsColumn
           title={`Cumulative (${stats.turnCount} Turns)`}
           stats={cumulativeFormatted}
           isCumulative={true}
+          width={COLUMN_WIDTH}
         />
       </Box>
 

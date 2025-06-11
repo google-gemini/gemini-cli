@@ -97,6 +97,12 @@ export const useSlashCommandProcessor = (
           lastTurnStats: message.lastTurnStats,
           duration: message.duration,
         };
+      } else if (message.type === MessageType.QUIT) {
+        historyItemContent = {
+          type: 'quit',
+          stats: message.stats,
+          duration: message.duration,
+        };
       } else {
         historyItemContent = {
           type: message.type as
@@ -594,8 +600,20 @@ Add any other context about the problem here.
         altName: 'exit',
         description: 'exit the cli',
         action: async (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Quitting. Good-bye.');
-          process.exit(0);
+          const now = new Date();
+          const { sessionStartTime, cumulative } = session.stats;
+          const wallDuration = now.getTime() - sessionStartTime.getTime();
+
+          addMessage({
+            type: MessageType.QUIT,
+            stats: cumulative,
+            duration: formatDuration(wallDuration),
+            timestamp: new Date(),
+          });
+
+          setTimeout(() => {
+            process.exit(0);
+          }, 100);
         },
       },
     ];
@@ -721,6 +739,7 @@ Add any other context about the problem here.
     session,
     gitService,
     loadHistory,
+    addItem,
   ]);
 
   const handleSlashCommand = useCallback(

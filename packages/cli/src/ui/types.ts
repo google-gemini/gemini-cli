@@ -97,6 +97,12 @@ export type HistoryItemStats = HistoryItemBase & {
   duration: string;
 };
 
+export type HistoryItemQuit = HistoryItemBase & {
+  type: 'quit';
+  stats: CumulativeStats;
+  duration: string;
+};
+
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
@@ -120,7 +126,8 @@ export type HistoryItemWithoutId =
   | HistoryItemError
   | HistoryItemAbout
   | HistoryItemToolGroup
-  | HistoryItemStats;
+  | HistoryItemStats
+  | HistoryItemQuit;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -131,6 +138,7 @@ export enum MessageType {
   USER = 'user',
   ABOUT = 'about',
   STATS = 'stats',
+  QUIT = 'quit',
   GEMINI = 'gemini',
 }
 
@@ -155,6 +163,13 @@ export type Message =
       timestamp: Date;
       stats: CumulativeStats;
       lastTurnStats: CumulativeStats;
+      duration: string;
+      content?: string;
+    }
+  | {
+      type: MessageType.QUIT;
+      timestamp: Date;
+      stats: CumulativeStats;
       duration: string;
       content?: string;
     };

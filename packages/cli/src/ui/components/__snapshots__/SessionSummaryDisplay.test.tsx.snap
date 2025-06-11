@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<SessionSummaryDisplay /> > renders correctly with given stats and duration 1`] = `
+"╭─────────────────────────────────────╮
+│                                     │
+│  Agent powering down. Goodbye!      │
+│                                     │
+│                                     │
+│  Cumulative Stats (10 Turns)        │
+│                                     │
+│  Input Tokens                1,000  │
+│  Output Tokens               2,000  │
+│  Tool Use Tokens               200  │
+│  Thoughts Tokens               300  │
+│  Cached Tokens         500 (14.3%)  │
+│  ─────────────────────────────────  │
+│  Total Tokens                3,500  │
+│                                     │
+│  Total duration (API)        50.2s  │
+│  Total duration (wall)  1h 23m 45s  │
+│                                     │
+╰─────────────────────────────────────╯"
+`;
+
+exports[`<SessionSummaryDisplay /> > renders zero state correctly 1`] = `
+"╭─────────────────────────────────╮
+│                                 │
+│  Agent powering down. Goodbye!  │
+│                                 │
+│                                 │
+│  Cumulative Stats (0 Turns)     │
+│                                 │
+│  Input Tokens             0     │
+│  Output Tokens            0     │
+│  Tool Use Tokens          0     │
+│  Thoughts Tokens          0     │
+│  Cached Tokens            0     │
+│  ──────────────────────────     │
+│  Total Tokens             0     │
+│                                 │
+│  Total duration (API)    0s     │
+│  Total duration (wall)   0s     │
+│                                 │
+╰─────────────────────────────────╯"
+`;
