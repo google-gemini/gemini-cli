@@ -73,4 +73,27 @@ describe('<HistoryItemDisplay />', () => {
     );
     expect(lastFrame()).toContain('About Gemini CLI');
   });
+
+  it('renders SessionSummaryDisplay for "quit" type', () => {
+    const stats: CumulativeStats = {
+      turnCount: 1,
+      promptTokenCount: 10,
+      candidatesTokenCount: 20,
+      totalTokenCount: 30,
+      cachedContentTokenCount: 5,
+      toolUsePromptTokenCount: 2,
+      thoughtsTokenCount: 3,
+      apiTimeMs: 123,
+    };
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'quit',
+      stats,
+      duration: '1s',
+    };
+    const { lastFrame } = render(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('Agent powering down. Goodbye!');
+  });
 });
