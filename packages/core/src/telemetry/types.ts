@@ -53,6 +53,7 @@ export interface ApiResponseEvent {
   cached_content_token_count: number;
   thoughts_token_count: number;
   tool_token_count: number;
+  response_text?: string;
 }
 
 export interface CliConfigEvent {

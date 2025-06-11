@@ -250,6 +250,7 @@ export class GeminiClient {
         response.usageMetadata?.cachedContentTokenCount ?? 0,
       thoughts_token_count: response.usageMetadata?.thoughtsTokenCount ?? 0,
       tool_token_count: response.usageMetadata?.toolUsePromptTokenCount ?? 0,
+      response_text: getResponseText(response),
     });
   }
 
