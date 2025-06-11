@@ -16,12 +16,11 @@ import {
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
     vi.useRealTimers(); // Restore real timers after each test
+    act(() => vi.runOnlyPendingTimers);
   });
 
   it('should initialize with default values when Idle', () => {
