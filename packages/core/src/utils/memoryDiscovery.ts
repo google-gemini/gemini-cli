@@ -81,6 +81,7 @@ async function getGeminiMdFilePathsInternal(
   currentWorkingDirectory: string,
   userHomePath: string,
   debugMode: boolean,
+  extensionContextFilePaths: string[] = [],
 ): Promise<string[]> {
   const resolvedCwd = path.resolve(currentWorkingDirectory);
   const resolvedHome = path.resolve(userHomePath);
@@ -195,6 +196,13 @@ async function getGeminiMdFilePathsInternal(
     }
   }
 
+  // Add extension context file paths
+  for (const extensionPath of extensionContextFilePaths) {
+    if (!paths.includes(extensionPath)) {
+      paths.push(extensionPath);
+    }
+  }
+
   if (debugMode)
     logger.debug(
       `Final ordered ${getCurrentGeminiMdFilename()} paths to read: ${JSON.stringify(paths)}`,
@@ -258,6 +266,7 @@ function concatenateInstructions(
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
+  extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
@@ -270,6 +279,7 @@ export async function loadServerHierarchicalMemory(
     currentWorkingDirectory,
     userHomePath,
     debugMode,
+    extensionContextFilePaths,
   );
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
