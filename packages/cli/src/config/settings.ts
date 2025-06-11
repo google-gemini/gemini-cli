@@ -29,6 +29,7 @@ export interface Settings {
   theme?: string;
   sandbox?: boolean | string;
   coreTools?: string[];
+  excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;

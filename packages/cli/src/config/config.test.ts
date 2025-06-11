@@ -44,6 +44,7 @@ vi.mock('@gemini-cli/core', async () => {
       getQuestion: () => params.question,
       getFullContext: () => params.fullContext,
       getCoreTools: () => params.coreTools,
+      getExcludeTools: () => params.excludeTools,
       getToolDiscoveryCommand: () => params.toolDiscoveryCommand,
       getToolCallCommand: () => params.toolCallCommand,
       getMcpServerCommand: () => params.mcpServerCommand,

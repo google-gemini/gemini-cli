@@ -175,6 +175,7 @@ export async function loadCliConfig(
     question: argv.prompt || '',
     fullContext: argv.all_files || false,
     coreTools: settings.coreTools || undefined,
+    excludeTools: settings.excludeTools || undefined,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
