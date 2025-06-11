@@ -43,21 +43,28 @@ function getCommonAttributes(config: Config): LogAttributes {
 export function logCliConfiguration(config: Config): void {
   if (!isTelemetrySdkInitialized()) return;
 
+  const generatorConfig = config.getContentGeneratorConfig();
+  const mcpServers = config.getMcpServers();
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     'event.name': EVENT_CLI_CONFIG,
     'event.timestamp': new Date().toISOString(),
     model: config.getModel(),
+    embedding_model: config.getEmbeddingModel(),
     sandbox_enabled:
       typeof config.getSandbox() === 'string' ? true : config.getSandbox(),
     core_tools_enabled: (config.getCoreTools() ?? []).join(','),
     approval_mode: config.getApprovalMode(),
-    vertex_ai_enabled: !!config.getContentGeneratorConfig().vertexai,
+    api_key_enabled: !!generatorConfig.apiKey,
+    vertex_ai_enabled: !!generatorConfig.vertexai,
+    code_assist_enabled: !!generatorConfig.codeAssist,
     log_user_prompts_enabled: config.getTelemetryLogUserPromptsEnabled(),
     file_filtering_respect_git_ignore:
       config.getFileFilteringRespectGitIgnore(),
     file_filtering_allow_build_artifacts:
       config.getFileFilteringAllowBuildArtifacts(),
+    debug_mode: config.getDebugMode(),
+    mcp_servers: mcpServers ? Object.keys(mcpServers).join(',') : '',
   };
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {

@@ -8,60 +8,105 @@ import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { Config } from '../config/config.js';
 import { EVENT_API_RESPONSE } from './constants.js';
-import { logApiResponse } from './loggers.js';
+import { logApiResponse, logCliConfiguration } from './loggers.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 
-describe('logApiResponse', () => {
-  const mockConfig = {
-    getSessionId: () => 'test-session-id',
-  } as Config;
+vi.mock('@gemini-cli/cli/dist/src/utils/version', () => ({
+  getCliVersion: () => 'test-version',
+}));
 
+vi.mock('@gemini-cli/cli/dist/src/config/settings', () => ({
+  getTheme: () => 'test-theme',
+}));
+
+describe('loggers', () => {
   const mockLogger = {
     emit: vi.fn(),
-  };
-
-  const mockMetrics = {
-    recordApiResponseMetrics: vi.fn(),
-    recordTokenUsageMetrics: vi.fn(),
   };
 
   beforeEach(() => {
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
-    vi.spyOn(metrics, 'recordApiResponseMetrics').mockImplementation(
-      mockMetrics.recordApiResponseMetrics,
-    );
-    vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
-      mockMetrics.recordTokenUsageMetrics,
-    );
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
   });
 
-  it('should log an API response with all fields', () => {
-    const event = {
-      model: 'test-model',
-      status_code: 200,
-      duration_ms: 100,
-      attempt: 1,
-      output_token_count: 50,
-      cached_content_token_count: 10,
-      thoughts_token_count: 5,
-      tool_token_count: 2,
-      response_text: 'test-response',
+  describe('logCliConfiguration', () => {
+    it('should log the cli configuration', () => {
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getModel: () => 'test-model',
+        getEmbeddingModel: () => 'test-embedding-model',
+        getSandbox: () => true,
+        getCoreTools: () => ['ls', 'read-file'],
+        getApprovalMode: () => 'default',
+        getContentGeneratorConfig: () => ({
+          model: 'test-model',
+          apiKey: 'test-api-key',
+          vertexai: true,
+          codeAssist: false,
+        }),
+        getTelemetryLogUserPromptsEnabled: () => true,
+        getFileFilteringRespectGitIgnore: () => true,
+        getFileFilteringAllowBuildArtifacts: () => false,
+        getDebugMode: () => true,
+        getMcpServers: () => ({
+          'test-server': {
+            command: 'test-command',
+          },
+        }),
+        getQuestion: () => 'test-question',
+      } as unknown as Config;
+
+      logCliConfiguration(mockConfig);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'CLI configuration loaded.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': 'gemini_cli.config',
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+          embedding_model: 'test-embedding-model',
+          sandbox_enabled: true,
+          core_tools_enabled: 'ls,read-file',
+          approval_mode: 'default',
+          api_key_enabled: true,
+          vertex_ai_enabled: true,
+          code_assist_enabled: false,
+          log_user_prompts_enabled: true,
+          file_filtering_respect_git_ignore: true,
+          file_filtering_allow_build_artifacts: false,
+          debug_mode: true,
+          mcp_servers: 'test-server',
+        },
+      });
+    });
+  });
+
+  describe('logApiResponse', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as Config;
+
+    const mockMetrics = {
+      recordApiResponseMetrics: vi.fn(),
+      recordTokenUsageMetrics: vi.fn(),
     };
 
-    logApiResponse(mockConfig, event);
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordApiResponseMetrics').mockImplementation(
+        mockMetrics.recordApiResponseMetrics,
+      );
+      vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
+        mockMetrics.recordTokenUsageMetrics,
+      );
+    });
 
-    expect(mockLogger.emit).toHaveBeenCalledWith({
-      body: 'API response from test-model. Status: 200. Duration: 100ms.',
-      attributes: {
-        'session.id': 'test-session-id',
-        'event.name': EVENT_API_RESPONSE,
-        'event.timestamp': '2025-01-01T00:00:00.000Z',
-        [SemanticAttributes.HTTP_STATUS_CODE]: 200,
+    it('should log an API response with all fields', () => {
+      const event = {
         model: 'test-model',
         status_code: 200,
         duration_ms: 100,
@@ -71,49 +116,70 @@ describe('logApiResponse', () => {
         thoughts_token_count: 5,
         tool_token_count: 2,
         response_text: 'test-response',
-      },
+      };
+
+      logApiResponse(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API response from test-model. Status: 200. Duration: 100ms.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_API_RESPONSE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          [SemanticAttributes.HTTP_STATUS_CODE]: 200,
+          model: 'test-model',
+          status_code: 200,
+          duration_ms: 100,
+          attempt: 1,
+          output_token_count: 50,
+          cached_content_token_count: 10,
+          thoughts_token_count: 5,
+          tool_token_count: 2,
+          response_text: 'test-response',
+        },
+      });
+
+      expect(mockMetrics.recordApiResponseMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'test-model',
+        100,
+        200,
+        undefined,
+      );
+
+      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'test-model',
+        50,
+        'output',
+      );
     });
 
-    expect(mockMetrics.recordApiResponseMetrics).toHaveBeenCalledWith(
-      mockConfig,
-      'test-model',
-      100,
-      200,
-      undefined,
-    );
+    it('should log an API response with an error', () => {
+      const event = {
+        model: 'test-model',
+        duration_ms: 100,
+        attempt: 1,
+        error: 'test-error',
+        output_token_count: 50,
+        cached_content_token_count: 10,
+        thoughts_token_count: 5,
+        tool_token_count: 2,
+        response_text: 'test-response',
+      };
 
-    expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
-      mockConfig,
-      'test-model',
-      50,
-      'output',
-    );
-  });
+      logApiResponse(mockConfig, event);
 
-  it('should log an API response with an error', () => {
-    const event = {
-      model: 'test-model',
-      duration_ms: 100,
-      attempt: 1,
-      error: 'test-error',
-      output_token_count: 50,
-      cached_content_token_count: 10,
-      thoughts_token_count: 5,
-      tool_token_count: 2,
-      response_text: 'test-response',
-    };
-
-    logApiResponse(mockConfig, event);
-
-    expect(mockLogger.emit).toHaveBeenCalledWith({
-      body: 'API response from test-model. Status: N/A. Duration: 100ms.',
-      attributes: {
-        'session.id': 'test-session-id',
-        ...event,
-        'event.name': EVENT_API_RESPONSE,
-        'event.timestamp': '2025-01-01T00:00:00.000Z',
-        'error.message': 'test-error',
-      },
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API response from test-model. Status: N/A. Duration: 100ms.',
+        attributes: {
+          'session.id': 'test-session-id',
+          ...event,
+          'event.name': EVENT_API_RESPONSE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          'error.message': 'test-error',
+        },
+      });
     });
   });
 });
