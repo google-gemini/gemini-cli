@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme } from './theme.js';
 
 const githubLightColors: ColorsTheme = {
   type: 'light',
@@ -19,7 +19,7 @@ const githubLightColors: ColorsTheme = {
   AccentRed: '#d14',
   Comment: '#998',
   Gray: '#999',
-  GradientColors: lightTheme.GradientColors,
+  GradientColors: ['#458', '#008080'],
 };
 
 export const GitHubLight: Theme = new Theme(

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme } from './theme.js';
 
 const xcodeColors: ColorsTheme = {
   type: 'light',
@@ -19,7 +19,7 @@ const xcodeColors: ColorsTheme = {
   AccentRed: '#c41a16',
   Comment: '#007400',
   Gray: '#c0c0c0',
-  GradientColors: darkTheme.GradientColors,
+  GradientColors: ['#1c00cf', '#007400'],
 };
 
 export const XCode: Theme = new Theme(
