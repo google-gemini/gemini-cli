@@ -29,6 +29,7 @@ export * from './utils/editor.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
+export * from './services/gitService.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';

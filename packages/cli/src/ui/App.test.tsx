@@ -63,6 +63,7 @@ interface MockServerConfig {
   getVertexAI: Mock<() => boolean | undefined>;
   getShowMemoryUsage: Mock<() => boolean>;
   getAccessibility: Mock<() => AccessibilitySettings>;
+  getProjectRoot: Mock<() => string | undefined>;
 }
 
 // Mock @gemini-cli/core and its Config class
@@ -120,7 +121,9 @@ vi.mock('@gemini-cli/core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
+        getProjectRoot: vi.fn(() => opts.projectRoot),
         getGeminiClient: vi.fn(() => ({})),
+        getCheckpointEnabled: vi.fn(() => opts.checkpoint ?? true),
       };
     });
   return {

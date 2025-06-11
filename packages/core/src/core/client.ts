@@ -77,6 +77,16 @@ export class GeminiClient {
     return this.chat;
   }
 
+  async getHistory(): Promise<Content[]> {
+    const chat = await this.chat;
+    return chat.getHistory();
+  }
+
+  async setHistory(history: Content[]): Promise<void> {
+    const chat = await this.chat;
+    chat.setHistory(history);
+  }
+
   private async getEnvironment(): Promise<Part[]> {
     const cwd = process.cwd();
     const today = new Date().toLocaleDateString(undefined, {
