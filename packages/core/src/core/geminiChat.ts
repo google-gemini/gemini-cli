@@ -290,6 +290,13 @@ export class GeminiChat {
   }
 
   /**
+   * Clears the chat history.
+   */
+  clearHistory(): void {
+    this.history = [];
+  }
+
+  /**
    * Adds a new entry to the chat history.
    *
    * @param content - The content to add to the history.

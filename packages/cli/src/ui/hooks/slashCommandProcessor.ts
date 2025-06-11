@@ -561,12 +561,21 @@ Add any other context about the problem here.
             return;
           }
           const chat = await config?.getGeminiClient()?.getChat();
+          if (!chat) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'No chat client available to resume conversation.',
+              timestamp: new Date(),
+            });
+            return;
+          }
           clearItems();
-          let i = 0;
+          chat.clearHistory();
           const rolemap: { [key: string]: MessageType } = {
             user: MessageType.USER,
             model: MessageType.GEMINI,
           };
+          let i = 0;
           for (const item of conversation) {
             i += 1;
             const text =
@@ -589,7 +598,7 @@ Add any other context about the problem here.
               } as HistoryItemWithoutId,
               i,
             );
-            chat?.addHistory(item);
+            chat.addHistory(item);
           }
           console.clear();
           refreshStatic();
