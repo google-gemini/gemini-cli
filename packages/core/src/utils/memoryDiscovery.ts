@@ -8,6 +8,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
+import { bfsFileSearch } from './bfsFileSearch.js';
 import {
   GEMINI_CONFIG_DIR,
   getCurrentGeminiMdFilename,
@@ -25,19 +26,6 @@ const logger = {
   error: (...args: any[]) =>
     console.error('[ERROR] [MemoryDiscovery]', ...args),
 };
-
-// TODO(adh): Refactor to use a shared ignore list with other tools like glob and read-many-files.
-const DEFAULT_IGNORE_DIRECTORIES = [
-  'node_modules',
-  '.git',
-  'dist',
-  'build',
-  'out',
-  'coverage',
-  '.vscode',
-  '.idea',
-  '.DS_Store',
-];
 
 const MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY = 200;
 
@@ -87,76 +75,6 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
     }
     currentDir = parentDir;
   }
-}
-
-async function collectDownwardGeminiFiles(
-  directory: string,
-  debugMode: boolean,
-  ignoreDirs: string[],
-  scannedDirCount: { count: number },
-  maxScanDirs: number,
-): Promise<string[]> {
-  if (scannedDirCount.count >= maxScanDirs) {
-    if (debugMode)
-      logger.debug(
-        `Max directory scan limit (${maxScanDirs}) reached. Stopping downward scan at: ${directory}`,
-      );
-    return [];
-  }
-  scannedDirCount.count++;
-
-  if (debugMode)
-    logger.debug(
-      `Scanning downward for ${getCurrentGeminiMdFilename()} files in: ${directory} (scanned: ${scannedDirCount.count}/${maxScanDirs})`,
-    );
-  const collectedPaths: string[] = [];
-  try {
-    const entries = await fs.readdir(directory, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (ignoreDirs.includes(entry.name)) {
-          if (debugMode)
-            logger.debug(`Skipping ignored directory: ${fullPath}`);
-          continue;
-        }
-        const subDirPaths = await collectDownwardGeminiFiles(
-          fullPath,
-          debugMode,
-          ignoreDirs,
-          scannedDirCount,
-          maxScanDirs,
-        );
-        collectedPaths.push(...subDirPaths);
-      } else if (
-        entry.isFile() &&
-        entry.name === getCurrentGeminiMdFilename()
-      ) {
-        try {
-          await fs.access(fullPath, fsSync.constants.R_OK);
-          collectedPaths.push(fullPath);
-          if (debugMode)
-            logger.debug(
-              `Found readable downward ${getCurrentGeminiMdFilename()}: ${fullPath}`,
-            );
-        } catch {
-          if (debugMode)
-            logger.debug(
-              `Downward ${getCurrentGeminiMdFilename()} not readable, skipping: ${fullPath}`,
-            );
-        }
-      }
-    }
-  } catch (error) {
-    // Only log warnings in non-test environments
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
-    if (!isTestEnv) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`Error scanning directory ${directory}: ${message}`);
-    }
-    if (debugMode) logger.debug(`Failed to scan directory: ${directory}`);
-  }
-  return collectedPaths;
 }
 
 async function getGeminiMdFilePathsInternal(
@@ -256,20 +174,19 @@ async function getGeminiMdFilePathsInternal(
   }
   paths.push(...upwardPaths);
 
-  if (debugMode)
-    logger.debug(`Starting downward scan from CWD: ${resolvedCwd}`);
-  const scannedDirCount = { count: 0 };
-  const downwardPaths = await collectDownwardGeminiFiles(
-    resolvedCwd,
-    debugMode,
-    DEFAULT_IGNORE_DIRECTORIES,
-    scannedDirCount,
-    MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
-  );
+  const downwardPaths = await bfsFileSearch(resolvedCwd, {
+    fileName: getCurrentGeminiMdFilename(),
+    maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
+    debug: debugMode,
+    respectGitIgnore: true,
+    projectRoot: projectRoot || resolvedCwd,
+  });
   downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
   if (debugMode && downwardPaths.length > 0)
     logger.debug(
-      `Found downward ${getCurrentGeminiMdFilename()} files (sorted): ${JSON.stringify(downwardPaths)}`,
+      `Found downward ${getCurrentGeminiMdFilename()} files (sorted): ${JSON.stringify(
+        downwardPaths,
+      )}`,
     );
   // Add downward paths only if they haven't been included already (e.g. from upward scan)
   for (const dPath of downwardPaths) {

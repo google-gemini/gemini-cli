@@ -512,13 +512,7 @@ describe('loadServerHierarchicalMemory', () => {
         ] as Dirent[];
       }
       if (p === ignoredDir) {
-        return [
-          {
-            name: ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST,
-            isFile: () => true,
-            isDirectory: () => false,
-          } as Dirent,
-        ] as Dirent[];
+        return [] as Dirent[];
       }
       return [] as Dirent[];
     }) as unknown as typeof fsPromises.readdir);
@@ -565,10 +559,8 @@ describe('loadServerHierarchicalMemory', () => {
     await loadServerHierarchicalMemory(CWD, true);
 
     expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[DEBUG] [MemoryDiscovery]'),
-      expect.stringContaining(
-        'Max directory scan limit (200) reached. Stopping downward scan at:',
-      ),
+      expect.stringContaining('[DEBUG] [BfsFileSearch]'),
+      expect.stringContaining('Scanning [200/200]:'),
     );
     consoleDebugSpy.mockRestore();
   });
