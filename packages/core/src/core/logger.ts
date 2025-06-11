@@ -9,11 +9,14 @@ import { promises as fs } from 'node:fs';
 import { Content } from '@google/genai';
 
 const GEMINI_DIR = '.gemini';
-const LOG_FILE_NAME = 'logs.json';
+const LOG_FILE_NAME_PREFIX = 'logs';
 const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 
 export enum MessageSenderType {
   USER = 'user',
+  SYSTEM = 'system',
+  TOOL_REQUEST = 'tool_request',
+  SERVER_ERROR = 'server_error',
 }
 
 export interface LogEntry {
@@ -35,6 +38,10 @@ export class Logger {
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
+  }
+
+  getLogFilePath(): string | undefined {
+    return this.logFilePath;
   }
 
   private async _readLogFile(): Promise<LogEntry[]> {
@@ -96,7 +103,10 @@ export class Logger {
       return;
     }
     this.geminiDir = path.resolve(process.cwd(), GEMINI_DIR);
-    this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
+    this.logFilePath = path.join(
+      this.geminiDir,
+      `${LOG_FILE_NAME_PREFIX}-${this.sessionId}.json`,
+    );
     this.checkpointFilePath = path.join(this.geminiDir, CHECKPOINT_FILE_NAME);
 
     try {
