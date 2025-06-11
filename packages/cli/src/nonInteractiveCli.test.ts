@@ -134,6 +134,7 @@ describe('runNonInteractive', () => {
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
+      mockConfig,
       expect.objectContaining({ callId: 'fc1', name: 'testTool' }),
       mockToolRegistry,
       expect.any(AbortSignal),

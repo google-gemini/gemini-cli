@@ -12,8 +12,11 @@ import {
   ToolResult,
   Tool,
   ToolCallConfirmationDetails,
+  Config,
 } from '../index.js';
 import { Part, Type } from '@google/genai';
+
+const mockConfig = {} as unknown as Config;
 
 describe('executeToolCall', () => {
   let mockToolRegistry: ToolRegistry;
@@ -68,6 +71,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockTool.execute).mockResolvedValue(toolResult);
 
     const response = await executeToolCall(
+      mockConfig,
       request,
       mockToolRegistry,
       abortController.signal,
@@ -99,6 +103,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
 
     const response = await executeToolCall(
+      mockConfig,
       request,
       mockToolRegistry,
       abortController.signal,
@@ -134,6 +139,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockTool.execute).mockRejectedValue(executionError);
 
     const response = await executeToolCall(
+      mockConfig,
       request,
       mockToolRegistry,
       abortController.signal,
@@ -184,6 +190,7 @@ describe('executeToolCall', () => {
 
     abortController.abort(); // Abort before calling
     const response = await executeToolCall(
+      mockConfig,
       request,
       mockToolRegistry,
       abortController.signal,
@@ -211,6 +218,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockTool.execute).mockResolvedValue(toolResult);
 
     const response = await executeToolCall(
+      mockConfig,
       request,
       mockToolRegistry,
       abortController.signal,

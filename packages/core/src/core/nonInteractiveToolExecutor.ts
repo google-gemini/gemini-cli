@@ -10,6 +10,7 @@ import {
   ToolRegistry,
   ToolResult,
 } from '../index.js';
+import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
 
 /**
@@ -17,6 +18,7 @@ import { convertToFunctionResponse } from './coreToolScheduler.js';
  * It does not handle confirmations, multiple calls, or live updates.
  */
 export async function executeToolCall(
+  config: Config,
   toolCallRequest: ToolCallRequestInfo,
   toolRegistry: ToolRegistry,
   abortSignal?: AbortSignal,

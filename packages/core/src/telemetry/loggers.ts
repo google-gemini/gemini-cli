@@ -34,10 +34,17 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogUserPromptsEnabled() ?? false;
 
+function getCommonAttributes(config: Config): LogAttributes {
+  return {
+    'session.id': config.getSessionId(),
+  };
+}
+
 export function logCliConfiguration(config: Config): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     'event.name': EVENT_CLI_CONFIG,
     'event.timestamp': new Date().toISOString(),
     model: config.getModel(),
@@ -69,6 +76,7 @@ export function logUserPrompt(
   if (!isTelemetrySdkInitialized()) return;
   const { prompt, ...restOfEventArgs } = event;
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     ...restOfEventArgs,
     'event.name': EVENT_USER_PROMPT,
     'event.timestamp': new Date().toISOString(),
@@ -85,10 +93,12 @@ export function logUserPrompt(
 }
 
 export function logToolCall(
+  config: Config,
   event: Omit<ToolCallEvent, 'event.name' | 'event.timestamp'>,
 ): void {
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
@@ -106,14 +116,21 @@ export function logToolCall(
     attributes,
   };
   logger.emit(logRecord);
-  recordToolCallMetrics(event.function_name, event.duration_ms, event.success);
+  recordToolCallMetrics(
+    config,
+    event.function_name,
+    event.duration_ms,
+    event.success,
+  );
 }
 
 export function logApiRequest(
+  config: Config,
   event: Omit<ApiRequestEvent, 'event.name' | 'event.timestamp'>,
 ): void {
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_API_REQUEST,
     'event.timestamp': new Date().toISOString(),
@@ -124,14 +141,21 @@ export function logApiRequest(
     attributes,
   };
   logger.emit(logRecord);
-  recordTokenUsageMetrics(event.model, event.input_token_count, 'input');
+  recordTokenUsageMetrics(
+    config,
+    event.model,
+    event.input_token_count,
+    'input',
+  );
 }
 
 export function logApiError(
+  config: Config,
   event: Omit<ApiErrorEvent, 'event.name' | 'event.timestamp'>,
 ): void {
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_API_ERROR,
     'event.timestamp': new Date().toISOString(),
@@ -152,6 +176,7 @@ export function logApiError(
   };
   logger.emit(logRecord);
   recordApiErrorMetrics(
+    config,
     event.model,
     event.duration_ms,
     event.status_code,
@@ -160,10 +185,12 @@ export function logApiError(
 }
 
 export function logApiResponse(
+  config: Config,
   event: Omit<ApiResponseEvent, 'event.name' | 'event.timestamp'>,
 ): void {
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_API_RESPONSE,
     'event.timestamp': new Date().toISOString(),
@@ -183,17 +210,29 @@ export function logApiResponse(
   };
   logger.emit(logRecord);
   recordApiResponseMetrics(
+    config,
     event.model,
     event.duration_ms,
     event.status_code,
     event.error,
   );
-  recordTokenUsageMetrics(event.model, event.output_token_count, 'output');
   recordTokenUsageMetrics(
+    config,
+    event.model,
+    event.output_token_count,
+    'output',
+  );
+  recordTokenUsageMetrics(
+    config,
     event.model,
     event.cached_content_token_count,
     'cache',
   );
-  recordTokenUsageMetrics(event.model, event.thoughts_token_count, 'thought');
-  recordTokenUsageMetrics(event.model, event.tool_token_count, 'tool');
+  recordTokenUsageMetrics(
+    config,
+    event.model,
+    event.thoughts_token_count,
+    'thought',
+  );
+  recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
 }

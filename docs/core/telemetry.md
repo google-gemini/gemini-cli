@@ -252,6 +252,8 @@ Use this method if you prefer not to use Docker.
 
 ## Data Reference: Logs & Metrics
 
+A `sessionId` is included as a common attribute on all logs and metrics.
+
 ### Logs
 
 These are timestamped records of specific events.
