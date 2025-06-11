@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -16,6 +16,9 @@ import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
@@ -283,7 +286,8 @@ export async function start_sandbox(sandbox: string) {
     ];
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     const proxyCommand = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
-    let proxyProcess: ChildProcess | undefined;
+    let proxyProcess: ChildProcess | undefined = undefined;
+    let sandboxProcess: ChildProcess | undefined = undefined;
     const sandboxEnv = { ...process.env };
     if (proxyCommand) {
       const proxy =
@@ -306,6 +310,17 @@ export async function start_sandbox(sandbox: string) {
         shell: true,
         detached: true,
       });
+      // install handlers to stop proxy on exit/signal
+      const stopProxy = () => {
+        console.log('stopping proxy ...');
+        if (proxyProcess?.pid) {
+          process.kill(-proxyProcess.pid, 'SIGTERM');
+        }
+      };
+      process.on('exit', stopProxy);
+      process.on('SIGINT', stopProxy);
+      process.on('SIGTERM', stopProxy);
+
       // commented out as it disrupts ink rendering
       // proxyProcess.stdout?.on('data', (data) => {
       //   console.info(data.toString());
@@ -313,31 +328,26 @@ export async function start_sandbox(sandbox: string) {
       proxyProcess.stderr?.on('data', (data) => {
         console.error(data.toString());
       });
-      console.log('waiting for proxy to start ...');
-      execSync(`until lsof -i :8877 | grep -q "LISTEN"; do sleep 0.1; done`);
-    }
-    try {
-      // spawn child and let it inherit stdio
-      const child = spawn(sandbox, args, {
-        stdio: 'inherit',
-        env: sandboxEnv,
+      proxyProcess.on('close', (code, signal) => {
+        console.error(
+          `ERROR: proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+        );
+        if (sandboxProcess?.pid) {
+          process.kill(-sandboxProcess.pid, 'SIGTERM');
+        }
+        process.exit(1);
       });
-      if (proxyProcess) {
-        proxyProcess.on('close', (code, signal) => {
-          console.error(
-            `ERROR: proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
-          );
-          if (child.pid) {
-            process.kill(-child.pid, 'SIGTERM');
-          }
-        });
-      }
-      await new Promise((resolve) => child.on('close', resolve));
-    } finally {
-      if (proxyProcess?.pid) {
-        process.kill(-proxyProcess.pid, 'SIGTERM');
-      }
+      console.log('waiting for proxy to start ...');
+      await execAsync(
+        `until curl -s http://localhost:8877; do sleep 0.25; done`,
+      );
     }
+    // spawn child and let it inherit stdio
+    sandboxProcess = spawn(sandbox, args, {
+      stdio: 'inherit',
+      env: sandboxEnv,
+    });
+    await new Promise((resolve) => sandboxProcess?.on('close', resolve));
     return;
   }
 
@@ -598,10 +608,12 @@ export async function start_sandbox(sandbox: string) {
 
   // Determine if the current user's UID/GID should be passed to the sandbox.
   // See shouldUseCurrentUserInSandbox for more details.
+  let userFlag = '';
   if (await shouldUseCurrentUserInSandbox()) {
     const uid = execSync('id -u').toString().trim();
     const gid = execSync('id -g').toString().trim();
     args.push('--user', `${uid}:${gid}`);
+    userFlag = `--user ${uid}:${gid}`;
     // when forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well
     args.push('--env', `HOME=${os.homedir()}`);
   }
@@ -613,15 +625,25 @@ export async function start_sandbox(sandbox: string) {
   args.push(...entrypoint(workdir));
 
   // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
-  let proxyProcess: ChildProcess | undefined;
+  let proxyProcess: ChildProcess | undefined = undefined;
+  let sandboxProcess: ChildProcess | undefined = undefined;
   if (proxyCommand) {
     // run proxyCommand in its own container
-    const proxyContainerCommand = `${sandbox} run --rm --init --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} --network ${SANDBOX_NETWORK_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+    const proxyContainerCommand = `${sandbox} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
     proxyProcess = spawn(proxyContainerCommand, {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: true,
       detached: true,
     });
+    // install handlers to stop proxy on exit/signal
+    const stopProxy = () => {
+      console.log('stopping proxy container ...');
+      execSync(`${sandbox} rm -f ${SANDBOX_PROXY_NAME}`);
+    };
+    process.on('exit', stopProxy);
+    process.on('SIGINT', stopProxy);
+    process.on('SIGTERM', stopProxy);
+
     // commented out as it disrupts ink rendering
     // proxyProcess.stdout?.on('data', (data) => {
     //   console.info(data.toString());
@@ -629,35 +651,43 @@ export async function start_sandbox(sandbox: string) {
     proxyProcess.stderr?.on('data', (data) => {
       console.error(data.toString().trim());
     });
+    proxyProcess.on('close', (code, signal) => {
+      console.error(
+        `ERROR: proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+      );
+      if (sandboxProcess?.pid) {
+        process.kill(-sandboxProcess.pid, 'SIGTERM');
+      }
+      process.exit(1);
+    });
     console.log('waiting for proxy to start ...');
-    execSync(`until lsof -i :8877 | grep -q "LISTEN"; do sleep 0.1; done`);
+    await execAsync(`until curl -s http://localhost:8877; do sleep 0.25; done`);
+    // connect proxy container to sandbox network
+    // (workaround for older versions of docker that don't support multiple --network args)
+    await execAsync(
+      `${sandbox} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
+    );
   }
 
-  try {
-    // spawn child and let it inherit stdio
-    const child = spawn(sandbox, args, {
-      stdio: 'inherit',
-    });
+  // spawn child and let it inherit stdio
+  sandboxProcess = spawn(sandbox, args, {
+    stdio: 'inherit',
+  });
 
-    child.on('error', (err) => {
-      console.error('Sandbox process error:', err);
-    });
+  sandboxProcess.on('error', (err) => {
+    console.error('Sandbox process error:', err);
+  });
 
-    await new Promise<void>((resolve) => {
-      child.on('close', (code, signal) => {
-        if (code !== 0) {
-          console.log(
-            `Sandbox process exited with code: ${code}, signal: ${signal}`,
-          );
-        }
-        resolve();
-      });
+  await new Promise<void>((resolve) => {
+    sandboxProcess?.on('close', (code, signal) => {
+      if (code !== 0) {
+        console.log(
+          `Sandbox process exited with code: ${code}, signal: ${signal}`,
+        );
+      }
+      resolve();
     });
-  } finally {
-    if (proxyProcess?.pid) {
-      process.kill(-proxyProcess.pid, 'SIGTERM');
-    }
-  }
+  });
 }
 
 // Helper functions to ensure sandbox image is present
