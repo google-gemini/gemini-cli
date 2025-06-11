@@ -17,7 +17,7 @@ export enum MessageSenderType {
 }
 
 export interface LogEntry {
-  sessionId: number;
+  sessionId: string;
   messageId: number;
   timestamp: string;
   type: MessageSenderType;
@@ -28,12 +28,14 @@ export class Logger {
   private geminiDir: string | undefined;
   private logFilePath: string | undefined;
   private checkpointFilePath: string | undefined;
-  private sessionId: number | undefined;
+  private sessionId: string | undefined;
   private messageId = 0; // Instance-specific counter for the next messageId
   private initialized = false;
   private logs: LogEntry[] = []; // In-memory cache, ideally reflects the last known state of the file
 
-  constructor() {}
+  constructor(sessionId: string) {
+    this.sessionId = sessionId;
+  }
 
   private async _readLogFile(): Promise<LogEntry[]> {
     if (!this.logFilePath) {
@@ -51,7 +53,7 @@ export class Logger {
       }
       return parsedLogs.filter(
         (entry) =>
-          typeof entry.sessionId === 'number' &&
+          typeof entry.sessionId === 'string' &&
           typeof entry.messageId === 'number' &&
           typeof entry.timestamp === 'string' &&
           typeof entry.type === 'string' &&
@@ -93,7 +95,6 @@ export class Logger {
     if (this.initialized) {
       return;
     }
-    this.sessionId = Math.floor(Date.now() / 1000);
     this.geminiDir = path.resolve(process.cwd(), GEMINI_DIR);
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
     this.checkpointFilePath = path.join(this.geminiDir, CHECKPOINT_FILE_NAME);
@@ -195,11 +196,9 @@ export class Logger {
     return this.logs
       .filter((entry) => entry.type === MessageSenderType.USER)
       .sort((a, b) => {
-        if (b.sessionId !== a.sessionId) return b.sessionId - a.sessionId;
         const dateA = new Date(a.timestamp).getTime();
         const dateB = new Date(b.timestamp).getTime();
-        if (dateB !== dateA) return dateB - dateA;
-        return b.messageId - a.messageId;
+        return dateB - dateA;
       })
       .map((entry) => entry.message);
   }

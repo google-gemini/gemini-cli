@@ -28,4 +28,3 @@ export {
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-export { sessionId } from './constants.js';

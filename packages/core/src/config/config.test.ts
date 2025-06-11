@@ -49,6 +49,7 @@ describe('Server Config (config.ts)', () => {
   const USER_MEMORY = 'Test User Memory';
   const TELEMETRY = false;
   const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
   const baseParams: ConfigParameters = {
     contentGeneratorConfig: {
       apiKey: API_KEY,
@@ -62,6 +63,7 @@ describe('Server Config (config.ts)', () => {
     fullContext: FULL_CONTEXT,
     userMemory: USER_MEMORY,
     telemetry: TELEMETRY,
+    sessionId: SESSION_ID,
   };
 
   beforeEach(() => {

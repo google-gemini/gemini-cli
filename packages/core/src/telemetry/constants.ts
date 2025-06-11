@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { randomUUID } from 'crypto';
-
 export const SERVICE_NAME = 'gemini-cli';
-export const sessionId = randomUUID();
 
 export const EVENT_USER_PROMPT = 'gemini_code.user_prompt';
 export const EVENT_TOOL_CALL = 'gemini_code.tool_call';

@@ -120,6 +120,7 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: ExtensionConfig[],
   geminiIgnorePatterns: string[],
+  sessionId: string,
 ): Promise<Config> {
   loadEnvironment();
 
@@ -148,6 +149,7 @@ export async function loadCliConfig(
   const mcpServers = mergeMcpServers(settings, extensions);
 
   return new Config({
+    sessionId,
     contentGeneratorConfig,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: argv.sandbox ?? settings.sandbox,

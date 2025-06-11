@@ -26,7 +26,7 @@ import {
 } from '@opentelemetry/sdk-metrics';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { Config } from '../config/config.js';
-import { SERVICE_NAME, sessionId } from './constants.js';
+import { SERVICE_NAME } from './constants.js';
 import { initializeMetrics } from './metrics.js';
 import { logCliConfiguration } from './loggers.js';
 
@@ -68,7 +68,7 @@ export function initializeTelemetry(config: Config): void {
   const resource = new Resource({
     [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
     [SemanticResourceAttributes.SERVICE_VERSION]: process.version,
-    'session.id': sessionId,
+    'session.id': config.getSessionId(),
   });
 
   const otlpEndpoint = config.getTelemetryOtlpEndpoint();
