@@ -147,15 +147,10 @@ export async function loadCliConfig(
 
   const mcpServers = mergeMcpServers(settings, extensions);
 
-  let sandbox = argv.sandbox ?? settings.sandbox;
-  if (argv.yolo) {
-    sandbox = false;
-  }
-
   return new Config({
     contentGeneratorConfig,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
-    sandbox,
+    sandbox: argv.sandbox ?? settings.sandbox,
     targetDir: process.cwd(),
     debugMode,
     question: argv.prompt || '',
