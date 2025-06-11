@@ -214,8 +214,6 @@ describe('API Key Handling', () => {
       'Both GEMINI_API_KEY and GOOGLE_API_KEY are set. Using GOOGLE_API_KEY.',
     );
     expect(result.getApiKey()).toBe('google-key');
-
-    consoleWarnSpy.mockRestore();
   });
 });
 

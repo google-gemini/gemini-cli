@@ -176,8 +176,6 @@ describe('retryWithBackoff', () => {
     // The third delay should be capped by maxDelayMs (250ms), accounting for jitter
     expect(delays[2]).toBeGreaterThanOrEqual(250 * 0.7);
     expect(delays[2]).toBeLessThanOrEqual(250 * 1.3);
-
-    setTimeoutSpy.mockRestore();
   });
 
   it('should handle jitter correctly, ensuring varied delays', async () => {
@@ -232,7 +230,5 @@ describe('retryWithBackoff', () => {
       expect(d).toBeGreaterThanOrEqual(100 * 0.7);
       expect(d).toBeLessThanOrEqual(100 * 1.3);
     });
-
-    setTimeoutSpy.mockRestore();
   });
 });

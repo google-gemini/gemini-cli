@@ -74,8 +74,7 @@ describe('loadGeminiIgnorePatterns', () => {
     if (actualFs.existsSync(tempDir)) {
       actualFs.rmSync(tempDir, { recursive: true, force: true });
     }
-    consoleLogSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it('should load and parse patterns from .geminiignore, ignoring comments and empty lines', () => {

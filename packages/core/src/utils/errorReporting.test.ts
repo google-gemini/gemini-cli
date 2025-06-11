@@ -29,7 +29,6 @@ describe('reportError', () => {
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
     vi.restoreAllMocks();
   });
 
