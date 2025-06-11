@@ -564,4 +564,32 @@ describe('loadServerHierarchicalMemory', () => {
     );
     consoleDebugSpy.mockRestore();
   });
+
+  it('should load extension context file paths', async () => {
+    const extensionFilePath = '/test/extensions/ext1/gemini.md';
+    mockFs.access.mockImplementation(async (p) => {
+      if (p === extensionFilePath) {
+        return undefined;
+      }
+      throw new Error('File not found');
+    });
+    mockFs.readFile.mockImplementation(async (p) => {
+      if (p === extensionFilePath) {
+        return 'Extension memory content';
+      }
+      throw new Error('File not found');
+    });
+
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      CWD,
+      false,
+      [extensionFilePath],
+    );
+
+    expect(memoryContent).toBe(
+      `--- Context from: ${path.relative(CWD, extensionFilePath)} ---\nExtension memory content\n--- End of Context from: ${path.relative(CWD, extensionFilePath)} ---`,
+    );
+    expect(fileCount).toBe(1);
+    expect(mockFs.readFile).toHaveBeenCalledWith(extensionFilePath, 'utf-8');
+  });
 });
