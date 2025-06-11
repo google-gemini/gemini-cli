@@ -82,12 +82,11 @@ describe('Logger', () => {
   let logger: Logger;
 
   beforeEach(async () => {
+    vi.resetAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T12:00:00.000Z'));
     await cleanupLogFile();
     logger = new Logger();
-    // Initialize is usually called here, but some tests initialize their own instances.
-    // For tests that use the global `logger`, it will be initialized here.
     await logger.initialize();
   });
 
@@ -95,7 +94,7 @@ describe('Logger', () => {
     logger.close();
     await cleanupLogFile();
     vi.useRealTimers();
-    vi.resetAllMocks(); // Ensure mocks are reset for every test
+    vi.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -221,7 +220,6 @@ describe('Logger', () => {
             f.startsWith(LOG_FILE_NAME + '.invalid_json') && f.endsWith('.bak'),
         ),
       ).toBe(true);
-      consoleDebugSpy.mockRestore();
       newLogger.close();
     });
 
@@ -251,7 +249,6 @@ describe('Logger', () => {
             f.endsWith('.bak'),
         ),
       ).toBe(true);
-      consoleDebugSpy.mockRestore();
       newLogger.close();
     });
   });
@@ -295,7 +292,6 @@ describe('Logger', () => {
         'Logger not initialized or session ID missing. Cannot log message.',
       );
       expect((await readLogFile()).length).toBe(0);
-      consoleDebugSpy.mockRestore();
       uninitializedLogger.close();
     });
 
@@ -346,9 +342,7 @@ describe('Logger', () => {
     });
 
     it('should not throw, not increment messageId, and log error if writing to file fails', async () => {
-      const writeFileSpy = vi
-        .spyOn(fs, 'writeFile')
-        .mockRejectedValueOnce(new Error('Disk full'));
+      vi.spyOn(fs, 'writeFile').mockRejectedValueOnce(new Error('Disk full'));
       const consoleDebugSpy = vi
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
@@ -363,9 +357,6 @@ describe('Logger', () => {
       );
       expect(logger['messageId']).toBe(initialMessageId); // Not incremented
       expect(logger['logs'].length).toBe(initialLogCount); // Log not added to in-memory cache
-
-      writeFileSpy.mockRestore();
-      consoleDebugSpy.mockRestore();
     });
   });
 
@@ -448,7 +439,6 @@ describe('Logger', () => {
       );
       const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
       expect(JSON.parse(fileContent)).toEqual(conversation);
-      // cleanup
       await fs.unlink(taggedFilePath);
     });
 
@@ -464,7 +454,6 @@ describe('Logger', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
       );
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -529,7 +518,6 @@ describe('Logger', () => {
         expect.stringContaining('Failed to read or parse checkpoint file'),
         expect.any(SyntaxError),
       );
-      consoleErrorSpy.mockRestore();
     });
 
     it('should return an empty array if logger is not initialized', async () => {
@@ -542,7 +530,6 @@ describe('Logger', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -564,7 +551,6 @@ describe('Logger', () => {
       expect(logger['logs']).toEqual([]);
       expect(logger['sessionId']).toBeUndefined();
       expect(logger['messageId']).toBe(0);
-      consoleDebugSpy.mockRestore();
     });
   });
 });
