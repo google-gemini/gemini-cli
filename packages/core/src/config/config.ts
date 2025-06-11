@@ -65,6 +65,7 @@ export interface ConfigParameters {
   question?: string;
   fullContext?: boolean;
   coreTools?: string[];
+  excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -95,6 +96,7 @@ export class Config {
   private readonly question: string | undefined;
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
+  private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
@@ -126,6 +128,7 @@ export class Config {
     this.question = params.question;
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
+    this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
@@ -208,6 +211,10 @@ export class Config {
 
   getCoreTools(): string[] | undefined {
     return this.coreTools;
+  }
+
+  getExcludeTools(): string[] | undefined {
+    return this.excludeTools;
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -360,12 +367,22 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   const tools = config.getCoreTools()
     ? new Set(config.getCoreTools())
     : undefined;
+  const excludeTools = config.getExcludeTools()
+    ? new Set(config.getExcludeTools())
+    : undefined;
 
   // helper to create & register core tools that are enabled
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
     // check both the tool name (.Name) and the class name (.name)
-    if (!tools || tools.has(ToolClass.Name) || tools.has(ToolClass.name)) {
+    if (
+      // coreTools contain tool name
+      (!tools || tools.has(ToolClass.Name) || tools.has(ToolClass.name)) &&
+      // excludeTools don't contain tool name
+      (!excludeTools ||
+        (!excludeTools.has(ToolClass.Name) &&
+          !excludeTools.has(ToolClass.name)))
+    ) {
       registry.registerTool(new ToolClass(...args));
     }
   };
