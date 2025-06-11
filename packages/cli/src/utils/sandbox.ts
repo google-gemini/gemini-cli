@@ -339,7 +339,7 @@ export async function start_sandbox(sandbox: string) {
       });
       console.log('waiting for proxy to start ...');
       await execAsync(
-        `until curl -s http://localhost:8877; do sleep 0.25; done`,
+        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
       );
     }
     // spawn child and let it inherit stdio
@@ -661,7 +661,9 @@ export async function start_sandbox(sandbox: string) {
       process.exit(1);
     });
     console.log('waiting for proxy to start ...');
-    await execAsync(`until curl -s http://localhost:8877; do sleep 0.25; done`);
+    await execAsync(
+      `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+    );
     // connect proxy container to sandbox network
     // (workaround for older versions of docker that don't support multiple --network args)
     await execAsync(
