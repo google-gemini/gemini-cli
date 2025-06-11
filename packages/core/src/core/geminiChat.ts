@@ -18,7 +18,7 @@ import {
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator } from './contentGenerator.js';
-import { Logger } from './logger.js';
+import { Config } from '../config/config.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -118,17 +118,15 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
-  private logger: Logger;
 
   constructor(
+    private readonly config: Config,
     private readonly contentGenerator: ContentGenerator,
     private readonly model: string,
-    sessionId: string,
-    private readonly config: GenerateContentConfig = {},
+    private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
   ) {
     validateHistory(history);
-    this.logger = new Logger(sessionId);
   }
 
   /**
@@ -161,7 +159,7 @@ export class GeminiChat {
       this.contentGenerator.generateContent({
         model: this.model,
         contents: this.getHistory(true).concat(userContent),
-        config: { ...this.config, ...params.config },
+        config: { ...this.generationConfig, ...params.config },
       });
 
     const responsePromise = retryWithBackoff(apiCall);
@@ -230,7 +228,7 @@ export class GeminiChat {
       this.contentGenerator.generateContentStream({
         model: this.model,
         contents: this.getHistory(true).concat(userContent),
-        config: { ...this.config, ...params.config },
+        config: { ...this.generationConfig, ...params.config },
       });
 
     // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries

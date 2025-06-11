@@ -21,6 +21,7 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
 } from './constants.js';
+import { Config } from '../config/config.js';
 
 let cliMeter: Meter | undefined;
 let toolCallCounter: Counter | undefined;
@@ -30,6 +31,12 @@ let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
+function getCommonAttributes(config: Config): Attributes {
+  return {
+    'session.id': config.getSessionId(),
+  };
+}
+
 export function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
@@ -37,7 +44,7 @@ export function getMeter(): Meter | undefined {
   return cliMeter;
 }
 
-export function initializeMetrics(): void {
+export function initializeMetrics(config: Config): void {
   if (isMetricsInitialized) return;
 
   const meter = getMeter();
@@ -73,11 +80,12 @@ export function initializeMetrics(): void {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
   });
-  sessionCounter.add(1);
+  sessionCounter.add(1, getCommonAttributes(config));
   isMetricsInitialized = true;
 }
 
 export function recordToolCallMetrics(
+  config: Config,
   functionName: string,
   durationMs: number,
   success: boolean,
@@ -86,25 +94,33 @@ export function recordToolCallMetrics(
     return;
 
   const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
     function_name: functionName,
     success,
   };
   toolCallCounter.add(1, metricAttributes);
   toolCallLatencyHistogram.record(durationMs, {
+    ...getCommonAttributes(config),
     function_name: functionName,
   });
 }
 
 export function recordTokenUsageMetrics(
+  config: Config,
   model: string,
   tokenCount: number,
   type: 'input' | 'output' | 'thought' | 'cache' | 'tool',
 ): void {
   if (!tokenUsageCounter || !isMetricsInitialized) return;
-  tokenUsageCounter.add(tokenCount, { model, type });
+  tokenUsageCounter.add(tokenCount, {
+    ...getCommonAttributes(config),
+    model,
+    type,
+  });
 }
 
 export function recordApiResponseMetrics(
+  config: Config,
   model: string,
   durationMs: number,
   statusCode?: number | string,
@@ -117,14 +133,19 @@ export function recordApiResponseMetrics(
   )
     return;
   const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
     model,
     status_code: statusCode ?? (error ? 'error' : 'ok'),
   };
   apiRequestCounter.add(1, metricAttributes);
-  apiRequestLatencyHistogram.record(durationMs, { model });
+  apiRequestLatencyHistogram.record(durationMs, {
+    ...getCommonAttributes(config),
+    model,
+  });
 }
 
 export function recordApiErrorMetrics(
+  config: Config,
   model: string,
   durationMs: number,
   statusCode?: number | string,
@@ -137,10 +158,14 @@ export function recordApiErrorMetrics(
   )
     return;
   const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
     model,
     status_code: statusCode ?? 'error',
     error_type: errorType ?? 'unknown',
   };
   apiRequestCounter.add(1, metricAttributes);
-  apiRequestLatencyHistogram.record(durationMs, { model });
+  apiRequestLatencyHistogram.record(durationMs, {
+    ...getCommonAttributes(config),
+    model,
+  });
 }

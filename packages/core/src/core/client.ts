@@ -160,9 +160,9 @@ export class GeminiClient {
       const systemInstruction = getCoreSystemPrompt(userMemory);
 
       return new GeminiChat(
+        this.config,
         await this.contentGenerator,
         this.model,
-        this.config.getSessionId(),
         {
           systemInstruction,
           ...this.generateContentConfig,
@@ -214,7 +214,7 @@ export class GeminiClient {
   }
 
   private _logApiRequest(model: string, inputTokenCount: number): void {
-    logApiRequest({
+    logApiRequest(this.config, {
       model,
       input_token_count: inputTokenCount,
       duration_ms: 0, // Duration is not known at request time
@@ -239,7 +239,7 @@ export class GeminiClient {
       responseError = `Finished with reason: ${finishReason}`;
     }
 
-    logApiResponse({
+    logApiResponse(this.config, {
       model,
       duration_ms: durationMs,
       attempt,
@@ -277,7 +277,7 @@ export class GeminiClient {
       }
     }
 
-    logApiError({
+    logApiError(this.config, {
       model,
       error: errorMessage,
       status_code: statusCode,

@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Content, Models, GenerateContentConfig, Part } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
+import { Config } from '../config/config.js';
 
 // Mocks
 const mockModelsModule = {
@@ -17,16 +18,19 @@ const mockModelsModule = {
   batchEmbedContents: vi.fn(),
 } as unknown as Models;
 
+const mockConfig = {
+  getSessionId: () => 'test-session-id',
+} as unknown as Config;
+
 describe('GeminiChat', () => {
   let chat: GeminiChat;
   const model = 'gemini-pro';
   const config: GenerateContentConfig = {};
-  const sessionId = 'test-session-id';
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset history for each test by creating a new instance
-    chat = new GeminiChat(mockModelsModule, model, sessionId, config, []);
+    chat = new GeminiChat(mockConfig, mockModelsModule, model, config, []);
   });
 
   afterEach(() => {
@@ -121,7 +125,7 @@ describe('GeminiChat', () => {
       chat.recordHistory(userInput, newModelOutput); // userInput here is for the *next* turn, but history is already primed
 
       // Reset and set up a more realistic scenario for merging with existing history
-      chat = new GeminiChat(mockModelsModule, model, sessionId, config, []);
+      chat = new GeminiChat(mockConfig, mockModelsModule, model, config, []);
       const firstUserInput: Content = {
         role: 'user',
         parts: [{ text: 'First user input' }],
@@ -164,7 +168,7 @@ describe('GeminiChat', () => {
         role: 'model',
         parts: [{ text: 'Initial model answer.' }],
       };
-      chat = new GeminiChat(mockModelsModule, model, sessionId, config, [
+      chat = new GeminiChat(mockConfig, mockModelsModule, model, config, [
         initialUser,
         initialModel,
       ]);

@@ -85,6 +85,7 @@ export async function runNonInteractive(
           };
 
           const toolResponse = await executeToolCall(
+            config,
             requestInfo,
             toolRegistry,
             abortController.signal,

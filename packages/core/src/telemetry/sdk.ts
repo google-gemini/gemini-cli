@@ -112,7 +112,7 @@ export function initializeTelemetry(config: Config): void {
     sdk.start();
     console.log('OpenTelemetry SDK started successfully.');
     telemetryInitialized = true;
-    initializeMetrics();
+    initializeMetrics(config);
     logCliConfiguration(config);
   } catch (error) {
     console.error('Error starting OpenTelemetry SDK:', error);
