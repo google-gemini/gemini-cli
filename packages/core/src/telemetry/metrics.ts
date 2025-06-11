@@ -18,7 +18,7 @@ import {
   METRIC_TOOL_CALL_LATENCY,
   METRIC_API_REQUEST_COUNT,
   METRIC_API_REQUEST_LATENCY,
-  METRIC_TOKEN_INPUT_COUNT,
+  METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
 } from './constants.js';
 
@@ -27,7 +27,7 @@ let toolCallCounter: Counter | undefined;
 let toolCallLatencyHistogram: Histogram | undefined;
 let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
-let tokenInputCounter: Counter | undefined;
+let tokenUsageCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 export function getMeter(): Meter | undefined {
@@ -64,8 +64,8 @@ export function initializeMetrics(): void {
       valueType: ValueType.INT,
     },
   );
-  tokenInputCounter = meter.createCounter(METRIC_TOKEN_INPUT_COUNT, {
-    description: 'Counts the total number of input tokens sent to the API.',
+  tokenUsageCounter = meter.createCounter(METRIC_TOKEN_USAGE, {
+    description: 'Counts the total number of tokens used.',
     valueType: ValueType.INT,
   });
 
@@ -95,12 +95,13 @@ export function recordToolCallMetrics(
   });
 }
 
-export function recordApiRequestMetrics(
+export function recordTokenUsageMetrics(
   model: string,
-  inputTokenCount: number,
+  tokenCount: number,
+  type: 'input' | 'output' | 'thought' | 'cache' | 'tool',
 ): void {
-  if (!tokenInputCounter || !isMetricsInitialized) return;
-  tokenInputCounter.add(inputTokenCount, { model });
+  if (!tokenUsageCounter || !isMetricsInitialized) return;
+  tokenUsageCounter.add(tokenCount, { model, type });
 }
 
 export function recordApiResponseMetrics(

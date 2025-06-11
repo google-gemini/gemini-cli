@@ -216,7 +216,7 @@ export class GeminiClient {
   private _logApiRequest(model: string, inputTokenCount: number): void {
     logApiRequest({
       model,
-      prompt_token_count: inputTokenCount,
+      input_token_count: inputTokenCount,
       duration_ms: 0, // Duration is not known at request time
     });
   }
@@ -245,6 +245,11 @@ export class GeminiClient {
       attempt,
       status_code: undefined,
       error: responseError,
+      output_token_count: response.usageMetadata?.candidatesTokenCount ?? 0,
+      cached_content_token_count:
+        response.usageMetadata?.cachedContentTokenCount ?? 0,
+      thoughts_token_count: response.usageMetadata?.thoughtsTokenCount ?? 0,
+      tool_token_count: response.usageMetadata?.toolUsePromptTokenCount ?? 0,
     });
   }
 
