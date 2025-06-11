@@ -27,7 +27,7 @@ import { ContentGenerator } from '../core/contentGenerator.js';
 // TODO: Use production endpoint once it supports our methods.
 export const CCPA_ENDPOINT =
   'https://staging-cloudcode-pa.sandbox.googleapis.com';
-export const CCPA_API_VERSION = '/v1internal';
+export const CCPA_API_VERSION = 'v1internal';
 
 export class CcpaServer implements ContentGenerator {
   constructor(
