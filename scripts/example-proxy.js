@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Example proxy server that listens on 0.0.0.0:8877 and only allows HTTPS connections to example.com.
+// Example proxy server that listens on :::8877 and only allows HTTPS connections to example.com.
 // Set `GEMINI_SANDBOX_PROXY_COMMAND=scripts/example-proxy.js` to run proxy alongside sandbox
 // Test via `curl https://example.com` inside sandbox (in shell mode or via shell tool)
 
@@ -66,8 +66,9 @@ server.on('connect', (req, clientSocket, head) => {
   });
 });
 
-server.listen(PROXY_PORT, '0.0.0.0', () => {
-  console.log(`[PROXY] Proxy listening on 0.0.0.0:${PROXY_PORT}`);
+server.listen(PROXY_PORT, () => {
+  const address = server.address();
+  console.log(`[PROXY] Proxy listening on ${address.address}:${address.port}`);
   console.log(
     `[PROXY] Allowing HTTPS connections to domains: ${ALLOWED_DOMAINS.join(', ')}`,
   );
