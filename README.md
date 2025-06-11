@@ -68,7 +68,7 @@ The Gemini CLI requires a Gemini API Key. It supports several ways to authentica
       export GOOGLE_GENAI_USE_VERTEXAI=true
       ```
 
-## Next Steps
+### Next Steps
 
 Congratulations! You've successfully set up and run the Gemini CLI.
 
