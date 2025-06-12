@@ -20,7 +20,6 @@ import {
   Tool,
   ToolCall,
   Status as CoreStatus,
-  logToolCall,
   EditorType,
 } from '@gemini-cli/core';
 import { useCallback, useState, useMemo } from 'react';
@@ -108,33 +107,9 @@ export function useReactToolScheduler(
 
   const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = useCallback(
     (completedToolCalls) => {
-      completedToolCalls.forEach((call) => {
-        let success = false;
-        let errorMessage: string | undefined;
-        let duration = 0;
-
-        if (call.status === 'success') {
-          success = true;
-        }
-        if (
-          call.status === 'error' &&
-          typeof call.response.resultDisplay === 'string'
-        ) {
-          errorMessage = call.response.resultDisplay;
-        }
-        duration = call.durationMs || 0;
-
-        logToolCall(config, {
-          function_name: call.request.name,
-          function_args: call.request.args,
-          duration_ms: duration,
-          success,
-          error: errorMessage,
-        });
-      });
       onComplete(completedToolCalls);
     },
-    [onComplete, config],
+    [onComplete],
   );
 
   const toolCallsUpdateHandler: ToolCallsUpdateHandler = useCallback(
@@ -165,6 +140,7 @@ export function useReactToolScheduler(
         onToolCallsUpdate: toolCallsUpdateHandler,
         approvalMode: config.getApprovalMode(),
         getPreferredEditor,
+        config,
       }),
     [
       config,

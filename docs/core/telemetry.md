@@ -288,6 +288,7 @@ These are timestamped records of specific events.
     - `function_args`
     - `duration_ms`
     - `success` (boolean)
+    - `decision` (string: "accept", "reject", or "modify", optional)
     - `error` (optional)
     - `error_type` (optional)
 
@@ -332,11 +333,13 @@ These are numerical measurements of behavior over time.
   - **Attributes**:
     - `function_name`
     - `success` (boolean)
+    - `decision` (string: "accept", "reject", or "modify", optional)
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
 
   - **Attributes**:
     - `function_name`
+    - `decision` (string: "accept", "reject", or "modify", optional)
 
 - `gemini_cli.api.request.count` (Counter, Int): Counts all API requests.
 

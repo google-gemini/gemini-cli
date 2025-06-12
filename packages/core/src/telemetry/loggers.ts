@@ -30,6 +30,7 @@ import {
   recordToolCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
+import { ToolConfirmationOutcome } from '../index.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogUserPromptsEnabled() ?? false;
@@ -38,6 +39,29 @@ function getCommonAttributes(config: Config): LogAttributes {
   return {
     'session.id': config.getSessionId(),
   };
+}
+
+export enum ToolCallDecision {
+  ACCEPT = 'accept',
+  REJECT = 'reject',
+  MODIFY = 'modify',
+}
+
+export function getDecisionFromOutcome(
+  outcome: ToolConfirmationOutcome,
+): ToolCallDecision {
+  switch (outcome) {
+    case ToolConfirmationOutcome.ProceedOnce:
+    case ToolConfirmationOutcome.ProceedAlways:
+    case ToolConfirmationOutcome.ProceedAlwaysServer:
+    case ToolConfirmationOutcome.ProceedAlwaysTool:
+      return ToolCallDecision.ACCEPT;
+    case ToolConfirmationOutcome.ModifyWithEditor:
+      return ToolCallDecision.MODIFY;
+    case ToolConfirmationOutcome.Cancel:
+    default:
+      return ToolCallDecision.REJECT;
+  }
 }
 
 export function logCliConfiguration(config: Config): void {
@@ -103,15 +127,20 @@ export function logUserPrompt(
 
 export function logToolCall(
   config: Config,
-  event: Omit<ToolCallEvent, 'event.name' | 'event.timestamp'>,
+  event: Omit<ToolCallEvent, 'event.name' | 'event.timestamp' | 'decision'>,
+  outcome?: ToolConfirmationOutcome,
 ): void {
   if (!isTelemetrySdkInitialized()) return;
+
+  const decision = outcome ? getDecisionFromOutcome(outcome) : undefined;
+
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
-    function_args: JSON.stringify(event.function_args),
+    function_args: JSON.stringify(event.function_args, null, 2),
+    decision,
   };
   if (event.error) {
     attributes['error.message'] = event.error;
@@ -121,7 +150,7 @@ export function logToolCall(
   }
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Tool call: ${event.function_name}. Success: ${event.success}. Duration: ${event.duration_ms}ms.`,
+    body: `Tool call: ${event.function_name}${decision ? `. Decision: ${decision}` : ''}. Success: ${event.success}. Duration: ${event.duration_ms}ms.`,
     attributes,
   };
   logger.emit(logRecord);
@@ -130,6 +159,7 @@ export function logToolCall(
     event.function_name,
     event.duration_ms,
     event.success,
+    decision,
   );
 }
 

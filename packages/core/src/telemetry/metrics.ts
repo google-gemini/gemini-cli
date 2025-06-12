@@ -89,6 +89,7 @@ export function recordToolCallMetrics(
   functionName: string,
   durationMs: number,
   success: boolean,
+  decision?: 'accept' | 'reject' | 'modify',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
@@ -97,6 +98,7 @@ export function recordToolCallMetrics(
     ...getCommonAttributes(config),
     function_name: functionName,
     success,
+    decision,
   };
   toolCallCounter.add(1, metricAttributes);
   toolCallLatencyHistogram.record(durationMs, {
