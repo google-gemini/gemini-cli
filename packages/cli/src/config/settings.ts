@@ -38,7 +38,6 @@ export interface Settings {
   contextFileName?: string;
   accessibility?: AccessibilitySettings;
   telemetry?: boolean;
-  enableModifyWithExternalEditors?: boolean;
   preferredEditor?: string;
 
   // Git-aware file filtering settings
