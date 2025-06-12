@@ -240,8 +240,12 @@ describe('handleAtCommand', () => {
     // If it were to return actual image Part, the test and handling would be different.
     // Current implementation of read_many_files for images returns base64 in text.
     const imageFileTextContent = '[base64 image data for path/to/image.png]';
+    const imagePart = {
+      mimeType: 'image/png',
+      inlineData: imageFileTextContent,
+    };
     mockReadManyFilesExecute.mockResolvedValue({
-      llmContent: [`--- ${imagePath} ---\n\n${imageFileTextContent}\n\n`],
+      llmContent: [imagePart],
       returnDisplay: 'Read 1 image.',
     });
 
@@ -256,8 +260,7 @@ describe('handleAtCommand', () => {
     expect(result.processedQuery).toEqual([
       { text: `@${imagePath}` },
       { text: '\n--- Content from referenced files ---' },
-      { text: `\nContent from @${imagePath}:\n` },
-      { text: imageFileTextContent },
+      imagePart,
       { text: '\n--- End of content ---' },
     ]);
     expect(result.shouldProceed).toBe(true);
