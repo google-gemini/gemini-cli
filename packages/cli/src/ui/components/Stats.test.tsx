@@ -66,6 +66,17 @@ describe('<StatsColumn />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
   });
+
+  it('hides the tool use row when there are no tool use tokens', () => {
+    const statsWithNoToolUse: FormattedStats = {
+      ...mockStats,
+      toolUseTokens: 0,
+    };
+    const { lastFrame } = render(
+      <StatsColumn title="Test Stats" stats={statsWithNoToolUse} />,
+    );
+    expect(lastFrame()).not.toContain('Tool Use Tokens');
+  });
 });
 
 describe('<DurationColumn />', () => {

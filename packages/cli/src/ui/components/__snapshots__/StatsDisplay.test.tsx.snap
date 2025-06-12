@@ -30,7 +30,6 @@ exports[`<StatsDisplay /> > renders zero state correctly 1`] = `
 │                                                                                                  │
 │  Input Tokens                                0    Input Tokens                                0  │
 │  Output Tokens                               0    Output Tokens                               0  │
-│  Tool Use Tokens                             0    Tool Use Tokens                             0  │
 │  Thoughts Tokens                             0    Thoughts Tokens                             0  │
 │  Cached Tokens                               0    Cached Tokens                               0  │
 │  ─────────────────────────────────────────────    ─────────────────────────────────────────────  │
