@@ -66,10 +66,12 @@ export const StatsColumn: React.FC<{
           label="Output Tokens"
           value={stats.outputTokens.toLocaleString()}
         />
-        <StatRow
-          label="Tool Use Tokens"
-          value={stats.toolUseTokens.toLocaleString()}
-        />
+        {stats.toolUseTokens > 0 && (
+          <StatRow
+            label="Tool Use Tokens"
+            value={stats.toolUseTokens.toLocaleString()}
+          />
+        )}
         <StatRow
           label="Thoughts Tokens"
           value={stats.thoughtsTokens.toLocaleString()}
