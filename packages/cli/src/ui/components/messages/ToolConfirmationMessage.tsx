@@ -28,7 +28,7 @@ export interface ToolConfirmationMessageProps {
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
-> = ({ confirmationDetails, config, isFocused = true }) => {
+> = ({ confirmationDetails, isFocused = true }) => {
   const { onConfirm } = confirmationDetails;
 
   useInput((_, key) => {
@@ -85,18 +85,12 @@ export const ToolConfirmationMessage: React.FC<
         label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
-    );
-
-    const externalEditorsEnabled =
-      config?.getEnableModifyWithExternalEditors() ?? false;
-    if (externalEditorsEnabled) {
-      options.push({
+      {
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
-      });
-    }
-
-    options.push({ label: 'No (esc)', value: ToolConfirmationOutcome.Cancel });
+      },
+      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
+    );
   } else if (confirmationDetails.type === 'exec') {
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
