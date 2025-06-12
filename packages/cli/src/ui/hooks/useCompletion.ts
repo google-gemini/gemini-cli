@@ -210,6 +210,11 @@ export function useCompletion(
             path.join(startDir, entry.name),
           );
 
+          // Conditionally ignore dotfiles
+          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
+            continue;
+          }
+
           // Check if this entry should be ignored by git-aware filtering
           if (
             fileDiscovery &&
@@ -260,7 +265,7 @@ export function useCompletion(
       const globPattern = `**/${searchPrefix}*`;
       const files = await fileDiscoveryService.glob(globPattern, {
         cwd,
-        dot: true,
+        dot: searchPrefix.startsWith('.'),
       });
 
       const suggestions: Suggestion[] = files
@@ -309,6 +314,10 @@ export function useCompletion(
           // Filter entries using git-aware filtering
           const filteredEntries = [];
           for (const entry of entries) {
+            // Conditionally ignore dotfiles
+            if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
+              continue;
+            }
             if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
 
             const relativePath = path.relative(
