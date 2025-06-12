@@ -89,6 +89,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
+  const [quittingMessages, setQuittingMessages] = useState<
+    HistoryItem[] | null
+  >(null);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const errorCount = useMemo(
@@ -162,6 +165,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
+    setQuittingMessages,
   );
 
   useInput((input: string, key: InkKeyType) => {
@@ -185,7 +189,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         if (ctrlCTimerRef.current) {
           clearTimeout(ctrlCTimerRef.current);
         }
-        process.exit(0);
+        const quitCommand = slashCommands.find(
+          (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
+        );
+        if (quitCommand) {
+          quitCommand.action('quit', '', '');
+        } else {
+          process.exit(0);
+        }
       } else {
         setCtrlCPressedOnce(true);
         ctrlCTimerRef.current = setTimeout(() => {
@@ -337,6 +348,22 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   }, [consoleMessages, config]);
 
   const branchName = useGitBranchName(config.getTargetDir());
+
+  if (quittingMessages) {
+    return (
+      <Box flexDirection="column" marginBottom={1}>
+        {quittingMessages.map((item) => (
+          <HistoryItemDisplay
+            key={item.id}
+            availableTerminalHeight={availableTerminalHeight}
+            item={item}
+            isPending={false}
+            config={config}
+          />
+        ))}
+      </Box>
+    );
+  }
 
   return (
     <StreamingContext.Provider value={streamingState}>

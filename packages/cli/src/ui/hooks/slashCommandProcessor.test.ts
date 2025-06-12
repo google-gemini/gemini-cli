@@ -98,6 +98,7 @@ describe('useSlashCommandProcessor', () => {
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
+  let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
   const mockUseSessionStats = useSessionStats as Mock;
@@ -111,6 +112,7 @@ describe('useSlashCommandProcessor', () => {
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
+    mockSetQuittingMessages = vi.fn();
     mockConfig = {
       getDebugMode: vi.fn(() => false),
       getSandbox: vi.fn(() => 'test-sandbox'),
@@ -156,6 +158,7 @@ describe('useSlashCommandProcessor', () => {
         mockPerformMemoryRefresh,
         mockCorgiMode,
         showToolDescriptions,
+        mockSetQuittingMessages,
       ),
     );
     return result.current;
@@ -406,7 +409,7 @@ Add any other context about the problem here.
     });
 
     it.each([['/quit'], ['/exit']])(
-      'should handle %s, add a quit message, and exit the process',
+      'should handle %s, set quitting messages, and exit the process',
       async (command) => {
         const { handleSlashCommand } = getProcessor();
         const mockDate = new Date('2025-01-01T01:02:03.000Z');
@@ -416,18 +419,25 @@ Add any other context about the problem here.
           handleSlashCommand(command);
         });
 
-        expect(mockAddItem).toHaveBeenCalledTimes(2);
-        expect(mockAddItem).toHaveBeenNthCalledWith(
-          2,
-          expect.objectContaining({
-            type: MessageType.QUIT,
+        expect(mockAddItem).not.toHaveBeenCalled();
+        expect(mockSetQuittingMessages).toHaveBeenCalledWith([
+          {
+            type: 'user',
+            text: command,
+            id: expect.any(Number),
+          },
+          {
+            type: 'quit',
+            stats: expect.any(Object),
             duration: '1h 2m 3s',
-          }),
-          expect.any(Number),
-        );
+            id: expect.any(Number),
+          },
+        ]);
 
         // Fast-forward timers to trigger process.exit
-        vi.advanceTimersByTime(100);
+        await act(async () => {
+          vi.advanceTimersByTime(100);
+        });
         expect(mockProcessExit).toHaveBeenCalledWith(0);
       },
     );
