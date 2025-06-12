@@ -19,10 +19,10 @@ import {
   CountTokensResponse,
   EmbedContentParameters,
 } from '@google/genai';
-import { Readable } from 'stream';
 import * as readline from 'readline';
-import type { ReadableStream } from 'node:stream/web';
 import { ContentGenerator } from '../core/contentGenerator.js';
+import { CcpaResponse, toCcpaRequest, fromCcpaResponse } from './converter.js';
+import { PassThrough } from 'node:stream';
 
 // TODO: Use production endpoint once it supports our methods.
 export const CCPA_ENDPOINT =
@@ -38,19 +38,25 @@ export class CcpaServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    return await this.streamEndpoint<GenerateContentResponse>(
+    const resps = await this.streamEndpoint<CcpaResponse>(
       'streamGenerateContent',
-      req,
+      toCcpaRequest(req, this.projectId),
     );
+    return (async function* (): AsyncGenerator<GenerateContentResponse> {
+      for await (const resp of resps) {
+        yield fromCcpaResponse(resp);
+      }
+    })();
   }
 
   async generateContent(
     req: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
-    return await this.callEndpoint<GenerateContentResponse>(
+    const resp = await this.callEndpoint<CcpaResponse>(
       'generateContent',
-      req,
+      toCcpaRequest(req, this.projectId),
     );
+    return fromCcpaResponse(resp);
   }
 
   async onboardUser(
@@ -92,11 +98,6 @@ export class CcpaServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
     });
-    if (res.status !== 200) {
-      throw new Error(
-        `Failed to fetch from ${method}: ${res.status} ${res.data}`,
-      );
-    }
     return res.data as T;
   }
 
@@ -114,15 +115,10 @@ export class CcpaServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
     });
-    if (res.status !== 200) {
-      throw new Error(
-        `Failed to fetch from ${method}: ${res.status} ${res.data}`,
-      );
-    }
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        input: Readable.fromWeb(res.data as ReadableStream<Uint8Array>),
+        input: res.data as PassThrough,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
