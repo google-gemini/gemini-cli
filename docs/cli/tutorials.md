@@ -4,9 +4,13 @@ Master usage of Gemini CLI to automate development tasks.
 
 ## Setting up Model Context Protocol (MCP) Servers
 
-> **A Note on Third-Party MCP Servers:** Before using a third-party MCP server, ensure you trust its source and understand the tools it provides. Your use of third-party servers is at your own risk.
+> [!NOTE]
+> Before using a third-party MCP server, ensure you trust its source and understand the tools it provides. Your use of third-party servers is at your own risk.
 
 ### GitHub MCP Server
+
+> [!WARNING]
+> The GitHub MCP Server has known security vulnerabilities, proceed with caution.
 
 The [GitHub MCP server] provides tools for interacting with GitHub repositories, such as creating issues, commenting on pull requests, and more.
 
@@ -51,6 +55,9 @@ In your project's root directory, create or open the `.gemini/settings.json` fil
 ```
 
 ##### Set Your GitHub Token
+
+> [!CAUTION]
+> Using a broadly scoped personal access token that has access to personal and private repositories can lead to information from the private repository leaked into the public repository. We recommend using a fine grained access token that doesn't share access to both public and private repositories.
 
 Use an environment variable to store your PAT.
 
