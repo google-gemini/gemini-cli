@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ToolCallDecision } from './loggers.js';
+
 export interface UserPromptEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string; // ISO 8601
@@ -18,6 +20,7 @@ export interface ToolCallEvent {
   function_args: Record<string, unknown>;
   duration_ms: number;
   success: boolean;
+  decision?: ToolCallDecision;
   error?: string;
   error_type?: string;
 }

@@ -16,6 +16,7 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResult,
+  Config,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
@@ -74,7 +75,12 @@ describe('CoreToolScheduler', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as Config;
+
     const scheduler = new CoreToolScheduler({
+      config: mockConfig,
       toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
