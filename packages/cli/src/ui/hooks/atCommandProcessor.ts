@@ -381,7 +381,12 @@ export async function handleAtCommand({
               text: `\nContent from @${filePathSpecInContent}:\n`,
             });
             processedQueryParts.push({ text: fileActualContent });
+          } else {
+            processedQueryParts.push({ text: part });
           }
+        } else {
+          // part is a Part object.
+          processedQueryParts.push(part);
         }
       }
       processedQueryParts.push({ text: '\n--- End of content ---' });
