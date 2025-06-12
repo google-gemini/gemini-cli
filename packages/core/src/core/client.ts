@@ -28,11 +28,6 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
-  logApiRequest,
-  logApiResponse,
-  logApiError,
-} from '../telemetry/index.js';
-import {
   ContentGenerator,
   createContentGenerator,
 } from './contentGenerator.js';
@@ -223,80 +218,6 @@ export class GeminiClient {
     return turn;
   }
 
-  private _logApiRequest(model: string, inputTokenCount: number): void {
-    logApiRequest(this.config, {
-      model,
-      input_token_count: inputTokenCount,
-      duration_ms: 0, // Duration is not known at request time
-    });
-  }
-
-  private _logApiResponse(
-    model: string,
-    durationMs: number,
-    attempt: number,
-    response: GenerateContentResponse,
-  ): void {
-    const promptFeedback = response.promptFeedback;
-    const finishReason = response.candidates?.[0]?.finishReason;
-    let responseError;
-    if (promptFeedback?.blockReason) {
-      responseError = `Blocked: ${promptFeedback.blockReason}${promptFeedback.blockReasonMessage ? ' - ' + promptFeedback.blockReasonMessage : ''}`;
-    } else if (
-      finishReason &&
-      !['STOP', 'MAX_TOKENS', 'UNSPECIFIED'].includes(finishReason)
-    ) {
-      responseError = `Finished with reason: ${finishReason}`;
-    }
-
-    logApiResponse(this.config, {
-      model,
-      duration_ms: durationMs,
-      attempt,
-      status_code: undefined,
-      error: responseError,
-      output_token_count: response.usageMetadata?.candidatesTokenCount ?? 0,
-      cached_content_token_count:
-        response.usageMetadata?.cachedContentTokenCount ?? 0,
-      thoughts_token_count: response.usageMetadata?.thoughtsTokenCount ?? 0,
-      tool_token_count: response.usageMetadata?.toolUsePromptTokenCount ?? 0,
-      response_text: getResponseText(response),
-    });
-  }
-
-  private _logApiError(
-    model: string,
-    error: unknown,
-    durationMs: number,
-    attempt: number,
-    isAbort: boolean = false,
-  ): void {
-    let statusCode: number | string | undefined;
-    let errorMessage = getErrorMessage(error);
-
-    if (isAbort) {
-      errorMessage = 'Request aborted by user';
-      statusCode = 'ABORTED'; // Custom S
-    } else if (typeof error === 'object' && error !== null) {
-      if ('status' in error) {
-        statusCode = (error as { status: number | string }).status;
-      } else if ('code' in error) {
-        statusCode = (error as { code: number | string }).code;
-      } else if ('httpStatusCode' in error) {
-        statusCode = (error as { httpStatusCode: number | string })
-          .httpStatusCode;
-      }
-    }
-
-    logApiError(this.config, {
-      model,
-      error: errorMessage,
-      status_code: statusCode,
-      duration_ms: durationMs,
-      attempt,
-    });
-  }
-
   async generateJson(
     contents: Content[],
     schema: SchemaUnion,
@@ -305,8 +226,6 @@ export class GeminiClient {
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
     const cg = await this.contentGenerator;
-    const attempt = 1;
-    const startTime = Date.now();
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -315,22 +234,6 @@ export class GeminiClient {
         ...this.generateContentConfig,
         ...config,
       };
-
-      let inputTokenCount = 0;
-      try {
-        const { totalTokens } = await cg.countTokens({
-          model,
-          contents,
-        });
-        inputTokenCount = totalTokens || 0;
-      } catch (_e) {
-        console.warn(
-          `Failed to count tokens for model ${model}. Proceeding with inputTokenCount = 0. Error: ${getErrorMessage(_e)}`,
-        );
-        inputTokenCount = 0;
-      }
-
-      this._logApiRequest(model, inputTokenCount);
 
       const apiCall = () =>
         cg.generateContent({
@@ -345,7 +248,6 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall);
-      const durationMs = Date.now() - startTime;
 
       const text = getResponseText(result);
       if (!text) {
@@ -358,12 +260,10 @@ export class GeminiClient {
           contents,
           'generateJson-empty-response',
         );
-        this._logApiError(model, error, durationMs, attempt);
         throw error;
       }
       try {
         const parsedJson = JSON.parse(text);
-        this._logApiResponse(model, durationMs, attempt, result);
         return parsedJson;
       } catch (parseError) {
         await reportError(
@@ -375,15 +275,12 @@ export class GeminiClient {
           },
           'generateJson-parse',
         );
-        this._logApiError(model, parseError, durationMs, attempt);
         throw new Error(
           `Failed to parse API response as JSON: ${getErrorMessage(parseError)}`,
         );
       }
     } catch (error) {
-      const durationMs = Date.now() - startTime;
       if (abortSignal.aborted) {
-        this._logApiError(model, error, durationMs, attempt, true);
         throw error;
       }
 
@@ -394,7 +291,6 @@ export class GeminiClient {
       ) {
         throw error;
       }
-      this._logApiError(model, error, durationMs, attempt);
 
       await reportError(
         error,
@@ -419,8 +315,6 @@ export class GeminiClient {
       ...this.generateContentConfig,
       ...generationConfig,
     };
-    const attempt = 1;
-    const startTime = Date.now();
 
     try {
       const userMemory = this.config.getUserMemory();
@@ -431,22 +325,6 @@ export class GeminiClient {
         ...configToUse,
         systemInstruction,
       };
-
-      let inputTokenCount = 0;
-      try {
-        const { totalTokens } = await cg.countTokens({
-          model: modelToUse,
-          contents,
-        });
-        inputTokenCount = totalTokens || 0;
-      } catch (_e) {
-        console.warn(
-          `Failed to count tokens for model ${modelToUse}. Proceeding with inputTokenCount = 0. Error: ${getErrorMessage(_e)}`,
-        );
-        inputTokenCount = 0;
-      }
-
-      this._logApiRequest(modelToUse, inputTokenCount);
 
       const apiCall = () =>
         cg.generateContent({
@@ -460,17 +338,11 @@ export class GeminiClient {
         'Raw API Response in client.ts:',
         JSON.stringify(result, null, 2),
       );
-      const durationMs = Date.now() - startTime;
-      this._logApiResponse(modelToUse, durationMs, attempt, result);
       return result;
     } catch (error: unknown) {
-      const durationMs = Date.now() - startTime;
       if (abortSignal.aborted) {
-        this._logApiError(modelToUse, error, durationMs, attempt, true);
         throw error;
       }
-
-      this._logApiError(modelToUse, error, durationMs, attempt);
 
       await reportError(
         error,

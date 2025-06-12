@@ -29,8 +29,8 @@ export interface ApiRequestEvent {
   'event.name': 'api_request';
   'event.timestamp': string; // ISO 8601
   model: string;
-  duration_ms: number;
   input_token_count: number;
+  request_text?: string;
 }
 
 export interface ApiErrorEvent {
@@ -41,7 +41,6 @@ export interface ApiErrorEvent {
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
-  attempt: number;
 }
 
 export interface ApiResponseEvent {
@@ -51,7 +50,7 @@ export interface ApiResponseEvent {
   status_code?: number | string;
   duration_ms: number;
   error?: string;
-  attempt: number;
+  input_token_count: number;
   output_token_count: number;
   cached_content_token_count: number;
   thoughts_token_count: number;
