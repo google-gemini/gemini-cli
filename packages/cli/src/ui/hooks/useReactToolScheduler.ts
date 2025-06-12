@@ -21,6 +21,7 @@ import {
   ToolCall,
   Status as CoreStatus,
   logToolCall,
+  EditorType,
 } from '@gemini-cli/core';
 import { useCallback, useState, useMemo } from 'react';
 import {
@@ -69,6 +70,7 @@ export function useReactToolScheduler(
   setPendingHistoryItem: React.Dispatch<
     React.SetStateAction<HistoryItemWithoutId | null>
   >,
+  getPreferredEditor: () => EditorType | undefined,
 ): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
@@ -162,12 +164,14 @@ export function useReactToolScheduler(
         onAllToolCallsComplete: allToolCallsCompleteHandler,
         onToolCallsUpdate: toolCallsUpdateHandler,
         approvalMode: config.getApprovalMode(),
+        getPreferredEditor,
       }),
     [
       config,
       outputUpdateHandler,
       allToolCallsCompleteHandler,
       toolCallsUpdateHandler,
+      getPreferredEditor,
     ],
   );
 

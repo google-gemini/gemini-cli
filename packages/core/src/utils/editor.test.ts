@@ -4,8 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
-import { checkHasEditor, getDiffCommand, openDiff } from './editor.js';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  checkHasEditorType,
+  getDiffCommand,
+  openDiff,
+  allowEditorTypeInSandbox,
+  isEditorAvailable,
+} from './editor.js';
 import { execSync, spawn } from 'child_process';
 
 vi.mock('child_process', () => ({
@@ -13,14 +27,14 @@ vi.mock('child_process', () => ({
   spawn: vi.fn(),
 }));
 
-describe('checkHasEditor', () => {
+describe('checkHasEditorType', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should return true for vscode if "code" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
-    expect(checkHasEditor('vscode')).toBe(true);
+    expect(checkHasEditorType('vscode')).toBe(true);
     const expectedCommand =
       process.platform === 'win32' ? 'where.exe code.cmd' : 'command -v code';
     expect(execSync).toHaveBeenCalledWith(expectedCommand, {
@@ -32,12 +46,12 @@ describe('checkHasEditor', () => {
     (execSync as Mock).mockImplementation(() => {
       throw new Error();
     });
-    expect(checkHasEditor('vscode')).toBe(false);
+    expect(checkHasEditorType('vscode')).toBe(false);
   });
 
   it('should return true for windsurf if "windsurf" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/windsurf'));
-    expect(checkHasEditor('windsurf')).toBe(true);
+    expect(checkHasEditorType('windsurf')).toBe(true);
     expect(execSync).toHaveBeenCalledWith('command -v windsurf', {
       stdio: 'ignore',
     });
@@ -47,12 +61,12 @@ describe('checkHasEditor', () => {
     (execSync as Mock).mockImplementation(() => {
       throw new Error();
     });
-    expect(checkHasEditor('windsurf')).toBe(false);
+    expect(checkHasEditorType('windsurf')).toBe(false);
   });
 
   it('should return true for cursor if "cursor" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/cursor'));
-    expect(checkHasEditor('cursor')).toBe(true);
+    expect(checkHasEditorType('cursor')).toBe(true);
     expect(execSync).toHaveBeenCalledWith('command -v cursor', {
       stdio: 'ignore',
     });
@@ -62,12 +76,12 @@ describe('checkHasEditor', () => {
     (execSync as Mock).mockImplementation(() => {
       throw new Error();
     });
-    expect(checkHasEditor('cursor')).toBe(false);
+    expect(checkHasEditorType('cursor')).toBe(false);
   });
 
   it('should return true for vim if "vim" command exists', () => {
     (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
-    expect(checkHasEditor('vim')).toBe(true);
+    expect(checkHasEditorType('vim')).toBe(true);
     const expectedCommand =
       process.platform === 'win32' ? 'where.exe vim' : 'command -v vim';
     expect(execSync).toHaveBeenCalledWith(expectedCommand, {
@@ -79,7 +93,7 @@ describe('checkHasEditor', () => {
     (execSync as Mock).mockImplementation(() => {
       throw new Error();
     });
-    expect(checkHasEditor('vim')).toBe(false);
+    expect(checkHasEditorType('vim')).toBe(false);
   });
 });
 
@@ -151,5 +165,87 @@ describe('openDiff', () => {
     await expect(openDiff('old.txt', 'new.txt', 'vscode')).rejects.toThrow(
       'spawn error',
     );
+  });
+});
+
+describe('allowEditorTypeInSandbox', () => {
+  afterEach(() => {
+    delete process.env.SANDBOX;
+  });
+
+  it('should allow vim in sandbox mode', () => {
+    process.env.SANDBOX = 'sandbox';
+    expect(allowEditorTypeInSandbox('vim')).toBe(true);
+  });
+
+  it('should allow vim when not in sandbox mode', () => {
+    delete process.env.SANDBOX;
+    expect(allowEditorTypeInSandbox('vim')).toBe(true);
+  });
+
+  it('should not allow vscode in sandbox mode', () => {
+    process.env.SANDBOX = 'sandbox';
+    expect(allowEditorTypeInSandbox('vscode')).toBe(false);
+  });
+
+  it('should allow vscode when not in sandbox mode', () => {
+    delete process.env.SANDBOX;
+    expect(allowEditorTypeInSandbox('vscode')).toBe(true);
+  });
+
+  it('should not allow windsurf in sandbox mode', () => {
+    process.env.SANDBOX = 'sandbox';
+    expect(allowEditorTypeInSandbox('windsurf')).toBe(false);
+  });
+
+  it('should allow windsurf when not in sandbox mode', () => {
+    delete process.env.SANDBOX;
+    expect(allowEditorTypeInSandbox('windsurf')).toBe(true);
+  });
+
+  it('should not allow cursor in sandbox mode', () => {
+    process.env.SANDBOX = 'sandbox';
+    expect(allowEditorTypeInSandbox('cursor')).toBe(false);
+  });
+
+  it('should allow cursor when not in sandbox mode', () => {
+    delete process.env.SANDBOX;
+    expect(allowEditorTypeInSandbox('cursor')).toBe(true);
+  });
+});
+
+describe('isEditorAvailable', () => {
+  afterEach(() => {
+    delete process.env.SANDBOX;
+  });
+
+  it('should return false for undefined editor', () => {
+    expect(isEditorAvailable(undefined)).toBe(false);
+  });
+
+  it('should return false for empty string editor', () => {
+    expect(isEditorAvailable('')).toBe(false);
+  });
+
+  it('should return false for invalid editor type', () => {
+    expect(isEditorAvailable('invalid-editor')).toBe(false);
+  });
+
+  it('should return true for vscode when installed and not in sandbox mode', () => {
+    (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+    expect(isEditorAvailable('vscode')).toBe(true);
+  });
+
+  it('should return false for vscode when not installed and not in sandbox mode', () => {
+    (execSync as Mock).mockImplementation(() => {
+      throw new Error();
+    });
+    expect(isEditorAvailable('vscode')).toBe(false);
+  });
+
+  it('should return false for vscode when installed and in sandbox mode', () => {
+    (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+    process.env.SANDBOX = 'sandbox';
+    expect(isEditorAvailable('vscode')).toBe(false);
   });
 });

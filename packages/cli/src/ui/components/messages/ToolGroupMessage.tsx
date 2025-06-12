@@ -17,6 +17,7 @@ interface ToolGroupMessageProps {
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight: number;
   config?: Config;
+  isFocused?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -24,6 +25,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   availableTerminalHeight,
   config,
+  isFocused = true,
 }) => {
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
@@ -84,6 +86,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 <ToolConfirmationMessage
                   confirmationDetails={tool.confirmationDetails}
                   config={config}
+                  isFocused={isFocused}
                 />
               )}
           </Box>

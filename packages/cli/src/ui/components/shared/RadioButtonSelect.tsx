@@ -19,6 +19,7 @@ import { Colors } from '../../colors.js';
 export interface RadioSelectItem<T> {
   label: string;
   value: T;
+  disabled?: boolean;
 }
 
 /**
@@ -97,11 +98,14 @@ export function RadioButtonSelect<T>({
     const itemWithThemeProps = props as typeof props & {
       themeNameDisplay?: string;
       themeTypeDisplay?: string;
+      disabled?: boolean;
     };
 
     let textColor = Colors.Foreground;
     if (isSelected) {
       textColor = Colors.AccentGreen;
+    } else if (itemWithThemeProps.disabled === true) {
+      textColor = Colors.Gray;
     }
 
     if (

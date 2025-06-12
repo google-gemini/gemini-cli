@@ -66,6 +66,7 @@ export const useSlashCommandProcessor = (
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
+  openEditorDialog: () => void,
   performMemoryRefresh: () => Promise<void>,
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
@@ -179,6 +180,13 @@ export const useSlashCommandProcessor = (
         description: 'change the theme',
         action: (_mainCommand, _subCommand, _args) => {
           openThemeDialog();
+        },
+      },
+      {
+        name: 'editor',
+        description: 'open the editor',
+        action: (_mainCommand, _subCommand, _args) => {
+          openEditorDialog();
         },
       },
       {
@@ -745,6 +753,7 @@ Add any other context about the problem here.
     setShowHelp,
     refreshStatic,
     openThemeDialog,
+    openEditorDialog,
     clearItems,
     performMemoryRefresh,
     showMemoryAction,
