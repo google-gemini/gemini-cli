@@ -8,8 +8,13 @@ import { ToolConfirmationOutcome } from '../index.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { Config } from '../config/config.js';
-import { EVENT_API_RESPONSE, EVENT_USER_PROMPT } from './constants.js';
 import {
+  EVENT_API_REQUEST,
+  EVENT_API_RESPONSE,
+  EVENT_USER_PROMPT,
+} from './constants.js';
+import {
+  logApiRequest,
   logApiResponse,
   logCliConfiguration,
   logUserPrompt,
@@ -167,7 +172,7 @@ describe('loggers', () => {
         model: 'test-model',
         status_code: 200,
         duration_ms: 100,
-        attempt: 1,
+        input_token_count: 17,
         output_token_count: 50,
         cached_content_token_count: 10,
         thoughts_token_count: 5,
@@ -187,7 +192,7 @@ describe('loggers', () => {
           model: 'test-model',
           status_code: 200,
           duration_ms: 100,
-          attempt: 1,
+          input_token_count: 17,
           output_token_count: 50,
           cached_content_token_count: 10,
           thoughts_token_count: 5,
@@ -216,8 +221,8 @@ describe('loggers', () => {
       const event = {
         model: 'test-model',
         duration_ms: 100,
-        attempt: 1,
         error: 'test-error',
+        input_token_count: 17,
         output_token_count: 50,
         cached_content_token_count: 10,
         thoughts_token_count: 5,
@@ -237,6 +242,78 @@ describe('loggers', () => {
           'error.message': 'test-error',
         },
       });
+    });
+  });
+
+  describe('logApiRequest', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as Config;
+
+    const mockMetrics = {
+      recordTokenUsageMetrics: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
+        mockMetrics.recordTokenUsageMetrics,
+      );
+    });
+
+    it('should log an API request with request_text', () => {
+      const event = {
+        model: 'test-model',
+        input_token_count: 123,
+        request_text: 'This is a test request',
+      };
+
+      logApiRequest(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API request to test-model. Tokens: 123.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_API_REQUEST,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+          input_token_count: 123,
+          request_text: 'This is a test request',
+        },
+      });
+
+      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'test-model',
+        123,
+        'input',
+      );
+    });
+
+    it('should log an API request without request_text', () => {
+      const event = {
+        model: 'test-model',
+        input_token_count: 456,
+      };
+
+      logApiRequest(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API request to test-model. Tokens: 456.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_API_REQUEST,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+          input_token_count: 456,
+        },
+      });
+
+      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'test-model',
+        456,
+        'input',
+      );
     });
   });
 
