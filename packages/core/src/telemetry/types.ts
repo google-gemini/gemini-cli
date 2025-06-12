@@ -7,7 +7,7 @@
 export interface UserPromptEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string; // ISO 8601
-  prompt_char_count: number;
+  prompt_length: number;
   prompt?: string;
 }
 

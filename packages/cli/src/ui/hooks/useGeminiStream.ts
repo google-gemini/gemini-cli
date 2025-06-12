@@ -188,7 +188,7 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         logUserPrompt(config, {
           prompt: trimmedQuery,
-          prompt_char_count: trimmedQuery.length,
+          prompt_length: trimmedQuery.length,
         });
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);

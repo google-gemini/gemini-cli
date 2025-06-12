@@ -81,19 +81,21 @@ export function logUserPrompt(
   },
 ): void {
   if (!isTelemetrySdkInitialized()) return;
-  const { prompt, ...restOfEventArgs } = event;
+
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
-    ...restOfEventArgs,
     'event.name': EVENT_USER_PROMPT,
     'event.timestamp': new Date().toISOString(),
+    prompt_length: event.prompt_length,
   };
+
   if (shouldLogUserPrompts(config)) {
-    attributes.prompt = prompt;
+    attributes.prompt = event.prompt;
   }
+
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `User prompt. Length: ${event.prompt_char_count}`,
+    body: `User prompt. Length: ${event.prompt_length}`,
     attributes,
   };
   logger.emit(logRecord);
