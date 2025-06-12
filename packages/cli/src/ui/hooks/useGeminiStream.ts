@@ -19,6 +19,7 @@ import {
   ToolCallRequestInfo,
   logUserPrompt,
   GitService,
+  EditorType,
 } from '@gemini-cli/core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
@@ -83,6 +84,7 @@ export const useGeminiStream = (
     import('./slashCommandProcessor.js').SlashCommandActionReturn | boolean
   >,
   shellModeActive: boolean,
+  getPreferredEditor: () => EditorType | undefined,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -115,6 +117,7 @@ export const useGeminiStream = (
       },
       config,
       setPendingHistoryItem,
+      getPreferredEditor,
     );
 
   const pendingToolCallGroupDisplay = useMemo(

@@ -24,6 +24,7 @@ interface HistoryItemDisplayProps {
   availableTerminalHeight: number;
   isPending: boolean;
   config?: Config;
+  isFocused?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -31,6 +32,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   availableTerminalHeight,
   isPending,
   config,
+  isFocused = true,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -76,6 +78,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
         config={config}
+        isFocused={isFocused}
       />
     )}
   </Box>

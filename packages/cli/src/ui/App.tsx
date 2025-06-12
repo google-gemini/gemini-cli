@@ -19,6 +19,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
+import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
@@ -29,6 +30,7 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
+import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -45,6 +47,8 @@ import {
   type Config,
   getCurrentGeminiMdFilename,
   ApprovalMode,
+  isEditorAvailable,
+  EditorType,
 } from '@gemini-cli/core';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -82,6 +86,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -105,6 +110,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
+
+  const {
+    isEditorDialogOpen,
+    openEditorDialog,
+    handleEditorSelect,
+    exitEditorDialog,
+  } = useEditorSettings(settings, setEditorError, addItem);
 
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
@@ -162,6 +174,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     setShowHelp,
     setDebugMessage,
     openThemeDialog,
+    openEditorDialog,
     performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
@@ -227,6 +240,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     }
   }, [config]);
 
+  const getPreferredEditor = useCallback(() => {
+    const editorType = settings.merged.preferredEditor;
+    const isValidEditor = isEditorAvailable(editorType);
+    if (!isValidEditor) {
+      openEditorDialog();
+      return;
+    }
+    return editorType as EditorType;
+  }, [settings, openEditorDialog]);
+
   const { streamingState, submitQuery, initError, pendingHistoryItems } =
     useGeminiStream(
       config.getGeminiClient(),
@@ -237,6 +260,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       setDebugMessage,
       handleSlashCommand,
       shellModeActive,
+      getPreferredEditor,
     );
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
@@ -409,6 +433,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               item={{ ...item, id: 0 }}
               isPending={true}
               config={config}
+              isFocused={!isEditorDialogOpen}
             />
           ))}
         </Box>
@@ -442,6 +467,19 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 onSelect={handleThemeSelect}
                 onHighlight={handleThemeHighlight}
                 settings={settings}
+              />
+            </Box>
+          ) : isEditorDialogOpen ? (
+            <Box flexDirection="column">
+              {editorError && (
+                <Box marginBottom={1}>
+                  <Text color={Colors.AccentRed}>{editorError}</Text>
+                </Box>
+              )}
+              <EditorSettingsDialog
+                onSelect={handleEditorSelect}
+                settings={settings}
+                onExit={exitEditorDialog}
               />
             </Box>
           ) : (

@@ -13,7 +13,6 @@ import {
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
-  checkHasEditor,
   Config,
 } from '@gemini-cli/core';
 import {
@@ -24,14 +23,16 @@ import {
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
   config?: Config;
+  isFocused?: boolean;
 }
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
-> = ({ confirmationDetails, config }) => {
+> = ({ confirmationDetails, config, isFocused = true }) => {
   const { onConfirm } = confirmationDetails;
 
   useInput((_, key) => {
+    if (!isFocused) return;
     if (key.escape) {
       onConfirm(ToolConfirmationOutcome.Cancel);
     }
@@ -86,40 +87,12 @@ export const ToolConfirmationMessage: React.FC<
       },
     );
 
-    // Conditionally add editor options if editors are installed
-    const notUsingSandbox = !process.env.SANDBOX;
     const externalEditorsEnabled =
       config?.getEnableModifyWithExternalEditors() ?? false;
-
-    if (checkHasEditor('vscode') && notUsingSandbox && externalEditorsEnabled) {
+    if (externalEditorsEnabled) {
       options.push({
-        label: 'Modify with VS Code',
-        value: ToolConfirmationOutcome.ModifyVSCode,
-      });
-    }
-
-    if (
-      checkHasEditor('windsurf') &&
-      notUsingSandbox &&
-      externalEditorsEnabled
-    ) {
-      options.push({
-        label: 'Modify with Windsurf',
-        value: ToolConfirmationOutcome.ModifyWindsurf,
-      });
-    }
-
-    if (checkHasEditor('cursor') && notUsingSandbox && externalEditorsEnabled) {
-      options.push({
-        label: 'Modify with Cursor',
-        value: ToolConfirmationOutcome.ModifyCursor,
-      });
-    }
-
-    if (checkHasEditor('vim') && externalEditorsEnabled) {
-      options.push({
-        label: 'Modify with vim',
-        value: ToolConfirmationOutcome.ModifyVim,
+        label: 'Modify with external editor',
+        value: ToolConfirmationOutcome.ModifyWithEditor,
       });
     }
 
@@ -192,7 +165,11 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Select Input for Options */}
       <Box flexShrink={0}>
-        <RadioButtonSelect items={options} onSelect={handleSelect} />
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          isFocused={isFocused}
+        />
       </Box>
     </Box>
   );

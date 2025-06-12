@@ -6,6 +6,11 @@ The Gemini CLI supports several built-in commands to help you manage your sessio
 
 Slash commands provide meta-level control over the CLI itself. They can typically be executed by typing the command and pressing `Enter`.
 
+- **`/editor`**
+
+  - **Description:** Allows you to configure your external editor for actions such as modifying Gemini's proposed code change.
+  - **Action:** Opens a dialog for selecting supported editors.
+
 - **`/help`** (or **`/?`**)
 
   - **Description:** Displays help information about the Gemini CLI, including available commands and their usage.

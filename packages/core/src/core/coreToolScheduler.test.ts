@@ -62,7 +62,6 @@ describe('CoreToolScheduler', () => {
       getFunctionDeclarations: () => [],
       tools: new Map(),
       discovery: {} as any,
-      config: {} as any,
       registerTool: () => {},
       getToolByName: () => mockTool,
       getToolByDisplayName: () => mockTool,
@@ -79,6 +78,7 @@ describe('CoreToolScheduler', () => {
       toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
     });
 
     const abortController = new AbortController();

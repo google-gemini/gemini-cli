@@ -32,7 +32,6 @@ import fs from 'fs';
 import os from 'os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
-import { ToolConfirmationOutcome } from './tools.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -634,7 +633,7 @@ describe('EditTool', () => {
       const result = await tool.onModify(
         params,
         new AbortController().signal,
-        ToolConfirmationOutcome.ModifyVSCode,
+        'vscode',
       );
 
       expect(mockOpenDiff).toHaveBeenCalledTimes(1);
@@ -678,7 +677,7 @@ describe('EditTool', () => {
       const result = await tool.onModify(
         params,
         new AbortController().signal,
-        ToolConfirmationOutcome.ModifyVSCode,
+        'vscode',
       );
 
       expect(mockOpenDiff).toHaveBeenCalledTimes(1);
@@ -711,7 +710,7 @@ describe('EditTool', () => {
       const result1 = await tool.onModify(
         params,
         new AbortController().signal,
-        ToolConfirmationOutcome.ModifyVSCode,
+        'vscode',
       );
       const firstCall = mockOpenDiff.mock.calls[0];
       const firstOldPath = firstCall[0];
@@ -727,7 +726,7 @@ describe('EditTool', () => {
       const result2 = await tool.onModify(
         params,
         new AbortController().signal,
-        ToolConfirmationOutcome.ModifyVSCode,
+        'vscode',
       );
       const secondCall = mockOpenDiff.mock.calls[1];
       const secondOldPath = secondCall[0];
