@@ -7,8 +7,12 @@
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { Config } from '../config/config.js';
-import { EVENT_API_RESPONSE } from './constants.js';
-import { logApiResponse, logCliConfiguration } from './loggers.js';
+import { EVENT_API_RESPONSE, EVENT_USER_PROMPT } from './constants.js';
+import {
+  logApiResponse,
+  logCliConfiguration,
+  logUserPrompt,
+} from './loggers.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
@@ -81,6 +85,56 @@ describe('loggers', () => {
           file_filtering_allow_build_artifacts: false,
           debug_mode: true,
           mcp_servers: 'test-server',
+        },
+      });
+    });
+  });
+
+  describe('logUserPrompt', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryLogUserPromptsEnabled: () => true,
+    } as unknown as Config;
+
+    it('should log a user prompt', () => {
+      const event = {
+        prompt: 'test-prompt',
+        prompt_length: 11,
+      };
+
+      logUserPrompt(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'User prompt. Length: 11',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_USER_PROMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          prompt_length: 11,
+          prompt: 'test-prompt',
+        },
+      });
+    });
+
+    it('should not log prompt if disabled', () => {
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getTelemetryLogUserPromptsEnabled: () => false,
+      } as unknown as Config;
+      const event = {
+        prompt: 'test-prompt',
+        prompt_length: 11,
+      };
+
+      logUserPrompt(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'User prompt. Length: 11',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_USER_PROMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          prompt_length: 11,
         },
       });
     });

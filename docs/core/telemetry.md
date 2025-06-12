@@ -278,7 +278,7 @@ These are timestamped records of specific events.
 - `gemini_cli.user_prompt`: Fired when a user submits a prompt.
 
   - **Attributes**:
-    - `prompt_char_count`
+    - `prompt_length`
     - `prompt` (except if `log_user_prompts_enabled` is false)
 
 - `gemini_cli.tool_call`: Fired for every function call.
