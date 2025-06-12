@@ -32,6 +32,7 @@ export default tseslint.config(
       'eslint.config.js',
       'packages/cli/dist/**',
       'packages/core/dist/**',
+      'packages/server/dist/**',
       'eslint-rules/*',
       'bundle/**',
     ],

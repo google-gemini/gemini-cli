@@ -42,6 +42,7 @@ describe('useCompletion git-aware filtering integration', () => {
       shouldIgnoreFile: vi.fn(),
       filterFiles: vi.fn(),
       getIgnoreInfo: vi.fn(() => ({ gitIgnored: [], customIgnored: [] })),
+      glob: vi.fn().mockResolvedValue([]),
     };
 
     mockConfig = {
@@ -223,6 +224,29 @@ describe('useCompletion git-aware filtering integration', () => {
     // Should filter out .log files but include matching .tsx files
     expect(result.current.suggestions).toEqual([
       { label: 'component.tsx', value: 'component.tsx' },
+    ]);
+  });
+
+  it('should use glob for top-level @ completions when available', async () => {
+    const globResults = [`${testCwd}/src/index.ts`, `${testCwd}/README.md`];
+    mockFileDiscoveryService.glob.mockResolvedValue(globResults);
+
+    const { result } = renderHook(() =>
+      useCompletion('@s', testCwd, true, slashCommands, mockConfig),
+    );
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+
+    expect(mockFileDiscoveryService.glob).toHaveBeenCalledWith('**/s*', {
+      cwd: testCwd,
+      dot: true,
+    });
+    expect(fs.readdir).not.toHaveBeenCalled(); // Ensure glob is used instead of readdir
+    expect(result.current.suggestions).toEqual([
+      { label: 'README.md', value: 'README.md' },
+      { label: 'src/index.ts', value: 'src/index.ts' },
     ]);
   });
 });
