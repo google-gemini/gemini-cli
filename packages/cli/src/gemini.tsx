@@ -41,7 +41,7 @@ export async function main() {
   const settings = loadSettings(workspaceRoot);
   setWindowTitle(basename(workspaceRoot), settings);
 
-  const geminiIgnorePatterns = loadGeminiIgnorePatterns(workspaceRoot);
+  const geminiIgnorePatterns = await loadGeminiIgnorePatterns(workspaceRoot);
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
     for (const error of settings.errors) {

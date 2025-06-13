@@ -4,46 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { GitIgnoreParser } from '@gemini-cli/core';
 
 const GEMINI_IGNORE_FILE_NAME = '.geminiignore';
 
 /**
  * Loads and parses a .geminiignore file from the given workspace root.
- * The .geminiignore file follows a format similar to .gitignore:
- * - Each line specifies a glob pattern.
- * - Lines are trimmed of leading and trailing whitespace.
- * - Blank lines (after trimming) are ignored.
- * - Lines starting with a pound sign (#) (after trimming) are treated as comments and ignored.
- * - Patterns are case-sensitive and follow standard glob syntax.
- * - If a # character appears elsewhere in a line (not at the start after trimming),
- *   it is considered part of the glob pattern.
+ * The .geminiignore file follows a format similar to .gitignore.
  *
  * @param workspaceRoot The absolute path to the workspace root where the .geminiignore file is expected.
  * @returns An array of glob patterns extracted from the .geminiignore file. Returns an empty array
  *          if the file does not exist or contains no valid patterns.
  */
-export function loadGeminiIgnorePatterns(workspaceRoot: string): string[] {
-  const ignoreFilePath = path.join(workspaceRoot, GEMINI_IGNORE_FILE_NAME);
-  const patterns: string[] = [];
+export async function loadGeminiIgnorePatterns(
+  workspaceRoot: string,
+): Promise<string[]> {
+  const parser = new GitIgnoreParser(workspaceRoot);
 
   try {
-    const fileContent = fs.readFileSync(ignoreFilePath, 'utf-8');
-    const lines = fileContent.split(/\r?\n/);
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (trimmedLine && !trimmedLine.startsWith('#')) {
-        patterns.push(trimmedLine);
-      }
-    }
-    if (patterns.length > 0) {
-      console.log(
-        `[INFO] Loaded ${patterns.length} patterns from .geminiignore`,
-      );
-    }
+    await parser.loadPatterns(GEMINI_IGNORE_FILE_NAME);
   } catch (error: unknown) {
+    const ignoreFilePath = path.join(workspaceRoot, GEMINI_IGNORE_FILE_NAME);
     if (
       error instanceof Error &&
       'code' in error &&
@@ -64,5 +46,11 @@ export function loadGeminiIgnorePatterns(workspaceRoot: string): string[] {
       );
     }
   }
-  return patterns;
+  const loadedPatterns = parser.getPatterns();
+  if (loadedPatterns.length > 0) {
+    console.log(
+      `[INFO] Loaded ${loadedPatterns.length} patterns from .geminiignore`,
+    );
+  }
+  return loadedPatterns;
 }
