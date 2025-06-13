@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { toCcpaRequest, fromCcpaResponse, CcpaResponse } from './converter.js';
+import {
+  toCodeAssistRequest,
+  fromCodeAsistResponse,
+  CodeAssistResponse,
+} from './converter.js';
 import {
   GenerateContentParameters,
   GenerateContentResponse,
@@ -14,14 +18,14 @@ import {
 } from '@google/genai';
 
 describe('converter', () => {
-  describe('toCcpaRequest', () => {
+  describe('toCodeAssistRequest', () => {
     it('should convert a simple request with project', () => {
       const genaiReq: GenerateContentParameters = {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const ccpaReq = toCcpaRequest(genaiReq, 'my-project');
-      expect(ccpaReq).toEqual({
+      const codeAssistReq = toCodeAssistRequest(genaiReq, 'my-project');
+      expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
         request: {
@@ -42,8 +46,8 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq).toEqual({
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: undefined,
         request: {
@@ -64,8 +68,8 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: 'Hello',
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq.request.contents).toEqual([
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
       ]);
     });
@@ -75,8 +79,8 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ text: 'Hello' }, { text: 'World' }],
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq.request.contents).toEqual([
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'user', parts: [{ text: 'World' }] },
       ]);
@@ -90,8 +94,8 @@ describe('converter', () => {
           systemInstruction: 'You are a helpful assistant.',
         },
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq.request.systemInstruction).toEqual({
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq.request.systemInstruction).toEqual({
         role: 'user',
         parts: [{ text: 'You are a helpful assistant.' }],
       });
@@ -106,8 +110,8 @@ describe('converter', () => {
           topK: 40,
         },
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq.request.generationConfig).toEqual({
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.8,
         topK: 40,
       });
@@ -132,8 +136,8 @@ describe('converter', () => {
           responseMimeType: 'application/json',
         },
       };
-      const ccpaReq = toCcpaRequest(genaiReq);
-      expect(ccpaReq.request.generationConfig).toEqual({
+      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.1,
         topP: 0.2,
         topK: 3,
@@ -150,9 +154,9 @@ describe('converter', () => {
     });
   });
 
-  describe('fromCcpaResponse', () => {
+  describe('fromCodeAssistResponse', () => {
     it('should convert a simple response', () => {
-      const ccpaRes: CcpaResponse = {
+      const codeAssistRes: CodeAssistResponse = {
         response: {
           candidates: [
             {
@@ -167,13 +171,13 @@ describe('converter', () => {
           ],
         },
       };
-      const genaiRes = fromCcpaResponse(ccpaRes);
+      const genaiRes = fromCodeAsistResponse(codeAssistRes);
       expect(genaiRes).toBeInstanceOf(GenerateContentResponse);
-      expect(genaiRes.candidates).toEqual(ccpaRes.response.candidates);
+      expect(genaiRes.candidates).toEqual(codeAssistRes.response.candidates);
     });
 
     it('should handle prompt feedback and usage metadata', () => {
-      const ccpaRes: CcpaResponse = {
+      const codeAssistRes: CodeAssistResponse = {
         response: {
           candidates: [],
           promptFeedback: {
@@ -187,13 +191,17 @@ describe('converter', () => {
           },
         },
       };
-      const genaiRes = fromCcpaResponse(ccpaRes);
-      expect(genaiRes.promptFeedback).toEqual(ccpaRes.response.promptFeedback);
-      expect(genaiRes.usageMetadata).toEqual(ccpaRes.response.usageMetadata);
+      const genaiRes = fromCodeAsistResponse(codeAssistRes);
+      expect(genaiRes.promptFeedback).toEqual(
+        codeAssistRes.response.promptFeedback,
+      );
+      expect(genaiRes.usageMetadata).toEqual(
+        codeAssistRes.response.usageMetadata,
+      );
     });
 
     it('should handle automatic function calling history', () => {
-      const ccpaRes: CcpaResponse = {
+      const codeAssistRes: CodeAssistResponse = {
         response: {
           candidates: [],
           automaticFunctionCallingHistory: [
@@ -213,9 +221,9 @@ describe('converter', () => {
           ],
         },
       };
-      const genaiRes = fromCcpaResponse(ccpaRes);
+      const genaiRes = fromCodeAsistResponse(codeAssistRes);
       expect(genaiRes.automaticFunctionCallingHistory).toEqual(
-        ccpaRes.response.automaticFunctionCallingHistory,
+        codeAssistRes.response.automaticFunctionCallingHistory,
       );
     });
   });

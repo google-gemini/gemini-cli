@@ -215,6 +215,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Set to any value to disable all color output in the CLI.
 - **`CLI_TITLE`**:
   - Set to a string to customize the title of the CLI.
+- **`CODE_ASSIST_ENDPOINT`**:
+  - Specifies the endpoint for the code assist server.
+  - This is useful for development and testing.
 
 ## 3. Command-Line Arguments
 

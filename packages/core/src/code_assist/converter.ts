@@ -27,13 +27,13 @@ import {
   ToolConfig,
 } from '@google/genai';
 
-export interface CcpaRequest {
+export interface CodeAssistRequest {
   model: string;
   project?: string;
-  request: CcpaGenerateContentRequest;
+  request: CodeAssistGenerateContentRequest;
 }
 
-interface CcpaGenerateContentRequest {
+interface CodeAssistGenerateContentRequest {
   contents: Content[];
   systemInstruction?: Content;
   cachedContent?: string;
@@ -41,10 +41,10 @@ interface CcpaGenerateContentRequest {
   toolConfig?: ToolConfig;
   labels?: Record<string, string>;
   safetySettings?: SafetySetting[];
-  generationConfig?: CcpaGenerationConfig;
+  generationConfig?: CodeAssistGenerationConfig;
 }
 
-interface CcpaGenerationConfig {
+interface CodeAssistGenerationConfig {
   temperature?: number;
   topP?: number;
   topK?: number;
@@ -67,7 +67,7 @@ interface CcpaGenerationConfig {
   thinkingConfig?: ThinkingConfig;
 }
 
-export interface CcpaResponse {
+export interface CodeAssistResponse {
   response: VertexResponse;
 }
 
@@ -78,18 +78,20 @@ interface VertexResponse {
   usageMetadata?: GenerateContentResponseUsageMetadata;
 }
 
-export function toCcpaRequest(
+export function toCodeAssistRequest(
   req: GenerateContentParameters,
   project?: string,
-): CcpaRequest {
+): CodeAssistRequest {
   return {
     model: req.model,
     project,
-    request: toCcpaGenerateContentRequest(req),
+    request: toCodeAssistGenerateContentRequest(req),
   };
 }
 
-export function fromCcpaResponse(res: CcpaResponse): GenerateContentResponse {
+export function fromCodeAsistResponse(
+  res: CodeAssistResponse,
+): GenerateContentResponse {
   const inres = res.response;
   const out = new GenerateContentResponse();
   out.candidates = inres.candidates;
@@ -99,9 +101,9 @@ export function fromCcpaResponse(res: CcpaResponse): GenerateContentResponse {
   return out;
 }
 
-function toCcpaGenerateContentRequest(
+function toCodeAssistGenerateContentRequest(
   req: GenerateContentParameters,
-): CcpaGenerateContentRequest {
+): CodeAssistGenerateContentRequest {
   return {
     contents: toContents(req.contents),
     systemInstruction: maybeToContent(req.config?.systemInstruction),
@@ -110,7 +112,7 @@ function toCcpaGenerateContentRequest(
     toolConfig: req.config?.toolConfig,
     labels: req.config?.labels,
     safetySettings: req.config?.safetySettings,
-    generationConfig: toCcpaGenerationConfig(req.config),
+    generationConfig: toCodeAssistGenerationConfig(req.config),
   };
 }
 
@@ -168,9 +170,9 @@ function toPart(part: PartUnion): Part {
   return part;
 }
 
-function toCcpaGenerationConfig(
+function toCodeAssistGenerationConfig(
   config?: GenerateContentConfig,
-): CcpaGenerationConfig | undefined {
+): CodeAssistGenerationConfig | undefined {
   if (!config) {
     return undefined;
   }

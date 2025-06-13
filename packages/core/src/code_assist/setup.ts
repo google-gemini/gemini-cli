@@ -5,7 +5,7 @@
  */
 
 import { ClientMetadata, OnboardUserRequest } from './types.js';
-import { CcpaServer } from './ccpaServer.js';
+import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { GaxiosError } from 'gaxios';
 import { clearCachedCredentials } from './oauth2.js';
@@ -19,7 +19,7 @@ export async function setupUser(
   oAuth2Client: OAuth2Client,
   projectId?: string,
 ): Promise<string> {
-  const ccpaServer: CcpaServer = new CcpaServer(oAuth2Client, projectId);
+  const caServer = new CodeAssistServer(oAuth2Client, projectId);
   const clientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
     platform: 'PLATFORM_UNSPECIFIED',
@@ -30,7 +30,7 @@ export async function setupUser(
   }
 
   // TODO: Support Free Tier user without projectId.
-  const loadRes = await ccpaServer.loadCodeAssist({
+  const loadRes = await caServer.loadCodeAssist({
     cloudaicompanionProject: process.env.GOOGLE_CLOUD_PROJECT,
     metadata: clientMetadata,
   });
@@ -42,10 +42,10 @@ export async function setupUser(
   };
   try {
     // Poll onboardUser until long running operation is complete.
-    let lroRes = await ccpaServer.onboardUser(onboardReq);
+    let lroRes = await caServer.onboardUser(onboardReq);
     while (!lroRes.done) {
       await new Promise((f) => setTimeout(f, 5000));
-      lroRes = await ccpaServer.onboardUser(onboardReq);
+      lroRes = await caServer.onboardUser(onboardReq);
     }
 
     return lroRes.response?.cloudaicompanionProject?.id || '';
