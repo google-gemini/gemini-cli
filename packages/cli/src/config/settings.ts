@@ -35,7 +35,7 @@ export interface Settings {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   showMemoryUsage?: boolean;
-  contextFileName?: string;
+  contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: boolean;
   preferredEditor?: string;

@@ -16,7 +16,7 @@ export interface ExtensionConfig {
   name: string;
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
-  contextFileName?: string;
+  contextFileName?: string | string[];
 }
 
 export function loadExtensions(workspaceDir: string): ExtensionConfig[] {
@@ -76,12 +76,15 @@ function loadExtensionsFromDir(dir: string): ExtensionConfig[] {
       }
 
       if (extensionConfig.contextFileName) {
-        const contextFilePath = path.join(
-          extensionDir,
-          extensionConfig.contextFileName,
-        );
-        if (fs.existsSync(contextFilePath)) {
-          extensionConfig.contextFileName = contextFilePath;
+        const contextFileNames = Array.isArray(extensionConfig.contextFileName)
+          ? extensionConfig.contextFileName
+          : [extensionConfig.contextFileName];
+        const resolvedPaths = contextFileNames
+          .map((fileName) => path.join(extensionDir, fileName))
+          .filter((filePath) => fs.existsSync(filePath));
+        if (resolvedPaths.length > 0) {
+          extensionConfig.contextFileName =
+            resolvedPaths.length === 1 ? resolvedPaths[0] : resolvedPaths;
         }
       } else {
         const contextFilePath = path.join(extensionDir, 'gemini.md');

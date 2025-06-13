@@ -9,6 +9,7 @@ import {
   MemoryTool,
   setGeminiMdFilename,
   getCurrentGeminiMdFilename,
+  getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from './memoryTool.js';
 import * as fs from 'fs/promises';
@@ -73,6 +74,13 @@ describe('MemoryTool', () => {
 
       setGeminiMdFilename('');
       expect(getCurrentGeminiMdFilename()).toBe(initialName);
+    });
+
+    it('should handle an array of filenames', () => {
+      const newNames = ['CUSTOM_CONTEXT.md', 'ANOTHER_CONTEXT.md'];
+      setGeminiMdFilename(newNames);
+      expect(getCurrentGeminiMdFilename()).toBe('CUSTOM_CONTEXT.md');
+      expect(getAllGeminiMdFilenames()).toEqual(newNames);
     });
   });
 
