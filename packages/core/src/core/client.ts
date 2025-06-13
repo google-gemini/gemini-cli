@@ -85,7 +85,9 @@ export class GeminiClient {
       day: 'numeric',
     });
     const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd);
+    const folderStructure = await getFolderStructure(cwd, {
+      fileService: await this.config.getFileService(),
+    });
     const context = `
   Okay, just setting up the context for our chat.
   Today is ${today}.
