@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { readPackageUp } from 'read-package-up';
+import { getPackageJson } from './package.js';
 import commandExists from 'command-exists';
 import {
   USER_SETTINGS_DIR,
@@ -102,13 +102,10 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 async function getSandboxImageName(
   isCustomProjectSandbox: boolean,
 ): Promise<string> {
-  const packageJsonResult = await readPackageUp();
-  const packageJsonConfig = packageJsonResult?.packageJson.config as
-    | { sandboxImageUri?: string }
-    | undefined;
+  const packageJson = await getPackageJson();
   return (
     process.env.GEMINI_SANDBOX_IMAGE ??
-    packageJsonConfig?.sandboxImageUri ??
+    packageJson?.config?.sandboxImageUri ??
     (isCustomProjectSandbox
       ? LOCAL_DEV_SANDBOX_IMAGE_NAME + '-' + path.basename(path.resolve())
       : LOCAL_DEV_SANDBOX_IMAGE_NAME)
