@@ -113,7 +113,7 @@ describe('loggers', () => {
       logUserPrompt(mockConfig, event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'User prompt. Length: 11',
+        body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
           'event.name': EVENT_USER_PROMPT,
@@ -137,7 +137,7 @@ describe('loggers', () => {
       logUserPrompt(mockConfig, event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'User prompt. Length: 11',
+        body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
           'event.name': EVENT_USER_PROMPT,
@@ -250,70 +250,42 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
     } as Config;
 
-    const mockMetrics = {
-      recordTokenUsageMetrics: vi.fn(),
-    };
-
-    beforeEach(() => {
-      vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
-        mockMetrics.recordTokenUsageMetrics,
-      );
-    });
-
     it('should log an API request with request_text', () => {
       const event = {
         model: 'test-model',
-        input_token_count: 123,
         request_text: 'This is a test request',
       };
 
       logApiRequest(mockConfig, event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'API request to test-model. Tokens: 123.',
+        body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
-          input_token_count: 123,
           request_text: 'This is a test request',
         },
       });
-
-      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
-        mockConfig,
-        'test-model',
-        123,
-        'input',
-      );
     });
 
     it('should log an API request without request_text', () => {
       const event = {
         model: 'test-model',
-        input_token_count: 456,
       };
 
       logApiRequest(mockConfig, event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'API request to test-model. Tokens: 456.',
+        body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
-          input_token_count: 456,
         },
       });
-
-      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
-        mockConfig,
-        'test-model',
-        456,
-        'input',
-      );
     });
   });
 
