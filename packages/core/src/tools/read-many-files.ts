@@ -8,7 +8,7 @@ import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'path';
-import fg from 'fast-glob';
+import { glob } from 'glob';
 import { getCurrentGeminiMdFilename } from './memoryTool.js';
 import {
   detectFileType,
@@ -270,7 +270,7 @@ Use this tool when the user's query implies needing the content of several files
 
   async execute(
     params: ReadManyFilesParams,
-    _signal: AbortSignal,
+    signal: AbortSignal,
   ): Promise<ToolResult> {
     const validationError = this.validateParams(params);
     if (validationError) {
@@ -313,19 +313,14 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     try {
-      // Using fast-glob (fg) for file searching based on patterns.
-      // The `cwd` option scopes the search to the toolBaseDir.
-      // `ignore` handles exclusions.
-      // `onlyFiles` ensures only files are returned.
-      // `dot` allows matching dotfiles (which can still be excluded by patterns).
-      // `absolute` returns absolute paths for consistent handling.
-      const entries = await fg(searchPatterns, {
+      const entries = await glob(searchPatterns, {
         cwd: toolBaseDir,
         ignore: effectiveExcludes,
-        onlyFiles: true,
+        nodir: true,
         dot: true,
         absolute: true,
-        caseSensitiveMatch: false,
+        nocase: true,
+        signal,
       });
 
       // Apply git-aware filtering if enabled and in git repository
