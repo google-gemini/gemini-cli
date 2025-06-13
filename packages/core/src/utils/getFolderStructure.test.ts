@@ -11,6 +11,7 @@ import { Dirent as FSDirent } from 'fs';
 import * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 vi.mock('path', async (importOriginal) => {
   const original = (await importOriginal()) as typeof nodePath;
@@ -319,8 +320,10 @@ describe('getFolderStructure gitignore', () => {
   });
 
   it('should ignore files and folders specified in .gitignore', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    await fileService.initialize();
     const structure = await getFolderStructure('/test/project', {
-      projectRoot: '/test/project',
+      fileService,
     });
     expect(structure).not.toContain('ignored.txt');
     expect(structure).toContain('node_modules/...');
@@ -328,9 +331,10 @@ describe('getFolderStructure gitignore', () => {
   });
 
   it('should not ignore files if respectGitIgnore is false', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    await fileService.initialize({ respectGitIgnore: false });
     const structure = await getFolderStructure('/test/project', {
-      projectRoot: '/test/project',
-      respectGitIgnore: false,
+      fileService,
     });
     expect(structure).toContain('ignored.txt');
     // node_modules is still ignored by default

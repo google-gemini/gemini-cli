@@ -19,6 +19,7 @@ import { Config } from '../config/config.js';
 import { Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -99,6 +100,7 @@ describe('Gemini Client (client.ts)', () => {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
       getTool: vi.fn().mockReturnValue(null),
     };
+    const fileService = new FileDiscoveryService('/test/dir');
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(() => {
       const mock = {
@@ -118,6 +120,7 @@ describe('Gemini Client (client.ts)', () => {
         getSessionId: vi.fn().mockReturnValue('test-session-id'),
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
+        getFileService: vi.fn().mockReturnValue(fileService),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return mock as any;
