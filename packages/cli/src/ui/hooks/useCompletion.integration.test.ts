@@ -41,7 +41,7 @@ describe('useCompletion git-aware filtering integration', () => {
       initialize: vi.fn(),
       shouldIgnoreFile: vi.fn(),
       filterFiles: vi.fn(),
-      getIgnoreInfo: vi.fn(() => ({ gitIgnored: [], customIgnored: [] })),
+      getIgnoreInfo: vi.fn(() => ({ gitIgnored: [] })),
       glob: vi.fn().mockResolvedValue([]),
     };
 
