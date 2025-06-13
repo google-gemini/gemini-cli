@@ -53,7 +53,7 @@ export interface LoadCodeAssistResponse {
 }
 
 /**
- * GeminiUserTier reflects the structure received from the CCPA when calling LoadCodeAssist.
+ * GeminiUserTier reflects the structure received from the CodeAssist when calling LoadCodeAssist.
  */
 export interface GeminiUserTier {
   id: UserTierId;
@@ -109,7 +109,7 @@ export enum UserTierId {
 }
 
 /**
- * PrivacyNotice reflects the structure received from the CCPA in regards to a tier
+ * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier
  * privacy notice.
  */
 export interface PrivacyNotice {

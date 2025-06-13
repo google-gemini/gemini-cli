@@ -30,7 +30,24 @@ Or ask it to perform a task using its tools:
 
 The Gemini CLI requires you to authenticate with Google's AI services. You'll need to configure **one** of the following authentication methods:
 
-1.  **Gemini API key:**
+1.  **Gemini Code Assist:**
+
+    - To enable this mode you only need set the GEMINI_CODE_ASSIST environment variable to true.
+    - Enterprise users must also provide a GOOGLE_CLOUD_PROJECT environment variable specifying their Google Cloud project.
+      In the following methods, replace `GOOGLE_CLOUD_PROJECT` with the relevant values for your project:
+      - You can temporarily set the environment variable in your current shell session using the following command:
+        ```bash
+        export GEMINI_CODE_ASSIST="true"
+        export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID" // Enterprise users only.
+        ```
+      - For repeated use, you can add the environment variable to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+        ```bash
+        echo 'export GEMINI_CODE_ASSIST="true"' >> ~/.bashrc
+        echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc # Enterprise users only.
+        source ~/.bashrc
+        ```
+
+2.  **Gemini API key:**
 
     - Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
     - Set the `GEMINI_API_KEY` environment variable. In the following methods, replace `YOUR_GEMINI_API_KEY` with the API key you obtained from Google AI Studio:
@@ -40,11 +57,11 @@ The Gemini CLI requires you to authenticate with Google's AI services. You'll ne
         ```
       - For repeated use, you can add the environment variable to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
         ```bash
-        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc # Or your preferred shell config file
-        source ~/.bashrc # Reload the config
+        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
+        source ~/.bashrc
         ```
 
-2.  **Google API Key (Vertex AI Express Mode):**
+3.  **Google API Key (Vertex AI Express Mode):**
 
     - You can use a general Google Cloud API key if it has been enabled for the Gemini API or Vertex AI.
     - Set the `GOOGLE_API_KEY` and `GOOGLE_GENAI_USE_VERTEXAI` environment variables. In the following methods, replace `YOUR_GEMINI_API_KEY` with your Google Cloud API key:
@@ -55,12 +72,12 @@ The Gemini CLI requires you to authenticate with Google's AI services. You'll ne
         ```
       - For repeated use, you can add the environment variables to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands adds the environment variables to a `~/.bashrc` file:
         ```bash
-        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc # Or your preferred shell config file
-        echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc # Or your preferred shell config file
-        source ~/.bashrc # Reload the config
+        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
+        echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
+        source ~/.bashrc
         ```
 
-3.  **Vertex AI (Project and Location):**
+4.  **Vertex AI (Project and Location):**
     - Ensure you have a Google Cloud project and have enabled the Vertex AI API.
     - Set up Application Default Credentials (ADC), using the following command:
       ```bash
@@ -76,10 +93,10 @@ The Gemini CLI requires you to authenticate with Google's AI services. You'll ne
         ```
       - For repeated use, you can add the environment variables to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands adds the environment variables to a `~/.bashrc` file:
         ```bash
-        echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc # Or your preferred shell config file
-        echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc # Or your preferred shell config file
-        echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc # Or your preferred shell config file
-        source ~/.bashrc # Reload the config
+        echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
+        echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
+        echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
+        source ~/.bashrc
         ```
 
 ### Next Steps
