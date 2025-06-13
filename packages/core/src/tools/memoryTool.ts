@@ -51,16 +51,30 @@ export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 
 // This variable will hold the currently configured filename for GEMINI.md context files.
 // It defaults to DEFAULT_CONTEXT_FILENAME but can be overridden by setGeminiMdFilename.
-let currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;
+let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 
-export function setGeminiMdFilename(newFilename: string): void {
-  if (newFilename && newFilename.trim() !== '') {
+export function setGeminiMdFilename(newFilename: string | string[]): void {
+  if (Array.isArray(newFilename)) {
+    if (newFilename.length > 0) {
+      currentGeminiMdFilename = newFilename.map((name) => name.trim());
+    }
+  } else if (newFilename && newFilename.trim() !== '') {
     currentGeminiMdFilename = newFilename.trim();
   }
 }
 
 export function getCurrentGeminiMdFilename(): string {
+  if (Array.isArray(currentGeminiMdFilename)) {
+    return currentGeminiMdFilename[0];
+  }
   return currentGeminiMdFilename;
+}
+
+export function getAllGeminiMdFilenames(): string[] {
+  if (Array.isArray(currentGeminiMdFilename)) {
+    return currentGeminiMdFilename;
+  }
+  return [currentGeminiMdFilename];
 }
 
 interface SaveMemoryParams {

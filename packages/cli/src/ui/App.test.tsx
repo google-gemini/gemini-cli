@@ -64,6 +64,7 @@ interface MockServerConfig {
   getShowMemoryUsage: Mock<() => boolean>;
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
+  getAllGeminiMdFilenames: Mock<() => string[]>;
 }
 
 // Mock @gemini-cli/core and its Config class
@@ -124,12 +125,14 @@ vi.mock('@gemini-cli/core', async (importOriginal) => {
         getProjectRoot: vi.fn(() => opts.projectRoot),
         getGeminiClient: vi.fn(() => ({})),
         getCheckpointEnabled: vi.fn(() => opts.checkpoint ?? true),
+        getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
       };
     });
   return {
     ...actualCore,
     Config: ConfigClassMock,
     MCPServerConfig: actualCore.MCPServerConfig,
+    getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
   };
 });
 
@@ -267,6 +270,26 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain('Using 1 AGENTS.MD file');
+  });
+
+  it('should display the first custom contextFileName when an array is provided', async () => {
+    mockSettings = createMockSettings({
+      contextFileName: ['AGENTS.MD', 'CONTEXT.MD'],
+      theme: 'Default',
+    });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+    mockConfig.getDebugMode.mockReturnValue(false);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using 2 AGENTS.MD files');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
