@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GitIgnoreParser, GitIgnoreFilter } from './gitIgnoreParser.js';
-import { isGitRepository } from './gitUtils.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Dirent } from 'fs';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.
@@ -22,8 +21,7 @@ interface BfsFileSearchOptions {
   ignoreDirs?: string[];
   maxDirs?: number;
   debug?: boolean;
-  respectGitIgnore?: boolean;
-  projectRoot?: string;
+  fileService?: FileDiscoveryService;
 }
 
 /**
@@ -42,20 +40,12 @@ export async function bfsFileSearch(
     ignoreDirs = [],
     maxDirs = Infinity,
     debug = false,
-    respectGitIgnore = true,
-    projectRoot = rootDir,
+    fileService,
   } = options;
   const foundFiles: string[] = [];
   const queue: string[] = [rootDir];
   const visited = new Set<string>();
   let scannedDirCount = 0;
-
-  let gitIgnoreFilter: GitIgnoreFilter | null = null;
-  if (respectGitIgnore && isGitRepository(projectRoot)) {
-    const parser = new GitIgnoreParser(projectRoot);
-    await parser.initialize();
-    gitIgnoreFilter = parser;
-  }
 
   while (queue.length > 0 && scannedDirCount < maxDirs) {
     const currentDir = queue.shift()!;
@@ -79,7 +69,7 @@ export async function bfsFileSearch(
 
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
-      if (gitIgnoreFilter?.isIgnored(fullPath)) {
+      if (fileService?.shouldIgnoreFile(fullPath)) {
         continue;
       }
 
