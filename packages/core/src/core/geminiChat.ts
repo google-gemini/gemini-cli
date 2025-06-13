@@ -14,6 +14,7 @@ import {
   SendMessageParameters,
   createUserContent,
   Part,
+  GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -23,13 +24,12 @@ import {
   logApiRequest,
   logApiResponse,
   logApiError,
+  combinedUsageMetadata,
 } from '../telemetry/loggers.js';
 import {
   getResponseText,
   getResponseTextFromParts,
 } from '../utils/generateContentResponseUtilities.js';
-import { getErrorMessage } from '../utils/errors.js';
-import { getRequestTextFromContents } from '../utils/requestUtils.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -140,51 +140,42 @@ export class GeminiChat {
     validateHistory(history);
   }
 
+  private _getRequestTextFromContents(contents: Content[]): string {
+    return contents
+      .flatMap((content) => content.parts ?? [])
+      .map((part) => part.text)
+      .filter(Boolean)
+      .join('');
+  }
+
   private async _logApiRequest(
     contents: Content[],
     model: string,
   ): Promise<void> {
-    let inputTokenCount = 0;
-    try {
-      const { totalTokens } = await this.contentGenerator.countTokens({
-        model,
-        contents,
-      });
-      inputTokenCount = totalTokens || 0;
-    } catch (_e) {
-      console.warn(
-        `Failed to count tokens for model ${model}. Proceeding with inputTokenCount = 0. Error: ${getErrorMessage(_e)}`,
-      );
-      inputTokenCount = 0;
-    }
-
     const shouldLogUserPrompts = (config: Config): boolean =>
       config.getTelemetryLogUserPromptsEnabled() ?? false;
 
-    const requestText = getRequestTextFromContents(contents);
+    const requestText = this._getRequestTextFromContents(contents);
     logApiRequest(this.config, {
       model,
-      input_token_count: inputTokenCount,
       request_text: shouldLogUserPrompts(this.config) ? requestText : undefined,
     });
   }
 
   private async _logApiResponse(
     durationMs: number,
-    response: GenerateContentResponse,
-    fullStreamedText?: string,
+    usageMetadata?: GenerateContentResponseUsageMetadata,
+    responseText?: string,
   ): Promise<void> {
-    const responseText = fullStreamedText ?? getResponseText(response);
     logApiResponse(this.config, {
       model: this.model,
       duration_ms: durationMs,
       status_code: 200, // Assuming 200 for success
-      input_token_count: response.usageMetadata?.promptTokenCount ?? 0,
-      output_token_count: response.usageMetadata?.candidatesTokenCount ?? 0,
-      cached_content_token_count:
-        response.usageMetadata?.cachedContentTokenCount ?? 0,
-      thoughts_token_count: response.usageMetadata?.thoughtsTokenCount ?? 0,
-      tool_token_count: response.usageMetadata?.toolUsePromptTokenCount ?? 0,
+      input_token_count: usageMetadata?.promptTokenCount ?? 0,
+      output_token_count: usageMetadata?.candidatesTokenCount ?? 0,
+      cached_content_token_count: usageMetadata?.cachedContentTokenCount ?? 0,
+      thoughts_token_count: usageMetadata?.thoughtsTokenCount ?? 0,
+      tool_token_count: usageMetadata?.toolUsePromptTokenCount ?? 0,
       response_text: responseText,
     });
   }
@@ -245,7 +236,11 @@ export class GeminiChat {
 
       response = await retryWithBackoff(apiCall);
       const durationMs = Date.now() - startTime;
-      await this._logApiResponse(durationMs, response);
+      await this._logApiResponse(
+        durationMs,
+        response.usageMetadata,
+        getResponseText(response),
+      );
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
@@ -413,18 +408,18 @@ export class GeminiChat {
     startTime: number,
   ) {
     const outputContent: Content[] = [];
-    let lastChunk: GenerateContentResponse | undefined;
+    const chunks: GenerateContentResponse[] = [];
     let errorOccurred = false;
 
     try {
       for await (const chunk of streamResponse) {
         if (isValidResponse(chunk)) {
+          chunks.push(chunk);
           const content = chunk.candidates?.[0]?.content;
           if (content !== undefined) {
             outputContent.push(content);
           }
         }
-        lastChunk = chunk;
         yield chunk;
       }
     } catch (error) {
@@ -434,7 +429,7 @@ export class GeminiChat {
       throw error;
     }
 
-    if (!errorOccurred && lastChunk) {
+    if (!errorOccurred) {
       const durationMs = Date.now() - startTime;
       const allParts: Part[] = [];
       for (const content of outputContent) {
@@ -443,7 +438,11 @@ export class GeminiChat {
         }
       }
       const fullText = getResponseTextFromParts(allParts);
-      await this._logApiResponse(durationMs, lastChunk, fullText);
+      await this._logApiResponse(
+        durationMs,
+        combinedUsageMetadata(chunks),
+        fullText,
+      );
     }
     this.recordHistory(inputContent, outputContent);
   }

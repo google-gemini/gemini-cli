@@ -29,7 +29,6 @@ export interface ApiRequestEvent {
   'event.name': 'api_request';
   'event.timestamp': string; // ISO 8601
   model: string;
-  input_token_count: number;
   request_text?: string;
 }
 

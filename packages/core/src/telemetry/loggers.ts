@@ -31,6 +31,10 @@ import {
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { ToolConfirmationOutcome } from '../index.js';
+import {
+  GenerateContentResponse,
+  GenerateContentResponseUsageMetadata,
+} from '@google/genai';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogUserPromptsEnabled() ?? false;
@@ -119,7 +123,7 @@ export function logUserPrompt(
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `User prompt. Length: ${event.prompt_length}`,
+    body: `User prompt. Length: ${event.prompt_length}.`,
     attributes,
   };
   logger.emit(logRecord);
@@ -176,16 +180,10 @@ export function logApiRequest(
   };
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `API request to ${event.model}. Tokens: ${event.input_token_count}.`,
+    body: `API request to ${event.model}.`,
     attributes,
   };
   logger.emit(logRecord);
-  recordTokenUsageMetrics(
-    config,
-    event.model,
-    event.input_token_count,
-    'input',
-  );
 }
 
 export function logApiError(
@@ -261,6 +259,12 @@ export function logApiResponse(
   recordTokenUsageMetrics(
     config,
     event.model,
+    event.input_token_count,
+    'input',
+  );
+  recordTokenUsageMetrics(
+    config,
+    event.model,
     event.output_token_count,
     'output',
   );
@@ -277,4 +281,44 @@ export function logApiResponse(
     'thought',
   );
   recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
+}
+
+export function combinedUsageMetadata(
+  chunks: GenerateContentResponse[],
+): GenerateContentResponseUsageMetadata {
+  const metadataKeys: Array<keyof GenerateContentResponseUsageMetadata> = [
+    'promptTokenCount',
+    'candidatesTokenCount',
+    'cachedContentTokenCount',
+    'thoughtsTokenCount',
+    'toolUsePromptTokenCount',
+    'totalTokenCount',
+  ];
+
+  const totals: Record<keyof GenerateContentResponseUsageMetadata, number> = {
+    promptTokenCount: 0,
+    candidatesTokenCount: 0,
+    cachedContentTokenCount: 0,
+    thoughtsTokenCount: 0,
+    toolUsePromptTokenCount: 0,
+    totalTokenCount: 0,
+    cacheTokensDetails: 0,
+    candidatesTokensDetails: 0,
+    promptTokensDetails: 0,
+    toolUsePromptTokensDetails: 0,
+    trafficType: 0,
+  };
+
+  for (const chunk of chunks) {
+    if (chunk.usageMetadata) {
+      for (const key of metadataKeys) {
+        const chunkValue = chunk.usageMetadata[key];
+        if (typeof chunkValue === 'number') {
+          totals[key] += chunkValue;
+        }
+      }
+    }
+  }
+
+  return totals as unknown as GenerateContentResponseUsageMetadata;
 }

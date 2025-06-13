@@ -33,6 +33,7 @@ import {
   WebSearchTool,
   WriteFileTool,
   sessionId,
+  logUserPrompt,
 } from '@gemini-cli/core';
 
 export async function main() {
@@ -119,6 +120,11 @@ export async function main() {
     console.error('No input provided via stdin.');
     process.exit(1);
   }
+
+  logUserPrompt(config, {
+    prompt: input,
+    prompt_length: input.length,
+  });
 
   // Non-interactive mode handled by runNonInteractive
   const nonInteractiveConfig = await loadNonInteractiveConfig(
