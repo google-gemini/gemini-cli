@@ -143,7 +143,8 @@ export class Config {
     this.telemetry = params.telemetry ?? false;
     this.telemetryLogUserPromptsEnabled =
       params.telemetryLogUserPromptsEnabled ?? true;
-    this.telemetryOtlpEndpoint = params.telemetryOtlpEndpoint ?? '';
+    this.telemetryOtlpEndpoint =
+      params.telemetryOtlpEndpoint ?? 'http://localhost:4317';
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
     this.checkpoint = params.checkpoint ?? false;
