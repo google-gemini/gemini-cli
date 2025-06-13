@@ -9,7 +9,7 @@ import { getEffectiveModel } from './modelCheck.js';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-} from '../config/config.js';
+} from '@gemini-cli/core';
 
 // Mock global fetch
 global.fetch = vi.fn();

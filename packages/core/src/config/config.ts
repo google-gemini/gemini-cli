@@ -24,6 +24,7 @@ import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import { initializeTelemetry } from '../telemetry/index.js';
+import { DEFAULT_GEMINI_EMBEDDING_MODEL } from './models.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -55,7 +56,7 @@ export class MCPServerConfig {
 export interface ConfigParameters {
   sessionId: string;
   contentGeneratorConfig: ContentGeneratorConfig;
-  embeddingModel: string;
+  embeddingModel?: string;
   sandbox?: boolean | string;
   targetDir: string;
   debugMode: boolean;
@@ -121,7 +122,8 @@ export class Config {
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.contentGeneratorConfig = params.contentGeneratorConfig;
-    this.embeddingModel = params.embeddingModel;
+    this.embeddingModel =
+      params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.debugMode = params.debugMode;

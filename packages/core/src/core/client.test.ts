@@ -18,6 +18,7 @@ import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -295,7 +296,7 @@ describe('Gemini Client (client.ts)', () => {
       await client.generateJson(contents, schema, abortSignal);
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: 'gemini-2.0-flash',
+        model: DEFAULT_GEMINI_FLASH_MODEL,
         config: {
           abortSignal,
           systemInstruction: getCoreSystemPrompt(''),
