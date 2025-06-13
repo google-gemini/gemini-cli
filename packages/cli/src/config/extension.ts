@@ -12,6 +12,11 @@ import * as os from 'os';
 export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
+export interface Extension {
+  config: ExtensionConfig;
+  contextFiles: string[];
+}
+
 export interface ExtensionConfig {
   name: string;
   version: string;
@@ -19,88 +24,92 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
 }
 
-export function loadExtensions(workspaceDir: string): ExtensionConfig[] {
+export function loadExtensions(workspaceDir: string): Extension[] {
   const allExtensions = [
     ...loadExtensionsFromDir(workspaceDir),
     ...loadExtensionsFromDir(os.homedir()),
   ];
 
-  const uniqueExtensions: ExtensionConfig[] = [];
+  const uniqueExtensions: Extension[] = [];
   const seenNames = new Set<string>();
   for (const extension of allExtensions) {
-    if (!seenNames.has(extension.name)) {
+    if (!seenNames.has(extension.config.name)) {
       console.log(
-        `Loading extension: ${extension.name} (version: ${extension.version})`,
+        `Loading extension: ${extension.config.name} (version: ${extension.config.version})`,
       );
       uniqueExtensions.push(extension);
-      seenNames.add(extension.name);
+      seenNames.add(extension.config.name);
     }
   }
 
   return uniqueExtensions;
 }
 
-function loadExtensionsFromDir(dir: string): ExtensionConfig[] {
+function loadExtensionsFromDir(dir: string): Extension[] {
   const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }
 
-  const extensions: ExtensionConfig[] = [];
+  const extensions: Extension[] = [];
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
-    if (!fs.statSync(extensionDir).isDirectory()) {
-      console.error(
-        `Warning: unexpected file ${extensionDir} in extensions directory.`,
-      );
-      continue;
-    }
-
-    const extensionPath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
-    if (!fs.existsSync(extensionPath)) {
-      console.error(
-        `Warning: extension directory ${extensionDir} does not contain a config file ${extensionPath}.`,
-      );
-      continue;
-    }
-
-    try {
-      const fileContent = fs.readFileSync(extensionPath, 'utf-8');
-      const extensionConfig = JSON.parse(fileContent) as ExtensionConfig;
-      if (!extensionConfig.name || !extensionConfig.version) {
-        console.error(
-          `Invalid extension config in ${extensionPath}: missing name or version.`,
-        );
-        continue;
-      }
-
-      if (extensionConfig.contextFileName) {
-        const contextFileNames = Array.isArray(extensionConfig.contextFileName)
-          ? extensionConfig.contextFileName
-          : [extensionConfig.contextFileName];
-        const resolvedPaths = contextFileNames
-          .map((fileName) => path.join(extensionDir, fileName))
-          .filter((filePath) => fs.existsSync(filePath));
-        if (resolvedPaths.length > 0) {
-          extensionConfig.contextFileName =
-            resolvedPaths.length === 1 ? resolvedPaths[0] : resolvedPaths;
-        }
-      } else {
-        const contextFilePath = path.join(extensionDir, 'gemini.md');
-        if (fs.existsSync(contextFilePath)) {
-          extensionConfig.contextFileName = contextFilePath;
-        }
-      }
-
-      extensions.push(extensionConfig);
-    } catch (e) {
-      console.error(
-        `Failed to load extension config from ${extensionPath}:`,
-        e,
-      );
+    const extension = loadExtension(extensionDir);
+    if (extension != null) {
+      extensions.push(extension);
     }
   }
-
   return extensions;
+}
+
+function loadExtension(extensionDir: string): Extension | null {
+  if (!fs.statSync(extensionDir).isDirectory()) {
+    console.error(
+      `Warning: unexpected file ${extensionDir} in extensions directory.`,
+    );
+    return null;
+  }
+
+  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
+  if (!fs.existsSync(configFilePath)) {
+    console.error(
+      `Warning: extension directory ${extensionDir} does not contain a config file ${configFilePath}.`,
+    );
+    return null;
+  }
+
+  try {
+    const configContent = fs.readFileSync(configFilePath, 'utf-8');
+    const config = JSON.parse(configContent) as ExtensionConfig;
+    if (!config.name || !config.version) {
+      console.error(
+        `Invalid extension config in ${configFilePath}: missing name or version.`,
+      );
+      return null;
+    }
+
+    const contextFiles = getContextFileNames(config)
+      .map((contextFileName) => path.join(extensionDir, contextFileName))
+      .filter((contextFilePath) => fs.existsSync(contextFilePath));
+
+    return {
+      config,
+      contextFiles,
+    };
+  } catch (e) {
+    console.error(
+      `Warning: error parsing extension config in ${configFilePath}: ${e}`,
+    );
+    return null;
+  }
+}
+
+function getContextFileNames(config: ExtensionConfig): string[] {
+  if (!config.contextFileName) {
+    return ['GEMINI.md', 'gemini.md', 'Gemini.md'];
+  } else if (!Array.isArray(config.contextFileName)) {
+    return [config.contextFileName];
+  }
+  return config.contextFileName;
 }

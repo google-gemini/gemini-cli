@@ -20,7 +20,7 @@ import {
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
-import { ExtensionConfig } from './extension.js';
+import { Extension } from './extension.js';
 import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -132,7 +132,7 @@ export async function loadHierarchicalGeminiMemory(
 
 export async function loadCliConfig(
   settings: Settings,
-  extensions: ExtensionConfig[],
+  extensions: Extension[],
   geminiIgnorePatterns: string[],
   sessionId: string,
 ): Promise<Config> {
@@ -152,9 +152,7 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const extensionContextFilePaths = extensions
-    .map((e) => e.contextFileName)
-    .filter((p): p is string => !!p);
+  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
@@ -206,18 +204,20 @@ export async function loadCliConfig(
   });
 }
 
-function mergeMcpServers(settings: Settings, extensions: ExtensionConfig[]) {
+function mergeMcpServers(settings: Settings, extensions: Extension[]) {
   const mcpServers = settings.mcpServers || {};
   for (const extension of extensions) {
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        logger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = server;
-    });
+    Object.entries(extension.config.mcpServers || {}).forEach(
+      ([key, server]) => {
+        if (mcpServers[key]) {
+          logger.warn(
+            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+          );
+          return;
+        }
+        mcpServers[key] = server;
+      },
+    );
   }
   return mcpServers;
 }

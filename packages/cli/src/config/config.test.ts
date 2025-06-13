@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// packages/cli/src/config/config.test.ts
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
 import { loadCliConfig } from './config.js';
 import { Settings } from './settings.js';
+import { Extension } from './extension.js';
 import * as ServerConfig from '@gemini-cli/core';
 
 const MOCK_HOME_DIR = '/mock/home/user';
@@ -210,27 +209,41 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
-    const extensions = [
+    const extensions: Extension[] = [
       {
-        name: 'ext1',
-        version: '1.0.0',
-        contextFileName: '/path/to/ext1/gemini.md',
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+        },
+        contextFiles: ['/path/to/ext1/GEMINI.md'],
       },
       {
-        name: 'ext2',
-        version: '1.0.0',
+        config: {
+          name: 'ext2',
+          version: '1.0.0',
+        },
+        contextFiles: [],
       },
       {
-        name: 'ext3',
-        version: '1.0.0',
-        contextFileName: '/path/to/ext3/gemini.md',
+        config: {
+          name: 'ext3',
+          version: '1.0.0',
+        },
+        contextFiles: [
+          '/path/to/ext3/context1.md',
+          '/path/to/ext3/context2.md',
+        ],
       },
     ];
     await loadCliConfig(settings, extensions, [], 'session-id');
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       false,
-      ['/path/to/ext1/gemini.md', '/path/to/ext3/gemini.md'],
+      [
+        '/path/to/ext1/GEMINI.md',
+        '/path/to/ext3/context1.md',
+        '/path/to/ext3/context2.md',
+      ],
     );
   });
 
