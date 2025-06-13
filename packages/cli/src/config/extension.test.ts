@@ -72,7 +72,7 @@ describe('loadExtensions', () => {
       'ext1',
       '1.0.0',
       false,
-      'my-context.md',
+      'my-context-file.md',
     );
 
     const extensions = loadExtensions(tempWorkspaceDir);
@@ -80,7 +80,7 @@ describe('loadExtensions', () => {
     expect(extensions).toHaveLength(1);
     const ext1 = extensions.find((e) => e.config.name === 'ext1');
     expect(ext1?.contextFiles).toEqual([
-      path.join(workspaceExtensionsDir, 'ext1', 'my-context.md'),
+      path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
   });
 });
