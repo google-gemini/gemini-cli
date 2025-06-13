@@ -9,6 +9,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', 'config.test.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
     environment: 'jsdom',
     globals: true,
     reporters: ['default', 'junit'],
