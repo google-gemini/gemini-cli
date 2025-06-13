@@ -324,7 +324,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     refreshStatic();
   }, [clearItems, clearConsoleMessagesState, refreshStatic]);
 
-  const { rows: terminalHeight } = useTerminalSize();
+  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize(); // Get terminalWidth
   const mainControlsRef = useRef<DOMElement>(null);
   const pendingHistoryItemRef = useRef<DOMElement>(null);
 
@@ -407,7 +407,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header title={process.env.GEMINI_CLI_TITLE} />
+              <Header terminalWidth={terminalWidth} />
               <Tips config={config} />
             </Box>,
             ...history.map((h) => (
