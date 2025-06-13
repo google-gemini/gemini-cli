@@ -45,6 +45,8 @@ export class MCPServerConfig {
     readonly cwd?: string,
     // For sse transport
     readonly url?: string,
+    // For streamable http transport
+    readonly httpUrl?: string,
     // For websocket transport
     readonly tcp?: string,
     // Common
