@@ -269,3 +269,32 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
   */
 });
+
+describe('mergeMcpServers', () => {
+  it('should not modify the original settings object', async () => {
+    const settings: Settings = {
+      mcpServers: {
+        'test-server': {
+          url: 'http://localhost:8080',
+        },
+      },
+    };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          mcpServers: {
+            'ext1-server': {
+              url: 'http://localhost:8081',
+            },
+          },
+        },
+        contextFiles: [],
+      },
+    ];
+    const originalSettings = JSON.parse(JSON.stringify(settings));
+    await loadCliConfig(settings, extensions, [], 'test-session');
+    expect(settings).toEqual(originalSettings);
+  });
+});

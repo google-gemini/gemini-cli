@@ -205,7 +205,7 @@ export async function loadCliConfig(
 }
 
 function mergeMcpServers(settings: Settings, extensions: Extension[]) {
-  const mcpServers = settings.mcpServers || {};
+  const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.config.mcpServers || {}).forEach(
       ([key, server]) => {
