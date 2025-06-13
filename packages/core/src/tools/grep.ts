@@ -9,7 +9,7 @@ import fsPromises from 'fs/promises';
 import path from 'path';
 import { EOL } from 'os';
 import { spawn } from 'child_process';
-import fastGlob from 'fast-glob';
+import { globStream } from 'glob';
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -168,7 +168,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    */
   async execute(
     params: GrepToolParams,
-    _signal: AbortSignal,
+    signal: AbortSignal,
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -187,6 +187,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         pattern: params.pattern,
         path: searchDirAbs,
         include: params.include,
+        signal,
       });
 
       if (matches.length === 0) {
@@ -382,6 +383,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     pattern: string;
     path: string; // Expects absolute path
     include?: string;
+    signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const { pattern, path: absolutePath, include } = options;
     let strategyUsed = 'none';
@@ -533,14 +535,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         '.hg/**',
       ]; // Use glob patterns for ignores here
 
-      const filesStream = fastGlob.stream(globPattern, {
+      const filesStream = globStream(globPattern, {
         cwd: absolutePath,
         dot: true,
         ignore: ignorePatterns,
         absolute: true,
-        onlyFiles: true,
-        suppressErrors: true,
-        stats: false,
+        nodir: true,
+        signal: options.signal,
       });
 
       const regex = new RegExp(pattern, 'i');

@@ -7,7 +7,7 @@
 import { GitIgnoreParser, GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'path';
-import fg from 'fast-glob';
+import { glob, type GlobOptions } from 'glob';
 
 export interface FileDiscoveryOptions {
   respectGitIgnore?: boolean;
@@ -35,12 +35,12 @@ export class FileDiscoveryService {
 
   async glob(
     pattern: string | string[],
-    options: fg.Options = {},
+    options: GlobOptions = {},
   ): Promise<string[]> {
-    const files = await fg(pattern, {
+    const files = (await glob(pattern, {
       ...options,
-      caseSensitiveMatch: false,
-    });
+      nocase: true,
+    })) as string[];
     return this.filterFiles(files);
   }
 
