@@ -31,6 +31,7 @@ import {
   createContentGenerator,
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
@@ -215,7 +216,7 @@ export class GeminiClient {
     contents: Content[],
     schema: SchemaUnion,
     abortSignal: AbortSignal,
-    model: string = 'gemini-2.0-flash',
+    model: string = DEFAULT_GEMINI_FLASH_MODEL,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
     const cg = await this.contentGenerator;

@@ -7,7 +7,7 @@
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-} from '../config/config.js';
+} from '@gemini-cli/core';
 
 /**
  * Checks if the default "pro" model is rate-limited and returns a fallback "flash"

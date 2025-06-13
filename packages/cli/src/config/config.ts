@@ -15,6 +15,8 @@ import {
   ApprovalMode,
   ContentGeneratorConfig,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
@@ -33,10 +35,6 @@ const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
-
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro-preview-06-05';
-export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash-preview-05-20';
-export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 interface CliArgs {
   model: string | undefined;
