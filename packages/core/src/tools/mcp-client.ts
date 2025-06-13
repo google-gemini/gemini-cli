@@ -12,6 +12,7 @@ import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
+import { WebSocketClientTransport } from './websocket-client-transport.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -164,6 +165,8 @@ async function connectAndDiscover(
   let transport;
   if (mcpServerConfig.url) {
     transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+  } else if (mcpServerConfig.tcp) {
+    transport = new WebSocketClientTransport(new URL(mcpServerConfig.tcp));
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
@@ -177,7 +180,7 @@ async function connectAndDiscover(
     });
   } else {
     console.error(
-      `MCP server '${mcpServerName}' has invalid configuration: missing both url (for SSE) and command (for stdio). Skipping.`,
+      `MCP server '${mcpServerName}' has invalid configuration: missing url (for SSE), tcp (for websocket), and command (for stdio). Skipping.`,
     );
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
@@ -254,9 +257,11 @@ async function connectAndDiscover(
       console.error(
         `MCP server '${mcpServerName}' did not return valid tool function declarations. Skipping.`,
       );
-      if (transport instanceof StdioClientTransport) {
-        await transport.close();
-      } else if (transport instanceof SSEClientTransport) {
+      if (
+        transport instanceof StdioClientTransport ||
+        transport instanceof SSEClientTransport ||
+        transport instanceof WebSocketClientTransport
+      ) {
         await transport.close();
       }
       // Update status to disconnected
@@ -315,7 +320,8 @@ async function connectAndDiscover(
     // Ensure transport is cleaned up on error too
     if (
       transport instanceof StdioClientTransport ||
-      transport instanceof SSEClientTransport
+      transport instanceof SSEClientTransport ||
+      transport instanceof WebSocketClientTransport
     ) {
       await transport.close();
     }
@@ -334,7 +340,8 @@ async function connectAndDiscover(
     );
     if (
       transport instanceof StdioClientTransport ||
-      transport instanceof SSEClientTransport
+      transport instanceof SSEClientTransport ||
+      transport instanceof WebSocketClientTransport
     ) {
       await transport.close();
       // Update status to disconnected
