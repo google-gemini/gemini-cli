@@ -8,14 +8,13 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { GitIgnoreParser } from './gitIgnoreParser.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { isGitRepository } from './gitUtils.js';
 
 // Mock fs module
 vi.mock('fs/promises');
 
 // Mock gitUtils module
-vi.mock('./gitUtils.js', () => ({
-  isGitRepository: vi.fn(() => true),
-}));
+vi.mock('./gitUtils.js');
 
 describe('GitIgnoreParser', () => {
   let parser: GitIgnoreParser;
@@ -26,6 +25,7 @@ describe('GitIgnoreParser', () => {
     // Reset mocks before each test
     vi.mocked(fs.readFile).mockClear();
     vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT')); // Default to no file
+    vi.mocked(isGitRepository).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -51,6 +51,13 @@ node_modules/
 
       await parser.initialize();
 
+      expect(parser.getPatterns()).toEqual([
+        '.git',
+        'node_modules/',
+        '*.log',
+        '/dist',
+        '.env',
+      ]);
       expect(parser.isIgnored('node_modules/some-lib')).toBe(true);
       expect(parser.isIgnored('src/app.log')).toBe(true);
       expect(parser.isIgnored('dist/index.js')).toBe(true);
@@ -68,7 +75,22 @@ node_modules/
       });
 
       await parser.initialize();
+      expect(parser.getPatterns()).toEqual(['.git', 'temp/', '*.tmp']);
+      expect(parser.isIgnored('temp/file.txt')).toBe(true);
+      expect(parser.isIgnored('src/file.tmp')).toBe(true);
+    });
 
+    it('should handle custom patterns file name', async () => {
+      vi.mocked(isGitRepository).mockReturnValue(false);
+      vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
+        if (filePath === path.join(mockProjectRoot, '.geminiignore')) {
+          return 'temp/\n*.tmp';
+        }
+        throw new Error('ENOENT');
+      });
+
+      await parser.initialize('.geminiignore');
+      expect(parser.getPatterns()).toEqual(['temp/', '*.tmp']);
       expect(parser.isIgnored('temp/file.txt')).toBe(true);
       expect(parser.isIgnored('src/file.tmp')).toBe(true);
     });
