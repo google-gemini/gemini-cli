@@ -71,34 +71,77 @@ export function initializeTelemetry(config: Config): void {
     'session.id': config.getSessionId(),
   });
 
-  const otlpEndpoint = config.getTelemetryOtlpEndpoint();
-  const grpcParsedEndpoint = parseGrpcEndpoint(otlpEndpoint);
-  const useOtlp = !!grpcParsedEndpoint;
+  const otlpEndpointSetting = config.getTelemetryOtlpEndpoint();
+  const gcpProjectId = process.env.GOOGLE_CLOUD_PROJECT;
 
-  const spanExporter = useOtlp
-    ? new OTLPTraceExporter({
+  let spanExporter;
+  let logExporter;
+  let metricReader;
+
+  if (otlpEndpointSetting && otlpEndpointSetting.trim() !== '') {
+    const grpcParsedEndpoint = parseGrpcEndpoint(otlpEndpointSetting);
+    if (grpcParsedEndpoint) {
+      diag.info(`Using user-configured OTLP endpoint: ${grpcParsedEndpoint}`);
+      spanExporter = new OTLPTraceExporter({
         url: grpcParsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
-      })
-    : new ConsoleSpanExporter();
-  const logExporter = useOtlp
-    ? new OTLPLogExporter({
+      });
+      logExporter = new OTLPLogExporter({
         url: grpcParsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
-      })
-    : new ConsoleLogRecordExporter();
-  const metricReader = useOtlp
-    ? new PeriodicExportingMetricReader({
+      });
+      metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           url: grpcParsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
         }),
         exportIntervalMillis: 10000,
-      })
-    : new PeriodicExportingMetricReader({
+      });
+    } else {
+      diag.warn(
+        `Invalid user-configured OTLP endpoint: "${otlpEndpointSetting}". Falling back to console exporter.`,
+      );
+      spanExporter = new ConsoleSpanExporter();
+      logExporter = new ConsoleLogRecordExporter();
+      metricReader = new PeriodicExportingMetricReader({
         exporter: new ConsoleMetricExporter(),
         exportIntervalMillis: 10000,
       });
+    }
+  } else if (gcpProjectId) {
+    diag.info(
+      `No OTLP endpoint configured, GOOGLE_CLOUD_PROJECT detected (${gcpProjectId}). Exporting telemetry to Google Cloud.`,
+    );
+    const gcpTraceUrl = 'https://trace.googleapis.com:443';
+    const gcpMetricUrl = 'https://monitoring.googleapis.com:443';
+    const gcpLogUrl = 'https://logging.googleapis.com:443';
+
+    spanExporter = new OTLPTraceExporter({
+      url: gcpTraceUrl,
+      compression: CompressionAlgorithm.GZIP,
+    });
+    logExporter = new OTLPLogExporter({
+      url: gcpLogUrl,
+      compression: CompressionAlgorithm.GZIP,
+    });
+    metricReader = new PeriodicExportingMetricReader({
+      exporter: new OTLPMetricExporter({
+        url: gcpMetricUrl,
+        compression: CompressionAlgorithm.GZIP,
+      }),
+      exportIntervalMillis: 10000,
+    });
+  } else {
+    diag.info(
+      'No OTLP endpoint or GOOGLE_CLOUD_PROJECT detected. Using console exporters.',
+    );
+    spanExporter = new ConsoleSpanExporter();
+    logExporter = new ConsoleLogRecordExporter();
+    metricReader = new PeriodicExportingMetricReader({
+      exporter: new ConsoleMetricExporter(),
+      exportIntervalMillis: 10000,
+    });
+  }
 
   sdk = new NodeSDK({
     resource,
