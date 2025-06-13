@@ -195,8 +195,6 @@ export async function loadCliConfig(
         : (settings.telemetry ?? false),
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-    fileFilteringAllowBuildArtifacts:
-      settings.fileFiltering?.allowBuildArtifacts,
     checkpoint: argv.checkpoint,
     proxy:
       process.env.HTTPS_PROXY ||

@@ -49,12 +49,10 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - **Description:** Controls git-aware file filtering behavior for @ commands and file discovery tools.
   - **Properties:**
     - **`respectGitIgnore`** (boolean, default: `true`): Whether to respect .gitignore patterns when discovering files. When enabled, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
-    - **`allowBuildArtifacts`** (boolean, default: `false`): Whether to include build artifacts and generated files in file discovery operations.
   - **Example:**
     ```json
     "fileFiltering": {
       "respectGitIgnore": true,
-      "allowBuildArtifacts": false
     }
     ```
 
