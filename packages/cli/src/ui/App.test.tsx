@@ -194,6 +194,7 @@ describe('App UI', () => {
       geminiMdFileCount: 0,
       showMemoryUsage: false,
       sessionId: 'test-session-id',
+      cwd: '/tmp',
       // Provide other required fields for ConfigParameters if necessary
     }) as unknown as MockServerConfig;
 

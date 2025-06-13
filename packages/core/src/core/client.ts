@@ -14,7 +14,6 @@ import {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import process from 'node:process';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import { Turn, ServerGeminiStreamEvent, GeminiEventType } from './turn.js';
 import { Config } from '../config/config.js';
@@ -33,16 +32,6 @@ import {
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
-const proxy =
-  process.env.HTTPS_PROXY ||
-  process.env.https_proxy ||
-  process.env.HTTP_PROXY ||
-  process.env.http_proxy;
-
-if (proxy) {
-  setGlobalDispatcher(new ProxyAgent(proxy));
-}
-
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
   private contentGenerator: Promise<ContentGenerator>;
@@ -55,6 +44,10 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(private config: Config) {
+    if (config.getProxy()) {
+      setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
+    }
+
     this.contentGenerator = createContentGenerator(
       this.config.getContentGeneratorConfig(),
     );
@@ -83,7 +76,7 @@ export class GeminiClient {
   }
 
   private async getEnvironment(): Promise<Part[]> {
-    const cwd = process.cwd();
+    const cwd = this.config.getWorkingDir();
     const today = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
       year: 'numeric',

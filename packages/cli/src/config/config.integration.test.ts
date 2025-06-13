@@ -53,6 +53,7 @@ describe('Configuration Integration Tests', () => {
   describe('File Filtering Configuration', () => {
     it('should load default file filtering settings', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -70,6 +71,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should load custom file filtering settings from configuration', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -87,6 +89,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should merge user and workspace file filtering settings', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -106,6 +109,7 @@ describe('Configuration Integration Tests', () => {
   describe('Configuration Integration', () => {
     it('should handle partial configuration objects gracefully', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -126,6 +130,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle empty configuration objects gracefully', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -144,6 +149,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle missing configuration sections gracefully', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -163,6 +169,7 @@ describe('Configuration Integration Tests', () => {
   describe('Real-world Configuration Scenarios', () => {
     it('should handle a security-focused configuration', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -180,6 +187,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle a development-focused configuration', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,
@@ -196,6 +204,7 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle a CI/CD environment configuration', async () => {
       const configParams: ConfigParameters = {
+        cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
         embeddingModel: 'test-embedding-model',
         sandbox: false,

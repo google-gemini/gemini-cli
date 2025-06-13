@@ -124,6 +124,7 @@ class MockTool extends BaseTool<{ param: string }, ToolResult> {
 }
 
 const baseConfigParams: ConfigParameters = {
+  cwd: '/tmp',
   contentGeneratorConfig: {
     model: 'test-model',
     apiKey: 'test-api-key',
