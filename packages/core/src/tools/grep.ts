@@ -14,6 +14,7 @@ import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
+import { isGitRepository } from '../utils/gitUtils.js';
 
 // --- Interfaces ---
 
@@ -263,47 +264,6 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   }
 
   /**
-   * Checks if a directory or its parent directories contain a .git folder.
-   * @param {string} dirPath Absolute path to the directory to check.
-   * @returns {Promise<boolean>} True if it's a Git repository, false otherwise.
-   */
-  private async isGitRepository(dirPath: string): Promise<boolean> {
-    let currentPath = path.resolve(dirPath);
-    const root = path.parse(currentPath).root;
-
-    try {
-      while (true) {
-        const gitPath = path.join(currentPath, '.git');
-        try {
-          const stats = await fsPromises.stat(gitPath);
-          if (stats.isDirectory() || stats.isFile()) {
-            return true;
-          }
-          // If .git exists but isn't a file/dir, something is weird, return false
-          return false;
-        } catch (error: unknown) {
-          if (!isNodeError(error) || error.code !== 'ENOENT') {
-            console.debug(
-              `Error checking for .git in ${currentPath}: ${error}`,
-            );
-            return false;
-          }
-        }
-
-        if (currentPath === root) {
-          break;
-        }
-        currentPath = path.dirname(currentPath);
-      }
-    } catch (error: unknown) {
-      console.debug(
-        `Error traversing directory structure upwards from ${dirPath}: ${getErrorMessage(error)}`,
-      );
-    }
-    return false;
-  }
-
-  /**
    * Parses the standard output of grep-like commands (git grep, system grep).
    * Expects format: filePath:lineNumber:lineContent
    * Handles colons within file paths and line content correctly.
@@ -390,7 +350,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
     try {
       // --- Strategy 1: git grep ---
-      const isGit = await this.isGitRepository(absolutePath);
+      const isGit = isGitRepository(absolutePath);
       const gitAvailable = isGit && (await this.isCommandAvailable('git'));
 
       if (gitAvailable) {
