@@ -47,7 +47,6 @@ describe('useCompletion git-aware filtering integration', () => {
 
     mockConfig = {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
-      getFileFilteringAllowBuildArtifacts: vi.fn(() => false),
       getFileService: vi.fn().mockResolvedValue(mockFileDiscoveryService),
     };
 

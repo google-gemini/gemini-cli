@@ -21,7 +21,6 @@ const mockConfig = {
   isSandboxed: vi.fn(() => false),
   getFileService: vi.fn(),
   getFileFilteringRespectGitIgnore: vi.fn(() => true),
-  getFileFilteringAllowBuildArtifacts: vi.fn(() => false),
 } as unknown as Config;
 
 const mockReadManyFilesExecute = vi.fn();

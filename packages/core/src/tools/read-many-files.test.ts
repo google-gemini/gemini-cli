@@ -29,7 +29,6 @@ describe('ReadManyFilesTool', () => {
       return service;
     },
     getFileFilteringRespectGitIgnore: () => true,
-    getFileFilteringAllowBuildArtifacts: () => false,
     getGeminiIgnorePatterns: () => ['**/foo.bar', 'foo.baz', 'foo.*'],
   } as Partial<Config> as Config;
 

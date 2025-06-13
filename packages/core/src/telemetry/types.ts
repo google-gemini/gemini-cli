@@ -67,7 +67,6 @@ export interface CliConfigEvent {
   vertex_ai_enabled: boolean;
   log_user_prompts_enabled: boolean;
   file_filtering_respect_git_ignore: boolean;
-  file_filtering_allow_build_artifacts: boolean;
 }
 
 export type TelemetryEvent =

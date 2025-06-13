@@ -81,7 +81,6 @@ export interface ConfigParameters {
   telemetryLogUserPromptsEnabled?: boolean;
   telemetryOtlpEndpoint?: string;
   fileFilteringRespectGitIgnore?: boolean;
-  fileFilteringAllowBuildArtifacts?: boolean;
   checkpoint?: boolean;
   proxy?: string;
   cwd: string;
@@ -114,7 +113,6 @@ export class Config {
   private readonly geminiClient: GeminiClient;
   private readonly geminiIgnorePatterns: string[] = [];
   private readonly fileFilteringRespectGitIgnore: boolean;
-  private readonly fileFilteringAllowBuildArtifacts: boolean;
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
   private readonly checkpoint: boolean;
@@ -148,8 +146,6 @@ export class Config {
     this.telemetryOtlpEndpoint = params.telemetryOtlpEndpoint ?? '';
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
-    this.fileFilteringAllowBuildArtifacts =
-      params.fileFilteringAllowBuildArtifacts ?? false;
     this.checkpoint = params.checkpoint ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
@@ -296,10 +292,6 @@ export class Config {
     return this.fileFilteringRespectGitIgnore;
   }
 
-  getFileFilteringAllowBuildArtifacts(): boolean {
-    return this.fileFilteringAllowBuildArtifacts;
-  }
-
   getCheckpointEnabled(): boolean {
     return this.checkpoint;
   }
@@ -317,7 +309,6 @@ export class Config {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
       await this.fileDiscoveryService.initialize({
         respectGitIgnore: this.fileFilteringRespectGitIgnore,
-        includeBuildArtifacts: this.fileFilteringAllowBuildArtifacts,
       });
     }
     return this.fileDiscoveryService;
