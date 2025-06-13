@@ -13,6 +13,7 @@ import {
   GEMINI_CONFIG_DIR,
   getAllGeminiMdFilenames,
 } from '../tools/memoryTool.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -178,12 +179,13 @@ async function getGeminiMdFilePathsInternal(
     }
     upwardPaths.forEach((p) => allPaths.add(p));
 
+    const fileService = new FileDiscoveryService(projectRoot || resolvedCwd);
+    await fileService.initialize();
     const downwardPaths = await bfsFileSearch(resolvedCwd, {
       fileName: geminiMdFilename,
       maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
       debug: debugMode,
-      respectGitIgnore: true,
-      projectRoot: projectRoot || resolvedCwd,
+      fileService,
     });
     downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
     if (debugMode && downwardPaths.length > 0)

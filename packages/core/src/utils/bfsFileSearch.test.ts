@@ -9,6 +9,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as gitUtils from './gitUtils.js';
 import { bfsFileSearch } from './bfsFileSearch.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 vi.mock('fs/promises');
 vi.mock('./gitUtils.js');
@@ -136,9 +137,11 @@ describe('bfsFileSearch', () => {
     });
     mockFs.readFile.mockResolvedValue('subdir2');
 
+    const fileService = new FileDiscoveryService('/test');
+    await fileService.initialize();
     const result = await bfsFileSearch('/test', {
       fileName: 'file1.txt',
-      respectGitIgnore: true,
+      fileService,
     });
     expect(result).toEqual(['/test/subdir1/file1.txt']);
   });
