@@ -35,8 +35,11 @@ export async function setupUser(
     metadata: clientMetadata,
   });
 
+  const onboardTier: string =
+    loadRes.allowedTiers?.find((tier) => tier.isDefault)?.id ?? 'legacy-tier';
+
   const onboardReq: OnboardUserRequest = {
-    tierId: 'legacy-tier',
+    tierId: onboardTier,
     cloudaicompanionProject: loadRes.cloudaicompanionProject || '',
     metadata: clientMetadata,
   };
