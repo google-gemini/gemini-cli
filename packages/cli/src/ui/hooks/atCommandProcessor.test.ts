@@ -92,7 +92,7 @@ describe('handleAtCommand', () => {
       initialize: vi.fn(),
       shouldIgnoreFile: vi.fn(() => false),
       filterFiles: vi.fn((files) => files),
-      getIgnoreInfo: vi.fn(() => ({ gitIgnored: [], customIgnored: [] })),
+      getIgnoreInfo: vi.fn(() => ({ gitIgnored: [] })),
       isGitRepository: vi.fn(() => true),
     };
     vi.mocked(FileDiscoveryService).mockImplementation(
