@@ -16,7 +16,7 @@ import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadGeminiIgnorePatterns } from './utils/loadIgnorePatterns.js';
-import { loadExtensions, ExtensionConfig } from './config/extension.js';
+import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import {
   ApprovalMode,
@@ -164,7 +164,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 
 async function loadNonInteractiveConfig(
   config: Config,
-  extensions: ExtensionConfig[],
+  extensions: Extension[],
   settings: LoadedSettings,
 ) {
   if (config.getApprovalMode() === ApprovalMode.YOLO) {
