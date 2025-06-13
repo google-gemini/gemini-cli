@@ -184,7 +184,7 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'editor',
-        description: 'open the editor',
+        description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => {
           openEditorDialog();
         },
