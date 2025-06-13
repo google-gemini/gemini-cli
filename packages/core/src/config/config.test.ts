@@ -51,6 +51,7 @@ describe('Server Config (config.ts)', () => {
   const EMBEDDING_MODEL = 'gemini-embedding';
   const SESSION_ID = 'test-session-id';
   const baseParams: ConfigParameters = {
+    cwd: '/tmp',
     contentGeneratorConfig: {
       apiKey: API_KEY,
       model: MODEL,

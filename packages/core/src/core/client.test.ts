@@ -17,6 +17,7 @@ import { ContentGenerator } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { Turn } from './turn.js';
+import { getCoreSystemPrompt } from './prompts.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -53,6 +54,11 @@ vi.mock('../utils/generateContentResponseUtilities', () => ({
   getResponseText: (result: GenerateContentResponse) =>
     result.candidates?.[0]?.content?.parts?.map((part) => part.text).join('') ||
     undefined,
+}));
+vi.mock('../telemetry/index.js', () => ({
+  logApiRequest: vi.fn(),
+  logApiResponse: vi.fn(),
+  logApiError: vi.fn(),
 }));
 
 describe('Gemini Client (client.ts)', () => {
@@ -109,6 +115,8 @@ describe('Gemini Client (client.ts)', () => {
         getUserMemory: vi.fn().mockReturnValue(''),
         getFullContext: vi.fn().mockReturnValue(false),
         getSessionId: vi.fn().mockReturnValue('test-session-id'),
+        getProxy: vi.fn().mockReturnValue(undefined),
+        getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return mock as any;
@@ -236,6 +244,68 @@ describe('Gemini Client (client.ts)', () => {
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API Failure',
       );
+    });
+  });
+
+  describe('generateContent', () => {
+    it('should call generateContent with the correct parameters', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const generationConfig = { temperature: 0.5 };
+      const abortSignal = new AbortController().signal;
+
+      // Mock countTokens
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = Promise.resolve(
+        mockGenerator as ContentGenerator,
+      );
+
+      await client.generateContent(contents, generationConfig, abortSignal);
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith({
+        model: 'test-model',
+        config: {
+          abortSignal,
+          systemInstruction: getCoreSystemPrompt(''),
+          temperature: 0.5,
+          topP: 1,
+        },
+        contents,
+      });
+    });
+  });
+
+  describe('generateJson', () => {
+    it('should call generateContent with the correct parameters', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'string' };
+      const abortSignal = new AbortController().signal;
+
+      // Mock countTokens
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = Promise.resolve(
+        mockGenerator as ContentGenerator,
+      );
+
+      await client.generateJson(contents, schema, abortSignal);
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith({
+        model: 'gemini-2.0-flash',
+        config: {
+          abortSignal,
+          systemInstruction: getCoreSystemPrompt(''),
+          temperature: 0,
+          topP: 1,
+          responseSchema: schema,
+          responseMimeType: 'application/json',
+        },
+        contents,
+      });
     });
   });
 
