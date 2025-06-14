@@ -81,7 +81,6 @@ export interface ConfigParameters {
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
-  geminiIgnorePatterns?: string[];
   accessibility?: AccessibilitySettings;
   telemetry?: boolean;
   telemetryLogUserPromptsEnabled?: boolean;
@@ -119,7 +118,6 @@ export class Config {
   private readonly telemetryLogUserPromptsEnabled: boolean;
   private readonly telemetryOtlpEndpoint: string;
   private readonly geminiClient: GeminiClient;
-  private readonly geminiIgnorePatterns: string[] = [];
   private readonly fileFilteringRespectGitIgnore: boolean;
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -164,9 +162,6 @@ export class Config {
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
-    }
-    if (params.geminiIgnorePatterns) {
-      this.geminiIgnorePatterns = params.geminiIgnorePatterns;
     }
 
     this.toolRegistry = createToolRegistry(this);
@@ -296,10 +291,6 @@ export class Config {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
-  getGeminiIgnorePatterns(): string[] {
-    return this.geminiIgnorePatterns;
-  }
-
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFilteringRespectGitIgnore;
   }
@@ -320,12 +311,9 @@ export class Config {
     return this.bugCommand;
   }
 
-  async getFileService(): Promise<FileDiscoveryService> {
+  getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
-      await this.fileDiscoveryService.initialize({
-        respectGitIgnore: this.fileFilteringRespectGitIgnore,
-      });
     }
     return this.fileDiscoveryService;
   }

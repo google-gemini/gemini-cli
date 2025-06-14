@@ -6,12 +6,12 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { GitIgnoreParser } from './gitIgnoreParser.js';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import { isGitRepository } from './gitUtils.js';
 
 // Mock fs module
-vi.mock('fs/promises');
+vi.mock('fs');
 
 // Mock gitUtils module
 vi.mock('./gitUtils.js');
@@ -23,8 +23,7 @@ describe('GitIgnoreParser', () => {
   beforeEach(() => {
     parser = new GitIgnoreParser(mockProjectRoot);
     // Reset mocks before each test
-    vi.mocked(fs.readFile).mockClear();
-    vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT')); // Default to no file
+    vi.mocked(fs.readFileSync).mockClear();
     vi.mocked(isGitRepository).mockReturnValue(true);
   });
 
@@ -33,11 +32,11 @@ describe('GitIgnoreParser', () => {
   });
 
   describe('initialization', () => {
-    it('should initialize without errors when no .gitignore exists', async () => {
-      await expect(parser.initialize()).resolves.not.toThrow();
+    it('should initialize without errors when no .gitignore exists', () => {
+      expect(() => parser.loadGitRepoPatterns()).not.toThrow();
     });
 
-    it('should load .gitignore patterns when file exists', async () => {
+    it('should load .gitignore patterns when file exists', () => {
       const gitignoreContent = `
 # Comment
 node_modules/
@@ -45,11 +44,9 @@ node_modules/
 /dist
 .env
 `;
-      vi.mocked(fs.readFile)
-        .mockResolvedValueOnce(gitignoreContent)
-        .mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(gitignoreContent);
 
-      await parser.initialize();
+      parser.loadGitRepoPatterns();
 
       expect(parser.getPatterns()).toEqual([
         '.git',
@@ -64,8 +61,8 @@ node_modules/
       expect(parser.isIgnored('.env')).toBe(true);
     });
 
-    it('should handle git exclude file', async () => {
-      vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
+    it('should handle git exclude file', () => {
+      vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
         if (
           filePath === path.join(mockProjectRoot, '.git', 'info', 'exclude')
         ) {
@@ -74,30 +71,34 @@ node_modules/
         throw new Error('ENOENT');
       });
 
-      await parser.initialize();
+      parser.loadGitRepoPatterns();
       expect(parser.getPatterns()).toEqual(['.git', 'temp/', '*.tmp']);
       expect(parser.isIgnored('temp/file.txt')).toBe(true);
       expect(parser.isIgnored('src/file.tmp')).toBe(true);
     });
 
-    it('should handle custom patterns file name', async () => {
+    it('should handle custom patterns file name', () => {
       vi.mocked(isGitRepository).mockReturnValue(false);
-      vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
+      vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
         if (filePath === path.join(mockProjectRoot, '.geminiignore')) {
           return 'temp/\n*.tmp';
         }
         throw new Error('ENOENT');
       });
 
-      await parser.initialize('.geminiignore');
+      parser.loadPatterns('.geminiignore');
       expect(parser.getPatterns()).toEqual(['temp/', '*.tmp']);
       expect(parser.isIgnored('temp/file.txt')).toBe(true);
       expect(parser.isIgnored('src/file.tmp')).toBe(true);
     });
+
+    it('should initialize without errors when no .geminiignore exists', () => {
+      expect(() => parser.loadPatterns('.geminiignore')).not.toThrow();
+    });
   });
 
   describe('isIgnored', () => {
-    beforeEach(async () => {
+    beforeEach(() => {
       const gitignoreContent = `
 node_modules/
 *.log
@@ -106,10 +107,8 @@ node_modules/
 src/*.tmp
 !src/important.tmp
 `;
-      vi.mocked(fs.readFile)
-        .mockResolvedValueOnce(gitignoreContent)
-        .mockRejectedValue(new Error('ENOENT'));
-      await parser.initialize();
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(gitignoreContent);
+      parser.loadGitRepoPatterns();
     });
 
     it('should always ignore .git directory', () => {
@@ -165,11 +164,12 @@ src/*.tmp
   });
 
   describe('getIgnoredPatterns', () => {
-    it('should return the raw patterns added', async () => {
+    it('should return the raw patterns added', () => {
       const gitignoreContent = '*.log\n!important.log';
-      vi.mocked(fs.readFile).mockResolvedValueOnce(gitignoreContent);
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(gitignoreContent);
 
-      await parser.initialize();
+      parser.loadGitRepoPatterns();
+      expect(parser.getPatterns()).toEqual(['.git', '*.log', '!important.log']);
     });
   });
 });

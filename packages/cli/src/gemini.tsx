@@ -15,7 +15,6 @@ import { LoadedSettings, loadSettings } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadGeminiIgnorePatterns } from './utils/loadIgnorePatterns.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import {
@@ -41,7 +40,6 @@ export async function main() {
   const settings = loadSettings(workspaceRoot);
   setWindowTitle(basename(workspaceRoot), settings);
 
-  const geminiIgnorePatterns = await loadGeminiIgnorePatterns(workspaceRoot);
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
     for (const error of settings.errors) {
@@ -56,15 +54,10 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(
-    settings.merged,
-    extensions,
-    geminiIgnorePatterns,
-    sessionId,
-  );
+  const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
   // Initialize centralized FileDiscoveryService
-  await config.getFileService();
+  config.getFileService();
   if (config.getCheckpointEnabled()) {
     try {
       await config.getGitService();
@@ -199,7 +192,6 @@ async function loadNonInteractiveConfig(
   return await loadCliConfig(
     nonInteractiveSettings,
     extensions,
-    config.getGeminiIgnorePatterns(),
     config.getSessionId(),
   );
 }

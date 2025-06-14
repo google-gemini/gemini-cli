@@ -11,6 +11,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs'; // For actual fs operations in setup
 import { Config } from '../config/config.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Mock fileUtils.processSingleFileContent
 vi.mock('../utils/fileUtils', async () => {
@@ -34,9 +35,14 @@ describe('ReadFileTool', () => {
     tempRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-file-tool-root-'),
     );
+    fs.writeFileSync(
+      path.join(tempRootDir, '.geminiignore'),
+      ['foo.*'].join('\n'),
+    );
+    const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfigInstance = {
-      getGeminiIgnorePatterns: () => ['**/foo.bar', 'foo.baz', 'foo.*'],
-    } as Config;
+      getFileService: () => fileService,
+    } as unknown as Config;
     tool = new ReadFileTool(tempRootDir, mockConfigInstance);
     mockProcessSingleFileContent.mockReset();
   });
@@ -235,7 +241,6 @@ describe('ReadFileTool', () => {
       };
       const result = await tool.execute(params, abortSignal);
       expect(result.returnDisplay).toContain('foo.bar');
-      expect(result.returnDisplay).toContain('foo.*');
       expect(result.returnDisplay).not.toContain('foo.baz');
     });
   });

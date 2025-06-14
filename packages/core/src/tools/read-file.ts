@@ -5,7 +5,6 @@
  */
 
 import path from 'path';
-import micromatch from 'micromatch';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
@@ -37,11 +36,10 @@ export interface ReadFileToolParams {
  */
 export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
-  private readonly geminiIgnorePatterns: string[];
 
   constructor(
     private rootDirectory: string,
-    config: Config,
+    private config: Config,
   ) {
     super(
       ReadFileTool.Name,
@@ -70,7 +68,6 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       },
     );
     this.rootDirectory = path.resolve(rootDirectory);
-    this.geminiIgnorePatterns = config.getGeminiIgnorePatterns() || [];
   }
 
   validateToolParams(params: ReadFileToolParams): string | null {
@@ -97,16 +94,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       return 'Limit must be a positive number';
     }
 
-    // Check against .geminiignore patterns
-    if (this.geminiIgnorePatterns.length > 0) {
+    const fileService = this.config.getFileService();
+    if (fileService.shouldGeminiIgnoreFile(params.path)) {
       const relativePath = makeRelative(params.path, this.rootDirectory);
-      if (micromatch.isMatch(relativePath, this.geminiIgnorePatterns)) {
-        // Get patterns that matched to show in the error message
-        const matchingPatterns = this.geminiIgnorePatterns.filter((p) =>
-          micromatch.isMatch(relativePath, p),
-        );
-        return `File path '${shortenPath(relativePath)}' is ignored by the following .geminiignore pattern(s):\n\n${matchingPatterns.join('\n')}`;
-      }
+      return `File path '${shortenPath(relativePath)}' is ignored by .geminiignore pattern(s).`;
     }
 
     return null;

@@ -221,7 +221,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       const respectGitIgnore =
         params.respect_git_ignore ??
         this.config.getFileFilteringRespectGitIgnore();
-      const fileDiscovery = await this.config.getFileService();
+      const fileDiscovery = this.config.getFileService();
 
       const entries = (await glob(params.pattern, {
         cwd: searchDirAbsolute,
@@ -239,7 +239,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       let filteredEntries = entries;
       let gitIgnoredCount = 0;
 
-      if (respectGitIgnore && fileDiscovery.isGitRepository()) {
+      if (respectGitIgnore) {
         const relativePaths = entries.map((p) =>
           path.relative(this.rootDirectory, p.fullpath()),
         );

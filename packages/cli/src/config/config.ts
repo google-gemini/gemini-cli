@@ -136,7 +136,6 @@ export async function loadHierarchicalGeminiMemory(
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
-  geminiIgnorePatterns: string[],
   sessionId: string,
 ): Promise<Config> {
   loadEnvironment();
@@ -158,9 +157,6 @@ export async function loadCliConfig(
   const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
 
   const fileService = new FileDiscoveryService(process.cwd());
-  await fileService.initialize({
-    respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-  });
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
@@ -193,7 +189,6 @@ export async function loadCliConfig(
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
-    geminiIgnorePatterns,
     accessibility: settings.accessibility,
     telemetry:
       argv.telemetry !== undefined

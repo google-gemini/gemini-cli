@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { glob } from 'glob';
 import {
   isNodeError,
   escapePath,
@@ -187,7 +188,7 @@ export function useCompletion(
     const findFilesRecursively = async (
       startDir: string,
       searchPrefix: string,
-      fileDiscovery: { shouldIgnoreFile: (path: string) => boolean } | null,
+      fileDiscovery: { shouldGitIgnoreFile: (path: string) => boolean } | null,
       currentRelativePath = '',
       depth = 0,
       maxDepth = 10, // Limit recursion depth
@@ -218,7 +219,7 @@ export function useCompletion(
           // Check if this entry should be ignored by git-aware filtering
           if (
             fileDiscovery &&
-            fileDiscovery.shouldIgnoreFile(entryPathFromRoot)
+            fileDiscovery.shouldGitIgnoreFile(entryPathFromRoot)
           ) {
             continue;
           }
@@ -263,9 +264,10 @@ export function useCompletion(
       maxResults = 50,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
-      const files = await fileDiscoveryService.glob(globPattern, {
+      const files = await glob(globPattern, {
         cwd,
         dot: searchPrefix.startsWith('.'),
+        nocase: true,
       });
 
       const suggestions: Suggestion[] = files
@@ -285,9 +287,7 @@ export function useCompletion(
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
-      const fileDiscoveryService = config
-        ? await config.getFileService()
-        : null;
+      const fileDiscoveryService = config ? config.getFileService() : null;
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
@@ -326,7 +326,7 @@ export function useCompletion(
             );
             if (
               fileDiscoveryService &&
-              fileDiscoveryService.shouldIgnoreFile(relativePath)
+              fileDiscoveryService.shouldGitIgnoreFile(relativePath)
             ) {
               continue;
             }

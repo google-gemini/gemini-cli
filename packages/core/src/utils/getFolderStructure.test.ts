@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import fsPromises from 'fs/promises';
+import * as fs from 'fs';
 import { Dirent as FSDirent } from 'fs';
 import * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
@@ -23,6 +24,7 @@ vi.mock('path', async (importOriginal) => {
 });
 
 vi.mock('fs/promises');
+vi.mock('fs');
 vi.mock('./gitUtils.js');
 
 // Import 'path' again here, it will be the mocked version
@@ -308,7 +310,7 @@ describe('getFolderStructure gitignore', () => {
       return [];
     });
 
-    (fsPromises.readFile as Mock).mockImplementation(async (p) => {
+    (fs.readFileSync as Mock).mockImplementation((p) => {
       const path = p.toString();
       if (path === '/test/project/.gitignore') {
         return 'ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml';
@@ -321,7 +323,6 @@ describe('getFolderStructure gitignore', () => {
 
   it('should ignore files and folders specified in .gitignore', async () => {
     const fileService = new FileDiscoveryService('/test/project');
-    await fileService.initialize();
     const structure = await getFolderStructure('/test/project', {
       fileService,
     });
@@ -332,9 +333,9 @@ describe('getFolderStructure gitignore', () => {
 
   it('should not ignore files if respectGitIgnore is false', async () => {
     const fileService = new FileDiscoveryService('/test/project');
-    await fileService.initialize({ respectGitIgnore: false });
     const structure = await getFolderStructure('/test/project', {
       fileService,
+      respectGitIgnore: false,
     });
     expect(structure).toContain('ignored.txt');
     // node_modules is still ignored by default
