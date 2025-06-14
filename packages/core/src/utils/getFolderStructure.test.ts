@@ -38,8 +38,8 @@ const createDirent = (name: string, type: 'file' | 'dir'): FSDirent => ({
   isSymbolicLink: () => false,
   isFIFO: () => false,
   isSocket: () => false,
-  parentPath: '',
   path: '',
+  parentPath: '',
 });
 
 describe('getFolderStructure', () => {
