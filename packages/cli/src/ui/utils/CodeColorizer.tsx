@@ -66,6 +66,11 @@ function renderHastNode(
 
   // Handle Root Node: Start recursion with initial inherited color
   if (node.type === 'root') {
+    // Check if children array is empty - this happens when lowlight can't detect language – fallback to plain text
+    if (!node.children || node.children.length === 0) {
+      return null;
+    }
+
     // Pass down the initial inheritedColor (likely undefined from the top call)
     // Ensure child type matches expected HAST structure (RootContent is common)
     return node.children?.map((child: RootContent, index: number) => (
@@ -105,21 +110,24 @@ export function colorizeCode(
 
     return (
       <Text>
-        {lines.map((line, index) => (
-          <Text key={index}>
-            <Text color={activeTheme.colors.Gray}>
-              {`${String(index + 1).padStart(padWidth, ' ')} `}
+        {lines.map((line, index) => {
+          const renderedNode = renderHastNode(
+            getHighlightedLines(line),
+            activeTheme,
+            undefined,
+          );
+
+          const contentToRender = renderedNode !== null ? renderedNode : line;
+          return (
+            <Text key={index}>
+              <Text color={activeTheme.colors.Gray}>
+                {`${String(index + 1).padStart(padWidth, ' ')} `}
+              </Text>
+              <Text color={activeTheme.defaultColor}>{contentToRender}</Text>
+              {index < lines.length - 1 && '\n'}
             </Text>
-            <Text color={activeTheme.defaultColor}>
-              {renderHastNode(
-                getHighlightedLines(line),
-                activeTheme,
-                undefined,
-              )}
-            </Text>
-            {index < lines.length - 1 && '\n'}
-          </Text>
-        ))}
+          );
+        })}
       </Text>
     );
   } catch (error) {

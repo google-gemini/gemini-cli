@@ -208,4 +208,54 @@ index 123..789 100644
     expect(output).toContain("21   + const anotherNew = 'test';");
     expect(output).toContain("22     console.log('end of second hunk');");
   });
+
+  it('should correctly render a diff with a SVN diff format', () => {
+    const newFileDiff = `
+fileDiff Index: file.txt
+===================================================================
+--- a/file.txt   Current
++++ b/file.txt   Proposed
+--- a/multi.js
++++ b/multi.js
+@@ -1,1 +1,1 @@
+-const oldVar = 1;
++const newVar = 1;
+@@ -20,1 +20,1 @@
+-const anotherOld = 'test';
++const anotherNew = 'test';
+\\ No newline at end of file  
+`;
+    const { lastFrame } = render(
+      <DiffRenderer diffContent={newFileDiff} filename="TEST" />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('1    - const oldVar = 1;');
+    expect(output).toContain('1    + const newVar = 1;');
+    expect(output).toContain('═');
+    expect(output).toContain("20   - const anotherOld = 'test';");
+    expect(output).toContain("20   + const anotherNew = 'test';");
+  });
+
+  it('should correctly render a new file with no file extension correctly', () => {
+    const newFileDiff = `
+fileDiff Index: Dockerfile
+===================================================================
+--- Dockerfile   Current
++++ Dockerfile   Proposed
+@@ -0,0 +1,3 @@
++FROM node:14
++RUN npm install
++RUN npm run build
+\\ No newline at end of file  
+`;
+    const { lastFrame } = render(
+      <DiffRenderer diffContent={newFileDiff} filename="Dockerfile" />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('1 FROM node:14');
+    expect(output).toContain('2 RUN npm install');
+    expect(output).toContain('3 RUN npm run build');
+  });
 });
