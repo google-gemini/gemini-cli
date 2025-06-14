@@ -53,6 +53,12 @@ export interface IndividualToolCallDisplay {
   renderOutputAsMarkdown?: boolean;
 }
 
+export interface CompressionProps {
+  isPending: boolean;
+  originalTokenCount?: number;
+  newTokenCount?: number;
+}
+
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
 }
@@ -113,6 +119,11 @@ export type HistoryItemUserShell = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemCompression = HistoryItemBase & {
+  type: 'compression';
+  compression: CompressionProps;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -127,7 +138,8 @@ export type HistoryItemWithoutId =
   | HistoryItemAbout
   | HistoryItemToolGroup
   | HistoryItemStats
-  | HistoryItemQuit;
+  | HistoryItemQuit
+  | HistoryItemCompression;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -140,6 +152,7 @@ export enum MessageType {
   STATS = 'stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
+  COMPRESSION = 'compression',
 }
 
 // Simplified message structure for internal feedback
@@ -172,6 +185,11 @@ export type Message =
       stats: CumulativeStats;
       duration: string;
       content?: string;
+    }
+  | {
+      type: MessageType.COMPRESSION;
+      compression: CompressionProps;
+      timestamp: Date;
     };
 
 export interface ConsoleMessageItem {

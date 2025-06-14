@@ -13,6 +13,7 @@ import {
   ServerGeminiStreamEvent as GeminiEvent,
   ServerGeminiContentEvent as ContentEvent,
   ServerGeminiErrorEvent as ErrorEvent,
+  ServerGeminiChatCompressedEvent,
   getErrorMessage,
   isNodeError,
   MessageSenderType,
@@ -368,11 +369,14 @@ export const useGeminiStream = (
   );
 
   const handleChatCompressionEvent = useCallback(
-    () =>
+    (eventValue: ServerGeminiChatCompressedEvent['value']) =>
       addItem(
         {
           type: 'info',
-          text: `IMPORTANT: this conversation approached the input token limit for ${config.getModel()}. We'll send a compressed context to the model for any future messages.`,
+          text:
+            `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
+            `A compressed context will be sent for future messages (compressed from: ` +
+            `${eventValue.originalTokenCount} to ${eventValue.newTokenCount} tokens).`,
         },
         Date.now(),
       ),
@@ -406,7 +410,7 @@ export const useGeminiStream = (
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ChatCompressed:
-            handleChatCompressionEvent();
+            handleChatCompressionEvent(event.value);
             break;
           case ServerGeminiEventType.UsageMetadata:
             addUsage(event.value);
