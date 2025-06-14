@@ -36,6 +36,10 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface BugCommandSettings {
+  urlTemplate: string;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -87,6 +91,7 @@ export interface ConfigParameters {
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
+  bugCommand?: BugCommandSettings;
 }
 
 export class Config {
@@ -121,6 +126,7 @@ export class Config {
   private readonly checkpoint: boolean;
   private readonly proxy: string | undefined;
   private readonly cwd: string;
+  private readonly bugCommand: BugCommandSettings | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -154,6 +160,7 @@ export class Config {
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
+    this.bugCommand = params.bugCommand;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -307,6 +314,10 @@ export class Config {
 
   getWorkingDir(): string {
     return this.cwd;
+  }
+
+  getBugCommand(): BugCommandSettings | undefined {
+    return this.bugCommand;
   }
 
   async getFileService(): Promise<FileDiscoveryService> {

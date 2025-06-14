@@ -129,6 +129,7 @@ describe('useSlashCommandProcessor', () => {
       getModel: vi.fn(() => 'test-model'),
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointEnabled: vi.fn(() => true),
+      getBugCommand: vi.fn(() => undefined),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -409,6 +410,47 @@ Add any other context about the problem here.
         process.env.SEATBELT_PROFILE,
         process.env.CLI_VERSION,
       );
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledTimes(2);
+      expect(open).toHaveBeenCalledWith(expectedUrl);
+      expect(commandResult).toBe(true);
+    });
+
+    it('should use the custom bug command URL from config if available', async () => {
+      const bugCommand = {
+        urlTemplate:
+          'https://custom-bug-tracker.com/new?title={title}&body={body}',
+      };
+      mockConfig = {
+        ...mockConfig,
+        getBugCommand: vi.fn(() => bugCommand),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      const bugDescription = 'This is a custom bug';
+      const diagnosticInfo = `
+## Describe the bug
+A clear and concise description of what the bug is.
+
+## Additional context
+Add any other context about the problem here.
+
+## Diagnostic Information
+*   **CLI Version:** unknown
+*   **Git Commit:** ${GIT_COMMIT_INFO}
+*   **Operating System:** test-platform test-node-version
+*   **Sandbox Environment:** no sandbox
+*   **Model Version:** test-model
+*   **Memory Usage:** 11.8 MB
+`;
+      const expectedUrl = bugCommand.urlTemplate
+        .replace('{title}', encodeURIComponent(bugDescription))
+        .replace('{body}', encodeURIComponent(diagnosticInfo));
+
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
         commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
