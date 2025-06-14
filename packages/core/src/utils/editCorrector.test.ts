@@ -32,6 +32,7 @@ vi.mock('../core/client.js', () => ({
 import {
   countOccurrences,
   ensureCorrectEdit,
+  ensureCorrectFileContent,
   unescapeStringForGeminiBug,
   resetEditCorrectorCaches_TEST_ONLY,
 } from './editCorrector.js';
@@ -102,7 +103,7 @@ describe('editCorrector', () => {
         'First line\nSecond line',
       );
     });
-    it('should handle multiple backslashes before an escapable character', () => {
+    it('should handle multiple backslashes before an escapable character (aggressive unescaping)', () => {
       expect(unescapeStringForGeminiBug('\\\\n')).toBe('\n');
       expect(unescapeStringForGeminiBug('\\\\\\t')).toBe('\t');
       expect(unescapeStringForGeminiBug('\\\\\\\\`')).toBe('`');
@@ -125,6 +126,21 @@ describe('editCorrector', () => {
       expect(
         unescapeStringForGeminiBug('\\\\\\\nLine1\\\nLine2\\tTab\\\\`Tick\\"'),
       ).toBe('\nLine1\nLine2\tTab`Tick"');
+    });
+    it('should handle escaped backslashes', () => {
+      expect(unescapeStringForGeminiBug('\\\\')).toBe('\\');
+      expect(unescapeStringForGeminiBug('C:\\\\Users')).toBe('C:\\Users');
+      expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe(
+        'path\to\\file',
+      );
+    });
+    it('should handle escaped backslashes mixed with other escapes (aggressive unescaping)', () => {
+      expect(unescapeStringForGeminiBug('line1\\\\\\nline2')).toBe(
+        'line1\nline2',
+      );
+      expect(unescapeStringForGeminiBug('quote\\\\"text\\\\nline')).toBe(
+        'quote"text\nline',
+      );
     });
   });
 
@@ -335,16 +351,13 @@ describe('editCorrector', () => {
           old_string: 'find \\\\me',
           new_string: 'replace with foobar',
         };
-        mockResponses.push({
-          corrected_target_snippet: 'find \\me',
-        });
         const result = await ensureCorrectEdit(
           currentContent,
           originalParams,
           mockGeminiClientInstance,
           abortSignal,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with foobar');
         expect(result.params.old_string).toBe('find \\me');
         expect(result.occurrences).toBe(1);
@@ -498,6 +511,169 @@ describe('editCorrector', () => {
         expect(result.params.new_string).toBe(expectedFinalNewString);
         expect(result.occurrences).toBe(1);
       });
+    });
+  });
+
+  describe('ensureCorrectFileContent', () => {
+    let mockGeminiClientInstance: Mocked<GeminiClient>;
+    let mockToolRegistry: Mocked<ToolRegistry>;
+    let mockConfigInstance: Config;
+    const abortSignal = new AbortController().signal;
+
+    beforeEach(() => {
+      mockToolRegistry = new ToolRegistry({} as Config) as Mocked<ToolRegistry>;
+      const configParams = {
+        apiKey: 'test-api-key',
+        model: 'test-model',
+        sandbox: false as boolean | string,
+        targetDir: '/test',
+        debugMode: false,
+        question: undefined as string | undefined,
+        fullContext: false,
+        coreTools: undefined as string[] | undefined,
+        toolDiscoveryCommand: undefined as string | undefined,
+        toolCallCommand: undefined as string | undefined,
+        mcpServerCommand: undefined as string | undefined,
+        mcpServers: undefined as Record<string, any> | undefined,
+        userAgent: 'test-agent',
+        userMemory: '',
+        geminiMdFileCount: 0,
+        alwaysSkipModificationConfirmation: false,
+      };
+      mockConfigInstance = {
+        ...configParams,
+        getApiKey: vi.fn(() => configParams.apiKey),
+        getModel: vi.fn(() => configParams.model),
+        getSandbox: vi.fn(() => configParams.sandbox),
+        getTargetDir: vi.fn(() => configParams.targetDir),
+        getToolRegistry: vi.fn(() => mockToolRegistry),
+        getDebugMode: vi.fn(() => configParams.debugMode),
+        getQuestion: vi.fn(() => configParams.question),
+        getFullContext: vi.fn(() => configParams.fullContext),
+        getCoreTools: vi.fn(() => configParams.coreTools),
+        getToolDiscoveryCommand: vi.fn(() => configParams.toolDiscoveryCommand),
+        getToolCallCommand: vi.fn(() => configParams.toolCallCommand),
+        getMcpServerCommand: vi.fn(() => configParams.mcpServerCommand),
+        getMcpServers: vi.fn(() => configParams.mcpServers),
+        getUserAgent: vi.fn(() => configParams.userAgent),
+        getUserMemory: vi.fn(() => configParams.userMemory),
+        setUserMemory: vi.fn((mem: string) => {
+          configParams.userMemory = mem;
+        }),
+        getGeminiMdFileCount: vi.fn(() => configParams.geminiMdFileCount),
+        setGeminiMdFileCount: vi.fn((count: number) => {
+          configParams.geminiMdFileCount = count;
+        }),
+        getAlwaysSkipModificationConfirmation: vi.fn(
+          () => configParams.alwaysSkipModificationConfirmation,
+        ),
+        setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
+          configParams.alwaysSkipModificationConfirmation = skip;
+        }),
+      } as unknown as Config;
+
+      callCount = 0;
+      mockResponses.length = 0;
+      mockGenerateJson = vi
+        .fn()
+        .mockImplementation((_contents, _schema, signal) => {
+          if (signal && signal.aborted) {
+            return Promise.reject(new Error('Aborted'));
+          }
+          const response = mockResponses[callCount];
+          callCount++;
+          if (response === undefined) return Promise.resolve({});
+          return Promise.resolve(response);
+        });
+      mockStartChat = vi.fn();
+      mockSendMessageStream = vi.fn();
+
+      mockGeminiClientInstance = new GeminiClient(
+        mockConfigInstance,
+      ) as Mocked<GeminiClient>;
+      resetEditCorrectorCaches_TEST_ONLY();
+    });
+
+    it('should return content unchanged if no escaping issues detected', async () => {
+      const content = 'This is normal content without escaping issues';
+      const result = await ensureCorrectFileContent(
+        content,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+      expect(result).toBe(content);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+    });
+
+    it('should call correctStringEscaping for potentially escaped content', async () => {
+      const content = 'console.log(\\"Hello World\\");';
+      const correctedContent = 'console.log("Hello World");';
+      mockResponses.push({
+        corrected_string_escaping: correctedContent,
+      });
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+
+      expect(result).toBe(correctedContent);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle correctStringEscaping returning corrected content via correct property name', async () => {
+      // This test specifically verifies the property name fix
+      const content = 'const message = \\"Hello\\nWorld\\";';
+      const correctedContent = 'const message = "Hello\nWorld";';
+
+      // Mock the response with the correct property name
+      mockResponses.push({
+        corrected_string_escaping: correctedContent,
+      });
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+
+      expect(result).toBe(correctedContent);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return original content if LLM correction fails', async () => {
+      const content = 'console.log(\\"Hello World\\");';
+      // Mock empty response to simulate LLM failure
+      mockResponses.push({});
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+
+      expect(result).toBe(content);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle various escape sequences that need correction', async () => {
+      const content =
+        'const obj = { name: \\"John\\", age: 30, bio: \\"Developer\\nEngineer\\" };';
+      const correctedContent =
+        'const obj = { name: "John", age: 30, bio: "Developer\nEngineer" };';
+
+      mockResponses.push({
+        corrected_string_escaping: correctedContent,
+      });
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+
+      expect(result).toBe(correctedContent);
     });
   });
 });
