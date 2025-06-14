@@ -38,6 +38,7 @@ export interface Settings {
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: boolean;
+  telemetryOtlpEndpoint?: string;
   preferredEditor?: string;
 
   // Git-aware file filtering settings
