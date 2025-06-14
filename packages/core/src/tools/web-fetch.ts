@@ -6,10 +6,26 @@
 
 import { GroundingMetadata } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, ToolResult } from './tools.js';
+import {
+  BaseTool,
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { Config } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { convert } from 'html-to-text';
+
+const URL_FETCH_TIMEOUT_MS = 10000;
+const MAX_CONTENT_LENGTH = 100000;
+
+// Helper function to extract URLs from a string
+function extractUrls(text: string): string[] {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.match(urlRegex) || [];
+}
 
 // Interfaces for grounding metadata (similar to web-search.ts)
 interface GroundingChunkWeb {
@@ -52,7 +68,7 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     super(
       WebFetchTool.Name,
       'WebFetch',
-      "Processes content from URL(s) embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
       {
         properties: {
           prompt: {
@@ -65,6 +81,71 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
         type: 'object',
       },
     );
+  }
+
+  private async executeFallback(
+    params: WebFetchToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
+    const urls = extractUrls(params.prompt);
+    if (urls.length === 0) {
+      return {
+        llmContent: 'Error: No URL found in the prompt for fallback.',
+        returnDisplay: 'Error: No URL found in the prompt for fallback.',
+      };
+    }
+    // For now, we only support one URL for fallback
+    let url = urls[0];
+
+    // Convert GitHub blob URL to raw URL
+    if (url.includes('github.com') && url.includes('/blob/')) {
+      url = url
+        .replace('github.com', 'raw.githubusercontent.com')
+        .replace('/blob/', '/');
+    }
+
+    try {
+      const response = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+      if (!response.ok) {
+        throw new Error(
+          `Request failed with status code ${response.status} ${response.statusText}`,
+        );
+      }
+      const html = await response.text();
+      const textContent = convert(html, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      }).substring(0, MAX_CONTENT_LENGTH);
+
+      const geminiClient = this.config.getGeminiClient();
+      const fallbackPrompt = `The user requested the following: "${params.prompt}".
+
+I was unable to access the URL directly. Instead, I have fetched the raw content of the page. Please use the following content to answer the user's request. Do not attempt to access the URL again.
+
+---
+${textContent}
+---`;
+      const result = await geminiClient.generateContent(
+        [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
+        {},
+        signal,
+      );
+      const resultText = getResponseText(result) || '';
+      return {
+        llmContent: resultText,
+        returnDisplay: `Content for ${url} processed using fallback fetch.`,
+      };
+    } catch (e) {
+      const error = e as Error;
+      const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+      };
+    }
   }
 
   validateParams(params: WebFetchToolParams): string | null {
@@ -97,6 +178,43 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
+  async shouldConfirmExecute(
+    params: WebFetchToolParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+      return false;
+    }
+
+    const validationError = this.validateParams(params);
+    if (validationError) {
+      return false;
+    }
+
+    // Perform GitHub URL conversion here to differentiate between user-provided
+    // URL and the actual URL to be fetched.
+    const urls = extractUrls(params.prompt).map((url) => {
+      if (url.includes('github.com') && url.includes('/blob/')) {
+        return url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+      }
+      return url;
+    });
+
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: `Confirm Web Fetch`,
+      prompt: params.prompt,
+      urls,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        }
+      },
+    };
+    return confirmationDetails;
+  }
+
   async execute(
     params: WebFetchToolParams,
     signal: AbortSignal,
@@ -110,6 +228,14 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     }
 
     const userPrompt = params.prompt;
+    const urls = extractUrls(userPrompt);
+    const url = urls[0];
+    const isPrivate = isPrivateIp(url);
+
+    if (isPrivate) {
+      return this.executeFallback(params, signal);
+    }
+
     const geminiClient = this.config.getGeminiClient();
 
     try {
@@ -120,7 +246,10 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
       );
 
       console.debug(
-        `[WebFetchTool] Full response for prompt "${userPrompt.substring(0, 50)}...":`,
+        `[WebFetchTool] Full response for prompt "${userPrompt.substring(
+          0,
+          50,
+        )}...":`,
         JSON.stringify(response, null, 2),
       );
 
@@ -138,7 +267,6 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
 
       // Error Handling
       let processingError = false;
-      let errorDetail = 'An unknown error occurred during content processing.';
 
       if (
         urlContextMeta?.urlMetadata &&
@@ -149,13 +277,10 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
         );
         if (allStatuses.every((s) => s !== 'URL_RETRIEVAL_STATUS_SUCCESS')) {
           processingError = true;
-          errorDetail = `All URL retrieval attempts failed. Statuses: ${allStatuses.join(', ')}. API reported: "${responseText || 'No additional detail.'}"`;
         }
       } else if (!responseText.trim() && !sources?.length) {
         // No URL metadata and no content/sources
         processingError = true;
-        errorDetail =
-          'No content was returned and no URL metadata was available to determine fetch status.';
       }
 
       if (
@@ -165,16 +290,10 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
       ) {
         // Successfully retrieved some URL (or no specific error from urlContextMeta), but no usable text or grounding data.
         processingError = true;
-        errorDetail =
-          'URL(s) processed, but no substantive content or grounding information was found.';
       }
 
       if (processingError) {
-        const errorText = `Failed to process prompt and fetch URL data. ${errorDetail}`;
-        return {
-          llmContent: `Error: ${errorText}`,
-          returnDisplay: `Error: ${errorText}`,
-        };
+        return this.executeFallback(params, signal);
       }
 
       const sourceListFormatted: string[] = [];
@@ -227,7 +346,10 @@ ${sourceListFormatted.join('\n')}`;
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
-      const errorMessage = `Error processing web content for prompt "${userPrompt.substring(0, 50)}...": ${getErrorMessage(error)}`;
+      const errorMessage = `Error processing web content for prompt "${userPrompt.substring(
+        0,
+        50,
+      )}...": ${getErrorMessage(error)}`;
       console.error(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,

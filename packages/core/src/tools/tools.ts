@@ -222,10 +222,19 @@ export interface ToolMcpConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
+export interface ToolInfoConfirmationDetails {
+  type: 'info';
+  title: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  prompt: string;
+  urls?: string[];
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
-  | ToolMcpConfirmationDetails;
+  | ToolMcpConfirmationDetails
+  | ToolInfoConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',

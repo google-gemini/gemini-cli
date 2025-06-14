@@ -8,9 +8,11 @@ This document describes the `web_fetch` tool.
 - **Arguments:**
   - `prompt` (string, required): A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content. For example: `"Summarize https://example.com/article and extract key points from https://another.com/data"`. The prompt must contain at least one URL starting with `http://` or `https://`.
 - **Behavior:**
-  - The tool sends the prompt and the specified URLs to the Gemini API.
-  - The API fetches the content of the URLs, processes it according to the instructions in the prompt, and returns a consolidated response.
-  - The tool formats the response, including source attribution with citations, and returns it to the user.
+  - The tool will first ask for confirmation before fetching any URLs.
+  - It attempts to process URLs through the Gemini API's `urlContext` tool first.
+  - If the Gemini API cannot access a URL (e.g., it's on `localhost`, a private network, or behind a firewall), the tool will fall back to fetching the content directly from the local machine.
+  - The tool can fetch content from `localhost` and private network addresses via this fallback mechanism.
+  - The tool formats the response, including source attribution with citations where possible, and returns it to the user.
 - **Examples:**
   - Summarizing a single article:
     ```
