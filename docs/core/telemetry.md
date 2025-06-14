@@ -12,15 +12,16 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 
 1.  **Ensure Prerequisites:**
     Ensure that:
-    - You have set the `GOOGLE_CLOUD_PROJECT` environment variable.
+    - You have exported the `GOOGLE_CLOUD_PROJECT` environment variable.
     - You have authenticated with Google Cloud and have the necessary IAM roles.
       For full details, see the [Google Cloud](#google-cloud) prerequisites.
 2.  **Run the Script:** Execute the following command from the project root:
     ```bash
     ./scripts/telemetry_gcp.js
     ```
-3.  **View Data:** The script will provide links to view your telemetry data (traces, metrics, logs) in the Google Cloud Console.
-4.  **Details:** Refer to documentation for telemetry in [Google Cloud](#google-cloud).
+3.  **Run Gemini CLI:** In a separate terminal, run your Gemini CLI commands. This will generate telemetry data that the collector will capture.
+4.  **View Data:** The script will provide links to view your telemetry data (traces, metrics, logs) in the Google Cloud Console.
+5.  **Details:** Refer to documentation for telemetry in [Google Cloud](#google-cloud).
 
 ### Local Telemetry with Jaeger UI (for Traces)
 
@@ -28,9 +29,10 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
     ```bash
     ./scripts/local_telemetry.js
     ```
-2.  **View Logs/Metrics:** Check the `.gemini/otel/collector.log` file for raw logs and metrics.
-3.  **View Traces:** Open your browser and go to `http://localhost:16686` to see traces in the Jaeger UI.
-4.  **Details:** Refer to documentation for telemetry in [Local](#local).
+2.  **Run Gemini CLI:** In a separate terminal, run your Gemini CLI commands. This will generate telemetry data that the collector will capture.
+3.  **View Logs/Metrics:** Check the `.gemini/otel/collector.log` file for raw logs and metrics.
+4.  **View Traces:** Open your browser and go to `http://localhost:16686` to see traces in the Jaeger UI.
+5.  **Details:** Refer to documentation for telemetry in [Local](#local).
 
 ## Enabling Telemetry
 
@@ -113,7 +115,10 @@ For a streamlined setup targeting Google Cloud, use the `scripts/telemetry_gcp.j
 1.  **Prerequisites**:
 
     - Ensure you have a Google Cloud Project ID.
-    - Set the `GOOGLE_CLOUD_PROJECT` environment variable to your project ID.
+    - Export the `GOOGLE_CLOUD_PROJECT` environment variable to make it available to the OTEL collector.
+      ```bash
+      export GOOGLE_CLOUD_PROJECT="your-project-id"
+      ```
     - Authenticate with Google Cloud (e.g., run `gcloud auth application-default login` or ensure `GOOGLE_APPLICATION_CREDENTIALS` is set).
     - Ensure your account/service account has the necessary roles: "Cloud Trace Agent", "Monitoring Metric Writer", and "Logs Writer".
 
@@ -132,17 +137,20 @@ For a streamlined setup targeting Google Cloud, use the `scripts/telemetry_gcp.j
     - Provide direct links to view traces, metrics, and logs in your Google Cloud Console.
     - On exit (Ctrl+C), it will attempt to restore your original telemetry and sandbox settings.
 
-3.  **View Telemetry in Google Cloud**:
+3.  **Run Gemini CLI:**
+    In a separate terminal, run your Gemini CLI commands. This will generate telemetry data that the collector will capture.
+
+4.  **View Telemetry in Google Cloud**:
     Use the links provided by the script to navigate to the Google Cloud Console and view your traces, metrics, and logs.
 
-4.  **Inspect Local Collector Logs**:
-    The script redirects the local OTEL collector's output to `.gemini/otel/collector-gcp.log`. You can monitor this file for detailed information or troubleshooting:
+5.  **Inspect Local Collector Logs**:
+    The script redirects the local OTEL collector\'s output to `.gemini/otel/collector-gcp.log`. You can monitor this file for detailed information or troubleshooting:
 
     ```bash
     tail -f .gemini/otel/collector-gcp.log
     ```
 
-5.  **Stop the Service**:
+6.  **Stop the Service**:
     Press `Ctrl+C` in the terminal where the script is running to stop the OTEL Collector.
 
 ## Data Reference: Logs & Metrics
