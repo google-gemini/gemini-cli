@@ -161,6 +161,9 @@ async function main() {
   });
 
   console.log(`\n✨ Local OTEL collector for GCP is running.`);
+  console.log(
+    '\n🚀 To send telemetry, run the Gemini CLI in a separate terminal window.',
+  );
   console.log(`\n📄 Collector logs are being written to: ${OTEL_LOG_FILE}`);
   console.log(`\n📊 View your telemetry data in Google Cloud Console:`);
   console.log(
