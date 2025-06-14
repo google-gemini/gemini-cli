@@ -511,10 +511,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_new_string_escaping === 'string' &&
-      result.corrected_new_string_escaping.length > 0
+      typeof result.corrected_string_escaping === 'string' &&
+      result.corrected_string_escaping.length > 0
     ) {
-      return result.corrected_new_string_escaping;
+      return result.corrected_string_escaping;
     } else {
       return potentiallyProblematicString;
     }
@@ -564,39 +564,45 @@ function trimPairIfPossible(
  */
 export function unescapeStringForGeminiBug(inputString: string): string {
   // Regex explanation:
-  // \\+ : Matches one or more literal backslash characters.
-  // (n|t|r|'|"|`|\n) : This is a capturing group. It matches one of the following:
+  // \\ : Matches exactly one literal backslash character.
+  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
   //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
-  //                       This handles cases like "\\n", "\\\\`", etc.
-  //   \n                 : This matches an actual newline character. This handles cases where the input
-  //                       string might have something like "\\\n" (a literal backslash followed by a newline).
+  //                       This handles cases like "\\n", "\\`", etc.
+  //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
+  //   \n : This matches an actual newline character. This handles cases where the input
+  //        string might have something like "\\\n" (a literal backslash followed by a newline).
   // g : Global flag, to replace all occurrences.
 
-  return inputString.replace(/\\+(n|t|r|'|"|`|\n)/g, (match, capturedChar) => {
-    // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
-    // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
+  return inputString.replace(
+    /\\+(n|t|r|'|"|`|\\|\n)/g,
+    (match, capturedChar) => {
+      // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
+      // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
 
-    switch (capturedChar) {
-      case 'n':
-        return '\n'; // Correctly escaped: \n (newline character)
-      case 't':
-        return '\t'; // Correctly escaped: \t (tab character)
-      case 'r':
-        return '\r'; // Correctly escaped: \r (carriage return character)
-      case "'":
-        return "'"; // Correctly escaped: ' (apostrophe character)
-      case '"':
-        return '"'; // Correctly escaped: " (quotation mark character)
-      case '`':
-        return '`'; // Correctly escaped: ` (backtick character)
-      case '\n': // This handles when 'capturedChar' is an actual newline
-        return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
-      default:
-        // This fallback should ideally not be reached if the regex captures correctly.
-        // It would return the original matched sequence if an unexpected character was captured.
-        return match;
-    }
-  });
+      switch (capturedChar) {
+        case 'n':
+          return '\n'; // Correctly escaped: \n (newline character)
+        case 't':
+          return '\t'; // Correctly escaped: \t (tab character)
+        case 'r':
+          return '\r'; // Correctly escaped: \r (carriage return character)
+        case "'":
+          return "'"; // Correctly escaped: ' (apostrophe character)
+        case '"':
+          return '"'; // Correctly escaped: " (quotation mark character)
+        case '`':
+          return '`'; // Correctly escaped: ` (backtick character)
+        case '\\': // This handles when 'capturedChar' is a literal backslash
+          return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
+        case '\n': // This handles when 'capturedChar' is an actual newline
+          return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+        default:
+          // This fallback should ideally not be reached if the regex captures correctly.
+          // It would return the original matched sequence if an unexpected character was captured.
+          return match;
+      }
+    },
+  );
 }
 
 /**
