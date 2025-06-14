@@ -208,7 +208,8 @@ export async function loadCliConfig(
       process.env.HTTP_PROXY ||
       process.env.http_proxy,
     cwd: process.cwd(),
-    telemetryOtlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    telemetryOtlpEndpoint:
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? settings.telemetryOtlpEndpoint,
     fileDiscoveryService: fileService,
   });
 }
