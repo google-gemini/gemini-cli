@@ -17,6 +17,7 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  FileDiscoveryService,
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
@@ -114,6 +115,7 @@ async function parseArguments(): Promise<CliArgs> {
 export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
+  fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
@@ -126,6 +128,7 @@ export async function loadHierarchicalGeminiMemory(
   return loadServerHierarchicalMemory(
     currentWorkingDirectory,
     debugMode,
+    fileService,
     extensionContextFilePaths,
   );
 }
@@ -154,10 +157,15 @@ export async function loadCliConfig(
 
   const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
 
+  const fileService = new FileDiscoveryService(process.cwd());
+  await fileService.initialize({
+    respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+  });
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
     debugMode,
+    fileService,
     extensionContextFilePaths,
   );
 
@@ -201,6 +209,7 @@ export async function loadCliConfig(
       process.env.http_proxy,
     cwd: process.cwd(),
     telemetryOtlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    fileDiscoveryService: fileService,
   });
 }
 

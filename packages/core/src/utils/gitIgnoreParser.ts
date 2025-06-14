@@ -47,14 +47,17 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   }
 
   async loadPatterns(patternsFileName: string): Promise<void> {
-    const content = await fs.readFile(
-      path.join(this.projectRoot, patternsFileName),
-      'utf-8',
-    );
+    const patternsFilePath = path.join(this.projectRoot, patternsFileName);
+    const content = await fs.readFile(patternsFilePath, 'utf-8');
     const patterns = content
       .split('\n')
       .map((p) => p.trim())
       .filter((p) => p !== '' && !p.startsWith('#'));
+    if (patterns.length > 0) {
+      console.log(
+        `Loaded ${patterns.length} patterns from ${patternsFilePath}`,
+      );
+    }
     this.addPatterns(patterns);
   }
 

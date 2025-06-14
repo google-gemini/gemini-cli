@@ -82,6 +82,7 @@ async function getGeminiMdFilePathsInternal(
   currentWorkingDirectory: string,
   userHomePath: string,
   debugMode: boolean,
+  fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
 ): Promise<string[]> {
   const allPaths = new Set<string>();
@@ -179,8 +180,6 @@ async function getGeminiMdFilePathsInternal(
     }
     upwardPaths.forEach((p) => allPaths.add(p));
 
-    const fileService = new FileDiscoveryService(projectRoot || resolvedCwd);
-    await fileService.initialize();
     const downwardPaths = await bfsFileSearch(resolvedCwd, {
       fileName: geminiMdFilename,
       maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
@@ -272,6 +271,7 @@ function concatenateInstructions(
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
+  fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
@@ -285,6 +285,7 @@ export async function loadServerHierarchicalMemory(
     currentWorkingDirectory,
     userHomePath,
     debugMode,
+    fileService,
     extensionContextFilePaths,
   );
   if (filePaths.length === 0) {
