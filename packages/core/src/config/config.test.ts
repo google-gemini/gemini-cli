@@ -142,9 +142,9 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
   });
 
-  it('should have a getFileService method that returns FileDiscoveryService', async () => {
+  it('should have a getFileService method that returns FileDiscoveryService', () => {
     const config = new Config(baseParams);
-    const fileService = await config.getFileService();
+    const fileService = config.getFileService();
     expect(fileService).toBeDefined();
   });
 });

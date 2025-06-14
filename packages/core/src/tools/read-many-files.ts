@@ -119,7 +119,7 @@ export class ReadManyFilesTool extends BaseTool<
   ToolResult
 > {
   static readonly Name: string = 'read_many_files';
-  private readonly geminiIgnorePatterns: string[];
+  private readonly geminiIgnorePatterns: string[] = [];
 
   /**
    * Creates an instance of ReadManyFilesTool.
@@ -191,7 +191,9 @@ Use this tool when the user's query implies needing the content of several files
       parameterSchema,
     );
     this.targetDir = path.resolve(targetDir);
-    this.geminiIgnorePatterns = config.getGeminiIgnorePatterns() || [];
+    this.geminiIgnorePatterns = config
+      .getFileService()
+      .getGeminiIgnorePatterns();
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
@@ -292,7 +294,7 @@ Use this tool when the user's query implies needing the content of several files
       respect_git_ignore ?? this.config.getFileFilteringRespectGitIgnore();
 
     // Get centralized file discovery service
-    const fileDiscovery = await this.config.getFileService();
+    const fileDiscovery = this.config.getFileService();
 
     const toolBaseDir = this.targetDir;
     const filesToConsider = new Set<string>();
@@ -323,18 +325,16 @@ Use this tool when the user's query implies needing the content of several files
         signal,
       });
 
-      // Apply git-aware filtering if enabled and in git repository
-      const filteredEntries =
-        respectGitIgnore && fileDiscovery.isGitRepository()
-          ? fileDiscovery
-              .filterFiles(
-                entries.map((p) => path.relative(toolBaseDir, p)),
-                {
-                  respectGitIgnore,
-                },
-              )
-              .map((p) => path.resolve(toolBaseDir, p))
-          : entries;
+      const filteredEntries = respectGitIgnore
+        ? fileDiscovery
+            .filterFiles(
+              entries.map((p) => path.relative(toolBaseDir, p)),
+              {
+                respectGitIgnore,
+              },
+            )
+            .map((p) => path.resolve(toolBaseDir, p))
+        : entries;
 
       let gitIgnoredCount = 0;
       for (const absoluteFilePath of entries) {
@@ -348,11 +348,7 @@ Use this tool when the user's query implies needing the content of several files
         }
 
         // Check if this file was filtered out by git ignore
-        if (
-          respectGitIgnore &&
-          fileDiscovery.isGitRepository() &&
-          !filteredEntries.includes(absoluteFilePath)
-        ) {
+        if (respectGitIgnore && !filteredEntries.includes(absoluteFilePath)) {
           gitIgnoredCount++;
           continue;
         }
@@ -362,12 +358,9 @@ Use this tool when the user's query implies needing the content of several files
 
       // Add info about git-ignored files if any were filtered
       if (gitIgnoredCount > 0) {
-        const reason = respectGitIgnore
-          ? 'git-ignored'
-          : 'filtered by custom ignore patterns';
         skippedFiles.push({
           path: `${gitIgnoredCount} file(s)`,
-          reason,
+          reason: 'ignored',
         });
       }
     } catch (error) {

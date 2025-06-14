@@ -26,6 +26,8 @@ interface FolderStructureOptions {
   fileIncludePattern?: RegExp;
   /** For filtering files. */
   fileService?: FileDiscoveryService;
+  /** Whether to use .gitignore patterns. */
+  respectGitIgnore?: boolean;
 }
 
 // Define a type for the merged options where fileIncludePattern remains optional
@@ -124,8 +126,8 @@ async function readFullStructure(
         }
         const fileName = entry.name;
         const filePath = path.join(currentPath, fileName);
-        if (options.fileService) {
-          if (options.fileService.shouldIgnoreFile(filePath)) {
+        if (options.respectGitIgnore && options.fileService) {
+          if (options.fileService.shouldGitIgnoreFile(filePath)) {
             continue;
           }
         }
@@ -159,8 +161,8 @@ async function readFullStructure(
         const subFolderPath = path.join(currentPath, subFolderName);
 
         let isIgnoredByGit = false;
-        if (options?.fileService) {
-          if (options.fileService.shouldIgnoreFile(subFolderPath)) {
+        if (options.respectGitIgnore && options.fileService) {
+          if (options.fileService.shouldGitIgnoreFile(subFolderPath)) {
             isIgnoredByGit = true;
           }
         }
@@ -293,6 +295,7 @@ export async function getFolderStructure(
     ignoredFolders: options?.ignoredFolders ?? DEFAULT_IGNORED_FOLDERS,
     fileIncludePattern: options?.fileIncludePattern,
     fileService: options?.fileService,
+    respectGitIgnore: options?.respectGitIgnore ?? true,
   };
 
   try {

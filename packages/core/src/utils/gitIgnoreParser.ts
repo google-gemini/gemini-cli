@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import ignore, { type Ignore } from 'ignore';
 import { isGitRepository } from './gitUtils.js';
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string): boolean;
+  getPatterns(): string[];
 }
 
 export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
-  private isGitRepo: boolean = false;
   private ig: Ignore = ignore();
   private patterns: string[] = [];
 
@@ -23,33 +23,28 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     this.projectRoot = path.resolve(projectRoot);
   }
 
-  async initialize(patternsFileName?: string): Promise<void> {
-    const patternFiles = [];
-    if (patternsFileName && patternsFileName !== '') {
-      patternFiles.push(patternsFileName);
-    }
+  loadGitRepoPatterns(): void {
+    if (!isGitRepository(this.projectRoot)) return;
 
-    this.isGitRepo = isGitRepository(this.projectRoot);
-    if (this.isGitRepo) {
-      patternFiles.push('.gitignore');
-      patternFiles.push(path.join('.git', 'info', 'exclude'));
+    // Always ignore .git directory regardless of .gitignore content
+    this.addPatterns(['.git']);
 
-      // Always ignore .git directory regardless of .gitignore content
-      this.addPatterns(['.git']);
-    }
+    const patternFiles = ['.gitignore', path.join('.git', 'info', 'exclude')];
     for (const pf of patternFiles) {
-      try {
-        await this.loadPatterns(pf);
-      } catch (_error) {
-        // File doesn't exist or can't be read, continue silently
-      }
+      this.loadPatterns(pf);
     }
   }
 
-  async loadPatterns(patternsFileName: string): Promise<void> {
+  loadPatterns(patternsFileName: string): void {
     const patternsFilePath = path.join(this.projectRoot, patternsFileName);
-    const content = await fs.readFile(patternsFilePath, 'utf-8');
-    const patterns = content
+    let content: string;
+    try {
+      content = fs.readFileSync(patternsFilePath, 'utf-8');
+    } catch (_error) {
+      // ignore file not found
+      return;
+    }
+    const patterns = (content ?? '')
       .split('\n')
       .map((p) => p.trim())
       .filter((p) => p !== '' && !p.startsWith('#'));

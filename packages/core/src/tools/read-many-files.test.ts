@@ -21,17 +21,6 @@ describe('ReadManyFilesTool', () => {
   let tempDirOutsideRoot: string;
   let mockReadFileFn: Mock;
 
-  // Mock config for testing
-  const mockConfig = {
-    getFileService: async () => {
-      const service = new FileDiscoveryService(tempRootDir);
-      await service.initialize({ respectGitIgnore: true });
-      return service;
-    },
-    getFileFilteringRespectGitIgnore: () => true,
-    getGeminiIgnorePatterns: () => ['**/foo.bar', 'foo.baz', 'foo.*'],
-  } as Partial<Config> as Config;
-
   beforeEach(async () => {
     tempRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-many-files-root-'),
@@ -39,6 +28,13 @@ describe('ReadManyFilesTool', () => {
     tempDirOutsideRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'read-many-files-external-'),
     );
+    fs.writeFileSync(path.join(tempRootDir, '.geminiignore'), 'foo.*');
+    const fileService = new FileDiscoveryService(tempRootDir);
+    const mockConfig = {
+      getFileService: () => fileService,
+      getFileFilteringRespectGitIgnore: () => true,
+    } as Partial<Config> as Config;
+
     tool = new ReadManyFilesTool(tempRootDir, mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;
@@ -369,13 +365,13 @@ describe('ReadManyFilesTool', () => {
 
     it('should return error if path is ignored by a .geminiignore pattern', async () => {
       createFile('foo.bar', '');
-      createFile('qux/foo.baz', '');
+      createFile('bar.ts', '');
       createFile('foo.quux', '');
-      const params = { paths: ['foo.bar', 'qux/foo.baz', 'foo.quux'] };
+      const params = { paths: ['foo.bar', 'bar.ts', 'foo.quux'] };
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.returnDisplay).not.toContain('foo.bar');
-      expect(result.returnDisplay).toContain('qux/foo.baz');
       expect(result.returnDisplay).not.toContain('foo.quux');
+      expect(result.returnDisplay).toContain('bar.ts');
     });
   });
 });

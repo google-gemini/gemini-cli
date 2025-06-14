@@ -135,7 +135,7 @@ export async function handleAtCommand({
   addItem({ type: 'user', text: query }, userMessageTimestamp);
 
   // Get centralized file discovery service
-  const fileDiscovery = await config.getFileService();
+  const fileDiscovery = config.getFileService();
   const respectGitIgnore = config.getFileFilteringRespectGitIgnore();
 
   const pathSpecsToRead: string[] = [];
@@ -182,7 +182,7 @@ export async function handleAtCommand({
     }
 
     // Check if path should be ignored by git
-    if (fileDiscovery.shouldIgnoreFile(pathName)) {
+    if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
       const reason = respectGitIgnore
         ? 'git-ignored and will be skipped'
         : 'ignored by custom patterns';
