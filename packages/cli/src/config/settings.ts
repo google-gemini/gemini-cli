@@ -7,7 +7,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
-import { MCPServerConfig, getErrorMessage } from '@gemini-cli/core';
+import {
+  MCPServerConfig,
+  getErrorMessage,
+  BugCommandSettings,
+} from '@gemini-cli/core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
@@ -40,6 +44,7 @@ export interface Settings {
   telemetry?: boolean;
   telemetryOtlpEndpoint?: string;
   preferredEditor?: string;
+  bugCommand?: BugCommandSettings;
 
   // Git-aware file filtering settings
   fileFiltering?: {

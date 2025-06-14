@@ -44,6 +44,18 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
   - **Default:** `GEMINI.md`
   - **Example:** `"contextFileName": "AGENTS.md"`
 
+- **`bugCommand`** (object, optional):
+
+  - **Description:** Overrides the default URL for the `/bug` command.
+  - **Properties:**
+    - **`urlTemplate`** (string, required): A URL that can contain `{title}` and `{body}` placeholders.
+  - **Example:**
+    ```json
+    "bugCommand": {
+      "urlTemplate": "https://bug.example.com/new?title={title}&body={body}"
+    }
+    ```
+
 - **`fileFiltering`** (object, optional):
 
   - **Description:** Controls git-aware file filtering behavior for @ commands and file discovery tools.

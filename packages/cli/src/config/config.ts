@@ -211,6 +211,7 @@ export async function loadCliConfig(
     telemetryOtlpEndpoint:
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? settings.telemetryOtlpEndpoint,
     fileDiscoveryService: fileService,
+    bugCommand: settings.bugCommand,
   });
 }
 
