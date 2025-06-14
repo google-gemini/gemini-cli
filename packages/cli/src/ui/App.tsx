@@ -170,7 +170,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     }
   }, [config, addItem]);
 
-  const { handleSlashCommand, slashCommands } = useSlashCommandProcessor(
+  const {
+    handleSlashCommand,
+    slashCommands,
+    pendingHistoryItems: pendingSlashCommandHistoryItems,
+  } = useSlashCommandProcessor(
     config,
     history,
     addItem,
@@ -186,6 +190,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
   );
+  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
@@ -286,18 +291,23 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     return editorType as EditorType;
   }, [settings, openEditorDialog]);
 
-  const { streamingState, submitQuery, initError, pendingHistoryItems } =
-    useGeminiStream(
-      config.getGeminiClient(),
-      history,
-      addItem,
-      setShowHelp,
-      config,
-      setDebugMessage,
-      handleSlashCommand,
-      shellModeActive,
-      getPreferredEditor,
-    );
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    pendingHistoryItems: pendingGeminiHistoryItems,
+  } = useGeminiStream(
+    config.getGeminiClient(),
+    history,
+    addItem,
+    setShowHelp,
+    config,
+    setDebugMessage,
+    handleSlashCommand,
+    shellModeActive,
+    getPreferredEditor,
+  );
+  pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });

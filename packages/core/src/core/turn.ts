@@ -98,8 +98,14 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export interface ChatCompressionInfo {
+  originalTokenCount: number | undefined;
+  newTokenCount: number | undefined;
+}
+
 export type ServerGeminiChatCompressedEvent = {
   type: GeminiEventType.ChatCompressed;
+  value: ChatCompressionInfo;
 };
 
 export type ServerGeminiUsageMetadataEvent = {

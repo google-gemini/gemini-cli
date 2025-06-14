@@ -62,6 +62,7 @@ import {
   getMCPServerStatus,
   MCPDiscoveryState,
   getMCPDiscoveryState,
+  GeminiClient,
 } from '@gemini-cli/core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 
@@ -100,6 +101,8 @@ describe('useSlashCommandProcessor', () => {
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
   let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
+  let mockTryCompressChat: ReturnType<typeof vi.fn>;
+  let mockGeminiClient: GeminiClient;
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
   const mockUseSessionStats = useSessionStats as Mock;
@@ -115,8 +118,13 @@ describe('useSlashCommandProcessor', () => {
     mockOpenEditorDialog = vi.fn();
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockSetQuittingMessages = vi.fn();
+    mockTryCompressChat = vi.fn();
+    mockGeminiClient = {
+      tryCompressChat: mockTryCompressChat,
+    } as unknown as GeminiClient;
     mockConfig = {
       getDebugMode: vi.fn(() => false),
+      getGeminiClient: () => mockGeminiClient,
       getSandbox: vi.fn(() => 'test-sandbox'),
       getModel: vi.fn(() => 'test-model'),
       getProjectRoot: vi.fn(() => '/test/dir'),
@@ -942,6 +950,37 @@ Add any other context about the problem here.
       );
 
       expect(commandResult).toBe(true);
+    });
+  });
+
+  describe('/compress command', () => {
+    it('should call tryCompressChat(true)', async () => {
+      const { handleSlashCommand } = getProcessor();
+      mockTryCompressChat.mockImplementationOnce(async (force?: boolean) => {
+        // TODO: Check that we have a pending compression item in the history.
+        expect(force).toBe(true);
+        return {
+          originalTokenCount: 100,
+          newTokenCount: 50,
+        };
+      });
+
+      await act(async () => {
+        handleSlashCommand('/compress');
+      });
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.COMPRESSION,
+          compression: {
+            isPending: false,
+            originalTokenCount: 100,
+            newTokenCount: 50,
+          },
+        }),
+        expect.any(Number),
+      );
     });
   });
 });
