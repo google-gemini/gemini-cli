@@ -17,6 +17,7 @@ import {
   getCurrentGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 const ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST = DEFAULT_CONTEXT_FILENAME;
 
@@ -43,6 +44,7 @@ describe('loadServerHierarchicalMemory', () => {
   let GLOBAL_GEMINI_DIR: string;
   let GLOBAL_GEMINI_FILE: string; // Defined in beforeEach
 
+  const fileService = new FileDiscoveryService(PROJECT_ROOT);
   beforeEach(() => {
     vi.resetAllMocks();
     // Set environment variables to indicate test environment
@@ -69,6 +71,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
     expect(memoryContent).toBe('');
     expect(fileCount).toBe(0);
@@ -95,6 +98,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
 
     expect(memoryContent).toBe(
@@ -125,6 +129,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
 
     expect(memoryContent).toBe(
@@ -167,6 +172,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
     const expectedContent =
       `--- Context from: ${path.relative(CWD, projectRootCustomFile)} ---\nProject root custom memory\n--- End of Context from: ${path.relative(CWD, projectRootCustomFile)} ---\n\n` +
@@ -231,6 +237,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
     const expectedContent =
       `--- Context from: ${customFilename} ---\nCWD custom memory\n--- End of Context from: ${customFilename} ---\n\n` +
@@ -277,6 +284,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
     const expectedContent =
       `--- Context from: ${path.relative(CWD, projectRootGeminiFile)} ---\nProject root memory\n--- End of Context from: ${path.relative(CWD, projectRootGeminiFile)} ---\n\n` +
@@ -345,6 +353,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
     const expectedContent =
       `--- Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---\nCWD memory\n--- End of Context from: ${ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST} ---\n\n` +
@@ -438,6 +447,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
 
     const relPathGlobal = path.relative(CWD, GLOBAL_GEMINI_FILE);
@@ -520,6 +530,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
     );
 
     const expectedContent = `--- Context from: ${path.join('my_code', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---\nMy code memory\n--- End of Context from: ${path.join('my_code', ORIGINAL_GEMINI_MD_FILENAME_CONST_FOR_TEST)} ---`;
@@ -556,7 +567,7 @@ describe('loadServerHierarchicalMemory', () => {
     }) as unknown as typeof fsPromises.readdir);
     mockFs.access.mockRejectedValue(new Error('not found'));
 
-    await loadServerHierarchicalMemory(CWD, true);
+    await loadServerHierarchicalMemory(CWD, true, fileService);
 
     expect(consoleDebugSpy).toHaveBeenCalledWith(
       expect.stringContaining('[DEBUG] [BfsFileSearch]'),
@@ -583,6 +594,7 @@ describe('loadServerHierarchicalMemory', () => {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       CWD,
       false,
+      fileService,
       [extensionFilePath],
     );
 

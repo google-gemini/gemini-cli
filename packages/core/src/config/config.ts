@@ -86,6 +86,7 @@ export interface ConfigParameters {
   checkpoint?: boolean;
   proxy?: string;
   cwd: string;
+  fileDiscoveryService?: FileDiscoveryService;
 }
 
 export class Config {
@@ -152,6 +153,7 @@ export class Config {
     this.checkpoint = params.checkpoint ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
+    this.fileDiscoveryService = params.fileDiscoveryService ?? null;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);

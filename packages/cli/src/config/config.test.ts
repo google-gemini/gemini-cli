@@ -33,11 +33,12 @@ vi.mock('@gemini-cli/core', async () => {
   return {
     ...actualServer,
     loadEnvironment: vi.fn(),
-    loadServerHierarchicalMemory: vi.fn((cwd, debug, extensionPaths) =>
-      Promise.resolve({
-        memoryContent: extensionPaths?.join(',') || '',
-        fileCount: extensionPaths?.length || 0,
-      }),
+    loadServerHierarchicalMemory: vi.fn(
+      (cwd, debug, fileService, extensionPaths) =>
+        Promise.resolve({
+          memoryContent: extensionPaths?.join(',') || '',
+          fileCount: extensionPaths?.length || 0,
+        }),
     ),
   };
 });
@@ -239,6 +240,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       false,
+      expect.any(Object),
       [
         '/path/to/ext1/GEMINI.md',
         '/path/to/ext3/context1.md',

@@ -139,6 +139,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
         process.cwd(),
         config.getDebugMode(),
+        await config.getFileService(),
       );
       config.setUserMemory(memoryContent);
       config.setGeminiMdFileCount(fileCount);
