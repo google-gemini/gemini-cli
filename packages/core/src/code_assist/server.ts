@@ -98,7 +98,6 @@ export class CodeAssistServer implements ContentGenerator {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-User-Project': this.projectId || '',
       },
       responseType: 'json',
       body: JSON.stringify(req),
