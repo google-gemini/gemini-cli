@@ -13,14 +13,17 @@ import {
   ToolResult,
   ToolRegistry,
   ApprovalMode,
-  EditTool,
-  EditToolParams,
   EditorType,
   Config,
   logToolCall,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import {
+  isModifiableTool,
+  ModifyContext,
+  modifyWithEditor,
+} from '../tools/modifiable-tool.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -525,8 +528,8 @@ export class CoreToolScheduler {
       );
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
-      if (waitingToolCall?.confirmationDetails?.type === 'edit') {
-        const editTool = waitingToolCall.tool as EditTool;
+      if (isModifiableTool(waitingToolCall.tool)) {
+        const modifyContext = waitingToolCall.tool.getModifyContext(signal);
         const editorType = this.getPreferredEditor();
         if (!editorType) {
           return;
@@ -535,22 +538,22 @@ export class CoreToolScheduler {
         this.setStatusInternal(callId, 'awaiting_approval', {
           ...waitingToolCall.confirmationDetails,
           isModifying: true,
-        });
+        } as ToolCallConfirmationDetails);
 
-        const modifyResults = await editTool.onModify(
-          waitingToolCall.request.args as unknown as EditToolParams,
-          signal,
+        const { updatedParams, updatedDiff } = await modifyWithEditor<
+          typeof waitingToolCall.request.args
+        >(
+          waitingToolCall.request.args,
+          modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
+          signal,
         );
-
-        if (modifyResults) {
-          this.setArgsInternal(callId, modifyResults.updatedParams);
-          this.setStatusInternal(callId, 'awaiting_approval', {
-            ...waitingToolCall.confirmationDetails,
-            fileDiff: modifyResults.updatedDiff,
-            isModifying: false,
-          });
-        }
+        this.setArgsInternal(callId, updatedParams);
+        this.setStatusInternal(callId, 'awaiting_approval', {
+          ...waitingToolCall.confirmationDetails,
+          fileDiff: updatedDiff,
+          isModifying: false,
+        } as ToolCallConfirmationDetails);
       }
     } else {
       this.setStatusInternal(callId, 'scheduled');

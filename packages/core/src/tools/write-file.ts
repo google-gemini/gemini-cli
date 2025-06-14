@@ -25,6 +25,7 @@ import {
 } from '../utils/editCorrector.js';
 import { GeminiClient } from '../core/client.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -51,7 +52,10 @@ interface GetCorrectedFileContentResult {
 /**
  * Implementation of the WriteFile tool logic
  */
-export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
+export class WriteFileTool
+  extends BaseTool<WriteFileToolParams, ToolResult>
+  implements ModifiableTool<WriteFileToolParams>
+{
   static readonly Name: string = 'write_file';
   private readonly client: GeminiClient;
 
@@ -335,5 +339,36 @@ export class WriteFileTool extends BaseTool<WriteFileToolParams, ToolResult> {
       );
     }
     return { originalContent, correctedContent, fileExists };
+  }
+
+  getModifyContext(
+    abortSignal: AbortSignal,
+  ): ModifyContext<WriteFileToolParams> {
+    return {
+      getFilePath: (params: WriteFileToolParams) => params.file_path,
+      getCurrentContent: async (params: WriteFileToolParams) => {
+        const correctedContentResult = await this._getCorrectedFileContent(
+          params.file_path,
+          params.content,
+          abortSignal,
+        );
+        return correctedContentResult.originalContent;
+      },
+      getProposedContent: async (params: WriteFileToolParams) => {
+        const correctedContentResult = await this._getCorrectedFileContent(
+          params.file_path,
+          params.content,
+          abortSignal,
+        );
+        return correctedContentResult.correctedContent;
+      },
+      createUpdatedParams: (
+        modifiedProposedContent: string,
+        originalParams: WriteFileToolParams,
+      ) => ({
+        ...originalParams,
+        content: modifiedProposedContent,
+      }),
+    };
   }
 }
