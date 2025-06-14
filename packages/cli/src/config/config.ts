@@ -265,7 +265,7 @@ async function createContentGeneratorConfig(
         '3. GOOGLE_API_KEY (for Gemini API or Vertex AI Express Mode access).\n' +
         '4. GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (for Vertex AI access).\n\n' +
         'For Gemini API keys, visit: https://ai.google.dev/gemini-api/docs/api-key\n' +
-        'For Vertex AI authentication, visit: https://cloud.google.com/vertex-ai/docs/start/authentication\n' +
+        'For Vertex AI authentication, visit: https://cloud.google.com/vertex-ai/docs/authentication\n' +
         'The GOOGLE_GENAI_USE_VERTEXAI environment variable can also be set to true/false to influence service selection when ambiguity exists.',
     );
     process.exit(1);
