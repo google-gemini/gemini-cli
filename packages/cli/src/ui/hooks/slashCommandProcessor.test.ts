@@ -48,6 +48,11 @@ vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn(),
 }));
 
+const mockGetCliVersionFn = vi.fn(() => '0.1.0');
+vi.mock('../../utils/version.js', () => ({
+  getCliVersion: (...args: []) => mockGetCliVersionFn(...args),
+}));
+
 import { act, renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import open from 'open';
@@ -350,6 +355,7 @@ describe('useSlashCommandProcessor', () => {
     const originalEnv = process.env;
     beforeEach(() => {
       vi.resetModules();
+      mockGetCliVersionFn.mockReturnValue('0.1.0');
       process.env = { ...originalEnv };
     });
 
@@ -399,16 +405,16 @@ Add any other context about the problem here.
     };
 
     it('should call open with the correct GitHub issue URL and return true', async () => {
+      mockGetCliVersionFn.mockReturnValue('test-version');
       process.env.SANDBOX = 'gemini-sandbox';
       process.env.SEATBELT_PROFILE = 'test_profile';
-      process.env.CLI_VERSION = 'test-version';
       const { handleSlashCommand } = getProcessor();
       const bugDescription = 'This is a test bug';
       const expectedUrl = getExpectedUrl(
         bugDescription,
         process.env.SANDBOX,
         process.env.SEATBELT_PROFILE,
-        process.env.CLI_VERSION,
+        'test-version',
       );
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
@@ -440,7 +446,7 @@ A clear and concise description of what the bug is.
 Add any other context about the problem here.
 
 ## Diagnostic Information
-*   **CLI Version:** unknown
+*   **CLI Version:** 0.1.0
 *   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** test-platform test-node-version
 *   **Sandbox Environment:** no sandbox
