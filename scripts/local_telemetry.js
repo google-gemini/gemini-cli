@@ -348,8 +348,13 @@ async function main() {
 
     // Restore original settings
     const finalSettings = readJsonFile(WORKSPACE_SETTINGS_FILE);
-    delete finalSettings.telemetry;
-    delete finalSettings.telemetryOtlpEndpoint;
+    if (finalSettings.telemetry) {
+      delete finalSettings.telemetry.enabled;
+      delete finalSettings.telemetry.otlpEndpoint;
+      if (Object.keys(finalSettings.telemetry).length === 0) {
+        delete finalSettings.telemetry;
+      }
+    }
     finalSettings.sandbox = originalSandboxSetting;
     writeJsonFile(WORKSPACE_SETTINGS_FILE, finalSettings);
     console.log('✅ Restored original telemetry and sandbox settings.');
@@ -393,8 +398,12 @@ async function main() {
   const originalSandboxSetting = workspaceSettings.sandbox;
   let settingsModified = false;
 
-  if (workspaceSettings.telemetry !== true) {
-    workspaceSettings.telemetry = true;
+  if (typeof workspaceSettings.telemetry !== 'object') {
+    workspaceSettings.telemetry = {};
+  }
+
+  if (workspaceSettings.telemetry.enabled !== true) {
+    workspaceSettings.telemetry.enabled = true;
     settingsModified = true;
     console.log('⚙️  Enabled telemetry in workspace settings.');
   }
@@ -405,10 +414,16 @@ async function main() {
     console.log('✅ Disabled sandbox mode for local telemetry.');
   }
 
-  if (workspaceSettings.telemetryOtlpEndpoint !== 'http://localhost:4317') {
-    workspaceSettings.telemetryOtlpEndpoint = 'http://localhost:4317';
+  if (workspaceSettings.telemetry.otlpEndpoint !== 'http://localhost:4317') {
+    workspaceSettings.telemetry.otlpEndpoint = 'http://localhost:4317';
     settingsModified = true;
     console.log('🔧 Set telemetry endpoint to http://localhost:4317.');
+  }
+
+  if (workspaceSettings.telemetry.target !== 'local') {
+    workspaceSettings.telemetry.target = 'local';
+    settingsModified = true;
+    console.log('🎯 Set telemetry target to local.');
   }
 
   if (settingsModified) {

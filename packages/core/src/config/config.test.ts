@@ -8,6 +8,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Config, ConfigParameters } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
+import {
+  DEFAULT_TELEMETRY_TARGET,
+  DEFAULT_OTLP_ENDPOINT,
+} from '../telemetry/index.js';
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -38,6 +42,14 @@ vi.mock('../tools/memoryTool', () => ({
   GEMINI_CONFIG_DIR: '.gemini',
 }));
 
+vi.mock('../telemetry/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../telemetry/index.js')>();
+  return {
+    ...actual,
+    initializeTelemetry: vi.fn(),
+  };
+});
+
 describe('Server Config (config.ts)', () => {
   const API_KEY = 'server-api-key';
   const MODEL = 'gemini-pro';
@@ -47,7 +59,7 @@ describe('Server Config (config.ts)', () => {
   const QUESTION = 'test question';
   const FULL_CONTEXT = false;
   const USER_MEMORY = 'Test User Memory';
-  const TELEMETRY = false;
+  const TELEMETRY_SETTINGS = { enabled: false };
   const EMBEDDING_MODEL = 'gemini-embedding';
   const SESSION_ID = 'test-session-id';
   const baseParams: ConfigParameters = {
@@ -63,7 +75,7 @@ describe('Server Config (config.ts)', () => {
     question: QUESTION,
     fullContext: FULL_CONTEXT,
     userMemory: USER_MEMORY,
-    telemetry: TELEMETRY,
+    telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
   };
 
@@ -120,7 +132,7 @@ describe('Server Config (config.ts)', () => {
   it('Config constructor should set telemetry to true when provided as true', () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
-      telemetry: true,
+      telemetry: { enabled: true },
     };
     const config = new Config(paramsWithTelemetry);
     expect(config.getTelemetryEnabled()).toBe(true);
@@ -129,7 +141,7 @@ describe('Server Config (config.ts)', () => {
   it('Config constructor should set telemetry to false when provided as false', () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
-      telemetry: false,
+      telemetry: { enabled: false },
     };
     const config = new Config(paramsWithTelemetry);
     expect(config.getTelemetryEnabled()).toBe(false);
@@ -139,12 +151,81 @@ describe('Server Config (config.ts)', () => {
     const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
     delete paramsWithoutTelemetry.telemetry;
     const config = new Config(paramsWithoutTelemetry);
-    expect(config.getTelemetryEnabled()).toBe(TELEMETRY);
+    expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
   it('should have a getFileService method that returns FileDiscoveryService', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  describe('Telemetry Settings', () => {
+    it('should return default telemetry target if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryTarget()).toBe(DEFAULT_TELEMETRY_TARGET);
+    });
+
+    it('should return provided OTLP endpoint', () => {
+      const endpoint = 'http://custom.otel.collector:4317';
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpEndpoint: endpoint },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpEndpoint()).toBe(endpoint);
+    });
+
+    it('should return default OTLP endpoint if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
+    });
+
+    it('should return provided logPrompts setting', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, logPrompts: false },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
+    });
+
+    it('should return default logPrompts setting (true) if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
+    });
+
+    it('should return default logPrompts setting (true) if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
+    });
+
+    it('should return default telemetry target if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryTarget()).toBe(DEFAULT_TELEMETRY_TARGET);
+    });
+
+    it('should return default OTLP endpoint if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
+    });
   });
 });

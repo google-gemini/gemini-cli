@@ -70,6 +70,7 @@ async function main() {
   const originalSandboxSetting = manageTelemetrySettings(
     true,
     'http://localhost:4317',
+    'gcp',
   );
   registerCleanup(
     () => [collectorProcess].filter((p) => p), // Function to get processes
@@ -80,9 +81,12 @@ async function main() {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   if (!projectId) {
     console.error(
-      '🛑 Error: GOOGLE_CLOUD_PROJECT environment variable is not set.',
+      '🛑 Error: GOOGLE_CLOUD_PROJECT environment variable is not exported.',
     );
-    console.log('Please set it to your Google Cloud Project ID and try again.');
+    console.log(
+      '   Please set it to your Google Cloud Project ID and try again.',
+    );
+    console.log('   `export GOOGLE_CLOUD_PROJECT=your-project-id`');
     process.exit(1);
   }
   console.log(`✅ Using Google Cloud Project ID: ${projectId}`);
@@ -167,13 +171,13 @@ async function main() {
   console.log(`\n📄 Collector logs are being written to: ${OTEL_LOG_FILE}`);
   console.log(`\n📊 View your telemetry data in Google Cloud Console:`);
   console.log(
-    `   - Traces: https://console.cloud.google.com/traces/list?project=${projectId}`,
+    `   - Logs: https://console.cloud.google.com/logs/query;query=logName%3D%22projects%2F${projectId}%2Flogs%2Fgemini_cli%22?project=${projectId}`,
   );
   console.log(
     `   - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer?project=${projectId}`,
   );
   console.log(
-    `   - Logs: https://console.cloud.google.com/logs/query;query=logName%3D%22projects%2F${projectId}%2Flogs%2Fgemini_cli%22?project=${projectId}`,
+    `   - Traces: https://console.cloud.google.com/traces/list?project=${projectId}`,
   );
   console.log(`\nPress Ctrl+C to exit.`);
 }

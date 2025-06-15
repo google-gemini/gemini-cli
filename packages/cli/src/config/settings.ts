@@ -11,6 +11,7 @@ import {
   MCPServerConfig,
   getErrorMessage,
   BugCommandSettings,
+  TelemetrySettings,
 } from '@gemini-cli/core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -41,8 +42,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
-  telemetry?: boolean;
-  telemetryOtlpEndpoint?: string;
+  telemetry?: TelemetrySettings;
   preferredEditor?: string;
   bugCommand?: BugCommandSettings;
 

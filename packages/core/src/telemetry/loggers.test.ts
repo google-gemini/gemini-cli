@@ -60,7 +60,7 @@ describe('loggers', () => {
           vertexai: true,
           codeAssist: false,
         }),
-        getTelemetryLogUserPromptsEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
         getFileFilteringRespectGitIgnore: () => true,
         getDebugMode: () => true,
         getMcpServers: () => ({
@@ -99,7 +99,7 @@ describe('loggers', () => {
   describe('logUserPrompt', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
-      getTelemetryLogUserPromptsEnabled: () => true,
+      getTelemetryLogPromptsEnabled: () => true,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -125,7 +125,7 @@ describe('loggers', () => {
     it('should not log prompt if disabled', () => {
       const mockConfig = {
         getSessionId: () => 'test-session-id',
-        getTelemetryLogUserPromptsEnabled: () => false,
+        getTelemetryLogPromptsEnabled: () => false,
       } as unknown as Config;
       const event = {
         prompt: 'test-prompt',

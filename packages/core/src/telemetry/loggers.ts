@@ -37,7 +37,7 @@ import {
 } from '@google/genai';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
-  config.getTelemetryLogUserPromptsEnabled() ?? false;
+  config.getTelemetryLogPromptsEnabled() ?? false;
 
 function getCommonAttributes(config: Config): LogAttributes {
   return {
@@ -86,7 +86,7 @@ export function logCliConfiguration(config: Config): void {
     api_key_enabled: !!generatorConfig.apiKey,
     vertex_ai_enabled: !!generatorConfig.vertexai,
     code_assist_enabled: !!generatorConfig.codeAssist,
-    log_user_prompts_enabled: config.getTelemetryLogUserPromptsEnabled(),
+    log_user_prompts_enabled: config.getTelemetryLogPromptsEnabled(),
     file_filtering_respect_git_ignore:
       config.getFileFilteringRespectGitIgnore(),
     debug_mode: config.getDebugMode(),
