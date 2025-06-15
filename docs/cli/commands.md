@@ -61,6 +61,13 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
 
   - **Description:** Displays a list of all the tools that are currently available to the model.
   - **Action:** Outputs a list of the available tools.
+  - **Sub-commands:**
+    - **`desc`** or **`descriptions`**:
+      - **Description:** Shows detailed descriptions of each tool.
+      - **Action:** Displays each tool's name with its full description as provided to the model.
+    - **`nodesc`** or **`nodescriptions`**:
+      - **Description:** Hides tool descriptions, showing only the tool names.
+      - **Action:** Displays a compact list with only tool names.
 
 - **`/compress`**
 

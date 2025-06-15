@@ -419,6 +419,21 @@ export const useSlashCommandProcessor = (
         name: 'tools',
         description: 'list available Gemini CLI tools',
         action: async (_mainCommand, _subCommand, _args) => {
+          // Check if the _subCommand includes a specific flag to control description visibility
+          let useShowDescriptions = showToolDescriptions;
+          if (_subCommand === 'desc' || _subCommand === 'descriptions') {
+            useShowDescriptions = true;
+          } else if (
+            _subCommand === 'nodesc' ||
+            _subCommand === 'nodescriptions'
+          ) {
+            useShowDescriptions = false;
+          } else if (_args === 'desc' || _args === 'descriptions') {
+            useShowDescriptions = true;
+          } else if (_args === 'nodesc' || _args === 'nodescriptions') {
+            useShowDescriptions = false;
+          }
+
           const toolRegistry = await config?.getToolRegistry();
           const tools = toolRegistry?.getAllTools();
           if (!tools) {
@@ -432,11 +447,51 @@ export const useSlashCommandProcessor = (
 
           // Filter out MCP tools by checking if they have a serverName property
           const geminiTools = tools.filter((tool) => !('serverName' in tool));
-          const geminiToolList = geminiTools.map((tool) => tool.displayName);
+
+          let message = 'Available Gemini CLI tools:\n\n';
+
+          if (geminiTools.length > 0) {
+            geminiTools.forEach((tool) => {
+              if (useShowDescriptions && tool.description) {
+                // Format tool name in cyan using simple ANSI cyan color
+                message += `  - \u001b[36m${tool.displayName}\u001b[0m: `;
+
+                // Apply green color to the description text
+                const greenColor = '\u001b[32m';
+                const resetColor = '\u001b[0m';
+
+                // Handle multi-line descriptions by properly indenting and preserving formatting
+                const descLines = tool.description.split('\n');
+                message += `${greenColor}${descLines[0]}${resetColor}\n`;
+
+                // If there are multiple lines, add proper indentation for each line
+                if (descLines.length > 1) {
+                  for (let i = 1; i < descLines.length; i++) {
+                    // Skip empty lines at the end
+                    if (
+                      i === descLines.length - 1 &&
+                      descLines[i].trim() === ''
+                    )
+                      continue;
+                    message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
+                  }
+                }
+              } else {
+                // Use cyan color for the tool name even when not showing descriptions
+                message += `  - \u001b[36m${tool.displayName}\u001b[0m\n`;
+              }
+            });
+          } else {
+            message += '  No tools available\n';
+          }
+          message += '\n';
+
+          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
+          message += '\u001b[0m';
 
           addMessage({
             type: MessageType.INFO,
-            content: `Available Gemini CLI tools:\n\n${geminiToolList.join('\n')}`,
+            content: message,
             timestamp: new Date(),
           });
         },
