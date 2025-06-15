@@ -170,17 +170,16 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     }
 
     const isWindows = os.platform() === 'win32';
+    const tempFileName = `shell_pgrep_${crypto
+      .randomBytes(6)
+      .toString('hex')}.tmp`;
+    const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
     // pgrep is not available on Windows, so we can't get background PIDs
     const command = isWindows
       ? params.command
       : (() => {
           // wrap command to append subprocess pids (via pgrep) to temporary file
-          const tempFileName = `shell_pgrep_${crypto
-            .randomBytes(6)
-            .toString('hex')}.tmp`;
-          const tempFilePath = path.join(os.tmpdir(), tempFileName);
-
           let command = params.command.trim();
           if (!command.endsWith('&')) command += ';';
           return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
@@ -293,10 +292,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     // parse pids (pgrep output) from temporary file and remove it
     const backgroundPIDs: number[] = [];
     if (os.platform() !== 'win32') {
-      const tempFileName = `shell_pgrep_${crypto
-        .randomBytes(6)
-        .toString('hex')}.tmp`;
-      const tempFilePath = path.join(os.tmpdir(), tempFileName);
       if (fs.existsSync(tempFilePath)) {
         const pgrepLines = fs
           .readFileSync(tempFilePath, 'utf8')
