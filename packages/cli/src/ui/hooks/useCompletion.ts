@@ -127,6 +127,34 @@ export function useCompletion(
 
     // --- Handle Slash Command Completion ---
     if (trimmedQuery.startsWith('/')) {
+      const parts = trimmedQuery.substring(1).split(' ');
+      const commandName = parts[0];
+      const subCommand = parts.slice(1).join(' ');
+
+      const command = slashCommands.find(
+        (cmd) => cmd.name === commandName || cmd.altName === commandName,
+      );
+
+      if (command && command.completion) {
+        const fetchAndSetSuggestions = async () => {
+          setIsLoadingSuggestions(true);
+          if (command.completion) {
+            const results = await command.completion();
+            const filtered = results.filter((r) => r.startsWith(subCommand));
+            const newSuggestions = filtered.map((s) => ({
+              label: s,
+              value: s,
+            }));
+            setSuggestions(newSuggestions);
+            setShowSuggestions(newSuggestions.length > 0);
+            setActiveSuggestionIndex(newSuggestions.length > 0 ? 0 : -1);
+          }
+          setIsLoadingSuggestions(false);
+        };
+        fetchAndSetSuggestions();
+        return;
+      }
+
       const partialCommand = trimmedQuery.substring(1);
       const filteredSuggestions = slashCommands
         .filter(
