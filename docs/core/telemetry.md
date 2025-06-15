@@ -273,6 +273,15 @@ These are numerical measurements of behavior over time.
     - `model`
 
 - `gemini_cli.token.usage` (Counter, Int): Counts the number of tokens used.
+
   - **Attributes**:
     - `model`
     - `type` (string: "input", "output", "thought", "cache", or "tool")
+
+- `gemini_cli.file.operation.count` (Counter, Int): Counts file operations.
+
+  - **Attributes**:
+    - `operation` (string: "create", "read", "update"): The type of file operation.
+    - `lines` (optional, Int): Number of lines in the file.
+    - `mimetype` (optional, string): Mimetype of the file.
+    - `extension` (optional, string): File extension of the file.

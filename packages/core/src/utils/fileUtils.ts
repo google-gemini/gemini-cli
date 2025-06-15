@@ -17,6 +17,16 @@ const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
 
 /**
+ * Looks up the specific MIME type for a file path.
+ * @param filePath Path to the file.
+ * @returns The specific MIME type string (e.g., 'text/python', 'application/javascript') or undefined if not found or ambiguous.
+ */
+export function getSpecificMimeType(filePath: string): string | undefined {
+  const lookedUpMime = mime.lookup(filePath);
+  return typeof lookedUpMime === 'string' ? lookedUpMime : undefined;
+}
+
+/**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
  * @param rootDirectory The absolute root directory.

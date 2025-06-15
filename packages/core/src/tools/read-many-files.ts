@@ -14,9 +14,14 @@ import {
   detectFileType,
   processSingleFileContent,
   DEFAULT_ENCODING,
+  getSpecificMimeType,
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config } from '../config/config.js';
+import {
+  recordFileOperationMetric,
+  FileOperation,
+} from '../telemetry/metrics.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -420,6 +425,18 @@ Use this tool when the user's query implies needing the content of several files
           contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
         }
         processedFilesRelativePaths.push(relativePathForDisplay);
+        const lines =
+          typeof fileReadResult.llmContent === 'string'
+            ? fileReadResult.llmContent.split('\n').length
+            : undefined;
+        const mimetype = getSpecificMimeType(filePath);
+        recordFileOperationMetric(
+          this.config,
+          FileOperation.READ,
+          lines,
+          mimetype,
+          path.extname(filePath),
+        );
       }
     }
 

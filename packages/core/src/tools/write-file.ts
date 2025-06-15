@@ -26,6 +26,11 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
+import {
+  recordFileOperationMetric,
+  FileOperation,
+} from '../telemetry/metrics.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -270,6 +275,27 @@ export class WriteFileTool
         : `Successfully overwrote file: ${params.file_path}`;
 
       const displayResult: FileDiff = { fileDiff, fileName };
+
+      const lines = fileContent.split('\n').length;
+      const mimetype = getSpecificMimeType(params.file_path);
+      const extension = path.extname(params.file_path); // Get extension
+      if (isNewFile) {
+        recordFileOperationMetric(
+          this.config,
+          FileOperation.CREATE,
+          lines,
+          mimetype,
+          extension,
+        );
+      } else {
+        recordFileOperationMetric(
+          this.config,
+          FileOperation.UPDATE,
+          lines,
+          mimetype,
+          extension,
+        );
+      }
 
       return {
         llmContent: llmSuccessMessage,
