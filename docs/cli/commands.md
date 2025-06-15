@@ -27,6 +27,9 @@ Slash commands provide meta-level control over the CLI itself. They can typicall
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hides tool descriptions, showing only the tool names.
       - **Action:** Displays a compact list with only tool names.
+    - **`schema`**:
+      - **Description:** Shows full schema of tool parameters.
+      - **Action:** Displays the full JSON schema for the tool's configured parameters.
   - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between showing and hiding tool descriptions.
 
 - **`/clear`** (Shortcut: **Ctrl+L**)

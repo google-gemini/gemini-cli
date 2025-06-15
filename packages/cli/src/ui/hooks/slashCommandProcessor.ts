@@ -238,6 +238,11 @@ export const useSlashCommandProcessor = (
           } else if (_args === 'nodesc' || _args === 'nodescriptions') {
             useShowDescriptions = false;
           }
+          // Check if the _subCommand includes a specific flag to show detailed tool schema
+          let useShowSchema = false;
+          if (_subCommand === 'schema' || _args === 'schema') {
+            useShowSchema = true;
+          }
 
           const toolRegistry = await config?.getToolRegistry();
           if (!toolRegistry) {
@@ -319,22 +324,18 @@ export const useSlashCommandProcessor = (
             }
 
             // Add server description with proper handling of multi-line descriptions
-            if (useShowDescriptions && server?.description) {
+            if ((useShowDescriptions || useShowSchema) && server?.description) {
               const greenColor = '\u001b[32m';
               const resetColor = '\u001b[0m';
 
-              const descLines = server.description.split('\n');
-              message += `: ${greenColor}${descLines[0]}${resetColor}`;
-              message += '\n';
-
-              // If there are multiple lines, add proper indentation for each line
-              if (descLines.length > 1) {
-                for (let i = 1; i < descLines.length; i++) {
-                  // Skip empty lines at the end
-                  if (i === descLines.length - 1 && descLines[i].trim() === '')
-                    continue;
+              const descLines = server.description.trim().split('\n');
+              if (descLines) {
+                message += ':\n';
+                for (let i = 0; i < descLines.length; i++) {
                   message += `    ${greenColor}${descLines[i]}${resetColor}\n`;
                 }
+              } else {
+                message += '\n';
               }
             } else {
               message += '\n';
@@ -345,34 +346,51 @@ export const useSlashCommandProcessor = (
 
             if (serverTools.length > 0) {
               serverTools.forEach((tool) => {
-                if (useShowDescriptions && tool.description) {
+                if (
+                  (useShowDescriptions || useShowSchema) &&
+                  tool.description
+                ) {
                   // Format tool name in cyan using simple ANSI cyan color
-                  message += `  - \u001b[36m${tool.name}\u001b[0m: `;
+                  message += `  - \u001b[36m${tool.name}\u001b[0m`;
 
                   // Apply green color to the description text
                   const greenColor = '\u001b[32m';
                   const resetColor = '\u001b[0m';
 
                   // Handle multi-line descriptions by properly indenting and preserving formatting
-                  const descLines = tool.description.split('\n');
-                  message += `${greenColor}${descLines[0]}${resetColor}\n`;
-
-                  // If there are multiple lines, add proper indentation for each line
-                  if (descLines.length > 1) {
-                    for (let i = 1; i < descLines.length; i++) {
-                      // Skip empty lines at the end
-                      if (
-                        i === descLines.length - 1 &&
-                        descLines[i].trim() === ''
-                      )
-                        continue;
+                  const descLines = tool.description.trim().split('\n');
+                  if (descLines) {
+                    message += ':\n';
+                    for (let i = 0; i < descLines.length; i++) {
                       message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
                     }
+                  } else {
+                    message += '\n';
                   }
                   // Reset is handled inline with each line now
                 } else {
                   // Use cyan color for the tool name even when not showing descriptions
                   message += `  - \u001b[36m${tool.name}\u001b[0m\n`;
+                }
+                if (useShowSchema) {
+                  // Prefix the parameters in cyan
+                  message += `    \u001b[36mParameters:\u001b[0m\n`;
+                  // Apply green color to the parameter text
+                  const greenColor = '\u001b[32m';
+                  const resetColor = '\u001b[0m';
+
+                  const paramsLines = JSON.stringify(
+                    tool.schema.parameters,
+                    null,
+                    2,
+                  )
+                    .trim()
+                    .split('\n');
+                  if (paramsLines) {
+                    for (let i = 0; i < paramsLines.length; i++) {
+                      message += `      ${greenColor}${paramsLines[i]}${resetColor}\n`;
+                    }
+                  }
                 }
               });
             } else {
