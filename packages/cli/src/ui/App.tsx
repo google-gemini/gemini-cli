@@ -53,7 +53,10 @@ import {
 } from '@gemini-cli/core';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
-import { SessionStatsProvider } from './contexts/SessionContext.js';
+import {
+  SessionStatsProvider,
+  useSessionStats,
+} from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
@@ -79,6 +82,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleNewMessage,
     clearConsoleMessages: clearConsoleMessagesState,
   } = useConsoleMessages();
+  const { stats: sessionStats } = useSessionStats();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
   const refreshStatic = useCallback(() => {
@@ -648,6 +652,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             showMemoryUsage={
               config.getDebugMode() || config.getShowMemoryUsage()
             }
+            promptTokenCount={sessionStats.currentResponse.promptTokenCount}
+            candidatesTokenCount={
+              sessionStats.currentResponse.candidatesTokenCount
+            }
+            totalTokenCount={sessionStats.currentResponse.totalTokenCount}
           />
         </Box>
       </Box>

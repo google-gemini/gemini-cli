@@ -31,6 +31,7 @@ interface SessionStatsState {
   sessionStartTime: Date;
   cumulative: CumulativeStats;
   currentTurn: CumulativeStats;
+  currentResponse: CumulativeStats;
 }
 
 // Defines the final "value" of our context, including the state
@@ -97,6 +98,16 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
       thoughtsTokenCount: 0,
       apiTimeMs: 0,
     },
+    currentResponse: {
+      turnCount: 0,
+      promptTokenCount: 0,
+      candidatesTokenCount: 0,
+      totalTokenCount: 0,
+      cachedContentTokenCount: 0,
+      toolUsePromptTokenCount: 0,
+      thoughtsTokenCount: 0,
+      apiTimeMs: 0,
+    },
   });
 
   // A single, internal worker function to handle all metadata aggregation.
@@ -107,15 +118,27 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
       setStats((prevState) => {
         const newCumulative = { ...prevState.cumulative };
         const newCurrentTurn = { ...prevState.currentTurn };
+        const newCurrentResponse = {
+          turnCount: 0,
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0,
+          cachedContentTokenCount: 0,
+          toolUsePromptTokenCount: 0,
+          thoughtsTokenCount: 0,
+          apiTimeMs: 0,
+        };
 
         // Add all tokens to the current turn's stats as well as cumulative stats.
         addTokens(newCurrentTurn, metadata);
         addTokens(newCumulative, metadata);
+        addTokens(newCurrentResponse, metadata);
 
         return {
           ...prevState,
           cumulative: newCumulative,
           currentTurn: newCurrentTurn,
+          currentResponse: newCurrentResponse,
         };
       });
     },
@@ -131,6 +154,16 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
       },
       currentTurn: {
         turnCount: 0, // Reset for the new turn's accumulation.
+        promptTokenCount: 0,
+        candidatesTokenCount: 0,
+        totalTokenCount: 0,
+        cachedContentTokenCount: 0,
+        toolUsePromptTokenCount: 0,
+        thoughtsTokenCount: 0,
+        apiTimeMs: 0,
+      },
+      currentResponse: {
+        turnCount: 0,
         promptTokenCount: 0,
         candidatesTokenCount: 0,
         totalTokenCount: 0,

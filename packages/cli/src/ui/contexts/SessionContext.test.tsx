@@ -177,6 +177,51 @@ describe('SessionStatsContext', () => {
     expect(stats?.currentTurn.apiTimeMs).toBe(100 + 50);
   });
 
+  it('should overwrite currentResponse with each API call', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    render(
+      <SessionStatsProvider>
+        <TestHarness contextRef={contextRef} />
+      </SessionStatsProvider>,
+    );
+
+    // 1. First API call
+    act(() => {
+      contextRef.current?.addUsage({ ...mockMetadata1, apiTimeMs: 100 });
+    });
+
+    let stats = contextRef.current?.stats;
+
+    // currentResponse should match the first call
+    expect(stats?.currentResponse.totalTokenCount).toBe(300);
+    expect(stats?.currentResponse.apiTimeMs).toBe(100);
+
+    // 2. Second API call
+    act(() => {
+      contextRef.current?.addUsage({ ...mockMetadata2, apiTimeMs: 50 });
+    });
+
+    stats = contextRef.current?.stats;
+
+    // currentResponse should now match the second call
+    expect(stats?.currentResponse.totalTokenCount).toBe(30);
+    expect(stats?.currentResponse.apiTimeMs).toBe(50);
+
+    // 3. Start a new turn
+    act(() => {
+      contextRef.current?.startNewTurn();
+    });
+
+    stats = contextRef.current?.stats;
+
+    // currentResponse should be reset
+    expect(stats?.currentResponse.totalTokenCount).toBe(0);
+    expect(stats?.currentResponse.apiTimeMs).toBe(0);
+  });
+
   it('should throw an error when useSessionStats is used outside of a provider', () => {
     // Suppress the expected console error during this test.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
