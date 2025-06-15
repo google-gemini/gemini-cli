@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ThoughtSummary } from '@gemini-cli/core';
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -15,12 +16,14 @@ interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
   elapsedTime: number;
   rightContent?: React.ReactNode;
+  thought?: ThoughtSummary | null;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   elapsedTime,
   rightContent,
+  thought,
 }) => {
   const streamingState = useStreamingContext();
 
@@ -28,25 +31,30 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     return null;
   }
 
+  const primaryText = thought?.subject || currentLoadingPhrase;
+
   return (
-    <Box marginTop={1} paddingLeft={0}>
-      <Box marginRight={1}>
-        <GeminiRespondingSpinner
-          nonRespondingDisplay={
-            streamingState === StreamingState.WaitingForConfirmation ? '⠏' : ''
-          }
-        />
+    <Box marginTop={1} paddingLeft={0} flexDirection="column">
+      {/* Main loading line */}
+      <Box>
+        <Box marginRight={1}>
+          <GeminiRespondingSpinner
+            nonRespondingDisplay={
+              streamingState === StreamingState.WaitingForConfirmation
+                ? '⠏'
+                : ''
+            }
+          />
+        </Box>
+        {primaryText && <Text color={Colors.AccentPurple}>{primaryText}</Text>}
+        <Text color={Colors.Gray}>
+          {streamingState === StreamingState.WaitingForConfirmation
+            ? ''
+            : ` (esc to cancel, ${elapsedTime}s)`}
+        </Text>
+        <Box flexGrow={1}>{/* Spacer */}</Box>
+        {rightContent && <Box>{rightContent}</Box>}
       </Box>
-      {currentLoadingPhrase && (
-        <Text color={Colors.AccentPurple}>{currentLoadingPhrase}</Text>
-      )}
-      <Text color={Colors.Gray}>
-        {streamingState === StreamingState.WaitingForConfirmation
-          ? ''
-          : ` (esc to cancel, ${elapsedTime}s)`}
-      </Text>
-      <Box flexGrow={1}>{/* Spacer */}</Box>
-      {rightContent && <Box>{rightContent}</Box>}
     </Box>
   );
 };

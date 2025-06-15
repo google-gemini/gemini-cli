@@ -38,6 +38,11 @@ import {
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
+function isThinkingSupported(model: string) {
+  if (model.startsWith('gemini-2.5')) return true;
+  return false;
+}
+
 export class GeminiClient {
   private chat: Promise<GeminiChat>;
   private contentGenerator: Promise<ContentGenerator>;
@@ -164,14 +169,21 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-
+      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+        ? {
+            ...this.generateContentConfig,
+            thinkingConfig: {
+              includeThoughts: true,
+            },
+          }
+        : this.generateContentConfig;
       return new GeminiChat(
         this.config,
         await this.contentGenerator,
         this.model,
         {
           systemInstruction,
-          ...this.generateContentConfig,
+          ...generateContentConfigWithThinking,
           tools,
         },
         history,

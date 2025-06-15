@@ -300,6 +300,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     submitQuery,
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
+    thought,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -542,6 +543,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           ) : (
             <>
               <LoadingIndicator
+                thought={
+                  streamingState === StreamingState.WaitingForConfirmation ||
+                  config.getAccessibility()?.disableLoadingPhrases
+                    ? undefined
+                    : thought
+                }
                 currentLoadingPhrase={
                   config.getAccessibility()?.disableLoadingPhrases
                     ? undefined

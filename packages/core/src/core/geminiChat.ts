@@ -417,6 +417,10 @@ export class GeminiChat {
           chunks.push(chunk);
           const content = chunk.candidates?.[0]?.content;
           if (content !== undefined) {
+            if (this.isThoughtContent(content)) {
+              yield chunk;
+              continue;
+            }
             outputContent.push(content);
           }
         }
@@ -452,12 +456,19 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
+    const nonThoughtModelOutput = modelOutput.filter(
+      (content) => !this.isThoughtContent(content),
+    );
+
     let outputContents: Content[] = [];
     if (
-      modelOutput.length > 0 &&
-      modelOutput.every((content) => content.role !== undefined)
+      nonThoughtModelOutput.length > 0 &&
+      nonThoughtModelOutput.every((content) => content.role !== undefined)
     ) {
-      outputContents = modelOutput;
+      outputContents = nonThoughtModelOutput;
+    } else if (nonThoughtModelOutput.length === 0 && modelOutput.length > 0) {
+      // This case handles when the model returns only a thought.
+      // We don't want to add an empty model response in this case.
     } else {
       // When not a function response appends an empty content when model returns empty response, so that the
       // history is always alternating between user and model.
@@ -486,7 +497,6 @@ export class GeminiChat {
       if (this.isThoughtContent(content)) {
         continue;
       }
-
       const lastContent =
         consolidatedOutputContents[consolidatedOutputContents.length - 1];
       if (this.isTextContent(lastContent) && this.isTextContent(content)) {
