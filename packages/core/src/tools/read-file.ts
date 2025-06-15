@@ -10,6 +10,11 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { isWithinRoot, processSingleFileContent } from '../utils/fileUtils.js';
 import { Config } from '../config/config.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
+import {
+  recordFileOperationMetric,
+  FileOperation,
+} from '../telemetry/metrics.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -144,6 +149,19 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         returnDisplay: result.returnDisplay, // User-friendly error
       };
     }
+
+    const lines =
+      typeof result.llmContent === 'string'
+        ? result.llmContent.split('\n').length
+        : undefined;
+    const mimetype = getSpecificMimeType(params.absolute_path);
+    recordFileOperationMetric(
+      this.config,
+      FileOperation.READ,
+      lines,
+      mimetype,
+      path.extname(params.absolute_path),
+    );
 
     return {
       llmContent: result.llmContent,

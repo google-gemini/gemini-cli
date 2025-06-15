@@ -19,3 +19,4 @@ export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
 export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
+export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
