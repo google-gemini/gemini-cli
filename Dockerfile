@@ -1,4 +1,4 @@
-FROM docker.io/library/node:22-slim
+FROM docker.io/library/node:20-slim
 
 ARG SANDBOX_NAME="gemini-cli-sandbox"
 ENV SANDBOX="$SANDBOX_NAME"
@@ -45,4 +45,4 @@ RUN npm install -g /usr/local/share/npm-global/gemini-cli-cli.tgz /usr/local/sha
   && rm -f /usr/local/share/npm-global/gemini-cli-{cli,core}.tgz
 
 # default entrypoint when none specified
-ENTRYPOINT ["gemini"]
+CMD ["gemini"]
