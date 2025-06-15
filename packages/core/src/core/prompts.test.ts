@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCoreSystemPrompt } from './prompts.js'; // Adjust import path
 import * as process from 'node:process';
+import * as os from 'node:os';
 import { isGitRepository } from '../utils/gitUtils.js';
 
 // Mock tool names if they are dynamically generated or complex
@@ -24,6 +25,9 @@ vi.mock('../tools/shell', () => ({
 vi.mock('../tools/write-file', () => ({
   WriteFileTool: { Name: 'write_file' },
 }));
+vi.mock('node:os', () => ({
+  platform: vi.fn(),
+}));
 vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
@@ -35,6 +39,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   beforeEach(() => {
     // Store original value before each test
     originalSandboxEnv = process.env.SANDBOX;
+    vi.mocked(os.platform).mockReturnValue('darwin');
   });
 
   afterEach(() => {

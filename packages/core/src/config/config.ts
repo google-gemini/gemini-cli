@@ -174,8 +174,8 @@ export class Config {
       setGeminiMdFilename(params.contextFileName);
     }
 
-    this.toolRegistry = createToolRegistry(this);
     this.geminiClient = new GeminiClient(this);
+    this.toolRegistry = createToolRegistry(this);
 
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
