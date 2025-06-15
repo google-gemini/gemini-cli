@@ -34,7 +34,7 @@ The core comes with a suite of pre-defined tools, typically found in `packages/c
 
 - **File System Tools:**
   - `LSTool` (`ls.ts`): Lists directory contents.
-  - `ReadFileTool` (`read-file.ts`): Reads the content of a single file.
+  - `ReadFileTool` (`read-file.ts`): Reads the content of a single file. It takes an `absolute_path` parameter, which must be an absolute path.
   - `WriteFileTool` (`write-file.ts`): Writes content to a file.
   - `GrepTool` (`grep.ts`): Searches for patterns in files.
   - `GlobTool` (`glob.ts`): Finds files matching glob patterns.

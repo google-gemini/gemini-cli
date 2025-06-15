@@ -18,7 +18,7 @@ export interface ReadFileToolParams {
   /**
    * The absolute path to the file to read
    */
-  path: string;
+  absolute_path: string;
 
   /**
    * The line number to start reading from (optional)
@@ -47,10 +47,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
       {
         properties: {
-          path: {
+          absolute_path: {
             description:
-              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
             type: 'string',
+            pattern: '^/',
           },
           offset: {
             description:
@@ -63,7 +64,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
             type: 'number',
           },
         },
-        required: ['path'],
+        required: ['absolute_path'],
         type: 'object',
       },
     );
@@ -80,9 +81,9 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     ) {
       return 'Parameters failed schema validation.';
     }
-    const filePath = params.path;
+    const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
-      return `File path must be absolute: ${filePath}`;
+      return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }
     if (!isWithinRoot(filePath, this.rootDirectory)) {
       return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
@@ -95,8 +96,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     }
 
     const fileService = this.config.getFileService();
-    if (fileService.shouldGeminiIgnoreFile(params.path)) {
-      const relativePath = makeRelative(params.path, this.rootDirectory);
+    if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
+      const relativePath = makeRelative(
+        params.absolute_path,
+        this.rootDirectory,
+      );
       return `File path '${shortenPath(relativePath)}' is ignored by .geminiignore pattern(s).`;
     }
 
@@ -106,12 +110,12 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   getDescription(params: ReadFileToolParams): string {
     if (
       !params ||
-      typeof params.path !== 'string' ||
-      params.path.trim() === ''
+      typeof params.absolute_path !== 'string' ||
+      params.absolute_path.trim() === ''
     ) {
       return `Path unavailable`;
     }
-    const relativePath = makeRelative(params.path, this.rootDirectory);
+    const relativePath = makeRelative(params.absolute_path, this.rootDirectory);
     return shortenPath(relativePath);
   }
 
@@ -128,7 +132,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     }
 
     const result = await processSingleFileContent(
-      params.path,
+      params.absolute_path,
       this.rootDirectory,
       params.offset,
       params.limit,
