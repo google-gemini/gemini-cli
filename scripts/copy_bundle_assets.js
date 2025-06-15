@@ -18,10 +18,12 @@
 // limitations under the License.
 
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { join, basename } from 'path';
+import { dirname, join, basename } from 'path';
+import { fileURLToPath } from 'url';
 import { glob } from 'glob';
 
-const root = join(import.meta.dirname, '..');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..');
 const bundleDir = join(root, 'bundle');
 
 // Create the bundle directory if it doesn't exist
