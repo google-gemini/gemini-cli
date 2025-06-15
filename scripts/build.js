@@ -20,9 +20,11 @@
 
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
-const root = join(import.meta.dirname, '..');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..');
 
 // npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
 if (!existsSync(join(root, 'node_modules'))) {

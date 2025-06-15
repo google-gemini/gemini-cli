@@ -19,9 +19,11 @@
 
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
-const root = join(import.meta.dirname, '..');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..');
 const generatedDir = join(root, 'packages/cli/src/generated');
 const gitCommitFile = join(generatedDir, 'git-commit.ts');
 let gitCommitInfo = 'N/A';

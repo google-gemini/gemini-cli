@@ -18,10 +18,12 @@
 // limitations under the License.
 
 import { spawn, execSync } from 'child_process';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 
-const root = join(import.meta.dirname, '..');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
 
 // check build status, write warnings to file for app to display if needed
