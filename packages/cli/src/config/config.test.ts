@@ -127,30 +127,119 @@ describe('loadCliConfig telemetry', () => {
 
   it('should use telemetry value from settings if CLI flag is not present (settings true)', async () => {
     process.argv = ['node', 'script.js'];
-    const settings: Settings = { telemetry: true };
+    const settings: Settings = { telemetry: { enabled: true } };
     const config = await loadCliConfig(settings, [], [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
   it('should use telemetry value from settings if CLI flag is not present (settings false)', async () => {
     process.argv = ['node', 'script.js'];
-    const settings: Settings = { telemetry: false };
+    const settings: Settings = { telemetry: { enabled: false } };
     const config = await loadCliConfig(settings, [], [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
   it('should prioritize --telemetry CLI flag (true) over settings (false)', async () => {
     process.argv = ['node', 'script.js', '--telemetry'];
-    const settings: Settings = { telemetry: false };
+    const settings: Settings = { telemetry: { enabled: false } };
     const config = await loadCliConfig(settings, [], [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
   it('should prioritize --no-telemetry CLI flag (false) over settings (true)', async () => {
     process.argv = ['node', 'script.js', '--no-telemetry'];
-    const settings: Settings = { telemetry: true };
+    const settings: Settings = { telemetry: { enabled: true } };
     const config = await loadCliConfig(settings, [], [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
+  });
+
+  it('should use telemetry OTLP endpoint from settings if CLI flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {
+      telemetry: { otlpEndpoint: 'http://settings.example.com' },
+    };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryOtlpEndpoint()).toBe(
+      'http://settings.example.com',
+    );
+  });
+
+  it('should prioritize --telemetry-otlp-endpoint CLI flag over settings', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--telemetry-otlp-endpoint',
+      'http://cli.example.com',
+    ];
+    const settings: Settings = {
+      telemetry: { otlpEndpoint: 'http://settings.example.com' },
+    };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryOtlpEndpoint()).toBe('http://cli.example.com');
+  });
+
+  it('should use default endpoint if no OTLP endpoint is provided via CLI or settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: { enabled: true } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryOtlpEndpoint()).toBe('http://localhost:4317');
+  });
+
+  it('should use telemetry target from settings if CLI flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.DEFAULT_TELEMETRY_TARGET },
+    };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryTarget()).toBe(
+      ServerConfig.DEFAULT_TELEMETRY_TARGET,
+    );
+  });
+
+  it('should prioritize --telemetry-target CLI flag over settings', async () => {
+    process.argv = ['node', 'script.js', '--telemetry-target', 'gcp'];
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.DEFAULT_TELEMETRY_TARGET },
+    };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryTarget()).toBe('gcp');
+  });
+
+  it('should use default target if no target is provided via CLI or settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: { enabled: true } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryTarget()).toBe(
+      ServerConfig.DEFAULT_TELEMETRY_TARGET,
+    );
+  });
+
+  it('should use telemetry log prompts from settings if CLI flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: { logPrompts: false } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
+  });
+
+  it('should prioritize --telemetry-log-prompts CLI flag (true) over settings (false)', async () => {
+    process.argv = ['node', 'script.js', '--telemetry-log-prompts'];
+    const settings: Settings = { telemetry: { logPrompts: false } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
+  });
+
+  it('should prioritize --no-telemetry-log-prompts CLI flag (false) over settings (true)', async () => {
+    process.argv = ['node', 'script.js', '--no-telemetry-log-prompts'];
+    const settings: Settings = { telemetry: { logPrompts: true } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
+  });
+
+  it('should use default log prompts (true) if no value is provided via CLI or settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { telemetry: { enabled: true } };
+    const config = await loadCliConfig(settings, [], [], 'test-session');
+    expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
   });
 });
 

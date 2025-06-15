@@ -23,7 +23,12 @@ import { GeminiClient } from '../core/client.js';
 import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { initializeTelemetry } from '../telemetry/index.js';
+import {
+  initializeTelemetry,
+  DEFAULT_TELEMETRY_TARGET,
+  DEFAULT_OTLP_ENDPOINT,
+  TelemetryTarget,
+} from '../telemetry/index.js';
 import { DEFAULT_GEMINI_EMBEDDING_MODEL } from './models.js';
 
 export enum ApprovalMode {
@@ -38,6 +43,13 @@ export interface AccessibilitySettings {
 
 export interface BugCommandSettings {
   urlTemplate: string;
+}
+
+export interface TelemetrySettings {
+  enabled?: boolean;
+  target?: TelemetryTarget;
+  otlpEndpoint?: string;
+  logPrompts?: boolean;
 }
 
 export class MCPServerConfig {
@@ -82,9 +94,7 @@ export interface ConfigParameters {
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
-  telemetry?: boolean;
-  telemetryLogUserPromptsEnabled?: boolean;
-  telemetryOtlpEndpoint?: string;
+  telemetry?: TelemetrySettings;
   fileFilteringRespectGitIgnore?: boolean;
   checkpoint?: boolean;
   proxy?: string;
@@ -114,9 +124,7 @@ export class Config {
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
-  private readonly telemetry: boolean;
-  private readonly telemetryLogUserPromptsEnabled: boolean;
-  private readonly telemetryOtlpEndpoint: string;
+  private readonly telemetrySettings: TelemetrySettings;
   private readonly geminiClient: GeminiClient;
   private readonly fileFilteringRespectGitIgnore: boolean;
   private fileDiscoveryService: FileDiscoveryService | null = null;
@@ -147,11 +155,13 @@ export class Config {
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
-    this.telemetry = params.telemetry ?? false;
-    this.telemetryLogUserPromptsEnabled =
-      params.telemetryLogUserPromptsEnabled ?? true;
-    this.telemetryOtlpEndpoint =
-      params.telemetryOtlpEndpoint ?? 'http://localhost:4317';
+    this.telemetrySettings = {
+      enabled: params.telemetry?.enabled ?? false,
+      target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
+      otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
+      logPrompts: params.telemetry?.logPrompts ?? true,
+    };
+
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
     this.checkpoint = params.checkpoint ?? false;
@@ -167,7 +177,7 @@ export class Config {
     this.toolRegistry = createToolRegistry(this);
     this.geminiClient = new GeminiClient(this);
 
-    if (this.telemetry) {
+    if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
     }
   }
@@ -272,15 +282,19 @@ export class Config {
   }
 
   getTelemetryEnabled(): boolean {
-    return this.telemetry;
+    return this.telemetrySettings.enabled ?? false;
   }
 
-  getTelemetryLogUserPromptsEnabled(): boolean {
-    return this.telemetryLogUserPromptsEnabled;
+  getTelemetryLogPromptsEnabled(): boolean {
+    return this.telemetrySettings.logPrompts ?? true;
   }
 
   getTelemetryOtlpEndpoint(): string {
-    return this.telemetryOtlpEndpoint;
+    return this.telemetrySettings.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT;
+  }
+
+  getTelemetryTarget(): TelemetryTarget {
+    return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
   }
 
   getGeminiClient(): GeminiClient {

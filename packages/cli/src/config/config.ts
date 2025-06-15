@@ -18,6 +18,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
+  TelemetryTarget,
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
@@ -47,6 +48,9 @@ interface CliArgs {
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
   checkpoint: boolean | undefined;
+  telemetryTarget: string | undefined;
+  telemetryOtlpEndpoint: string | undefined;
+  telemetryLogPrompts: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -93,7 +97,24 @@ async function parseArguments(): Promise<CliArgs> {
     })
     .option('telemetry', {
       type: 'boolean',
-      description: 'Enable telemetry?',
+      description:
+        'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
+    })
+    .option('telemetry-target', {
+      type: 'string',
+      choices: ['local', 'gcp'],
+      description:
+        'Set the telemetry target (local or gcp). Overrides settings files.',
+    })
+    .option('telemetry-otlp-endpoint', {
+      type: 'string',
+      description:
+        'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+    })
+    .option('telemetry-log-prompts', {
+      type: 'boolean',
+      description:
+        'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
     .option('checkpoint', {
       alias: 'c',
@@ -190,10 +211,16 @@ export async function loadCliConfig(
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
     accessibility: settings.accessibility,
-    telemetry:
-      argv.telemetry !== undefined
-        ? argv.telemetry
-        : (settings.telemetry ?? false),
+    telemetry: {
+      enabled: argv.telemetry ?? settings.telemetry?.enabled,
+      target: (argv.telemetryTarget ??
+        settings.telemetry?.target) as TelemetryTarget,
+      otlpEndpoint:
+        argv.telemetryOtlpEndpoint ??
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
+        settings.telemetry?.otlpEndpoint,
+      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
+    },
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
     checkpoint: argv.checkpoint,
@@ -203,8 +230,6 @@ export async function loadCliConfig(
       process.env.HTTP_PROXY ||
       process.env.http_proxy,
     cwd: process.cwd(),
-    telemetryOtlpEndpoint:
-      process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? settings.telemetryOtlpEndpoint,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
   });

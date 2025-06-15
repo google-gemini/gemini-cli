@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export enum TelemetryTarget {
+  GCP = 'gcp',
+  LOCAL = 'local',
+}
+
+const DEFAULT_TELEMETRY_TARGET = TelemetryTarget.LOCAL;
+const DEFAULT_OTLP_ENDPOINT = 'http://localhost:4317';
+
+export { DEFAULT_TELEMETRY_TARGET, DEFAULT_OTLP_ENDPOINT };
 export {
   initializeTelemetry,
   shutdownTelemetry,

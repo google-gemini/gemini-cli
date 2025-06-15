@@ -10,7 +10,7 @@ import path from 'path';
 import fs from 'fs';
 import net from 'net';
 import os from 'os';
-import { execSync } from 'child_process'; // Removed spawn, it's not used here
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -251,15 +251,20 @@ export async function ensureBinary(
 export function manageTelemetrySettings(
   enable,
   oTelEndpoint = 'http://localhost:4317',
+  target = 'local',
   originalSandboxSettingToRestore,
 ) {
   const workspaceSettings = readJsonFile(WORKSPACE_SETTINGS_FILE);
   const currentSandboxSetting = workspaceSettings.sandbox;
   let settingsModified = false;
 
+  if (typeof workspaceSettings.telemetry !== 'object') {
+    workspaceSettings.telemetry = {};
+  }
+
   if (enable) {
-    if (workspaceSettings.telemetry !== true) {
-      workspaceSettings.telemetry = true;
+    if (workspaceSettings.telemetry.enabled !== true) {
+      workspaceSettings.telemetry.enabled = true;
       settingsModified = true;
       console.log('⚙️  Enabled telemetry in workspace settings.');
     }
@@ -268,22 +273,36 @@ export function manageTelemetrySettings(
       settingsModified = true;
       console.log('✅ Disabled sandbox mode for telemetry.');
     }
-    if (workspaceSettings.telemetryOtlpEndpoint !== oTelEndpoint) {
-      workspaceSettings.telemetryOtlpEndpoint = oTelEndpoint;
+    if (workspaceSettings.telemetry.otlpEndpoint !== oTelEndpoint) {
+      workspaceSettings.telemetry.otlpEndpoint = oTelEndpoint;
       settingsModified = true;
       console.log(`🔧 Set telemetry OTLP endpoint to ${oTelEndpoint}.`);
     }
-  } else {
-    if (workspaceSettings.telemetry === true) {
-      delete workspaceSettings.telemetry;
+    if (workspaceSettings.telemetry.target !== target) {
+      workspaceSettings.telemetry.target = target;
       settingsModified = true;
-      console.log('⚙️ Disabled telemetry in workspace settings.');
+      console.log(`🎯 Set telemetry target to ${target}.`);
     }
-    if (workspaceSettings.telemetryOtlpEndpoint) {
-      delete workspaceSettings.telemetryOtlpEndpoint;
+  } else {
+    if (workspaceSettings.telemetry.enabled === true) {
+      delete workspaceSettings.telemetry.enabled;
+      settingsModified = true;
+      console.log('⚙️  Disabled telemetry in workspace settings.');
+    }
+    if (workspaceSettings.telemetry.otlpEndpoint) {
+      delete workspaceSettings.telemetry.otlpEndpoint;
       settingsModified = true;
       console.log('🔧 Cleared telemetry OTLP endpoint.');
     }
+    if (workspaceSettings.telemetry.target) {
+      delete workspaceSettings.telemetry.target;
+      settingsModified = true;
+      console.log('🎯 Cleared telemetry target.');
+    }
+    if (Object.keys(workspaceSettings.telemetry).length === 0) {
+      delete workspaceSettings.telemetry;
+    }
+
     if (
       originalSandboxSettingToRestore !== undefined &&
       workspaceSettings.sandbox !== originalSandboxSettingToRestore
