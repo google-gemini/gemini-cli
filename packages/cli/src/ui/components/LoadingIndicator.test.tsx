@@ -159,4 +159,56 @@ describe('<LoadingIndicator />', () => {
     );
     expect(lastFrame()).toBe('');
   });
+
+  it('should display fallback phrase if thought is empty', () => {
+    const props = {
+      thought: null,
+      currentLoadingPhrase: 'Loading...',
+      elapsedTime: 5,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    const output = lastFrame();
+    expect(output).toContain('Loading...');
+  });
+
+  it('should display the subject of a thought', () => {
+    const props = {
+      thought: {
+        subject: 'Thinking about something...',
+        description: 'and other stuff.',
+      },
+      elapsedTime: 5,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    if (output) {
+      expect(output).toContain('Thinking about something...');
+      expect(output).not.toContain('and other stuff.');
+    }
+  });
+
+  it('should prioritize thought.subject over currentLoadingPhrase', () => {
+    const props = {
+      thought: {
+        subject: 'This should be displayed',
+        description: 'A description',
+      },
+      currentLoadingPhrase: 'This should not be displayed',
+      elapsedTime: 5,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    const output = lastFrame();
+    expect(output).toContain('This should be displayed');
+    expect(output).not.toContain('This should not be displayed');
+  });
 });
