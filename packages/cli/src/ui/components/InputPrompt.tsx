@@ -109,11 +109,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const selectedSuggestion = completionSuggestions[indexToUse];
 
       if (query.trimStart().startsWith('/')) {
+        const parts = query.trimStart().substring(1).split(' ');
+        const commandName = parts[0];
         const slashIndex = query.indexOf('/');
         const base = query.substring(0, slashIndex + 1);
-        const newValue = base + selectedSuggestion.value;
-        buffer.setText(newValue);
-        handleSubmitAndClear(newValue);
+
+        const command = slashCommands.find((cmd) => cmd.name === commandName);
+        if (command && command.completion) {
+          const newValue = `${base}${commandName} ${selectedSuggestion.value}`;
+          buffer.setText(newValue);
+        } else {
+          const newValue = base + selectedSuggestion.value;
+          buffer.setText(newValue);
+          handleSubmitAndClear(newValue);
+        }
       } else {
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
@@ -131,7 +140,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       resetCompletionState();
     },
-    [resetCompletionState, handleSubmitAndClear, buffer, completionSuggestions],
+    [
+      resetCompletionState,
+      handleSubmitAndClear,
+      buffer,
+      completionSuggestions,
+      slashCommands,
+    ],
   );
 
   useInput(

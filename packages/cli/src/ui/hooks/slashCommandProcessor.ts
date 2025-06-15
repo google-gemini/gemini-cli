@@ -44,6 +44,7 @@ export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
+  completion?: () => Promise<string[]>;
   action: (
     mainCommand: string,
     subCommand?: string,
@@ -643,6 +644,25 @@ Add any other context about the problem here.
         name: 'resume',
         description:
           'resume from conversation checkpoint. Usage: /resume [tag]',
+        completion: async () => {
+          const geminiDir = config?.getGeminiDir();
+          if (!geminiDir) {
+            return [];
+          }
+          try {
+            const files = await fs.readdir(geminiDir);
+            return files
+              .filter(
+                (file) =>
+                  file.startsWith('checkpoint-') && file.endsWith('.json'),
+              )
+              .map((file) =>
+                file.replace('checkpoint-', '').replace('.json', ''),
+              );
+          } catch (_err) {
+            return [];
+          }
+        },
         action: async (_mainCommand, subCommand, _args) => {
           const tag = (subCommand || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
