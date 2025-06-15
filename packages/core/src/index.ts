@@ -13,6 +13,7 @@ export * from './core/contentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
 export * from './core/prompts.js';
+export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
