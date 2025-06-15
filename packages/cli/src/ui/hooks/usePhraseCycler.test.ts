@@ -87,7 +87,9 @@ describe('usePhraseCycler', () => {
     expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
 
     // Set back to active - should pick a random witty phrase
-    rerender({ isActive: true, isWaiting: false });
+    act(() => {
+      rerender({ isActive: true, isWaiting: false });
+    });
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
