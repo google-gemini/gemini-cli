@@ -21,15 +21,7 @@ import {
   ApprovalMode,
   Config,
   EditTool,
-  GlobTool,
-  GrepTool,
-  LSTool,
-  MemoryTool,
-  ReadFileTool,
-  ReadManyFilesTool,
   ShellTool,
-  WebFetchTool,
-  WebSearchTool,
   WriteFileTool,
   sessionId,
   logUserPrompt,
@@ -166,28 +158,16 @@ async function loadNonInteractiveConfig(
   }
 
   // Everything is not allowed, ensure that only read-only tools are configured.
-
-  let existingCoreTools = config.getCoreTools();
-  existingCoreTools = existingCoreTools || [
-    ReadFileTool.Name,
-    LSTool.Name,
-    GrepTool.Name,
-    GlobTool.Name,
-    EditTool.Name,
-    WriteFileTool.Name,
-    WebFetchTool.Name,
-    WebSearchTool.Name,
-    ReadManyFilesTool.Name,
-    ShellTool.Name,
-    MemoryTool.Name,
-  ];
+  const existingExcludeTools = settings.merged.excludeTools || [];
   const interactiveTools = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
-  const nonInteractiveTools = existingCoreTools.filter(
-    (tool) => !interactiveTools.includes(tool),
-  );
+
+  const newExcludeTools = [
+    ...new Set([...existingExcludeTools, ...interactiveTools]),
+  ];
+
   const nonInteractiveSettings = {
     ...settings.merged,
-    coreTools: nonInteractiveTools,
+    excludeTools: newExcludeTools,
   };
   return await loadCliConfig(
     nonInteractiveSettings,

@@ -427,6 +427,9 @@ Add any other context about the problem here.
     });
 
     it('should use the custom bug command URL from config if available', async () => {
+      process.env.CLI_VERSION = '0.1.0';
+      process.env.SANDBOX = 'sandbox-exec';
+      process.env.SEATBELT_PROFILE = 'permissive-open';
       const bugCommand = {
         urlTemplate:
           'https://custom-bug-tracker.com/new?title={title}&body={body}',
@@ -449,7 +452,7 @@ Add any other context about the problem here.
 *   **CLI Version:** 0.1.0
 *   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** test-platform test-node-version
-*   **Sandbox Environment:** no sandbox
+*   **Sandbox Environment:** sandbox-exec (permissive-open)
 *   **Model Version:** test-model
 *   **Memory Usage:** 11.8 MB
 `;
