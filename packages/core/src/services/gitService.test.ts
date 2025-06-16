@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GitService, historyDirName } from './gitService.js';
+import { GitService } from './gitService.js';
 import * as path from 'path';
 import type * as FsPromisesModule from 'fs/promises';
 import type { ChildProcess } from 'node:child_process';
@@ -29,6 +29,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   };
 });
 
+const hoistedMockEnv = vi.hoisted(() => vi.fn());
 const hoistedMockSimpleGit = vi.hoisted(() => vi.fn());
 const hoistedMockCheckIsRepo = vi.hoisted(() => vi.fn());
 const hoistedMockInit = vi.hoisted(() => vi.fn());
@@ -42,6 +43,7 @@ vi.mock('simple-git', () => ({
     raw: hoistedMockRaw,
     add: hoistedMockAdd,
     commit: hoistedMockCommit,
+    env: hoistedMockEnv,
   })),
   CheckRepoActions: { IS_REPO_ROOT: 'is-repo-root' },
 }));
@@ -56,8 +58,31 @@ vi.mock('../utils/errors.js', () => ({
   isNodeError: hoistedMockIsNodeError,
 }));
 
+const hoistedMockHomedir = vi.hoisted(() => vi.fn());
+vi.mock('os', () => ({
+  homedir: hoistedMockHomedir,
+}));
+
+const hoistedMockCreateHash = vi.hoisted(() => {
+  const mockUpdate = vi.fn().mockReturnThis();
+  const mockDigest = vi.fn();
+  return {
+    createHash: vi.fn(() => ({
+      update: mockUpdate,
+      digest: mockDigest,
+    })),
+    mockUpdate,
+    mockDigest,
+  };
+});
+vi.mock('crypto', () => ({
+  createHash: hoistedMockCreateHash.createHash,
+}));
+
 describe('GitService', () => {
   const mockProjectRoot = '/test/project';
+  const mockHomedir = '/mock/home';
+  const mockHash = 'mock-hash';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,13 +99,24 @@ describe('GitService', () => {
     hoistedMockReadFile.mockResolvedValue('');
     hoistedMockWriteFile.mockResolvedValue(undefined);
     hoistedMockIsNodeError.mockImplementation((e) => e instanceof Error);
+    hoistedMockHomedir.mockReturnValue(mockHomedir);
+    hoistedMockCreateHash.mockUpdate.mockReturnThis();
+    hoistedMockCreateHash.mockDigest.mockReturnValue(mockHash);
 
+    hoistedMockEnv.mockImplementation(() => ({
+      checkIsRepo: hoistedMockCheckIsRepo,
+      init: hoistedMockInit,
+      raw: hoistedMockRaw,
+      add: hoistedMockAdd,
+      commit: hoistedMockCommit,
+    }));
     hoistedMockSimpleGit.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,
       init: hoistedMockInit,
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
+      env: hoistedMockEnv,
     }));
     hoistedMockCheckIsRepo.mockResolvedValue(false);
     hoistedMockInit.mockResolvedValue(undefined);
@@ -136,27 +172,26 @@ describe('GitService', () => {
         'GitService requires Git to be installed',
       );
     });
+
+    it('should call setupShadowGitRepository if Git is available', async () => {
+      const service = new GitService(mockProjectRoot);
+      const setupSpy = vi
+        .spyOn(service, 'setupShadowGitRepository')
+        .mockResolvedValue(undefined);
+
+      await service.initialize();
+      expect(setupSpy).toHaveBeenCalled();
+    });
   });
 
-  it('should call setupHiddenGitRepository if Git is available', async () => {
-    const service = new GitService(mockProjectRoot);
-    const setupSpy = vi
-      .spyOn(service, 'setupHiddenGitRepository')
-      .mockResolvedValue(undefined);
-
-    await service.initialize();
-    expect(setupSpy).toHaveBeenCalled();
-  });
-
-  describe('setupHiddenGitRepository', () => {
-    const historyDir = path.join(mockProjectRoot, historyDirName);
-    const repoDir = path.join(historyDir, 'repository');
+  describe('setupShadowGitRepository', () => {
+    const repoDir = path.join(mockHomedir, '.gemini', 'history', mockHash);
     const hiddenGitIgnorePath = path.join(repoDir, '.gitignore');
     const visibleGitIgnorePath = path.join(mockProjectRoot, '.gitignore');
 
     it('should create history and repository directories', async () => {
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
+      await service.setupShadowGitRepository();
       expect(hoistedMockMkdir).toHaveBeenCalledWith(repoDir, {
         recursive: true,
       });
@@ -165,7 +200,7 @@ describe('GitService', () => {
     it('should initialize git repo in historyDir if not already initialized', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
+      await service.setupShadowGitRepository();
       expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
       expect(hoistedMockInit).toHaveBeenCalled();
     });
@@ -173,7 +208,7 @@ describe('GitService', () => {
     it('should not initialize git repo if already initialized', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(true);
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
+      await service.setupShadowGitRepository();
       expect(hoistedMockInit).not.toHaveBeenCalled();
     });
 
@@ -186,7 +221,7 @@ describe('GitService', () => {
         return '';
       });
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
+      await service.setupShadowGitRepository();
       expect(hoistedMockReadFile).toHaveBeenCalledWith(
         visibleGitIgnorePath,
         'utf-8',
@@ -206,48 +241,28 @@ describe('GitService', () => {
         return '';
       });
       hoistedMockIsNodeError.mockImplementation(
-        (e: unknown): e is NodeJS.ErrnoException =>
-          e === readError &&
-          e instanceof Error &&
-          (e as NodeJS.ErrnoException).code !== 'ENOENT',
+        (e: unknown): e is NodeJS.ErrnoException => e instanceof Error,
       );
 
       const service = new GitService(mockProjectRoot);
-      await expect(service.setupHiddenGitRepository()).rejects.toThrow(
+      await expect(service.setupShadowGitRepository()).rejects.toThrow(
         'Read permission denied',
       );
     });
 
-    it('should add historyDirName to projectRoot .gitignore if not present', async () => {
-      const initialGitignoreContent = 'node_modules/';
-      hoistedMockReadFile.mockImplementation(async (filePath) => {
-        if (filePath === visibleGitIgnorePath) {
-          return initialGitignoreContent;
-        }
-        return '';
-      });
-      const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
-      const expectedContent = `${initialGitignoreContent}\n# Gemini CLI history directory\n${historyDirName}\n`;
-      expect(hoistedMockWriteFile).toHaveBeenCalledWith(
-        visibleGitIgnorePath,
-        expectedContent,
-      );
-    });
-
     it('should make an initial commit if no commits exist in history repo', async () => {
-      hoistedMockRaw.mockResolvedValue('');
+      hoistedMockCheckIsRepo.mockResolvedValue(false);
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
-      expect(hoistedMockAdd).toHaveBeenCalledWith(hiddenGitIgnorePath);
-      expect(hoistedMockCommit).toHaveBeenCalledWith('Initial commit');
+      await service.setupShadowGitRepository();
+      expect(hoistedMockCommit).toHaveBeenCalledWith('Initial commit', {
+        '--allow-empty': null,
+      });
     });
 
     it('should not make an initial commit if commits already exist', async () => {
-      hoistedMockRaw.mockResolvedValue('test-commit');
+      hoistedMockCheckIsRepo.mockResolvedValue(true);
       const service = new GitService(mockProjectRoot);
-      await service.setupHiddenGitRepository();
-      expect(hoistedMockAdd).not.toHaveBeenCalled();
+      await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
     });
   });

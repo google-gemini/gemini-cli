@@ -6,18 +6,26 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 import { isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
-
-export const historyDirName = '.gemini_cli_history';
 
 export class GitService {
   private projectRoot: string;
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
+  }
+
+  private getHistoryDir(): string {
+    const hash = crypto
+      .createHash('sha256')
+      .update(this.projectRoot)
+      .digest('hex');
+    return path.join(os.homedir(), '.gemini', 'history', hash);
   }
 
   async initialize(): Promise<void> {
@@ -28,7 +36,7 @@ export class GitService {
     if (!gitAvailable) {
       throw new Error('GitService requires Git to be installed');
     }
-    this.setupHiddenGitRepository();
+    this.setupShadowGitRepository();
   }
 
   verifyGitAvailability(): Promise<boolean> {
@@ -47,66 +55,40 @@ export class GitService {
    * Creates a hidden git repository in the project root.
    * The Git repository is used to support checkpointing.
    */
-  async setupHiddenGitRepository() {
-    const historyDir = path.join(this.projectRoot, historyDirName);
-    const repoDir = path.join(historyDir, 'repository');
+  async setupShadowGitRepository() {
+    const repoDir = this.getHistoryDir();
 
     await fs.mkdir(repoDir, { recursive: true });
-    const repoInstance: SimpleGit = simpleGit(repoDir);
-    const isRepoDefined = await repoInstance.checkIsRepo(
+    const isRepoDefined = await simpleGit(repoDir).checkIsRepo(
       CheckRepoActions.IS_REPO_ROOT,
     );
+
     if (!isRepoDefined) {
-      await repoInstance.init();
-      try {
-        await repoInstance.raw([
-          'worktree',
-          'add',
-          this.projectRoot,
-          '--force',
-        ]);
-      } catch (error) {
-        console.log('Failed to add worktree:', error);
-      }
+      await simpleGit(repoDir).init(false, {
+        '--initial-branch': 'main',
+      });
+
+      const repo = simpleGit(repoDir);
+      await repo.commit('Initial commit', { '--allow-empty': null });
     }
 
-    const visibileGitIgnorePath = path.join(this.projectRoot, '.gitignore');
-    const hiddenGitIgnorePath = path.join(repoDir, '.gitignore');
+    const userGitIgnorePath = path.join(this.projectRoot, '.gitignore');
+    const shadowGitIgnorePath = path.join(repoDir, '.gitignore');
 
-    let visibileGitIgnoreContent = ``;
+    let userGitIgnoreContent = '';
     try {
-      visibileGitIgnoreContent = await fs.readFile(
-        visibileGitIgnorePath,
-        'utf-8',
-      );
+      userGitIgnoreContent = await fs.readFile(userGitIgnorePath, 'utf-8');
     } catch (error) {
       if (isNodeError(error) && error.code !== 'ENOENT') {
         throw error;
       }
     }
 
-    await fs.writeFile(hiddenGitIgnorePath, visibileGitIgnoreContent);
-
-    if (!visibileGitIgnoreContent.includes(historyDirName)) {
-      const updatedContent = `${visibileGitIgnoreContent}\n# Gemini CLI history directory\n${historyDirName}\n`;
-      await fs.writeFile(visibileGitIgnorePath, updatedContent);
-    }
-
-    const commit = await repoInstance.raw([
-      'rev-list',
-      '--all',
-      '--max-count=1',
-    ]);
-    if (!commit) {
-      await repoInstance.add(hiddenGitIgnorePath);
-
-      await repoInstance.commit('Initial commit');
-    }
+    await fs.writeFile(shadowGitIgnorePath, userGitIgnoreContent);
   }
 
-  private get hiddenGitRepository(): SimpleGit {
-    const historyDir = path.join(this.projectRoot, historyDirName);
-    const repoDir = path.join(historyDir, 'repository');
+  private get shadowGitRepository(): SimpleGit {
+    const repoDir = this.getHistoryDir();
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
@@ -114,19 +96,19 @@ export class GitService {
   }
 
   async getCurrentCommitHash(): Promise<string> {
-    const hash = await this.hiddenGitRepository.raw('rev-parse', 'HEAD');
+    const hash = await this.shadowGitRepository.raw('rev-parse', 'HEAD');
     return hash.trim();
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    const repo = this.hiddenGitRepository;
+    const repo = this.shadowGitRepository;
     await repo.add('.');
     const commitResult = await repo.commit(message);
     return commitResult.commit;
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
-    const repo = this.hiddenGitRepository;
+    const repo = this.shadowGitRepository;
     await repo.raw(['restore', '--source', commitHash, '.']);
   }
 }
