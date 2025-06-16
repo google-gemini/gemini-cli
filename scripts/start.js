@@ -64,4 +64,8 @@ const env = {
   DEV: 'true',
 };
 
-spawn('node', nodeArgs, { stdio: 'inherit', env });
+const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+
+child.on('close', (code) => {
+  process.exit(code);
+});
