@@ -438,6 +438,7 @@ Add any other context about the problem here.
         ...mockConfig,
         getBugCommand: vi.fn(() => bugCommand),
       } as unknown as Config;
+      process.env.CLI_VERSION = '0.1.0';
 
       const { handleSlashCommand } = getProcessor();
       const bugDescription = 'This is a custom bug';
