@@ -340,6 +340,27 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toBe(true);
     });
 
+    it('/clear should clear items, reset chat, and refresh static', async () => {
+      const mockResetChat = vi.fn();
+      mockConfig = {
+        ...mockConfig,
+        getGeminiClient: () => ({
+          resetChat: mockResetChat,
+        }),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/clear');
+      });
+
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(mockResetChat).toHaveBeenCalled();
+      expect(mockRefreshStatic).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
     it('/editor should open editor dialog and return true', async () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;

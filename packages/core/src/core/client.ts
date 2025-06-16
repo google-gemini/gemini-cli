@@ -86,6 +86,11 @@ export class GeminiClient {
     chat.setHistory(history);
   }
 
+  async resetChat(): Promise<void> {
+    this.chat = this.startChat();
+    await this.chat;
+  }
+
   private async getEnvironment(): Promise<Part[]> {
     const cwd = this.config.getWorkingDir();
     const today = new Date().toLocaleDateString(undefined, {
