@@ -74,9 +74,10 @@ describe('modifyWithEditor', () => {
       getProposedContent: vi.fn().mockResolvedValue(proposedContent),
       createUpdatedParams: vi
         .fn()
-        .mockImplementation((modifiedContent, originalParams) => ({
+        .mockImplementation((oldContent, modifiedContent, originalParams) => ({
           ...originalParams,
           modifiedContent,
+          oldContent,
         })),
     };
 
@@ -153,6 +154,7 @@ describe('modifyWithEditor', () => {
       );
 
       expect(mockModifyContext.createUpdatedParams).toHaveBeenCalledWith(
+        currentContent,
         modifiedContent,
         mockParams,
       );
@@ -183,6 +185,7 @@ describe('modifyWithEditor', () => {
         updatedParams: {
           ...mockParams,
           modifiedContent,
+          oldContent: currentContent,
         },
         updatedDiff: 'mock diff content',
       });

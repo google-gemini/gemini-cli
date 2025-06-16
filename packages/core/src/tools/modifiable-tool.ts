@@ -29,6 +29,7 @@ export interface ModifyContext<ToolParams> {
   getProposedContent: (params: ToolParams) => Promise<string>;
 
   createUpdatedParams: (
+    oldContent: string,
     modifiedProposedContent: string,
     originalParams: ToolParams,
   ) => ToolParams;
@@ -98,6 +99,7 @@ function getUpdatedParams<ToolParams>(
   }
 
   const updatedParams = modifyContext.createUpdatedParams(
+    oldContent,
     newContent,
     originalParams,
   );

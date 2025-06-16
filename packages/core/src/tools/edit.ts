@@ -467,10 +467,12 @@ Expectation for required parameters:
         }
       },
       createUpdatedParams: (
+        oldContent: string,
         modifiedProposedContent: string,
         originalParams: EditToolParams,
       ): EditToolParams => ({
         ...originalParams,
+        old_string: oldContent,
         new_string: modifiedProposedContent,
       }),
     };

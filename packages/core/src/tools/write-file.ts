@@ -389,6 +389,7 @@ export class WriteFileTool
         return correctedContentResult.correctedContent;
       },
       createUpdatedParams: (
+        _oldContent: string,
         modifiedProposedContent: string,
         originalParams: WriteFileToolParams,
       ) => ({
