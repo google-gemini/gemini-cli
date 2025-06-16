@@ -35,7 +35,8 @@
     "publish:sandbox": "node scripts/publish-sandbox.js",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
     "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:docker && npm run tag:docker && npm run publish:sandbox && npm run publish:npm",
-    "telemetry": "node scripts/telemetry.js"
+    "telemetry": "node scripts/telemetry.js",
+    "start:gcp": "npm run telemetry -- --target=gcp & npm start"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
