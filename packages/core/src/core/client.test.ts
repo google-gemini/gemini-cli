@@ -331,6 +331,34 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('resetChat', () => {
+    it('should create a new chat session, clearing the old history', async () => {
+      // 1. Get the initial chat instance and add some history.
+      const initialChat = await client.getChat();
+      const initialHistory = await client.getHistory();
+      await client.addHistory({
+        role: 'user',
+        parts: [{ text: 'some old message' }],
+      });
+      const historyWithOldMessage = await client.getHistory();
+      expect(historyWithOldMessage.length).toBeGreaterThan(
+        initialHistory.length,
+      );
+
+      // 2. Call resetChat.
+      await client.resetChat();
+
+      // 3. Get the new chat instance and its history.
+      const newChat = await client.getChat();
+      const newHistory = await client.getHistory();
+
+      // 4. Assert that the chat instance is new and the history is reset.
+      expect(newChat).not.toBe(initialChat);
+      expect(newHistory.length).toBe(initialHistory.length);
+      expect(JSON.stringify(newHistory)).not.toContain('some old message');
+    });
+  });
+
   describe('sendMessageStream', () => {
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange

@@ -181,10 +181,11 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'clear',
-        description: 'clear the screen',
-        action: (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Clearing terminal.');
+        description: 'clear the screen and conversation history',
+        action: async (_mainCommand, _subCommand, _args) => {
+          onDebugMessage('Clearing terminal and resetting chat.');
           clearItems();
+          await config?.getGeminiClient()?.resetChat();
           console.clear();
           refreshStatic();
         },
