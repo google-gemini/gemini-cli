@@ -635,9 +635,9 @@ export function useTextBuffer({
           const lineContent = currentLine(newCursorRow);
           const before = cpSlice(lineContent, 0, newCursorCol);
           const after = cpSlice(lineContent, newCursorCol);
-          newLines[newCursorRow] = before + parts[0];
 
           if (parts.length > 1) {
+            newLines[newCursorRow] = before + parts[0];
             const remainingParts = parts.slice(1);
             const lastPartOriginal = remainingParts.pop() ?? '';
             newLines.splice(newCursorRow + 1, 0, ...remainingParts);
@@ -649,6 +649,8 @@ export function useTextBuffer({
             newCursorRow = newCursorRow + parts.length - 1;
             newCursorCol = cpLen(lastPartOriginal);
           } else {
+            newLines[newCursorRow] = before + parts[0] + after;
+
             newCursorCol = cpLen(before) + cpLen(parts[0]);
           }
         } else if (op.type === 'backspace') {
