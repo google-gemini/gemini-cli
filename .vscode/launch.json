@@ -5,6 +5,24 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch CLI",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch E2E",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test:e2e", "read_many_files"],
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
       "name": "Attach",
       "port": 9229,
       "request": "attach",

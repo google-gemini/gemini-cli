@@ -51,7 +51,6 @@ jobs:
           path: |
             packages/*/dist
             package-lock.json # Only upload dist and lockfile
-
   test:
     name: Test
     runs-on: ubuntu-latest

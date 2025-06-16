@@ -97,6 +97,7 @@ export async function runNonInteractive(
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
+            process.exit(1);
           }
 
           if (toolResponse.responseParts) {
