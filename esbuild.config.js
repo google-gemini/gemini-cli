@@ -5,9 +5,14 @@
  */
 
 import esbuild from 'esbuild';
-import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+const pkg = require(path.resolve(__dirname, 'package.json'));
 
 esbuild
   .build({

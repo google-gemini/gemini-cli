@@ -23,6 +23,7 @@ import {
 import { Settings } from './settings.js';
 import { getEffectiveModel } from '../utils/modelCheck.js';
 import { Extension } from './extension.js';
+import { getCliVersion } from '../utils/version.js';
 import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -122,7 +123,8 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
-    .version(process.env.CLI_VERSION || '0.0.0') // This will enable the --version flag based on package.json
+    .version(getCliVersion()) // This will enable the --version flag based on package.json
+    .alias('v', 'version')
     .help()
     .alias('h', 'help')
     .strict().argv;
