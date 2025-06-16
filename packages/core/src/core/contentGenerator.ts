@@ -42,18 +42,19 @@ export type ContentGeneratorConfig = {
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
 ): Promise<ContentGenerator> {
-  if (config.codeAssist) {
-    return createCodeAssistContentGenerator();
-  }
   const version = process.env.CLI_VERSION || process.version;
+  const httpOptions = {
+    headers: {
+      'User-Agent': `GeminiCLI/${version}/(${process.platform}; ${process.arch})`,
+    },
+  };
+  if (config.codeAssist) {
+    return createCodeAssistContentGenerator(httpOptions);
+  }
   const googleGenAI = new GoogleGenAI({
     apiKey: config.apiKey === '' ? undefined : config.apiKey,
     vertexai: config.vertexai,
-    httpOptions: {
-      headers: {
-        'User-Agent': `GeminiCLI/${version}/(${process.platform}; ${process.arch})`,
-      },
-    },
+    httpOptions,
   });
   return googleGenAI.models;
 }

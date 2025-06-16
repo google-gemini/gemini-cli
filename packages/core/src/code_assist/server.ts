@@ -28,6 +28,12 @@ import {
 } from './converter.js';
 import { PassThrough } from 'node:stream';
 
+/** HTTP options to be used in each of the requests. */
+export interface HttpOptions {
+  /** Additional HTTP headers to be sent with the request. */
+  headers?: Record<string, string>;
+}
+
 // TODO: Use production endpoint once it supports our methods.
 export const CODE_ASSIST_ENDPOINT =
   process.env.CODE_ASSIST_ENDPOINT ??
@@ -38,6 +44,7 @@ export class CodeAssistServer implements ContentGenerator {
   constructor(
     readonly auth: OAuth2Client,
     readonly projectId?: string,
+    readonly httpOptions: HttpOptions = {},
   ) {}
 
   async generateContentStream(
@@ -98,6 +105,7 @@ export class CodeAssistServer implements ContentGenerator {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...this.httpOptions.headers,
       },
       responseType: 'json',
       body: JSON.stringify(req),
@@ -115,7 +123,10 @@ export class CodeAssistServer implements ContentGenerator {
       params: {
         alt: 'sse',
       },
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.httpOptions.headers,
+      },
       responseType: 'stream',
       body: JSON.stringify(req),
     });
