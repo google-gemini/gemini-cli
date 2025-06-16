@@ -78,18 +78,18 @@ async function main() {
     originalSandboxSetting,
   );
 
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const projectId = process.env.OTLP_GOOGLE_CLOUD_PROJECT;
   if (!projectId) {
     console.error(
-      '🛑 Error: GOOGLE_CLOUD_PROJECT environment variable is not exported.',
+      '🛑 Error: OTLP_GOOGLE_CLOUD_PROJECT environment variable is not exported.',
     );
     console.log(
       '   Please set it to your Google Cloud Project ID and try again.',
     );
-    console.log('   `export GOOGLE_CLOUD_PROJECT=your-project-id`');
+    console.log('   `export OTLP_GOOGLE_CLOUD_PROJECT=your-project-id`');
     process.exit(1);
   }
-  console.log(`✅ Using Google Cloud Project ID: ${projectId}`);
+  console.log(`✅ Using OTLP Google Cloud Project ID: ${projectId}`);
 
   console.log('\n🔑 Please ensure you are authenticated with Google Cloud:');
   console.log(

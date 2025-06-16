@@ -216,9 +216,12 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_ KEY"`.
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
-  - Required for using Code Assist, Telemetry or Vertex AI.
+  - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+- **`OTLP_GOOGLE_CLOUD_PROJECT`**:
+  - Your Google Cloud Project ID for Telemetry in Google Cloud
+  - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non express mode.
