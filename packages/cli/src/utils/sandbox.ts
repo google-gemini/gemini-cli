@@ -443,6 +443,27 @@ export async function start_sandbox(sandbox: string) {
   // mount os.tmpdir() as os.tmpdir() inside container
   args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
 
+  // mount gcloud config directory if it exists
+  const gcloudConfigDir = path.join(os.homedir(), '.config', 'gcloud');
+  if (fs.existsSync(gcloudConfigDir)) {
+    args.push(
+      '--volume',
+      `${gcloudConfigDir}:${getContainerPath(gcloudConfigDir)}:ro`,
+    );
+  }
+
+  // mount ADC file if GOOGLE_APPLICATION_CREDENTIALS is set
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const adcFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (fs.existsSync(adcFile)) {
+      args.push('--volume', `${adcFile}:${getContainerPath(adcFile)}:ro`);
+      args.push(
+        '--env',
+        `GOOGLE_APPLICATION_CREDENTIALS=${getContainerPath(adcFile)}`,
+      );
+    }
+  }
+
   // mount paths listed in SANDBOX_MOUNTS
   if (process.env.SANDBOX_MOUNTS) {
     for (let mount of process.env.SANDBOX_MOUNTS.split(',')) {
@@ -538,6 +559,30 @@ export async function start_sandbox(sandbox: string) {
   }
   if (process.env.GOOGLE_API_KEY) {
     args.push('--env', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
+  }
+
+  // copy GOOGLE_GENAI_USE_VERTEXAI
+  if (process.env.GOOGLE_GENAI_USE_VERTEXAI) {
+    args.push(
+      '--env',
+      `GOOGLE_GENAI_USE_VERTEXAI=${process.env.GOOGLE_GENAI_USE_VERTEXAI}`,
+    );
+  }
+
+  // copy GOOGLE_CLOUD_PROJECT
+  if (process.env.GOOGLE_CLOUD_PROJECT) {
+    args.push(
+      '--env',
+      `GOOGLE_CLOUD_PROJECT=${process.env.GOOGLE_CLOUD_PROJECT}`,
+    );
+  }
+
+  // copy GOOGLE_CLOUD_LOCATION
+  if (process.env.GOOGLE_CLOUD_LOCATION) {
+    args.push(
+      '--env',
+      `GOOGLE_CLOUD_LOCATION=${process.env.GOOGLE_CLOUD_LOCATION}`,
+    );
   }
 
   // copy GEMINI_MODEL
