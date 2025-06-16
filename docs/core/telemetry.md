@@ -12,7 +12,7 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 
 1.  **Ensure Prerequisites:**
     Ensure that:
-    - You have exported the `GOOGLE_CLOUD_PROJECT` environment variable.
+    - You have exported the `OTLP_GOOGLE_CLOUD_PROJECT` environment variable.
     - You have authenticated with Google Cloud and have the necessary IAM roles.
       For full details, see the [Google Cloud](#google-cloud) prerequisites.
 1.  **Run the Command:** Execute the following command from the project root:
@@ -22,8 +22,6 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 1.  **Run Gemini CLI:** In a separate terminal, run your Gemini CLI commands. This will generate telemetry data that the collector will capture.
 1.  **View Data:** The script will provide links to view your telemetry data (traces, metrics, logs) in the Google Cloud Console.
 1.  **Details:** Refer to documentation for telemetry in [Google Cloud](#google-cloud).
-
-> **Note:** You can also use `npm run start:gcp` as a shorthand for running the CLI with GCP telemetry.
 
 ### Local Telemetry with Jaeger UI (for Traces)
 
