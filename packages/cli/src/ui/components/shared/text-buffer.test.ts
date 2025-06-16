@@ -173,6 +173,21 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 2]);
     });
 
+    it('insert: should insert text in the middle of a line', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abc',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result.current.move('right'));
+      act(() => result.current.insert('-NEW-'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('a-NEW-bc');
+      expect(state.cursor).toEqual([0, 6]);
+    });
+
     it('newline: should create a new line and move cursor', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
