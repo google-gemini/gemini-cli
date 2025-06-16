@@ -23,6 +23,8 @@ This entire system is built on the **[OpenTelemetry] (OTEL)** standard, allowing
 1.  **View Data:** The script will provide links to view your telemetry data (traces, metrics, logs) in the Google Cloud Console.
 1.  **Details:** Refer to documentation for telemetry in [Google Cloud](#google-cloud).
 
+> **Note:** You can also use `npm run start:gcp` as a shorthand for running the CLI with GCP telemetry.
+
 ### Local Telemetry with Jaeger UI (for Traces)
 
 1.  **Run the Command:** Execute the following command from the project root:
