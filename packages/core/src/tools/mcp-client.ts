@@ -223,10 +223,13 @@ async function connectAndDiscover(
       // Exclude args and env which may contain sensitive data
     };
 
-    console.error(
+    let errorString =
       `failed to start or connect to MCP server '${mcpServerName}' ` +
-        `${JSON.stringify(safeConfig)}; \n${error}`,
-    );
+      `${JSON.stringify(safeConfig)}; \n${error}`;
+    if (process.env.SANDBOX) {
+      errorString += `\nMake sure it is available in the sandbox`;
+    }
+    console.error(errorString);
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     return;
