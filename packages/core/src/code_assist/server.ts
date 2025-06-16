@@ -53,6 +53,7 @@ export class CodeAssistServer implements ContentGenerator {
     const resps = await this.streamEndpoint<CodeAssistResponse>(
       'streamGenerateContent',
       toCodeAssistRequest(req, this.projectId),
+      req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
       for await (const resp of resps) {
@@ -67,6 +68,7 @@ export class CodeAssistServer implements ContentGenerator {
     const resp = await this.callEndpoint<CodeAssistResponse>(
       'generateContent',
       toCodeAssistRequest(req, this.projectId),
+      req.config?.abortSignal,
     );
     return fromCodeAsistResponse(resp);
   }
@@ -99,7 +101,11 @@ export class CodeAssistServer implements ContentGenerator {
     throw Error();
   }
 
-  async callEndpoint<T>(method: string, req: object): Promise<T> {
+  async callEndpoint<T>(
+    method: string,
+    req: object,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await this.auth.request({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
       method: 'POST',
@@ -109,6 +115,7 @@ export class CodeAssistServer implements ContentGenerator {
       },
       responseType: 'json',
       body: JSON.stringify(req),
+      signal,
     });
     return res.data as T;
   }
@@ -116,6 +123,7 @@ export class CodeAssistServer implements ContentGenerator {
   async streamEndpoint<T>(
     method: string,
     req: object,
+    signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
     const res = await this.auth.request({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
@@ -129,6 +137,7 @@ export class CodeAssistServer implements ContentGenerator {
       },
       responseType: 'stream',
       body: JSON.stringify(req),
+      signal,
     });
 
     return (async function* (): AsyncGenerator<T> {
