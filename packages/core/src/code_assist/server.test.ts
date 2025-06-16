@@ -45,6 +45,7 @@ describe('CodeAssistServer', () => {
     expect(server.callEndpoint).toHaveBeenCalledWith(
       'generateContent',
       expect.any(Object),
+      undefined,
     );
     expect(response.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
       'response',
@@ -82,6 +83,7 @@ describe('CodeAssistServer', () => {
       expect(server.streamEndpoint).toHaveBeenCalledWith(
         'streamGenerateContent',
         expect.any(Object),
+        undefined,
       );
       expect(res.candidates?.[0]?.content?.parts?.[0]?.text).toBe('response');
     }
