@@ -21,6 +21,10 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('open', () => ({
+  default: vi.fn(),
+}));
+
 vi.mock('read-package-up', () => ({
   readPackageUp: vi.fn(() =>
     Promise.resolve({ packageJson: { version: 'test-version' } }),
@@ -62,28 +66,28 @@ describe('loadCliConfig', () => {
   it('should set showMemoryUsage to true when --memory flag is present', async () => {
     process.argv = ['node', 'script.js', '--show_memory_usage'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 
   it('should set showMemoryUsage to false when --memory flag is not present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(false);
   });
 
   it('should set showMemoryUsage to false by default from settings if CLI flag is not present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { showMemoryUsage: false };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(false);
   });
 
   it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
     process.argv = ['node', 'script.js', '--show_memory_usage'];
     const settings: Settings = { showMemoryUsage: false };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 });
@@ -107,49 +111,49 @@ describe('loadCliConfig telemetry', () => {
   it('should set telemetry to false by default when no flag or setting is present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
   it('should set telemetry to true when --telemetry flag is present', async () => {
     process.argv = ['node', 'script.js', '--telemetry'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
   it('should set telemetry to false when --no-telemetry flag is present', async () => {
     process.argv = ['node', 'script.js', '--no-telemetry'];
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
   it('should use telemetry value from settings if CLI flag is not present (settings true)', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
   it('should use telemetry value from settings if CLI flag is not present (settings false)', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { enabled: false } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
   it('should prioritize --telemetry CLI flag (true) over settings (false)', async () => {
     process.argv = ['node', 'script.js', '--telemetry'];
     const settings: Settings = { telemetry: { enabled: false } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
   it('should prioritize --no-telemetry CLI flag (false) over settings (true)', async () => {
     process.argv = ['node', 'script.js', '--no-telemetry'];
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
@@ -158,7 +162,7 @@ describe('loadCliConfig telemetry', () => {
     const settings: Settings = {
       telemetry: { otlpEndpoint: 'http://settings.example.com' },
     };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryOtlpEndpoint()).toBe(
       'http://settings.example.com',
     );
@@ -174,14 +178,14 @@ describe('loadCliConfig telemetry', () => {
     const settings: Settings = {
       telemetry: { otlpEndpoint: 'http://settings.example.com' },
     };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryOtlpEndpoint()).toBe('http://cli.example.com');
   });
 
   it('should use default endpoint if no OTLP endpoint is provided via CLI or settings', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryOtlpEndpoint()).toBe('http://localhost:4317');
   });
 
@@ -190,7 +194,7 @@ describe('loadCliConfig telemetry', () => {
     const settings: Settings = {
       telemetry: { target: ServerConfig.DEFAULT_TELEMETRY_TARGET },
     };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryTarget()).toBe(
       ServerConfig.DEFAULT_TELEMETRY_TARGET,
     );
@@ -201,14 +205,14 @@ describe('loadCliConfig telemetry', () => {
     const settings: Settings = {
       telemetry: { target: ServerConfig.DEFAULT_TELEMETRY_TARGET },
     };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryTarget()).toBe('gcp');
   });
 
   it('should use default target if no target is provided via CLI or settings', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryTarget()).toBe(
       ServerConfig.DEFAULT_TELEMETRY_TARGET,
     );
@@ -217,28 +221,28 @@ describe('loadCliConfig telemetry', () => {
   it('should use telemetry log prompts from settings if CLI flag is not present', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { logPrompts: false } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 
   it('should prioritize --telemetry-log-prompts CLI flag (true) over settings (false)', async () => {
     process.argv = ['node', 'script.js', '--telemetry-log-prompts'];
     const settings: Settings = { telemetry: { logPrompts: false } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
   });
 
   it('should prioritize --no-telemetry-log-prompts CLI flag (false) over settings (true)', async () => {
     process.argv = ['node', 'script.js', '--no-telemetry-log-prompts'];
     const settings: Settings = { telemetry: { logPrompts: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 
   it('should use default log prompts (true) if no value is provided via CLI or settings', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], [], 'test-session');
+    const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
   });
 });
@@ -262,7 +266,7 @@ describe('API Key Handling', () => {
     delete process.env.GOOGLE_API_KEY;
 
     const settings: Settings = {};
-    const result = await loadCliConfig(settings, [], [], 'test-session');
+    const result = await loadCliConfig(settings, [], 'test-session');
     expect(result.getContentGeneratorConfig().apiKey).toBe('gemini-key');
   });
 
@@ -275,7 +279,7 @@ describe('API Key Handling', () => {
     process.env.GOOGLE_API_KEY = 'google-key';
 
     const settings: Settings = {};
-    const result = await loadCliConfig(settings, [], [], 'test-session');
+    const result = await loadCliConfig(settings, [], 'test-session');
 
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       '[WARN]',
@@ -325,7 +329,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         ],
       },
     ];
-    await loadCliConfig(settings, extensions, [], 'session-id');
+    await loadCliConfig(settings, extensions, 'session-id');
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       false,
@@ -385,7 +389,7 @@ describe('mergeMcpServers', () => {
       },
     ];
     const originalSettings = JSON.parse(JSON.stringify(settings));
-    await loadCliConfig(settings, extensions, [], 'test-session');
+    await loadCliConfig(settings, extensions, 'test-session');
     expect(settings).toEqual(originalSettings);
   });
 });
