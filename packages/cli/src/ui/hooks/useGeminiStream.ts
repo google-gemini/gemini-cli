@@ -74,7 +74,7 @@ enum StreamProcessingStatus {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
-  geminiClient: GeminiClient | null,
+  geminiClient: GeminiClient,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
@@ -140,6 +140,7 @@ export const useGeminiStream = (
     onExec,
     onDebugMessage,
     config,
+    geminiClient,
   );
 
   const streamingState = useMemo(() => {
@@ -472,13 +473,6 @@ export const useGeminiStream = (
 
       if (!options?.isContinuation) {
         startNewTurn();
-      }
-
-      if (!geminiClient) {
-        const errorMsg = 'Gemini client is not available.';
-        setInitError(errorMsg);
-        addItem({ type: MessageType.ERROR, text: errorMsg }, Date.now());
-        return;
       }
 
       setIsResponding(true);
