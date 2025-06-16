@@ -473,25 +473,18 @@ export const useSlashCommandProcessor = (
             geminiTools.forEach((tool) => {
               if (useShowDescriptions && tool.description) {
                 // Format tool name in cyan using simple ANSI cyan color
-                message += `  - \u001b[36m${tool.displayName}\u001b[0m: `;
+                message += `  - \u001b[36m${tool.displayName} (${tool.name})\u001b[0m:\n`;
 
                 // Apply green color to the description text
                 const greenColor = '\u001b[32m';
                 const resetColor = '\u001b[0m';
 
                 // Handle multi-line descriptions by properly indenting and preserving formatting
-                const descLines = tool.description.split('\n');
-                message += `${greenColor}${descLines[0]}${resetColor}\n`;
+                const descLines = tool.description.trim().split('\n');
 
                 // If there are multiple lines, add proper indentation for each line
-                if (descLines.length > 1) {
-                  for (let i = 1; i < descLines.length; i++) {
-                    // Skip empty lines at the end
-                    if (
-                      i === descLines.length - 1 &&
-                      descLines[i].trim() === ''
-                    )
-                      continue;
+                if (descLines) {
+                  for (let i = 0; i < descLines.length; i++) {
                     message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
                   }
                 }

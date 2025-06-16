@@ -606,8 +606,8 @@ Add any other context about the problem here.
 
       // Should only show tool1 and tool2, not the MCP tools
       const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('\u001b[36mTool1\u001b[0m');
-      expect(message).toContain('\u001b[36mTool2\u001b[0m');
+      expect(message).toContain('Tool1');
+      expect(message).toContain('Tool2');
       expect(commandResult).toBe(true);
     });
 
@@ -664,9 +664,9 @@ Add any other context about the problem here.
       });
 
       const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('\u001b[36mTool1\u001b[0m');
+      expect(message).toContain('Tool1');
       expect(message).toContain('Description for Tool1');
-      expect(message).toContain('\u001b[36mTool2\u001b[0m');
+      expect(message).toContain('Tool2');
       expect(message).toContain('Description for Tool2');
       expect(commandResult).toBe(true);
     });
