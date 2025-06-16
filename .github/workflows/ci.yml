@@ -4,9 +4,9 @@ name: Gemini CLI CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, release]
   pull_request:
-    branches: [main]
+    branches: [main, release]
 
 jobs:
   build:
