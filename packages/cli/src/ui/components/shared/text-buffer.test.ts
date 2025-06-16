@@ -585,6 +585,68 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
+    it('should handle multiple delete characters in one input', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abcde',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result.current.move('end')); // cursor at the end
+      expect(getBufferState(result).cursor).toEqual([0, 5]);
+
+      act(() => {
+        result.current.applyOperations([
+          { type: 'backspace' },
+          { type: 'backspace' },
+          { type: 'backspace' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('ab');
+      expect(getBufferState(result).cursor).toEqual([0, 2]);
+    });
+
+    it('should handle inserts that contain delete characters ', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abcde',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result.current.move('end')); // cursor at the end
+      expect(getBufferState(result).cursor).toEqual([0, 5]);
+
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: '\x7f\x7f\x7f' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('ab');
+      expect(getBufferState(result).cursor).toEqual([0, 2]);
+    });
+
+    it('should handle inserts with a mix of regular and delete characters ', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abcde',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result.current.move('end')); // cursor at the end
+      expect(getBufferState(result).cursor).toEqual([0, 5]);
+
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: '\x7fI\x7f\x7fNEW' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('abcNEW');
+      expect(getBufferState(result).cursor).toEqual([0, 6]);
+    });
+
     it('should handle arrow keys for movement', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
@@ -632,9 +694,13 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       );
 
       // Simulate pasting the long text multiple times
-      act(() => result.current.insertStr(longText));
-      act(() => result.current.insertStr(longText));
-      act(() => result.current.insertStr(longText));
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: longText },
+          { type: 'insert', payload: longText },
+          { type: 'insert', payload: longText },
+        ]);
+      });
 
       const state = getBufferState(result);
       // Check that the text is the result of three concatenations.
@@ -790,6 +856,53 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const state = getBufferState(result);
       expect(state.text).toBe('fiXrd');
       expect(state.cursor).toEqual([0, 3]); // After 'X'
+    });
+  });
+
+  describe('Input Sanitization', () => {
+    it('should strip ANSI escape codes from input', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const textWithAnsi = '\x1B[31mHello\x1B[0m';
+      act(() => result.current.handleInput(textWithAnsi, {}));
+      expect(getBufferState(result).text).toBe('Hello');
+    });
+
+    it('should strip control characters from input', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const textWithControlChars = 'H\x07e\x08l\x0Bl\x0Co'; // BELL, BACKSPACE, VT, FF
+      act(() => result.current.handleInput(textWithControlChars, {}));
+      expect(getBufferState(result).text).toBe('Hello');
+    });
+
+    it('should strip mixed ANSI and control characters from input', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const textWithMixed = '\u001B[4mH\u001B[0mello';
+      act(() => result.current.handleInput(textWithMixed, {}));
+      expect(getBufferState(result).text).toBe('Hello');
+    });
+
+    it('should not strip standard characters or newlines', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const validText = 'Hello World\nThis is a test.';
+      act(() => result.current.handleInput(validText, {}));
+      expect(getBufferState(result).text).toBe(validText);
+    });
+
+    it('should sanitize pasted text via handleInput', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const pastedText = '\u001B[4mPasted\u001B[4m Text';
+      act(() => result.current.handleInput(pastedText, {}));
+      expect(getBufferState(result).text).toBe('Pasted Text');
     });
   });
 });
