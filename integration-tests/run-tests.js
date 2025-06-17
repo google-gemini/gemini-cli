@@ -77,6 +77,7 @@ async function main() {
       stdio: 'pipe',
       env: {
         ...process.env,
+        GEMINI_CLI_INTEGRATION_TEST: 'true',
         INTEGRATION_TEST_FILE_DIR: testFileDir,
         KEEP_OUTPUT: keepOutput.toString(),
         TEST_FILE_NAME: testFileName,
