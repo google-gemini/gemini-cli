@@ -7,7 +7,6 @@
 import { ClientMetadata, OnboardUserRequest } from './types.js';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
-import { GaxiosError } from 'gaxios';
 import { clearCachedCredentials } from './oauth2.js';
 
 /**
@@ -53,17 +52,12 @@ export async function setupUser(
 
     return lroRes.response?.cloudaicompanionProject?.id || '';
   } catch (e) {
-    if (e instanceof GaxiosError) {
-      const detail = e.response?.data?.error?.details[0].detail;
-      if (detail && detail.includes('projectID is empty')) {
-        await clearCachedCredentials();
-        console.log(
-          '\n\nEnterprise users must specify GOOGLE_CLOUD_PROJECT ' +
-            'in your environment variables or .env file.\n\n',
-        );
-        process.exit(1);
-      }
-    }
+    await clearCachedCredentials();
+    console.log(
+      '\n\nError onboarding with Code Assist.\n' +
+        'Enterprise users must specify GOOGLE_CLOUD_PROJECT ' +
+        'in their environment variables or .env file.\n\n',
+    );
     throw e;
   }
 }
