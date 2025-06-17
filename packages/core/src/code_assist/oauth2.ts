@@ -12,6 +12,7 @@ import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import * as os from 'os';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -41,30 +42,8 @@ const SIGN_IN_FAILURE_URL =
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
 
-export async function getCachedCredentialClient(): Promise<OAuth2Client> {
-  try {
-    const creds = await fs.readFile(
-      path.join(process.cwd(), GEMINI_DIR, CREDENTIAL_FILENAME),
-      'utf-8',
-    );
-
-    const oAuth2Client = new OAuth2Client({
-      clientId: OAUTH_CLIENT_ID,
-      clientSecret: OAUTH_CLIENT_SECRET,
-    });
-    oAuth2Client.setCredentials(JSON.parse(creds));
-    // This will either return the existing token or refresh it.
-    await oAuth2Client.getAccessToken();
-    // If we are here, the token is valid.
-    return oAuth2Client;
-  } catch (_) {
-    // Could not load credentials.
-    throw new Error('Could not load credentials');
-  }
-}
-
 export async function clearCachedCredentials(): Promise<void> {
-  await fs.rm(path.join(process.cwd(), GEMINI_DIR, CREDENTIAL_FILENAME));
+  await fs.rm(getCachedCredentialPath());
 }
 
 export async function getOauthClient(): Promise<OAuth2Client> {
@@ -72,16 +51,19 @@ export async function getOauthClient(): Promise<OAuth2Client> {
     return await getCachedCredentialClient();
   } catch (_) {
     const loggedInClient = await webLoginClient();
-    await fs.mkdir(path.join(process.cwd(), GEMINI_DIR), { recursive: true });
+
+    await fs.mkdir(path.dirname(getCachedCredentialPath()), {
+      recursive: true,
+    });
     await fs.writeFile(
-      path.join(process.cwd(), GEMINI_DIR, CREDENTIAL_FILENAME),
+      getCachedCredentialPath(),
       JSON.stringify(loggedInClient.credentials, null, 2),
     );
     return loggedInClient;
   }
 }
 
-export async function webLoginClient(): Promise<OAuth2Client> {
+async function webLoginClient(): Promise<OAuth2Client> {
   const port = await getAvailablePort();
   const oAuth2Client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
@@ -162,4 +144,27 @@ function getAvailablePort(): Promise<number> {
       reject(e);
     }
   });
+}
+
+async function getCachedCredentialClient(): Promise<OAuth2Client> {
+  try {
+    const creds = await fs.readFile(getCachedCredentialPath(), 'utf-8');
+
+    const oAuth2Client = new OAuth2Client({
+      clientId: OAUTH_CLIENT_ID,
+      clientSecret: OAUTH_CLIENT_SECRET,
+    });
+    oAuth2Client.setCredentials(JSON.parse(creds));
+    // This will either return the existing token or refresh it.
+    await oAuth2Client.getAccessToken();
+    // If we are here, the token is valid.
+    return oAuth2Client;
+  } catch (_) {
+    // Could not load credentials.
+    throw new Error('Could not load credentials');
+  }
+}
+
+function getCachedCredentialPath(): string {
+  return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
 }
