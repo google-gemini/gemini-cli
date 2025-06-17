@@ -760,6 +760,8 @@ Add any other context about the problem here.
             type: MessageType.COMPRESSION,
             compression: {
               isPending: true,
+              originalTokenCount: null,
+              newTokenCount: null,
             },
           });
           try {

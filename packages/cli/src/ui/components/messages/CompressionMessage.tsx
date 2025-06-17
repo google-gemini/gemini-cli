@@ -23,7 +23,8 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
 }) => {
   const text = compression.isPending
     ? 'Compressing chat history'
-    : `Chat history compressed from ${compression.originalTokenCount} to ${compression.newTokenCount} tokens.`;
+    : `Chat history compressed from ${compression.originalTokenCount ?? 'unknown'}` +
+      ` to ${compression.newTokenCount ?? 'unknown'} tokens.`;
 
   return (
     <Box flexDirection="row">
