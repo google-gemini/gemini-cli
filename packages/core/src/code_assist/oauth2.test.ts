@@ -4,12 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { webLoginClient } from './oauth2.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { getOauthClient } from './oauth2.js';
 import { OAuth2Client } from 'google-auth-library';
+import * as fs from 'fs';
+import * as path from 'path';
 import http from 'http';
 import open from 'open';
 import crypto from 'crypto';
+import * as os from 'os';
+
+vi.mock('os', async (importOriginal) => {
+  const os = await importOriginal<typeof import('os')>();
+  return {
+    ...os,
+    homedir: vi.fn(),
+  };
+});
 
 vi.mock('google-auth-library');
 vi.mock('http');
@@ -17,6 +28,18 @@ vi.mock('open');
 vi.mock('crypto');
 
 describe('oauth2', () => {
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+  });
+  afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
   it('should perform a web login', async () => {
     const mockAuthUrl = 'https://example.com/auth';
     const mockCode = 'test-code';
@@ -33,16 +56,17 @@ describe('oauth2', () => {
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
       setCredentials: mockSetCredentials,
+      credentials: mockTokens,
     } as unknown as OAuth2Client;
     vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
     vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
     vi.mocked(open).mockImplementation(async () => ({}) as never);
 
-    let requestCallback!: (
-      req: http.IncomingMessage,
-      res: http.ServerResponse,
-    ) => void;
+    let requestCallback!: http.RequestListener<
+      typeof http.IncomingMessage,
+      typeof http.ServerResponse
+    >;
     const mockHttpServer = {
       listen: vi.fn((port: number, callback?: () => void) => {
         if (callback) {
@@ -58,14 +82,14 @@ describe('oauth2', () => {
       address: () => ({ port: 1234 }),
     };
     vi.mocked(http.createServer).mockImplementation((cb) => {
-      requestCallback = cb as (
-        req: http.IncomingMessage,
-        res: http.ServerResponse,
-      ) => void;
+      requestCallback = cb as http.RequestListener<
+        typeof http.IncomingMessage,
+        typeof http.ServerResponse
+      >;
       return mockHttpServer as unknown as http.Server;
     });
 
-    const clientPromise = webLoginClient();
+    const clientPromise = getOauthClient();
 
     // Wait for the server to be created
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -78,15 +102,17 @@ describe('oauth2', () => {
       end: vi.fn(),
     } as unknown as http.ServerResponse;
 
-    if (requestCallback) {
-      await requestCallback(mockReq, mockRes);
-    }
+    await requestCallback(mockReq, mockRes);
 
     const client = await clientPromise;
+    expect(client).toBe(mockOAuth2Client);
 
     expect(open).toHaveBeenCalledWith(mockAuthUrl);
     expect(mockGetToken).toHaveBeenCalledWith(mockCode);
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
-    expect(client).toBe(mockOAuth2Client);
+
+    const tokenPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
+    const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
+    expect(tokenData).toEqual(mockTokens);
   });
 });
