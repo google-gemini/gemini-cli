@@ -475,9 +475,11 @@ export class GeminiClient {
       await cg.countTokens({ model: this.model, contents: newHistory })
     ).totalTokens;
 
-    return {
-      originalTokenCount,
-      newTokenCount,
-    };
+    return originalTokenCount && newTokenCount
+      ? {
+          originalTokenCount,
+          newTokenCount,
+        }
+      : null;
   }
 }

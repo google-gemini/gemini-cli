@@ -159,8 +159,8 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessor = (showToolDescriptions: boolean = false) => {
-    const { result } = renderHook(() =>
+  const getProcessorHook = (showToolDescriptions: boolean = false) =>
+    renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
         [],
@@ -178,8 +178,9 @@ describe('useSlashCommandProcessor', () => {
         mockSetQuittingMessages,
       ),
     );
-    return result.current;
-  };
+
+  const getProcessor = (showToolDescriptions: boolean = false) =>
+    getProcessorHook(showToolDescriptions).result.current;
 
   describe('/memory add', () => {
     it('should return tool scheduling info on valid input', async () => {
@@ -1132,10 +1133,20 @@ Add any other context about the problem here.
 
   describe('/compress command', () => {
     it('should call tryCompressChat(true)', async () => {
-      const { handleSlashCommand } = getProcessor();
+      const hook = getProcessorHook();
       mockTryCompressChat.mockImplementationOnce(async (force?: boolean) => {
-        // TODO: Check that we have a pending compression item in the history.
         expect(force).toBe(true);
+        await act(async () => {
+          hook.rerender();
+        });
+        expect(hook.result.current.pendingHistoryItems).toContainEqual({
+          type: MessageType.COMPRESSION,
+          compression: {
+            isPending: true,
+            originalTokenCount: null,
+            newTokenCount: null,
+          },
+        });
         return {
           originalTokenCount: 100,
           newTokenCount: 50,
@@ -1143,8 +1154,12 @@ Add any other context about the problem here.
       });
 
       await act(async () => {
-        handleSlashCommand('/compress');
+        hook.result.current.handleSlashCommand('/compress');
       });
+      await act(async () => {
+        hook.rerender();
+      });
+      expect(hook.result.current.pendingHistoryItems).toEqual([]);
       expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,

@@ -110,13 +110,13 @@ export type ServerGeminiErrorEvent = {
 };
 
 export interface ChatCompressionInfo {
-  originalTokenCount: number | undefined;
-  newTokenCount: number | undefined;
+  originalTokenCount: number;
+  newTokenCount: number;
 }
 
 export type ServerGeminiChatCompressedEvent = {
   type: GeminiEventType.ChatCompressed;
-  value: ChatCompressionInfo;
+  value: ChatCompressionInfo | null;
 };
 
 export type ServerGeminiUsageMetadataEvent = {

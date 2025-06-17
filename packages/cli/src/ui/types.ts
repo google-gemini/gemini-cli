@@ -55,8 +55,8 @@ export interface IndividualToolCallDisplay {
 
 export interface CompressionProps {
   isPending: boolean;
-  originalTokenCount?: number;
-  newTokenCount?: number;
+  originalTokenCount: number | null;
+  newTokenCount: number | null;
 }
 
 export interface HistoryItemBase {
