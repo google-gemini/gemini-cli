@@ -60,6 +60,8 @@ import {
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
+import { UpdateNotification } from './components/UpdateNotification.js';
+import { checkForUpdates } from './utils/updateCheck.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -76,6 +78,12 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkForUpdates().then(setUpdateMessage);
+  }, []);
+
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
@@ -467,6 +475,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <Box flexDirection="column" key="header">
               <Header terminalWidth={terminalWidth} />
               <Tips config={config} />
+              {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay

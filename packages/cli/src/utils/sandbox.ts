@@ -659,7 +659,10 @@ export async function start_sandbox(sandbox: string) {
   // Determine if the current user's UID/GID should be passed to the sandbox.
   // See shouldUseCurrentUserInSandbox for more details.
   let userFlag = '';
-  if (await shouldUseCurrentUserInSandbox()) {
+  if (process.env.GEMINI_CLI_INTEGRATION_TEST === 'true') {
+    args.push('--user', 'root');
+    userFlag = '--user root';
+  } else if (await shouldUseCurrentUserInSandbox()) {
     const uid = execSync('id -u').toString().trim();
     const gid = execSync('id -g').toString().trim();
     args.push('--user', `${uid}:${gid}`);

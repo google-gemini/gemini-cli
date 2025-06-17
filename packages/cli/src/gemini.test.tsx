@@ -44,9 +44,15 @@ vi.mock('./config/config.js', () => ({
 
 vi.mock('read-package-up', () => ({
   readPackageUp: vi.fn().mockResolvedValue({
-    packageJson: { version: 'test-version' },
+    packageJson: { name: 'test-pkg', version: 'test-version' },
     path: '/fake/path/package.json',
   }),
+}));
+
+vi.mock('update-notifier', () => ({
+  default: vi.fn(() => ({
+    notify: vi.fn(),
+  })),
 }));
 
 vi.mock('./utils/sandbox.js', () => ({
