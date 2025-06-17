@@ -14,24 +14,60 @@ interface Help {
 }
 
 export const Help: React.FC<Help> = ({ commands }) => (
-  <Box flexDirection="column" marginBottom={1}>
+  <Box
+    flexDirection="column"
+    marginBottom={1}
+    borderColor={Colors.Gray}
+    borderStyle="round"
+    padding={1}
+  >
+    {/* Basics */}
     <Text bold color={Colors.Foreground}>
-      Abilities:
+      Basics:
     </Text>
-    <Text color={Colors.Foreground}> * Use tools to read and write files</Text>
     <Text color={Colors.Foreground}>
-      {' '}
-      * Semantically search and explain code
+      <Text bold color={Colors.AccentPurple}>
+        Add context
+      </Text>
+      : Use{' '}
+      <Text bold color={Colors.AccentPurple}>
+        @
+      </Text>{' '}
+      to specify files for context (e.g.,{' '}
+      <Text bold color={Colors.AccentPurple}>
+        @src/myFile.ts
+      </Text>
+      ) to target specific files or folders.
     </Text>
-    <Text color={Colors.Foreground}> * Execute bash commands</Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Shell mode
+      </Text>
+      : Execute shell commands via{' '}
+      <Text bold color={Colors.AccentPurple}>
+        !
+      </Text>{' '}
+      (e.g.,{' '}
+      <Text bold color={Colors.AccentPurple}>
+        !npm run start
+      </Text>
+      ) or use natural language (e.g.{' '}
+      <Text bold color={Colors.AccentPurple}>
+        start server
+      </Text>
+      ).
+    </Text>
+
     <Box height={1} />
+
+    {/* Commands */}
     <Text bold color={Colors.Foreground}>
       Commands:
     </Text>
     {commands
       .filter((command) => command.description)
       .map((command: SlashCommand) => (
-        <Text key={command.name} color={Colors.Gray}>
+        <Text key={command.name} color={Colors.Foreground}>
           <Text bold color={Colors.AccentPurple}>
             {' '}
             /{command.name}
@@ -39,12 +75,55 @@ export const Help: React.FC<Help> = ({ commands }) => (
           {command.description && ' - ' + command.description}
         </Text>
       ))}
-    <Text color={Colors.Gray}>
+    <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
         {' '}
         !{' '}
       </Text>
-      shell command
+      - shell command
+    </Text>
+
+    <Box height={1} />
+
+    {/* Shortcuts */}
+    <Text bold color={Colors.Foreground}>
+      Keyboard Shortcuts:
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Enter
+      </Text>{' '}
+      - Send message
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Shift+Enter
+      </Text>{' '}
+      - New line
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Up/Down
+      </Text>{' '}
+      - Cycle through your prompt history
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Alt+Left/Right
+      </Text>{' '}
+      - Jump through words in the input
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Esc
+      </Text>{' '}
+      - Cancel operation
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+C
+      </Text>{' '}
+      - Quit application
     </Text>
   </Box>
 );
