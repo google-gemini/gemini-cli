@@ -35,4 +35,5 @@ packages/*/coverage/
 
 # Generated files
 packages/cli/src/generated/
+packages/core/src/generated/
 .integration-tests/
