@@ -47,6 +47,10 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  // When using Code Assist this triggers the Oauth login.
+  // Do this now, before sandboxing, so web redirect works.
+  await config.getGeminiClient().initialize();
+
   // Initialize centralized FileDiscoveryService
   config.getFileService();
   if (config.getCheckpointEnabled()) {
@@ -64,10 +68,6 @@ export async function main() {
       console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
     }
   }
-
-  // When using Code Assist this triggers the Oauth login.
-  // Do this now, before sandboxing, so web redirect works.
-  await config.getGeminiClient().getChat();
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {

@@ -49,7 +49,7 @@ export async function createContentGenerator(
     },
   };
   if (config.codeAssist) {
-    return createCodeAssistContentGenerator(httpOptions);
+    return await createCodeAssistContentGenerator(httpOptions);
   }
   const googleGenAI = new GoogleGenAI({
     apiKey: config.apiKey === '' ? undefined : config.apiKey,

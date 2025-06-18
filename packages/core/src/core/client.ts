@@ -44,8 +44,8 @@ function isThinkingSupported(model: string) {
 }
 
 export class GeminiClient {
-  private chat: Promise<GeminiChat>;
-  private contentGenerator: Promise<ContentGenerator>;
+  private chat?: GeminiChat;
+  private contentGenerator?: ContentGenerator;
   private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -59,35 +59,45 @@ export class GeminiClient {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.contentGenerator = createContentGenerator(
-      this.config.getContentGeneratorConfig(),
-    );
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
-    this.chat = this.startChat();
+  }
+
+  async initialize() {
+    this.contentGenerator = await createContentGenerator(
+      this.config.getContentGeneratorConfig(),
+    );
+    this.chat = await this.startChat();
   }
 
   async addHistory(content: Content) {
-    const chat = await this.chat;
-    chat.addHistory(content);
+    this.getChat().addHistory(content);
   }
 
-  getChat(): Promise<GeminiChat> {
+  getChat(): GeminiChat {
+    if (!this.chat) {
+      throw new Error('Chat not initialized');
+    }
     return this.chat;
   }
 
+  private getContentGenerator(): ContentGenerator {
+    if (!this.contentGenerator) {
+      throw new Error('Content generator not initialized');
+    }
+    return this.contentGenerator;
+  }
+
   async getHistory(): Promise<Content[]> {
-    const chat = await this.chat;
-    return chat.getHistory();
+    return this.getChat().getHistory();
   }
 
   async setHistory(history: Content[]): Promise<void> {
-    const chat = await this.chat;
-    chat.setHistory(history);
+    this.getChat().setHistory(history);
   }
 
   async resetChat(): Promise<void> {
-    this.chat = this.startChat();
+    this.chat = await this.startChat();
     await this.chat;
   }
 
@@ -184,7 +194,7 @@ export class GeminiClient {
         : this.generateContentConfig;
       return new GeminiChat(
         this.config,
-        await this.contentGenerator,
+        this.getContentGenerator(),
         this.model,
         {
           systemInstruction,
@@ -210,22 +220,24 @@ export class GeminiClient {
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!turns) {
-      const chat = await this.chat;
-      return new Turn(chat);
+      return new Turn(this.getChat());
     }
 
     const compressed = await this.tryCompressChat();
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const chat = await this.chat;
-    const turn = new Turn(chat);
+    const turn = new Turn(this.getChat());
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
-      const nextSpeakerCheck = await checkNextSpeaker(chat, this, signal);
+      const nextSpeakerCheck = await checkNextSpeaker(
+        this.getChat(),
+        this,
+        signal,
+      );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
@@ -243,7 +255,6 @@ export class GeminiClient {
     model: string = DEFAULT_GEMINI_FLASH_MODEL,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
-    const cg = await this.contentGenerator;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -254,7 +265,7 @@ export class GeminiClient {
       };
 
       const apiCall = () =>
-        cg.generateContent({
+        this.getContentGenerator().generateContent({
           model,
           config: {
             ...requestConfig,
@@ -327,7 +338,6 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const cg = await this.contentGenerator;
     const modelToUse = this.model;
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
@@ -345,7 +355,7 @@ export class GeminiClient {
       };
 
       const apiCall = () =>
-        cg.generateContent({
+        this.getContentGenerator().generateContent({
           model: modelToUse,
           config: requestConfig,
           contents,
@@ -386,8 +396,8 @@ export class GeminiClient {
       contents: texts,
     };
 
-    const cg = await this.contentGenerator;
-    const embedContentResponse = await cg.embedContent(embedModelParams);
+    const embedContentResponse =
+      await this.getContentGenerator().embedContent(embedModelParams);
     if (
       !embedContentResponse.embeddings ||
       embedContentResponse.embeddings.length === 0
@@ -415,19 +425,18 @@ export class GeminiClient {
   async tryCompressChat(
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
-    const chat = await this.chat;
-    const history = chat.getHistory(true); // Get curated history
+    const history = this.getChat().getHistory(true); // Get curated history
 
     // Regardless of `force`, don't do anything if the history is empty.
     if (history.length === 0) {
       return null;
     }
 
-    const cg = await this.contentGenerator;
-    const { totalTokens: originalTokenCount } = await cg.countTokens({
-      model: this.model,
-      contents: history,
-    });
+    const { totalTokens: originalTokenCount } =
+      await this.getContentGenerator().countTokens({
+        model: this.model,
+        contents: history,
+      });
 
     // If not forced, check if we should compress based on context size.
     if (!force) {
@@ -457,7 +466,7 @@ export class GeminiClient {
     const summarizationRequestMessage = {
       text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
     };
-    const response = await chat.sendMessage({
+    const response = await this.getChat().sendMessage({
       message: summarizationRequestMessage,
     });
     const newHistory = [
@@ -470,9 +479,12 @@ export class GeminiClient {
         parts: [{ text: response.text }],
       },
     ];
-    this.chat = this.startChat(newHistory);
+    this.chat = await this.startChat(newHistory);
     const newTokenCount = (
-      await cg.countTokens({ model: this.model, contents: newHistory })
+      await this.getContentGenerator().countTokens({
+        model: this.model,
+        contents: newHistory,
+      })
     ).totalTokens;
 
     return originalTokenCount && newTokenCount

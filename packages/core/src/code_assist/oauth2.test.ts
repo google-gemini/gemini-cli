@@ -73,8 +73,10 @@ describe('oauth2', () => {
       (resolve) => (serverListeningCallback = resolve),
     );
 
+    let capturedPort = 0;
     const mockHttpServer = {
       listen: vi.fn((port: number, callback?: () => void) => {
+        capturedPort = port;
         if (callback) {
           callback();
         }
@@ -86,7 +88,7 @@ describe('oauth2', () => {
         }
       }),
       on: vi.fn(),
-      address: () => ({ port: 1234 }),
+      address: () => ({ port: capturedPort }),
     };
     vi.mocked(http.createServer).mockImplementation((cb) => {
       requestCallback = cb as http.RequestListener<
@@ -115,7 +117,10 @@ describe('oauth2', () => {
     expect(client).toBe(mockOAuth2Client);
 
     expect(open).toHaveBeenCalledWith(mockAuthUrl);
-    expect(mockGetToken).toHaveBeenCalledWith(mockCode);
+    expect(mockGetToken).toHaveBeenCalledWith({
+      code: mockCode,
+      redirect_uri: `http://localhost:${capturedPort}/oauth2callback`,
+    });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
     const tokenPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
