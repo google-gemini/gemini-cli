@@ -18,51 +18,34 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Content } from '@google/genai';
 
-const GEMINI_DIR = '.gemini';
+import crypto from 'node:crypto';
+import os from 'node:os';
+
+const GEMINI_DIR_NAME = '.gemini';
+const TMP_DIR_NAME = 'tmp';
 const LOG_FILE_NAME = 'logs.json';
 const CHECKPOINT_FILE_NAME = 'checkpoint.json';
-const TEST_LOG_FILE_PATH = path.join(process.cwd(), GEMINI_DIR, LOG_FILE_NAME);
+
+const projectDir = process.cwd();
+const hash = crypto.createHash('sha256').update(projectDir).digest('hex');
+const TEST_GEMINI_DIR = path.join(
+  os.homedir(),
+  GEMINI_DIR_NAME,
+  TMP_DIR_NAME,
+  hash,
+);
+
+const TEST_LOG_FILE_PATH = path.join(TEST_GEMINI_DIR, LOG_FILE_NAME);
 const TEST_CHECKPOINT_FILE_PATH = path.join(
-  process.cwd(),
-  GEMINI_DIR,
+  TEST_GEMINI_DIR,
   CHECKPOINT_FILE_NAME,
 );
 
-async function cleanupLogFile() {
+async function cleanupLogAndCheckpointFiles() {
   try {
-    await fs.unlink(TEST_LOG_FILE_PATH);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      // Other errors during unlink are ignored for cleanup purposes
-    }
-  }
-  try {
-    await fs.unlink(TEST_CHECKPOINT_FILE_PATH);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      // Other errors during unlink are ignored for cleanup purposes
-    }
-  }
-  try {
-    const geminiDirPath = path.join(process.cwd(), GEMINI_DIR);
-    const dirContents = await fs.readdir(geminiDirPath);
-    for (const file of dirContents) {
-      if (
-        (file.startsWith(LOG_FILE_NAME + '.') ||
-          file.startsWith(CHECKPOINT_FILE_NAME + '.')) &&
-        file.endsWith('.bak')
-      ) {
-        try {
-          await fs.unlink(path.join(geminiDirPath, file));
-        } catch (_e) {
-          /* ignore */
-        }
-      }
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      /* ignore if .gemini dir itself is missing */
-    }
+    await fs.rm(TEST_GEMINI_DIR, { recursive: true, force: true });
+  } catch (_error) {
+    // Ignore errors, as the directory may not exist, which is fine.
   }
 }
 
@@ -90,48 +73,45 @@ describe('Logger', () => {
     vi.resetAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T12:00:00.000Z'));
-    await cleanupLogFile();
+    // Clean up before the test
+    await cleanupLogAndCheckpointFiles();
+    // Ensure the directory exists for the test
+    await fs.mkdir(TEST_GEMINI_DIR, { recursive: true });
     logger = new Logger(testSessionId);
     await logger.initialize();
   });
 
   afterEach(async () => {
-    logger.close();
-    await cleanupLogFile();
+    if (logger) {
+      logger.close();
+    }
+    // Clean up after the test
+    await cleanupLogAndCheckpointFiles();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   afterAll(async () => {
-    await cleanupLogFile();
+    // Final cleanup
+    await cleanupLogAndCheckpointFiles();
   });
 
   describe('initialize', () => {
     it('should create .gemini directory and an empty log file if none exist', async () => {
-      await cleanupLogFile();
-      const geminiDirPath = path.join(process.cwd(), GEMINI_DIR);
-      try {
-        await fs.rm(geminiDirPath, { recursive: true, force: true });
-      } catch (_e) {
-        /* ignore */
-      }
-
-      const newLogger = new Logger(testSessionId);
-      await newLogger.initialize();
-
       const dirExists = await fs
-        .access(geminiDirPath)
+        .access(TEST_GEMINI_DIR)
         .then(() => true)
         .catch(() => false);
       expect(dirExists).toBe(true);
+
       const fileExists = await fs
         .access(TEST_LOG_FILE_PATH)
         .then(() => true)
         .catch(() => false);
       expect(fileExists).toBe(true);
+
       const logContent = await readLogFile();
       expect(logContent).toEqual([]);
-      newLogger.close();
     });
 
     it('should load existing logs and set correct messageId for the current session', async () => {
@@ -160,8 +140,10 @@ describe('Logger', () => {
           message: 'Msg2',
         },
       ];
-      await fs.mkdir(path.join(process.cwd(), GEMINI_DIR), { recursive: true });
-      await fs.writeFile(TEST_LOG_FILE_PATH, JSON.stringify(existingLogs));
+      await fs.writeFile(
+        TEST_LOG_FILE_PATH,
+        JSON.stringify(existingLogs, null, 2),
+      );
       const newLogger = new Logger(currentSessionId);
       await newLogger.initialize();
       expect(newLogger['messageId']).toBe(2);
@@ -179,8 +161,10 @@ describe('Logger', () => {
           message: 'OldMsg',
         },
       ];
-      await fs.mkdir(path.join(process.cwd(), GEMINI_DIR), { recursive: true });
-      await fs.writeFile(TEST_LOG_FILE_PATH, JSON.stringify(existingLogs));
+      await fs.writeFile(
+        TEST_LOG_FILE_PATH,
+        JSON.stringify(existingLogs, null, 2),
+      );
       const newLogger = new Logger('a-new-session');
       await newLogger.initialize();
       expect(newLogger['messageId']).toBe(0);
@@ -188,11 +172,12 @@ describe('Logger', () => {
     });
 
     it('should be idempotent', async () => {
-      // logger is initialized in beforeEach
       await logger.logMessage(MessageSenderType.USER, 'test message');
       const initialMessageId = logger['messageId'];
       const initialLogCount = logger['logs'].length;
+
       await logger.initialize(); // Second call should not change state
+
       expect(logger['messageId']).toBe(initialMessageId);
       expect(logger['logs'].length).toBe(initialLogCount);
       const logsFromFile = await readLogFile();
@@ -200,22 +185,21 @@ describe('Logger', () => {
     });
 
     it('should handle invalid JSON in log file by backing it up and starting fresh', async () => {
-      await fs.mkdir(path.join(process.cwd(), GEMINI_DIR), { recursive: true });
       await fs.writeFile(TEST_LOG_FILE_PATH, 'invalid json');
       const consoleDebugSpy = vi
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
+
       const newLogger = new Logger(testSessionId);
       await newLogger.initialize();
+
       expect(consoleDebugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Invalid JSON in log file'),
         expect.any(SyntaxError),
       );
       const logContent = await readLogFile();
       expect(logContent).toEqual([]);
-      const dirContents = await fs.readdir(
-        path.join(process.cwd(), GEMINI_DIR),
-      );
+      const dirContents = await fs.readdir(TEST_GEMINI_DIR);
       expect(
         dirContents.some(
           (f) =>
@@ -226,7 +210,6 @@ describe('Logger', () => {
     });
 
     it('should handle non-array JSON in log file by backing it up and starting fresh', async () => {
-      await fs.mkdir(path.join(process.cwd(), GEMINI_DIR), { recursive: true });
       await fs.writeFile(
         TEST_LOG_FILE_PATH,
         JSON.stringify({ not: 'an array' }),
@@ -234,16 +217,16 @@ describe('Logger', () => {
       const consoleDebugSpy = vi
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
+
       const newLogger = new Logger(testSessionId);
       await newLogger.initialize();
+
       expect(consoleDebugSpy).toHaveBeenCalledWith(
         `Log file at ${TEST_LOG_FILE_PATH} is not a valid JSON array. Starting with empty logs.`,
       );
       const logContent = await readLogFile();
       expect(logContent).toEqual([]);
-      const dirContents = await fs.readdir(
-        path.join(process.cwd(), GEMINI_DIR),
-      );
+      const dirContents = await fs.readdir(TEST_GEMINI_DIR);
       expect(
         dirContents.some(
           (f) =>
@@ -307,20 +290,13 @@ describe('Logger', () => {
       await logger2.initialize();
       expect(logger2['sessionId']).toEqual(logger1['sessionId']);
 
-      // Log from logger1
-      await logger1.logMessage(MessageSenderType.USER, 'L1M1'); // L1 internal msgId becomes 1, writes {s1, 0}
+      await logger1.logMessage(MessageSenderType.USER, 'L1M1');
       vi.advanceTimersByTime(10);
-
-      // Log from logger2. It reads file (sees {s1,0}), its internal msgId for s1 is 1.
-      await logger2.logMessage(MessageSenderType.USER, 'L2M1'); // L2 internal msgId becomes 2, writes {s1, 1}
+      await logger2.logMessage(MessageSenderType.USER, 'L2M1');
       vi.advanceTimersByTime(10);
-
-      // Log from logger1. It reads file (sees {s1,0}, {s1,1}), its internal msgId for s1 is 2.
-      await logger1.logMessage(MessageSenderType.USER, 'L1M2'); // L1 internal msgId becomes 3, writes {s1, 2}
+      await logger1.logMessage(MessageSenderType.USER, 'L1M2');
       vi.advanceTimersByTime(10);
-
-      // Log from logger2. It reads file (sees {s1,0}, {s1,1}, {s1,2}), its internal msgId for s1 is 3.
-      await logger2.logMessage(MessageSenderType.USER, 'L2M2'); // L2 internal msgId becomes 4, writes {s1, 3}
+      await logger2.logMessage(MessageSenderType.USER, 'L2M2');
 
       const logsFromFile = await readLogFile();
       expect(logsFromFile.length).toBe(4);
@@ -335,8 +311,8 @@ describe('Logger', () => {
       expect(messagesInFile).toEqual(['L1M1', 'L2M1', 'L1M2', 'L2M2']);
 
       // Check internal state (next messageId each logger would use for that session)
-      expect(logger1['messageId']).toBe(3); // L1 wrote 0, then 2. Next is 3.
-      expect(logger2['messageId']).toBe(4); // L2 wrote 1, then 3. Next is 4.
+      expect(logger1['messageId']).toBe(3);
+      expect(logger2['messageId']).toBe(4);
 
       logger1.close();
       logger2.close();
@@ -363,25 +339,26 @@ describe('Logger', () => {
 
   describe('getPreviousUserMessages', () => {
     it('should retrieve all user messages from logs, sorted newest first', async () => {
-      // This test now verifies that messages from different sessions are included
-      // and sorted correctly by timestamp, as the session-based sorting was removed.
       const loggerSort = new Logger('session-1');
       await loggerSort.initialize();
-      await loggerSort.logMessage(MessageSenderType.USER, 'S1M0_ts100000'); // msgId 0
+      await loggerSort.logMessage(MessageSenderType.USER, 'S1M0_ts100000');
       vi.advanceTimersByTime(1000);
-      await loggerSort.logMessage(MessageSenderType.USER, 'S1M1_ts101000'); // msgId 1
+      await loggerSort.logMessage(MessageSenderType.USER, 'S1M1_ts101000');
       vi.advanceTimersByTime(1000);
-      await loggerSort.logMessage(MessageSenderType.USER, 'S2M0_ts102000'); // msgId 0 for s2
+      // Switch to a different session to log
+      const loggerSort2 = new Logger('session-2');
+      await loggerSort2.initialize();
+      await loggerSort2.logMessage(MessageSenderType.USER, 'S2M0_ts102000');
       vi.advanceTimersByTime(1000);
-      await loggerSort.logMessage(
+      await loggerSort2.logMessage(
         'model' as MessageSenderType,
         'S2_Model_ts103000',
       );
       vi.advanceTimersByTime(1000);
-      await loggerSort.logMessage(MessageSenderType.USER, 'S2M1_ts104000'); // msgId 1 for s2
+      await loggerSort2.logMessage(MessageSenderType.USER, 'S2M1_ts104000');
       loggerSort.close();
+      loggerSort2.close();
 
-      // A new logger will load all previous logs regardless of session
       const finalLogger = new Logger('final-session');
       await finalLogger.initialize();
 
@@ -426,13 +403,11 @@ describe('Logger', () => {
       const tag = 'my-test-tag';
       await logger.saveCheckpoint(conversation, tag);
       const taggedFilePath = path.join(
-        process.cwd(),
-        GEMINI_DIR,
+        TEST_GEMINI_DIR,
         `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
       );
       const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
       expect(JSON.parse(fileContent)).toEqual(conversation);
-      await fs.unlink(taggedFilePath);
     });
 
     it('should not throw if logger is not initialized', async () => {
@@ -458,10 +433,9 @@ describe('Logger', () => {
     ];
 
     beforeEach(async () => {
-      // Create a default checkpoint for some tests
       await fs.writeFile(
         TEST_CHECKPOINT_FILE_PATH,
-        JSON.stringify(conversation),
+        JSON.stringify(conversation, null, 2),
       );
     });
 
@@ -477,17 +451,16 @@ describe('Logger', () => {
         { role: 'user', parts: [{ text: 'Another message' }] },
       ];
       const taggedFilePath = path.join(
-        process.cwd(),
-        GEMINI_DIR,
+        TEST_GEMINI_DIR,
         `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
       );
-      await fs.writeFile(taggedFilePath, JSON.stringify(taggedConversation));
+      await fs.writeFile(
+        taggedFilePath,
+        JSON.stringify(taggedConversation, null, 2),
+      );
 
       const loaded = await logger.loadCheckpoint(tag);
       expect(loaded).toEqual(taggedConversation);
-
-      // cleanup
-      await fs.unlink(taggedFilePath);
     });
 
     it('should return an empty array if a tagged checkpoint file does not exist', async () => {
