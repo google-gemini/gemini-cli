@@ -123,7 +123,7 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
-    .version(getCliVersion()) // This will enable the --version flag based on package.json
+    .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')

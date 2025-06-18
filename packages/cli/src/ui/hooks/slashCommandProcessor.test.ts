@@ -48,7 +48,7 @@ vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn(),
 }));
 
-const mockGetCliVersionFn = vi.fn(() => '0.1.0');
+const mockGetCliVersionFn = vi.fn(() => Promise.resolve('0.1.0'));
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: (...args: []) => mockGetCliVersionFn(...args),
 }));
@@ -377,7 +377,7 @@ describe('useSlashCommandProcessor', () => {
     const originalEnv = process.env;
     beforeEach(() => {
       vi.resetModules();
-      mockGetCliVersionFn.mockReturnValue('0.1.0');
+      mockGetCliVersionFn.mockResolvedValue('0.1.0');
       process.env = { ...originalEnv };
     });
 
@@ -427,7 +427,7 @@ Add any other context about the problem here.
     };
 
     it('should call open with the correct GitHub issue URL and return true', async () => {
-      mockGetCliVersionFn.mockReturnValue('test-version');
+      mockGetCliVersionFn.mockResolvedValue('test-version');
       process.env.SANDBOX = 'gemini-sandbox';
       process.env.SEATBELT_PROFILE = 'test_profile';
       const { handleSlashCommand } = getProcessor();
