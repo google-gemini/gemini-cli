@@ -39,7 +39,7 @@ This guide provides solutions to common issues and debugging tips.
     1.  Run `npm install` to ensure all dependencies are present.
     2.  Run `npm run build` to compile the project.
 
-- **Error: "Operation not permitted" or "Permission denied" or similar.**
+- **Error: "Operation not permitted", "Permission denied", or similar.**
   - **Cause:** If sandboxing is enabled, then the application is likely attempting an operation restricted by your sandbox, such as writing outside the project directory or system temp directory.
   - **Solution:** See [README](../README.md#sandboxing) for more information on sandboxing, including how to customize your sandbox configuration.
 
