@@ -131,7 +131,7 @@ const baseConfigParams: ConfigParameters = {
     vertexai: false,
   },
   embeddingModel: 'test-embedding-model',
-  sandbox: false,
+  sandbox: undefined,
   targetDir: '/test/dir',
   debugMode: false,
   userMemory: '',

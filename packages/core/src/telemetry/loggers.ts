@@ -79,8 +79,7 @@ export function logCliConfiguration(config: Config): void {
     'event.timestamp': new Date().toISOString(),
     model: config.getModel(),
     embedding_model: config.getEmbeddingModel(),
-    sandbox_enabled:
-      typeof config.getSandbox() === 'string' ? true : config.getSandbox(),
+    sandbox_enabled: !!config.getSandbox(),
     core_tools_enabled: (config.getCoreTools() ?? []).join(','),
     approval_mode: config.getApprovalMode(),
     api_key_enabled: !!generatorConfig.apiKey,

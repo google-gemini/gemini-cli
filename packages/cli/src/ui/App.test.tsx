@@ -13,6 +13,7 @@ import {
   ApprovalMode,
   ToolRegistry,
   AccessibilitySettings,
+  SandboxConfig,
 } from '@gemini-cli/core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
@@ -21,7 +22,7 @@ import process from 'node:process';
 interface MockServerConfig {
   apiKey: string;
   model: string;
-  sandbox: boolean | string;
+  sandbox?: SandboxConfig;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -42,7 +43,7 @@ interface MockServerConfig {
 
   getApiKey: Mock<() => string>;
   getModel: Mock<() => string>;
-  getSandbox: Mock<() => boolean | string>;
+  getSandbox: Mock<() => SandboxConfig | undefined>;
   getTargetDir: Mock<() => string>;
   getToolRegistry: Mock<() => ToolRegistry>; // Use imported ToolRegistry type
   getDebugMode: Mock<() => boolean>;
@@ -78,7 +79,7 @@ vi.mock('@gemini-cli/core', async (importOriginal) => {
       return {
         apiKey: opts.apiKey || 'test-key',
         model: opts.model || 'test-model-in-mock-factory',
-        sandbox: typeof opts.sandbox === 'boolean' ? opts.sandbox : false,
+        sandbox: opts.sandbox,
         targetDir: opts.targetDir || '/test/dir',
         debugMode: opts.debugMode || false,
         question: opts.question,
@@ -99,9 +100,7 @@ vi.mock('@gemini-cli/core', async (importOriginal) => {
 
         getApiKey: vi.fn(() => opts.apiKey || 'test-key'),
         getModel: vi.fn(() => opts.model || 'test-model-in-mock-factory'),
-        getSandbox: vi.fn(() =>
-          typeof opts.sandbox === 'boolean' ? opts.sandbox : false,
-        ),
+        getSandbox: vi.fn(() => opts.sandbox),
         getTargetDir: vi.fn(() => opts.targetDir || '/test/dir'),
         getToolRegistry: vi.fn(() => ({}) as ToolRegistry), // Simple mock
         getDebugMode: vi.fn(() => opts.debugMode || false),
@@ -190,7 +189,7 @@ describe('App UI', () => {
         model: 'test-model',
       },
       embeddingModel: 'test-embedding-model',
-      sandbox: false,
+      sandbox: undefined,
       targetDir: '/test/dir',
       debugMode: false,
       userMemory: '',
