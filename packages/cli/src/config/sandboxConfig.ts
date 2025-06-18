@@ -85,18 +85,13 @@ export async function loadSandboxConfig(
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
   const sandboxOption = argv.sandbox ?? settings.sandbox;
-  const sandboxCommand = getSandboxCommand(sandboxOption);
-  if (!sandboxCommand) {
-    return undefined;
-  }
+  const command = getSandboxCommand(sandboxOption);
 
   const packageJson = await getPackageJson();
-  return {
-    command: sandboxCommand,
-    image:
-      argv['sandbox-image'] ??
-      process.env.GEMINI_SANDBOX_IMAGE ??
-      packageJson?.config?.sandboxImageUri ??
-      'gemini-cli-sandbox',
-  };
+  const image =
+    argv['sandbox-image'] ??
+    process.env.GEMINI_SANDBOX_IMAGE ??
+    packageJson?.config?.sandboxImageUri;
+
+  return command && image ? { command, image } : undefined;
 }

@@ -22,6 +22,7 @@ import { chmodSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
 
 const argv = yargs(hideBin(process.argv))
   .option('s', {
@@ -47,9 +48,7 @@ try {
     .toString()
     .trim();
 } catch {
-  console.warn(
-    'WARNING: container-based sandboxing is disabled (see README.md#sandboxing)',
-  );
+  console.warn('ERROR: could not detect sandbox container command');
   process.exit(0);
 }
 
@@ -62,10 +61,16 @@ if (sandboxCommand === 'sandbox-exec') {
 
 console.log(`using ${sandboxCommand} for sandboxing`);
 
-const baseImage = 'gemini-cli-sandbox';
+const baseImage = cliPkgJson.config.sandboxImageUri;
 const customImage = argv.i;
 const baseDockerfile = 'Dockerfile';
 const customDockerfile = argv.f;
+
+if (!baseImage?.length) {
+  console.warn(
+    'No default image tag specified in gemini-cli/packages/cli/package.json',
+  );
+}
 
 if (!argv.s) {
   execSync('npm install', { stdio: 'inherit' });
@@ -122,7 +127,9 @@ function buildImage(imageName, dockerfile) {
   console.log(`built ${imageName}`);
 }
 
-buildImage(baseImage, baseDockerfile);
+if (baseImage && baseDockerfile) {
+  buildImage(baseImage, baseDockerfile);
+}
 
 if (customDockerfile && customImage) {
   buildImage(customImage, customDockerfile);
