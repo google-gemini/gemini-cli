@@ -24,4 +24,4 @@
 
 ## Linked issues / bugs
 
-<!-- Add links to any gh issues or other extenral bugs --->
+<!-- Add links to any gh issues or other external bugs --->
