@@ -13,6 +13,7 @@ import { cpSlice, cpLen, TextBuffer } from './shared/text-buffer.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import process from 'node:process';
+import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
@@ -58,16 +59,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const resetCompletionState = completion.resetCompletionState;
+  const shellHistory = useShellHistory(config.getProjectRoot());
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      if (shellModeActive) {
+        shellHistory.addCommandToHistory(submittedValue);
+      }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
       onSubmit(submittedValue);
       resetCompletionState();
     },
-    [onSubmit, buffer, resetCompletionState],
+    [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
   );
 
   const customSetTextAndResetCompletionSignal = useCallback(
@@ -81,7 +86,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
-    isActive: !completion.showSuggestions,
+    isActive: !completion.showSuggestions && !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
   });
@@ -304,6 +309,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Standard arrow navigation within the buffer
       if (key.upArrow && !completion.showSuggestions) {
+        if (shellModeActive) {
+          const prevCommand = shellHistory.getPreviousCommand();
+          if (prevCommand !== null) {
+            buffer.setText(prevCommand);
+          }
+          return;
+        }
         if (
           (buffer.allVisualLines.length === 1 || // Always navigate for single line
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0)) &&
@@ -316,6 +328,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
       if (key.downArrow && !completion.showSuggestions) {
+        if (shellModeActive) {
+          const nextCommand = shellHistory.getNextCommand();
+          if (nextCommand !== null) {
+            buffer.setText(nextCommand);
+          }
+          return;
+        }
         if (
           (buffer.allVisualLines.length === 1 || // Always navigate for single line
             buffer.visualCursor[0] === buffer.allVisualLines.length - 1) &&
