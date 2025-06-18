@@ -22,9 +22,12 @@ import {
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
 import {
-  CodeAssistResponse,
-  toCodeAssistRequest,
-  fromCodeAsistResponse,
+  CaGenerateContentResponse,
+  toGenerateContentRequest,
+  fromGenerateContentResponse,
+  toCountTokenRequest,
+  fromCountTokenResponse,
+  CaCountTokenResponse,
 } from './converter.js';
 import { PassThrough } from 'node:stream';
 
@@ -50,14 +53,14 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const resps = await this.streamEndpoint<CodeAssistResponse>(
+    const resps = await this.streamEndpoint<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toCodeAssistRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.projectId),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
       for await (const resp of resps) {
-        yield fromCodeAsistResponse(resp);
+        yield fromGenerateContentResponse(resp);
       }
     })();
   }
@@ -65,12 +68,12 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContent(
     req: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
-    const resp = await this.callEndpoint<CodeAssistResponse>(
+    const resp = await this.callEndpoint<CaGenerateContentResponse>(
       'generateContent',
-      toCodeAssistRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.projectId),
       req.config?.abortSignal,
     );
-    return fromCodeAsistResponse(resp);
+    return fromGenerateContentResponse(resp);
   }
 
   async onboardUser(
@@ -91,8 +94,12 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
-  async countTokens(_req: CountTokensParameters): Promise<CountTokensResponse> {
-    return { totalTokens: 0 };
+  async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
+    const resp = await this.callEndpoint<CaCountTokenResponse>(
+      'countTokens',
+      toCountTokenRequest(req),
+    );
+    return fromCountTokenResponse(resp);
   }
 
   async embedContent(

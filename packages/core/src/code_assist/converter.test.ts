@@ -6,9 +6,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  toCodeAssistRequest,
-  fromCodeAsistResponse,
-  CodeAssistResponse,
+  toGenerateContentRequest,
+  fromGenerateContentResponse,
+  CaGenerateContentResponse,
 } from './converter.js';
 import {
   GenerateContentParameters,
@@ -24,7 +24,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq, 'my-project');
+      const codeAssistReq = toGenerateContentRequest(genaiReq, 'my-project');
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
@@ -46,7 +46,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: undefined,
@@ -68,7 +68,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: 'Hello',
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
       ]);
@@ -79,7 +79,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ text: 'Hello' }, { text: 'World' }],
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'user', parts: [{ text: 'World' }] },
@@ -94,7 +94,7 @@ describe('converter', () => {
           systemInstruction: 'You are a helpful assistant.',
         },
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.systemInstruction).toEqual({
         role: 'user',
         parts: [{ text: 'You are a helpful assistant.' }],
@@ -110,7 +110,7 @@ describe('converter', () => {
           topK: 40,
         },
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.8,
         topK: 40,
@@ -136,7 +136,7 @@ describe('converter', () => {
           responseMimeType: 'application/json',
         },
       };
-      const codeAssistReq = toCodeAssistRequest(genaiReq);
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.1,
         topP: 0.2,
@@ -156,7 +156,7 @@ describe('converter', () => {
 
   describe('fromCodeAssistResponse', () => {
     it('should convert a simple response', () => {
-      const codeAssistRes: CodeAssistResponse = {
+      const codeAssistRes: CaGenerateContentResponse = {
         response: {
           candidates: [
             {
@@ -171,13 +171,13 @@ describe('converter', () => {
           ],
         },
       };
-      const genaiRes = fromCodeAsistResponse(codeAssistRes);
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes).toBeInstanceOf(GenerateContentResponse);
       expect(genaiRes.candidates).toEqual(codeAssistRes.response.candidates);
     });
 
     it('should handle prompt feedback and usage metadata', () => {
-      const codeAssistRes: CodeAssistResponse = {
+      const codeAssistRes: CaGenerateContentResponse = {
         response: {
           candidates: [],
           promptFeedback: {
@@ -191,7 +191,7 @@ describe('converter', () => {
           },
         },
       };
-      const genaiRes = fromCodeAsistResponse(codeAssistRes);
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.promptFeedback).toEqual(
         codeAssistRes.response.promptFeedback,
       );
@@ -201,7 +201,7 @@ describe('converter', () => {
     });
 
     it('should handle automatic function calling history', () => {
-      const codeAssistRes: CodeAssistResponse = {
+      const codeAssistRes: CaGenerateContentResponse = {
         response: {
           candidates: [],
           automaticFunctionCallingHistory: [
@@ -221,7 +221,7 @@ describe('converter', () => {
           ],
         },
       };
-      const genaiRes = fromCodeAsistResponse(codeAssistRes);
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.automaticFunctionCallingHistory).toEqual(
         codeAssistRes.response.automaticFunctionCallingHistory,
       );
