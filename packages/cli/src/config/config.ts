@@ -28,6 +28,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { loadSandboxConfig } from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -42,6 +43,7 @@ const logger = {
 interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
+  'sandbox-image': string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
   all_files: boolean | undefined;
@@ -71,6 +73,10 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 's',
       type: 'boolean',
       description: 'Run in sandbox?',
+    })
+    .option('sandbox-image', {
+      type: 'string',
+      description: 'Sandbox image URI.',
     })
     .option('debug', {
       alias: 'd',
@@ -192,11 +198,13 @@ export async function loadCliConfig(
 
   const mcpServers = mergeMcpServers(settings, extensions);
 
+  const sandboxConfig = await loadSandboxConfig(settings, argv);
+
   return new Config({
     sessionId,
     contentGeneratorConfig,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
-    sandbox: argv.sandbox ?? settings.sandbox,
+    sandbox: sandboxConfig,
     targetDir: process.cwd(),
     debugMode,
     question: argv.prompt || '',

@@ -10,13 +10,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { getPackageJson } from './package.js';
-import commandExists from 'command-exists';
 import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
+import { SandboxConfig } from '@gemini-cli/core';
 
 const execAsync = promisify(exec);
 
@@ -97,62 +96,6 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     }
   }
   return false; // Default to false if no other condition is met
-}
-
-async function getSandboxImageName(
-  isCustomProjectSandbox: boolean,
-): Promise<string> {
-  const packageJson = await getPackageJson();
-  return (
-    process.env.GEMINI_SANDBOX_IMAGE ??
-    packageJson?.config?.sandboxImageUri ??
-    (isCustomProjectSandbox
-      ? LOCAL_DEV_SANDBOX_IMAGE_NAME + '-' + path.basename(path.resolve())
-      : LOCAL_DEV_SANDBOX_IMAGE_NAME)
-  );
-}
-
-export function sandbox_command(sandbox?: string | boolean): string {
-  // note environment variable takes precedence over argument (from command line or settings)
-  sandbox = process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? sandbox;
-  if (sandbox === '1' || sandbox === 'true') sandbox = true;
-  else if (sandbox === '0' || sandbox === 'false') sandbox = false;
-
-  if (sandbox === false) {
-    return '';
-  }
-
-  if (typeof sandbox === 'string' && sandbox !== '') {
-    // confirm that specfied command exists
-    if (commandExists.sync(sandbox)) {
-      return sandbox;
-    }
-    console.error(
-      `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
-    );
-    process.exit(1);
-  }
-
-  // look for seatbelt, docker, or podman, in that order
-  // for container-based sandboxing, require sandbox to be enabled explicitly
-  if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
-    return 'sandbox-exec';
-  } else if (commandExists.sync('docker') && sandbox === true) {
-    return 'docker';
-  } else if (commandExists.sync('podman') && sandbox === true) {
-    return 'podman';
-  }
-
-  // throw an error if user requested sandbox but no command was found
-  if (sandbox === true) {
-    console.error(
-      'ERROR: GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
-        'install docker or podman or specify command in GEMINI_SANDBOX',
-    );
-    process.exit(1);
-  }
-
-  return '';
 }
 
 // docker does not allow container names to contain ':' or '/', so we
@@ -237,8 +180,8 @@ function entrypoint(workdir: string): string[] {
   return ['bash', '-c', args.join(' ')];
 }
 
-export async function start_sandbox(sandbox: string) {
-  if (sandbox === 'sandbox-exec') {
+export async function start_sandbox(config: SandboxConfig) {
+  if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
       console.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
@@ -340,14 +283,14 @@ export async function start_sandbox(sandbox: string) {
       );
     }
     // spawn child and let it inherit stdio
-    sandboxProcess = spawn(sandbox, args, {
+    sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });
     await new Promise((resolve) => sandboxProcess?.on('close', resolve));
     return;
   }
 
-  console.error(`hopping into sandbox (command: ${sandbox}) ...`);
+  console.error(`hopping into sandbox (command: ${config.command}) ...`);
 
   // determine full path for gemini-cli to distinguish linked vs installed setting
   const gcPath = fs.realpathSync(process.argv[1]);
@@ -358,7 +301,7 @@ export async function start_sandbox(sandbox: string) {
   );
   const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
-  const image = await getSandboxImageName(isCustomProjectSandbox);
+  const image = config.image;
   const workdir = path.resolve(process.cwd());
   const containerWorkdir = getContainerPath(workdir);
 
@@ -391,7 +334,7 @@ export async function start_sandbox(sandbox: string) {
           stdio: 'inherit',
           env: {
             ...process.env,
-            GEMINI_SANDBOX: sandbox, // in case sandbox is enabled via flags (see config.ts under cli package)
+            GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
           },
         },
       );
@@ -399,7 +342,7 @@ export async function start_sandbox(sandbox: string) {
   }
 
   // stop if image is missing
-  if (!(await ensureSandboxImageIsPresent(sandbox, image))) {
+  if (!(await ensureSandboxImageIsPresent(config.command, image))) {
     const remedy =
       image === LOCAL_DEV_SANDBOX_IMAGE_NAME
         ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
@@ -529,7 +472,7 @@ export async function start_sandbox(sandbox: string) {
     // if using proxy, switch to internal networking through proxy
     if (proxy) {
       execSync(
-        `${sandbox} network inspect ${SANDBOX_NETWORK_NAME} || ${sandbox} network create --internal ${SANDBOX_NETWORK_NAME}`,
+        `${config.command} network inspect ${SANDBOX_NETWORK_NAME} || ${config.command} network create --internal ${SANDBOX_NETWORK_NAME}`,
       );
       args.push('--network', SANDBOX_NETWORK_NAME);
       // if proxy command is set, create a separate network w/ host access (i.e. non-internal)
@@ -537,7 +480,7 @@ export async function start_sandbox(sandbox: string) {
       // this allows proxy to work even on rootless podman on macos with host<->vm<->container isolation
       if (proxyCommand) {
         execSync(
-          `${sandbox} network inspect ${SANDBOX_PROXY_NAME} || ${sandbox} network create ${SANDBOX_PROXY_NAME}`,
+          `${config.command} network inspect ${SANDBOX_PROXY_NAME} || ${config.command} network create ${SANDBOX_PROXY_NAME}`,
         );
       }
     }
@@ -546,7 +489,9 @@ export async function start_sandbox(sandbox: string) {
   // name container after image, plus numeric suffix to avoid conflicts
   const imageName = parseImageName(image);
   let index = 0;
-  const containerNameCheck = execSync(`${sandbox} ps -a --format "{{.Names}}"`)
+  const containerNameCheck = execSync(
+    `${config.command} ps -a --format "{{.Names}}"`,
+  )
     .toString()
     .trim();
   while (containerNameCheck.includes(`${imageName}-${index}`)) {
@@ -650,7 +595,7 @@ export async function start_sandbox(sandbox: string) {
   args.push('--env', `SANDBOX=${containerName}`);
 
   // for podman only, use empty --authfile to skip unnecessary auth refresh overhead
-  if (sandbox === 'podman') {
+  if (config.command === 'podman') {
     const emptyAuthFilePath = path.join(os.tmpdir(), 'empty_auth.json');
     fs.writeFileSync(emptyAuthFilePath, '{}', 'utf-8');
     args.push('--authfile', emptyAuthFilePath);
@@ -683,7 +628,7 @@ export async function start_sandbox(sandbox: string) {
 
   if (proxyCommand) {
     // run proxyCommand in its own container
-    const proxyContainerCommand = `${sandbox} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+    const proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
     proxyProcess = spawn(proxyContainerCommand, {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: true,
@@ -692,7 +637,7 @@ export async function start_sandbox(sandbox: string) {
     // install handlers to stop proxy on exit/signal
     const stopProxy = () => {
       console.log('stopping proxy container ...');
-      execSync(`${sandbox} rm -f ${SANDBOX_PROXY_NAME}`);
+      execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
     };
     process.on('exit', stopProxy);
     process.on('SIGINT', stopProxy);
@@ -721,12 +666,12 @@ export async function start_sandbox(sandbox: string) {
     // connect proxy container to sandbox network
     // (workaround for older versions of docker that don't support multiple --network args)
     await execAsync(
-      `${sandbox} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
+      `${config.command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
     );
   }
 
   // spawn child and let it inherit stdio
-  sandboxProcess = spawn(sandbox, args, {
+  sandboxProcess = spawn(config.command, args, {
     stdio: 'inherit',
   });
 
