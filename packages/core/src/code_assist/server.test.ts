@@ -133,11 +133,16 @@ describe('CodeAssistServer', () => {
   it('should return 0 for countTokens', async () => {
     const auth = new OAuth2Client();
     const server = new CodeAssistServer(auth, 'test-project');
+    const mockResponse = {
+      totalTokens: 100,
+    };
+    vi.spyOn(server, 'callEndpoint').mockResolvedValue(mockResponse);
+
     const response = await server.countTokens({
       model: 'test-model',
       contents: [{ role: 'user', parts: [{ text: 'request' }] }],
     });
-    expect(response.totalTokens).toBe(0);
+    expect(response.totalTokens).toBe(100);
   });
 
   it('should throw an error for embedContent', async () => {

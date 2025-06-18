@@ -10,6 +10,8 @@ import {
   ContentUnion,
   GenerateContentConfig,
   GenerateContentParameters,
+  CountTokensParameters,
+  CountTokensResponse,
   GenerateContentResponse,
   GenerationConfigRoutingConfig,
   MediaResolution,
@@ -27,13 +29,13 @@ import {
   ToolConfig,
 } from '@google/genai';
 
-export interface CodeAssistRequest {
+export interface CAGenerateContentRequest {
   model: string;
   project?: string;
-  request: CodeAssistGenerateContentRequest;
+  request: VertexGenerateContentRequest;
 }
 
-interface CodeAssistGenerateContentRequest {
+interface VertexGenerateContentRequest {
   contents: Content[];
   systemInstruction?: Content;
   cachedContent?: string;
@@ -41,10 +43,10 @@ interface CodeAssistGenerateContentRequest {
   toolConfig?: ToolConfig;
   labels?: Record<string, string>;
   safetySettings?: SafetySetting[];
-  generationConfig?: CodeAssistGenerationConfig;
+  generationConfig?: VertexGenerationConfig;
 }
 
-interface CodeAssistGenerationConfig {
+interface VertexGenerationConfig {
   temperature?: number;
   topP?: number;
   topK?: number;
@@ -67,30 +69,61 @@ interface CodeAssistGenerationConfig {
   thinkingConfig?: ThinkingConfig;
 }
 
-export interface CodeAssistResponse {
-  response: VertexResponse;
+export interface CaGenerateContentResponse {
+  response: VertexGenerateContentResponse;
 }
 
-interface VertexResponse {
+interface VertexGenerateContentResponse {
   candidates: Candidate[];
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
 }
+export interface CaCountTokenRequest {
+  request: VertexCountTokenRequest;
+}
 
-export function toCodeAssistRequest(
-  req: GenerateContentParameters,
-  project?: string,
-): CodeAssistRequest {
+interface VertexCountTokenRequest {
+  model: string;
+  contents: Content[];
+}
+
+export interface CaCountTokenResponse {
+  totalTokens: number;
+}
+
+export function toCountTokenRequest(
+  req: CountTokensParameters,
+): CaCountTokenRequest {
   return {
-    model: req.model,
-    project,
-    request: toCodeAssistGenerateContentRequest(req),
+    request: {
+      model: 'models/' + req.model,
+      contents: toContents(req.contents),
+    },
   };
 }
 
-export function fromCodeAsistResponse(
-  res: CodeAssistResponse,
+export function fromCountTokenResponse(
+  res: CaCountTokenResponse,
+): CountTokensResponse {
+  return {
+    totalTokens: res.totalTokens,
+  };
+}
+
+export function toGenerateContentRequest(
+  req: GenerateContentParameters,
+  project?: string,
+): CAGenerateContentRequest {
+  return {
+    model: req.model,
+    project,
+    request: toVertexGenerateContentRequest(req),
+  };
+}
+
+export function fromGenerateContentResponse(
+  res: CaGenerateContentResponse,
 ): GenerateContentResponse {
   const inres = res.response;
   const out = new GenerateContentResponse();
@@ -101,9 +134,9 @@ export function fromCodeAsistResponse(
   return out;
 }
 
-function toCodeAssistGenerateContentRequest(
+function toVertexGenerateContentRequest(
   req: GenerateContentParameters,
-): CodeAssistGenerateContentRequest {
+): VertexGenerateContentRequest {
   return {
     contents: toContents(req.contents),
     systemInstruction: maybeToContent(req.config?.systemInstruction),
@@ -112,7 +145,7 @@ function toCodeAssistGenerateContentRequest(
     toolConfig: req.config?.toolConfig,
     labels: req.config?.labels,
     safetySettings: req.config?.safetySettings,
-    generationConfig: toCodeAssistGenerationConfig(req.config),
+    generationConfig: toVertexGenerationConfig(req.config),
   };
 }
 
@@ -170,9 +203,9 @@ function toPart(part: PartUnion): Part {
   return part;
 }
 
-function toCodeAssistGenerationConfig(
+function toVertexGenerationConfig(
   config?: GenerateContentConfig,
-): CodeAssistGenerationConfig | undefined {
+): VertexGenerationConfig | undefined {
   if (!config) {
     return undefined;
   }
