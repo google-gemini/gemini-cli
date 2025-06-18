@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, Credentials } from 'google-auth-library';
 import * as http from 'http';
 import url from 'url';
 import crypto from 'crypto';
@@ -42,23 +42,12 @@ const SIGN_IN_FAILURE_URL =
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
 
-export async function clearCachedCredentials(): Promise<void> {
-  await fs.rm(getCachedCredentialPath());
-}
-
 export async function getOauthClient(): Promise<OAuth2Client> {
   try {
     return await getCachedCredentialClient();
   } catch (_) {
     const loggedInClient = await webLoginClient();
-
-    await fs.mkdir(path.dirname(getCachedCredentialPath()), {
-      recursive: true,
-    });
-    await fs.writeFile(
-      getCachedCredentialPath(),
-      JSON.stringify(loggedInClient.credentials, null, 2),
-    );
+    await setCachedCredentials(loggedInClient.credentials);
     return loggedInClient;
   }
 }
@@ -149,7 +138,6 @@ function getAvailablePort(): Promise<number> {
 async function getCachedCredentialClient(): Promise<OAuth2Client> {
   try {
     const creds = await fs.readFile(getCachedCredentialPath(), 'utf-8');
-
     const oAuth2Client = new OAuth2Client({
       clientId: OAUTH_CLIENT_ID,
       clientSecret: OAUTH_CLIENT_SECRET,
@@ -163,6 +151,14 @@ async function getCachedCredentialClient(): Promise<OAuth2Client> {
     // Could not load credentials.
     throw new Error('Could not load credentials');
   }
+}
+
+async function setCachedCredentials(credentials: Credentials) {
+  const filePath = getCachedCredentialPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const credString = JSON.stringify(credentials, null, 2);
+  await fs.writeFile(filePath, credString);
 }
 
 function getCachedCredentialPath(): string {
