@@ -1,22 +1,15 @@
 # Tutorials
 
-Master usage of Gemini CLI to automate development tasks.
+This page contains tutorials for interacting with Gemini CLI.
 
-## Setting up Model Context Protocol (MCP) Servers
+## Setting up a Model Context Protocol (MCP) server
 
-> [!NOTE]
+> [!CAUTION]
 > Before using a third-party MCP server, ensure you trust its source and understand the tools it provides. Your use of third-party servers is at your own risk.
 
-### GitHub MCP Server
+This tutorial demonstrates how to set up a MCP server, using the [GitHub MCP server](https://github.com/github/github-mcp-server) as an example. The GitHub MCP server provides tools for interacting with GitHub repositories, such as creating issues and commenting on pull requests.
 
-> [!WARNING]
-> The GitHub MCP Server has known security vulnerabilities, proceed with caution.
-
-The [GitHub MCP server] provides tools for interacting with GitHub repositories, such as creating issues, commenting on pull requests, and more.
-
-[GitHub MCP server]: https://github.com/github/github-mcp-server
-
-#### Prerequisites
+### Prerequisites
 
 Before you begin, ensure you have the following installed and configured:
 
@@ -27,11 +20,11 @@ Before you begin, ensure you have the following installed and configured:
 [classic]: https://github.com/settings/tokens/new
 [fine-grained]: https://github.com/settings/personal-access-tokens/new
 
-#### Guide
+### Guide
 
-##### Configure the MCP Server in `settings.json`
+#### Configure the MCP server in `settings.json`
 
-In your project's root directory, create or open the `.gemini/settings.json` file. Add the `mcpServers` configuration block to instruct Gemini how to launch the GitHub server.
+In your project's root directory, create or open the [`.gemini/settings.json` file](./configuration.md). Within the file, add the `mcpServers` configuration block, which provides instructions for how to launch the GitHub MCP server.
 
 ```json
 {
@@ -54,22 +47,22 @@ In your project's root directory, create or open the `.gemini/settings.json` fil
 }
 ```
 
-##### Set Your GitHub Token
+#### Set your GitHub token
 
 > [!CAUTION]
-> Using a broadly scoped personal access token that has access to personal and private repositories can lead to information from the private repository leaked into the public repository. We recommend using a fine grained access token that doesn't share access to both public and private repositories.
+> Using a broadly scoped personal access token that has access to personal and private repositories can lead to information from the private repository being leaked into the public repository. We recommend using a fine grained access token that doesn't share access to both public and private repositories.
 
-Use an environment variable to store your PAT.
+Use an environment variable to store your GitHub PAT:
 
 ```bash
 GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourActualGitHubTokenHere"
 ```
 
-Gemini CLI will automatically substitute the `${GITHUB_PERSONAL_ACCESS_TOKEN}` placeholder from your `settings.json` file.
+Gemini CLI uses this value in the `mcpServers` configuration that you defined in the `settings.json` file.
 
-##### Launch Gemini CLI and Verify the Connection
+#### Launch Gemini CLI and verify the connection
 
-Gemini CLI will automatically read your configuration and launch the GitHub MCP server in the background. You can ask Gemini CLI to perform GitHub actions in natural language.
+When you launch Gemini CLI, it automatically reads your configuration and launches the GitHub MCP server in the background. You can then use natural language prompts to ask Gemini CLI to perform GitHub actions. For example:
 
 ```bash
 "get all open issues assigned to me in the 'foo/bar' repo and prioritize them"
