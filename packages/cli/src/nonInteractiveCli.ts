@@ -27,6 +27,11 @@ function getResponseText(response: GenerateContentResponse): string | null {
       candidate.content.parts &&
       candidate.content.parts.length > 0
     ) {
+      // We are running in headless mode so we don't need to return thoughts to STDOUT.
+      const thoughtPart = candidate.content.parts[0];
+      if (thoughtPart?.thought) {
+        return null;
+      }
       return candidate.content.parts
         .filter((part) => part.text)
         .map((part) => part.text)
