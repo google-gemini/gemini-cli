@@ -110,5 +110,7 @@ export class GitService {
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
     const repo = this.shadowGitRepository;
     await repo.raw(['restore', '--source', commitHash, '.']);
+    // Removes any untracked files that were introduced post snapshot.
+    await repo.clean('f', ['-d']);
   }
 }
