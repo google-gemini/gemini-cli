@@ -59,6 +59,31 @@ describe('useCompletion git-aware filtering integration', () => {
     vi.restoreAllMocks();
   });
 
+  it('should filter git-ignored entries from @ completions', async () => {
+    const globResults = [`${testCwd}/data`, `${testCwd}/dist`];
+    vi.mocked(glob).mockResolvedValue(globResults);
+
+    // Mock git ignore service to ignore certain files
+    mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
+      (path: string) => path.includes('dist'),
+    );
+
+    const { result } = renderHook(() =>
+      useCompletion('@d', testCwd, true, slashCommands, mockConfig),
+    );
+
+    // Wait for async operations to complete
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150)); // Account for debounce
+    });
+
+    expect(result.current.suggestions).toHaveLength(1);
+    expect(result.current.suggestions).toEqual(
+      expect.arrayContaining([{ label: 'data', value: 'data' }]),
+    );
+    expect(result.current.showSuggestions).toBe(true);
+  });
+
   it('should filter git-ignored directories from @ completions', async () => {
     // Mock fs.readdir to return both regular and git-ignored directories
     vi.mocked(fs.readdir).mockResolvedValue([

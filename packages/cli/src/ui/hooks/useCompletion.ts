@@ -306,6 +306,12 @@ export function useCompletion(
             value: escapePath(relativePath),
           };
         })
+        .filter((s) => {
+          if (fileDiscoveryService) {
+            return !fileDiscoveryService.shouldGitIgnoreFile(s.label); // relative path
+          }
+          return true;
+        })
         .slice(0, maxResults);
 
       return suggestions;
