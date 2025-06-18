@@ -518,7 +518,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'about',
         description: 'show version info',
-        action: (_mainCommand, _subCommand, _args) => {
+        action: async (_mainCommand, _subCommand, _args) => {
           const osVersion = process.platform;
           let sandboxEnv = 'no sandbox';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
@@ -529,7 +529,7 @@ export const useSlashCommandProcessor = (
             })`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = getCliVersion();
+          const cliVersion = await getCliVersion();
           addMessage({
             type: MessageType.ABOUT,
             timestamp: new Date(),
@@ -543,7 +543,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'bug',
         description: 'submit a bug report',
-        action: (_mainCommand, _subCommand, args) => {
+        action: async (_mainCommand, _subCommand, args) => {
           let bugDescription = _subCommand || '';
           if (args) {
             bugDescription += ` ${args}`;
@@ -560,8 +560,8 @@ export const useSlashCommandProcessor = (
             })`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
+          const cliVersion = await getCliVersion();
           const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
-          const cliVersion = getCliVersion();
 
           const diagnosticInfo = `
 ## Describe the bug
