@@ -203,6 +203,7 @@ export async function start_sandbox(config: SandboxConfig) {
       );
       process.exit(1);
     }
+    // Log on STDERR so it doesn't clutter the output on STDOUT
     console.error(`using macos seatbelt (profile: ${profile}) ...`);
     // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
     const args = [

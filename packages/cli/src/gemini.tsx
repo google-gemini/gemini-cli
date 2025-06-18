@@ -30,7 +30,6 @@ import {
 export async function main() {
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
-  setWindowTitle(basename(workspaceRoot), settings);
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
@@ -84,6 +83,7 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
+    setWindowTitle(basename(workspaceRoot), settings);
     render(
       <React.StrictMode>
         <AppWrapper
