@@ -61,7 +61,7 @@ if (sandboxCommand === 'sandbox-exec') {
 
 console.log(`using ${sandboxCommand} for sandboxing`);
 
-const baseImage = cliPkgJson.config.sandboxImageUri;
+const baseImage = cliPkgJson.config.sandboximageName;
 const customImage = argv.i;
 const baseDockerfile = 'Dockerfile';
 const customDockerfile = argv.f;
