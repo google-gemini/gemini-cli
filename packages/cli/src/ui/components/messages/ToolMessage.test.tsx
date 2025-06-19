@@ -60,7 +60,7 @@ describe('<ToolMessage />', () => {
     description: 'A tool for testing',
     resultDisplay: 'Test result',
     status: ToolCallStatus.Success,
-    availableTerminalHeight: 20,
+    terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
   };

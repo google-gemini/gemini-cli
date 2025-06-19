@@ -19,17 +19,26 @@ import {
   RadioButtonSelect,
   RadioSelectItem,
 } from '../shared/RadioButtonSelect.js';
+import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
   config?: Config;
   isFocused?: boolean;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
 }
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
-> = ({ confirmationDetails, isFocused = true }) => {
+> = ({
+  confirmationDetails,
+  isFocused = true,
+  availableTerminalHeight,
+  terminalWidth,
+}) => {
   const { onConfirm } = confirmationDetails;
+  const childWidth = terminalWidth - 2; // 2 for padding
 
   useInput((_, key) => {
     if (!isFocused) return;
@@ -47,6 +56,35 @@ export const ToolConfirmationMessage: React.FC<
     RadioSelectItem<ToolConfirmationOutcome>
   >();
 
+  // Body content is now the DiffRenderer, passing filename to it
+  // The bordered box is removed from here and handled within DiffRenderer
+
+  function availableBodyContentHeight() {
+    if (options.length === 0) {
+      // This should not happen in practice as options are always added before this is called.
+      throw new Error('Options not provided for confirmation message');
+    }
+
+    if (availableTerminalHeight === undefined) {
+      return undefined;
+    }
+
+    // Calculate the vertical space (in lines) consumed by UI elements
+    // surrounding the main body content.
+    const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
+    const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
+    const HEIGHT_QUESTION = 1; // The question text is one line.
+    const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
+    const HEIGHT_OPTIONS = options.length; // Each option in the radio select takes one line.
+
+    const surroundingElementsHeight =
+      PADDING_OUTER_Y +
+      MARGIN_BODY_BOTTOM +
+      HEIGHT_QUESTION +
+      MARGIN_QUESTION_BOTTOM +
+      HEIGHT_OPTIONS;
+    return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
+  }
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
       return (
@@ -66,15 +104,6 @@ export const ToolConfirmationMessage: React.FC<
       );
     }
 
-    // Body content is now the DiffRenderer, passing filename to it
-    // The bordered box is removed from here and handled within DiffRenderer
-    bodyContent = (
-      <DiffRenderer
-        diffContent={confirmationDetails.fileDiff}
-        filename={confirmationDetails.fileName}
-      />
-    );
-
     question = `Apply this change?`;
     options.push(
       {
@@ -91,17 +120,17 @@ export const ToolConfirmationMessage: React.FC<
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
+    bodyContent = (
+      <DiffRenderer
+        diffContent={confirmationDetails.fileDiff}
+        filename={confirmationDetails.fileName}
+        availableTerminalHeight={availableBodyContentHeight()}
+        terminalWidth={childWidth}
+      />
+    );
   } else if (confirmationDetails.type === 'exec') {
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
-
-    bodyContent = (
-      <Box flexDirection="column">
-        <Box paddingX={1} marginLeft={1}>
-          <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
-        </Box>
-      </Box>
-    );
 
     question = `Allow execution?`;
     options.push(
@@ -115,11 +144,43 @@ export const ToolConfirmationMessage: React.FC<
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
+
+    let bodyContentHeight = availableBodyContentHeight();
+    if (bodyContentHeight !== undefined) {
+      bodyContentHeight -= 2; // Account for padding;
+    }
+    bodyContent = (
+      <Box flexDirection="column">
+        <Box paddingX={1} marginLeft={1}>
+          <MaxSizedBox
+            maxHeight={bodyContentHeight}
+            maxWidth={Math.max(childWidth - 4, 1)}
+          >
+            <Box>
+              <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
+            </Box>
+          </MaxSizedBox>
+        </Box>
+      </Box>
+    );
   } else if (confirmationDetails.type === 'info') {
     const infoProps = confirmationDetails;
     const displayUrls =
       infoProps.urls &&
       !(infoProps.urls.length === 1 && infoProps.urls[0] === infoProps.prompt);
+
+    question = `Do you want to proceed?`;
+    options.push(
+      {
+        label: 'Yes, allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+      },
+      {
+        label: 'Yes, allow always',
+        value: ToolConfirmationOutcome.ProceedAlways,
+      },
+      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
+    );
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
@@ -133,19 +194,6 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
         )}
       </Box>
-    );
-
-    question = `Do you want to proceed?`;
-    options.push(
-      {
-        label: 'Yes, allow once',
-        value: ToolConfirmationOutcome.ProceedOnce,
-      },
-      {
-        label: 'Yes, allow always',
-        value: ToolConfirmationOutcome.ProceedAlways,
-      },
-      { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
   } else {
     // mcp tool confirmation
@@ -177,7 +225,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" padding={1} minWidth="90%">
+    <Box flexDirection="column" padding={1} width={childWidth}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
@@ -186,7 +234,7 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
-        <Text>{question}</Text>
+        <Text wrap="truncate">{question}</Text>
       </Box>
 
       {/* Select Input for Options */}

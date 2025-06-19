@@ -22,7 +22,8 @@ import { Config } from '@gemini-cli/core';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
-  availableTerminalHeight: number;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
   isPending: boolean;
   config?: Config;
   isFocused?: boolean;
@@ -31,6 +32,7 @@ interface HistoryItemDisplayProps {
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
   availableTerminalHeight,
+  terminalWidth,
   isPending,
   config,
   isFocused = true,
@@ -44,6 +46,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         text={item.text}
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
+        terminalWidth={terminalWidth}
       />
     )}
     {item.type === 'gemini_content' && (
@@ -51,6 +54,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         text={item.text}
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
+        terminalWidth={terminalWidth}
       />
     )}
     {item.type === 'info' && <InfoMessage text={item.text} />}
@@ -78,6 +82,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         toolCalls={item.tools}
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
+        terminalWidth={terminalWidth}
         config={config}
         isFocused={isFocused}
       />

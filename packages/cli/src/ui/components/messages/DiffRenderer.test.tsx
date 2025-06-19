@@ -16,6 +16,9 @@ describe('<DiffRenderer />', () => {
     mockColorizeCode.mockClear();
   });
 
+  const sanitizeOutput = (output: string | undefined, terminalWidth: number) =>
+    output?.replace(/GAP_INDICATOR/g, '═'.repeat(terminalWidth));
+
   it('should call colorizeCode with correct language for new file with known extension', () => {
     const newFileDiffContent = `
 diff --git a/test.py b/test.py
@@ -27,11 +30,17 @@ index 0000000..e69de29
 +print("hello world")
 `;
     render(
-      <DiffRenderer diffContent={newFileDiffContent} filename="test.py" />,
+      <DiffRenderer
+        diffContent={newFileDiffContent}
+        filename="test.py"
+        terminalWidth={80}
+      />,
     );
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'print("hello world")',
       'python',
+      undefined,
+      80,
     );
   });
 
@@ -46,9 +55,18 @@ index 0000000..e69de29
 +some content
 `;
     render(
-      <DiffRenderer diffContent={newFileDiffContent} filename="test.unknown" />,
+      <DiffRenderer
+        diffContent={newFileDiffContent}
+        filename="test.unknown"
+        terminalWidth={80}
+      />,
     );
-    expect(mockColorizeCode).toHaveBeenCalledWith('some content', null);
+    expect(mockColorizeCode).toHaveBeenCalledWith(
+      'some content',
+      null,
+      undefined,
+      80,
+    );
   });
 
   it('should call colorizeCode with null language for new file if no filename is provided', () => {
@@ -61,8 +79,15 @@ index 0000000..e69de29
 @@ -0,0 +1 @@
 +some text content
 `;
-    render(<DiffRenderer diffContent={newFileDiffContent} />);
-    expect(mockColorizeCode).toHaveBeenCalledWith('some text content', null);
+    render(
+      <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />,
+    );
+    expect(mockColorizeCode).toHaveBeenCalledWith(
+      'some text content',
+      null,
+      undefined,
+      80,
+    );
   });
 
   it('should render diff content for existing file (not calling colorizeCode directly for the whole block)', () => {
@@ -79,6 +104,7 @@ index 0000001..0000002 100644
       <DiffRenderer
         diffContent={existingFileDiffContent}
         filename="test.txt"
+        terminalWidth={80}
       />,
     );
     // colorizeCode is used internally by the line-by-line rendering, not for the whole block
@@ -103,14 +129,20 @@ index 1234567..1234567 100644
 +++ b/file.txt
 `;
     const { lastFrame } = render(
-      <DiffRenderer diffContent={noChangeDiff} filename="file.txt" />,
+      <DiffRenderer
+        diffContent={noChangeDiff}
+        filename="file.txt"
+        terminalWidth={80}
+      />,
     );
     expect(lastFrame()).toContain('No changes detected');
     expect(mockColorizeCode).not.toHaveBeenCalled();
   });
 
   it('should handle empty diff content', () => {
-    const { lastFrame } = render(<DiffRenderer diffContent="" />);
+    const { lastFrame } = render(
+      <DiffRenderer diffContent="" terminalWidth={80} />,
+    );
     expect(lastFrame()).toContain('No diff content');
     expect(mockColorizeCode).not.toHaveBeenCalled();
   });
@@ -130,7 +162,11 @@ index 123..456 100644
  context line 11
 `;
     const { lastFrame } = render(
-      <DiffRenderer diffContent={diffWithGap} filename="file.txt" />,
+      <DiffRenderer
+        diffContent={diffWithGap}
+        filename="file.txt"
+        terminalWidth={80}
+      />,
     );
     const output = lastFrame();
     expect(output).toContain('═'); // Check for the border character used in the gap
@@ -161,7 +197,11 @@ index abc..def 100644
  context line 15
 `;
     const { lastFrame } = render(
-      <DiffRenderer diffContent={diffWithSmallGap} filename="file.txt" />,
+      <DiffRenderer
+        diffContent={diffWithSmallGap}
+        filename="file.txt"
+        terminalWidth={80}
+      />,
     );
     const output = lastFrame();
     expect(output).not.toContain('═'); // Ensure no separator is rendered
@@ -171,7 +211,7 @@ index abc..def 100644
     expect(output).toContain('context line 11');
   });
 
-  it('should correctly render a diff with multiple hunks and a gap indicator', () => {
+  describe('should correctly render a diff with multiple hunks and a gap indicator', () => {
     const diffWithMultipleHunks = `
 diff --git a/multi.js b/multi.js
 index 123..789 100644
@@ -188,25 +228,56 @@ index 123..789 100644
 +const anotherNew = 'test';
  console.log('end of second hunk');
 `;
-    const { lastFrame } = render(
-      <DiffRenderer diffContent={diffWithMultipleHunks} filename="multi.js" />,
+
+    it.each([
+      {
+        terminalWidth: 80,
+        height: undefined,
+        expected: `1      console.log('first hunk');
+2    - const oldVar = 1;
+2    + const newVar = 1;
+3      console.log('end of first hunk');
+════════════════════════════════════════════════════════════════════════════════
+20     console.log('second hunk');
+21   - const anotherOld = 'test';
+21   + const anotherNew = 'test';
+22     console.log('end of second hunk');`,
+      },
+      {
+        terminalWidth: 80,
+        height: 6,
+        expected: `... first 4 lines hidden ...
+════════════════════════════════════════════════════════════════════════════════
+20     console.log('second hunk');
+21   - const anotherOld = 'test';
+21   + const anotherNew = 'test';
+22     console.log('end of second hunk');`,
+      },
+      {
+        terminalWidth: 30,
+        height: 6,
+        expected: `... first 10 lines hidden ...
+       'test';
+21   + const anotherNew =
+       'test';
+22     console.log('end of
+       second hunk');`,
+      },
+    ])(
+      'with terminalWidth $terminalWidth and height $height',
+      ({ terminalWidth, height, expected }) => {
+        const { lastFrame } = render(
+          <DiffRenderer
+            diffContent={diffWithMultipleHunks}
+            filename="multi.js"
+            terminalWidth={terminalWidth}
+            availableTerminalHeight={height}
+          />,
+        );
+        const output = lastFrame();
+        expect(sanitizeOutput(output, terminalWidth)).toEqual(expected);
+      },
     );
-    const output = lastFrame();
-
-    // Check for content from the first hunk
-    expect(output).toContain("1      console.log('first hunk');");
-    expect(output).toContain('2    - const oldVar = 1;');
-    expect(output).toContain('2    + const newVar = 1;');
-    expect(output).toContain("3      console.log('end of first hunk');");
-
-    // Check for the gap indicator between hunks
-    expect(output).toContain('═');
-
-    // Check for content from the second hunk
-    expect(output).toContain("20     console.log('second hunk');");
-    expect(output).toContain("21   - const anotherOld = 'test';");
-    expect(output).toContain("21   + const anotherNew = 'test';");
-    expect(output).toContain("22     console.log('end of second hunk');");
   });
 
   it('should correctly render a diff with a SVN diff format', () => {
@@ -226,15 +297,19 @@ fileDiff Index: file.txt
 \\ No newline at end of file  
 `;
     const { lastFrame } = render(
-      <DiffRenderer diffContent={newFileDiff} filename="TEST" />,
+      <DiffRenderer
+        diffContent={newFileDiff}
+        filename="TEST"
+        terminalWidth={80}
+      />,
     );
     const output = lastFrame();
 
-    expect(output).toContain('1    - const oldVar = 1;');
-    expect(output).toContain('1    + const newVar = 1;');
-    expect(output).toContain('═');
-    expect(output).toContain("20   - const anotherOld = 'test';");
-    expect(output).toContain("20   + const anotherNew = 'test';");
+    expect(output).toEqual(`1    - const oldVar = 1;
+1    + const newVar = 1;
+════════════════════════════════════════════════════════════════════════════════
+20   - const anotherOld = 'test';
+20   + const anotherNew = 'test';`);
   });
 
   it('should correctly render a new file with no file extension correctly', () => {
@@ -250,12 +325,15 @@ fileDiff Index: Dockerfile
 \\ No newline at end of file  
 `;
     const { lastFrame } = render(
-      <DiffRenderer diffContent={newFileDiff} filename="Dockerfile" />,
+      <DiffRenderer
+        diffContent={newFileDiff}
+        filename="Dockerfile"
+        terminalWidth={80}
+      />,
     );
     const output = lastFrame();
-
-    expect(output).toContain('1 FROM node:14');
-    expect(output).toContain('2 RUN npm install');
-    expect(output).toContain('3 RUN npm run build');
+    expect(output).toEqual(`1 FROM node:14
+2 RUN npm install
+3 RUN npm run build`);
   });
 });

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { common, createLowlight } from 'lowlight';
 import type {
   Root,
@@ -16,6 +16,7 @@ import type {
 } from 'hast';
 import { themeManager } from '../themes/theme-manager.js';
 import { Theme } from '../themes/theme.js';
+import { MaxSizedBox } from '../components/shared/MaxSizedBox.js';
 
 // Configure themeing and parsing utilities.
 const lowlight = createLowlight(common);
@@ -84,6 +85,8 @@ function renderHastNode(
   return null;
 }
 
+const RESERVED_LINES_FOR_TRUNCATION_MESSAGE = 2;
+
 /**
  * Renders syntax-highlighted code for Ink applications using a selected theme.
  *
@@ -94,6 +97,8 @@ function renderHastNode(
 export function colorizeCode(
   code: string,
   language: string | null,
+  availableHeight?: number,
+  maxWidth?: number,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = themeManager.getActiveTheme();
@@ -101,15 +106,33 @@ export function colorizeCode(
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
-    const lines = codeToHighlight.split('\n');
+    let lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
+
+    let hiddenLinesCount = 0;
+
+    // Optimizaiton to avoid highlighting lines that cannot possibly be displayed.
+    if (availableHeight && lines.length > availableHeight) {
+      const sliceIndex =
+        lines.length - availableHeight + RESERVED_LINES_FOR_TRUNCATION_MESSAGE;
+      if (sliceIndex > 0) {
+        hiddenLinesCount = sliceIndex;
+        lines = lines.slice(sliceIndex);
+      }
+    }
+
     const getHighlightedLines = (line: string) =>
       !language || !lowlight.registered(language)
         ? lowlight.highlightAuto(line)
         : lowlight.highlight(language, line);
 
     return (
-      <Text>
+      <MaxSizedBox
+        maxHeight={availableHeight}
+        maxWidth={maxWidth}
+        additionalHiddenLinesCount={hiddenLinesCount}
+        overflowDirection="top"
+      >
         {lines.map((line, index) => {
           const renderedNode = renderHastNode(
             getHighlightedLines(line),
@@ -119,16 +142,17 @@ export function colorizeCode(
 
           const contentToRender = renderedNode !== null ? renderedNode : line;
           return (
-            <Text key={index}>
+            <Box key={index}>
               <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1).padStart(padWidth, ' ')} `}
+                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
               </Text>
-              <Text color={activeTheme.defaultColor}>{contentToRender}</Text>
-              {index < lines.length - 1 && '\n'}
-            </Text>
+              <Text color={activeTheme.defaultColor} wrap="wrap">
+                {contentToRender}
+              </Text>
+            </Box>
           );
         })}
-      </Text>
+      </MaxSizedBox>
     );
   } catch (error) {
     console.error(
@@ -140,17 +164,20 @@ export function colorizeCode(
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     return (
-      <Text>
+      <MaxSizedBox
+        maxHeight={availableHeight}
+        maxWidth={maxWidth}
+        overflowDirection="top"
+      >
         {lines.map((line, index) => (
-          <Text key={index}>
+          <Box key={index}>
             <Text color={activeTheme.defaultColor}>
               {`${String(index + 1).padStart(padWidth, ' ')} `}
             </Text>
             <Text color={activeTheme.colors.Gray}>{line}</Text>
-            {index < lines.length - 1 && '\n'}
-          </Text>
+          </Box>
         ))}
-      </Text>
+      </MaxSizedBox>
     );
   }
 }

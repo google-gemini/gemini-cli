@@ -20,7 +20,11 @@ describe('ToolConfirmationMessage', () => {
     };
 
     const { lastFrame } = render(
-      <ToolConfirmationMessage confirmationDetails={confirmationDetails} />,
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
     );
 
     expect(lastFrame()).not.toContain('URLs to fetch:');
@@ -39,7 +43,11 @@ describe('ToolConfirmationMessage', () => {
     };
 
     const { lastFrame } = render(
-      <ToolConfirmationMessage confirmationDetails={confirmationDetails} />,
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
     );
 
     expect(lastFrame()).toContain('URLs to fetch:');

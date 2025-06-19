@@ -12,13 +12,15 @@ import { Colors } from '../../colors.js';
 interface GeminiMessageProps {
   text: string;
   isPending: boolean;
-  availableTerminalHeight: number;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
 }
 
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   text,
   isPending,
   availableTerminalHeight,
+  terminalWidth,
 }) => {
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
@@ -33,6 +35,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           text={text}
           isPending={isPending}
           availableTerminalHeight={availableTerminalHeight}
+          terminalWidth={terminalWidth}
         />
       </Box>
     </Box>
