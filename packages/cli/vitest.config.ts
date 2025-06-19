@@ -14,6 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     reporters: ['default', 'junit'],
+    silent: true,
     outputFile: {
       junit: 'junit.xml',
     },
