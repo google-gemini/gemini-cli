@@ -247,48 +247,6 @@ describe('loadCliConfig telemetry', () => {
   });
 });
 
-describe('API Key Handling', () => {
-  const originalEnv = { ...process.env };
-  const originalArgv = process.argv;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    process.argv = ['node', 'script.js'];
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-    process.argv = originalArgv;
-  });
-
-  it('should use GEMINI_API_KEY from env', async () => {
-    process.env.GEMINI_API_KEY = 'gemini-key';
-    delete process.env.GOOGLE_API_KEY;
-
-    const settings: Settings = {};
-    const result = await loadCliConfig(settings, [], 'test-session');
-    expect(result.getContentGeneratorConfig().apiKey).toBe('gemini-key');
-  });
-
-  it('should use GOOGLE_API_KEY and warn when both GOOGLE_API_KEY and GEMINI_API_KEY are set', async () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    process.env.GEMINI_API_KEY = 'gemini-key';
-    process.env.GOOGLE_API_KEY = 'google-key';
-
-    const settings: Settings = {};
-    const result = await loadCliConfig(settings, [], 'test-session');
-
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[WARN]',
-      'Both GEMINI_API_KEY and GOOGLE_API_KEY are set. Using GOOGLE_API_KEY.',
-    );
-    expect(result.getContentGeneratorConfig().apiKey).toBe('google-key');
-  });
-});
-
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();

@@ -359,6 +359,7 @@ describe('useGeminiStream', () => {
           props.handleSlashCommand,
           props.shellModeActive,
           () => 'vscode' as EditorType,
+          () => {},
         ),
       {
         initialProps: {

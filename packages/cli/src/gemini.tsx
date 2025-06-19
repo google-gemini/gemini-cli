@@ -25,7 +25,9 @@ import {
   WriteFileTool,
   sessionId,
   logUserPrompt,
+  AuthType,
 } from '@gemini-cli/core';
+import { validateAuthMethod } from './config/auth.js';
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -46,10 +48,6 @@ export async function main() {
 
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
-
-  // When using Code Assist this triggers the Oauth login.
-  // Do this now, before sandboxing, so web redirect works.
-  await config.getGeminiClient().initialize();
 
   // Initialize centralized FileDiscoveryService
   config.getFileService();
@@ -73,6 +71,15 @@ export async function main() {
   if (!process.env.SANDBOX) {
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
+      if (settings.merged.selectedAuthType) {
+        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
+        const err = validateAuthMethod(settings.merged.selectedAuthType);
+        if (err) {
+          console.error(err);
+          process.exit(1);
+        }
+        await config.refreshAuth(settings.merged.selectedAuthType);
+      }
       await start_sandbox(sandboxConfig);
       process.exit(0);
     }
@@ -152,28 +159,58 @@ async function loadNonInteractiveConfig(
   extensions: Extension[],
   settings: LoadedSettings,
 ) {
-  if (config.getApprovalMode() === ApprovalMode.YOLO) {
-    // Since everything is being allowed we can use normal yolo behavior.
-    return config;
+  let finalConfig = config;
+  if (config.getApprovalMode() !== ApprovalMode.YOLO) {
+    // Everything is not allowed, ensure that only read-only tools are configured.
+    const existingExcludeTools = settings.merged.excludeTools || [];
+    const interactiveTools = [
+      ShellTool.Name,
+      EditTool.Name,
+      WriteFileTool.Name,
+    ];
+
+    const newExcludeTools = [
+      ...new Set([...existingExcludeTools, ...interactiveTools]),
+    ];
+
+    const nonInteractiveSettings = {
+      ...settings.merged,
+      excludeTools: newExcludeTools,
+    };
+    finalConfig = await loadCliConfig(
+      nonInteractiveSettings,
+      extensions,
+      config.getSessionId(),
+    );
   }
 
-  // Everything is not allowed, ensure that only read-only tools are configured.
-  const existingExcludeTools = settings.merged.excludeTools || [];
-  const interactiveTools = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
-
-  const newExcludeTools = [
-    ...new Set([...existingExcludeTools, ...interactiveTools]),
-  ];
-
-  const nonInteractiveSettings = {
-    ...settings.merged,
-    excludeTools: newExcludeTools,
-  };
-  const newConfig = await loadCliConfig(
-    nonInteractiveSettings,
-    extensions,
-    config.getSessionId(),
+  return await validateNonInterActiveAuth(
+    settings.merged.selectedAuthType,
+    finalConfig,
   );
-  await newConfig.getGeminiClient().initialize();
-  return newConfig;
+}
+
+async function validateNonInterActiveAuth(
+  selectedAuthType: AuthType | undefined,
+  nonInteractiveConfig: Config,
+) {
+  // making a special case for the cli. many headless environments might not have a settings.json set
+  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
+  // still expect that exists
+  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
+    console.error(
+      'Please set an Auth method in your .gemini/settings.json OR specify GEMINI_API_KEY env variable file before running',
+    );
+    process.exit(1);
+  }
+
+  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
+  const err = validateAuthMethod(selectedAuthType);
+  if (err != null) {
+    console.error(err);
+    process.exit(1);
+  }
+
+  await nonInteractiveConfig.refreshAuth(selectedAuthType);
+  return nonInteractiveConfig;
 }

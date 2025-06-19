@@ -20,6 +20,8 @@ export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
 
 export * from './code_assist/codeAssist.js';
+export * from './code_assist/oauth2.js';
+export * from './code_assist/errors.js';
 
 // Export utilities
 export * from './utils/paths.js';

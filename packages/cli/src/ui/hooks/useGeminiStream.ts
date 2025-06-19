@@ -22,6 +22,7 @@ import {
   GitService,
   EditorType,
   ThoughtSummary,
+  isAuthError,
 } from '@gemini-cli/core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
@@ -87,6 +88,7 @@ export const useGeminiStream = (
   >,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
+  onAuthError: () => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -496,7 +498,9 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
       } catch (error: unknown) {
-        if (!isNodeError(error) || error.name !== 'AbortError') {
+        if (isAuthError(error)) {
+          onAuthError();
+        } else if (!isNodeError(error) || error.name !== 'AbortError') {
           addItem(
             {
               type: MessageType.ERROR,
@@ -522,6 +526,7 @@ export const useGeminiStream = (
       setInitError,
       geminiClient,
       startNewTurn,
+      onAuthError,
     ],
   );
 
