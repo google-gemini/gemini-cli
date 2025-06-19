@@ -605,15 +605,46 @@ export async function start_sandbox(config: SandboxConfig) {
   // Determine if the current user's UID/GID should be passed to the sandbox.
   // See shouldUseCurrentUserInSandbox for more details.
   let userFlag = '';
+  const finalEntrypoint = entrypoint(workdir);
+
   if (process.env.GEMINI_CLI_INTEGRATION_TEST === 'true') {
     args.push('--user', 'root');
     userFlag = '--user root';
   } else if (await shouldUseCurrentUserInSandbox()) {
+    // For the user-creation logic to work, the container must start as root.
+    // The entrypoint script then handles dropping privileges to the correct user.
+    args.push('--user', 'root');
+
     const uid = execSync('id -u').toString().trim();
     const gid = execSync('id -g').toString().trim();
-    args.push('--user', `${uid}:${gid}`);
+
+    // Instead of passing --user to the main sandbox container, we let it
+    // start as root, then create a user with the host's UID/GID, and
+    // finally switch to that user to run the gemini process. This is
+    // necessary on Linux to ensure the user exists within the
+    // container's /etc/passwd file, which is required by os.userInfo().
+    const username = 'gemini';
+    const homeDir = getContainerPath(os.homedir());
+
+    const setupUserCommands = [
+      // Use -f with groupadd to avoid errors if the group already exists.
+      `groupadd -f -g ${gid} ${username}`,
+      // Create user only if it doesn't exist. Use -o for non-unique UID.
+      `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username}`,
+    ].join(' && ');
+
+    const originalCommand = finalEntrypoint[2];
+    const escapedOriginalCommand = originalCommand.replace(/'/g, "'\\''");
+
+    // Use `su -p` to preserve the environment.
+    const suCommand = `su -p ${username} -c '${escapedOriginalCommand}'`;
+
+    // The entrypoint is always `['bash', '-c', '<command>']`, so we modify the command part.
+    finalEntrypoint[2] = `${setupUserCommands} && ${suCommand}`;
+
+    // We still need userFlag for the simpler proxy container, which does not have this issue.
     userFlag = `--user ${uid}:${gid}`;
-    // when forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well
+    // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
     args.push('--env', `HOME=${os.homedir()}`);
   }
 
@@ -621,7 +652,7 @@ export async function start_sandbox(config: SandboxConfig) {
   args.push(image);
 
   // push container entrypoint (including args)
-  args.push(...entrypoint(workdir));
+  args.push(...finalEntrypoint);
 
   // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
   let proxyProcess: ChildProcess | undefined = undefined;
