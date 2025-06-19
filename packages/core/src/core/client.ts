@@ -362,10 +362,6 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall);
-      console.log(
-        'Raw API Response in client.ts:',
-        JSON.stringify(result, null, 2),
-      );
       return result;
     } catch (error: unknown) {
       if (abortSignal.aborted) {
