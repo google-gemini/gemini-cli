@@ -21,12 +21,16 @@ interface ThemeDialogProps {
   onHighlight: (themeName: string | undefined) => void;
   /** The settings object */
   settings: LoadedSettings;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
 }
 
 export function ThemeDialog({
   onSelect,
   onHighlight,
   settings,
+  availableTerminalHeight,
+  terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
@@ -94,6 +98,34 @@ export function ThemeDialog({
         : `(Modified in ${otherScope})`;
   }
 
+  // Constants for calculating preview pane layout.
+  // These values are based on the JSX structure below.
+  const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
+  // A safety margin to prevent text from touching the border.
+  // This is a complete hack unrelated to the 0.9 used in App.tsx
+  const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
+  // Combined horizontal padding from the dialog and preview pane.
+  const TOTAL_HORIZONTAL_PADDING = 4;
+  const colorizeCodeWidth = Math.max(
+    Math.floor(
+      (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
+        PREVIEW_PANE_WIDTH_PERCENTAGE *
+        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+    ),
+    1,
+  );
+
+  // Vertical space taken by elements other than the two code blocks in the preview pane.
+  // Includes "Preview" title, borders, padding, and margin between blocks.
+  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 7;
+  const availableTerminalHeightCodeBlock = availableTerminalHeight
+    ? Math.max(
+        Math.floor(
+          (availableTerminalHeight - PREVIEW_PANE_FIXED_VERTICAL_SPACE) / 2,
+        ),
+        2,
+      )
+    : undefined;
   return (
     <Box
       borderStyle="round"
@@ -155,6 +187,8 @@ def fibonacci(n):
         a, b = b, a + b
     return a`,
             'python',
+            availableTerminalHeightCodeBlock,
+            colorizeCodeWidth,
           )}
           <Box marginTop={1} />
           <DiffRenderer
@@ -165,6 +199,8 @@ def fibonacci(n):
 -This line was deleted.
 +This line was added.
 `}
+            availableTerminalHeight={availableTerminalHeightCodeBlock}
+            terminalWidth={colorizeCodeWidth}
           />
         </Box>
       </Box>

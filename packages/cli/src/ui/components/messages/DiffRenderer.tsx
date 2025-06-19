@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import crypto from 'crypto';
 import { colorizeCode } from '../../utils/CodeColorizer.js';
+import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -90,6 +91,8 @@ interface DiffRendererProps {
   diffContent: string;
   filename?: string;
   tabWidth?: number;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -98,6 +101,8 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
   filename,
   tabWidth = DEFAULT_TAB_WIDTH,
+  availableTerminalHeight,
+  terminalWidth,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
     return <Text color={Colors.AccentYellow}>No diff content.</Text>;
@@ -136,9 +141,20 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     const language = fileExtension
       ? getLanguageFromExtension(fileExtension)
       : null;
-    renderedOutput = colorizeCode(addedContent, language);
+    renderedOutput = colorizeCode(
+      addedContent,
+      language,
+      availableTerminalHeight,
+      terminalWidth,
+    );
   } else {
-    renderedOutput = renderDiffContent(parsedLines, filename, tabWidth);
+    renderedOutput = renderDiffContent(
+      parsedLines,
+      filename,
+      tabWidth,
+      availableTerminalHeight,
+      terminalWidth,
+    );
   }
 
   return renderedOutput;
@@ -146,8 +162,10 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
 const renderDiffContent = (
   parsedLines: DiffLine[],
-  filename?: string,
+  filename: string | undefined,
   tabWidth = DEFAULT_TAB_WIDTH,
+  availableTerminalHeight: number | undefined,
+  terminalWidth: number,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -191,7 +209,11 @@ const renderDiffContent = (
   const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
 
   return (
-    <Box flexDirection="column" key={key}>
+    <MaxSizedBox
+      maxHeight={availableTerminalHeight}
+      maxWidth={terminalWidth}
+      key={key}
+    >
       {displayableLines.reduce<React.ReactNode[]>((acc, line, index) => {
         // Determine the relevant line number for gap calculation based on type
         let relevantLineNumberForGapCalc: number | null = null;
@@ -209,16 +231,9 @@ const renderDiffContent = (
             lastLineNumber + MAX_CONTEXT_LINES_WITHOUT_GAP + 1
         ) {
           acc.push(
-            <Box
-              key={`gap-${index}`}
-              width="100%"
-              borderTop={true}
-              borderBottom={false}
-              borderRight={false}
-              borderLeft={false}
-              borderStyle="double"
-              borderColor={Colors.Gray}
-            ></Box>,
+            <Box key={`gap-${index}`}>
+              <Text wrap="truncate">{'═'.repeat(terminalWidth)}</Text>
+            </Box>,
           );
         }
 
@@ -271,7 +286,7 @@ const renderDiffContent = (
         );
         return acc;
       }, [])}
-    </Box>
+    </MaxSizedBox>
   );
 };
 

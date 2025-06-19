@@ -11,17 +11,18 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
+import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
 const STATUS_INDICATOR_WIDTH = 3;
 const MIN_LINES_SHOWN = 2; // show at least this many lines
-const MIN_LINES_HIDDEN = 3; // hide at least this many lines (or don't hide any)
 
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
-  availableTerminalHeight: number;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
 }
@@ -32,36 +33,18 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   resultDisplay,
   status,
   availableTerminalHeight,
+  terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
-  const resultIsString =
-    typeof resultDisplay === 'string' && resultDisplay.trim().length > 0;
-  const lines = React.useMemo(
-    () => (resultIsString ? resultDisplay.split('\n') : []),
-    [resultIsString, resultDisplay],
-  );
-  let contentHeightEstimate = Math.max(
-    availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
-    MIN_LINES_SHOWN + 1, // enforce minimum lines shown
-  );
-  // enforce minimum lines hidden (don't hide any otherwise)
-  if (lines.length - contentHeightEstimate < MIN_LINES_HIDDEN) {
-    contentHeightEstimate = lines.length;
-  }
+  const availableHeight = availableTerminalHeight
+    ? Math.max(
+        availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
+        MIN_LINES_SHOWN + 1, // enforce minimum lines shown
+      )
+    : undefined;
 
-  // Truncate the overall string content if it's too long.
-  // MarkdownRenderer will handle specific truncation for code blocks within this content.
-  // Estimate available height for this specific tool message content area
-  // This is a rough estimate; ideally, we'd have a more precise measurement.
-  const displayableResult = React.useMemo(
-    () =>
-      resultIsString
-        ? lines.slice(-contentHeightEstimate).join('\n')
-        : resultDisplay,
-    [lines, resultIsString, contentHeightEstimate, resultDisplay],
-  );
-  const hiddenLines = Math.max(0, lines.length - contentHeightEstimate);
+  const childWidth = terminalWidth - 3; // account for padding.
 
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
@@ -75,37 +58,32 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
-      {displayableResult && (
+      {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {hiddenLines > 0 && (
-              <Box>
-                <Text color={Colors.Gray}>
-                  ... first {hiddenLines} line{hiddenLines === 1 ? '' : 's'}{' '}
-                  hidden ...
-                </Text>
+            {typeof resultDisplay === 'string' && renderOutputAsMarkdown && (
+              <Box flexDirection="column">
+                <MarkdownDisplay
+                  text={resultDisplay}
+                  isPending={false}
+                  availableTerminalHeight={availableHeight}
+                  terminalWidth={childWidth}
+                />
               </Box>
             )}
-            {typeof displayableResult === 'string' &&
-              renderOutputAsMarkdown && (
-                <Box flexDirection="column">
-                  <MarkdownDisplay
-                    text={displayableResult}
-                    isPending={false}
-                    availableTerminalHeight={availableTerminalHeight}
-                  />
+            {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
+              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+                <Box>
+                  <Text wrap="wrap">{resultDisplay}</Text>
                 </Box>
-              )}
-            {typeof displayableResult === 'string' &&
-              !renderOutputAsMarkdown && (
-                <Box flexDirection="column">
-                  <Text>{displayableResult}</Text>
-                </Box>
-              )}
-            {typeof displayableResult !== 'string' && (
+              </MaxSizedBox>
+            )}
+            {typeof resultDisplay !== 'string' && (
               <DiffRenderer
-                diffContent={displayableResult.fileDiff}
-                filename={displayableResult.fileName}
+                diffContent={resultDisplay.fileDiff}
+                filename={resultDisplay.fileName}
+                availableTerminalHeight={availableHeight}
+                terminalWidth={childWidth}
               />
             )}
           </Box>
@@ -193,5 +171,8 @@ const ToolInfo: React.FC<ToolInfo> = ({
 };
 
 const TrailingIndicator: React.FC = () => (
-  <Text color={Colors.Foreground}> ←</Text>
+  <Text color={Colors.Foreground} wrap="truncate">
+    {' '}
+    ←
+  </Text>
 );

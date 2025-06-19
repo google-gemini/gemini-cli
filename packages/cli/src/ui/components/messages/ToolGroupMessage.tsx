@@ -15,7 +15,8 @@ import { Config } from '@gemini-cli/core';
 interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
-  availableTerminalHeight: number;
+  availableTerminalHeight?: number;
+  terminalWidth: number;
   config?: Config;
   isFocused?: boolean;
 }
@@ -24,6 +25,7 @@ interface ToolGroupMessageProps {
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   availableTerminalHeight,
+  terminalWidth,
   config,
   isFocused = true,
 }) => {
@@ -33,6 +35,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const borderColor = hasPending ? Colors.AccentYellow : Colors.Gray;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+  // This is a bit of a magic number, but it accounts for the border and
+  // marginLeft.
+  const innerWidth = terminalWidth - 4;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -40,6 +45,23 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
     [toolCalls],
   );
+
+  let countToolCallsWithResults = 0;
+  for (const tool of toolCalls) {
+    if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
+      countToolCallsWithResults++;
+    }
+  }
+  const countOneLineToolCalls = toolCalls.length - countToolCallsWithResults;
+  const availableTerminalHeightPerToolMessage = availableTerminalHeight
+    ? Math.max(
+        Math.floor(
+          (availableTerminalHeight - staticHeight - countOneLineToolCalls) /
+            Math.max(1, countToolCallsWithResults),
+        ),
+        1,
+      )
+    : undefined;
 
   return (
     <Box
@@ -69,7 +91,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 resultDisplay={tool.resultDisplay}
                 status={tool.status}
                 confirmationDetails={tool.confirmationDetails}
-                availableTerminalHeight={availableTerminalHeight - staticHeight}
+                availableTerminalHeight={availableTerminalHeightPerToolMessage}
+                terminalWidth={innerWidth}
                 emphasis={
                   isConfirming
                     ? 'high'
@@ -87,6 +110,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   confirmationDetails={tool.confirmationDetails}
                   config={config}
                   isFocused={isFocused}
+                  availableTerminalHeight={
+                    availableTerminalHeightPerToolMessage
+                  }
+                  terminalWidth={innerWidth}
                 />
               )}
           </Box>

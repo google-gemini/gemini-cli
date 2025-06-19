@@ -20,7 +20,7 @@ describe('<HistoryItemDisplay />', () => {
     id: 1,
     timestamp: 12345,
     isPending: false,
-    availableTerminalHeight: 100,
+    terminalWidth: 80,
   };
 
   it('renders UserMessage for "user" type', () => {
