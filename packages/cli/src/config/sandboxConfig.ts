@@ -91,7 +91,7 @@ export async function loadSandboxConfig(
   const image =
     argv['sandbox-image'] ??
     process.env.GEMINI_SANDBOX_IMAGE ??
-    packageJson?.config?.sandboximageName;
+    packageJson?.config?.sandboxImageUri;
 
   return command && image ? { command, image } : undefined;
 }

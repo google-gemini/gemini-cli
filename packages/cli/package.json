@@ -26,8 +26,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "gemini-cli-sandbox",
-    "sandboximageName": "gemini-cli-sandbox"
+    "sandboxImageUri": "gemini-cli-sandbox"
   },
   "dependencies": {
     "@gemini-cli/core": "file:../core",
