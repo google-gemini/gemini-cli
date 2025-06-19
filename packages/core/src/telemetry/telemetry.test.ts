@@ -27,9 +27,7 @@ describe('telemetry', () => {
 
     mockConfig = new Config({
       sessionId: 'test-session-id',
-      contentGeneratorConfig: {
-        model: 'test-model',
-      },
+      model: 'test-model',
       targetDir: '/test/dir',
       debugMode: false,
       cwd: '/test/dir',

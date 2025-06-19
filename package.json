@@ -25,7 +25,7 @@
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
-    "preflight": "npm ci && npm run format && npm run lint:fix && npm run build && npm run typecheck && npm run test:ci",
+    "preflight": "npm run clean && npm ci && npm run format && npm run lint:fix && npm run build && npm run typecheck && npm run test:ci",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",

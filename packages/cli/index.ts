@@ -13,7 +13,7 @@ import { main } from './src/gemini.js';
 main().catch((error) => {
   console.error('An unexpected critical error occurred:');
   if (error instanceof Error) {
-    console.error(error.message);
+    console.error(error.stack);
   } else {
     console.error(String(error));
   }

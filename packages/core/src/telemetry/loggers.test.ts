@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolConfirmationOutcome } from '../index.js';
+import { AuthType, ToolConfirmationOutcome } from '../index.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { Config } from '../config/config.js';
@@ -57,8 +57,7 @@ describe('loggers', () => {
         getContentGeneratorConfig: () => ({
           model: 'test-model',
           apiKey: 'test-api-key',
-          vertexai: true,
-          codeAssist: false,
+          authType: AuthType.USE_VERTEX_AI,
         }),
         getTelemetryLogPromptsEnabled: () => true,
         getFileFilteringRespectGitIgnore: () => true,
@@ -86,7 +85,6 @@ describe('loggers', () => {
           approval_mode: 'default',
           api_key_enabled: true,
           vertex_ai_enabled: true,
-          code_assist_enabled: false,
           log_user_prompts_enabled: true,
           file_filtering_respect_git_ignore: true,
           debug_mode: true,

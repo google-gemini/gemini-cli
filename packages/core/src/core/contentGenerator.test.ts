@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { createContentGenerator } from './contentGenerator.js';
+import { createContentGenerator, AuthType } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 
@@ -20,7 +20,7 @@ describe('contentGenerator', () => {
     );
     const generator = await createContentGenerator({
       model: 'test-model',
-      codeAssist: true,
+      authType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
     });
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toBe(mockGenerator);
@@ -34,6 +34,7 @@ describe('contentGenerator', () => {
     const generator = await createContentGenerator({
       model: 'test-model',
       apiKey: 'test-api-key',
+      authType: AuthType.USE_GEMINI,
     });
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',

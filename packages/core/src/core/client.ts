@@ -33,6 +33,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   ContentGenerator,
+  ContentGeneratorConfig,
   createContentGenerator,
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
@@ -63,11 +64,17 @@ export class GeminiClient {
     this.embeddingModel = config.getEmbeddingModel();
   }
 
-  async initialize() {
+  async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
-      this.config.getContentGeneratorConfig(),
+      contentGeneratorConfig,
     );
     this.chat = await this.startChat();
+  }
+  private getContentGenerator(): ContentGenerator {
+    if (!this.contentGenerator) {
+      throw new Error('Content generator not initialized');
+    }
+    return this.contentGenerator;
   }
 
   async addHistory(content: Content) {
@@ -79,13 +86,6 @@ export class GeminiClient {
       throw new Error('Chat not initialized');
     }
     return this.chat;
-  }
-
-  private getContentGenerator(): ContentGenerator {
-    if (!this.contentGenerator) {
-      throw new Error('Content generator not initialized');
-    }
-    return this.contentGenerator;
   }
 
   async getHistory(): Promise<Content[]> {

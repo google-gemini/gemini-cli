@@ -20,6 +20,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
+import { useAuthCommand } from './hooks/useAuthCommand.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -31,6 +32,7 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
+import { AuthDialog } from './components/AuthDialog.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
@@ -51,6 +53,7 @@ import {
   isEditorAvailable,
   EditorType,
 } from '@gemini-cli/core';
+import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import {
@@ -101,6 +104,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
@@ -128,6 +132,23 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
+
+  const {
+    isAuthDialogOpen,
+    openAuthDialog,
+    handleAuthSelect,
+    handleAuthHighlight,
+  } = useAuthCommand(settings, setAuthError, config);
+
+  useEffect(() => {
+    if (settings.merged.selectedAuthType) {
+      const error = validateAuthMethod(settings.merged.selectedAuthType);
+      if (error) {
+        setAuthError(error);
+        openAuthDialog();
+      }
+    }
+  }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
 
   const {
     isEditorDialogOpen,
@@ -197,6 +218,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     setShowHelp,
     setDebugMessage,
     openThemeDialog,
+    openAuthDialog,
     openEditorDialog,
     performMemoryRefresh,
     toggleCorgiMode,
@@ -306,6 +328,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     return editorType as EditorType;
   }, [settings, openEditorDialog]);
 
+  const onAuthError = useCallback(() => {
+    setAuthError('reauth required');
+    openAuthDialog();
+  }, [openAuthDialog, setAuthError]);
+
   const {
     streamingState,
     submitQuery,
@@ -322,6 +349,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleSlashCommand,
     shellModeActive,
     getPreferredEditor,
+    onAuthError,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
@@ -555,6 +583,20 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     : undefined
                 }
                 terminalWidth={mainAreaWidth}
+              />
+            </Box>
+          ) : isAuthDialogOpen ? (
+            <Box flexDirection="column">
+              {authError && (
+                <Box marginBottom={1}>
+                  <Text color={Colors.AccentRed}>{authError}</Text>
+                </Box>
+              )}
+              <AuthDialog
+                onSelect={handleAuthSelect}
+                onHighlight={handleAuthHighlight}
+                settings={settings}
+                initialErrorMessage={authError}
               />
             </Box>
           ) : isEditorDialogOpen ? (

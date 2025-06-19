@@ -13,7 +13,6 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  ContentGeneratorConfig,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -21,7 +20,7 @@ import {
   TelemetryTarget,
 } from '@gemini-cli/core';
 import { Settings } from './settings.js';
-import { getEffectiveModel } from '../utils/modelCheck.js';
+
 import { Extension } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import * as dotenv from 'dotenv';
@@ -194,15 +193,12 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  const contentGeneratorConfig = await createContentGeneratorConfig(argv);
-
   const mcpServers = mergeMcpServers(settings, extensions);
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
   return new Config({
     sessionId,
-    contentGeneratorConfig,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
@@ -242,6 +238,7 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
+    model: argv.model!,
   });
 }
 
@@ -262,59 +259,6 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
   }
   return mcpServers;
 }
-
-async function createContentGeneratorConfig(
-  argv: CliArgs,
-): Promise<ContentGeneratorConfig> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
-
-  const hasCodeAssist = process.env.GEMINI_CODE_ASSIST === 'true';
-  const hasGeminiApiKey = !!geminiApiKey;
-  const hasGoogleApiKey = !!googleApiKey;
-  const hasVertexProjectLocationConfig =
-    !!googleCloudProject && !!googleCloudLocation;
-
-  if (hasGeminiApiKey && hasGoogleApiKey) {
-    logger.warn(
-      'Both GEMINI_API_KEY and GOOGLE_API_KEY are set. Using GOOGLE_API_KEY.',
-    );
-  }
-  if (
-    !hasCodeAssist &&
-    !hasGeminiApiKey &&
-    !hasGoogleApiKey &&
-    !hasVertexProjectLocationConfig
-  ) {
-    logger.error(
-      'No valid API authentication configuration found. Please set ONE of the following combinations in your environment variables or .env file:\n' +
-        '1. GEMINI_CODE_ASSIST=true (for Code Assist access).\n' +
-        '2. GEMINI_API_KEY (for Gemini API access).\n' +
-        '3. GOOGLE_API_KEY (for Gemini API or Vertex AI Express Mode access).\n' +
-        '4. GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (for Vertex AI access).\n\n' +
-        'For Gemini API keys, visit: https://ai.google.dev/gemini-api/docs/api-key\n' +
-        'For Vertex AI authentication, visit: https://cloud.google.com/vertex-ai/docs/authentication\n' +
-        'The GOOGLE_GENAI_USE_VERTEXAI environment variable can also be set to true/false to influence service selection when ambiguity exists.',
-    );
-    process.exit(1);
-  }
-
-  const config: ContentGeneratorConfig = {
-    model: argv.model || DEFAULT_GEMINI_MODEL,
-    apiKey: googleApiKey || geminiApiKey || '',
-    vertexai: hasGeminiApiKey ? false : undefined,
-    codeAssist: hasCodeAssist,
-  };
-
-  if (config.apiKey) {
-    config.model = await getEffectiveModel(config.apiKey, config.model);
-  }
-
-  return config;
-}
-
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
