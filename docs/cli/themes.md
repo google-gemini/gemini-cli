@@ -1,35 +1,36 @@
 # Themes
 
-Gemini CLI supports a variety of themes to customize its color scheme and appearance. You can change the theme to suit your preferences via the `/theme` command.
+Gemini CLI supports a variety of themes to customize its color scheme and appearance. You can change the theme to suit your preferences via the `/theme` command or `"theme":` configuration setting.
 
 ## Available Themes
 
-The CLI comes with a selection of pre-defined themes. As seen in `theme-manager.ts`, these typically include:
+Gemini CLI comes with a selection of pre-defined themes, which you can list using the `/theme` command within Gemini CLI:
 
 - **Dark Themes:**
-  - `AtomOneDark`
+  - `ANSI`
+  - `Atom One`
+  - `Ayu`
+  - `Default`
   - `Dracula`
-  - `VS2015` (Default)
-  - `GitHub` (Dark variant usually)
+  - `GitHub`
 - **Light Themes:**
-  - `VS` (Visual Studio Light)
-  - `GoogleCode`
-  - `XCode` (Light variant usually)
-- **ANSI:**
-  - `ANSI`: A theme that primarily uses the terminal's native ANSI color capabilities.
-
-_(The exact list and their appearance can be confirmed by running the `/theme` command within the CLI.)_
+  - `ANSI Light`
+  - `Ayu Light`
+  - `Default Light`
+  - `GitHub Light`
+  - `Google Code`
+  - `Xcode`
 
 ### Changing Themes
 
-1.  Type the `/theme` command in the CLI.
-2.  A dialog or selection prompt (`ThemeDialog.tsx`) will appear, listing the available themes.
-3.  You can typically navigate (e.g., with arrow keys) and select a theme. Some interfaces might offer a live preview or highlight as you select.
-4.  Confirm your selection (often with Enter) to apply the theme. You can usually cancel out of the selection (e.g., with Escape).
+1.  Enter `/theme` into Gemini CLI.
+2.  A dialog or selection prompt appears, listing the available themes.
+3.  Using the arrow keys, select a theme. Some interfaces might offer a live preview or highlight as you select.
+4.  Confirm your selection to apply the theme.
 
 ### Theme Persistence
 
-Selected themes are usually saved in the CLI's configuration (see [CLI Configuration](./docs/cli/configuration.md)) so your preference is remembered across sessions.
+Selected themes are saved in Gemini CLI's [configuration](./docs/cli/configuration.md) so your preference is remembered across sessions.
 
 ## Dark Themes
 
