@@ -30,6 +30,11 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 function getSandboxCommand(
   sandbox?: boolean | string,
 ): SandboxConfig['command'] | '' {
+  // If the SANDBOX env var is set, we're already inside the sandbox.
+  if (process.env.SANDBOX) {
+    return '';
+  }
+
   // note environment variable takes precedence over argument (from command line or settings)
   sandbox = process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? sandbox;
   if (sandbox === '1' || sandbox === 'true') sandbox = true;
