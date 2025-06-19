@@ -14,7 +14,6 @@ import path from 'path';
 export type PackageJson = BasePackageJson & {
   config?: {
     sandboxImageUri?: string;
-    sandboximageName?: string;
   };
 };
 
