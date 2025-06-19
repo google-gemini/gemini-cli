@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthClient } from 'google-auth-library';
+import { OAuth2Client } from 'google-auth-library';
 import {
   LoadCodeAssistResponse,
   LoadCodeAssistRequest,
@@ -45,7 +45,7 @@ export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
-    readonly auth: AuthClient,
+    readonly auth: OAuth2Client,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
   ) {}
