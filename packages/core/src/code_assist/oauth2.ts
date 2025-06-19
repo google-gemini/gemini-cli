@@ -160,10 +160,20 @@ export function getAvailablePort(): Promise<number> {
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   try {
-    const creds = await fs.readFile(getCachedCredentialPath(), 'utf-8');
+    const keyFile =
+      process.env.GOOGLE_APPLICATION_CREDENTIALS || getCachedCredentialPath();
+
+    const creds = await fs.readFile(keyFile, 'utf-8');
     client.setCredentials(JSON.parse(creds));
-    // This will either return the existing token or refresh it.
-    await client.getAccessToken();
+
+    // This will verify locally that the credentials look good.
+    const { token } = await client.getAccessToken();
+    if (!token) {
+      return false;
+    }
+
+    // This will check with the server to see if it hasn't been revoked.
+    await client.getTokenInfo(token);
 
     return true;
   } catch (_) {
