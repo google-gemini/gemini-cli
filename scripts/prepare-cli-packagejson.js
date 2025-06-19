@@ -45,6 +45,7 @@ if (!cliPackageJson.config) {
   cliPackageJson.config = {};
 }
 cliPackageJson.config.sandboxImageUri = containerImageUri;
+cliPackageJson.config.sandboximageName = containerImageName;
 
 // Remove 'prepublishOnly' from scripts if it exists
 if (cliPackageJson.scripts && cliPackageJson.scripts.prepublishOnly) {
