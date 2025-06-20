@@ -5,11 +5,17 @@
  */
 
 import { render } from 'ink-testing-library';
-import { MaxSizedBox } from './MaxSizedBox.js';
+import { MaxSizedBox, setMaxSizedBoxDebugging } from './MaxSizedBox.js';
 import { Box, Text } from 'ink';
 import { describe, it, expect } from 'vitest';
 
 describe('<MaxSizedBox />', () => {
+  // Make sure MaxSizedBox logs errors on invalid configurations.
+  // This is useful for debugging issues with the component.
+  // It should be set to false in production for perfornance and to avoid
+  // cluttering the console if there are ignoreable issues.
+  setMaxSizedBoxDebugging(true);
+
   it('renders children without truncation when they fit', () => {
     const { lastFrame } = render(
       <MaxSizedBox maxWidth={80} maxHeight={10}>
