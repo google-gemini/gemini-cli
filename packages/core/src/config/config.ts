@@ -113,7 +113,7 @@ export interface ConfigParameters {
 }
 
 export class Config {
-  private toolRegistry: Promise<ToolRegistry>;
+  private toolRegistry!: ToolRegistry;
   private readonly sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -184,8 +184,6 @@ export class Config {
       setGeminiMdFilename(params.contextFileName);
     }
 
-    this.toolRegistry = createToolRegistry(this);
-
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
     }
@@ -198,10 +196,10 @@ export class Config {
     );
 
     const gc = new GeminiClient(this);
-    await gc.initialize(contentConfig);
-
-    this.contentGeneratorConfig = contentConfig;
     this.geminiClient = gc;
+    this.toolRegistry = await createToolRegistry(this);
+    await gc.initialize(contentConfig);
+    this.contentGeneratorConfig = contentConfig;
   }
 
   getSessionId(): string {
@@ -232,8 +230,8 @@ export class Config {
     return this.targetDir;
   }
 
-  async getToolRegistry(): Promise<ToolRegistry> {
-    return this.toolRegistry;
+  getToolRegistry(): Promise<ToolRegistry> {
+    return Promise.resolve(this.toolRegistry);
   }
 
   getDebugMode(): boolean {
