@@ -18,7 +18,7 @@ import {
 import { Config, EditorType } from '@gemini-cli/core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { HistoryItem } from '../types.js';
+import { HistoryItem, StreamingState } from '../types.js';
 import { Dispatch, SetStateAction } from 'react';
 import { LoadedSettings } from '../../config/settings.js';
 
@@ -323,8 +323,13 @@ describe('useGeminiStream', () => {
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
   ) => {
-    mockUseReactToolScheduler.mockReturnValue([
-      initialToolCalls,
+    let currentToolCalls = initialToolCalls;
+    const setToolCalls = (newToolCalls: TrackedToolCall[]) => {
+      currentToolCalls = newToolCalls;
+    };
+
+    mockUseReactToolScheduler.mockImplementation(() => [
+      currentToolCalls,
       mockScheduleToolCalls,
       mockCancelAllToolCalls,
       mockMarkToolsAsSubmitted,
@@ -348,8 +353,13 @@ describe('useGeminiStream', () => {
         >;
         shellModeActive: boolean;
         loadedSettings: LoadedSettings;
-      }) =>
-        useGeminiStream(
+        toolCalls?: TrackedToolCall[]; // Allow passing updated toolCalls
+      }) => {
+        // Update the mock's return value if new toolCalls are passed in props
+        if (props.toolCalls) {
+          setToolCalls(props.toolCalls);
+        }
+        return useGeminiStream(
           props.client,
           props.history,
           props.addItem,
@@ -360,7 +370,8 @@ describe('useGeminiStream', () => {
           props.shellModeActive,
           () => 'vscode' as EditorType,
           () => {},
-        ),
+        );
+      },
       {
         initialProps: {
           client,
@@ -640,5 +651,80 @@ describe('useGeminiStream', () => {
       expect(mockStartNewTurn).not.toHaveBeenCalled();
       expect(mockSendMessageStream).not.toHaveBeenCalled();
     });
+  });
+
+  it('should not flicker streaming state to Idle between tool completion and submission', async () => {
+    const toolCallResponseParts: PartListUnion = [
+      { text: 'tool 1 final response' },
+    ];
+
+    const initialToolCalls: TrackedToolCall[] = [
+      {
+        request: { callId: 'call1', name: 'tool1', args: {} },
+        status: 'executing',
+        responseSubmittedToGemini: false,
+        tool: {
+          name: 'tool1',
+          description: 'desc',
+          getDescription: vi.fn(),
+        } as any,
+        startTime: Date.now(),
+      } as TrackedExecutingToolCall,
+    ];
+
+    const completedToolCalls: TrackedToolCall[] = [
+      {
+        ...(initialToolCalls[0] as TrackedExecutingToolCall),
+        status: 'success',
+        response: {
+          callId: 'call1',
+          responseParts: toolCallResponseParts,
+          error: undefined,
+          resultDisplay: 'Tool 1 success display',
+        },
+        endTime: Date.now(),
+      } as TrackedCompletedToolCall,
+    ];
+
+    const { result, rerender, client } = renderTestHook(initialToolCalls);
+
+    // 1. Initial state should be Responding because a tool is executing.
+    expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+    // 2. Rerender with the completed tool call.
+    // The useEffect should pick this up but hasn't called submitQuery yet.
+    act(() => {
+      rerender({
+        client,
+        history: [],
+        addItem: mockAddItem,
+        setShowHelp: mockSetShowHelp,
+        config: mockConfig,
+        onDebugMessage: mockOnDebugMessage,
+        handleSlashCommand:
+          mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
+        shellModeActive: false,
+        loadedSettings: mockLoadedSettings,
+        // This is the key part of the test: update the toolCalls array
+        // to simulate the tool finishing.
+        // @ts-expect-error - we are adding a property to the props object
+        toolCalls: completedToolCalls,
+      });
+    });
+
+    // 3. The state should *still* be Responding, not Idle.
+    // This is because the completed tool's response has not been submitted yet.
+    expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+    // 4. Wait for the useEffect to call submitQuery.
+    await waitFor(() => {
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        toolCallResponseParts,
+        expect.any(AbortSignal),
+      );
+    });
+
+    // 5. After submission, the state should remain Responding.
+    expect(result.current.streamingState).toBe(StreamingState.Responding);
   });
 });
