@@ -6,6 +6,19 @@ Gemini CLI supports several built-in commands to help you manage your session, c
 
 Slash commands provide meta-level control over the CLI itself.
 
+- **`/bug`**
+
+  - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `bugCommand` setting in your `.gemini/settings.json` files.
+
+- **`/clear`**
+
+  - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
+  - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
+
+- **`/compress`**
+
+  - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened.
+
 - **`/editor`**
 
   - **Description:** Open a dialog for selecting supported editors.
@@ -26,15 +39,6 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Show the full JSON schema for the tool's configured parameters.
   - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between showing and hiding tool descriptions.
 
-- **`/clear`**
-
-  - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
-  - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
-
-- [**`/theme`**](./themes.md)
-
-  - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
-
 - **`/memory`**
 
   - **Description:** Manage the AI's instructional context (hierarchical memory loaded from `GEMINI.md` files).
@@ -45,9 +49,13 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Reload the hierarchical instructional memory from all `GEMINI.md` files found in the configured locations (global, project/ancestors, and sub-directories). This command updates the model with the latest `GEMINI.md` content.
     - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](./configuration.md#4-geminimd-files-hierarchical-instructional-context).
 
-- **`/quit`** (or **`/exit`**)
+- **`/stats`**
 
-  - **Description:** Exit Gemini CLI.
+  - **Description:** Display detailed statistics for the current Gemini CLI session, such as the session duration.
+
+- [**`/theme`**](./themes.md)
+
+  - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 
 - [**`/tools`**](../tools/index.md)
 
@@ -58,13 +66,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
 
-- **`/compress`**
+- **`/quit`** (or **`/exit`**)
 
-  - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened.
-
-- **`/bug`**
-
-  - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `bugCommand` setting in your `.gemini/settings.json` files.
+  - **Description:** Exit Gemini CLI.
 
 ## At commands (`@`)
 
