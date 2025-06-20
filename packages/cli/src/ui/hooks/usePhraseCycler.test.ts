@@ -63,6 +63,20 @@ describe('usePhraseCycler', () => {
   });
 
   it('should reset to a witty phrase when isActive becomes true after being false (and not waiting)', () => {
+    // Ensure there are at least two phrases for this test to be meaningful.
+    if (WITTY_LOADING_PHRASES.length < 2) {
+      return;
+    }
+
+    // Mock Math.random to make the test deterministic.
+    let callCount = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      // Cycle through 0, 1, 0, 1, ...
+      const val = callCount % 2;
+      callCount++;
+      return val / WITTY_LOADING_PHRASES.length;
+    });
+
     const { result, rerender } = renderHook(
       ({ isActive, isWaiting }) => usePhraseCycler(isActive, isWaiting),
       { initialProps: { isActive: false, isWaiting: false } },
@@ -72,25 +86,27 @@ describe('usePhraseCycler', () => {
     rerender({ isActive: true, isWaiting: false });
     const firstActivePhrase = result.current;
     expect(WITTY_LOADING_PHRASES).toContain(firstActivePhrase);
+    // With our mock, this should be the first phrase.
+    expect(firstActivePhrase).toBe(WITTY_LOADING_PHRASES[0]);
 
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
-    // Phrase should change if enough phrases and interval passed
-    if (WITTY_LOADING_PHRASES.length > 1) {
-      expect(result.current).not.toBe(firstActivePhrase);
-    }
-    expect(WITTY_LOADING_PHRASES).toContain(result.current);
+
+    // Phrase should change to the second phrase.
+    expect(result.current).not.toBe(firstActivePhrase);
+    expect(result.current).toBe(WITTY_LOADING_PHRASES[1]);
 
     // Set to inactive - should reset to the default initial phrase
     rerender({ isActive: false, isWaiting: false });
     expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
 
-    // Set back to active - should pick a random witty phrase
+    // Set back to active - should pick a random witty phrase (which our mock controls)
     act(() => {
       rerender({ isActive: true, isWaiting: false });
     });
-    expect(WITTY_LOADING_PHRASES).toContain(result.current);
+    // The random mock will now return 0, so it should be the first phrase again.
+    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
   });
 
   it('should clear phrase interval on unmount when active', () => {

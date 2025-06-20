@@ -6,7 +6,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { AuthType, Config, clearCachedCredentialFile } from '@gemini-cli/core';
+import {
+  AuthType,
+  Config,
+  clearCachedCredentialFile,
+  getErrorMessage,
+} from '@gemini-cli/core';
 
 async function performAuthFlow(authMethod: AuthType, config: Config) {
   await config.refreshAuth(authMethod);
@@ -22,15 +27,35 @@ export const useAuthCommand = (
     settings.merged.selectedAuthType === undefined,
   );
 
-  useEffect(() => {
-    if (!isAuthDialogOpen) {
-      performAuthFlow(settings.merged.selectedAuthType as AuthType, config);
-    }
-  }, [isAuthDialogOpen, settings, config]);
-
   const openAuthDialog = useCallback(() => {
     setIsAuthDialogOpen(true);
   }, []);
+
+  useEffect(() => {
+    const authFlow = async () => {
+      if (isAuthDialogOpen || !settings.merged.selectedAuthType) {
+        return;
+      }
+
+      try {
+        await performAuthFlow(
+          settings.merged.selectedAuthType as AuthType,
+          config,
+        );
+      } catch (e) {
+        const errorMessage =
+          settings.merged.selectedAuthType ===
+          AuthType.LOGIN_WITH_GOOGLE_PERSONAL
+            ? `Failed to login. Ensure your Google account is not an enterprise account.
+Message: ${getErrorMessage(e)}`
+            : `Failed to login. Message: ${getErrorMessage(e)}`;
+        setAuthError(errorMessage);
+        openAuthDialog();
+      }
+    };
+
+    void authFlow();
+  }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
 
   const handleAuthSelect = useCallback(
     async (authMethod: string | undefined, scope: SettingScope) => {
