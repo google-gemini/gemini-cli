@@ -647,7 +647,7 @@ Add any other context about the problem here.
         description:
           'resume from conversation checkpoint. Usage: /resume [tag]',
         completion: async () => {
-          const geminiDir = config?.getGeminiDir();
+          const geminiDir = config?.getProjectTempDir();
           if (!geminiDir) {
             return [];
           }
@@ -805,14 +805,14 @@ Add any other context about the problem here.
       },
     ];
 
-    if (config?.getCheckpointEnabled()) {
+    if (config?.getCheckpointingEnabled()) {
       commands.push({
         name: 'restore',
         description:
           'restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
         action: async (_mainCommand, subCommand, _args) => {
-          const checkpointDir = config?.getGeminiDir()
-            ? path.join(config.getGeminiDir(), 'checkpoints')
+          const checkpointDir = config?.getProjectTempDir()
+            ? path.join(config.getProjectTempDir(), 'checkpoints')
             : undefined;
 
           if (!checkpointDir) {

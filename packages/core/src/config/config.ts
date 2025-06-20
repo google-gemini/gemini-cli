@@ -27,6 +27,7 @@ import { GeminiClient } from '../core/client.js';
 import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -104,7 +105,7 @@ export interface ConfigParameters {
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;
   fileFilteringRespectGitIgnore?: boolean;
-  checkpoint?: boolean;
+  checkpointing?: boolean;
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
@@ -138,7 +139,7 @@ export class Config {
   private readonly fileFilteringRespectGitIgnore: boolean;
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
-  private readonly checkpoint: boolean;
+  private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
@@ -173,7 +174,7 @@ export class Config {
 
     this.fileFilteringRespectGitIgnore =
       params.fileFilteringRespectGitIgnore ?? true;
-    this.checkpoint = params.checkpoint ?? false;
+    this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
@@ -325,12 +326,16 @@ export class Config {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
+  getProjectTempDir(): string {
+    return getProjectTempDir(this.getProjectRoot());
+  }
+
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFilteringRespectGitIgnore;
   }
 
-  getCheckpointEnabled(): boolean {
-    return this.checkpoint;
+  getCheckpointingEnabled(): boolean {
+    return this.checkpointing;
   }
 
   getProxy(): string | undefined {
