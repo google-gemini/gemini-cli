@@ -51,7 +51,7 @@ export async function main() {
 
   // Initialize centralized FileDiscoveryService
   config.getFileService();
-  if (config.getCheckpointEnabled()) {
+  if (config.getCheckpointingEnabled()) {
     try {
       await config.getGitService();
     } catch {

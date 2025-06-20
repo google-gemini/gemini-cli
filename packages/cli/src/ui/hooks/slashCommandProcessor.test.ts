@@ -135,7 +135,7 @@ describe('useSlashCommandProcessor', () => {
       getSandbox: vi.fn(() => 'test-sandbox'),
       getModel: vi.fn(() => 'test-model'),
       getProjectRoot: vi.fn(() => '/test/dir'),
-      getCheckpointEnabled: vi.fn(() => true),
+      getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
     } as unknown as Config;
     mockCorgiMode = vi.fn();

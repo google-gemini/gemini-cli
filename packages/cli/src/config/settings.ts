@@ -27,6 +27,10 @@ export enum SettingScope {
   Workspace = 'Workspace',
 }
 
+export interface CheckpointingSettings {
+  enabled?: boolean;
+}
+
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
@@ -47,6 +51,7 @@ export interface Settings {
   telemetry?: TelemetrySettings;
   preferredEditor?: string;
   bugCommand?: BugCommandSettings;
+  checkpointing?: CheckpointingSettings;
 
   // Git-aware file filtering settings
   fileFiltering?: {

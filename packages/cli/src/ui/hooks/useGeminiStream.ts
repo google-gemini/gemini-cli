@@ -638,7 +638,7 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const saveRestorableToolCalls = async () => {
-      if (!config.getCheckpointEnabled()) {
+      if (!config.getCheckpointingEnabled()) {
         return;
       }
       const restorableToolCalls = toolCalls.filter(
@@ -649,8 +649,8 @@ export const useGeminiStream = (
       );
 
       if (restorableToolCalls.length > 0) {
-        const checkpointDir = config.getGeminiDir()
-          ? path.join(config.getGeminiDir(), 'checkpoints')
+        const checkpointDir = config.getProjectTempDir()
+          ? path.join(config.getProjectTempDir(), 'checkpoints')
           : undefined;
 
         if (!checkpointDir) {

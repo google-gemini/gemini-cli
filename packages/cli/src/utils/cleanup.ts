@@ -6,10 +6,11 @@
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { getProjectTempDir } from '@gemini-cli/core';
 
 export async function cleanupCheckpoints() {
-  const geminiDir = join(process.cwd(), '.gemini');
-  const checkpointsDir = join(geminiDir, 'checkpoints');
+  const tempDir = getProjectTempDir(process.cwd());
+  const checkpointsDir = join(tempDir, 'checkpoints');
   try {
     await fs.rm(checkpointsDir, { recursive: true, force: true });
   } catch {

@@ -49,7 +49,7 @@ interface CliArgs {
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
-  checkpoint: boolean | undefined;
+  checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
@@ -122,7 +122,7 @@ async function parseArguments(): Promise<CliArgs> {
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
-    .option('checkpoint', {
+    .option('checkpointing', {
       alias: 'c',
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
@@ -229,7 +229,7 @@ export async function loadCliConfig(
     },
     // Git-aware file filtering settings
     fileFilteringRespectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-    checkpoint: argv.checkpoint,
+    checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||
