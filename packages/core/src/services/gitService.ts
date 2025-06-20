@@ -7,11 +7,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import * as crypto from 'crypto';
 import { isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
+import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
 
 export class GitService {
   private projectRoot: string;
@@ -21,11 +21,8 @@ export class GitService {
   }
 
   private getHistoryDir(): string {
-    const hash = crypto
-      .createHash('sha256')
-      .update(this.projectRoot)
-      .digest('hex');
-    return path.join(os.homedir(), '.gemini', 'history', hash);
+    const hash = getProjectHash(this.projectRoot);
+    return path.join(os.homedir(), GEMINI_DIR, 'history', hash);
   }
 
   async initialize(): Promise<void> {

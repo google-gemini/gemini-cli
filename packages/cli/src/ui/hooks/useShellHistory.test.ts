@@ -7,16 +7,30 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useShellHistory } from './useShellHistory.js';
 import * as fs from 'fs/promises';
-import path from 'path';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 
 vi.mock('fs/promises');
+vi.mock('os');
+vi.mock('crypto');
 
 const MOCKED_PROJECT_ROOT = '/test/project';
-const MOCKED_HISTORY_DIR = path.join(MOCKED_PROJECT_ROOT, '.gemini');
+const MOCKED_HOME_DIR = '/test/home';
+const MOCKED_PROJECT_HASH = 'mocked_hash';
+
+const MOCKED_HISTORY_DIR = path.join(
+  MOCKED_HOME_DIR,
+  '.gemini',
+  'tmp',
+  MOCKED_PROJECT_HASH,
+);
 const MOCKED_HISTORY_FILE = path.join(MOCKED_HISTORY_DIR, 'shell_history');
 
 describe('useShellHistory', () => {
   const mockedFs = vi.mocked(fs);
+  const mockedOs = vi.mocked(os);
+  const mockedCrypto = vi.mocked(crypto);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -24,6 +38,13 @@ describe('useShellHistory', () => {
     mockedFs.readFile.mockResolvedValue('');
     mockedFs.writeFile.mockResolvedValue(undefined);
     mockedFs.mkdir.mockResolvedValue(undefined);
+    mockedOs.homedir.mockReturnValue(MOCKED_HOME_DIR);
+
+    const hashMock = {
+      update: vi.fn().mockReturnThis(),
+      digest: vi.fn().mockReturnValue(MOCKED_PROJECT_HASH),
+    };
+    mockedCrypto.createHash.mockReturnValue(hashMock as never);
   });
 
   it('should initialize and read the history file from the correct path', async () => {

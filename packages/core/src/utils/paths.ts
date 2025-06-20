@@ -6,6 +6,10 @@
 
 import path from 'node:path';
 import os from 'os';
+import * as crypto from 'crypto';
+
+export const GEMINI_DIR = '.gemini';
+const TMP_DIR_NAME = 'tmp';
 
 /**
  * Replaces the home directory with a tilde.
@@ -133,4 +137,23 @@ export function escapePath(filePath: string): string {
  */
 export function unescapePath(filePath: string): string {
   return filePath.replace(/\\ /g, ' ');
+}
+
+/**
+ * Generates a unique hash for a project based on its root path.
+ * @param projectRoot The absolute path to the project's root directory.
+ * @returns A SHA256 hash of the project root path.
+ */
+export function getProjectHash(projectRoot: string): string {
+  return crypto.createHash('sha256').update(projectRoot).digest('hex');
+}
+
+/**
+ * Generates a unique temporary directory path for a project.
+ * @param projectRoot The absolute path to the project's root directory.
+ * @returns The path to the project's temporary directory.
+ */
+export function getProjectTempDir(projectRoot: string): string {
+  const hash = getProjectHash(projectRoot);
+  return path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
 }
