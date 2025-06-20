@@ -28,6 +28,7 @@ import {
   AuthType,
 } from '@gemini-cli/core';
 import { validateAuthMethod } from './config/auth.js';
+import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -48,6 +49,8 @@ export async function main() {
 
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
+
+  setMaxSizedBoxDebugging(config.getDebugMode());
 
   // Initialize centralized FileDiscoveryService
   config.getFileService();

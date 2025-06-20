@@ -10,7 +10,11 @@ import stringWidth from 'string-width';
 import { Colors } from '../../colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 
-const enableDebugLog = true;
+let enableDebugLog = false;
+
+export function setMaxSizedBoxDebugging(value: boolean) {
+  enableDebugLog = value;
+}
 
 function debugReportError(message: string, element: React.ReactNode) {
   if (!enableDebugLog) return;
