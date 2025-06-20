@@ -12,15 +12,31 @@ import net from 'net';
 import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import crypto from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const ROOT_DIR = path.resolve(__dirname, '..');
-export const GEMINI_DIR = path.join(ROOT_DIR, '.gemini');
-export const OTEL_DIR = path.join(GEMINI_DIR, 'otel');
+const projectRoot = path.resolve(__dirname, '..');
+const projectHash = crypto
+  .createHash('sha256')
+  .update(projectRoot)
+  .digest('hex');
+
+// User-level .gemini directory in home
+const USER_GEMINI_DIR = path.join(os.homedir(), '.gemini');
+// Project-level .gemini directory in the workspace
+const WORKSPACE_GEMINI_DIR = path.join(projectRoot, '.gemini');
+
+// Telemetry artifacts are stored in a hashed directory under the user's ~/.gemini/tmp
+export const OTEL_DIR = path.join(USER_GEMINI_DIR, 'tmp', projectHash, 'otel');
 export const BIN_DIR = path.join(OTEL_DIR, 'bin');
-export const WORKSPACE_SETTINGS_FILE = path.join(GEMINI_DIR, 'settings.json');
+
+// Workspace settings remain in the project's .gemini directory
+export const WORKSPACE_SETTINGS_FILE = path.join(
+  WORKSPACE_GEMINI_DIR,
+  'settings.json',
+);
 
 export function getJson(url) {
   const tmpFile = path.join(
