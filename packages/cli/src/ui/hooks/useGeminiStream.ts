@@ -155,7 +155,12 @@ export const useGeminiStream = (
         (tc) =>
           tc.status === 'executing' ||
           tc.status === 'scheduled' ||
-          tc.status === 'validating',
+          tc.status === 'validating' ||
+          ((tc.status === 'success' ||
+            tc.status === 'error' ||
+            tc.status === 'cancelled') &&
+            !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
+              .responseSubmittedToGemini),
       )
     ) {
       return StreamingState.Responding;
@@ -453,8 +458,9 @@ export const useGeminiStream = (
   const submitQuery = useCallback(
     async (query: PartListUnion, options?: { isContinuation: boolean }) => {
       if (
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation) &&
+        !options?.isContinuation
       )
         return;
 
