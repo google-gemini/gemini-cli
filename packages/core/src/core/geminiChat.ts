@@ -24,7 +24,7 @@ import {
   logApiRequest,
   logApiResponse,
   logApiError,
-  combinedUsageMetadata,
+  getFinalUsageMetadata,
 } from '../telemetry/loggers.js';
 import {
   getStructuredResponse,
@@ -444,7 +444,7 @@ export class GeminiChat {
       const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
-        combinedUsageMetadata(chunks),
+        getFinalUsageMetadata(chunks),
         fullText,
       );
     }

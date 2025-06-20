@@ -288,42 +288,14 @@ export function logApiResponse(
   recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
 }
 
-export function combinedUsageMetadata(
+export function getFinalUsageMetadata(
   chunks: GenerateContentResponse[],
-): GenerateContentResponseUsageMetadata {
-  const metadataKeys: Array<keyof GenerateContentResponseUsageMetadata> = [
-    'promptTokenCount',
-    'candidatesTokenCount',
-    'cachedContentTokenCount',
-    'thoughtsTokenCount',
-    'toolUsePromptTokenCount',
-    'totalTokenCount',
-  ];
+): GenerateContentResponseUsageMetadata | undefined {
+  // Only the last streamed item has the final token count.
+  const lastChunkWithMetadata = chunks
+    .slice()
+    .reverse()
+    .find((chunk) => chunk.usageMetadata);
 
-  const totals: Record<keyof GenerateContentResponseUsageMetadata, number> = {
-    promptTokenCount: 0,
-    candidatesTokenCount: 0,
-    cachedContentTokenCount: 0,
-    thoughtsTokenCount: 0,
-    toolUsePromptTokenCount: 0,
-    totalTokenCount: 0,
-    cacheTokensDetails: 0,
-    candidatesTokensDetails: 0,
-    promptTokensDetails: 0,
-    toolUsePromptTokensDetails: 0,
-    trafficType: 0,
-  };
-
-  for (const chunk of chunks) {
-    if (chunk.usageMetadata) {
-      for (const key of metadataKeys) {
-        const chunkValue = chunk.usageMetadata[key];
-        if (typeof chunkValue === 'number') {
-          totals[key] += chunkValue;
-        }
-      }
-    }
-  }
-
-  return totals as unknown as GenerateContentResponseUsageMetadata;
+  return lastChunkWithMetadata?.usageMetadata;
 }

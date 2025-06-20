@@ -25,7 +25,7 @@ export {
   logApiRequest,
   logApiError,
   logApiResponse,
-  combinedUsageMetadata,
+  getFinalUsageMetadata,
 } from './loggers.js';
 export {
   UserPromptEvent,
