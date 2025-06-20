@@ -587,11 +587,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             </Box>
           ) : isAuthDialogOpen ? (
             <Box flexDirection="column">
-              {authError && (
-                <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{authError}</Text>
-                </Box>
-              )}
               <AuthDialog
                 onSelect={handleAuthSelect}
                 onHighlight={handleAuthHighlight}
