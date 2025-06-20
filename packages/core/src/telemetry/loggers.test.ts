@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType, ToolConfirmationOutcome } from '../index.js';
+import { ToolConfirmationOutcome } from '../tools/tools.js';
+import { AuthType } from '../core/contentGenerator.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { Config } from '../config/config.js';
@@ -26,14 +27,6 @@ import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { GenerateContentResponse } from '@google/genai';
-
-vi.mock('@gemini-cli/cli/dist/src/utils/version', () => ({
-  getCliVersion: () => 'test-version',
-}));
-
-vi.mock('@gemini-cli/cli/dist/src/config/settings', () => ({
-  getTheme: () => 'test-theme',
-}));
 
 describe('loggers', () => {
   const mockLogger = {

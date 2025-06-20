@@ -30,7 +30,7 @@ import {
   recordToolCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { ToolConfirmationOutcome } from '../index.js';
+import { ToolConfirmationOutcome } from '../tools/tools.js';
 import {
   GenerateContentResponse,
   GenerateContentResponseUsageMetadata,
