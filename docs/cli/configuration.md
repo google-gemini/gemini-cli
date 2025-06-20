@@ -1,54 +1,51 @@
 # Gemini CLI Configuration
 
-The Gemini CLI offers several ways to configure its behavior, from environment variables and command-line arguments to dedicated settings files. This document outlines the different configuration methods and available settings.
+Gemini CLI offers several ways to configure its behavior, including environment variables, command-line arguments, and settings files. This document outlines the different configuration methods and available settings.
 
-## Configuration Layers
+## Configuration layers
 
-Configuration is typically applied in the following order of precedence (lower numbers are overridden by higher numbers):
+Configuration is applied in the following order of precedence (lower numbers are overridden by higher numbers):
 
-1.  **Default Values:** Hardcoded defaults within the application.
-2.  **User Settings File:** Global settings for the current user.
-3.  **Project Settings File:** Project-specific settings.
-4.  **Environment Variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
-5.  **Command-line Arguments:** Values passed when launching the CLI.
+1.  **Default values:** Hardcoded defaults within the application.
+2.  **User settings file:** Global settings for the current user.
+3.  **Project settings file:** Project-specific settings.
+4.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
+5.  **Command-line arguments:** Values passed when launching the CLI.
 
-## 1. Settings Files (`settings.json`)
+## The user settings file and project settings file
 
-The Gemini CLI uses `settings.json` files for persistent configuration. There are two main locations for these files:
+Gemini CLI uses `settings.json` files for persistent configuration. There are two locations for these files:
 
-- **User Settings:**
+- **User settings file:**
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
-  - **Scope:** Applies globally to all Gemini CLI sessions for the current user.
-- **Project Settings:**
+  - **Scope:** Applies to all Gemini CLI sessions for the current user.
+- **Project settings file:**
   - **Location:** `.gemini/settings.json` within your project's root directory.
-  - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override User settings.
+  - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user settings.
 
-**Note on Environment Variables in Settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
+**Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
-### The `.gemini` Directory in Your Project
+### The `.gemini` directory in your project
 
-When you create a `.gemini/settings.json` file for project-specific settings, or when the system needs to store project-specific information, this `.gemini` directory is used.
+In addition to a project settings file, a project's `.gemini` directory can contain other project-specific files related to Gemini CLI's operation, such as:
 
-**Purpose:**
+- [Custom sandbox profiles](#sandboxing) (e.g., `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
+- [Telemtry configurations](../core/telemetry.md#running-an-otel-collector) (e.g., `.gemini/otel/`).
 
-- Stores project-specific configuration for the Gemini CLI (in `settings.json`).
-- Can hold other project-specific files related to Gemini CLI's operation, such as:
-  - Custom sandbox profiles (e.g., `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
-  - A project-specific core system prompt override file (e.g., `.gemini/system.md`). If present, this file can be used to override the default system prompt for the project.
+### Available settings in `settings.json`:
 
-### Available Settings in `settings.json`:
+- **`contextFileName`** (string or array of strings):
 
-- **`contextFileName`** (string or array of strings, optional):
-
-  - **Description:** Specifies the filename for context files (e.g., `GEMINI.md`, `AGENTS.md`). May be a single filename or a list of accepted filenames.
+  - **Description:** Specifies the filename for context files (e.g., `GEMINI.md`, `AGENTS.md`). Can be a single filename or a list of accepted filenames.
   - **Default:** `GEMINI.md`
   - **Example:** `"contextFileName": "AGENTS.md"`
 
-- **`bugCommand`** (object, optional):
+- **`bugCommand`** (object):
 
   - **Description:** Overrides the default URL for the `/bug` command.
+  - **Default:** `"urlTemplate": "https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.md&title={title}&body={body}"`
   - **Properties:**
-    - **`urlTemplate`** (string, required): A URL that can contain `{title}` and `{body}` placeholders.
+    - **`urlTemplate`** (string): A URL that can contain `{title}` and `{body}` placeholders.
   - **Example:**
     ```json
     "bugCommand": {
@@ -56,96 +53,77 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
     }
     ```
 
-- **`fileFiltering`** (object, optional):
+- **`fileFiltering`** (object):
 
   - **Description:** Controls git-aware file filtering behavior for @ commands and file discovery tools.
+  - **Default:** `"respectGitIgnore": true`
   - **Properties:**
-    - **`respectGitIgnore`** (boolean, default: `true`): Whether to respect .gitignore patterns when discovering files. When enabled, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
+    - **`respectGitIgnore`** (boolean): Whether to respect .gitignore patterns when discovering files. When set to `true`, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
   - **Example:**
     ```json
     "fileFiltering": {
-      "respectGitIgnore": true,
+      "respectGitIgnore": true
     }
     ```
 
-- **`coreTools`** (array of strings, optional):
-  - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict or customize the set of built-in tools.
-  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]`.
-  - **Behavior:** If this setting is provided, only the listed tools will be available for the model to use. If omitted, all default core tools are available. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. You can also specify the alternative internal tool names used by the model, e.g. `read_file`, and you can get a full listing for that by simply asking the model "what tools do you have?".
-- **`excludeTools`** (array of strings, optional):
-  - **Description:** Allows you to specify a list of core tool names that should be excluded from the model.
-  - **Example:** `"excludeTools": ["run_shell_command", "glob"]`.
-- **`autoAccept`** (boolean, optional):
+- **`coreTools`** (array of strings):
 
-  - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation.
-  - **Default:** `false` (users will be prompted for most tool calls).
-  - **Behavior:**
-    - If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe. An indicator may be shown in the UI when auto-accept is active.
-    - Potentially destructive or system-modifying tools (like `run_shell_command` or `write_file`) will likely still require confirmation regardless of this setting.
+  - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools.
+  - **Default:** All tools available for use by the Gemini model.
+  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]`.
+
+- **`excludeTools`** (array of strings):
+
+  - **Description:** Allows you to specify a list of core tool names that should be excluded from the model. A tool listed in both `excludeTools` and `coreTools` is excluded.
+  - **Default**: No tools excluded.
+  - **Example:** `"excludeTools": ["run_shell_command", "findFiles"]`.
+
+- **`autoAccept`** (boolean):
+
+  - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
+  - **Default:** `false`
   - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):
-  - Specifies the visual theme for the CLI.
-  - Example: `"theme": "VS2015"`
-  - See the [Theming section in README.md](../../README.md#theming) for available theme names.
+
+  - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
+  - **Default:** `"Default"`
+  - **Example:** `"theme": "GitHub"`
+
 - **`sandbox`** (boolean or string):
-  - Controls whether and how to use sandboxing for tool execution.
-  - If a `.gemini/sandbox.Dockerfile` exists in your project, it will be used to build a custom sandbox image.
-  - `true`: Enable default sandbox (see [README](../../README.md) for behavior).
-  - `false`: Disable sandboxing (WARNING: this is inherently unsafe).
-  - `"docker"` or `"podman"`: Explicitly choose container-based sandboxing command.
-  - `<command>`: Specify custom command for container-based sandboxing.
-- **`toolDiscoveryCommand`** (string, advanced):
-  - Custom shell command for discovering tools from your project, if available.
-  - Must return on `stdout` a JSON array of [function declarations](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations).
-    - Tool wrappers, i.e. `[{ "function_declarations": [...] }, ...]`, are optional.
-    - Example for a single function `add_two_numbers(a, b)`:
-      ```
-      [
-        {
-          "name": "add_two_numbers",
-          "description": "Add two numbers.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "a": {
-                "type": "integer",
-                "description": "first number"
-              },
-              "b": {
-                "type": "integer",
-                "description": "second number"
-              }
-            },
-            "required": [
-              "a",
-              "b"
-            ]
-          }
-        }
-      ]
-      ```
-- **`toolCallCommand`** (string, advanced):
-  - Custom shell command for calling a specific tool discovered via `toolDiscoveryCommand`.
-  - Must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
-  - Must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
-    - Example for `add_two_numbers` (see above): `{"a":1, "b":2}`
-  - Must return function output as JSON on `stdout`, analogous to [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
-    - Example for `add_two_numbers` (see above): `3` (for input `{"a":1, "b":2}` on `stdin`)
-- **`mcpServers`** (object, advanced):
-  - Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools.
-  - This is an object where each key is a unique server name (alias) and the value is an object defining that server's parameters:
-    - `command` (string, required): The command to execute to start the MCP server.
-    - `args` (array of strings, optional): Arguments to pass to the command.
-    - `env` (object, optional): Environment variables to set for the server process.
-    - `cwd` (string, optional): The working directory in which to start the server.
-    - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
-    - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
-  - **Behavior:**
-    - The CLI will attempt to connect to each configured MCP server to discover available tools.
-    - If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts.
-    - The system may strip certain schema properties from MCP tool definitions for compatibility.
-  - Example:
+
+  - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
+  - **Default:** `false`
+  - **Example:** `"sandbox": "docker"`
+
+- **`toolDiscoveryCommand`** (string):
+
+  - **Description:** Defines a custom shell command for discovering tools from your project. The shell command must return on `stdout` a JSON array of [function declarations](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations). Tool wrappers are optional.
+  - **Default:** Empty
+  - **Example:** `"toolDiscoveryCommand": "bin/get_tools"`
+
+- **`toolCallCommand`** (string):
+
+  - **Description:** Defines a custom shell command for calling a specific tool that was discovered using `toolDiscoveryCommand`. The shell command must meet the following criteria:
+    - It must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
+    - It must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
+    - It must return function output as JSON on `stdout`, analogous to [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
+  - **Default:** Empty
+  - **Example:** `"toolCallCommand": "bin/call_tool"`
+
+- **`mcpServers`** (object):
+
+  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility.
+  - **Default:** Empty
+  - **Properties:**
+    - **`<SERVER_NAME>`** (object): The server parameters for the named server.
+      - `command` (string, required): The command to execute to start the MCP server.
+      - `args` (array of strings, optional): Arguments to pass to the command.
+      - `env` (object, optional): Environment variables to set for the server process.
+      - `cwd` (string, optional): The working directory in which to start the server.
+      - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
+      - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+  - **Example:**
     ```json
     "mcpServers": {
       "myPythonServer": {
@@ -168,14 +146,16 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
       },
     }
     ```
-  - **`mcpServerCommand`** (string, advanced, **deprecated**):
-    - Legacy setting for configuring a single MCP server. Please use `mcpServers` instead for better flexibility and support for multiple servers.
+
+- **`mcpServerCommand`** (string, **deprecated**):
+
+  - This is a legacy setting for configuring a single MCP server. Use `mcpServers` instead.
 
 ### Example `settings.json`:
 
 ```json
 {
-  "theme": "VS2015",
+  "theme": "GitHub",
   "sandbox": "docker",
   "toolDiscoveryCommand": "bin/get_tools",
   "toolCallCommand": "bin/call_tool",
@@ -191,7 +171,7 @@ When you create a `.gemini/settings.json` file for project-specific settings, or
 }
 ```
 
-## 2. Environment Variables & `.env` Files
+## Environment Variables & `.env` Files
 
 Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments.
 
@@ -250,7 +230,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
 
-## 3. Command-Line Arguments
+## Command-Line Arguments
 
 Arguments passed directly when running the CLI can override other configurations for that specific session.
 
@@ -268,7 +248,7 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
 
-## 4. Context Files (Hierarchical Instructional Context)
+## Context Files (Hierarchical Instructional Context)
 
 While not strictly configuration for the CLI's _behavior_, context files (defaulting to `GEMINI.md` but configurable via the `contextFileName` setting) are crucial for configuring the _instructional context_ (also referred to as "memory") provided to the Gemini model. This powerful feature allows you to give project-specific instructions, coding style guides, or any relevant background information to the AI, making its responses more tailored and accurate to your needs. The CLI includes UI elements, such as an indicator in the footer showing the number of loaded context files, to keep you informed about the active context.
 
