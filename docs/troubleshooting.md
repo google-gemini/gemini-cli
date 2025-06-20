@@ -2,33 +2,29 @@
 
 This guide provides solutions to common issues and debugging tips.
 
-## Frequently Asked Questions (FAQs)
+## Frequently asked questions (FAQs)
 
-- **Q: How do I update the CLI to the latest version?**
+- **Q: How do I update Gemini CLI to the latest version?**
 
-  - A: If installed globally via npm, you can usually update with `npm install -g <package-name>@latest`. If run from source, pull the latest changes from the repository and rebuild using `npm run build`.
+  - A: If installed globally via npm, update Gemini CLI using the command `npm install -g @gemini-cli/cli@latest`. If run from source, pull the latest changes from the repository and rebuild using `npm run build`.
 
-- **Q: Where are the CLI configuration files stored?**
+- **Q: Where are Gemini CLI configuration files stored?**
 
-  - A: The CLI configuration is typically managed within `packages/cli/src/config/`. Refer to [CLI Configuration](./cli/configuration.md) for more details.
+  - A: The CLI configuration is stored within two `settings.json` files: one in your home directory and one in your project's root directory. In both locations, `settings.json` is found in the `.gemini/` folder. Refer to [CLI Configuration](./cli/configuration.md) for more details.
 
-- **Q: Where are the core configuration files stored?**
-  - A: The core configuration is typically managed within `packages/core/src/config/`. Refer to [Core Configuration](./core/configuration.md) for more details.
+## Common error messages and solutions
 
-## Common Error Messages and Solutions
+- **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
 
-- **Error: `EADDRINUSE` (Address already in use) when starting the server.**
-
-  - **Cause:** Another process is already using the port the server is trying to bind to.
+  - **Cause:** Another process is already using the port the MCP server is trying to bind to.
   - **Solution:**
-    1.  Stop the other process using the port.
-    2.  Configure the server to use a different port (see [`core/configuration.md`](./core/configuration.md)).
+    Either stop the other process that is using the port or configure the MCP server to use a different port.
 
-- **Error: Command not found (when using the CLI).**
+- **Error: Command not found (when attempting the run Gemini CLI).**
 
-  - **Cause:** The CLI is not correctly installed or not in your system's PATH.
+  - **Cause:** Gemini CLI is not correctly installed or not in your system's PATH.
   - **Solution:**
-    1.  Ensure the CLI installation was successful.
+    1.  Ensure Gemini CLI installation was successful.
     2.  If installed globally, check that your npm global binary directory is in your PATH.
     3.  If running from source, ensure you are using the correct command to invoke it (e.g., `node packages/cli/dist/index.js ...`).
 
@@ -40,29 +36,30 @@ This guide provides solutions to common issues and debugging tips.
     2.  Run `npm run build` to compile the project.
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
+
   - **Cause:** If sandboxing is enabled, then the application is likely attempting an operation restricted by your sandbox, such as writing outside the project directory or system temp directory.
-  - **Solution:** See [README](../README.md#sandboxing) for more information on sandboxing, including how to customize your sandbox configuration.
+  - **Solution:** See [Sandboxing](./cli/configuration.md#sandboxing) for more information, including how to customize your sandbox configuration.
 
 ## Debugging Tips
 
-- **CLI Debugging:**
+- **CLI debugging:**
 
   - Use the `--verbose` flag (if available) with CLI commands for more detailed output.
   - Check the CLI logs, often found in a user-specific configuration or cache directory.
 
-- **Core Debugging:**
+- **Core debugging:**
 
   - Check the server console output for error messages or stack traces.
   - Increase log verbosity if configurable.
   - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step through server-side code.
 
-- **Tool Issues:**
+- **Tool issues:**
 
   - If a specific tool is failing, try to isolate the issue by running the simplest possible version of the command or operation the tool performs.
-  - For `run_shell_command`, ensure the command works directly in your shell first.
+  - For `run_shell_command`, check that the command works directly in your shell first.
   - For file system tools, double-check paths and permissions.
 
-- **Pre-flight Checks:**
+- **Pre-flight checks:**
   - Always run `npm run preflight` before committing code. This can catch many common issues related to formatting, linting, and type errors.
 
 If you encounter an issue not covered here, consider searching the project's issue tracker on GitHub or reporting a new issue with detailed information.
