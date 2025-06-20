@@ -810,6 +810,22 @@ Add any other context about the problem here.
         name: 'restore',
         description:
           'restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
+        completion: async () => {
+          const checkpointDir = config?.getProjectTempDir()
+            ? path.join(config.getProjectTempDir(), 'checkpoints')
+            : undefined;
+          if (!checkpointDir) {
+            return [];
+          }
+          try {
+            const files = await fs.readdir(checkpointDir);
+            return files
+              .filter((file) => file.endsWith('.json'))
+              .map((file) => file.replace('.json', ''));
+          } catch (_err) {
+            return [];
+          }
+        },
         action: async (_mainCommand, subCommand, _args) => {
           const checkpointDir = config?.getProjectTempDir()
             ? path.join(config.getProjectTempDir(), 'checkpoints')
