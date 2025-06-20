@@ -30,15 +30,15 @@ export function AuthDialog({
   );
   const allAuthItems = [
     {
-      label: 'Login with Google Personal Account',
+      label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
     },
     { label: 'Gemini API Key', value: AuthType.USE_GEMINI },
     {
-      label: 'Login with GCP Project and Google Work Account',
+      label: 'Login with Google Work',
       value: AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE,
     },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Vertex API Key', value: AuthType.USE_VERTEX_AI },
   ];
 
   const isSelectedAuthInMore = allAuthItems
