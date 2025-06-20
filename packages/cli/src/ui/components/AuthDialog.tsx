@@ -28,7 +28,7 @@ export function AuthDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialErrorMessage || null,
   );
-  const authItems = [
+  const allAuthItems = [
     {
       label: 'Login with Google Personal Account',
       value: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
@@ -41,7 +41,20 @@ export function AuthDialog({
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
-  let initialAuthIndex = authItems.findIndex(
+  const isSelectedAuthInMore = allAuthItems
+    .slice(2)
+    .some((item) => item.value === settings.merged.selectedAuthType);
+
+  const [showAll, setShowAll] = useState(isSelectedAuthInMore);
+
+  const initialAuthItems = [
+    ...allAuthItems.slice(0, 2),
+    { label: 'More...', value: 'more' },
+  ];
+
+  const items = showAll ? allAuthItems : initialAuthItems;
+
+  let initialAuthIndex = items.findIndex(
     (item) => item.value === settings.merged.selectedAuthType,
   );
 
@@ -50,6 +63,10 @@ export function AuthDialog({
   }
 
   const handleAuthSelect = (authMethod: string) => {
+    if (authMethod === 'more') {
+      setShowAll(true);
+      return;
+    }
     const error = validateAuthMethod(authMethod);
     if (error) {
       setErrorMessage(error);
@@ -75,7 +92,7 @@ export function AuthDialog({
     >
       <Text bold>Select Auth Method</Text>
       <RadioButtonSelect
-        items={authItems}
+        items={items}
         initialIndex={initialAuthIndex}
         onSelect={handleAuthSelect}
         onHighlight={onHighlight}
