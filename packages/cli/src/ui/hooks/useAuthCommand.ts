@@ -31,6 +31,8 @@ export const useAuthCommand = (
     setIsAuthDialogOpen(true);
   }, []);
 
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   useEffect(() => {
     const authFlow = async () => {
       if (isAuthDialogOpen || !settings.merged.selectedAuthType) {
@@ -38,6 +40,7 @@ export const useAuthCommand = (
       }
 
       try {
+        setIsAuthenticating(true);
         await performAuthFlow(
           settings.merged.selectedAuthType as AuthType,
           config,
@@ -51,6 +54,8 @@ Message: ${getErrorMessage(e)}`
             : `Failed to login. Message: ${getErrorMessage(e)}`;
         setAuthError(errorMessage);
         openAuthDialog();
+      } finally {
+        setIsAuthenticating(false);
       }
     };
 
@@ -73,10 +78,16 @@ Message: ${getErrorMessage(e)}`
     // For now, we don't do anything on highlight.
   }, []);
 
+  const cancelAuthentication = useCallback(() => {
+    setIsAuthenticating(false);
+  }, []);
+
   return {
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
     handleAuthHighlight,
+    isAuthenticating,
+    cancelAuthentication,
   };
 };

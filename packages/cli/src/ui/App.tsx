@@ -33,6 +33,7 @@ import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
+import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
@@ -138,6 +139,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openAuthDialog,
     handleAuthSelect,
     handleAuthHighlight,
+    isAuthenticating,
+    cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
 
   useEffect(() => {
@@ -585,6 +588,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 terminalWidth={mainAreaWidth}
               />
             </Box>
+          ) : isAuthenticating ? (
+            <AuthInProgress
+              onTimeout={() => {
+                setAuthError('Authentication timed out. Please try again.');
+                cancelAuthentication();
+                openAuthDialog();
+              }}
+            />
           ) : isAuthDialogOpen ? (
             <Box flexDirection="column">
               <AuthDialog
