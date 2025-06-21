@@ -19,27 +19,28 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
     <Box flexDirection="column" marginBottom={1}>
       <Text color={Colors.Foreground}>Tips for getting started:</Text>
       <Text color={Colors.Foreground}>
-        1.{' '}
-        <Text bold color={Colors.AccentPurple}>
-          /help
-        </Text>{' '}
-        for more information.
+        1. Ask questions, edit code or run commands.
       </Text>
       <Text color={Colors.Foreground}>
-        2. Ask coding questions, edit code or run commands.
-      </Text>
-      <Text color={Colors.Foreground}>
-        3. Be specific for the best results.
+        2. Be specific for the best results.
       </Text>
       {geminiMdFileCount === 0 && (
         <Text color={Colors.Foreground}>
-          4. Create{' '}
+          3. Create{' '}
           <Text bold color={Colors.AccentPurple}>
             GEMINI.md
           </Text>{' '}
           files to customize your interactions with Gemini.
         </Text>
       )}
+      <Text color={Colors.Foreground}>
+        {geminiMdFileCount === 0 ? '4.' : '3.'}{' '}
+        <Text bold color={Colors.AccentPurple}>
+          /help
+        </Text>{' '}
+        for more information. Full documentation can be found at
+        https://github.com/google-gemini/gemini-cli/blob/main/docs/index.md.
+      </Text>
     </Box>
   );
 };
