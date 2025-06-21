@@ -32,6 +32,7 @@ import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
+import { LoadedSettings } from '../../config/settings.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -60,6 +61,7 @@ export interface SlashCommand {
  */
 export const useSlashCommandProcessor = (
   config: Config | null,
+  settings: LoadedSettings,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
@@ -135,9 +137,9 @@ export const useSlashCommandProcessor = (
   );
 
   const showMemoryAction = useCallback(async () => {
-    const actionFn = createShowMemoryAction(config, addMessage);
+    const actionFn = createShowMemoryAction(config, settings, addMessage);
     await actionFn();
-  }, [config, addMessage]);
+  }, [config, settings, addMessage]);
 
   const addMemoryAction = useCallback(
     (
