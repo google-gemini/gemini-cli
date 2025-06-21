@@ -28,12 +28,16 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return <Text> </Text>; // Render an empty space to reserve height
   }
 
-  const geminiMdText =
-    geminiMdFileCount > 0
-      ? `${geminiMdFileCount} ${contextFileNames[0]} file${
-          geminiMdFileCount > 1 ? 's' : ''
-        }`
-      : '';
+  const geminiMdText = (() => {
+    if (geminiMdFileCount === 0) {
+      return '';
+    }
+    const allNamesTheSame = new Set(contextFileNames).size < 2;
+    const name = allNamesTheSame ? contextFileNames[0] : 'context';
+    return `${geminiMdFileCount} ${name} file${
+      geminiMdFileCount > 1 ? 's' : ''
+    }`;
+  })();
 
   const mcpText =
     mcpServerCount > 0

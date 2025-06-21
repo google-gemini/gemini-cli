@@ -62,14 +62,15 @@ import {
 } from './slashCommandProcessor.js';
 import { MessageType } from '../types.js';
 import {
-  type Config,
-  MCPServerStatus,
-  getMCPServerStatus,
+  Config,
   MCPDiscoveryState,
+  MCPServerStatus,
   getMCPDiscoveryState,
+  getMCPServerStatus,
   GeminiClient,
 } from '@gemini-cli/core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { LoadedSettings } from '../../config/settings.js';
 
 vi.mock('@gemini-code/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@gemini-code/core')>();
@@ -161,10 +162,16 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessorHook = (showToolDescriptions: boolean = false) =>
-    renderHook(() =>
+  const getProcessorHook = (showToolDescriptions: boolean = false) => {
+    const settings = {
+      merged: {
+        contextFileName: 'GEMINI.md',
+      },
+    } as LoadedSettings;
+    return renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
+        settings,
         [],
         mockAddItem,
         mockClearItems,
@@ -181,6 +188,7 @@ describe('useSlashCommandProcessor', () => {
         mockSetQuittingMessages,
       ),
     );
+  };
 
   const getProcessor = (showToolDescriptions: boolean = false) =>
     getProcessorHook(showToolDescriptions).result.current;
@@ -253,7 +261,11 @@ describe('useSlashCommandProcessor', () => {
       });
       expect(
         ShowMemoryCommandModule.createShowMemoryAction,
-      ).toHaveBeenCalledWith(mockConfig, expect.any(Function));
+      ).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Object),
+        expect.any(Function),
+      );
       expect(mockReturnedShowAction).toHaveBeenCalled();
       expect(commandResult).toBe(true);
     });

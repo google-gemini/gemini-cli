@@ -260,7 +260,7 @@ describe('App UI', () => {
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
     mockSettings = createMockSettings({
-      contextFileName: 'AGENTS.MD',
+      contextFileName: 'AGENTS.md',
       theme: 'Default',
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
@@ -275,12 +275,12 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 1 AGENTS.MD file');
+    expect(lastFrame()).toContain('Using 1 AGENTS.md file');
   });
 
-  it('should display the first custom contextFileName when an array is provided', async () => {
+  it('should display a generic message when multiple context files with different names are provided', async () => {
     mockSettings = createMockSettings({
-      contextFileName: ['AGENTS.MD', 'CONTEXT.MD'],
+      contextFileName: ['AGENTS.md', 'CONTEXT.md'],
       theme: 'Default',
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
@@ -295,7 +295,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 2 AGENTS.MD files');
+    expect(lastFrame()).toContain('Using 2 context files');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
