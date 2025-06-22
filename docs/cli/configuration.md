@@ -156,6 +156,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/save`, `/resume`, and `/restore` commands are available.
 
+- **`preferredEditor`** (string):
+
+  - **Description:** Specifies the preferred editor to use for viewing diffs.
+  - **Default:** `vscode`
+  - **Example:** `"preferredEditor": "vscode"`
+
 ### Example `settings.json`:
 
 ```json
