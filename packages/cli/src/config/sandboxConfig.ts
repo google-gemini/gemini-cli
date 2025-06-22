@@ -36,7 +36,12 @@ function getSandboxCommand(
   }
 
   // note environment variable takes precedence over argument (from command line or settings)
-  sandbox = process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? sandbox;
+  const environmentConfiguredSandbox =
+    process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? '';
+  sandbox =
+    environmentConfiguredSandbox?.length > 0
+      ? environmentConfiguredSandbox
+      : sandbox;
   if (sandbox === '1' || sandbox === 'true') sandbox = true;
   else if (sandbox === '0' || sandbox === 'false' || !sandbox) sandbox = false;
 
