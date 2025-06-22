@@ -147,9 +147,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
-- **`mcpServerCommand`** (string, **deprecated**):
+- **`checkpointing`** (object):
 
-  - This is a legacy setting for configuring a single MCP server. Use `mcpServers` instead.
+  - **Description:** Configures the checkpointing feature, which allows you to save and restore conversation and file states. See the [Checkpointing Commands](./commands.md#checkpointing-commands) for more details.
+  - **Default:** `{"enabled": false}`
+  - **Properties:**
+    - **`enabled`** (boolean): When `true`, the `/save`, `/resume`, and `/restore` commands are available.
 
 ### Example `settings.json`:
 
@@ -171,6 +174,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 }
 ```
 
+## Shell History
+
+The CLI keeps a history of shell commands you run. To avoid conflicts between different projects, this history is stored in a project-specific directory within your user's home folder.
+
+- **Location:** `~/.gemini/tmp/<project_hash>/shell_history`
+  - `<project_hash>` is a unique identifier generated from your project's root path.
+  - The history is stored in a file named `shell_history`.
+
 ## Environment Variables & `.env` Files
 
 Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments.
@@ -187,8 +198,8 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
-  - Overrides the hardcoded default, which is currently `gemini-2.5-pro-preview-05-06`.
-  - Example: `export GEMINI_MODEL="gemini-1.5-flash-latest"`
+  - Overrides the hardcoded default
+  - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
@@ -199,6 +210,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+- **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
+  - **Description:** The path to your Google Application Credentials JSON file.
+  - **Example:** `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.

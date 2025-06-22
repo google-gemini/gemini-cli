@@ -44,6 +44,9 @@ The core comes with a suite of pre-defined tools, typically found in `packages/c
   - `ShellTool` (`shell.ts`): Executes arbitrary shell commands (requires careful sandboxing and user confirmation).
 - **Web Tools:**
   - `WebFetchTool` (`web-fetch.ts`): Fetches content from a URL.
+  - `WebSearchTool` (`web-search.ts`): Performs a web search.
+- **Memory Tools:**
+  - `MemoryTool` (`memoryTool.ts`): Interacts with the AI's memory.
 
 Each of these tools extends `BaseTool` and implements the required methods for its specific functionality.
 

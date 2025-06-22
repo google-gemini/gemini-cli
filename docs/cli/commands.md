@@ -43,6 +43,8 @@ Slash commands provide meta-level control over the CLI itself.
 
   - **Description:** Manage the AI's instructional context (hierarchical memory loaded from `GEMINI.md` files).
   - **Sub-commands:**
+    - **`add`**:
+      - **Description:** Adds the following text to the AI's memory. Usage: `/memory add <text to remember>`
     - **`show`**:
       - **Description:** Display the full, concatenated content of the current hierarchical memory that has been loaded from all `GEMINI.md` files. This lets you inspect the instructional context being provided to the Gemini model.
     - **`refresh`**:
@@ -57,6 +59,14 @@ Slash commands provide meta-level control over the CLI itself.
 
   - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 
+- **`/auth`**
+
+  - **Description:** Open a dialog that lets you change the authentication method.
+
+- **`/about`**
+
+  - **Description:** Show version info. Please share this information when filing issues.
+
 - [**`/tools`**](../tools/index.md)
 
   - **Description:** Display a list of tools that are currently available within Gemini CLI.
@@ -69,6 +79,25 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **`/exit`**)
 
   - **Description:** Exit Gemini CLI.
+
+## Checkpointing Commands
+
+Checkpointing allows you to save and restore the state of your conversation and files. This is disabled by default, you must explicitly enable checkpointing using the `--checkpointing` argument or via [settings](./configuration.md).
+
+- **`/save`**
+
+  - **Description:** Saves a checkpoint of the current conversation history. You can optionally add a `[tag]` to easily identify it later.
+  - **Usage:** `/save [tag]`
+
+- **`/resume`**
+
+  - **Description:** Resumes a conversation from a previously saved checkpoint. If you don't provide a `[tag]`, it will attempt to load the latest checkpoint.
+  - **Usage:** `/resume [tag]`
+
+- **`/restore`**
+
+  - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
+  - **Usage:** `/restore [tool_call_id]`
 
 ## At commands (`@`)
 
