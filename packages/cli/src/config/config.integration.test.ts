@@ -75,7 +75,9 @@ describe('Configuration Integration Tests', () => {
         sandbox: false,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: false,
+        fileFiltering: {
+          respectGitIgnore: false,
+        },
       };
 
       const config = new Config(configParams);
@@ -109,7 +111,9 @@ describe('Configuration Integration Tests', () => {
         sandbox: false,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: false,
+        fileFiltering: {
+          respectGitIgnore: false,
+        },
       };
 
       const config = new Config(configParams);
@@ -178,7 +182,9 @@ describe('Configuration Integration Tests', () => {
         sandbox: false,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: false, // CI might need to see all files
+        fileFiltering: {
+          respectGitIgnore: false,
+        }, // CI might need to see all files
       };
 
       const config = new Config(configParams);

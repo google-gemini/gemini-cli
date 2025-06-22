@@ -163,7 +163,9 @@ describe('Server Config (config.ts)', () => {
   it('should set custom file filtering settings when provided', () => {
     const paramsWithFileFiltering: ConfigParameters = {
       ...baseParams,
-      fileFilteringRespectGitIgnore: false,
+      fileFiltering: {
+        respectGitIgnore: false,
+      },
     };
     const config = new Config(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
