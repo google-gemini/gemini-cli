@@ -89,6 +89,7 @@ export async function runNonInteractive(
             callId,
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
+            isClientInitiated: false,
           };
 
           const toolResponse = await executeToolCall(

@@ -57,6 +57,7 @@ export interface ToolCallRequestInfo {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  isClientInitiated: boolean;
 }
 
 export interface ToolCallResponseInfo {
@@ -139,11 +140,7 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  readonly pendingToolCalls: Array<{
-    callId: string;
-    name: string;
-    args: Record<string, unknown>;
-  }>;
+  readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
   private lastUsageMetadata: GenerateContentResponseUsageMetadata | null = null;
 
@@ -254,11 +251,17 @@ export class Turn {
     const name = fnCall.name || 'undefined_tool_name';
     const args = (fnCall.args || {}) as Record<string, unknown>;
 
-    this.pendingToolCalls.push({ callId, name, args });
+    const toolCallRequest: ToolCallRequestInfo = {
+      callId,
+      name,
+      args,
+      isClientInitiated: false,
+    };
+
+    this.pendingToolCalls.push(toolCallRequest);
 
     // Yield a request for the tool call, not the pending/confirming status
-    const value: ToolCallRequestInfo = { callId, name, args };
-    return { type: GeminiEventType.ToolCallRequest, value };
+    return { type: GeminiEventType.ToolCallRequest, value: toolCallRequest };
   }
 
   getDebugResponses(): GenerateContentResponse[] {

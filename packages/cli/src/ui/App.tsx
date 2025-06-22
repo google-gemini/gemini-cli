@@ -362,6 +362,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     shellModeActive,
     getPreferredEditor,
     onAuthError,
+    performMemoryRefresh,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
