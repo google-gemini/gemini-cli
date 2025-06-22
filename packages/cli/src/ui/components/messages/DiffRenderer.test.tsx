@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { render } from 'ink-testing-library';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';
 
-describe('<DiffRenderer />', () => {
+describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
 
   beforeEach(() => {
@@ -30,11 +31,13 @@ index 0000000..e69de29
 +print("hello world")
 `;
     render(
-      <DiffRenderer
-        diffContent={newFileDiffContent}
-        filename="test.py"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={newFileDiffContent}
+          filename="test.py"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'print("hello world")',
@@ -55,11 +58,13 @@ index 0000000..e69de29
 +some content
 `;
     render(
-      <DiffRenderer
-        diffContent={newFileDiffContent}
-        filename="test.unknown"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={newFileDiffContent}
+          filename="test.unknown"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'some content',
@@ -80,7 +85,9 @@ index 0000000..e69de29
 +some text content
 `;
     render(
-      <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />,
+      <OverflowProvider>
+        <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />
+      </OverflowProvider>,
     );
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'some text content',
@@ -101,11 +108,13 @@ index 0000001..0000002 100644
 +new line
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={existingFileDiffContent}
-        filename="test.txt"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={existingFileDiffContent}
+          filename="test.txt"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     // colorizeCode is used internally by the line-by-line rendering, not for the whole block
     expect(mockColorizeCode).not.toHaveBeenCalledWith(
@@ -129,11 +138,13 @@ index 1234567..1234567 100644
 +++ b/file.txt
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={noChangeDiff}
-        filename="file.txt"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={noChangeDiff}
+          filename="file.txt"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     expect(lastFrame()).toContain('No changes detected');
     expect(mockColorizeCode).not.toHaveBeenCalled();
@@ -141,7 +152,9 @@ index 1234567..1234567 100644
 
   it('should handle empty diff content', () => {
     const { lastFrame } = render(
-      <DiffRenderer diffContent="" terminalWidth={80} />,
+      <OverflowProvider>
+        <DiffRenderer diffContent="" terminalWidth={80} />
+      </OverflowProvider>,
     );
     expect(lastFrame()).toContain('No diff content');
     expect(mockColorizeCode).not.toHaveBeenCalled();
@@ -162,11 +175,13 @@ index 123..456 100644
  context line 11
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={diffWithGap}
-        filename="file.txt"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={diffWithGap}
+          filename="file.txt"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     const output = lastFrame();
     expect(output).toContain('═'); // Check for the border character used in the gap
@@ -197,11 +212,13 @@ index abc..def 100644
  context line 15
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={diffWithSmallGap}
-        filename="file.txt"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={diffWithSmallGap}
+          filename="file.txt"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     const output = lastFrame();
     expect(output).not.toContain('═'); // Ensure no separator is rendered
@@ -267,12 +284,14 @@ index 123..789 100644
       'with terminalWidth $terminalWidth and height $height',
       ({ terminalWidth, height, expected }) => {
         const { lastFrame } = render(
-          <DiffRenderer
-            diffContent={diffWithMultipleHunks}
-            filename="multi.js"
-            terminalWidth={terminalWidth}
-            availableTerminalHeight={height}
-          />,
+          <OverflowProvider>
+            <DiffRenderer
+              diffContent={diffWithMultipleHunks}
+              filename="multi.js"
+              terminalWidth={terminalWidth}
+              availableTerminalHeight={height}
+            />
+          </OverflowProvider>,
         );
         const output = lastFrame();
         expect(sanitizeOutput(output, terminalWidth)).toEqual(expected);
@@ -297,11 +316,13 @@ fileDiff Index: file.txt
 \\ No newline at end of file  
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={newFileDiff}
-        filename="TEST"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={newFileDiff}
+          filename="TEST"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     const output = lastFrame();
 
@@ -325,11 +346,13 @@ fileDiff Index: Dockerfile
 \\ No newline at end of file  
 `;
     const { lastFrame } = render(
-      <DiffRenderer
-        diffContent={newFileDiff}
-        filename="Dockerfile"
-        terminalWidth={80}
-      />,
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={newFileDiff}
+          filename="Dockerfile"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
     );
     const output = lastFrame();
     expect(output).toEqual(`1 FROM node:14

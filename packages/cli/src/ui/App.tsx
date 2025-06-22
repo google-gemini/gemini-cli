@@ -68,6 +68,8 @@ import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
+import { OverflowProvider } from './contexts/OverflowContext.js';
+import { ShowMoreLines } from './components/ShowMoreLines.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -560,23 +562,27 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         >
           {(item) => item}
         </Static>
-        <Box ref={pendingHistoryItemRef}>
-          {pendingHistoryItems.map((item, i) => (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                constrainHeight ? availableTerminalHeight : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              // TODO(taehykim): It seems like references to ids aren't necessary in
-              // HistoryItemDisplay. Refactor later. Use a fake id for now.
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              config={config}
-              isFocused={!isEditorDialogOpen}
-            />
-          ))}
-        </Box>
+        <OverflowProvider>
+          <Box ref={pendingHistoryItemRef} flexDirection="column">
+            {pendingHistoryItems.map((item, i) => (
+              <HistoryItemDisplay
+                key={i}
+                availableTerminalHeight={
+                  constrainHeight ? availableTerminalHeight : undefined
+                }
+                terminalWidth={mainAreaWidth}
+                // TODO(taehykim): It seems like references to ids aren't necessary in
+                // HistoryItemDisplay. Refactor later. Use a fake id for now.
+                item={{ ...item, id: 0 }}
+                isPending={true}
+                config={config}
+                isFocused={!isEditorDialogOpen}
+              />
+            ))}
+            <ShowMoreLines constrainHeight={constrainHeight} />
+          </Box>
+        </OverflowProvider>
+
         {showHelp && <Help commands={slashCommands} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
@@ -700,13 +706,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               </Box>
 
               {showErrorDetails && (
-                <DetailedMessagesDisplay
-                  messages={filteredConsoleMessages}
-                  maxHeight={
-                    constrainHeight ? debugConsoleMaxHeight : undefined
-                  }
-                  width={inputWidth}
-                />
+                <OverflowProvider>
+                  <DetailedMessagesDisplay
+                    messages={filteredConsoleMessages}
+                    maxHeight={
+                      constrainHeight ? debugConsoleMaxHeight : undefined
+                    }
+                    width={inputWidth}
+                  />
+                  <ShowMoreLines constrainHeight={constrainHeight} />
+                </OverflowProvider>
               )}
 
               {isInputActive && (

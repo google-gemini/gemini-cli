@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
 import { Colors } from '../../colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
+import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
 let enableDebugLog = false;
+
+/**
+ * Minimum height for the MaxSizedBox component.
+ * This ensures there is room for at least one line of content as well as the
+ * message that content was truncated.
+ */
+export const MINIMUM_MAX_HEIGHT = 2;
 
 export function setMaxSizedBoxDebugging(value: boolean) {
   enableDebugLog = value;
@@ -95,6 +103,10 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
 }) => {
+  const id = useId();
+  const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
+
+  const laidOutStyledText: StyledText[][] = [];
   // When maxHeight is not set, we render the content normally rather
   // than using our custom layout logic. This should slightly improve
   // performance for the case where there is no height limit and is
@@ -103,6 +115,59 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   // In the future we might choose to still apply our layout logic
   // even in this case particularlly if there are cases where we
   // intentionally diverse how certain layouts are rendered.
+  let targetMaxHeight;
+  if (maxHeight !== undefined) {
+    targetMaxHeight = Math.max(Math.round(maxHeight), MINIMUM_MAX_HEIGHT);
+
+    if (maxWidth === undefined) {
+      throw new Error('maxWidth must be defined when maxHeight is set.');
+    }
+    function visitRows(element: React.ReactNode) {
+      if (!React.isValidElement(element)) {
+        return;
+      }
+      if (element.type === Fragment) {
+        React.Children.forEach(element.props.children, visitRows);
+        return;
+      }
+      if (element.type === Box) {
+        layoutInkElementAsStyledText(element, maxWidth!, laidOutStyledText);
+        return;
+      }
+
+      debugReportError('MaxSizedBox children must be <Box> elements', element);
+    }
+
+    React.Children.forEach(children, visitRows);
+  }
+
+  const contentWillOverflow =
+    (targetMaxHeight !== undefined &&
+      laidOutStyledText.length > targetMaxHeight) ||
+    additionalHiddenLinesCount > 0;
+  const visibleContentHeight =
+    contentWillOverflow && targetMaxHeight !== undefined
+      ? targetMaxHeight - 1
+      : targetMaxHeight;
+
+  const hiddenLinesCount =
+    visibleContentHeight !== undefined
+      ? Math.max(0, laidOutStyledText.length - visibleContentHeight)
+      : 0;
+  const totalHiddenLines = hiddenLinesCount + additionalHiddenLinesCount;
+
+  useEffect(() => {
+    if (totalHiddenLines > 0) {
+      addOverflowingId?.(id);
+    } else {
+      removeOverflowingId?.(id);
+    }
+
+    return () => {
+      removeOverflowingId?.(id);
+    };
+  }, [id, totalHiddenLines, addOverflowingId, removeOverflowingId]);
+
   if (maxHeight === undefined) {
     return (
       <Box width={maxWidth} height={maxHeight} flexDirection="column">
@@ -111,46 +176,10 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     );
   }
 
-  if (maxWidth === undefined) {
-    throw new Error('maxWidth must be defined when maxHeight is set.');
-  }
-
-  const laidOutStyledText: StyledText[][] = [];
-  function visitRows(element: React.ReactNode) {
-    if (!React.isValidElement(element)) {
-      return;
-    }
-    if (element.type === Fragment) {
-      React.Children.forEach(element.props.children, visitRows);
-      return;
-    }
-    if (element.type === Box) {
-      layoutInkElementAsStyledText(element, maxWidth!, laidOutStyledText);
-      return;
-    }
-
-    debugReportError('MaxSizedBox children must be <Box> elements', element);
-  }
-
-  React.Children.forEach(children, visitRows);
-
-  const contentWillOverflow =
-    (laidOutStyledText.length > maxHeight && maxHeight > 0) ||
-    additionalHiddenLinesCount > 0;
-  const visibleContentHeight = contentWillOverflow ? maxHeight - 1 : maxHeight;
-
-  const hiddenLinesCount = Math.max(
-    0,
-    laidOutStyledText.length - visibleContentHeight,
-  );
-  const totalHiddenLines = hiddenLinesCount + additionalHiddenLinesCount;
-
   const visibleStyledText =
     hiddenLinesCount > 0
       ? overflowDirection === 'top'
-        ? laidOutStyledText.slice(
-            laidOutStyledText.length - visibleContentHeight,
-          )
+        ? laidOutStyledText.slice(hiddenLinesCount, laidOutStyledText.length)
         : laidOutStyledText.slice(0, visibleContentHeight)
       : laidOutStyledText;
 
