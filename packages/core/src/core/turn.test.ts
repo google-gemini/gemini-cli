@@ -132,8 +132,13 @@ describe('Turn', () => {
       const mockResponseStream = (async function* () {
         yield {
           functionCalls: [
-            { id: 'fc1', name: 'tool1', args: { arg1: 'val1' } },
-            { name: 'tool2', args: { arg2: 'val2' } }, // No ID
+            {
+              id: 'fc1',
+              name: 'tool1',
+              args: { arg1: 'val1' },
+              isClientInitiated: false,
+            },
+            { name: 'tool2', args: { arg2: 'val2' }, isClientInitiated: false }, // No ID
           ],
         } as unknown as GenerateContentResponse;
       })();
@@ -156,6 +161,7 @@ describe('Turn', () => {
           callId: 'fc1',
           name: 'tool1',
           args: { arg1: 'val1' },
+          isClientInitiated: false,
         }),
       );
       expect(turn.pendingToolCalls[0]).toEqual(event1.value);
@@ -163,7 +169,11 @@ describe('Turn', () => {
       const event2 = events[1] as ServerGeminiToolCallRequestEvent;
       expect(event2.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event2.value).toEqual(
-        expect.objectContaining({ name: 'tool2', args: { arg2: 'val2' } }),
+        expect.objectContaining({
+          name: 'tool2',
+          args: { arg2: 'val2' },
+          isClientInitiated: false,
+        }),
       );
       expect(event2.value.callId).toEqual(
         expect.stringMatching(/^tool2-\d{13}-\w{10,}$/),
@@ -301,6 +311,7 @@ describe('Turn', () => {
           callId: 'fc1',
           name: 'undefined_tool_name',
           args: { arg1: 'val1' },
+          isClientInitiated: false,
         }),
       );
       expect(turn.pendingToolCalls[0]).toEqual(event1.value);
@@ -308,7 +319,12 @@ describe('Turn', () => {
       const event2 = events[1] as ServerGeminiToolCallRequestEvent;
       expect(event2.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event2.value).toEqual(
-        expect.objectContaining({ callId: 'fc2', name: 'tool2', args: {} }),
+        expect.objectContaining({
+          callId: 'fc2',
+          name: 'tool2',
+          args: {},
+          isClientInitiated: false,
+        }),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
 
@@ -319,6 +335,7 @@ describe('Turn', () => {
           callId: 'fc3',
           name: 'undefined_tool_name',
           args: {},
+          isClientInitiated: false,
         }),
       );
       expect(turn.pendingToolCalls[2]).toEqual(event3.value);

@@ -62,6 +62,7 @@ describe('executeToolCall', () => {
       callId: 'call1',
       name: 'testTool',
       args: { param1: 'value1' },
+      isClientInitiated: false,
     };
     const toolResult: ToolResult = {
       llmContent: 'Tool executed successfully',
@@ -99,6 +100,7 @@ describe('executeToolCall', () => {
       callId: 'call2',
       name: 'nonExistentTool',
       args: {},
+      isClientInitiated: false,
     };
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
 
@@ -133,6 +135,7 @@ describe('executeToolCall', () => {
       callId: 'call3',
       name: 'testTool',
       args: { param1: 'value1' },
+      isClientInitiated: false,
     };
     const executionError = new Error('Tool execution failed');
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
@@ -164,6 +167,7 @@ describe('executeToolCall', () => {
       callId: 'call4',
       name: 'testTool',
       args: { param1: 'value1' },
+      isClientInitiated: false,
     };
     const cancellationError = new Error('Operation cancelled');
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
@@ -206,6 +210,7 @@ describe('executeToolCall', () => {
       callId: 'call5',
       name: 'testTool',
       args: {},
+      isClientInitiated: false,
     };
     const imageDataPart: Part = {
       inlineData: { mimeType: 'image/png', data: 'base64data' },
