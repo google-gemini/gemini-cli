@@ -56,13 +56,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 - **`fileFiltering`** (object):
 
   - **Description:** Controls git-aware file filtering behavior for @ commands and file discovery tools.
-  - **Default:** `"respectGitIgnore": true`
+  - **Default:** `"respectGitIgnore": true, "enableRecursiveFileSearch": true`
   - **Properties:**
     - **`respectGitIgnore`** (boolean): Whether to respect .gitignore patterns when discovering files. When set to `true`, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
+    - **`enableRecursiveFileSearch`** (boolean): Whether to enable searching recursively for filenames under the current tree when completing @ prefixes in the prompt.
   - **Example:**
     ```json
     "fileFiltering": {
-      "respectGitIgnore": true
+      "respectGitIgnore": true,
+      "enableRecursiveFileSearch": false
     }
     ```
 

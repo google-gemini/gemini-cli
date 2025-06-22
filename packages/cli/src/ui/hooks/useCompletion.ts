@@ -322,10 +322,16 @@ export function useCompletion(
       let fetchedSuggestions: Suggestion[] = [];
 
       const fileDiscoveryService = config ? config.getFileService() : null;
+      const enableRecursiveSearch =
+        config?.getEnableRecursiveFileSearch() ?? true;
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
-        if (partialPath.indexOf('/') === -1 && prefix) {
+        if (
+          partialPath.indexOf('/') === -1 &&
+          prefix &&
+          enableRecursiveSearch
+        ) {
           if (fileDiscoveryService) {
             fetchedSuggestions = await findFilesWithGlob(
               prefix,

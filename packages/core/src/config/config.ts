@@ -104,7 +104,10 @@ export interface ConfigParameters {
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;
-  fileFilteringRespectGitIgnore?: boolean;
+  fileFiltering?: {
+    respectGitIgnore?: boolean;
+    enableRecursiveFileSearch?: boolean;
+  };
   checkpointing?: boolean;
   proxy?: string;
   cwd: string;
@@ -136,7 +139,10 @@ export class Config {
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private geminiClient!: GeminiClient;
-  private readonly fileFilteringRespectGitIgnore: boolean;
+  private readonly fileFiltering: {
+    respectGitIgnore: boolean;
+    enableRecursiveFileSearch: boolean;
+  };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
@@ -172,8 +178,11 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
     };
 
-    this.fileFilteringRespectGitIgnore =
-      params.fileFilteringRespectGitIgnore ?? true;
+    this.fileFiltering = {
+      respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
+      enableRecursiveFileSearch:
+        params.fileFiltering?.enableRecursiveFileSearch ?? true,
+    };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
@@ -330,8 +339,12 @@ export class Config {
     return getProjectTempDir(this.getProjectRoot());
   }
 
+  getEnableRecursiveFileSearch(): boolean {
+    return this.fileFiltering.enableRecursiveFileSearch;
+  }
+
   getFileFilteringRespectGitIgnore(): boolean {
-    return this.fileFilteringRespectGitIgnore;
+    return this.fileFiltering.respectGitIgnore;
   }
 
   getCheckpointingEnabled(): boolean {

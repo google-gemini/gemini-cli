@@ -47,6 +47,7 @@ describe('useCompletion git-aware filtering integration', () => {
     mockConfig = {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
       getFileService: vi.fn().mockReturnValue(mockFileDiscoveryService),
+      getEnableRecursiveFileSearch: vi.fn(() => true),
     };
 
     vi.mocked(FileDiscoveryService).mockImplementation(
@@ -168,6 +169,35 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(suggestionLabels.some((l) => l.includes('node_modules'))).toBe(
       false,
     );
+  });
+
+  it('should not perform recursive search when disabled in config', async () => {
+    const globResults = [`${testCwd}/data`, `${testCwd}/dist`];
+    vi.mocked(glob).mockResolvedValue(globResults);
+
+    // Disable recursive search in the mock config
+    const mockConfigNoRecursive = {
+      ...mockConfig,
+      getEnableRecursiveFileSearch: vi.fn(() => false),
+    };
+
+    vi.mocked(fs.readdir).mockResolvedValue([
+      { name: 'data', isDirectory: () => true },
+      { name: 'dist', isDirectory: () => true },
+    ] as Array<{ name: string; isDirectory: () => boolean }>);
+
+    renderHook(() =>
+      useCompletion('@d', testCwd, true, slashCommands, mockConfigNoRecursive),
+    );
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+
+    // `glob` should not be called because recursive search is disabled
+    expect(glob).not.toHaveBeenCalled();
+    // `fs.readdir` should be called for the top-level directory instead
+    expect(fs.readdir).toHaveBeenCalledWith(testCwd, { withFileTypes: true });
   });
 
   it('should work without config (fallback behavior)', async () => {
