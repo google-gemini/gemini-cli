@@ -20,7 +20,7 @@
     "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker node integration-tests/run-tests.js",
     "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman node integration-tests/run-tests.js",
     "start": "node scripts/start.js",
-    "debug": "cross-env DEBUG=1 node scripts/start.js",
+    "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "typecheck": "npm run typecheck --workspaces --if-present",

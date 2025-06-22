@@ -6,6 +6,8 @@
 
 import { Box, Text } from 'ink';
 import { useOverflowState } from '../contexts/OverflowContext.js';
+import { useStreamingContext } from '../contexts/StreamingContext.js';
+import { StreamingState } from '../types.js';
 import { Colors } from '../colors.js';
 
 interface ShowMoreLinesProps {
@@ -14,11 +16,16 @@ interface ShowMoreLinesProps {
 
 export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   const overflowState = useOverflowState();
+  const streamingState = useStreamingContext();
 
   if (
     overflowState === undefined ||
     overflowState.overflowingIds.size === 0 ||
-    !constrainHeight
+    !constrainHeight ||
+    !(
+      streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.WaitingForConfirmation
+    )
   ) {
     return null;
   }
@@ -26,7 +33,7 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   return (
     <Box>
       <Text color={Colors.Gray} wrap="truncate">
-        Press Ctrl-S to show more lines
+        Press ctrl-s to show more lines
       </Text>
     </Box>
   );
