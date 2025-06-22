@@ -16,7 +16,10 @@ import type {
 } from 'hast';
 import { themeManager } from '../themes/theme-manager.js';
 import { Theme } from '../themes/theme.js';
-import { MaxSizedBox } from '../components/shared/MaxSizedBox.js';
+import {
+  MaxSizedBox,
+  MINIMUM_MAX_HEIGHT,
+} from '../components/shared/MaxSizedBox.js';
 
 // Configure themeing and parsing utilities.
 const lowlight = createLowlight(common);
@@ -85,8 +88,6 @@ function renderHastNode(
   return null;
 }
 
-const RESERVED_LINES_FOR_TRUNCATION_MESSAGE = 2;
-
 /**
  * Renders syntax-highlighted code for Ink applications using a selected theme.
  *
@@ -111,11 +112,11 @@ export function colorizeCode(
 
     let hiddenLinesCount = 0;
 
-    // Optimizaiton to avoid highlighting lines that cannot possibly be displayed.
-    if (availableHeight && lines.length > availableHeight) {
-      const sliceIndex =
-        lines.length - availableHeight + RESERVED_LINES_FOR_TRUNCATION_MESSAGE;
-      if (sliceIndex > 0) {
+    // Optimization to avoid highlighting lines that cannot possibly be displayed.
+    if (availableHeight !== undefined) {
+      availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
+      if (lines.length > availableHeight) {
+        const sliceIndex = lines.length - availableHeight;
         hiddenLinesCount = sliceIndex;
         lines = lines.slice(sliceIndex);
       }
