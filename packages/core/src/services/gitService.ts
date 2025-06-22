@@ -54,18 +54,24 @@ export class GitService {
    */
   async setupShadowGitRepository() {
     const repoDir = this.getHistoryDir();
+    const gitConfigPath = path.join(repoDir, '.gitconfig');
 
     await fs.mkdir(repoDir, { recursive: true });
-    const isRepoDefined = await simpleGit(repoDir).checkIsRepo(
-      CheckRepoActions.IS_REPO_ROOT,
-    );
+
+    // We don't want to inherit the user's name, email, or gpg signing
+    // preferences for the shadow repository, so we create a dedicated gitconfig.
+    const gitConfigContent =
+      '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
+    await fs.writeFile(gitConfigPath, gitConfigContent);
+
+    const repo = simpleGit(repoDir);
+    const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
 
     if (!isRepoDefined) {
-      await simpleGit(repoDir).init(false, {
+      await repo.init(false, {
         '--initial-branch': 'main',
       });
 
-      const repo = simpleGit(repoDir);
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
 
@@ -89,6 +95,9 @@ export class GitService {
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
+      // Prevent git from using the user's global git config.
+      HOME: repoDir,
+      XDG_CONFIG_HOME: repoDir,
     });
   }
 
