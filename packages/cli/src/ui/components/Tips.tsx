@@ -38,8 +38,7 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
         <Text bold color={Colors.AccentPurple}>
           /help
         </Text>{' '}
-        for more information. Full documentation can be found at
-        https://github.com/google-gemini/gemini-cli/blob/main/docs/index.md.
+        for more information.
       </Text>
     </Box>
   );

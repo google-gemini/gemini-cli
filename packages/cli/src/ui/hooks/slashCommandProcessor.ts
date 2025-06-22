@@ -183,6 +183,28 @@ export const useSlashCommandProcessor = (
         },
       },
       {
+        name: 'docs',
+        description: 'open full Gemini CLI documentation in your browser',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const docsUrl =
+            'https://github.com/google-gemini/gemini-cli/blob/main/docs/index.md';
+          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+            addMessage({
+              type: MessageType.INFO,
+              content: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,
+              timestamp: new Date(),
+            });
+          } else {
+            addMessage({
+              type: MessageType.INFO,
+              content: `Opening documentation in your browser: ${docsUrl}`,
+              timestamp: new Date(),
+            });
+            await open(docsUrl);
+          }
+        },
+      },
+      {
         name: 'clear',
         description: 'clear the screen and conversation history',
         action: async (_mainCommand, _subCommand, _args) => {
