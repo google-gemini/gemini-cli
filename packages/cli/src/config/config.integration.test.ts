@@ -210,4 +210,34 @@ describe('Configuration Integration Tests', () => {
       expect(config.getCheckpointingEnabled()).toBe(true);
     });
   });
+
+  describe('Extension Context Files', () => {
+    it('should have an empty array for extension context files by default', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+      };
+      const config = new Config(configParams);
+      expect(config.getExtensionContextFilePaths()).toEqual([]);
+    });
+
+    it('should correctly store and return extension context file paths', () => {
+      const contextFiles = ['/path/to/file1.txt', '/path/to/file2.js'];
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        extensionContextFilePaths: contextFiles,
+      };
+      const config = new Config(configParams);
+      expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
+    });
+  });
 });

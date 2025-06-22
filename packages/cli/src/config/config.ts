@@ -244,6 +244,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
+    extensionContextFilePaths,
   });
 }
 

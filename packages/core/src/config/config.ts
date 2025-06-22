@@ -118,6 +118,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   disableDataCollection?: boolean;
+  extensionContextFilePaths?: string[];
 }
 
 export class Config {
@@ -155,6 +156,7 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly disableDataCollection: boolean;
+  private readonly extensionContextFilePaths: string[];
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -196,6 +198,7 @@ export class Config {
     this.model = params.model;
     this.disableDataCollection =
       params.telemetry?.disableDataCollection ?? true;
+    this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -385,6 +388,10 @@ export class Config {
 
   getDisableDataCollection(): boolean {
     return this.disableDataCollection;
+  }
+
+  getExtensionContextFilePaths(): string[] {
+    return this.extensionContextFilePaths;
   }
 
   async getGitService(): Promise<GitService> {
