@@ -24,12 +24,16 @@ import {
   logApiRequest,
   logApiResponse,
   logApiError,
-  getFinalUsageMetadata,
 } from '../telemetry/loggers.js';
 import {
   getStructuredResponse,
   getStructuredResponseFromParts,
 } from '../utils/generateContentResponseUtilities.js';
+import {
+  ApiErrorEvent,
+  ApiRequestEvent,
+  ApiResponseEvent,
+} from '../telemetry/types.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -152,14 +156,8 @@ export class GeminiChat {
     contents: Content[],
     model: string,
   ): Promise<void> {
-    const shouldLogUserPrompts = (config: Config): boolean =>
-      config.getTelemetryLogPromptsEnabled() ?? false;
-
     const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(this.config, {
-      model,
-      request_text: shouldLogUserPrompts(this.config) ? requestText : undefined,
-    });
+    logApiRequest(this.config, new ApiRequestEvent(model, requestText));
   }
 
   private async _logApiResponse(
@@ -167,31 +165,20 @@ export class GeminiChat {
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
   ): Promise<void> {
-    logApiResponse(this.config, {
-      model: this.model,
-      duration_ms: durationMs,
-      status_code: 200, // Assuming 200 for success
-      input_token_count: usageMetadata?.promptTokenCount ?? 0,
-      output_token_count: usageMetadata?.candidatesTokenCount ?? 0,
-      cached_content_token_count: usageMetadata?.cachedContentTokenCount ?? 0,
-      thoughts_token_count: usageMetadata?.thoughtsTokenCount ?? 0,
-      tool_token_count: usageMetadata?.toolUsePromptTokenCount ?? 0,
-      response_text: responseText,
-    });
+    logApiResponse(
+      this.config,
+      new ApiResponseEvent(this.model, durationMs, usageMetadata, responseText),
+    );
   }
 
   private _logApiError(durationMs: number, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
-    const statusCode = 'unknown';
 
-    logApiError(this.config, {
-      model: this.model,
-      error: errorMessage,
-      status_code: statusCode,
-      error_type: errorType,
-      duration_ms: durationMs,
-    });
+    logApiError(
+      this.config,
+      new ApiErrorEvent(this.model, errorMessage, durationMs, errorType),
+    );
   }
 
   /**
@@ -402,6 +389,17 @@ export class GeminiChat {
     this.history = history;
   }
 
+  getFinalUsageMetadata(
+    chunks: GenerateContentResponse[],
+  ): GenerateContentResponseUsageMetadata | undefined {
+    const lastChunkWithMetadata = chunks
+      .slice()
+      .reverse()
+      .find((chunk) => chunk.usageMetadata);
+
+    return lastChunkWithMetadata?.usageMetadata;
+  }
+
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,
@@ -444,7 +442,7 @@ export class GeminiChat {
       const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
-        getFinalUsageMetadata(chunks),
+        this.getFinalUsageMetadata(chunks),
         fullText,
       );
     }

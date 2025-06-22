@@ -131,6 +131,8 @@ export async function main() {
   }
 
   logUserPrompt(config, {
+    'event.name': 'user_prompt',
+    'event.timestamp': new Date().toISOString(),
     prompt: input,
     prompt_length: input.length,
   });
