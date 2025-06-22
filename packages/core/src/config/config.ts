@@ -33,8 +33,10 @@ import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   TelemetryTarget,
+  StartSessionEvent,
 } from '../telemetry/index.js';
 import { DEFAULT_GEMINI_EMBEDDING_MODEL } from './models.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -55,6 +57,7 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   logPrompts?: boolean;
+  disableDataCollection?: boolean;
 }
 
 export class MCPServerConfig {
@@ -114,6 +117,7 @@ export interface ConfigParameters {
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
   model: string;
+  disableDataCollection?: boolean;
 }
 
 export class Config {
@@ -150,6 +154,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
+  private readonly disableDataCollection: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -189,6 +194,8 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.disableDataCollection =
+      params.telemetry?.disableDataCollection ?? true;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -196,6 +203,12 @@ export class Config {
 
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
+    }
+
+    if (!this.disableDataCollection) {
+      ClearcutLogger.getInstance(this)?.enqueueLogEvent(
+        new StartSessionEvent(this),
+      );
     }
   }
 
@@ -368,6 +381,10 @@ export class Config {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
     }
     return this.fileDiscoveryService;
+  }
+
+  getDisableDataCollection(): boolean {
+    return this.disableDataCollection;
   }
 
   async getGitService(): Promise<GitService> {

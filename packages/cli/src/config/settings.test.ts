@@ -6,15 +6,13 @@
 
 /// <reference types="vitest/globals" />
 
-const MOCK_HOME_DIR = '/mock/home/user'; // MUST BE FIRST
-
-// Mock 'os' first. Its factory uses MOCK_HOME_DIR.
+// Mock 'os' first.
 import * as osActual from 'os'; // Import for type info for the mock factory
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
     ...actualOs,
-    homedir: vi.fn(() => MOCK_HOME_DIR),
+    homedir: vi.fn(() => '/mock/home/user'),
   };
 });
 
@@ -77,7 +75,7 @@ describe('Settings Loading and Merging', () => {
     mockFsMkdirSync = vi.mocked(fs.mkdirSync);
     mockStripJsonComments = vi.mocked(stripJsonComments);
 
-    vi.mocked(osActual.homedir).mockReturnValue(MOCK_HOME_DIR);
+    vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
     (mockStripJsonComments as unknown as Mock).mockImplementation(
       (jsonString: string) => jsonString,
     );

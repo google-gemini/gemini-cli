@@ -38,12 +38,17 @@ const MockedGeminiClientClass = vi.hoisted(() =>
   }),
 );
 
+const MockedUserPromptEvent = vi.hoisted(() =>
+  vi.fn().mockImplementation(() => {}),
+);
+
 vi.mock('@gemini-cli/core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
+    UserPromptEvent: MockedUserPromptEvent,
   };
 });
 
@@ -283,6 +288,7 @@ describe('useGeminiStream', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
+      getDisableDataCollection: () => false,
       addHistory: vi.fn(),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();

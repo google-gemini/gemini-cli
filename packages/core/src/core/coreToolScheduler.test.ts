@@ -77,6 +77,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = {
       getSessionId: () => 'test-session-id',
+      getDisableDataCollection: () => false,
     } as Config;
 
     const scheduler = new CoreToolScheduler({

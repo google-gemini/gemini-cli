@@ -16,6 +16,7 @@ import {
   EditorType,
   Config,
   logToolCall,
+  ToolCallEvent,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -652,20 +653,7 @@ export class CoreToolScheduler {
       this.toolCalls = [];
 
       for (const call of completedCalls) {
-        logToolCall(
-          this.config,
-          {
-            function_name: call.request.name,
-            function_args: call.request.args,
-            duration_ms: call.durationMs ?? 0,
-            success: call.status === 'success',
-            error:
-              call.status === 'error'
-                ? call.response.error?.message
-                : undefined,
-          },
-          call.outcome,
-        );
+        logToolCall(this.config, new ToolCallEvent(call));
       }
 
       if (this.onAllToolCallsComplete) {
