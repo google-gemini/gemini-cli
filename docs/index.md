@@ -20,7 +20,7 @@ This documentation is organized into the following sections:
   - **[Telemetry](./telemetry.md):** Overview of telemetry in the CLI.
 - **Core Details:** Documentation for `packages/core`.
   - **[Core Introduction](./core/index.md):** Overview of the core component.
-  - **[Configuration](./core/configuration.md):** Information on configuring the core component.
+  - **[Telemetry and Usage Statistics](./core/telemetry.md):** Details on configuring telemetry and usage statistics.
   - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
 - **Tools:**
   - **[Tools Overview](./tools/index.md):** Overview of the available tools.
