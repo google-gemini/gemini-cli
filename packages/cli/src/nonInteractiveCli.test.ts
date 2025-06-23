@@ -215,8 +215,7 @@ describe('runNonInteractive', () => {
     await runNonInteractive(mockConfig, 'Initial fail');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error processing input:',
-      apiError,
+      '[API Error: API connection failed]',
     );
   });
 });

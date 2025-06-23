@@ -49,8 +49,13 @@ export enum GeminiEventType {
   Thought = 'thought',
 }
 
-export interface GeminiErrorEventValue {
+export interface StructuredError {
   message: string;
+  status?: number;
+}
+
+export interface GeminiErrorEventValue {
+  error: StructuredError;
 }
 
 export interface ToolCallRequestInfo {
@@ -236,8 +241,18 @@ export class Turn {
         contextForReport,
         'Turn.run-sendMessageStream',
       );
-      const errorMessage = getErrorMessage(error);
-      yield { type: GeminiEventType.Error, value: { message: errorMessage } };
+      const status =
+        typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        typeof (error as { status: unknown }).status === 'number'
+          ? (error as { status: number }).status
+          : undefined;
+      const structuredError: StructuredError = {
+        message: getErrorMessage(error),
+        status,
+      };
+      yield { type: GeminiEventType.Error, value: { error: structuredError } };
       return;
     }
   }

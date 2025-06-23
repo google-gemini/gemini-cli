@@ -19,6 +19,8 @@ import {
   GenerateContentResponse,
 } from '@google/genai';
 
+import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {
     const candidate = response.candidates[0];
@@ -126,7 +128,7 @@ export async function runNonInteractive(
       }
     }
   } catch (error) {
-    console.error('Error processing input:', error);
+    console.error(parseAndFormatApiError(error));
     process.exit(1);
   } finally {
     if (isTelemetrySdkInitialized()) {

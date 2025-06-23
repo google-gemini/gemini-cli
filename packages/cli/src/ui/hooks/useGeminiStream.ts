@@ -396,7 +396,10 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
       addItem(
-        { type: MessageType.ERROR, text: `[API Error: ${eventValue.message}]` },
+        {
+          type: MessageType.ERROR,
+          text: parseAndFormatApiError(eventValue.error),
+        },
         userMessageTimestamp,
       );
     },
@@ -530,6 +533,10 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
       } catch (error: unknown) {
+        console.log(
+          'GEMINI_DEBUG: Caught error in useGeminiStream.ts:',
+          JSON.stringify(error),
+        );
         if (isAuthError(error)) {
           onAuthError();
         } else if (!isNodeError(error) || error.name !== 'AbortError') {
