@@ -78,6 +78,13 @@ export function AuthDialog({
 
   useInput((_input, key) => {
     if (key.escape) {
+      if (settings.merged.selectedAuthType === undefined) {
+        // Prevent exiting if no auth method is set
+        setErrorMessage(
+          'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
+        );
+        return;
+      }
       onSelect(undefined, SettingScope.User);
     }
   });
