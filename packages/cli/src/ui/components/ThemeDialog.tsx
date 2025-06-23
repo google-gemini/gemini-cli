@@ -115,94 +115,143 @@ export function ThemeDialog({
     1,
   );
 
+  const DAILOG_PADDING = 2;
+  const selectThemeHeight = themeItems.length + 1;
+  const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
+  const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
+  const TAB_TO_SELECT_HEIGHT = 2;
+  availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
+  availableTerminalHeight -= 2; // Top and bottom borders.
+  availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
+
+  let totalLeftHandSideHeight =
+    DAILOG_PADDING +
+    selectThemeHeight +
+    SCOPE_SELECTION_HEIGHT +
+    SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
+
+  let showScopeSelection = true;
+  let includePadding = true;
+
+  // Remove content from the LHS that can be ommitted if it exceeds the available height.
+  if (totalLeftHandSideHeight > availableTerminalHeight) {
+    includePadding = false;
+    totalLeftHandSideHeight -= DAILOG_PADDING;
+  }
+
+  if (totalLeftHandSideHeight > availableTerminalHeight) {
+    // First, try hiding the scope selection
+    totalLeftHandSideHeight -= SCOPE_SELECTION_HEIGHT;
+    showScopeSelection = false;
+  }
+
+  // Don't focus the scope selection if it is hidden due to height constraints.
+  const currenFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
+
   // Vertical space taken by elements other than the two code blocks in the preview pane.
-  // Includes "Preview" title, borders, padding, and margin between blocks.
-  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 7;
-  const availableTerminalHeightCodeBlock = availableTerminalHeight
-    ? Math.max(
-        Math.floor(
-          (availableTerminalHeight - PREVIEW_PANE_FIXED_VERTICAL_SPACE) / 2,
-        ),
-        2,
-      )
-    : undefined;
+  // Includes "Preview" title, borders, and margin between blocks.
+  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
+
+  // The right column doesn't need to ever be shorter than the left column.
+  availableTerminalHeight = Math.max(
+    availableTerminalHeight,
+    totalLeftHandSideHeight,
+  );
+  const availableTerminalHeightCodeBlock =
+    availableTerminalHeight -
+    PREVIEW_PANE_FIXED_VERTICAL_SPACE -
+    (includePadding ? 2 : 0) * 2;
+  // Give slightly more space to the code block as it is 3 lines longer.
+  const diffHeight = Math.floor(availableTerminalHeightCodeBlock / 2) - 1;
+  const codeBlockHeight = Math.ceil(availableTerminalHeightCodeBlock / 2) + 1;
+
   return (
     <Box
       borderStyle="round"
       borderColor={Colors.Gray}
-      flexDirection="row"
-      padding={1}
+      flexDirection="column"
+      paddingTop={includePadding ? 1 : 0}
+      paddingBottom={includePadding ? 1 : 0}
+      paddingLeft={1}
+      paddingRight={1}
       width="100%"
     >
-      {/* Left Column: Selection */}
-      <Box flexDirection="column" width="45%" paddingRight={2}>
-        <Text bold={focusedSection === 'theme'}>
-          {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
-          <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
-        </Text>
-        <RadioButtonSelect
-          key={selectInputKey}
-          items={themeItems}
-          initialIndex={initialThemeIndex}
-          onSelect={handleThemeSelect}
-          onHighlight={onHighlight}
-          isFocused={focusedSection === 'theme'}
-        />
-
-        {/* Scope Selection */}
-        <Box marginTop={1} flexDirection="column">
-          <Text bold={focusedSection === 'scope'}>
-            {focusedSection === 'scope' ? '> ' : '  '}Apply To
+      <Box flexDirection="row">
+        {/* Left Column: Selection */}
+        <Box flexDirection="column" width="45%" paddingRight={2}>
+          <Text bold={currenFocusedSection === 'theme'} wrap="truncate">
+            {currenFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+            <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
-            items={scopeItems}
-            initialIndex={0} // Default to User Settings
-            onSelect={handleScopeSelect}
-            onHighlight={handleScopeHighlight}
-            isFocused={focusedSection === 'scope'}
+            key={selectInputKey}
+            items={themeItems}
+            initialIndex={initialThemeIndex}
+            onSelect={handleThemeSelect}
+            onHighlight={onHighlight}
+            isFocused={currenFocusedSection === 'theme'}
           />
+
+          {/* Scope Selection */}
+          {showScopeSelection && (
+            <Box marginTop={1} flexDirection="column">
+              <Text bold={currenFocusedSection === 'scope'} wrap="truncate">
+                {currenFocusedSection === 'scope' ? '> ' : '  '}Apply To
+              </Text>
+              <RadioButtonSelect
+                items={scopeItems}
+                initialIndex={0} // Default to User Settings
+                onSelect={handleScopeSelect}
+                onHighlight={handleScopeHighlight}
+                isFocused={currenFocusedSection === 'scope'}
+              />
+            </Box>
+          )}
         </Box>
 
-        <Box marginTop={1}>
-          <Text color={Colors.Gray}>
-            (Use Enter to select, Tab to change focus)
-          </Text>
+        {/* Right Column: Preview */}
+        <Box flexDirection="column" width="55%" paddingLeft={2}>
+          <Text bold>Preview</Text>
+          <Box
+            borderStyle="single"
+            borderColor={Colors.Gray}
+            paddingTop={includePadding ? 1 : 0}
+            paddingBottom={includePadding ? 1 : 0}
+            paddingLeft={1}
+            paddingRight={1}
+            flexDirection="column"
+          >
+            {colorizeCode(
+              `# function
+-def fibonacci(n):
+-    a, b = 0, 1
+-    for _ in range(n):
+-        a, b = b, a + b
+-    return a`,
+              'python',
+              codeBlockHeight,
+              colorizeCodeWidth,
+            )}
+            <Box marginTop={1} />
+            <DiffRenderer
+              diffContent={`--- a/old_file.txt
+-+++ b/new_file.txt
+-@@ -1,4 +1,5 @@
+- This is a context line.
+--This line was deleted.
+-+This line was added.
+-`}
+              availableTerminalHeight={diffHeight}
+              terminalWidth={colorizeCodeWidth}
+            />
+          </Box>
         </Box>
       </Box>
-
-      {/* Right Column: Preview */}
-      <Box flexDirection="column" width="55%" paddingLeft={2}>
-        <Text bold>Preview</Text>
-        <Box
-          borderStyle="single"
-          borderColor={Colors.Gray}
-          padding={1}
-          flexDirection="column"
-        >
-          {colorizeCode(
-            `# function
-def fibonacci(n):
-    a, b = 0, 1
-    for _ in range(n):
-        a, b = b, a + b
-    return a`,
-            'python',
-            availableTerminalHeightCodeBlock,
-            colorizeCodeWidth,
-          )}
-          <Box marginTop={1} />
-          <DiffRenderer
-            diffContent={`--- a/old_file.txt
-+++ b/new_file.txt
-@@ -1,4 +1,5 @@
- This is a context line.
--This line was deleted.
-+This line was added.
-`}
-            availableTerminalHeight={availableTerminalHeightCodeBlock}
-            terminalWidth={colorizeCodeWidth}
-          />
-        </Box>
+      <Box marginTop={1}>
+        <Text color={Colors.Gray} wrap="truncate">
+          (Use Enter to select
+          {showScopeSelection ? ', Tab to change focus' : ''})
+        </Text>
       </Box>
     </Box>
   );

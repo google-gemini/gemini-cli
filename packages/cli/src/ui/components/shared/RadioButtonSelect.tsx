@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import SelectInput, {
   type ItemProps as InkSelectItemProps,
   type IndicatorProps as InkSelectIndicatorProps,
@@ -78,12 +78,11 @@ export function RadioButtonSelect<T>({
     isSelected = false,
   }: InkSelectIndicatorProps): React.JSX.Element {
     return (
-      <Text
-        color={isSelected ? Colors.AccentGreen : Colors.Foreground}
-        wrap="truncate"
-      >
-        {isSelected ? '● ' : '○ '}
-      </Text>
+      <Box minWidth={2} flexShrink={0}>
+        <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+          {isSelected ? '●' : '○'}
+        </Text>
+      </Box>
     );
   }
 
