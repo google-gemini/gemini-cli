@@ -76,11 +76,13 @@ export const StatsColumn: React.FC<{
           label="Thoughts Tokens"
           value={stats.thoughtsTokens.toLocaleString()}
         />
-        <StatRow
-          label="Cached Tokens"
-          value={cachedDisplay}
-          valueColor={cachedColor}
-        />
+        {stats.cachedTokens > 0 && (
+          <StatRow
+            label="Cached Tokens"
+            value={cachedDisplay}
+            valueColor={cachedColor}
+          />
+        )}
         {/* Divider Line */}
         <Box
           borderTop={true}
