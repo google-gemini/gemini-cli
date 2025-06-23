@@ -107,39 +107,31 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
 
   const laidOutStyledText: StyledText[][] = [];
-  // When maxHeight is not set, we render the content normally rather
-  // than using our custom layout logic. This should slightly improve
-  // performance for the case where there is no height limit and is
-  // a useful debugging tool to ensure that our layouts are consist
-  // with the expected layout when there is no height limit.
-  // In the future we might choose to still apply our layout logic
-  // even in this case particularlly if there are cases where we
-  // intentionally diverse how certain layouts are rendered.
-  let targetMaxHeight;
-  if (maxHeight !== undefined) {
-    targetMaxHeight = Math.max(Math.round(maxHeight), MINIMUM_MAX_HEIGHT);
+  const targetMaxHeight = Math.max(
+    Math.round(maxHeight ?? Number.MAX_SAFE_INTEGER),
+    MINIMUM_MAX_HEIGHT,
+  );
 
-    if (maxWidth === undefined) {
-      throw new Error('maxWidth must be defined when maxHeight is set.');
-    }
-    function visitRows(element: React.ReactNode) {
-      if (!React.isValidElement(element)) {
-        return;
-      }
-      if (element.type === Fragment) {
-        React.Children.forEach(element.props.children, visitRows);
-        return;
-      }
-      if (element.type === Box) {
-        layoutInkElementAsStyledText(element, maxWidth!, laidOutStyledText);
-        return;
-      }
-
-      debugReportError('MaxSizedBox children must be <Box> elements', element);
-    }
-
-    React.Children.forEach(children, visitRows);
+  if (maxWidth === undefined) {
+    throw new Error('maxWidth must be defined when maxHeight is set.');
   }
+  function visitRows(element: React.ReactNode) {
+    if (!React.isValidElement(element)) {
+      return;
+    }
+    if (element.type === Fragment) {
+      React.Children.forEach(element.props.children, visitRows);
+      return;
+    }
+    if (element.type === Box) {
+      layoutInkElementAsStyledText(element, maxWidth!, laidOutStyledText);
+      return;
+    }
+
+    debugReportError('MaxSizedBox children must be <Box> elements', element);
+  }
+
+  React.Children.forEach(children, visitRows);
 
   const contentWillOverflow =
     (targetMaxHeight !== undefined &&
@@ -167,14 +159,6 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       removeOverflowingId?.(id);
     };
   }, [id, totalHiddenLines, addOverflowingId, removeOverflowingId]);
-
-  if (maxHeight === undefined) {
-    return (
-      <Box width={maxWidth} height={maxHeight} flexDirection="column">
-        {children}
-      </Box>
-    );
-  }
 
   const visibleStyledText =
     hiddenLinesCount > 0
