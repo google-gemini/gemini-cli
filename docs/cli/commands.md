@@ -10,6 +10,19 @@ Slash commands provide meta-level control over the CLI itself.
 
   - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `bugCommand` setting in your `.gemini/settings.json` files.
 
+- **`/chat`**
+
+  - **Description:** Save and resume conversation history for branching conversation state interactively, or resuming a previous state from a later session.
+  - **Sub-commands:**
+    - **`save`**
+      - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
+      - **Usage:** `/chat save <tag>`
+    - **`resume`**
+      - **Description:** Resumes a conversation from a previous save.
+      - **Usage:** `/chat resume <tag>`
+    - **`list`**
+      - **Description:** Lists available tags for chat state resumption.
+
 - **`/clear`**
 
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
@@ -51,6 +64,12 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Reload the hierarchical instructional memory from all `GEMINI.md` files found in the configured locations (global, project/ancestors, and sub-directories). This command updates the model with the latest `GEMINI.md` content.
     - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](./configuration.md#4-geminimd-files-hierarchical-instructional-context).
 
+- **`/restore`**
+
+  - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
+  - **Usage:** `/restore [tool_call_id]`
+  - **Note:** Only available if the CLI is invoked with the `--checkpointing` option or configured via [settings](./configuration.md).
+
 - **`/stats`**
 
   - **Description:** Display detailed statistics for the current Gemini CLI session, such as the session duration.
@@ -79,25 +98,6 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **`/exit`**)
 
   - **Description:** Exit Gemini CLI.
-
-## Checkpointing Commands
-
-Checkpointing allows you to save and restore the state of your conversation and files. This is disabled by default, you must explicitly enable checkpointing using the `--checkpointing` argument or via [settings](./configuration.md).
-
-- **`/save`**
-
-  - **Description:** Saves a checkpoint of the current conversation history. You can optionally add a `[tag]` to easily identify it later.
-  - **Usage:** `/save [tag]`
-
-- **`/resume`**
-
-  - **Description:** Resumes a conversation from a previously saved checkpoint. If you don't provide a `[tag]`, it will attempt to load the latest checkpoint.
-  - **Usage:** `/resume [tag]`
-
-- **`/restore`**
-
-  - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
-  - **Usage:** `/restore [tool_call_id]`
 
 ## At commands (`@`)
 
