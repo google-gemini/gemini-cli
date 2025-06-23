@@ -11,7 +11,12 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
+import {
+  CallableTool,
+  FunctionDeclaration,
+  mcpToTool,
+  Schema,
+} from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
@@ -299,6 +304,8 @@ async function connectAndDiscover(
           toolNameForModel.slice(0, 28) + '___' + toolNameForModel.slice(-32);
       }
 
+      sanatizeParameters(funcDecl.parameters);
+
       // Ensure parameters is a valid JSON schema object, default to empty if not.
       const parameterSchema: Record<string, unknown> =
         funcDecl.parameters && typeof funcDecl.parameters === 'object'
@@ -351,6 +358,27 @@ async function connectAndDiscover(
       await transport.close();
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+    }
+  }
+}
+
+export function sanatizeParameters(schema?: Schema) {
+  if (!schema) {
+    return;
+  }
+  if (schema.anyOf) {
+    // Vertex AI gets confused if both anyOf and default are set.
+    schema.default = undefined;
+    for (const item of schema.anyOf) {
+      sanatizeParameters(item);
+    }
+  }
+  if (schema.items) {
+    sanatizeParameters(schema.items);
+  }
+  if (schema.properties) {
+    for (const item of Object.values(schema.properties)) {
+      sanatizeParameters(item);
     }
   }
 }

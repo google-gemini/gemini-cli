@@ -14,7 +14,8 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import { discoverMcpTools } from './mcp-client.js';
+import { discoverMcpTools, sanatizeParameters } from './mcp-client.js';
+import { Schema, Type } from '@google/genai';
 import { Config, MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -534,5 +535,89 @@ describe('discoverMcpTools', () => {
     const lastClientInstance =
       clientInstances[clientInstances.length - 1]?.value;
     expect(lastClientInstance?.onerror).toEqual(expect.any(Function));
+  });
+});
+
+describe('sanatizeParameters', () => {
+  it('should do nothing for an undefined schema', () => {
+    const schema = undefined;
+    sanatizeParameters(schema);
+  });
+
+  it('should remove default when anyOf is present', () => {
+    const schema: Schema = {
+      anyOf: [{ type: Type.STRING }, { type: Type.NUMBER }],
+      default: 'hello',
+    };
+    sanatizeParameters(schema);
+    expect(schema.default).toBeUndefined();
+  });
+
+  it('should recursively sanatize items in anyOf', () => {
+    const schema: Schema = {
+      anyOf: [
+        {
+          anyOf: [{ type: Type.STRING }],
+          default: 'world',
+        },
+        { type: Type.NUMBER },
+      ],
+    };
+    sanatizeParameters(schema);
+    expect(schema.anyOf![0].default).toBeUndefined();
+  });
+
+  it('should recursively sanatize items in items', () => {
+    const schema: Schema = {
+      items: {
+        anyOf: [{ type: Type.STRING }],
+        default: 'world',
+      },
+    };
+    sanatizeParameters(schema);
+    expect(schema.items!.default).toBeUndefined();
+  });
+
+  it('should recursively sanatize items in properties', () => {
+    const schema: Schema = {
+      properties: {
+        prop1: {
+          anyOf: [{ type: Type.STRING }],
+          default: 'world',
+        },
+      },
+    };
+    sanatizeParameters(schema);
+    expect(schema.properties!.prop1.default).toBeUndefined();
+  });
+
+  it('should handle complex nested schemas', () => {
+    const schema: Schema = {
+      properties: {
+        prop1: {
+          items: {
+            anyOf: [{ type: Type.STRING }],
+            default: 'world',
+          },
+        },
+        prop2: {
+          anyOf: [
+            {
+              properties: {
+                nestedProp: {
+                  anyOf: [{ type: Type.NUMBER }],
+                  default: 123,
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+    sanatizeParameters(schema);
+    expect(schema.properties!.prop1.items!.default).toBeUndefined();
+    const nestedProp =
+      schema.properties!.prop2.anyOf![0].properties!.nestedProp;
+    expect(nestedProp?.default).toBeUndefined();
   });
 });
