@@ -71,7 +71,7 @@ describe('loggers', () => {
           authType: AuthType.USE_VERTEX_AI,
         }),
         getTelemetryEnabled: () => true,
-        getDisableDataCollection: () => false,
+        getUsageStatisticsEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
         getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringAllowBuildArtifacts: () => false,
@@ -116,7 +116,7 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
-      getDisableDataCollection: () => false,
+      getUsageStatisticsEnabled: () => true,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -142,7 +142,7 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false,
         getTargetDir: () => 'target-dir',
-        getDisableDataCollection: () => false,
+        getUsageStatisticsEnabled: () => true,
       } as unknown as Config;
       const event = new UserPromptEvent(11, 'test-prompt');
 
@@ -164,7 +164,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
-      getDisableDataCollection: () => false,
+      getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
     } as Config;
@@ -270,7 +270,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
-      getDisableDataCollection: () => false,
+      getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
     } as Config;
@@ -347,7 +347,7 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
       getGeminiClient: () => mockGeminiClient,
-      getDisableDataCollection: () => false,
+      getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
     } as Config;

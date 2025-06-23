@@ -57,7 +57,7 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   logPrompts?: boolean;
-  disableDataCollection?: boolean;
+  usageStatisticsEnabled?: boolean;
 }
 
 export class MCPServerConfig {
@@ -181,7 +181,7 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       logPrompts: params.telemetry?.logPrompts ?? true,
-      disableDataCollection: params.telemetry?.disableDataCollection ?? false,
+      usageStatisticsEnabled: params.telemetry?.usageStatisticsEnabled ?? true,
     };
 
     this.fileFiltering = {
@@ -205,7 +205,7 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (!this.getDisableDataCollection()) {
+    if (this.getUsageStatisticsEnabled()) {
       ClearcutLogger.getInstance(this)?.logStartSessionEvent(
         new StartSessionEvent(this),
       );
@@ -385,8 +385,8 @@ export class Config {
     return this.fileDiscoveryService;
   }
 
-  getDisableDataCollection(): boolean {
-    return this.telemetrySettings.disableDataCollection ?? false;
+  getUsageStatisticsEnabled(): boolean {
+    return this.telemetrySettings.usageStatisticsEnabled ?? true;
   }
 
   getExtensionContextFilePaths(): string[] {
