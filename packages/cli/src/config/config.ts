@@ -226,7 +226,7 @@ export async function loadCliConfig(
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-      disableDataCollection: settings.telemetry?.disableDataCollection ?? true,
+      disableDataCollection: settings.telemetry?.disableDataCollection ?? false,
     },
     // Git-aware file filtering settings
     fileFiltering: {
