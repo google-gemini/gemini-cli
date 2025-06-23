@@ -6,15 +6,27 @@ This repository contains the Gemini CLI tool.
 
 ## Quickstart
 
-1. [Install Node 18+](https://nodejs.org/en/download).
-2. Run the Gemini CLI from your shell using the following command: `npx https://github.com/google-gemini/gemini-cli`
-3. When prompted, sign in with your Google account
-4. Enjoy!
+1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
+2. **Run the CLI:** Execute the following command in your terminal:
 
-When you login with your Google account, you get up to 60 model requests per minute and 1,000 model requests per day using Gemini 2.5 Pro. Alternatively, if you prefer to use a specific model or need more capacity, you can:
+   ```bash
+   npx https://github.com/google-gemini/gemini-cli
+   ```
 
-- [Get an API key from Google AI Studio](https://aistudio.google.com/apikey).
-- Set the API key in your shell using the following command, replacing `YOUR_API_KEY` with the API key you obtained: `export GEMINI_API_KEY="YOUR_API_KEY"` or store it in an .env file.
+3. **Authenticate:** When prompted, sign in with your Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini 2.5 Pro.
+
+You are now ready to use the Gemini CLI!
+
+### For advanced use or increased limits:
+
+If you need to use a specific model or require a higher request capacity, you can use an API key:
+
+1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
+
+   ```bash
+   export GEMINI_API_KEY="YOUR_API_KEY"
+   ```
 
 ## Examples
 
