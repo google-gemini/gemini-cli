@@ -289,6 +289,7 @@ describe('useGeminiStream', () => {
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
       getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
       addHistory: vi.fn(),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
