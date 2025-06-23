@@ -117,7 +117,6 @@ export interface ConfigParameters {
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
   model: string;
-  disableDataCollection?: boolean;
   extensionContextFilePaths?: string[];
 }
 
@@ -155,7 +154,6 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
-  private readonly disableDataCollection: boolean;
   private readonly extensionContextFilePaths: string[];
 
   constructor(params: ConfigParameters) {
@@ -183,6 +181,7 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       logPrompts: params.telemetry?.logPrompts ?? true,
+      disableDataCollection: params.telemetry?.disableDataCollection ?? false,
     };
 
     this.fileFiltering = {
@@ -196,8 +195,6 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
-    this.disableDataCollection =
-      params.telemetry?.disableDataCollection ?? true;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
 
     if (params.contextFileName) {
@@ -208,10 +205,12 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (!this.disableDataCollection) {
-      ClearcutLogger.getInstance(this)?.enqueueLogEvent(
+    if (!this.getDisableDataCollection()) {
+      ClearcutLogger.getInstance(this)?.logStartSessionEvent(
         new StartSessionEvent(this),
       );
+    } else {
+      console.log('Data collection is disabled.');
     }
   }
 
@@ -387,7 +386,7 @@ export class Config {
   }
 
   getDisableDataCollection(): boolean {
-    return this.disableDataCollection;
+    return this.telemetrySettings.disableDataCollection ?? false;
   }
 
   getExtensionContextFilePaths(): string[] {
