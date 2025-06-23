@@ -727,6 +727,7 @@ Add any other context about the problem here.
             model: MessageType.GEMINI,
           };
           let i = 0;
+          let hasSystemPrompt = false;
           for (const item of conversation) {
             i += 1;
             const text =
@@ -734,22 +735,23 @@ Add any other context about the problem here.
                 ?.filter((m) => !!m.text)
                 .map((m) => m.text)
                 .join('') || '';
-            if (i <= 2) {
-              // Skip system prompt back and forth.
-              continue;
-            }
             if (!text) {
               // Parsing Part[] back to various non-text output not yet implemented.
               continue;
             }
-            addItem(
-              {
-                type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-                text,
-              } as HistoryItemWithoutId,
-              i,
-            );
             chat.addHistory(item);
+            if (i === 1 && text.match(/context for our chat/)) {
+              hasSystemPrompt = true;
+            }
+            if (i > 2 || !hasSystemPrompt) {
+              addItem(
+                {
+                  type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+                  text,
+                } as HistoryItemWithoutId,
+                i,
+              );
+            }
           }
           console.clear();
           refreshStatic();
