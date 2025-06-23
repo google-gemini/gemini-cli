@@ -169,6 +169,9 @@ async function main() {
     '\n🚀 To send telemetry, run the Gemini CLI in a separate terminal window.',
   );
   console.log(`\n📄 Collector logs are being written to: ${OTEL_LOG_FILE}`);
+  console.log(
+    `📄 Tail collector logs in another terminal: tail -f ${OTEL_LOG_FILE}`,
+  );
   console.log(`\n📊 View your telemetry data in Google Cloud Console:`);
   console.log(
     `   - Logs: https://console.cloud.google.com/logs/query;query=logName%3D%22projects%2F${projectId}%2Flogs%2Fgemini_cli%22?project=${projectId}`,
