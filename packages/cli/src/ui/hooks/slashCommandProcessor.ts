@@ -186,8 +186,7 @@ export const useSlashCommandProcessor = (
         name: 'docs',
         description: 'open full Gemini CLI documentation in your browser',
         action: async (_mainCommand, _subCommand, _args) => {
-          const docsUrl =
-            'https://github.com/google-gemini/gemini-cli/blob/main/docs/index.md';
+          const docsUrl = 'https://goo.gle/gemini-cli-docs';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
             addMessage({
               type: MessageType.INFO,
