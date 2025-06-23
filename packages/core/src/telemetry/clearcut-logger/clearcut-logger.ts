@@ -79,7 +79,6 @@ export class ClearcutLogger {
     }
 
     this.flushToClearcut();
-    this.last_flush_time = Date.now();
   }
 
   flushToClearcut(): Promise<LogResponse> {
@@ -121,6 +120,7 @@ export class ClearcutLogger {
     }).then((buf: Buffer) => {
       try {
         this.events.length = 0;
+        this.last_flush_time = Date.now();
         return this.decodeLogResponse(buf) || {};
       } catch (error: unknown) {
         console.error('Error flushing log events:', error);
