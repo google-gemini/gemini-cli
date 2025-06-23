@@ -30,7 +30,6 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are tw
 In addition to a project settings file, a project's `.gemini` directory can contain other project-specific files related to Gemini CLI's operation, such as:
 
 - [Custom sandbox profiles](#sandboxing) (e.g., `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
-- [Telemtry configurations](../core/telemetry.md#running-an-otel-collector) (e.g., `.gemini/otel/`).
 
 ### Available settings in `settings.json`:
 
