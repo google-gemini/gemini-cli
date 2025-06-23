@@ -207,6 +207,11 @@ async function main() {
     `
 🔎 View traces in the Jaeger UI: http://localhost:${JAEGER_PORT}`,
   );
+  console.log(`📊 View metrics in the logs and metrics: ${OTEL_LOG_FILE}`);
+  console.log(
+    `
+📄 Tail logs and metrics in another terminal: tail -f ${OTEL_LOG_FILE}`,
+  );
   console.log(`
 Press Ctrl+C to exit.`);
 }
