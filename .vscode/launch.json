@@ -12,9 +12,9 @@
       "runtimeArgs": ["run", "start"],
       "skipFiles": ["<node_internals>/**"],
       "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
       "env": {
-        "GEMINI_SANDBOX": "false",
-        "GEMINI_API_KEY": "testkey"
+        "GEMINI_SANDBOX": "false"
       }
     },
     {
