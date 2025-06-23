@@ -295,11 +295,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   );
 
   useInput((input: string, key: InkKeyType) => {
+    let enteringConstrainHeightMode = false;
     if (!constrainHeight) {
       // Automatically re-enter constrain height mode if the user types
       // anything. When constrainHeight==false, the user will experience
       // significant flickering so it is best to disable it immediately when
       // the user starts interacting with the app.
+      enteringConstrainHeightMode = true;
       setConstrainHeight(true);
 
       // If our pending history item happens to exceed the terminal height we will most likely need to refresh
@@ -335,7 +337,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         return;
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && input === 's') {
+    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
   });
