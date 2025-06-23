@@ -651,34 +651,101 @@ Add any other context about the problem here.
         },
       },
       {
-        name: 'save',
-        description: 'save conversation checkpoint. Usage: /save [tag]',
-        action: async (_mainCommand, subCommand, _args) => {
-          const tag = (subCommand || '').trim();
+        name: 'chat',
+        description:
+          'Manage conversation history. Usage: /chat <save|resume> [tag]',
+        action: async (_mainCommand, subCommand, args) => {
+          const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
           await logger.initialize();
           const chat = await config?.getGeminiClient()?.getChat();
-          const history = chat?.getHistory() || [];
-          if (history.length > 0) {
-            await logger.saveCheckpoint(chat?.getHistory() || [], tag);
+          if (!chat) {
             addMessage({
-              type: MessageType.INFO,
-              content: `Conversation checkpoint saved${tag ? ' with tag: ' + tag : ''}.`,
+              type: MessageType.ERROR,
+              content: 'No chat client available for conversation status.',
               timestamp: new Date(),
             });
-          } else {
-            addMessage({
-              type: MessageType.INFO,
-              content: 'No conversation found to save.',
-              timestamp: new Date(),
-            });
+            return;
+          }
+          switch (subCommand) {
+            case 'save': {
+              const history = chat.getHistory();
+              if (history.length > 0) {
+                await logger.saveCheckpoint(chat?.getHistory() || [], tag);
+                addMessage({
+                  type: MessageType.INFO,
+                  content: `Conversation checkpoint saved${tag ? ' with tag: ' + tag : ''}.`,
+                  timestamp: new Date(),
+                });
+              } else {
+                addMessage({
+                  type: MessageType.INFO,
+                  content: 'No conversation found to save.',
+                  timestamp: new Date(),
+                });
+              }
+              return;
+            }
+            case 'resume':
+            case 'restore':
+            case 'load': {
+              const conversation = await logger.loadCheckpoint(tag);
+              if (conversation.length === 0) {
+                addMessage({
+                  type: MessageType.INFO,
+                  content: `No saved checkpoint found${tag ? ' with tag: ' + tag : ''}.`,
+                  timestamp: new Date(),
+                });
+                return;
+              }
+
+              clearItems();
+              chat.clearHistory();
+              const rolemap: { [key: string]: MessageType } = {
+                user: MessageType.USER,
+                model: MessageType.GEMINI,
+              };
+              let hasSystemPrompt = false;
+              let i = 0;
+              for (const item of conversation) {
+                i += 1;
+                const text =
+                  item.parts
+                    ?.filter((m) => !!m.text)
+                    .map((m) => m.text)
+                    .join('') || '';
+                if (!text) {
+                  // Parsing Part[] back to various non-text output not yet implemented.
+                  continue;
+                }
+                chat.addHistory(item);
+                if (i === 1 && text.match(/context for our chat/)) {
+                  hasSystemPrompt = true;
+                }
+                if (i > 2 || !hasSystemPrompt) {
+                  addItem(
+                    {
+                      type:
+                        (item.role && rolemap[item.role]) || MessageType.GEMINI,
+                      text,
+                    } as HistoryItemWithoutId,
+                    i,
+                  );
+                }
+              }
+              console.clear();
+              refreshStatic();
+              return;
+            }
+            default:
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Unknown /chat command: ${subCommand}. Available: save, resume`,
+                timestamp: new Date(),
+              });
+              return;
           }
         },
-      },
-      {
-        name: 'resume',
-        description:
-          'resume from conversation checkpoint. Usage: /resume [tag]',
         completion: async () => {
           const geminiDir = config?.getProjectTempDir();
           if (!geminiDir) {
@@ -691,70 +758,14 @@ Add any other context about the problem here.
                 (file) =>
                   file.startsWith('checkpoint-') && file.endsWith('.json'),
               )
-              .map((file) =>
-                file.replace('checkpoint-', '').replace('.json', ''),
+              .map(
+                (file) =>
+                  'resume ' +
+                  file.replace('checkpoint-', '').replace('.json', ''),
               );
           } catch (_err) {
             return [];
           }
-        },
-        action: async (_mainCommand, subCommand, _args) => {
-          const tag = (subCommand || '').trim();
-          const logger = new Logger(config?.getSessionId() || '');
-          await logger.initialize();
-          const conversation = await logger.loadCheckpoint(tag);
-          if (conversation.length === 0) {
-            addMessage({
-              type: MessageType.INFO,
-              content: `No saved checkpoint found${tag ? ' with tag: ' + tag : ''}.`,
-              timestamp: new Date(),
-            });
-            return;
-          }
-          const chat = await config?.getGeminiClient()?.getChat();
-          if (!chat) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'No chat client available to resume conversation.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          clearItems();
-          chat.clearHistory();
-          const rolemap: { [key: string]: MessageType } = {
-            user: MessageType.USER,
-            model: MessageType.GEMINI,
-          };
-          let i = 0;
-          let hasSystemPrompt = false;
-          for (const item of conversation) {
-            i += 1;
-            const text =
-              item.parts
-                ?.filter((m) => !!m.text)
-                .map((m) => m.text)
-                .join('') || '';
-            if (!text) {
-              // Parsing Part[] back to various non-text output not yet implemented.
-              continue;
-            }
-            chat.addHistory(item);
-            if (i === 1 && text.match(/context for our chat/)) {
-              hasSystemPrompt = true;
-            }
-            if (i > 2 || !hasSystemPrompt) {
-              addItem(
-                {
-                  type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-                  text,
-                } as HistoryItemWithoutId,
-                i,
-              );
-            }
-          }
-          console.clear();
-          refreshStatic();
         },
       },
       {
