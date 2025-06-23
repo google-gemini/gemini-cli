@@ -40,7 +40,7 @@
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
     "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:docker && npm run publish:sandbox && npm run publish:npm",
     "telemetry": "node scripts/telemetry.js",
-    "start:gcp": "npm run telemetry -- --target=gcp & npm start"
+    "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\""
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -55,6 +55,7 @@
     "@types/mime-types": "^2.1.4",
     "@types/minimatch": "^5.1.2",
     "@vitest/coverage-v8": "^3.1.1",
+    "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
     "eslint": "^9.24.0",
