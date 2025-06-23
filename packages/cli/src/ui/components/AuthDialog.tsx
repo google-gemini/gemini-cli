@@ -38,7 +38,7 @@ export function AuthDialog({
       label: 'Login with Google Work',
       value: AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE,
     },
-    { label: 'Vertex API Key', value: AuthType.USE_VERTEX_AI },
+    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
   const isSelectedAuthInMore = allAuthItems
