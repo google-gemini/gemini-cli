@@ -83,7 +83,9 @@ export class ClearcutLogger {
   }
 
   flushToClearcut(): Promise<LogResponse> {
-    console.log('Flushing log events to Clearcut.');
+    if (this.config?.getDebugMode()) {
+      console.log('Flushing log events to Clearcut.');
+    }
     return new Promise<Buffer>((resolve, reject) => {
       const request = [
         {
@@ -93,7 +95,9 @@ export class ClearcutLogger {
         },
       ];
       const body = JSON.stringify(request);
-      console.log('Clearcut POST request body:', body);
+      if (this.config?.getDebugMode()) {
+        console.log('Clearcut POST request body:', body);
+      }
       const options = {
         hostname: 'play.googleapis.com',
         path: '/log',
@@ -108,7 +112,9 @@ export class ClearcutLogger {
         });
       });
       req.on('error', (e) => {
-        console.log('Clearcut POST request error: ', e);
+        if (this.config?.getDebugMode()) {
+          console.log('Clearcut POST request error: ', e);
+        }
         reject(e);
       });
       req.end(body);
@@ -159,7 +165,9 @@ export class ClearcutLogger {
     const returnVal = {
       nextRequestWaitMs: Number(ms),
     };
-    console.log('Clearcut response: ', returnVal);
+    if (this.config?.getDebugMode()) {
+      console.log('Clearcut response: ', returnVal);
+    }
     return returnVal;
   }
 
