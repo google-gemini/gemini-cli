@@ -30,17 +30,22 @@ export const Header: React.FC<HeaderProps> = ({
       terminalWidth >= widthOfLongLogo ? longAsciiLogo : shortAsciiLogo;
   }
 
+  const artWidth = getAsciiArtWidth(displayTitle);
+
   return (
-    <>
-      <Box marginBottom={1} alignItems="flex-start">
-        {Colors.GradientColors ? (
-          <Gradient colors={Colors.GradientColors}>
-            <Text>{displayTitle}</Text>
-          </Gradient>
-        ) : (
+    <Box
+      marginBottom={1}
+      alignItems="flex-start"
+      width={artWidth}
+      flexShrink={0}
+    >
+      {Colors.GradientColors ? (
+        <Gradient colors={Colors.GradientColors}>
           <Text>{displayTitle}</Text>
-        )}
-      </Box>
-    </>
+        </Gradient>
+      ) : (
+        <Text>{displayTitle}</Text>
+      )}
+    </Box>
   );
 };
