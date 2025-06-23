@@ -754,7 +754,8 @@ Add any other context about the problem here.
       expect(commandResult).toBe(true);
     });
 
-    it('should display a message when no MCP servers are configured', async () => {
+    it('should display a message with a URL when no MCP servers are configured in a sandbox', async () => {
+      process.env.SANDBOX = 'sandbox';
       mockConfig = {
         ...mockConfig,
         getToolRegistry: vi.fn().mockResolvedValue({
@@ -773,10 +774,38 @@ Add any other context about the problem here.
         2,
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'No MCP servers configured.',
+          text: `No MCP servers configured. Please open the following URL in your browser to view documentation:\nhttps://goo.gle/gemini-cli-docs-mcp`,
         }),
         expect.any(Number),
       );
+      expect(commandResult).toBe(true);
+      delete process.env.SANDBOX;
+    });
+
+    it('should display a message and open a URL when no MCP servers are configured outside a sandbox', async () => {
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue([]),
+        }),
+        getMcpServers: vi.fn().mockReturnValue({}),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'No MCP servers configured. Opening documentation in your browser: https://goo.gle/gemini-cli-docs-mcp',
+        }),
+        expect.any(Number),
+      );
+      expect(open).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs-mcp');
       expect(commandResult).toBe(true);
     });
 
