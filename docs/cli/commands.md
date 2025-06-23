@@ -72,7 +72,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/stats`**
 
-  - **Description:** Display detailed statistics for the current Gemini CLI session, such as the session duration.
+  - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
 
 - [**`/theme`**](./themes.md)
 
