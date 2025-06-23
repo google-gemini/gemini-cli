@@ -48,12 +48,6 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       .split('\n')
       .map((p) => p.trim())
       .filter((p) => p !== '' && !p.startsWith('#'));
-    if (patterns.length > 0) {
-      // Log the number of patterns loaded on STDERR so it doesn't clutter the output on STDOUT
-      console.error(
-        `Loaded ${patterns.length} patterns from ${patternsFilePath}`,
-      );
-    }
     this.addPatterns(patterns);
   }
 
