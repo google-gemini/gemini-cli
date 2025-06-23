@@ -291,11 +291,21 @@ export const useSlashCommandProcessor = (
           const serverNames = Object.keys(mcpServers);
 
           if (serverNames.length === 0) {
-            addMessage({
-              type: MessageType.INFO,
-              content: 'No MCP servers configured.',
-              timestamp: new Date(),
-            });
+            const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
+            if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+              addMessage({
+                type: MessageType.INFO,
+                content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
+                timestamp: new Date(),
+              });
+            } else {
+              addMessage({
+                type: MessageType.INFO,
+                content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
+                timestamp: new Date(),
+              });
+              await open(docsUrl);
+            }
             return;
           }
 
