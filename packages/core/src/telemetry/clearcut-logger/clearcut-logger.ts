@@ -98,9 +98,6 @@ export class ClearcutLogger {
         },
       ];
       const body = JSON.stringify(request);
-      if (this.config?.getDebugMode() ?? false) {
-        console.log('Clearcut POST request body:', body);
-      }
       const options = {
         hostname: 'play.googleapis.com',
         path: '/log',
