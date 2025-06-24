@@ -128,7 +128,12 @@ export async function runNonInteractive(
       }
     }
   } catch (error) {
-    console.error(parseAndFormatApiError(error));
+    console.error(
+      parseAndFormatApiError(
+        error,
+        config.getContentGeneratorConfig().authType,
+      ),
+    );
     process.exit(1);
   } finally {
     if (isTelemetrySdkInitialized()) {

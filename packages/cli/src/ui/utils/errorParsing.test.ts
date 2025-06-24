@@ -6,11 +6,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseAndFormatApiError } from './errorParsing.js';
-import { StructuredError } from '@gemini-cli/core';
+import { AuthType, StructuredError } from '@gemini-cli/core';
 
 describe('parseAndFormatApiError', () => {
-  const rateLimitMessage =
-    'Please wait and try again later. To increase your limits, upgrade to a plan with higher limits, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey';
+  const enterpriseMessage = 'upgrade to a plan with higher limits';
+  const vertexMessage = 'request a quota increase through Vertex';
+  const geminiMessage = 'request a quota increase through AI Studio';
 
   it('should format a valid API error JSON', () => {
     const errorMessage =
@@ -20,11 +21,31 @@ describe('parseAndFormatApiError', () => {
     expect(parseAndFormatApiError(errorMessage)).toBe(expected);
   });
 
-  it('should format a 429 API error JSON with the custom message', () => {
+  it('should format a 429 API error with the default message', () => {
     const errorMessage =
       'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
-    const expected = `[API Error: Rate limit exceeded (Status: RESOURCE_EXHAUSTED)]\n${rateLimitMessage}`;
-    expect(parseAndFormatApiError(errorMessage)).toBe(expected);
+    const result = parseAndFormatApiError(errorMessage);
+    expect(result).toContain('[API Error: Rate limit exceeded');
+    expect(result).toContain('Your request has been rate limited');
+  });
+
+  it('should format a 429 API error with the enterprise message', () => {
+    const errorMessage =
+      'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
+    const result = parseAndFormatApiError(
+      errorMessage,
+      AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE,
+    );
+    expect(result).toContain('[API Error: Rate limit exceeded');
+    expect(result).toContain(enterpriseMessage);
+  });
+
+  it('should format a 429 API error with the vertex message', () => {
+    const errorMessage =
+      'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
+    const result = parseAndFormatApiError(errorMessage, AuthType.USE_VERTEX_AI);
+    expect(result).toContain('[API Error: Rate limit exceeded');
+    expect(result).toContain(vertexMessage);
   });
 
   it('should return the original message if it is not a JSON error', () => {
@@ -66,9 +87,9 @@ describe('parseAndFormatApiError', () => {
       },
     });
 
-    const expected = `[API Error: Gemini 2.5 Pro Preview doesn't have a free quota tier. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. (Status: Too Many Requests)]\n${rateLimitMessage}`;
-
-    expect(parseAndFormatApiError(errorMessage)).toBe(expected);
+    const result = parseAndFormatApiError(errorMessage, AuthType.USE_GEMINI);
+    expect(result).toContain('Gemini 2.5 Pro Preview');
+    expect(result).toContain(geminiMessage);
   });
 
   it('should format a StructuredError', () => {
@@ -80,13 +101,14 @@ describe('parseAndFormatApiError', () => {
     expect(parseAndFormatApiError(error)).toBe(expected);
   });
 
-  it('should format a 429 StructuredError with the custom message', () => {
+  it('should format a 429 StructuredError with the vertex message', () => {
     const error: StructuredError = {
       message: 'Rate limit exceeded',
       status: 429,
     };
-    const expected = `[API Error: Rate limit exceeded]\n${rateLimitMessage}`;
-    expect(parseAndFormatApiError(error)).toBe(expected);
+    const result = parseAndFormatApiError(error, AuthType.USE_VERTEX_AI);
+    expect(result).toContain('[API Error: Rate limit exceeded]');
+    expect(result).toContain(vertexMessage);
   });
 
   it('should handle an unknown error type', () => {

@@ -53,6 +53,7 @@ describe('runNonInteractive', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({}),
     } as unknown as Config;
 
     mockProcessStdoutWrite = vi.fn().mockImplementation(() => true);
