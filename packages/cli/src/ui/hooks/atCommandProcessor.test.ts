@@ -21,6 +21,7 @@ const mockConfig = {
   isSandboxed: vi.fn(() => false),
   getFileService: vi.fn(),
   getFileFilteringRespectGitIgnore: vi.fn(() => true),
+  getEnableRecursiveFileSearch: vi.fn(() => true),
 } as unknown as Config;
 
 const mockReadManyFilesExecute = vi.fn();
@@ -716,6 +717,37 @@ describe('handleAtCommand', () => {
         `Path ${gitFile} is git-ignored and will be skipped.`,
       );
       expect(mockReadManyFilesExecute).not.toHaveBeenCalled();
+      expect(result.processedQuery).toEqual([{ text: query }]);
+      expect(result.shouldProceed).toBe(true);
+    });
+  });
+
+  describe('when recursive file search is disabled', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getEnableRecursiveFileSearch).mockReturnValue(false);
+    });
+
+    it('should not use glob search for a nonexistent file', async () => {
+      const invalidFile = 'nonexistent.txt';
+      const query = `@${invalidFile}`;
+
+      vi.mocked(fsPromises.stat).mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 300,
+        signal: abortController.signal,
+      });
+
+      expect(mockGlobExecute).not.toHaveBeenCalled();
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        `Glob tool not found. Path ${invalidFile} will be skipped.`,
+      );
       expect(result.processedQuery).toEqual([{ text: query }]);
       expect(result.shouldProceed).toBe(true);
     });
