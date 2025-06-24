@@ -20,6 +20,7 @@ import { Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { setSimulate429 } from '../utils/testUtils.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -67,6 +68,9 @@ describe('Gemini Client (client.ts)', () => {
   let client: GeminiClient;
   beforeEach(async () => {
     vi.resetAllMocks();
+
+    // Disable 429 simulation for tests
+    setSimulate429(false);
 
     // Set up the mock for GoogleGenAI constructor and its methods
     const MockedGoogleGenAI = vi.mocked(GoogleGenAI);

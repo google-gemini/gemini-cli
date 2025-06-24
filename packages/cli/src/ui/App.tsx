@@ -115,6 +115,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
+  const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
@@ -212,6 +213,42 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       );
       console.error('Error refreshing memory:', error);
     }
+  }, [config, addItem]);
+
+  // Watch for model changes (e.g., from Flash fallback)
+  useEffect(() => {
+    const checkModelChange = () => {
+      const configModel = config.getModel();
+      if (configModel !== currentModel) {
+        setCurrentModel(configModel);
+      }
+    };
+
+    // Check immediately and then periodically
+    checkModelChange();
+    const interval = setInterval(checkModelChange, 1000); // Check every second
+
+    return () => clearInterval(interval);
+  }, [config, currentModel]);
+
+  // Set up Flash fallback handler
+  useEffect(() => {
+    const flashFallbackHandler = async (
+      currentModel: string,
+      fallbackModel: string,
+    ): Promise<boolean> => {
+      // Add message to UI history
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `⚡ Rate limiting detected. Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.`,
+        },
+        Date.now(),
+      );
+      return true; // Always accept the fallback
+    };
+
+    config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem]);
 
   const {
@@ -787,7 +824,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             </Box>
           )}
           <Footer
-            model={config.getModel()}
+            model={currentModel}
             targetDir={config.getTargetDir()}
             debugMode={config.getDebugMode()}
             branchName={branchName}

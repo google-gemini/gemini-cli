@@ -18,7 +18,7 @@ import {
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { ContentGenerator } from './contentGenerator.js';
+import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
 import {
   logApiRequest,
@@ -34,6 +34,7 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
 } from '../telemetry/types.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -182,6 +183,44 @@ export class GeminiChat {
   }
 
   /**
+   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config, otherwise returns null.
+   */
+  private async handleFlashFallback(authType?: string): Promise<string | null> {
+    // Only handle fallback for OAuth users
+    if (
+      authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL &&
+      authType !== AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE
+    ) {
+      return null;
+    }
+
+    const currentModel = this.model;
+    const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
+
+    // Don't fallback if already using Flash model
+    if (currentModel === fallbackModel) {
+      return null;
+    }
+
+    // Check if config has a fallback handler (set by CLI package)
+    const fallbackHandler = this.config.flashFallbackHandler;
+    if (typeof fallbackHandler === 'function') {
+      try {
+        const accepted = await fallbackHandler(currentModel, fallbackModel);
+        if (accepted) {
+          this.config.setModel(fallbackModel);
+          return fallbackModel;
+        }
+      } catch (error) {
+        console.warn('Flash fallback handler failed:', error);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Sends a message to the model and returns the response.
    *
    * @remarks
@@ -315,6 +354,9 @@ export class GeminiChat {
           }
           return false; // Don't retry other errors by default
         },
+        onPersistent429: async (authType?: string) =>
+          await this.handleFlashFallback(authType),
+        authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
       // Resolve the internal tracking of send completion promise - `sendPromise`

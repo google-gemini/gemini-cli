@@ -171,7 +171,7 @@ export const useSlashCommandProcessor = (
     [addMessage],
   );
 
-  const savedChatTags = async function () {
+  const savedChatTags = useCallback(async () => {
     const geminiDir = config?.getProjectTempDir();
     if (!geminiDir) {
       return [];
@@ -186,7 +186,7 @@ export const useSlashCommandProcessor = (
     } catch (_err) {
       return [];
     }
-  };
+  }, [config]);
 
   const slashCommands: SlashCommand[] = useMemo(() => {
     const commands: SlashCommand[] = [
@@ -992,6 +992,7 @@ Add any other context about the problem here.
     addMemoryAction,
     addMessage,
     toggleCorgiMode,
+    savedChatTags,
     config,
     showToolDescriptions,
     session,

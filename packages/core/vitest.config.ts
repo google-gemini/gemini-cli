@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     reporters: ['default', 'junit'],
     silent: true,
+    setupFiles: ['./test-setup.ts'],
     outputFile: {
       junit: 'junit.xml',
     },
