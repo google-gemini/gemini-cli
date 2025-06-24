@@ -57,7 +57,6 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   logPrompts?: boolean;
-  usageStatisticsEnabled?: boolean;
 }
 
 export class MCPServerConfig {
@@ -107,6 +106,7 @@ export interface ConfigParameters {
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;
+  usageStatisticsEnabled?: boolean;
   fileFiltering?: {
     respectGitIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
@@ -142,6 +142,7 @@ export class Config {
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
+  private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
@@ -181,8 +182,8 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       logPrompts: params.telemetry?.logPrompts ?? true,
-      usageStatisticsEnabled: params.telemetry?.usageStatisticsEnabled ?? true,
     };
+    this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
     this.fileFiltering = {
       respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
@@ -386,7 +387,7 @@ export class Config {
   }
 
   getUsageStatisticsEnabled(): boolean {
-    return this.telemetrySettings.usageStatisticsEnabled ?? true;
+    return this.usageStatisticsEnabled;
   }
 
   getExtensionContextFilePaths(): string[] {
