@@ -59,6 +59,7 @@ describe('editor utils', () => {
       { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
       { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
       { editor: 'vim', command: 'vim', win32Command: 'vim' },
+      { editor: 'zed', command: 'zed', win32Command: 'zed' },
     ];
 
     for (const { editor, command, win32Command } of testCases) {
@@ -105,29 +106,36 @@ describe('editor utils', () => {
   });
 
   describe('getDiffCommand', () => {
-    it('should return the correct command for vscode', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'vscode');
-      expect(command).toEqual({
-        command: 'code',
-        args: ['--wait', '--diff', 'old.txt', 'new.txt'],
-      });
-    });
+    const guiEditors: Array<{
+      editor: EditorType;
+      command: string;
+      win32Command: string;
+    }> = [
+      { editor: 'vscode', command: 'code', win32Command: 'code.cmd' },
+      { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
+      { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
+      { editor: 'zed', command: 'zed', win32Command: 'zed' },
+    ];
 
-    it('should return the correct command for windsurf', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'windsurf');
-      expect(command).toEqual({
-        command: 'windsurf',
-        args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+    for (const { editor, command, win32Command } of guiEditors) {
+      it(`should return the correct command for ${editor} on non-windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command,
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
       });
-    });
 
-    it('should return the correct command for cursor', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'cursor');
-      expect(command).toEqual({
-        command: 'cursor',
-        args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+      it(`should return the correct command for ${editor} on windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command: win32Command,
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
       });
-    });
+    }
 
     it('should return the correct command for vim', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'vim');
@@ -163,55 +171,67 @@ describe('editor utils', () => {
   });
 
   describe('openDiff', () => {
-    it('should call spawn for vscode', async () => {
-      const mockSpawn = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') {
-            cb(0);
-          }
-        }),
-      };
-      (spawn as Mock).mockReturnValue(mockSpawn);
-      await openDiff('old.txt', 'new.txt', 'vscode');
-      expect(spawn).toHaveBeenCalledWith(
-        'code',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        { stdio: 'inherit' },
-      );
-      expect(mockSpawn.on).toHaveBeenCalledWith('close', expect.any(Function));
-      expect(mockSpawn.on).toHaveBeenCalledWith('error', expect.any(Function));
-    });
+    const spawnEditors: EditorType[] = ['vscode', 'windsurf', 'cursor', 'zed'];
+    for (const editor of spawnEditors) {
+      it(`should call spawn for ${editor}`, async () => {
+        const mockSpawn = {
+          on: vi.fn((event, cb) => {
+            if (event === 'close') {
+              cb(0);
+            }
+          }),
+        };
+        (spawn as Mock).mockReturnValue(mockSpawn);
+        await openDiff('old.txt', 'new.txt', editor);
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
+        expect(spawn).toHaveBeenCalledWith(
+          diffCommand.command,
+          diffCommand.args,
+          {
+            stdio: 'inherit',
+          },
+        );
+        expect(mockSpawn.on).toHaveBeenCalledWith(
+          'close',
+          expect.any(Function),
+        );
+        expect(mockSpawn.on).toHaveBeenCalledWith(
+          'error',
+          expect.any(Function),
+        );
+      });
 
-    it('should reject if spawn for vscode fails', async () => {
-      const mockError = new Error('spawn error');
-      const mockSpawn = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') {
-            cb(mockError);
-          }
-        }),
-      };
-      (spawn as Mock).mockReturnValue(mockSpawn);
-      await expect(openDiff('old.txt', 'new.txt', 'vscode')).rejects.toThrow(
-        'spawn error',
-      );
-    });
+      it(`should reject if spawn for ${editor} fails`, async () => {
+        const mockError = new Error('spawn error');
+        const mockSpawn = {
+          on: vi.fn((event, cb) => {
+            if (event === 'error') {
+              cb(mockError);
+            }
+          }),
+        };
+        (spawn as Mock).mockReturnValue(mockSpawn);
+        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+          'spawn error',
+        );
+      });
 
-    it('should reject if vscode exits with non-zero code', async () => {
-      const mockSpawn = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') {
-            cb(1);
-          }
-        }),
-      };
-      (spawn as Mock).mockReturnValue(mockSpawn);
-      await expect(openDiff('old.txt', 'new.txt', 'vscode')).rejects.toThrow(
-        'VS Code exited with code 1',
-      );
-    });
+      it(`should reject if ${editor} exits with non-zero code`, async () => {
+        const mockSpawn = {
+          on: vi.fn((event, cb) => {
+            if (event === 'close') {
+              cb(1);
+            }
+          }),
+        };
+        (spawn as Mock).mockReturnValue(mockSpawn);
+        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+          `${editor} exited with code 1`,
+        );
+      });
+    }
 
-    const execSyncEditors: EditorType[] = ['vim', 'windsurf', 'cursor'];
+    const execSyncEditors: EditorType[] = ['vim'];
     for (const editor of execSyncEditors) {
       it(`should call execSync for ${editor} on non-windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
@@ -249,7 +269,7 @@ describe('editor utils', () => {
       // @ts-expect-error Testing unsupported editor
       await openDiff('old.txt', 'new.txt', 'foobar');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'No diff tool available. Install vim or vscode.',
+        'No diff tool available. Install a supported editor.',
       );
     });
   });
@@ -264,7 +284,7 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('vim')).toBe(true);
     });
 
-    const guiEditors: EditorType[] = ['vscode', 'windsurf', 'cursor'];
+    const guiEditors: EditorType[] = ['vscode', 'windsurf', 'cursor', 'zed'];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
         process.env.SANDBOX = 'sandbox';
