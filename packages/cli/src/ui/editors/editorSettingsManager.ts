@@ -17,6 +17,7 @@ export interface EditorDisplay {
 }
 
 export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
+  zed: 'Zed',
   vscode: 'VS Code',
   windsurf: 'Windsurf',
   cursor: 'Cursor',
@@ -27,7 +28,13 @@ class EditorSettingsManager {
   private readonly availableEditors: EditorDisplay[];
 
   constructor() {
-    const editorTypes: EditorType[] = ['vscode', 'windsurf', 'cursor', 'vim'];
+    const editorTypes: EditorType[] = [
+      'zed',
+      'vscode',
+      'windsurf',
+      'cursor',
+      'vim',
+    ];
     this.availableEditors = [
       {
         name: 'None',
