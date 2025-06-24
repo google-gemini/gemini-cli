@@ -14,6 +14,7 @@ import {
 } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
+import { setSimulate429 } from '../utils/testUtils.js';
 
 // Mocks
 const mockModelsModule = {
@@ -29,6 +30,12 @@ const mockConfig = {
   getTelemetryLogPromptsEnabled: () => true,
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getContentGeneratorConfig: () => ({
+    authType: 'oauth-personal',
+    model: 'test-model',
+  }),
+  setModel: vi.fn(),
+  flashFallbackHandler: undefined,
 } as unknown as Config;
 
 describe('GeminiChat', () => {
@@ -38,6 +45,8 @@ describe('GeminiChat', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Disable 429 simulation for tests
+    setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig, mockModelsModule, model, config, []);
   });

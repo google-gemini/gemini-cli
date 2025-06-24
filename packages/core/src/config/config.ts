@@ -35,7 +35,10 @@ import {
   TelemetryTarget,
   StartSessionEvent,
 } from '../telemetry/index.js';
-import { DEFAULT_GEMINI_EMBEDDING_MODEL } from './models.js';
+import {
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 export enum ApprovalMode {
@@ -84,6 +87,11 @@ export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
 }
+
+export type FlashFallbackHandler = (
+  currentModel: string,
+  fallbackModel: string,
+) => Promise<boolean>;
 
 export interface ConfigParameters {
   sessionId: string;
@@ -156,6 +164,8 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
+  private modelSwitchedDuringSession: boolean = false;
+  flashFallbackHandler?: FlashFallbackHandler;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -216,9 +226,24 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
+    // Check if this is actually a switch to a different auth method
+    const previousAuthType = this.contentGeneratorConfig?.authType;
+    const _isAuthMethodSwitch =
+      previousAuthType && previousAuthType !== authMethod;
+
+    // Always use the original default model when switching auth methods
+    // This ensures users don't stay on Flash after switching between auth types
+    // and allows API key users to get proper fallback behavior from getEffectiveModel
+    const modelToUse = this.model; // Use the original default model
+
+    // Temporarily clear contentGeneratorConfig to prevent getModel() from returning
+    // the previous session's model (which might be Flash)
+    this.contentGeneratorConfig = undefined!;
+
     const contentConfig = await createContentGeneratorConfig(
-      this.getModel(),
+      modelToUse,
       authMethod,
+      this,
     );
 
     const gc = new GeminiClient(this);
@@ -226,6 +251,11 @@ export class Config {
     this.toolRegistry = await createToolRegistry(this);
     await gc.initialize(contentConfig);
     this.contentGeneratorConfig = contentConfig;
+
+    // Reset the session flag since we're explicitly changing auth and using default model
+    this.modelSwitchedDuringSession = false;
+
+    // Note: In the future, we may want to reset any cached state when switching auth methods
   }
 
   getSessionId(): string {
@@ -238,6 +268,28 @@ export class Config {
 
   getModel(): string {
     return this.contentGeneratorConfig?.model || this.model;
+  }
+
+  setModel(newModel: string): void {
+    if (this.contentGeneratorConfig) {
+      this.contentGeneratorConfig.model = newModel;
+      this.modelSwitchedDuringSession = true;
+    }
+  }
+
+  isModelSwitchedDuringSession(): boolean {
+    return this.modelSwitchedDuringSession;
+  }
+
+  resetModelToDefault(): void {
+    if (this.contentGeneratorConfig) {
+      this.contentGeneratorConfig.model = this.model; // Reset to the original default model
+      this.modelSwitchedDuringSession = false;
+    }
+  }
+
+  setFlashFallbackHandler(handler: FlashFallbackHandler): void {
+    this.flashFallbackHandler = handler;
   }
 
   getEmbeddingModel(): string {
@@ -445,3 +497,6 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
     return registry;
   })();
 }
+
+// Export model constants for use in CLI
+export { DEFAULT_GEMINI_FLASH_MODEL };
