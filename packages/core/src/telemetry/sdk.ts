@@ -28,8 +28,6 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import { initializeMetrics } from './metrics.js';
-import { logCliConfiguration } from './loggers.js';
-import { StartSessionEvent } from './types.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
@@ -115,7 +113,6 @@ export function initializeTelemetry(config: Config): void {
     console.log('OpenTelemetry SDK started successfully.');
     telemetryInitialized = true;
     initializeMetrics(config);
-    logCliConfiguration(config, new StartSessionEvent(config));
   } catch (error) {
     console.error('Error starting OpenTelemetry SDK:', error);
   }
