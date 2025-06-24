@@ -85,12 +85,15 @@ export class ClearcutLogger {
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
+    const eventsToSend = [...this.events];
+    this.events.length = 0;
+
     return new Promise<Buffer>((resolve, reject) => {
       const request = [
         {
           log_source_name: 'CONCORD',
           request_time_ms: Date.now(),
-          log_event: this.events,
+          log_event: eventsToSend,
         },
       ];
       const body = JSON.stringify(request);
@@ -114,12 +117,13 @@ export class ClearcutLogger {
         if (this.config?.getDebugMode()) {
           console.log('Clearcut POST request error: ', e);
         }
+        // Add the events back to the front of the queue to be retried.
+        this.events.unshift(...eventsToSend);
         reject(e);
       });
       req.end(body);
     }).then((buf: Buffer) => {
       try {
-        this.events.length = 0;
         this.last_flush_time = Date.now();
         return this.decodeLogResponse(buf) || {};
       } catch (error: unknown) {

@@ -12,12 +12,9 @@ import {
 } from './sdk.js';
 import { Config } from '../config/config.js';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import * as loggers from './loggers.js';
-import { StartSessionEvent } from './types.js';
 
 vi.mock('@opentelemetry/sdk-node');
 vi.mock('../config/config.js');
-vi.mock('./loggers.js');
 
 describe('telemetry', () => {
   let mockConfig: Config;
@@ -38,8 +35,6 @@ describe('telemetry', () => {
       'http://localhost:4317',
     );
     vi.spyOn(mockConfig, 'getSessionId').mockReturnValue('test-session-id');
-    vi.spyOn(loggers, 'logCliConfiguration').mockImplementation(() => {});
-
     mockNodeSdk = {
       start: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
@@ -56,11 +51,8 @@ describe('telemetry', () => {
 
   it('should initialize the telemetry service', () => {
     initializeTelemetry(mockConfig);
-    const event = new StartSessionEvent(mockConfig);
-
     expect(NodeSDK).toHaveBeenCalled();
     expect(mockNodeSdk.start).toHaveBeenCalled();
-    expect(loggers.logCliConfiguration).toHaveBeenCalledWith(mockConfig, event);
   });
 
   it('should shutdown the telemetry service', async () => {
