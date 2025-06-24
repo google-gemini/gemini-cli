@@ -210,10 +210,10 @@ export async function handleAtCommand({
       resolvedSuccessfully = true;
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOENT') {
-        onDebugMessage(
-          `Path ${pathName} not found directly, attempting glob search.`,
-        );
-        if (globTool) {
+        if (config.getEnableRecursiveFileSearch() && globTool) {
+          onDebugMessage(
+            `Path ${pathName} not found directly, attempting glob search.`,
+          );
           try {
             const globResult = await globTool.execute(
               { pattern: `**/*${pathName}*`, path: config.getTargetDir() },
