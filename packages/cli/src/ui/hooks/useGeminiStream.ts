@@ -22,7 +22,7 @@ import {
   GitService,
   EditorType,
   ThoughtSummary,
-  isAuthError,
+  UnauthorizedError,
   UserPromptEvent,
 } from '@gemini-cli/core';
 import { type Part, type PartListUnion } from '@google/genai';
@@ -537,7 +537,7 @@ export const useGeminiStream = (
           'GEMINI_DEBUG: Caught error in useGeminiStream.ts:',
           JSON.stringify(error),
         );
-        if (isAuthError(error)) {
+        if (error instanceof UnauthorizedError) {
           onAuthError();
         } else if (!isNodeError(error) || error.name !== 'AbortError') {
           addItem(

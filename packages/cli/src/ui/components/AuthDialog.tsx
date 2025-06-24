@@ -35,7 +35,7 @@ export function AuthDialog({
     },
     { label: 'Gemini API Key', value: AuthType.USE_GEMINI },
     {
-      label: 'Login with Google Work',
+      label: 'Login with Google Workspace',
       value: AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE,
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
