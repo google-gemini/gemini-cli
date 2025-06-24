@@ -408,7 +408,9 @@ function layoutInkElementAsStyledText(
     ) {
       lines.push(currentLine);
     }
-    output.push(...lines);
+    for (const line of lines) {
+      output.push(line);
+    }
     return;
   }
 
@@ -524,5 +526,7 @@ function layoutInkElementAsStyledText(
   if (wrappingPart.length > 0) {
     addWrappingPartToLines();
   }
-  output.push(...lines);
+  for (const line of lines) {
+    output.push(line);
+  }
 }
