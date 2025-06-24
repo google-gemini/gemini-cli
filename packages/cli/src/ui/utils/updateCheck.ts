@@ -6,12 +6,11 @@
 
 import updateNotifier from 'update-notifier';
 import { readPackageUp } from 'read-package-up';
-import process from 'node:process';
 
 export async function checkForUpdates(): Promise<string | null> {
   try {
     // read-package-up looks for the closest package.json from cwd
-    const pkgResult = await readPackageUp({ cwd: process.cwd() });
+    const pkgResult = await readPackageUp({ cwd: __dirname });
     if (!pkgResult) {
       return null;
     }
