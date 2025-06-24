@@ -4,6 +4,8 @@
 
 This repository contains the Gemini CLI tool.
 
+![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+
 ## Quickstart
 
 1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
