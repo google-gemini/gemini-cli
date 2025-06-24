@@ -292,8 +292,7 @@ export class GeminiClient {
         throw error;
       }
       try {
-        const parsedJson = JSON.parse(text);
-        return parsedJson;
+        return JSON.parse(text);
       } catch (parseError) {
         await reportError(
           parseError,

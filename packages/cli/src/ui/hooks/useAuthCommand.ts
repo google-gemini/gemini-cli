@@ -49,7 +49,7 @@ export const useAuthCommand = (
         const errorMessage =
           settings.merged.selectedAuthType ===
           AuthType.LOGIN_WITH_GOOGLE_PERSONAL
-            ? `Failed to login. Ensure your Google account is not an enterprise account.
+            ? `Failed to login. Ensure your Google account is not a Workspace account.
 Message: ${getErrorMessage(e)}`
             : `Failed to login. Message: ${getErrorMessage(e)}`;
         setAuthError(errorMessage);
