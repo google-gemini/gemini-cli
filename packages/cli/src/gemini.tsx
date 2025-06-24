@@ -10,6 +10,9 @@ import { AppWrapper } from './ui/App.js';
 import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
+import v8 from 'node:v8';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
@@ -33,6 +36,50 @@ import {
 } from '@gemini-cli/core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+
+function getNodeMemoryArgs(config: Config): string[] {
+  const totalMemoryMB = os.totalmem() / (1024 * 1024);
+  const heapStats = v8.getHeapStatistics();
+  const currentMaxOldSpaceSizeMb = Math.floor(
+    heapStats.heap_size_limit / 1024 / 1024,
+  );
+
+  // Set target to 50% of total memory
+  const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+  if (config.getDebugMode()) {
+    console.debug(
+      `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
+    );
+  }
+
+  if (process.env.GEMINI_CLI_NO_RELAUNCH) {
+    return [];
+  }
+
+  if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
+    if (config.getDebugMode()) {
+      console.debug(
+        `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
+      );
+    }
+    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+  }
+
+  return [];
+}
+
+async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
+  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+
+  const child = spawn(process.execPath, nodeArgs, {
+    stdio: 'inherit',
+    env: newEnv,
+  });
+
+  await new Promise((resolve) => child.on('close', resolve));
+  process.exit(0);
+}
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -84,6 +131,10 @@ export async function main() {
     }
   }
 
+  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+    ? getNodeMemoryArgs(config)
+    : [];
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
     const sandboxConfig = config.getSandbox();
@@ -97,11 +148,17 @@ export async function main() {
         }
         await config.refreshAuth(settings.merged.selectedAuthType);
       }
-      await start_sandbox(sandboxConfig);
+      await start_sandbox(sandboxConfig, memoryArgs);
       process.exit(0);
+    } else {
+      // Not in a sandbox and not entering one, so relaunch with additional
+      // arguments to control memory usage if needed.
+      if (memoryArgs.length > 0) {
+        await relaunchWithAdditionalArgs(memoryArgs);
+        process.exit(0);
+      }
     }
   }
-
   let input = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
 

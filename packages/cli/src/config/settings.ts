@@ -53,6 +53,7 @@ export interface Settings {
   preferredEditor?: string;
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
+  autoConfigureMaxOldSpaceSize?: boolean;
 
   // Git-aware file filtering settings
   fileFiltering?: {

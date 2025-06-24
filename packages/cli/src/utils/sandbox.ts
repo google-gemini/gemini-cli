@@ -180,7 +180,10 @@ function entrypoint(workdir: string): string[] {
   return ['bash', '-c', args.join(' ')];
 }
 
-export async function start_sandbox(config: SandboxConfig) {
+export async function start_sandbox(
+  config: SandboxConfig,
+  nodeArgs: string[] = [],
+) {
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
@@ -206,6 +209,11 @@ export async function start_sandbox(config: SandboxConfig) {
     // Log on STDERR so it doesn't clutter the output on STDOUT
     console.error(`using macos seatbelt (profile: ${profile}) ...`);
     // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+    const nodeOptions = [
+      ...(process.env.DEBUG ? ['--inspect-brk'] : []),
+      ...nodeArgs,
+    ].join(' ');
+
     const args = [
       '-D',
       `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
@@ -221,7 +229,7 @@ export async function start_sandbox(config: SandboxConfig) {
       '-c',
       [
         `SANDBOX=sandbox-exec`,
-        `NODE_OPTIONS="${process.env.DEBUG ? `--inspect-brk` : ''}"`,
+        `NODE_OPTIONS="${nodeOptions}"`,
         ...process.argv.map((arg) => quote([arg])),
       ].join(' '),
     ];
@@ -588,8 +596,14 @@ export async function start_sandbox(config: SandboxConfig) {
   }
 
   // copy NODE_OPTIONS
-  if (process.env.NODE_OPTIONS) {
-    args.push('--env', `NODE_OPTIONS="${process.env.NODE_OPTIONS}"`);
+  const existingNodeOptions = process.env.NODE_OPTIONS || '';
+  const allNodeOptions = [
+    ...(existingNodeOptions ? [existingNodeOptions] : []),
+    ...nodeArgs,
+  ].join(' ');
+
+  if (allNodeOptions.length > 0) {
+    args.push('--env', `NODE_OPTIONS="${allNodeOptions}"`);
   }
 
   // set SANDBOX as container name
