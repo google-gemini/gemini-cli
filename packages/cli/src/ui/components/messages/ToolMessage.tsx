@@ -18,6 +18,9 @@ const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
 const STATUS_INDICATOR_WIDTH = 3;
 const MIN_LINES_SHOWN = 2; // show at least this many lines
 
+// Large threshold to ensure we don't cause performance issues for very large
+// outputs that will get truncated further MaxSizedBox anyway.
+const MAXIMUM_RESULT_DISPLAY_CHARACTERS = 1000000;
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
@@ -52,7 +55,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   }
 
   const childWidth = terminalWidth - 3; // account for padding.
-
+  if (typeof resultDisplay === 'string') {
+    if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+      // Truncate the result display to fit within the available width.
+      resultDisplay =
+        '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+    }
+  }
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
