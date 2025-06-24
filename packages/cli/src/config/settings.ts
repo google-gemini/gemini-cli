@@ -49,6 +49,7 @@ export interface Settings {
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;
+  usageStatisticsEnabled?: boolean;
   preferredEditor?: string;
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
