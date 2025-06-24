@@ -16,6 +16,7 @@ This documentation is organized into the following sections:
   - **[CLI Introduction](./cli/index.md):** Overview of the command-line interface.
   - **[Commands](./cli/commands.md):** Description of available CLI commands.
   - **[Configuration](./cli/configuration.md):** Information on configuring the CLI.
+  - **[Checkpointing](./checkpointing.md):** Documentation for the checkpointing feature.
   - **[Extensions](./extension.md):** How to extend the CLI with new functionality.
   - **[Telemetry](./telemetry.md):** Overview of telemetry in the CLI.
 - **Core Details:** Documentation for `packages/core`.
