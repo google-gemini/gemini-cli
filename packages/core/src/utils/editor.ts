@@ -145,6 +145,7 @@ export async function openDiff(
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
+            shell: true,
           });
 
           childProcess.on('close', (code) => {
