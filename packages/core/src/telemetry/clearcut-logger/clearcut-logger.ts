@@ -66,7 +66,8 @@ export class ClearcutLogger {
 
   createLogEvent(name: string, data: object): object {
     return {
-      Application: 'GEMINI_CLI',
+      console_type: 'GEMINI_CLI',
+      application: 102,
       event_name: name,
       client_install_id: getPersistentUserId(),
       event_metadata: [data] as object[],
@@ -97,7 +98,7 @@ export class ClearcutLogger {
         },
       ];
       const body = JSON.stringify(request);
-      if (this.config?.getDebugMode()) {
+      if (this.config?.getDebugMode() ?? false) {
         console.log('Clearcut POST request body:', body);
       }
       const options = {
@@ -178,63 +179,62 @@ export class ClearcutLogger {
   logStartSessionEvent(event: StartSessionEvent): void {
     const data = [
       {
-        EventMetadataKey: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
         value: event.model,
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_EMBEDDING_MODEL,
         value: event.embedding_model,
       },
       {
-        EventMetadataKey: EventMetadataKey.GEMINI_CLI_START_SESSION_SANDBOX,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_SANDBOX,
         value: event.sandbox_enabled.toString(),
       },
       {
-        EventMetadataKey: EventMetadataKey.GEMINI_CLI_START_SESSION_CORE_TOOLS,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_CORE_TOOLS,
         value: event.core_tools_enabled,
       },
       {
-        EventMetadataKey:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_APPROVAL_MODE,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_APPROVAL_MODE,
         value: event.approval_mode,
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_API_KEY_ENABLED,
         value: event.api_key_enabled.toString(),
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
         value: event.vertex_ai_enabled.toString(),
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_DEBUG_MODE_ENABLED,
         value: event.debug_enabled.toString(),
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
         value: event.vertex_ai_enabled.toString(),
       },
       {
-        EventMetadataKey: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS,
         value: event.mcp_servers,
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
         value: event.vertex_ai_enabled.toString(),
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_ENABLED,
         value: event.telemetry_enabled.toString(),
       },
       {
-        EventMetadataKey:
+        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
@@ -245,124 +245,141 @@ export class ClearcutLogger {
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(
-      EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
-      JSON.stringify(event.prompt_length),
-    );
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
+        value: JSON.stringify(event.prompt_length),
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
     this.flushToClearcut();
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME, event.function_name);
-    data.set(
-      EventMetadataKey.GEMINI_CLI_TOOL_CALL_DECISION,
-      JSON.stringify(event.decision),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_TOOL_CALL_SUCCESS,
-      JSON.stringify(event.success),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_TOOL_CALL_DURATION_MS,
-      JSON.stringify(event.duration_ms),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_TOOL_ERROR_MESSAGE,
-      JSON.stringify(event.error),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
-      JSON.stringify(event.error_type),
-    );
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
+        value: JSON.stringify(event.function_name),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_DECISION,
+        value: JSON.stringify(event.decision),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_SUCCESS,
+        value: JSON.stringify(event.success),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_DURATION_MS,
+        value: JSON.stringify(event.duration_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_ERROR_MESSAGE,
+        value: JSON.stringify(event.error),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
+        value: JSON.stringify(event.error_type),
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(tool_call_event_name, data));
     this.flushToClearcut();
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL, event.model);
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: JSON.stringify(event.model),
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
     this.flushToClearcut();
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL, event.model);
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_STATUS_CODE,
-      JSON.stringify(event.status_code),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_DURATION_MS,
-      JSON.stringify(event.duration_ms),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_ERROR_MESSAGE,
-      JSON.stringify(event.error),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT,
-      JSON.stringify(event.input_token_count),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_OUTPUT_TOKEN_COUNT,
-      JSON.stringify(event.output_token_count),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_CACHED_TOKEN_COUNT,
-      JSON.stringify(event.cached_content_token_count),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_THINKING_TOKEN_COUNT,
-      JSON.stringify(event.thoughts_token_count),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
-      JSON.stringify(event.tool_token_count),
-    );
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_STATUS_CODE,
+        value: JSON.stringify(event.status_code),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_DURATION_MS,
+        value: JSON.stringify(event.duration_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MESSAGE,
+        value: JSON.stringify(event.error),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT,
+        value: JSON.stringify(event.input_token_count),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_OUTPUT_TOKEN_COUNT,
+        value: JSON.stringify(event.output_token_count),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CACHED_TOKEN_COUNT,
+        value: JSON.stringify(event.cached_content_token_count),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_THINKING_TOKEN_COUNT,
+        value: JSON.stringify(event.thoughts_token_count),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_THINKING_TOKEN_COUNT,
+        value: JSON.stringify(event.tool_token_count),
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
     this.flushToClearcut();
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL, event.model);
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_ERROR_TYPE,
-      JSON.stringify(event.error_type),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_ERROR_STATUS_CODE,
-      JSON.stringify(event.status_code),
-    );
-    data.set(
-      EventMetadataKey.GEMINI_CLI_API_ERROR_DURATION_MS,
-      JSON.stringify(event.duration_ms),
-    );
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_TYPE,
+        value: JSON.stringify(event.error_type),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_STATUS_CODE,
+        value: JSON.stringify(event.status_code),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_DURATION_MS,
+        value: JSON.stringify(event.duration_ms),
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
     this.flushToClearcut();
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
-    const data: Map<EventMetadataKey, string> = new Map();
-
-    data.set(
-      EventMetadataKey.GEMINI_CLI_END_SESSION_ID,
-      event?.session_id?.toString() ?? '',
-    );
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_END_SESSION_ID,
+        value: event?.session_id?.toString() ?? '',
+      },
+    ];
 
     this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
     // Flush immediately on session end.
