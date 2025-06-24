@@ -4,10 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { StructuredError } from '@gemini-cli/core';
+import { AuthType, StructuredError } from '@gemini-cli/core';
 
-const RATE_LIMIT_ERROR_MESSAGE =
+const RATE_LIMIT_ERROR_MESSAGE_GOOGLE =
   '\nPlease wait and try again later. To increase your limits, upgrade to a plan with higher limits, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey';
+const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
+  '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
+const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
+  '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
+const RATE_LIMIT_ERROR_MESSAGE_DEFAULT =
+  'Your request has been rate limited. Please wait and try again later.';
 
 export interface ApiError {
   error: {
@@ -37,11 +43,28 @@ function isStructuredError(error: unknown): error is StructuredError {
   );
 }
 
-export function parseAndFormatApiError(error: unknown): string {
+function getRateLimitMessage(authType?: AuthType): string {
+  switch (authType) {
+    case AuthType.LOGIN_WITH_GOOGLE_PERSONAL:
+    case AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE:
+      return RATE_LIMIT_ERROR_MESSAGE_GOOGLE;
+    case AuthType.USE_GEMINI:
+      return RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI;
+    case AuthType.USE_VERTEX_AI:
+      return RATE_LIMIT_ERROR_MESSAGE_VERTEX;
+    default:
+      return RATE_LIMIT_ERROR_MESSAGE_DEFAULT;
+  }
+}
+
+export function parseAndFormatApiError(
+  error: unknown,
+  authType?: AuthType,
+): string {
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
-      text += RATE_LIMIT_ERROR_MESSAGE;
+      text += getRateLimitMessage(authType);
     }
     return text;
   }
@@ -70,7 +93,7 @@ export function parseAndFormatApiError(error: unknown): string {
         }
         let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
         if (parsedError.error.code === 429) {
-          text += RATE_LIMIT_ERROR_MESSAGE;
+          text += getRateLimitMessage(authType);
         }
         return text;
       }

@@ -16,7 +16,7 @@ import {
   TrackedExecutingToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { Config, EditorType } from '@gemini-cli/core';
+import { Config, EditorType, AuthType } from '@gemini-cli/core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { HistoryItem, MessageType, StreamingState } from '../types.js';
@@ -115,6 +115,11 @@ vi.mock('../contexts/SessionContext.js', () => ({
 
 vi.mock('./slashCommandProcessor.js', () => ({
   handleSlashCommand: vi.fn().mockReturnValue(false),
+}));
+
+const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
+vi.mock('../utils/errorParsing.js', () => ({
+  parseAndFormatApiError: mockParseAndFormatApiError,
 }));
 
 // --- END MOCKS ---
@@ -1030,6 +1035,57 @@ describe('useGeminiStream', () => {
 
       await waitFor(() => {
         expect(mockPerformMemoryRefresh).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should call parseAndFormatApiError with the correct authType on stream initialization failure', async () => {
+      // 1. Setup
+      const mockError = new Error('Rate limit exceeded');
+      const mockAuthType = AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE;
+      mockParseAndFormatApiError.mockClear();
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: '' };
+          throw mockError;
+        })(),
+      );
+
+      const testConfig = {
+        ...mockConfig,
+        getContentGeneratorConfig: vi.fn(() => ({
+          authType: mockAuthType,
+        })),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(testConfig),
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          testConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+        ),
+      );
+
+      // 2. Action
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // 3. Assertion
+      await waitFor(() => {
+        expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
+          'Rate limit exceeded',
+          mockAuthType,
+        );
       });
     });
   });

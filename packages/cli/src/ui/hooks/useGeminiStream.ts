@@ -398,12 +398,15 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.ERROR,
-          text: parseAndFormatApiError(eventValue.error),
+          text: parseAndFormatApiError(
+            eventValue.error,
+            config.getContentGeneratorConfig().authType,
+          ),
         },
         userMessageTimestamp,
       );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
   const handleChatCompressionEvent = useCallback(
@@ -533,10 +536,6 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
       } catch (error: unknown) {
-        console.log(
-          'GEMINI_DEBUG: Caught error in useGeminiStream.ts:',
-          JSON.stringify(error),
-        );
         if (error instanceof UnauthorizedError) {
           onAuthError();
         } else if (!isNodeError(error) || error.name !== 'AbortError') {
@@ -545,6 +544,7 @@ export const useGeminiStream = (
               type: MessageType.ERROR,
               text: parseAndFormatApiError(
                 getErrorMessage(error) || 'Unknown error',
+                config.getContentGeneratorConfig().authType,
               ),
             },
             userMessageTimestamp,
@@ -566,6 +566,7 @@ export const useGeminiStream = (
       geminiClient,
       startNewTurn,
       onAuthError,
+      config,
     ],
   );
 
