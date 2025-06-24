@@ -189,6 +189,7 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
+            shell: true,
           },
         );
         expect(mockSpawn.on).toHaveBeenCalledWith(

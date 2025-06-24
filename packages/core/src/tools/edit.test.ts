@@ -54,7 +54,7 @@ describe('EditTool', () => {
         .fn()
         .mockReturnValue(mockClientInstanceWithGenerateJson),
       getTargetDir: () => rootDir,
-      getApprovalMode: vi.fn(() => false),
+      getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
@@ -78,7 +78,6 @@ describe('EditTool', () => {
     } as unknown as Config;
 
     // Reset mocks before each test
-    (mockConfig.getApprovalMode as Mock).mockClear();
     (mockConfig.getApprovalMode as Mock).mockClear();
     // Default to not skipping confirmation
     (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
@@ -335,7 +334,6 @@ describe('EditTool', () => {
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
         async (content, p, client) => {
-          console.log('mockEnsureCorrectEdit CALLED IN TEST');
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
