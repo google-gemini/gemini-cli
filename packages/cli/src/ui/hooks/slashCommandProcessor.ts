@@ -171,6 +171,23 @@ export const useSlashCommandProcessor = (
     [addMessage],
   );
 
+  const savedChatTags = async function () {
+    const geminiDir = config?.getProjectTempDir();
+    if (!geminiDir) {
+      return [];
+    }
+    try {
+      const files = await fs.readdir(geminiDir);
+      return files
+        .filter(
+          (file) => file.startsWith('checkpoint-') && file.endsWith('.json'),
+        )
+        .map((file) => file.replace('checkpoint-', '').replace('.json', ''));
+    } catch (_err) {
+      return [];
+    }
+  };
+
   const slashCommands: SlashCommand[] = useMemo(() => {
     const commands: SlashCommand[] = [
       {
@@ -653,7 +670,7 @@ Add any other context about the problem here.
       {
         name: 'chat',
         description:
-          'Manage conversation history. Usage: /chat <save|resume> [tag]',
+          'Manage conversation history. Usage: /chat <list|save|resume> [tag]',
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
@@ -737,36 +754,26 @@ Add any other context about the problem here.
               refreshStatic();
               return;
             }
+            case 'list':
+              addMessage({
+                type: MessageType.INFO,
+                content:
+                  'list of saved conversations: ' +
+                  (await savedChatTags()).join(', '),
+                timestamp: new Date(),
+              });
+              return;
             default:
               addMessage({
                 type: MessageType.ERROR,
-                content: `Unknown /chat command: ${subCommand}. Available: save, resume`,
+                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume`,
                 timestamp: new Date(),
               });
               return;
           }
         },
-        completion: async () => {
-          const geminiDir = config?.getProjectTempDir();
-          if (!geminiDir) {
-            return [];
-          }
-          try {
-            const files = await fs.readdir(geminiDir);
-            return files
-              .filter(
-                (file) =>
-                  file.startsWith('checkpoint-') && file.endsWith('.json'),
-              )
-              .map(
-                (file) =>
-                  'resume ' +
-                  file.replace('checkpoint-', '').replace('.json', ''),
-              );
-          } catch (_err) {
-            return [];
-          }
-        },
+        completion: async () =>
+          (await savedChatTags()).map((tag) => 'resume ' + tag),
       },
       {
         name: 'quit',
