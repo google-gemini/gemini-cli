@@ -4,7 +4,6 @@ Gemini CLI's core package (`packages/core`) is the backend portion of Gemini CLI
 
 ## Navigating this section
 
-- **[Telemetry](./telemetry.md):** Information on monitoring Gemini CLI's performance, health, and usage.
 - **[Core tools API](./tools-api.md):** Information on how tools are defined, registered, and used by the core.
 
 ## Role of the core

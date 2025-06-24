@@ -2,13 +2,13 @@
 
 Telemetry provides data about Gemini CLI's performance, health, and usage. By enabling it, you can monitor operations, debug issues, and optimize tool usage through traces, metrics, and structured logs.
 
-Gemini CLI's telemtry system is built on the **[OpenTelemetry] (OTEL)** standard, allowing you to send data to any compatible backend.
+Gemini CLI's telemetry system is built on the **[OpenTelemetry] (OTEL)** standard, allowing you to send data to any compatible backend.
 
 [OpenTelemetry]: https://opentelemetry.io/
 
 ## Enabling telemetry
 
-You can enable telemetry in multiple ways. Configuration is primarily managed via the [`.gemini/settings.json` file](../cli/configuration.md) and environment variables, but CLI flags can override these settings for a specific session.
+You can enable telemetry in multiple ways. Configuration is primarily managed via the [`.gemini/settings.json` file](./cli/configuration.md) and environment variables, but CLI flags can override these settings for a specific session.
 
 ### Order of precedence
 

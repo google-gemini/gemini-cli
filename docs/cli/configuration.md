@@ -162,7 +162,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Example:** `"preferredEditor": "vscode"`
 
 - **`telemetry`** (object)
-  - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../core/telemetry.md).
+  - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
   - **Default:** `{"enabled": false, "target": "local", "otlpEndpoint": "http://localhost:4317", "logPrompts": true}`
   - **Properties:**
     - **`enabled`** (boolean): Whether or not telemtery is enabled.
@@ -307,13 +307,13 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--telemetry`**:
-  - Enables [telemetry](../core/telemetry.md).
+  - Enables [telemetry](../telemetry.md).
 - **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../core/telemetry.md) for more information.
+  - Sets the telemetry target. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../core/telemetry.md) for more information.
+  - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See [telemetry](../core/telemetry.md) for more information.
+  - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
   - Enables [checkpointing](./commands.md#checkpointing-commands).
 - **`--version`**:
