@@ -621,14 +621,7 @@ export const useSlashCommandProcessor = (
           const cliVersion = await getCliVersion();
           const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
-          const diagnosticInfo = `
-## Describe the bug
-A clear and concise description of what the bug is.
-
-## Additional context
-Add any other context about the problem here.
-
-## Diagnostic Information
+          const info = `
 *   **CLI Version:** ${cliVersion}
 *   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** ${osVersion}
@@ -638,14 +631,14 @@ Add any other context about the problem here.
 `;
 
           let bugReportUrl =
-            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.md&title={title}&body={body}';
+            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
           const bugCommand = config?.getBugCommand();
           if (bugCommand?.urlTemplate) {
             bugReportUrl = bugCommand.urlTemplate;
           }
           bugReportUrl = bugReportUrl
             .replace('{title}', encodeURIComponent(bugDescription))
-            .replace('{body}', encodeURIComponent(diagnosticInfo));
+            .replace('{info}', encodeURIComponent(info));
 
           addMessage({
             type: MessageType.INFO,
