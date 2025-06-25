@@ -7,6 +7,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../../colors.js';
+import { formatUserMessageForDisplay } from '../../utils/messageFormatting.js';
 
 interface UserMessageProps {
   text: string;
@@ -15,6 +16,7 @@ interface UserMessageProps {
 export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
+  const displayText = formatUserMessageForDisplay(text);
 
   return (
     <Box flexDirection="row" marginY={1}>
@@ -23,7 +25,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={Colors.Gray}>
-          {text}
+          {displayText}
         </Text>
       </Box>
     </Box>

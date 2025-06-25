@@ -19,6 +19,16 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 import { Config } from '@google/gemini-cli-core';
+import {
+  clipboardHasImage,
+  saveClipboardImage,
+  cleanupOldClipboardImages,
+} from '../utils/clipboardUtils.js';
+import {
+  formatUserMessageForDisplay,
+  mapCursorPosition,
+} from '../utils/messageFormatting.js';
+import * as path from 'path';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -42,7 +52,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onClearScreen,
   config,
   slashCommands,
-  placeholder = '  Type your message or @path/to/file',
+  placeholder = '  Type your message or @path/to/file (Ctrl+V for images)',
   focus = true,
   inputWidth,
   suggestionsWidth,
@@ -50,7 +60,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
@@ -154,6 +163,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       slashCommands,
     ],
   );
+
+  // Handle clipboard image pasting with Ctrl+V
+  const handleClipboardImage = useCallback(async () => {
+    try {
+      if (await clipboardHasImage()) {
+        const imagePath = await saveClipboardImage(config.getTargetDir());
+        if (imagePath) {
+          // Clean up old images
+          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
+            // Ignore cleanup errors
+          });
+
+          // Get relative path from current directory
+          const relativePath = path.relative(config.getTargetDir(), imagePath);
+
+          // Insert clean @path reference
+          const currentText = buffer.text;
+          const insertText = `@${relativePath}`;
+
+          let newText: string;
+          if (!currentText || currentText.endsWith(' ')) {
+            newText = currentText + insertText + ' ';
+          } else {
+            newText = currentText + ' ' + insertText + ' ';
+          }
+
+          // setText automatically moves cursor to end, no need for moveToOffset
+          buffer.setText(newText);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling clipboard image:', error);
+    }
+  }, [buffer, config]);
 
   useInput(
     (input, key) => {
@@ -348,6 +391,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Ctrl+V for image paste (like Claude Code)
+      if (key.ctrl && input === 'v') {
+        handleClipboardImage();
+        return;
+      }
+
       // Fallback to buffer's default input handling
       buffer.handleInput(input, key as Record<string, boolean>);
     },
@@ -384,41 +433,73 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={Colors.Gray}>{placeholder}</Text>
             )
           ) : (
-            linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
+            (() => {
+              // Count images across all lines to maintain sequential numbering
+              const fullText = linesToRender.join('\n');
+              const formattedFullText = formatUserMessageForDisplay(
+                fullText,
+                1,
+              );
+              const formattedLines = formattedFullText.split('\n');
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+              return linesToRender.map((lineText, visualIdxInRenderedSet) => {
+                const cursorVisualRow =
+                  cursorVisualRowAbsolute - scrollVisualRow;
+                const formattedLineText =
+                  formattedLines[visualIdxInRenderedSet] || lineText;
+                let display = cpSlice(formattedLineText, 0, inputWidth);
+                const currentVisualWidth = stringWidth(display);
+                if (currentVisualWidth < inputWidth) {
+                  display =
+                    display + ' '.repeat(inputWidth - currentVisualWidth);
+                }
+
+                if (visualIdxInRenderedSet === cursorVisualRow) {
+                  // Map the cursor position from original text to formatted text
+                  // Calculate position in full text for proper image numbering
+                  const lineStartInFullText =
+                    linesToRender.slice(0, visualIdxInRenderedSet).join('\\n')
+                      .length + (visualIdxInRenderedSet > 0 ? 1 : 0);
+                  const cursorInFullText =
+                    lineStartInFullText + cursorVisualColAbsolute;
+                  const mappedCursorInFullText = mapCursorPosition(
+                    fullText,
+                    cursorInFullText,
+                    1,
+                  );
+                  const mappedCursorCol =
+                    mappedCursorInFullText -
+                    (formattedLines.slice(0, visualIdxInRenderedSet).join('\\n')
+                      .length +
+                      (visualIdxInRenderedSet > 0 ? 1 : 0));
+                  const relativeVisualColForHighlight = mappedCursorCol;
+
+                  if (relativeVisualColForHighlight >= 0) {
+                    if (relativeVisualColForHighlight < cpLen(display)) {
+                      const charToHighlight =
+                        cpSlice(
+                          display,
+                          relativeVisualColForHighlight,
+                          relativeVisualColForHighlight + 1,
+                        ) || ' ';
+                      const highlighted = chalk.inverse(charToHighlight);
+                      display =
+                        cpSlice(display, 0, relativeVisualColForHighlight) +
+                        highlighted +
+                        cpSlice(display, relativeVisualColForHighlight + 1);
+                    } else if (
+                      relativeVisualColForHighlight === cpLen(display) &&
+                      cpLen(display) === inputWidth
+                    ) {
+                      display = display + chalk.inverse(' ');
+                    }
                   }
                 }
-              }
-              return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-              );
-            })
+                return (
+                  <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                );
+              });
+            })()
           )}
         </Box>
       </Box>
