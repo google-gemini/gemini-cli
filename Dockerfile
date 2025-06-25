@@ -40,11 +40,11 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 USER node
 
 # install gemini-cli and clean up
-COPY packages/cli/dist/gemini-cli-cli-*.tgz /usr/local/share/npm-global/gemini-cli-cli.tgz
-COPY packages/core/dist/gemini-cli-core-*.tgz /usr/local/share/npm-global/gemini-cli-core.tgz
-RUN npm install -g /usr/local/share/npm-global/gemini-cli-cli.tgz /usr/local/share/npm-global/gemini-cli-core.tgz \
+COPY packages/cli/dist/google-gemini-cli-*.tgz /usr/local/share/npm-global/gemini-cli.tgz
+COPY packages/core/dist/google-gemini-cli-core-*.tgz /usr/local/share/npm-global/gemini-core.tgz
+RUN npm install -g /usr/local/share/npm-global/gemini-cli.tgz /usr/local/share/npm-global/gemini-core.tgz \
   && npm cache clean --force \
-  && rm -f /usr/local/share/npm-global/gemini-cli-{cli,core}.tgz
+  && rm -f /usr/local/share/npm-global/gemini-{cli,core}.tgz
 
 # default entrypoint when none specified
 CMD ["gemini"]

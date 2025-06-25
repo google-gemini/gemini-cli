@@ -18,7 +18,7 @@ import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
-import { Config } from '@gemini-cli/core';
+import { Config } from '@google/gemini-cli-core';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;

@@ -6,7 +6,7 @@ This guide provides solutions to common issues and debugging tips.
 
 - **Q: How do I update Gemini CLI to the latest version?**
 
-  - A: If installed globally via npm, update Gemini CLI using the command `npm install -g @gemini-cli/cli@latest`. If run from source, pull the latest changes from the repository and rebuild using `npm run build`.
+  - A: If installed globally via npm, update Gemini CLI using the command `npm install -g @google/gemini-cli@latest`. If run from source, pull the latest changes from the repository and rebuild using `npm run build`.
 
 - **Q: Where are Gemini CLI configuration files stored?**
 

@@ -14,7 +14,7 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
-} from '@gemini-cli/core';
+} from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 
@@ -68,9 +68,10 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
 }
 
-// Mock @gemini-cli/core and its Config class
-vi.mock('@gemini-cli/core', async (importOriginal) => {
-  const actualCore = await importOriginal<typeof import('@gemini-cli/core')>();
+// Mock @google/gemini-cli-core and its Config class
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actualCore =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {

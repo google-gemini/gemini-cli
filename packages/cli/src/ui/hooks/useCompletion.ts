@@ -15,7 +15,7 @@ import {
   getErrorMessage,
   Config,
   FileDiscoveryService,
-} from '@gemini-cli/core';
+} from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,

@@ -77,18 +77,23 @@ if (!argv.s) {
   execSync('npm run build --workspaces', { stdio: 'inherit' });
 }
 
-console.log('packing @gemini-cli/cli ...');
+console.log('packing @google/gemini-cli ...');
 const cliPackageDir = join('packages', 'cli');
-rmSync(join(cliPackageDir, 'dist', 'gemini-cli-cli-*.tgz'), { force: true });
-execSync(`npm pack -w @gemini-cli/cli --pack-destination ./packages/cli/dist`, {
-  stdio: 'ignore',
-});
-
-console.log('packing @gemini-cli/core ...');
-const corePackageDir = join('packages', 'core');
-rmSync(join(corePackageDir, 'dist', 'gemini-cli-core-*.tgz'), { force: true });
+rmSync(join(cliPackageDir, 'dist', 'google-gemini-cli-*.tgz'), { force: true });
 execSync(
-  `npm pack -w @gemini-cli/core --pack-destination ./packages/core/dist`,
+  `npm pack -w @google/gemini-cli --pack-destination ./packages/cli/dist`,
+  {
+    stdio: 'ignore',
+  },
+);
+
+console.log('packing @google/gemini-cli-core ...');
+const corePackageDir = join('packages', 'core');
+rmSync(join(corePackageDir, 'dist', 'google-gemini-cli-core-*.tgz'), {
+  force: true,
+});
+execSync(
+  `npm pack -w @google/gemini-cli-core --pack-destination ./packages/core/dist`,
   { stdio: 'ignore' },
 );
 
@@ -97,11 +102,11 @@ const packageVersion = JSON.parse(
 ).version;
 
 chmodSync(
-  join(cliPackageDir, 'dist', `gemini-cli-cli-${packageVersion}.tgz`),
+  join(cliPackageDir, 'dist', `google-gemini-cli-${packageVersion}.tgz`),
   0o755,
 );
 chmodSync(
-  join(corePackageDir, 'dist', `gemini-cli-core-${packageVersion}.tgz`),
+  join(corePackageDir, 'dist', `google-gemini-cli-core-${packageVersion}.tgz`),
   0o755,
 );
 

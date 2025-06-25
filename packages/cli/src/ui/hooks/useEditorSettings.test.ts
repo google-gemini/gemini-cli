@@ -22,10 +22,10 @@ import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
-} from '@gemini-cli/core';
+} from '@google/gemini-cli-core';
 
-vi.mock('@gemini-cli/core', async () => {
-  const actual = await vi.importActual('@gemini-cli/core');
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
     checkHasEditorType: vi.fn(() => true),
