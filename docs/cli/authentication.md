@@ -4,7 +4,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
 
 1.  **Login with Google (Gemini Code Assist):**
 
-    - Use this option to log in with the standard, free account you use for services like Gmail, Google Photos, and Google Drive for personal use (e.g. your-name@gmail.com).
+    - Use this option to log in with the standard, personal account you use for services like Gmail, Google Photos, and Google Drive for personal use (e.g. your-name@gmail.com).
     - During initial startup, Gemini CLI will direct you to a webpage for authentication. Once authenticated, your credentials will be cached locally so the web login can be skipped on subsequent runs.
     - Note that the web login must be done in a browser that can communicate with the machine Gemini CLI is being run from. (Specifically, the browser will be redirected to a localhost url that Gemini CLI will be listening on).
 
@@ -25,7 +25,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
 3.  **Login with Google Workspace**
 
     - Use this option to log in with the **Google Workspace Accounts**. This is a paid service for businesses and organizations that provides a suite of productivity tools, including a custom email domain (e.g. your-name@your-company.com), enhanced security features, and administrative controls. These accounts are often managed by an employer or school.
-      - Google Workspace Account must configure a Google Cloud Project Id to use. You can temporarily set the environment variable in your current shell session using the following command:
+      - Google Workspace Account must first configure a Google Cloud Project Id to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam). You can temporarily set the environment variable in your current shell session using the following command:
       ```bash
       export GOOGLE_CLOUD_PROJECT_ID="YOUR_PROJECT_ID"
       ```
