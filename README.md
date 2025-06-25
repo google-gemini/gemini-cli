@@ -80,6 +80,11 @@ gemini
 - For more comprehensive documentation, see the [full documentation](./docs/index.md).
 - Take a look at some [popular tasks](#popular-tasks) for more inspiration.
 
+### Troubleshooting
+
+Head over to the [troubleshooting](docs/troubleshooting.md) guide if you're
+having issues.
+
 ## Popular tasks
 
 ### Explore a new codebase

@@ -2,6 +2,19 @@
 
 This guide provides solutions to common issues and debugging tips.
 
+## Authentication
+
+- **Error: `Failed to login. Message: Request contains an invalid argument`**
+
+  - Users with Google Workspace accounts, or users with Google Cloud accounts
+    associated with their Gmail accounts may not be able to activate the free
+    tier of the Google Code Assist plan.
+  - For Google Cloud accounts, you can work around this by setting
+    `GOOGLE_CLOUD_PROJECT` to your project ID.
+  - You can also grab an API key from [AI
+    Studio](http://aistudio.google.com/app/apikey), which also includes a
+    separate free tier.
+
 ## Frequently asked questions (FAQs)
 
 - **Q: How do I update Gemini CLI to the latest version?**
