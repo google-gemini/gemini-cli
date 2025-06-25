@@ -24,10 +24,6 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import {
-  formatUserMessageForDisplay,
-  mapCursorPosition,
-} from '../utils/messageFormatting.js';
 import * as path from 'path';
 
 export interface InputPromptProps {
@@ -52,7 +48,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onClearScreen,
   config,
   slashCommands,
-  placeholder = '  Type your message or @path/to/file (Ctrl+V for images)',
+  placeholder = '  Type your message or @path/to/file',
   focus = true,
   inputWidth,
   suggestionsWidth,
@@ -178,19 +174,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // Get relative path from current directory
           const relativePath = path.relative(config.getTargetDir(), imagePath);
 
-          // Insert clean @path reference
-          const currentText = buffer.text;
+          // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
-
-          let newText: string;
-          if (!currentText || currentText.endsWith(' ')) {
-            newText = currentText + insertText + ' ';
-          } else {
-            newText = currentText + ' ' + insertText + ' ';
+          const currentText = buffer.text;
+          const [row, col] = buffer.cursor;
+          
+          // Calculate offset from row/col
+          let offset = 0;
+          for (let i = 0; i < row; i++) {
+            offset += buffer.lines[i].length + 1; // +1 for newline
           }
-
-          // setText automatically moves cursor to end, no need for moveToOffset
-          buffer.setText(newText);
+          offset += col;
+          
+          // Add spaces around the path if needed
+          let textToInsert = insertText;
+          const charBefore = offset > 0 ? currentText[offset - 1] : '';
+          const charAfter = offset < currentText.length ? currentText[offset] : '';
+          
+          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+            textToInsert = ' ' + textToInsert;
+          }
+          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+            textToInsert = textToInsert + ' ';
+          }
+          
+          // Insert at cursor position
+          buffer.replaceRangeByOffset(offset, offset, textToInsert);
         }
       }
     } catch (error) {
@@ -391,7 +400,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+V for image paste (like Claude Code)
+      // Ctrl+V for image paste
       if (key.ctrl && input === 'v') {
         handleClipboardImage();
         return;
@@ -433,46 +442,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={Colors.Gray}>{placeholder}</Text>
             )
           ) : (
-            (() => {
-              // Count images across all lines to maintain sequential numbering
-              const fullText = linesToRender.join('\n');
-              const formattedFullText = formatUserMessageForDisplay(
-                fullText,
-                1,
-              );
-              const formattedLines = formattedFullText.split('\n');
+            linesToRender.map((lineText, visualIdxInRenderedSet) => {
+              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
+              let display = cpSlice(lineText, 0, inputWidth);
+              const currentVisualWidth = stringWidth(display);
+              if (currentVisualWidth < inputWidth) {
+                display = display + ' '.repeat(inputWidth - currentVisualWidth);
+              }
 
-              return linesToRender.map((lineText, visualIdxInRenderedSet) => {
-                const cursorVisualRow =
-                  cursorVisualRowAbsolute - scrollVisualRow;
-                const formattedLineText =
-                  formattedLines[visualIdxInRenderedSet] || lineText;
-                let display = cpSlice(formattedLineText, 0, inputWidth);
-                const currentVisualWidth = stringWidth(display);
-                if (currentVisualWidth < inputWidth) {
-                  display =
-                    display + ' '.repeat(inputWidth - currentVisualWidth);
-                }
-
-                if (visualIdxInRenderedSet === cursorVisualRow) {
-                  // Map the cursor position from original text to formatted text
-                  // Calculate position in full text for proper image numbering
-                  const lineStartInFullText =
-                    linesToRender.slice(0, visualIdxInRenderedSet).join('\\n')
-                      .length + (visualIdxInRenderedSet > 0 ? 1 : 0);
-                  const cursorInFullText =
-                    lineStartInFullText + cursorVisualColAbsolute;
-                  const mappedCursorInFullText = mapCursorPosition(
-                    fullText,
-                    cursorInFullText,
-                    1,
-                  );
-                  const mappedCursorCol =
-                    mappedCursorInFullText -
-                    (formattedLines.slice(0, visualIdxInRenderedSet).join('\\n')
-                      .length +
-                      (visualIdxInRenderedSet > 0 ? 1 : 0));
-                  const relativeVisualColForHighlight = mappedCursorCol;
+              if (visualIdxInRenderedSet === cursorVisualRow) {
+                const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                   if (relativeVisualColForHighlight >= 0) {
                     if (relativeVisualColForHighlight < cpLen(display)) {
@@ -498,8 +477,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 return (
                   <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
                 );
-              });
-            })()
+              })
           )}
         </Box>
       </Box>
