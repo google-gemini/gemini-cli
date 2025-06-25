@@ -22,10 +22,16 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         source ~/.bashrc
         ```
 
-3.  **Login with Google Workspace**
+3.  **<a id="workspace-gca"></a>Login with Google (Gemini Code Assist for Workspace or licensed Code Assist users):**
 
-    - Use this option to log in with the **Google Workspace Accounts**. This is a paid service for businesses and organizations that provides a suite of productivity tools, including a custom email domain (e.g. your-name@your-company.com), enhanced security features, and administrative controls. These accounts are often managed by an employer or school.
-      - Google Workspace Account must first configure a Google Cloud Project Id to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam). You can temporarily set the environment variable in your current shell session using the following command:
+    (For more information, see: https://developers.google.com/gemini-code-assist/resources/faqs#gcp-project-requirement)
+
+    - Use this option if:
+
+      1. You have a Google Workspace account. Google Workspace is a paid service for businesses and organizations that provides a suite of productivity tools, including a custom email domain (e.g. your-name@your-company.com), enhanced security features, and administrative controls. These accounts are often managed by an employer or school.
+      2. You are a licensed Code Assist user. This can happen if you have previously purchased a Code Assist license or have acquired one through Google Developer Program.
+
+    - If you fall into one of these categories, you must first configure a Google Cloud Project Id to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam). You can temporarily set the environment variable in your current shell session using the following command:
       ```bash
       export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
       ```
