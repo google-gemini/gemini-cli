@@ -1002,7 +1002,6 @@ Add any other context about the problem here.
     setQuittingMessages,
     pendingCompressionItemRef,
     setPendingCompressionItem,
-    savedChatTags,
   ]);
 
   const handleSlashCommand = useCallback(
