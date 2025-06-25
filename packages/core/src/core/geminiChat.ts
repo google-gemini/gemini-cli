@@ -188,10 +188,7 @@ export class GeminiChat {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (
-      authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL &&
-      authType !== AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE
-    ) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
       return null;
     }
 
