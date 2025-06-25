@@ -24,7 +24,7 @@ This guide provides solutions to common issues and debugging tips.
   - **Solution:**
     Either stop the other process that is using the port or configure the MCP server to use a different port.
 
-- **Error: Command not found (when attempting the run Gemini CLI).**
+- **Error: Command not found (when attempting to run Gemini CLI).**
 
   - **Cause:** Gemini CLI is not correctly installed or not in your system's PATH.
   - **Solution:**
