@@ -68,7 +68,7 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
   GeminiClient,
-} from '@gemini-cli/core';
+} from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 
@@ -712,7 +712,7 @@ Add any other context about the problem here.
   describe('/mcp command', () => {
     beforeEach(() => {
       // Mock the core module with getMCPServerStatus and getMCPDiscoveryState
-      vi.mock('@gemini-cli/core', async (importOriginal) => {
+      vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         const actual = await importOriginal();
         return {
           ...actual,

@@ -9,13 +9,13 @@ import type { Mocked } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
-import { FileDiscoveryService } from '@gemini-cli/core';
+import { FileDiscoveryService } from '@google/gemini-cli-core';
 import { glob } from 'glob';
 
 // Mock dependencies
 vi.mock('fs/promises');
-vi.mock('@gemini-cli/core', async () => {
-  const actual = await vi.importActual('@gemini-cli/core');
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn(),

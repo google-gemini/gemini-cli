@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseAndFormatApiError } from './errorParsing.js';
-import { AuthType, StructuredError } from '@gemini-cli/core';
+import { AuthType, StructuredError } from '@google/gemini-cli-core';
 
 describe('parseAndFormatApiError', () => {
   const enterpriseMessage = 'upgrade to a plan with higher limits';

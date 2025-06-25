@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { ApprovalMode } from '@gemini-cli/core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 
 interface AutoAcceptIndicatorProps {
   approvalMode: ApprovalMode;

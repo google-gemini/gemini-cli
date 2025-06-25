@@ -1,5 +1,5 @@
 {
-  "name": "@gemini-cli/core",
+  "name": "@google/gemini-cli-core",
   "version": "0.1.0",
   "description": "Gemini CLI Server",
   "type": "module",
