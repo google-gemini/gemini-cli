@@ -47,6 +47,14 @@ export async function runNonInteractive(
   config: Config,
   input: string,
 ): Promise<void> {
+  // Handle EPIPE errors when the output is piped to a command that closes early.
+  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EPIPE') {
+      // Exit gracefully if the pipe is closed.
+      process.exit(0);
+    }
+  });
+
   const geminiClient = config.getGeminiClient();
   const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
