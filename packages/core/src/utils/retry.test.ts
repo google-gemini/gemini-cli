@@ -426,7 +426,7 @@ describe('retryWithBackoff', () => {
 
       await expect(promise).resolves.toBe('success');
 
-      // Should trigger fallback after 4 consecutive 429s (attempts 2-5)
+      // Should trigger fallback after 2 consecutive 429s (attempts 2-3)
       expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
     });
   });
