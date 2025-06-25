@@ -10,7 +10,6 @@ For users who authenticate using their Google account to access Gemini Code Assi
 
 - Terms of Service: Your use of Gemini CLI is governed by the general [Google Terms of Service](https://policies.google.com/terms?hl=en-US).
 - Privacy Notice: The collection and use of your data are described in the [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals).
-- Usage Statistics Opt-Out: You may opt-out from Usage Statistics data by following the instructions available here: Usage Statistics Configuration.
 
 ## 2. Gemini API Key (Using Gemini Developer [API](https://ai.google.dev/gemini-api/docs) a: Unpaid Service, b: Paid Service)
 
