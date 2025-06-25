@@ -32,5 +32,6 @@ This documentation is organized into the following sections:
   - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory` tool.
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
 - **[Troubleshooting Guide](./troubleshooting.md):** Find solutions to common problems and FAQs.
+- **[Terms of Service and Privacy Notice](./tos-privacy.md):** Information on the terms of service and privacy notices applicable to your use of Gemini CLI.
 
 We hope this documentation helps you make the most of the Gemini CLI!
