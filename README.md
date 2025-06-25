@@ -30,6 +30,7 @@ With the Gemini CLI you can:
 
    ```bash
    npm install -g @google/gemini-cli
+   gemini
    ```
 
 3. **Pick a color theme**
@@ -57,17 +58,17 @@ Once the CLI is running, you can start interacting with Gemini from your shell.
 You can start a project from a new directory:
 
 ```sh
-$ cd new-project/
-$ gemini
+cd new-project/
+gemini
 > Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
 Or work with an existing project:
 
 ```sh
-$ git clone https://github.com/google-gemini/gemini-cli
-$ cd gemini-cli
-$ gemini
+git clone https://github.com/google-gemini/gemini-cli
+cd gemini-cli
+gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
 
