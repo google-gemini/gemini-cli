@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Gemini CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -19,17 +19,16 @@
     "typecheck": "tsc --noEmit",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepublishOnly": "npm publish --workspace=@google/gemini-cli-core",
     "prepack": "npm run build"
   },
   "files": [
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "gemini-cli-sandbox"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "0.1.0",
+    "@google/gemini-cli-core": "0.1.1",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
