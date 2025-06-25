@@ -73,7 +73,7 @@ Contributors to the project will want to run the CLI directly from the source co
 
 ### 4. Running the latest Gemini CLI commit from GitHub
 
-You can run the most recently committed version of Gemini CLI directly from the GitHub repository. This is useful for testing features still in developement.
+You can run the most recently committed version of Gemini CLI directly from the GitHub repository. This is useful for testing features still in development.
 
 ```bash
 # Execute the CLI directly from the main branch on GitHub

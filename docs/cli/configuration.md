@@ -165,7 +165,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
   - **Default:** `{"enabled": false, "target": "local", "otlpEndpoint": "http://localhost:4317", "logPrompts": true}`
   - **Properties:**
-    - **`enabled`** (boolean): Whether or not telemtery is enabled.
+    - **`enabled`** (boolean): Whether or not telemetry is enabled.
     - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
     - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
     - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
@@ -243,7 +243,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
   - Ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
-  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_ KEY"`.
+  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.

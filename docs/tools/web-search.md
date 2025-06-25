@@ -14,7 +14,7 @@ Use `google_web_search` to perform a web search using Google Search via the Gemi
 
 ## How to use `google_web_search` with the Gemini CLI
 
-The `google_web_search` tool sends a query to the Gemini API, which then perform a web search. `google_web_search` will return a generated response based on the search results, including citations and sources.
+The `google_web_search` tool sends a query to the Gemini API, which then performs a web search. `google_web_search` will return a generated response based on the search results, including citations and sources.
 
 Usage:
 
