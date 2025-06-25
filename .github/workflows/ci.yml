@@ -37,7 +37,7 @@ jobs:
           git diff --exit-code
 
       - name: Run linter
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Build project
         run: npm run build
