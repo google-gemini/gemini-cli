@@ -6,6 +6,8 @@ labels: ''
 assignees: ''
 ---
 
+<!-- Please search https://github.com/google-gemini/gemini-cli/issues to see if an issue already exists for the bug you encountered. If you find one, please add a comment to the existing issue. -->
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
