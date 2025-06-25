@@ -10,7 +10,10 @@ assignees: ''
 A clear and concise description of what the bug is.
 
 **Client information**
-Please paste the full text from the /about command run from Gemini CLI. Also include which platform (MacOS, Windows, Linux)
+Please paste the full text from the /about command run from Gemini CLI. Also include which platform (MacOS, Windows, Linux).
+
+**Login information**
+Describe how you are logging in.
 
 **Additional context**
 Add any other context about the problem here.
