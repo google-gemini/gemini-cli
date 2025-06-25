@@ -13,13 +13,6 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE) {
-    if (!process.env.GOOGLE_CLOUD_PROJECT) {
-      return 'GOOGLE_CLOUD_PROJECT environment variable not found. Add that to your .env and try again, no reload needed!';
-    }
-    return null;
-  }
-
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env.GEMINI_API_KEY) {
       return 'GEMINI_API_KEY environment variable not found. Add that to your .env and try again, no reload needed!';

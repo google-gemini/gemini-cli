@@ -36,7 +36,6 @@ export interface ContentGenerator {
 
 export enum AuthType {
   LOGIN_WITH_GOOGLE_PERSONAL = 'oauth-personal',
-  LOGIN_WITH_GOOGLE_ENTERPRISE = 'oauth-enterprise',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
 }
@@ -68,14 +67,6 @@ export async function createContentGeneratorConfig(
 
   // if we are using google auth nothing else to validate for now
   if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
-    return contentGeneratorConfig;
-  }
-
-  // if its enterprise make sure we have a cloud project
-  if (
-    authType === AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE &&
-    !!googleCloudProject
-  ) {
     return contentGeneratorConfig;
   }
 
@@ -118,10 +109,7 @@ export async function createContentGenerator(
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
-  if (
-    config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL ||
-    config.authType === AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE
-  ) {
+  if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
     return createCodeAssistContentGenerator(httpOptions, config.authType);
   }
 
