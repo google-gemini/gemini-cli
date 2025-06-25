@@ -120,15 +120,22 @@ export class ClearcutLogger {
         reject(e);
       });
       req.end(body);
-    }).then((buf: Buffer) => {
-      try {
-        this.last_flush_time = Date.now();
-        return this.decodeLogResponse(buf) || {};
-      } catch (error: unknown) {
+    })
+      .then((buf: Buffer) => {
+        try {
+          this.last_flush_time = Date.now();
+          return this.decodeLogResponse(buf) || {};
+        } catch (error: unknown) {
+          console.error('Error flushing log events:', error);
+          return {};
+        }
+      })
+      .catch((error: unknown) => {
+        // Handle all errors to prevent unhandled promise rejections
         console.error('Error flushing log events:', error);
+        // Return empty response to maintain the Promise<LogResponse> contract
         return {};
-      }
-    });
+      });
   }
 
   // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
