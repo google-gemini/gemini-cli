@@ -47,21 +47,54 @@ function isWordChar(ch: string | undefined): boolean {
  */
 function stripUnsafeCharacters(str: string): string {
   const stripped = stripAnsi(str);
-  return toCodePoints(stripAnsi(stripped))
+  return toCodePoints(stripped)
     .filter((char) => {
-      if (char.length > 1) return false;
       const code = char.codePointAt(0);
       if (code === undefined) {
         return false;
       }
-      // Allow emojis and other non-ASCII characters
-      const isUnsafe =
-        code === 127 || (code <= 31 && code !== 13 && code !== 10);
+      // Allow all printable ASCII characters (0x20 to 0x7E)
+      if (code >= 0x20 && code <= 0x7e) {
+        return true;
+      }
+      // Allow common newline characters
+      if (code === 0x0a || code === 0x0d) {
+        return true;
+      }
       // Allow characters in the Unicode Basic Multilingual Plane (BMP) that are not control characters
-      // and are not the DELETE character (127).
       // This broadly includes most printable characters and many symbols, including emojis.
-      const isEmojiOrPrintable = code > 31 && code !== 127;
-      return !isUnsafe && isEmojiOrPrintable;
+      // Control characters in BMP are U+0000-U+001F, U+007F-U+009F.
+      // We already handled U+000A and U+000D.
+      if (code > 0x7e && (code < 0x007f || code > 0x009f)) {
+        return true;
+      }
+      // For characters outside BMP (e.g., some rare emojis, supplementary planes),
+      // we'll allow them if they are not explicitly control characters.
+      // This is a more permissive approach.
+      // A more robust solution might involve checking Unicode categories (e.g., L, M, N, P, S, Zs, Zl, Zp)
+      // but that would require a more complex library.
+      // For now, we'll assume anything not a control character is okay.
+      if (code > 0x9f && code < 0xe000) {
+        // Basic Multilingual Plane (BMP)
+        return true;
+      }
+      if (code >= 0xe000 && code <= 0xf8ff) {
+        // Private Use Area (BMP)
+        return true;
+      }
+      if (code >= 0xf0000 && code <= 0xffffd) {
+        // Supplementary Private Use Area-A
+        return true;
+      }
+      if (code >= 0x10000 && code <= 0x10ffff) {
+        // Supplementary Planes (includes many emojis)
+        return true;
+      }
+
+      // Explicitly disallow known problematic control characters
+      const isControlCharacter =
+        (code >= 0x00 && code <= 0x1f) || (code >= 0x7f && code <= 0x9f);
+      return !isControlCharacter;
     })
     .join('');
 }
