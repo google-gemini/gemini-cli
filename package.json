@@ -1,6 +1,9 @@
 {
   "name": "@google/gemini-cli",
   "version": "0.1.5",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "module",
   "workspaces": [
     "packages/*"
