@@ -2,6 +2,7 @@
   "name": "@google/gemini-cli",
   "version": "0.1.5",
   "description": "Gemini CLI",
+  "repository": "google-gemini/gemini-cli",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -25,7 +26,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1"
+    "sandboxImageUri": "gemini-cli-sandbox"
   },
   "dependencies": {
     "@google/gemini-cli-core": "*",
