@@ -89,7 +89,7 @@ function validateHistory(history: Content[]) {
  * @remarks
  * The model may sometimes generate invalid or empty contents(e.g., due to safty
  * filters or recitation). Extracting valid turns from the history
- * ensures that subsequent requests could be accpeted by the model.
+ * ensures that subsequent requests could be accepted by the model.
  */
 function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
