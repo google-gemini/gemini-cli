@@ -71,15 +71,6 @@ import {
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
-
-vi.mock('@gemini-code/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@gemini-code/core')>();
-  return {
-    ...actual,
-    GitService: vi.fn(),
-  };
-});
-
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
