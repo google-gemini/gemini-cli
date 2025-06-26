@@ -1,13 +1,13 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "workspaces": [
     "packages/*"
   ],
   "repository": "google-gemini/gemini-cli",
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.4"
   },
   "scripts": {
     "generate": "node scripts/generate-git-commit-info.js",
