@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "description": "Gemini CLI Server",
   "type": "module",
   "main": "dist/index.js",
