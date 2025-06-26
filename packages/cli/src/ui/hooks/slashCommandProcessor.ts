@@ -719,6 +719,11 @@ export const useSlashCommandProcessor = (
               let i = 0;
               for (const item of conversation) {
                 i += 1;
+
+                // Add each item to history regardless of whether we display
+                // it.
+                chat.addHistory(item);
+
                 const text =
                   item.parts
                     ?.filter((m) => !!m.text)
@@ -728,7 +733,6 @@ export const useSlashCommandProcessor = (
                   // Parsing Part[] back to various non-text output not yet implemented.
                   continue;
                 }
-                chat.addHistory(item);
                 if (i === 1 && text.match(/context for our chat/)) {
                   hasSystemPrompt = true;
                 }
