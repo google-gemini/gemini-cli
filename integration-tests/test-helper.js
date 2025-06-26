@@ -42,6 +42,11 @@ export class TestRig {
     mkdirSync(join(this.testDir, dir));
   }
 
+  sync() {
+    // ensure file system is done before spawning
+    execSync('sync', { cwd: this.testDir });
+  }
+
   run(prompt, ...args) {
     const output = execSync(
       `node ${this.bundlePath} --yolo --prompt "${prompt}" ${args.join(' ')}`,
