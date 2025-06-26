@@ -115,8 +115,8 @@ export class GeminiClient {
       fileService: this.config.getFileService(),
     });
     const context = `
-  Okay, just setting up the context for our chat.
-  Today is ${today}.
+  This is the Gemini CLI. We are setting up the context for our chat.
+  Today's date is ${today}.
   My operating system is: ${platform}
   I'm currently working in the directory: ${cwd}
   ${folderStructure}
