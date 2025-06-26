@@ -30,7 +30,7 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
 
 ### Theme Persistence
 
-Selected themes are saved in Gemini CLI's [configuration](./docs/cli/configuration.md) so your preference is remembered across sessions.
+Selected themes are saved in Gemini CLI's [configuration](./configuration.md) so your preference is remembered across sessions.
 
 ## Dark Themes
 
