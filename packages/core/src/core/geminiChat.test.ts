@@ -14,7 +14,6 @@ import {
 } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 
 // Mocks
@@ -39,14 +38,11 @@ describe('GeminiChat', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: () => ({
-        authType: AuthType.USE_GEMINI,
+        authType: 'oauth-personal',
         model: 'test-model',
       }),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       setModel: vi.fn(),
-      getGeminiClient: vi.fn().mockReturnValue({
-        generateJson: vi.fn().mockResolvedValue({ model: 'pro' }),
-      }),
       flashFallbackHandler: undefined,
     } as unknown as Config;
 
@@ -114,7 +110,7 @@ describe('GeminiChat', () => {
       await chat.sendMessageStream({ message: 'hello' });
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         config: {},
       });
