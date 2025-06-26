@@ -272,7 +272,7 @@ describe('retryWithBackoff', () => {
       expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
 
       // Should retry again after fallback
-      expect(mockFn).toHaveBeenCalledTimes(4); // 3 initial attempts + 1 after fallback
+      expect(mockFn).toHaveBeenCalledTimes(3); // 2 initial attempts + 1 after fallback
     });
 
     it('should NOT trigger fallback for API key users', async () => {

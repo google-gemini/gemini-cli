@@ -138,7 +138,6 @@ export class GeminiChat {
   constructor(
     private readonly config: Config,
     private readonly contentGenerator: ContentGenerator,
-    private readonly model: string,
     private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
   ) {
@@ -168,7 +167,12 @@ export class GeminiChat {
   ): Promise<void> {
     logApiResponse(
       this.config,
-      new ApiResponseEvent(this.model, durationMs, usageMetadata, responseText),
+      new ApiResponseEvent(
+        this.config.getModel(),
+        durationMs,
+        usageMetadata,
+        responseText,
+      ),
     );
   }
 
@@ -178,7 +182,12 @@ export class GeminiChat {
 
     logApiError(
       this.config,
-      new ApiErrorEvent(this.model, errorMessage, durationMs, errorType),
+      new ApiErrorEvent(
+        this.config.getModel(),
+        errorMessage,
+        durationMs,
+        errorType,
+      ),
     );
   }
 
@@ -192,7 +201,7 @@ export class GeminiChat {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -244,7 +253,7 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
     let response: GenerateContentResponse;
@@ -252,12 +261,23 @@ export class GeminiChat {
     try {
       const apiCall = () =>
         this.contentGenerator.generateContent({
-          model: this.model,
+          model: this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
 
-      response = await retryWithBackoff(apiCall);
+      response = await retryWithBackoff(apiCall, {
+        shouldRetry: (error: Error) => {
+          if (error && error.message) {
+            if (error.message.includes('429')) return true;
+            if (error.message.match(/5\d{2}/)) return true;
+          }
+          return false;
+        },
+        onPersistent429: async (authType?: string) =>
+          await this.handleFlashFallback(authType),
+        authType: this.config.getContentGeneratorConfig()?.authType,
+      });
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
         durationMs,
@@ -326,14 +346,14 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
 
     try {
       const apiCall = () =>
         this.contentGenerator.generateContentStream({
-          model: this.model,
+          model: this.config.getModel(),
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
