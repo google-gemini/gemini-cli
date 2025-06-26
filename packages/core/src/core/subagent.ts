@@ -3,10 +3,10 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { getErrorMessage } from '../utils/errors.js';
+
 import { reportError } from '../utils/errorReporting.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { Config, ConfigParameters } from '../config/config.js';
+import { Config } from '../config/config.js';
 import { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
 import { createContentGenerator } from './contentGenerator.js';
@@ -15,38 +15,12 @@ import {
   Content,
   Part,
   FunctionCall,
-  GenerateContentResponse,
   GenerateContentConfig,
   FunctionDeclaration,
   Type,
 } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
-//import { GeminiClient } from '../core/client.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-
-/**
- * Extracts the text content from a GenerateContentResponse object.
- *
- * @param response - The GenerateContentResponse object to extract text from.
- * @returns The extracted text content, or null if no text is found.
- */
-function getResponseText(response: GenerateContentResponse): string | null {
-
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
 
 /**
  * @fileoverview Defines the configuration interfaces for a subagent.
@@ -104,7 +78,7 @@ export interface PromptConfig {
   goals: string;
   /** A list of expected output objects and the variables they should emit. */
   outputs: Record<string, string>;
-  /** A list of tool names (in the tool registry) that the subagent is permitted to use. */
+  /** A list of tool names (in the tool registry) or full function declarations that the subagent is permitted to use. */
   tools: Array<string | FunctionDeclaration>;
 }
 
@@ -172,56 +146,42 @@ export class ContextState {
 }
 
 /**
- * This is a helper function which manually replaces `${..}` placeholders with values from a dictionary.
+ * Replaces `${...}` placeholders in a template string with values from a context.
  *
- * This function iterates through a template string, identifies placeholders in the format `${key}`,
- * and replaces them with their corresponding values retrieved from the provided `ContextState` object.
- * It ensures that all referenced keys exist in the context before performing replacements.
+ * This function identifies all placeholders in the format `${key}`, validates that
+ * each key exists in the provided `ContextState`, and then performs the substitution.
  *
- * @param {string} template - The template string containing placeholders like `${key}`.
- * @param {ContextState} context - The `ContextState` object from which to retrieve values for the placeholders.
- * @returns {string} The templated string with placeholders replaced by their corresponding values from the context.
+ * @param template The template string containing placeholders.
+ * @param context The `ContextState` object providing placeholder values.
+ * @returns The populated string with all placeholders replaced.
  * @throws {Error} if any placeholder key is not found in the context.
  */
-function templateString(template: string, context: ContextState) {
-  // Regular expression to find placeholders like ${key}
+function templateString(template: string, context: ContextState): string {
   const placeholderRegex = /\$\{(\w+)\}/g;
-  let match;
-  const missingKeys = new Set<string>();
-  const foundKeys = new Set<string>();
-  let templatedString = template;
 
-  const contextKeys = context.get_keys();
+  // First, find all unique keys required by the template.
+  const requiredKeys = new Set(
+    Array.from(template.matchAll(placeholderRegex), (match) => match[1]),
+  );
 
-  // First pass: Identify all referenced keys and check for missing ones
-  while ((match = placeholderRegex.exec(template)) !== null) {
-    const key = match[1]; // The captured group is the key name
+  // Check if all required keys exist in the context.
+  const contextKeys = new Set(context.get_keys());
+  const missingKeys = Array.from(requiredKeys).filter(
+    (key) => !contextKeys.has(key),
+  );
 
-    if (!contextKeys.includes(key)) {
-      missingKeys.add(key);
-    } else {
-      foundKeys.add(key);
-    }
-  }
-
-  // If there are any missing keys, throw an error
-  if (missingKeys.size > 0) {
-    const missingKeysArray = Array.from(missingKeys);
+  if (missingKeys.length > 0) {
     throw new Error(
-      `Missing values for the following keys: ${missingKeysArray.join(', ')}`,
+      `Missing context values for the following keys: ${missingKeys.join(
+        ', ',
+      )}`,
     );
   }
 
-  for (const key of foundKeys) {
-    const toReplace = '${' + key + '}';
-    const replValue = String(context.get(key));
-    while (true) {
-      templatedString = templatedString.replace(toReplace, replValue);
-      if (!templatedString.includes(toReplace)) break;
-    }
-  }
-
-  return templatedString;
+  // Perform the replacement using a replacer function.
+  return template.replace(placeholderRegex, (_match, key) =>
+    String(context.get(key)),
+  );
 }
 
 /**
@@ -230,7 +190,6 @@ function templateString(template: string, context: ContextState) {
  * runtime context, and the collection of its outputs.
  */
 export class SubAgentScope {
-  runtimeContext: Config;
   output: OutputObject = {
     terminate_reason: SubagentTerminateMode.ERROR,
     emitted_vars: {},
@@ -238,19 +197,17 @@ export class SubAgentScope {
 
   /**
    * Constructs a new SubAgentScope instance.
-   * @param configParams - Parameters for the overall configuration.
+   * @param runtimeContext - The shared runtime configuration and services.
    * @param promptConfig - Configuration for the subagent's prompt and behavior.
    * @param modelConfig - Configuration for the generative model parameters.
    * @param runConfig - Configuration for the subagent's execution environment and constraints.
    */
   constructor(
-    private readonly configParams: ConfigParameters,
+    readonly runtimeContext: Config,
     private readonly promptConfig: PromptConfig,
     private readonly modelConfig: ModelConfig,
     private readonly runConfig: RunConfig,
-  ) {
-    this.runtimeContext = new Config(this.configParams);
-  }
+  ) {}
 
   /**
    * Runs the subagent in a non-interactive mode.
@@ -264,23 +221,22 @@ export class SubAgentScope {
     const chat = await this.createChatObject();
 
     if (!chat) {
-      console.error('Chat object creation failure');
+      this.output.terminate_reason = SubagentTerminateMode.ERROR;
       return;
     }
 
     const abortController = new AbortController();
-
-    // Tools
     const toolRegistry: ToolRegistry =
       await this.runtimeContext.getToolRegistry();
+
+    // Prepare the list of tools available to the subagent.
     const tools_to_load: string[] = [];
     const toolsList: FunctionDeclaration[] = [];
-    for (const t of this.promptConfig.tools) {
-      if (typeof t === 'string') {
-        tools_to_load.push(t);
+    for (const toolName of this.promptConfig.tools) {
+      if (typeof toolName === 'string') {
+        tools_to_load.push(toolName);
       } else {
-        //if (typeof t) {
-        toolsList.push(t);
+        toolsList.push(toolName);
       }
     }
 
@@ -289,11 +245,7 @@ export class SubAgentScope {
     );
     toolsList.push(...this.getScopeLocalFuncDefs());
 
-    // Prompt!
-    chat.setSystemInstruction(this.buildChatSystemPrompt(
-      context,
-      toolsList,
-    ));
+    chat.setSystemInstruction(this.buildChatSystemPrompt(context, toolsList));
 
     let currentMessages: Content[] = [
       { role: 'user', parts: [{ text: 'Get Started!' }] },
@@ -302,7 +254,7 @@ export class SubAgentScope {
     const startTime = Date.now();
     try {
       while (true) {
-        // If we've eclipsed our timeout window, termiante.
+        // Check for timeout.
         const duration = Date.now() - startTime;
         const durationMin = duration / (1000 * 60);
         if (durationMin >= this.runConfig.max_time_minutes) {
@@ -311,45 +263,30 @@ export class SubAgentScope {
         }
 
         const messageParams = {
-          message: currentMessages[0]?.parts || [], // Ensure parts are always provided
+          message: currentMessages[0]?.parts || [],
           config: {
             abortSignal: abortController.signal,
             tools: [{ functionDeclarations: toolsList }],
           },
         };
 
-        // Send the message to the chat object, which will manage its' own history
+        // Send the message to the GeminiChat object, which will manage its own history
         const responseStream = await chat.sendMessageStream(messageParams);
 
-        // Given that we've called streaming, let's combine all the parts of the response
-        // so we can process them, properly
+        // Combine all chunks in stream for proper processing.
         const functionCalls: FunctionCall[] = [];
-        let thinkingMessage = '';
         for await (const resp of responseStream) {
           if (abortController.signal.aborted) {
             console.error('Operation cancelled.');
             return;
           }
-          const textPart = getResponseText(resp);
-          if (textPart) {
-            //process.stdout.write(textPart);
-            thinkingMessage += textPart;
-          }
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+
+          const calls = resp.functionCalls;
+          if (calls) {
+            functionCalls.push(...calls);
           }
         }
 
-        // If a thinking message was provided, let's add it to the history?
-        if (thinkingMessage.length) {
-          console.log('💭:', thinkingMessage);
-          // I think chat already keeps this data in the history object, right? so we don't need to do anything?
-        }
-
-        // for any function calls given, let's linearly execute them.
-        // WARNING - sometimes the model gets confused, and if ToolA provides input to ToolB
-        // instead of providing that Proper input, it defaults to the wrong values!!!!
-        // We might need to truncate this to 1 call per loop!!
         if (functionCalls.length > 0) {
           currentMessages = await this.processFunctionCalls(
             functionCalls,
@@ -358,45 +295,28 @@ export class SubAgentScope {
             currentMessages,
           );
         } else {
-          //console.log("trying to exit..")
+          // The model has stopped calling tools, which signals completion.
+          // Verify that all expected output variables have been emitted.
+          const remainingVars = Object.keys(this.promptConfig.outputs).filter(
+            (key) => !(key in this.output.emitted_vars),
+          );
 
-          // If we get here, the model has suggested there's no more tools to call.
-          // This is a signal that we're done processing and can exit.
-          const remainingVars = [];
-          // before that happens, let's check if we emitted the needed variables
-          for (const key of Object.keys(this.promptConfig.outputs)) {
-            if (!(key in this.output.emitted_vars)) {
-              remainingVars.push(key);
-            }
-          }
-
-          if (remainingVars.length) {
-            // TODO:
-            // if it's found that there's variables waiting to be emitted, we should add a message to the history, which
-            // directs the model to emit those variables before it is allowed to exit.
-            // Below is an attempt at this process, but it is causing an error, since we're adding the part, when a function wasn't asked for
-            // and the Gemini API is barfing... so let's disable it for now, and just hope the LLM figures out they need to call EmitValue?
-            // we have variables that need to be emitted, let's tell the history
-            //let txtMsg =
-            //  'Before you can exit your work, you need to call the self.emitvalue tool for the following values:\n';
-            //for (const k of remainingVars) {
-            //  txtMsg += `* ${k} : ${this.promptConfig.outputs[k]}\n`;
-            //}
-            //if(currentMessages.length && currentMessages[0].parts)
-            //  currentMessages[0]?.parts?.push({text:txtMsg})
-            //chat.addHistory({ role: 'user', parts: [{text:txtMsg}] });
-          } else {
-            // process.stdout.write('\n'); // Ensure a final newline
+          if (remainingVars.length === 0) {
             this.output.terminate_reason = SubagentTerminateMode.GOAL;
             break;
           }
+
+          // If variables are missing, the loop continues, relying on the
+          // system prompt to guide the model to call self.emitvalue.
+          console.debug(
+            'Variables appear to be missing. Relying on model to call EmitValue.',
+          );
         }
       }
-    } catch (_error) {
-      console.error('Error processing input:', _error);
-      process.exit(1);
-    } finally {
-      //
+    } catch (error) {
+      console.error('Error during subagent execution:', error);
+      this.output.terminate_reason = SubagentTerminateMode.ERROR;
+      throw error;
     }
   }
 
@@ -420,20 +340,18 @@ export class SubAgentScope {
   ) {
     const toolResponseParts: Part[] = [];
 
-    for (const fc of functionCalls) {
-      const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+    for (const functionCall of functionCalls) {
+      const callId = functionCall.id ?? `${functionCall.name}-${Date.now()}`;
       const requestInfo: ToolCallRequestInfo = {
         callId,
-        name: fc.name as string,
-        args: (fc.args ?? {}) as Record<string, unknown>,
-        isClientInitiated:true
+        name: functionCall.name as string,
+        args: (functionCall.args ?? {}) as Record<string, unknown>,
+        isClientInitiated: true,
       };
 
-      let toolResponse = null;
+      let toolResponse;
 
-      console.log('🔨:', callId);
-
-      // Let's check for our scope local tools, first
+      // Handle scope-local tools first.
       if (callId.startsWith('self.emitvalue')) {
         const valName = String(requestInfo.args['emit_variable_name']);
         const valVal = String(requestInfo.args['emit_variable_value']);
@@ -456,9 +374,10 @@ export class SubAgentScope {
 
       if (toolResponse.error) {
         console.error(
-          `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
+          `Error executing tool ${functionCall.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
         );
-        continue; // process.exit(1);
+        // Continue to the next tool call instead of halting execution.
+        continue;
       }
 
       if (toolResponse.responseParts) {
@@ -485,10 +404,6 @@ export class SubAgentScope {
    * @returns {Promise<GeminiChat | undefined>} A promise that resolves to a `GeminiChat` instance, or undefined if creation fails.
    */
   private async createChatObject(extraHistory?: Content[]) {
-    //HISTORY - do we inherit, or stat fresh?
-
-    // sets up the start of the chat with env variables to work with
-    // this might be too dependent on the main agent to be useful
     const envParts = await this.getEnvironment();
     const initialHistory: Content[] = [
       {
@@ -501,62 +416,44 @@ export class SubAgentScope {
       },
     ];
 
-    // TODO : we shoudl pin the inital history so it doesn't get 
-    // culled via the compression system!  
     const start_history = [...initialHistory, ...(extraHistory ?? [])];
 
-    // TOOLS - let's filter based on input config
-    // Don't define tools during the create phase, only do it when we send the message.
-
-    // PROMPT -
-    // We intentinoally don't use a system prompt here, and instead
-    // allow it to be created during the first part of the runtime loop
-    // which allows it to have formatting variables based upon the context state
-    // If we want some custom AgentScope system prompting, we can add this back in.
-    //const systemInstruction = getCoreSystemPrompt(this.runtimeContext.getUserMemory());
-    const systemInstruction = ''; 
+    // The system instruction is set dynamically within the run loop to allow
+    // for context-based templating.
+    const systemInstruction = '';
 
     try {
-      // Create a copy of the content generator
       const targetContentConfig: GenerateContentConfig = {
         temperature: this.modelConfig.temp,
         topP: this.modelConfig.top_p,
       };
 
-      const contentGenConfigInst = {
+      const generationConfig = {
         systemInstruction,
         ...targetContentConfig,
-        //tools, // don't pass in tools here, they are ignored later.
       };
 
-      console.log("GOT HERE 3")
-      //const constGenerator = await geminiClient.contentGenerator;
       const contentGenerator = await createContentGenerator(
         this.runtimeContext.getContentGeneratorConfig(),
       );
-      console.log("GOT HERE 4")
 
-      // Create the geminiChat item, with these configurations.
-      const gcInst = await new GeminiChat(
+      this.runtimeContext.setModel(this.modelConfig.model);
+
+      return new GeminiChat(
         this.runtimeContext,
         contentGenerator,
-        this.modelConfig.model,
-        contentGenConfigInst,
+        generationConfig,
         start_history,
       );
-
-      
-
-      return gcInst;
     } catch (error) {
-      
       await reportError(
         error,
         'Error initializing Gemini chat session.',
         start_history,
-        'startChat'
+        'startChat',
       );
-      throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
+      // The calling function will handle the undefined return.
+      return undefined;
     }
   }
 
@@ -613,13 +510,9 @@ export class SubAgentScope {
               'Full context requested, but read_many_files returned no content.',
             );
           }
-        } else {
-          console.warn(
-            'Full context requested, but read_many_files tool not found.',
-          );
         }
       } catch (error) {
-        // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
+        // This error is logged but doesn't halt the process, as full context is optional.
         console.error('Error reading full file context:', error);
         initialParts.push({
           text: '\n--- Error reading full file context ---',
@@ -636,15 +529,15 @@ export class SubAgentScope {
    * @returns An array of `FunctionDeclaration` objects.
    */
   private getScopeLocalFuncDefs() {
-    const yieldResultFcn: FunctionDeclaration = {
+    const emitValueTool: FunctionDeclaration = {
       name: 'self.emitvalue',
       description: `* This tool emits A SINGLE return value from this execution, such that it can be collected and presented to the calling function.
-* You can only emit ONE VALUE each time you call this tool. You are expected to call this tool MULTIPLE TIMES if you have MULTIPLE OUTPUTS.`,
+        * You can only emit ONE VALUE each time you call this tool. You are expected to call this tool MULTIPLE TIMES if you have MULTIPLE OUTPUTS.`,
       parameters: {
         type: Type.OBJECT,
         properties: {
           emit_variable_name: {
-            description: 'This is the name of the variable to be returned..',
+            description: 'This is the name of the variable to be returned.',
             type: Type.STRING,
           },
           emit_variable_value: {
@@ -653,10 +546,11 @@ export class SubAgentScope {
             type: Type.STRING,
           },
         },
+        required: ['emit_variable_name', 'emit_variable_value'],
       },
     };
 
-    return [yieldResultFcn];
+    return [emitValueTool];
   }
 
   /**
@@ -669,8 +563,7 @@ export class SubAgentScope {
   private buildChatSystemPrompt(
     context: ContextState,
     toolsList: FunctionDeclaration[],
-  ) {
-    // templatize any values that may have been prompted from global state
+  ): string {
     const templated_plan = templateString(this.promptConfig.plan, context);
     let templated_goals = templateString(this.promptConfig.goals, context);
 
@@ -679,8 +572,6 @@ export class SubAgentScope {
       templated_goals += `\n* Use the 'self.emitvalue' tool to emit the '${key}' key, with a value described as '${value}'`;
     }
 
-    // For some reason, when using the existing geminiChat system, it doesn't really understand the tools it has access to..
-    // I would assume that the genAI.GenerateContent api would take care of that, but it seems not? So I include the tools in this prompt.
     const input = `You are an expert AI that takes on all sorts of roles to accomplish tasks for the user. You will continue to iterate, and call tools until the goals are complete. 
 
 Here are the tools you have access to, for this session, to solve the goals:
@@ -700,7 +591,7 @@ ${templated_plan}
  
  Important things:
  * You are running in non-interactive mode. You cannot ask the user for input.
- * You are in charge of determininig if your goals are complete or not. If you think they are done, then be done, and don't call any more tools.
+ * You must determine if your goals are complete. Once you believe all goals have been met, do not call any more tools.
  `;
 
     return input;

@@ -75,8 +75,7 @@ export class CleanDocstringTool extends BaseTool<
     params: CleanDocstringToolParams,
     _signal: AbortSignal,
   ): Promise<ToolResult> {
-    // let's create the subagent, and invoke it with these params
-    // give it access to the specific tools
+    // Create a subagent, and invoke it with these params and give it access to the specific tools.
     const configParams: ConfigParameters = {
       sessionId: 'smarttool-cleandocstring-session',
       targetDir: '.',
@@ -85,26 +84,43 @@ export class CleanDocstringTool extends BaseTool<
       model: DEFAULT_GEMINI_FLASH_MODEL,
     };
 
+    const subAgentConfig = new Config(configParams);
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    if (!authType) {
+      return {
+        llmContent:
+          'Error: Parent tool is not properly authenticated. Cannot create sub-agent.',
+        returnDisplay:
+          'Error: Parent tool is not properly authenticated. Cannot create sub-agent.',
+      };
+    }
+    await subAgentConfig.refreshAuth(authType);
 
-    // Prompt Config
     const promptConfig = {
       plan: `Your job is to read the file located at ${params.path} and edit it to make sure that it has full coverage of proper docstrings for the language. 
-How you approach your work:
-1. Start by loading the file into memory via ${ReadFileTool.name}.
-2. Then, think to yourself to find all the function defintions / function headers in that file.
-3. For each function, check the file to see if the docstring is valid or not.
-4. If the docstring is pretty good, don't make any edits, just continue on.
-5. If the docstring needs updating, then edit the file to update it.
+
+// Step-by-Step Workflow:
+1.  **Load the File:** Use the ${ReadFileTool.name} to load the source code from ${params.path}.
+2.  **Identify Language & Conventions:** Analyze the file content or extension to determine the programming language. State the language and the docstring convention you will use (e.g., "This is a Python file. I will use Google Style docstrings.").
+3.  **Locate Functions:** Systematically scan the code and create a list of all function definitions.
+4.  **Analyze and Edit (One Function at a Time):** For each function in your list, perform the following micro-workflow:
+    a. **Check for Existing Docstring:** Look for a docstring immediately following the function signature.
+    b. **Analyze Quality:** Evaluate the existing docstring (if any) against the "Definition of a High-Quality Docstring" checklist. Does it accurately reflect the function's parameters and return value? Is it formatted correctly?
+    c. **Determine Action:**
+        * **If the docstring is perfect:** Do nothing and move to the next function.
+        * **If the docstring is missing or incomplete/incorrect:** Generate a new, high-quality docstring.
+    d. **Execute Edit:** If an update is needed, formulate a precise edit to insert or replace the docstring for **only that single function**. Do not modify any other part of the file.
+
 
 Rules for great docstrings:
 * Docstrings should include a description of what the function does
 * Docstrings should ensure that it properly describes input / return parameters
 
 Important notes about your task:
-* Do not try to edit the whole file at once. Try to make smaller edits so you don't accidentially make a mistake. It's ok to make an edit, clear your history, and re-read the file in again. that's a good thing.
-* Be cafeful not to edit any part of the file that would cause errors. Make sure you do the right replacement functions to ensure the functions are correct, etc etc.
+* Do not try to edit the whole file at once. Try to make smaller edits so you don't accidentally make a mistake. It's ok to make an edit, clear your history, and re-read the file in again. that's a good thing.
+* Be careful not to edit any part of the file that would cause errors. Make sure you do the right replacement functions to ensure the functions are correct, etc etc.
 * Be careful not to duplicate any existing docstrings. If there's an existing docstring, you should review it, or edit it.
-* Avoid re-writing an existing docstring, unless it is incorrect, or out of date, or non-existant. 
+* Avoid re-writing an existing docstring, unless it is incorrect, or out of date, or non-existent. 
 * Remember, a Docstring isn't just any random string, it's a SPECIFIC comment that's attached to a function that describes the arguments and returns.
 * Do not edit any other part of the file, unrelated to the docstring.
 * Your job is to JUST update the docstrings - Do not change any code, do not change inline comments. 
@@ -117,23 +133,20 @@ Important notes about your task:
       tools: [ReadFileTool.Name, EditTool.Name, LSTool.Name, GrepTool.Name],
     };
 
-    // Model Config
     const modelConfig = {
       model: DEFAULT_GEMINI_FLASH_MODEL,
       temp: 0.2,
       top_p: 0.95,
     };
 
-    // Run Config
     const runConfig = {
       max_time_minutes: 2,
     };
 
-    // Context
     const context = new ContextState();
 
     const orchestrator = new SubAgentScope(
-      configParams,
+      subAgentConfig,
       promptConfig,
       modelConfig,
       runConfig,
@@ -152,8 +165,8 @@ Important notes about your task:
       console.error('Orchestrator run failed:', error);
     }
     return {
-      llmContent: `Error: An error occured while trying to fix up the docstrings for ${params.path}`,
-      returnDisplay: `Error: An error occured while trying to fix up the docstrings for ${params.path}`,
+      llmContent: `Error: An error occurred while trying to fix up the docstrings for ${params.path}`,
+      returnDisplay: `Error: An error occurred while trying to fix up the docstrings for ${params.path}`,
     };
   }
 }

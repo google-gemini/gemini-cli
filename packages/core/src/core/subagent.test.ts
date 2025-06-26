@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-vi.mock('../core/client.js');
+vi.mock('../core/geminiChat.js');
+vi.mock('../core/contentGenerator.js');
 
-import { GenerateContentResponse } from '@google/genai';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ConfigParameters } from '../config/config.js';
-import { GeminiClient } from './client.js';
+import { createContentGenerator } from '../core/contentGenerator.js';
+import { GeminiChat } from './geminiChat.js';
+import { Config, ConfigParameters } from '../config/config.js';
 import {
   ContextState,
   SubAgentScope,
@@ -20,31 +21,41 @@ import {
 } from './subagent.js';
 
 describe('SubAgentScope', () => {
-  let mockGenerateContent: Mock;
+  let mockSendMessageStream: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGenerateContent = vi.fn();
-    vi.mocked(GeminiClient).mockImplementation(
+    mockSendMessageStream = vi.fn();
+    vi.mocked(GeminiChat).mockImplementation(
       () =>
         ({
-          generateContent: mockGenerateContent,
-        }) as unknown as GeminiClient,
+          sendMessageStream: mockSendMessageStream,
+          setSystemInstruction: vi.fn(),
+        }) as unknown as GeminiChat,
     );
+    vi.mocked(createContentGenerator).mockResolvedValue({
+      getGenerativeModel: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   });
 
   it('should correctly execute a simple query and emit the expected variables', async () => {
-    // Mock the model's response. The SubAgentScope is expected to parse this
-    // and extract the capital.
-    mockGenerateContent.mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [{ text: '{"capital": "Paris"}' }],
-          },
-        },
-      ],
-    } as GenerateContentResponse);
+    // Mock the model's response to issue a tool call.
+    mockSendMessageStream.mockResolvedValue(
+      (async function* () {
+        yield {
+          functionCalls: [
+            {
+              name: 'self.emitvalue',
+              args: {
+                emit_variable_name: 'capital',
+                emit_variable_value: 'Paris',
+              },
+            },
+          ],
+        };
+      })(),
+    );
 
     // Base configuration parameters
     const configParams: ConfigParameters = {
@@ -54,6 +65,10 @@ describe('SubAgentScope', () => {
       debugMode: false,
       cwd: process.cwd(),
     };
+
+    const config = new Config(configParams);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await config.refreshAuth('test-auth' as any);
 
     // Prompt Config
     const promptConfig = {
@@ -80,7 +95,7 @@ describe('SubAgentScope', () => {
     context.set('user_query', 'Tell me the capital of France.');
 
     const orchestrator = new SubAgentScope(
-      configParams,
+      config,
       promptConfig,
       modelConfig,
       runConfig,

@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CleanDocstringTool } from './clean-docstring.js';
 import { Config, ConfigParameters } from '../config/config.js';
+import { AuthType } from '../core/contentGenerator.js';
 import { SubAgentScope, SubagentTerminateMode } from '../core/subagent.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
@@ -28,6 +29,10 @@ describe('CleanDocstringTool', () => {
       cwd: process.cwd(),
     };
     mockConfig = new Config(cp);
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: 'test-auth' as AuthType,
+      model: DEFAULT_GEMINI_FLASH_MODEL,
+    });
     tool = new CleanDocstringTool(rootDirectory, mockConfig);
     vi.clearAllMocks();
   });
@@ -71,8 +76,12 @@ describe('CleanDocstringTool', () => {
 
       const result = await tool.execute(validParams, signal);
 
-      expect(result.llmContent).toContain('An error occured');
-      expect(result.returnDisplay).toContain('An error occured');
+      expect(result.llmContent).toContain(
+        'An error occurred while trying to fix up the docstrings',
+      );
+      expect(result.returnDisplay).toContain(
+        'An error occurred while trying to fix up the docstrings',
+      );
     });
 
     it('should return an error message when the subagent throws an error', async () => {
@@ -89,8 +98,12 @@ describe('CleanDocstringTool', () => {
 
       const result = await tool.execute(validParams, signal);
 
-      expect(result.llmContent).toContain('An error occured');
-      expect(result.returnDisplay).toContain('An error occured');
+      expect(result.llmContent).toContain(
+        'An error occurred while trying to fix up the docstrings',
+      );
+      expect(result.returnDisplay).toContain(
+        'An error occurred while trying to fix up the docstrings',
+      );
     });
   });
 });
