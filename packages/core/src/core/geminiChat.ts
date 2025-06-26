@@ -87,7 +87,7 @@ function validateHistory(history: Content[]) {
  * Extracts the curated (valid) history from a comprehensive history.
  *
  * @remarks
- * The model may sometimes generate invalid or empty contents(e.g., due to safty
+ * The model may sometimes generate invalid or empty contents(e.g., due to safety
  * filters or recitation). Extracting valid turns from the history
  * ensures that subsequent requests could be accepted by the model.
  */

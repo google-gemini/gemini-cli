@@ -133,7 +133,7 @@ export function ThemeDialog({
   let showScopeSelection = true;
   let includePadding = true;
 
-  // Remove content from the LHS that can be ommitted if it exceeds the available height.
+  // Remove content from the LHS that can be omitted if it exceeds the available height.
   if (totalLeftHandSideHeight > availableTerminalHeight) {
     includePadding = false;
     totalLeftHandSideHeight -= DAILOG_PADDING;

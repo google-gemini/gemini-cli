@@ -58,7 +58,7 @@ function getSandboxCommand(
       );
       process.exit(1);
     }
-    // confirm that specfied command exists
+    // confirm that specified command exists
     if (commandExists.sync(sandbox)) {
       return sandbox;
     }
