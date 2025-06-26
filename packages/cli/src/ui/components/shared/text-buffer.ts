@@ -54,9 +54,14 @@ function stripUnsafeCharacters(str: string): string {
       if (code === undefined) {
         return false;
       }
+      // Allow emojis and other non-ASCII characters
       const isUnsafe =
         code === 127 || (code <= 31 && code !== 13 && code !== 10);
-      return !isUnsafe;
+      // Allow characters in the Unicode Basic Multilingual Plane (BMP) that are not control characters
+      // and are not the DELETE character (127).
+      // This broadly includes most printable characters and many symbols, including emojis.
+      const isEmojiOrPrintable = code > 31 && code !== 127;
+      return !isUnsafe && isEmojiOrPrintable;
     })
     .join('');
 }
