@@ -46,12 +46,6 @@ if (!cliPackageJson.config) {
 }
 cliPackageJson.config.sandboxImageUri = containerImageUri;
 
-// Remove 'prepublishOnly' from scripts if it exists
-if (cliPackageJson.scripts && cliPackageJson.scripts.prepublishOnly) {
-  delete cliPackageJson.scripts.prepublishOnly;
-  console.log('Removed prepublishOnly script from packages/cli/package.json');
-}
-
 fs.writeFileSync(
   cliPackageJsonPath,
   JSON.stringify(cliPackageJson, null, 2) + '\n',
