@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -39,11 +39,11 @@
     "build:cli": "npm run build --workspace packages/cli",
     "build:core": "npm run build --workspace packages/core",
     "build:packages": "npm run build:core && npm run build:cli",
-    "build:docker": "node scripts/build_sandbox.js -s",
+    "build:sandbox:fast": "node scripts/build_sandbox.js --skip-npm-install-build",
     "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
     "publish:sandbox": "node scripts/publish-sandbox.js",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
-    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:docker && npm run publish:sandbox && npm run publish:npm",
+    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
     "telemetry": "node scripts/telemetry.js",
     "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\""
   },

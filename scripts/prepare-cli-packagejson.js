@@ -62,3 +62,15 @@ console.log(
 console.log(`  URI: ${containerImageUri}`);
 console.log(`  Registry: ${containerImageRegistry}`);
 console.log(`  Image Name: ${containerImageName}`);
+
+// Copy README.md to packages/cli
+const rootReadmePath = path.resolve(__dirname, '../README.md');
+const cliReadmePath = path.resolve(__dirname, '../packages/cli/README.md');
+
+try {
+  fs.copyFileSync(rootReadmePath, cliReadmePath);
+  console.log('Copied root README.md to packages/cli/');
+} catch (err) {
+  console.error('Error copying README.md:', err);
+  process.exit(1);
+}
