@@ -150,7 +150,7 @@ export interface OnboardUserResponse {
 
 /**
  * Status code of user license status
- * it does not stricly correspond to the proto
+ * it does not strictly correspond to the proto
  * Error value is an additional value assigned to error responses from OnboardUser
  */
 export enum OnboardUserStatusCode {

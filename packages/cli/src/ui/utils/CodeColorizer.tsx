@@ -21,7 +21,7 @@ import {
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
 
-// Configure themeing and parsing utilities.
+// Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
 
 function renderHastNode(
