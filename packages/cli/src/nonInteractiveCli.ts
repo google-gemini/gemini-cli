@@ -110,10 +110,15 @@ export async function runNonInteractive(
           );
 
           if (toolResponse.error) {
+            const isToolNotFound = toolResponse.error.message.includes(
+              'not found in registry',
+            );
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            process.exit(1);
+            if (!isToolNotFound) {
+              process.exit(1);
+            }
           }
 
           if (toolResponse.responseParts) {
