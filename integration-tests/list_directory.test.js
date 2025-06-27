@@ -9,7 +9,7 @@ import { strict as assert } from 'assert';
 import { TestRig } from './test-helper.js';
 
 test('should be able to list a directory', async (t) => {
-  const rig = new TestRig();
+  const rig = new TestRig();KO
   rig.setup(t.name);
   rig.createFile('file1.txt', 'file 1 content');
   rig.mkdir('subdir');
