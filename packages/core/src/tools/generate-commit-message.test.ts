@@ -21,6 +21,45 @@ vi.mock('../core/client.js', () => ({
   })),
 }));
 
+const COMMIT_MESSAGE_PROMPT_LINES = [
+  'You are an expert software engineer specializing in writing concise and meaningful git commit messages.',
+  'Your task is to generate a commit message in the Conventional Commits format based on the provided git diff.',
+  '',
+  '# Process',
+  '1. **Analyze the Diff**: In an <analysis> block, first reason about the changes. Summarize the core changes and infer the overall purpose (the "why"). Determine the most appropriate `type` and `scope`.',
+  '2. **Generate the Commit Message**: Based on your analysis, generate the final commit message. Remember to focus on the *why* behind the change, not just the *what*.',
+  '',
+  '# Commit Message Format',
+  '- **Header**: `type(scope): subject`. The header must be lowercase. The `type` must be one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.',
+  '- **Body**: Optional. Use it to explain the "what" and "why" of the change. Use the imperative, present tense (e.g., "change" not "changed").',
+  '- **Footer**: Optional. For BREAKING CHANGES and referencing issues.',
+  '',
+  '# Examples',
+  '',
+  '```',
+  'feat(home): add ad',
+  '- Introduced the @ctrl/react-adsense package to enable Google AdSense integration in the application.',
+  '- Updated package.json and pnpm-lock.yaml to include the new dependency.',
+  '- Added the Adsense component in page.tsx to display ads, enhancing monetization opportunities.',
+  '- Included a script tag in layout.tsx for loading the AdSense script asynchronously.',
+  '',
+  "These changes improve the application's revenue potential while maintaining a clean and organized codebase.",
+  '```',
+  '',
+  '```',
+  'refactor(cmpts)!: rename input form',
+  '- Renamed `InputForm.tsx` to `input-form.tsx` to follow consistent naming conventions.',
+  '- Updated the import path in `app/page.tsx` to reflect the renamed file.',
+  '',
+  'BREAKING CHANGE: This change renames `InputForm.tsx` to `input-form.tsx`, which will require updates to any imports referencing the old file name.',
+  '```',
+  '',
+  '# Git Diff to Analyze',
+  '```diff',
+  '@{{diff}}',
+  '```',
+];
+
 describe('GenerateCommitMessageTool', () => {
   let tool: GenerateCommitMessageTool;
   let mockConfig: Config;
@@ -37,64 +76,17 @@ describe('GenerateCommitMessageTool', () => {
     mockSpawn = spawn as Mock;
   });
 
-  // Helper to mock spawn behavior
-  const mockSpawnProcess = (
-    stagedStdout: string,
-    stagedStderr: string,
-    stagedExitCode: number,
-    unstagedStdout: string = '',
-    unstagedStderr: string = '',
-    unstagedExitCode: number = 0,
-  ) => {
-    let callCount = 0;
-    mockSpawn.mockImplementation((command, args) => {
-      callCount++;
-      if (args.includes('--cached')) {
-        // Staged diff call
-        const mockChild = {
-          stdout: {
-            on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-              if (event === 'data') listener(Buffer.from(stagedStdout));
-            }),
-          },
-          stderr: {
-            on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-              if (event === 'data') listener(Buffer.from(stagedStderr));
-            }),
-          },
-          on: vi.fn(
-            (event: string, listener: (code: number, signal: string) => void) => {
-              if (event === 'close') listener(stagedExitCode, '');
-            },
-          ),
-        };
-        return mockChild;
-      } else {
-        // Unstaged diff call
-        const mockChild = {
-          stdout: {
-            on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-              if (event === 'data') listener(Buffer.from(unstagedStdout));
-            }),
-          },
-          stderr: {
-            on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-              if (event === 'data') listener(Buffer.from(unstagedStderr));
-            }),
-          },
-          on: vi.fn(
-            (event: string, listener: (code: number, signal: string) => void) => {
-              if (event === 'close') listener(unstagedExitCode, '');
-            },
-          ),
-        };
-        return mockChild;
-      }
-    });
-  };
-
   it('should return a message when there are no changes', async () => {
-    mockSpawnProcess('', '', 0, '', '', 0);
+    mockSpawn.mockImplementation((_command, _args) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn() };
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
@@ -108,19 +100,44 @@ describe('GenerateCommitMessageTool', () => {
   });
 
   it('should return an error when git diff fails', async () => {
-    mockSpawnProcess('', 'git error', 1);
+    mockSpawn.mockImplementation((_command, _args) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn() };
+      child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+        if (event === 'data') listener(Buffer.from('git error'));
+      }) };
+      process.nextTick(() => child.emit('close', 1));
+      return child;
+    });
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
-    expect(result.llmContent).toBe('Error getting git diff: git error');
-    expect(result.returnDisplay).toBe('Error getting git diff: git error');
+    expect(result.llmContent).toBe('Error: Git diff command failed: git error');
+    expect(result.returnDisplay).toBe('Error: Git diff command failed: git error');
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
   it('should generate a commit message when there are staged changes', async () => {
     const diff =
       'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
-    mockSpawnProcess(diff, '', 0);
+
+    mockSpawn.mockImplementationOnce((_command, _args) => {
+      // Staged diff call
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+        if (event === 'data') listener(Buffer.from(diff));
+      }) };
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
+
     (mockClient.generateContent as Mock).mockResolvedValue({
       candidates: [
         {
@@ -131,31 +148,62 @@ describe('GenerateCommitMessageTool', () => {
       ],
     });
 
-    const result = await tool.execute(undefined, new AbortController().signal);
+    const controller = new AbortController();
+    const result = await tool.execute(undefined, controller.signal);
+
+    const expectedPrompt = COMMIT_MESSAGE_PROMPT_LINES.join('\n').replace(
+      /@\{\{diff\}\}'/g,
+      diff,
+    );
 
     expect(result.llmContent).toBe('feat: new feature');
     expect(result.returnDisplay).toBe('feat: new feature');
     expect(mockClient.generateContent).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
+      [
+        {
           role: 'user',
-          parts: expect.arrayContaining([
-            expect.objectContaining({
-              text: expect.stringContaining(diff),
-            }),
-          ]),
-        }),
-      ]),
+          parts: [
+            {
+              text: expect.stringContaining(diff), // Use stringContaining for the diff part
+            },
+          ],
+        },
+      ],
       {},
-      expect.any(AbortSignal),
+      controller.signal,
     );
   });
 
   it('should generate a commit message when there are only unstaged changes', async () => {
     const diff =
       'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
-    // No staged changes, but unstaged changes
-    mockSpawnProcess('', '', 0, diff, '', 0);
+
+    // Mock for staged diff (no changes)
+    mockSpawn.mockImplementationOnce((_command, _args) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn() };
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
+
+    // Mock for unstaged diff (with changes)
+    mockSpawn.mockImplementationOnce((_command, _args) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+        if (event === 'data') listener(Buffer.from(diff));
+      }) };
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
+
     (mockClient.generateContent as Mock).mockResolvedValue({
       candidates: [
         {
@@ -166,49 +214,52 @@ describe('GenerateCommitMessageTool', () => {
       ],
     });
 
-    const result = await tool.execute(undefined, new AbortController().signal);
+    const controller = new AbortController();
+    const result = await tool.execute(undefined, controller.signal);
+
+    const expectedPrompt = COMMIT_MESSAGE_PROMPT_LINES.join('\n').replace(
+      /@\{\{diff\}\}'/g,
+      diff,
+    );
 
     expect(result.llmContent).toBe('feat: new feature');
     expect(result.returnDisplay).toBe('feat: new feature');
     expect(mockClient.generateContent).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
+      [
+        {
           role: 'user',
-          parts: expect.arrayContaining([
-            expect.objectContaining({
-              text: expect.stringContaining(diff),
-            }),
-          ]),
-        }),
-      ]),
+          parts: [
+            {
+              text: expect.stringContaining(diff), // Use stringContaining for the diff part
+            },
+          ],
+        },
+      ],
       {},
-      expect.any(AbortSignal),
+      controller.signal,
     );
   });
 
   it('should return an error when spawn process fails to start', async () => {
     const mockError = new Error('spawn error');
-    // For the error event, the listener only receives the error object, not code/signal
-    mockSpawn.mockImplementationOnce(
-      (_command: string, _args: string[], _options: object) => {
-        const child = new EventEmitter() as EventEmitter & {
-          stdout: { on: ReturnType<typeof vi.fn> };
-          stderr: { on: ReturnType<typeof vi.fn> };
-        };
-        child.stdout = { on: vi.fn() };
-        child.stderr = { on: vi.fn() };
-        process.nextTick(() => child.emit('error', mockError));
-        return child;
-      },
-    );
+    mockSpawn.mockImplementationOnce(() => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+      };
+      child.stdout = { on: vi.fn() };
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('error', mockError));
+      return child;
+    });
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
     expect(result.llmContent).toBe(
-      `Failed to start git diff process: ${mockError.message}`,
+      `Error: Failed to spawn git process: ${mockError.message}`,
     );
     expect(result.returnDisplay).toBe(
-      `Failed to start git diff process: ${mockError.message}`,
+      `Error: Failed to spawn git process: ${mockError.message}`,
     );
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });

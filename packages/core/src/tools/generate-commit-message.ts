@@ -4,95 +4,84 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
-import { Config } from '../config/config.js';
+import { 
+  BaseTool, 
+  ToolResult, 
+  ToolCallConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+  ToolConfirmationOutcome 
+} from './tools.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
+import { promisify } from 'util';
+import { exec } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
-const COMMIT_MESSAGE_PROMPT_LINES = [
-  '',
-  'You are a helpful assistant that generates commit messages in the Conventional Commits format.',
-  '',
-  '# Git diff',
-  '@{{diff}}',
-  '',
-  '------',
-  '',
-  'Generate an English commit message that meets the friendly requirements of commitizen from git difft:',
-  '',
-  '# Examples',
-  '',
-  '```',
-  'feat(home): add ad',
-  '- Introduced the @ctrl/react-adsense package to enable Google AdSense integration in the application.',
-  '- Updated package.json and pnpm-lock.yaml to include the new dependency.',
-  '- Added the Adsense component in page.tsx to display ads, enhancing monetization opportunities.',
-  '- Included a script tag in layout.tsx for loading the AdSense script asynchronously.',
-  '',
-  '',
-  "These changes improve the application's revenue potential while maintaining a clean and organized codebase.",
-  '```',
-  '',
-  '------',
-  '',
-  '```',
-  'refactor(cmpts)!: rename input form',
-  '- Renamed `InputForm.tsx` to `input-form.tsx` to follow consistent naming conventions.',
-  '- Updated the import path in `app/page.tsx` to reflect the renamed file.',
-  '',
-  'BREAKING CHANGE: This change renames `InputForm.tsx` to `input-form.tsx`, which will require updates to any imports referencing the old file name.',
-  '```',
-  '',
-  '------',
-  '',
-  '```',
-  'feat(api): refactor client and improve hexagram',
-  '- Replaced `openai` import with `createOpenAI` to allow for customizable settings.',
-  '- Added support for custom OpenAI API base URL configuration.',
-  '- Enhanced hexagram generation logic:',
-  '  - Improved randomness simulation for hexagram line generation.',
-  '  - Refactored `determineLineType` for better readability and error handling.',
-  '  - Optimized transformation logic for moving lines.',
-  '  - Standardized logging format for debug messages.',
-  '  - Updated hexagram data structure for consistency and clarity.',
-  '  - Fixed typos and logical errors in several hexagram mappings.',
-  '',
-  'These changes improve code readability, maintainability, and debugging efficiency.',
-  '```',
-  '',
-  '# Overview',
-  '',
-  'Each commit message must follow a structured format and remain succinct and clear. The message consists of three parts—a header (all lowercase), a body (capitalized at the beginning of every line), and a footer. The header is mandatory and must conform to the following format: `type(scope): subject`. The body must begin with one blank line after the header and every line should be capitalized. The footer can contain breaking changes and issue references.',
-  '',
-  '## Header',
-  '',
-  'The header is the most important part of the commit message. It should be a single line that summarizes the change. The type must be one of the following: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert. The scope is optional and should be a noun describing the area of the codebase that the change affects. The subject should be a short, imperative-tense description of the change.',
-  '',
-  '## Body',
-  '',
-  'The body is optional, but it is highly recommended. It should provide more context about the change, including the motivation and the approach. Use the imperative, present tense: "change" not "changed" nor "changes". The body should include the motivation for the change and contrast this with previous behavior. Capitalized at the beginning.',
-  '',
-  '## Footer',
-  '',
-  'The footer should contain any information about Breaking Changes and is also the place to reference GitHub issues that this commit closes.',
-  'Breaking Changes should start with the word BREAKING CHANGE: with a space or two newlines. The rest of the commit message is then used for this. Capitalized at the beginning.',
-  '',
-  'Diff:',
-  '```',
-  '@{{diff}}',
-  '```',
-];
+const execAsync = promisify(exec);
+
+const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise and meaningful git commit messages following the Conventional Commits format.
+
+Your task is to analyze git changes and generate commit messages that follow this specific workflow:
+
+# Analysis Process
+1. List the files that have been changed or added
+2. Summarize the nature of the changes (new feature, enhancement, bug fix, refactoring, test, docs, etc.)
+3. Determine the purpose or motivation behind these changes
+4. Assess the impact of these changes on the overall project
+5. Check for any sensitive information that shouldn't be committed
+6. Draft a concise commit message that focuses on the "why" rather than the "what"
+
+# Commit Message Format
+- **Header**: \`type(scope): subject\` (lowercase)
+- **Types**: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+- **Body**: Optional. Explain the "what" and "why" using imperative, present tense
+- **Footer**: Optional. For BREAKING CHANGES and issue references
+
+# Requirements
+- Message must be clear, concise, and to the point
+- Must accurately reflect the changes and their purpose
+- Avoid generic words like "Update" or "Fix" without context
+- Focus on the motivation and impact, not just the implementation details
+
+# Output Format
+Please provide your analysis in <commit_analysis> tags, then provide the final commit message.
+
+# Git Status
+\`\`\`
+{{status}}
+\`\`\`
+
+# Git Diff
+\`\`\`diff
+{{diff}}
+\`\`\`
+
+# Recent Commit Messages (for reference)
+\`\`\`
+{{log}}
+\`\`\``;
 
 export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   static readonly Name = 'generate_commit_message';
   private readonly client: GeminiClient;
+  private readonly config: Config;
+  
+  // Cache generated commit message to avoid regeneration
+  private cachedCommitData: {
+    statusOutput: string;
+    diffOutput: string;
+    logOutput: string;
+    commitMessage: string;
+    finalCommitMessage: string;
+    timestamp: number;
+  } | null = null;
 
   constructor(config: Config) {
     super(
       GenerateCommitMessageTool.Name,
       'Generate Commit Message',
-      'Generate a commit message from the git changes in the current project directory.',
+      'Executes a git commit workflow: analyzes changes, generates commit message, and creates commit.',
       {
         properties: {},
         required: [],
@@ -100,6 +89,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       },
     );
     this.client = config.getGeminiClient();
+    this.config = config;
   }
 
   validateToolParams(_params: undefined): string | null {
@@ -107,151 +97,248 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   }
 
   getDescription(_params: undefined): string {
-    return 'Generate a commit message for the current changes.';
+    return 'Analyze git changes and create commit.';
+  }
+
+  async shouldConfirmExecute(
+    _params: undefined,
+    signal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Check if auto-commit is enabled
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+      return false;
+    }
+
+    try {
+      // First gather git information
+      const [statusOutput, diffOutput, logOutput] = await Promise.all([
+        this.executeGitCommand(['status', '--porcelain'], signal),
+        this.executeGitCommand(['diff', '--cached'], signal).then(staged => 
+          staged || this.executeGitCommand(['diff'], signal)
+        ),
+        this.executeGitCommand(['log', '--oneline', '-10'], signal)
+      ]);
+
+      if (!diffOutput?.trim()) {
+        // No changes to confirm
+        return false;
+      }
+
+      // Generate commit message first and cache it
+      const commitMessage = await this.generateCommitMessage(
+        statusOutput || '',
+        diffOutput,
+        logOutput || '',
+        signal
+      );
+
+      const finalCommitMessage = this.addGeminiSignature(commitMessage);
+      
+      // Cache the data for execute method
+      this.cachedCommitData = {
+        statusOutput: statusOutput || '',
+        diffOutput,
+        logOutput: logOutput || '',
+        commitMessage,
+        finalCommitMessage,
+        timestamp: Date.now()
+      };
+
+      const confirmationDetails: ToolExecuteConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Git Commit',
+        command: `Commit with message:\n\n${finalCommitMessage}`,
+        rootCommand: 'git-commit',
+        onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+            this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+          }
+        },
+      };
+      return confirmationDetails;
+    } catch (error) {
+      // If we can't gather git info or generate message, skip confirmation
+      return false;
+    }
   }
 
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
-    console.debug('[GenerateCommitMessage] Tool execution started');
-    
-    return new Promise((resolve) => {
-      // First try to get staged changes
-      console.debug('[GenerateCommitMessage] Checking for staged changes...');
-      const stagedChild = spawn('git', ['diff', '--cached'], { signal });
-      let stagedStdout = '';
-      let stagedStderr = '';
+    console.debug('[GenerateCommitMessage] Starting git commit workflow...');
 
-      stagedChild.stdout.on('data', (data) => {
-        stagedStdout += data.toString();
-        console.debug('[GenerateCommitMessage] Staged stdout data received:', data.toString().length, 'bytes');
-      });
+    try {
+      let finalCommitMessage: string;
+      let statusOutput: string;
 
-      stagedChild.stderr.on('data', (data) => {
-        stagedStderr += data.toString();
-        console.debug('[GenerateCommitMessage] Staged stderr data received:', data.toString());
-      });
-
-      stagedChild.on('close', async (stagedExitCode) => {
-        console.debug('[GenerateCommitMessage] Staged git diff completed with exit code:', stagedExitCode);
+      // Check if we have cached data from shouldConfirmExecute
+      if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < 30000)) {
+        console.debug('[GenerateCommitMessage] Using cached commit message from confirmation...');
+        finalCommitMessage = this.cachedCommitData.finalCommitMessage;
+        statusOutput = this.cachedCommitData.statusOutput;
         
-        if (stagedExitCode !== 0) {
-          console.debug('[GenerateCommitMessage] Staged git diff failed, stderr:', stagedStderr);
-          resolve({
-            llmContent: `Error getting git diff: ${stagedStderr}`,
-            returnDisplay: `Error getting git diff: ${stagedStderr}`,
-          });
-          return;
+        // Clear cache after use
+        this.cachedCommitData = null;
+      } else {
+        console.debug('[GenerateCommitMessage] No valid cache, generating fresh commit message...');
+        
+        // Step 1: Gather git information (parallel execution)
+        const [statusOut, diffOutput, logOutput] = await Promise.all([
+          this.executeGitCommand(['status', '--porcelain'], signal),
+          this.executeGitCommand(['diff', '--cached'], signal).then(staged => 
+            staged || this.executeGitCommand(['diff'], signal)
+          ),
+          this.executeGitCommand(['log', '--oneline', '-10'], signal)
+        ]);
+
+        statusOutput = statusOut || '';
+
+        if (!diffOutput?.trim()) {
+          return {
+            llmContent: 'No changes detected in the current workspace.',
+            returnDisplay: 'No changes detected in the current workspace.',
+          };
         }
 
-        const stagedDiff = stagedStdout.trim();
-        console.debug('[GenerateCommitMessage] Staged diff length:', stagedDiff.length);
+        // Step 2: Generate commit message using AI analysis
+        const commitMessage = await this.generateCommitMessage(
+          statusOutput,
+          diffOutput,
+          logOutput || '',
+          signal
+        );
 
-        // If we have staged changes, use them
-        if (stagedDiff) {
-          console.debug('[GenerateCommitMessage] Found staged changes, generating commit message...');
-          await this.generateCommitFromDiff(stagedDiff, signal, resolve);
-          return;
+        finalCommitMessage = this.addGeminiSignature(commitMessage);
+      }
+
+      // Step 3: Add relevant files to staging area if needed
+      if (statusOutput?.includes('??')) {
+        console.debug('[GenerateCommitMessage] Adding untracked files to staging...');
+        const untrackedFiles = this.parseUntrackedFiles(statusOutput);
+        if (untrackedFiles.length > 0) {
+          await this.executeGitCommand(['add', ...untrackedFiles], signal);
         }
+      }
 
-        // Otherwise, try unstaged changes
-        console.debug('[GenerateCommitMessage] No staged changes found, checking unstaged changes...');
-        const unstagedChild = spawn('git', ['diff'], { signal });
-        let unstagedStdout = '';
-        let unstagedStderr = '';
-
-        unstagedChild.stdout.on('data', (data) => {
-          unstagedStdout += data.toString();
-          console.debug('[GenerateCommitMessage] Unstaged stdout data received:', data.toString().length, 'bytes');
-        });
-
-        unstagedChild.stderr.on('data', (data) => {
-          unstagedStderr += data.toString();
-          console.debug('[GenerateCommitMessage] Unstaged stderr data received:', data.toString());
-        });
-
-        unstagedChild.on('close', async (unstagedExitCode) => {
-          console.debug('[GenerateCommitMessage] Unstaged git diff completed with exit code:', unstagedExitCode);
+      // Step 4: Create commit
+      console.debug('[GenerateCommitMessage] Creating commit with message:', finalCommitMessage.substring(0, 100) + '...');
+      
+      try {
+        await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
+        
+        // Step 5: Verify commit was successful
+        const finalStatus = await this.executeGitCommand(['status', '--porcelain'], signal);
+        
+        return {
+          llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
+          returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
+        };
+      } catch (commitError) {
+        // Handle pre-commit hook modifications
+        if (commitError instanceof Error && commitError.message.includes('pre-commit')) {
+          console.debug('[GenerateCommitMessage] Pre-commit hook modified files, retrying...');
+          await this.executeGitCommand(['add', '.'], signal);
+          await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
           
-          if (unstagedExitCode !== 0) {
-            console.debug('[GenerateCommitMessage] Unstaged git diff failed, stderr:', unstagedStderr);
-            resolve({
-              llmContent: `Error getting git diff: ${unstagedStderr}`,
-              returnDisplay: `Error getting git diff: ${unstagedStderr}`,
-            });
-            return;
-          }
+          return {
+            llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+            returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+          };
+        }
+        throw commitError;
+      }
 
-          const unstagedDiff = unstagedStdout.trim();
-          console.debug('[GenerateCommitMessage] Unstaged diff length:', unstagedDiff.length);
+    } catch (error) {
+      console.error('[GenerateCommitMessage] Error during execution:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error during commit workflow: ${errorMessage}`,
+        returnDisplay: `Error during commit workflow: ${errorMessage}`,
+      };
+    }
+  }
 
-          if (!unstagedDiff) {
-            console.debug('[GenerateCommitMessage] No unstaged changes found either');
-            resolve({
-              llmContent: 'No changes detected in the current workspace.',
-              returnDisplay: 'No changes detected in the current workspace.',
-            });
-            return;
-          }
+  private async executeGitCommand(
+    args: string[],
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      const child = spawn('git', args, { signal, stdio: 'pipe' });
+      let stdout = '';
+      let stderr = '';
 
-          console.debug('[GenerateCommitMessage] Found unstaged changes, generating commit message...');
-          await this.generateCommitFromDiff(unstagedDiff, signal, resolve);
-        });
-
-        unstagedChild.on('error', (err) => {
-          console.debug('[GenerateCommitMessage] Unstaged git diff process error:', err.message);
-          resolve({
-            llmContent: `Failed to start git diff process: ${err.message}`,
-            returnDisplay: `Failed to start git diff process: ${err.message}`,
-          });
-        });
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
       });
 
-      stagedChild.on('error', (err) => {
-        console.debug('[GenerateCommitMessage] Staged git diff process error:', err.message);
-        resolve({
-          llmContent: `Failed to start git diff process: ${err.message}`,
-          returnDisplay: `Failed to start git diff process: ${err.message}`,
-        });
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (exitCode) => {
+        if (exitCode !== 0) {
+          reject(new Error(`Git command failed (${args.join(' ')}): ${stderr}`));
+        } else {
+          resolve(stdout.trim() || null);
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(new Error(`Failed to execute git ${args.join(' ')}: ${err.message}`));
       });
     });
   }
 
-  private async generateCommitFromDiff(
+  private parseUntrackedFiles(statusOutput: string): string[] {
+    return statusOutput
+      .split('\n')
+      .filter(line => line.startsWith('??'))
+      .map(line => line.substring(3).trim())
+      .filter(file => !file.includes('node_modules/') && !file.includes('.git/'));
+  }
+
+  private async generateCommitMessage(
+    status: string,
     diff: string,
+    log: string,
     signal: AbortSignal,
-    resolve: (value: ToolResult) => void,
-  ): Promise<void> {
-    console.debug('[GenerateCommitMessage] Starting commit message generation...');
-    console.debug('[GenerateCommitMessage] Diff preview (first 200 chars):', diff.substring(0, 200) + (diff.length > 200 ? '...' : ''));
-    
-    const prompt = COMMIT_MESSAGE_PROMPT_LINES.join('\n').replace(
-      /@\{\{diff\}\}/g,
-      diff,
-    );
-    console.debug('[GenerateCommitMessage] Prompt length:', prompt.length);
-    console.debug('[GenerateCommitMessage] Calling Gemini API...');
-    
+  ): Promise<string> {
+    const prompt = COMMIT_ANALYSIS_PROMPT
+      .replace('{{status}}', status)
+      .replace('{{diff}}', diff)
+      .replace('{{log}}', log);
+
+    console.debug('[GenerateCommitMessage] Calling Gemini API for commit analysis...');
+
     try {
       const response = await this.client.generateContent(
         [{ role: 'user', parts: [{ text: prompt }] }],
         {},
         signal,
       );
-      console.debug('[GenerateCommitMessage] Gemini API response received');
-      
-      const generatedText = getResponseText(response) ?? '';
-      console.debug('[GenerateCommitMessage] Generated text length:', generatedText.length);
-      console.debug('[GenerateCommitMessage] Generated text preview:', generatedText.substring(0, 100) + (generatedText.length > 100 ? '...' : ''));
 
-      resolve({
-        llmContent: generatedText,
-        returnDisplay: generatedText,
-      });
+      const generatedText = getResponseText(response) ?? '';
+      
+      // Extract commit message from analysis (look for the message after </commit_analysis>)
+      const analysisEndIndex = generatedText.indexOf('</commit_analysis>');
+      if (analysisEndIndex !== -1) {
+        const commitMessage = generatedText
+          .substring(analysisEndIndex + '</commit_analysis>'.length)
+          .trim()
+          .replace(/^```[a-z]*\n?/, '')
+          .replace(/```$/, '')
+          .trim();
+        
+        return commitMessage || generatedText;
+      }
+
+      return generatedText;
     } catch (error) {
-      console.debug('[GenerateCommitMessage] Error during Gemini API call:', error);
-      resolve({
-        llmContent: `Error generating commit message: ${error}`,
-        returnDisplay: `Error generating commit message: ${error}`,
-      });
+      console.error('[GenerateCommitMessage] Error during Gemini API call:', error);
+      throw new Error(`Failed to generate commit message: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private addGeminiSignature(commitMessage: string): string {
+    // Return the commit message without any signature
+    return commitMessage;
   }
 }
