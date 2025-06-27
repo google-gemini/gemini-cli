@@ -33,7 +33,7 @@ export function AuthDialog({
       label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
     },
-    { label: 'Gemini API Key', value: AuthType.USE_GEMINI },
+    { label: 'Gemini API Key (AI Studio)', value: AuthType.USE_GEMINI },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
