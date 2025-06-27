@@ -94,6 +94,8 @@ export type HistoryItemAbout = HistoryItemBase & {
   osVersion: string;
   sandboxEnv: string;
   modelVersion: string;
+  selectedAuthType: string;
+  gcpProject: string;
 };
 
 export type HistoryItemStats = HistoryItemBase & {
@@ -169,6 +171,8 @@ export type Message =
       osVersion: string;
       sandboxEnv: string;
       modelVersion: string;
+      selectedAuthType: string;
+      gcpProject: string;
       content?: string; // Optional content, not really used for ABOUT
     }
   | {
