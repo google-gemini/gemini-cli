@@ -1220,9 +1220,16 @@ export function useTextBuffer({
   );
 
   const handleInput = useCallback(
-    (input: string | undefined, key: Record<string, boolean>): boolean => {
+    (key: {
+      name: string;
+      ctrl: boolean;
+      meta: boolean;
+      shift: boolean;
+      paste: boolean;
+      sequence: string;
+    }): boolean => {
+      const { sequence: input } = key;
       dbg('handleInput', {
-        input,
         key,
         cursor: [cursorRow, cursorCol],
         visualCursor,
@@ -1231,50 +1238,46 @@ export function useTextBuffer({
       const beforeLogicalCursor = [cursorRow, cursorCol];
       const beforeVisualCursor = [...visualCursor];
 
-      if (key['escape']) return false;
+      if (key.name === 'escape') return false;
 
       if (
-        key['return'] ||
+        key.name === 'return' ||
         input === '\r' ||
         input === '\n' ||
         input === '\\\r' // VSCode terminal represents shift + enter this way
       )
         newline();
-      else if (key['leftArrow'] && !key['meta'] && !key['ctrl'] && !key['alt'])
-        move('left');
-      else if (key['ctrl'] && input === 'b') move('left');
-      else if (key['rightArrow'] && !key['meta'] && !key['ctrl'] && !key['alt'])
-        move('right');
-      else if (key['ctrl'] && input === 'f') move('right');
-      else if (key['upArrow']) move('up');
-      else if (key['downArrow']) move('down');
-      else if ((key['ctrl'] || key['alt']) && key['leftArrow'])
-        move('wordLeft');
-      else if (key['meta'] && input === 'b') move('wordLeft');
-      else if ((key['ctrl'] || key['alt']) && key['rightArrow'])
+      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
+      else if (key.ctrl && key.name === 'b') move('left');
+      else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
+      else if (key.ctrl && key.name === 'f') move('right');
+      else if (key.name === 'up') move('up');
+      else if (key.name === 'down') move('down');
+      else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
+      else if (key.meta && key.name === 'b') move('wordLeft');
+      else if ((key.ctrl || key.meta) && key.name === 'right')
         move('wordRight');
-      else if (key['meta'] && input === 'f') move('wordRight');
-      else if (key['home']) move('home');
-      else if (key['ctrl'] && input === 'a') move('home');
-      else if (key['end']) move('end');
-      else if (key['ctrl'] && input === 'e') move('end');
-      else if (key['ctrl'] && input === 'w') deleteWordLeft();
+      else if (key.meta && key.name === 'f') move('wordRight');
+      else if (key.name === 'home') move('home');
+      else if (key.ctrl && key.name === 'a') move('home');
+      else if (key.name === 'end') move('end');
+      else if (key.ctrl && key.name === 'e') move('end');
+      else if (key.ctrl && key.name === 'w') deleteWordLeft();
       else if (
-        (key['meta'] || key['ctrl'] || key['alt']) &&
-        (key['backspace'] || input === '\x7f')
+        (key.meta || key.ctrl) &&
+        (key.name === 'backspace' || input === '\x7f')
       )
         deleteWordLeft();
-      else if ((key['meta'] || key['ctrl'] || key['alt']) && key['delete'])
+      else if ((key.meta || key.ctrl) && key.name === 'delete')
         deleteWordRight();
       else if (
-        key['backspace'] ||
+        key.name === 'backspace' ||
         input === '\x7f' ||
-        (key['ctrl'] && input === 'h') ||
-        (key['delete'] && !key['shift'])
+        (key.ctrl && key.name === 'h')
       )
         backspace();
-      else if (key['delete'] || (key['ctrl'] && input === 'd')) del();
-      else if (input && !key['ctrl'] && !key['meta']) {
+      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
+      else if (input && !key.ctrl && !key.meta) {
         insert(input);
       }
 
@@ -1483,10 +1486,14 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (
-    input: string | undefined,
-    key: Record<string, boolean>,
-  ) => boolean;
+  handleInput: (key: {
+    name: string;
+    ctrl: boolean;
+    meta: boolean;
+    shift: boolean;
+    paste: boolean;
+    sequence: string;
+  }) => boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
