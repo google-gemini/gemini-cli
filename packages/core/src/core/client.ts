@@ -503,7 +503,7 @@ export class GeminiClient {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
