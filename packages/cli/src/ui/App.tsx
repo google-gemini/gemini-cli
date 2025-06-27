@@ -63,6 +63,7 @@ import {
   useSessionStats,
 } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
@@ -86,6 +87,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+  useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
 
