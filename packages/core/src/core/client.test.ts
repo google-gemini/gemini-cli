@@ -470,6 +470,54 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('undoLastModelTurn', () => {
+    it('should remove the last model turn from history, and do nothing otherwise', async () => {
+      // --- Scenario 1: Last turn is from the model ---
+      const historyBeforeModelUndo = await client.getHistory();
+      const lengthBeforeModelUndo = historyBeforeModelUndo.length;
+      expect(lengthBeforeModelUndo).toBeGreaterThan(0);
+      const lastTurnBeforeModelUndo =
+        historyBeforeModelUndo[lengthBeforeModelUndo - 1];
+      expect(lastTurnBeforeModelUndo.role).toBe('model'); // Default setup ends with a model turn
+
+      // Call undoLastModelTurn
+      await client.undoLastModelTurn();
+
+      // Assert the new state
+      const historyAfterModelUndo = await client.getHistory();
+      expect(historyAfterModelUndo.length).toBe(lengthBeforeModelUndo - 1);
+      expect(JSON.stringify(historyAfterModelUndo)).not.toContain(
+        JSON.stringify(lastTurnBeforeModelUndo.parts),
+      );
+      const lastTurnAfterModelUndo =
+        historyAfterModelUndo[historyAfterModelUndo.length - 1];
+      expect(lastTurnAfterModelUndo.role).toBe('user'); // The previous turn should now be the last
+
+      // --- Scenario 2: Last turn is from the user ---
+      const userTurn = {
+        role: 'user',
+        parts: [{ text: 'User says something' }],
+      };
+      await client.addHistory(userTurn);
+      const historyBeforeUserUndo = await client.getHistory();
+      const lengthBeforeUserUndo = historyBeforeUserUndo.length;
+
+      // Call undoLastModelTurn - should do nothing
+      await client.undoLastModelTurn();
+
+      // Assert history is unchanged
+      const historyAfterUserUndo = await client.getHistory();
+      expect(historyAfterUserUndo.length).toBe(lengthBeforeUserUndo);
+      expect(historyAfterUserUndo).toEqual(historyBeforeUserUndo);
+
+      // --- Scenario 3: History is empty ---
+      await client.setHistory([]);
+      await client.undoLastModelTurn();
+      const historyAfterEmptyUndo = await client.getHistory();
+      expect(historyAfterEmptyUndo.length).toBe(0);
+    });
+  });
+
   describe('sendMessageStream', () => {
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange

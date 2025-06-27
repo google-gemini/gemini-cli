@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
+  WaitingToolCall,
   ValidatingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
@@ -16,6 +17,7 @@ import {
   BaseTool,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
+  GeminiClient,
   ToolResult,
   Config,
 } from '../index.js';
@@ -79,6 +81,8 @@ describe('CoreToolScheduler', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
+      getGeminiClient: () =>
+        ({ undoLastModelTurn: vi.fn() }) as unknown as GeminiClient,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -118,6 +122,114 @@ describe('CoreToolScheduler', () => {
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('cancelled');
+  });
+
+  it('should call undoLastModelTurn on the client when a tool call is cancelled', async () => {
+    // 1. Setup Mocks
+    const mockUndoLastModelTurn = vi.fn();
+    const mockGeminiClient = {
+      undoLastModelTurn: mockUndoLastModelTurn,
+    } as unknown as GeminiClient;
+
+    const mockTool = new MockTool();
+    mockTool.shouldConfirm = true; // Ensure confirmation is triggered
+
+    const toolRegistry = {
+      getTool: () => mockTool,
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getGeminiClient: () => mockGeminiClient, // Provide the mock client
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'cancel-test-1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const waitingCall = onToolCallsUpdate.mock
+      .calls[1][0][0] as WaitingToolCall;
+
+    await waitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.Cancel,
+    );
+
+    expect(mockUndoLastModelTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should result in one cancelled tool call when a tool call is cancelled', async () => {
+    // 1. Setup Mocks
+    const mockUndoLastModelTurn = vi.fn();
+    const mockGeminiClient = {
+      undoLastModelTurn: mockUndoLastModelTurn,
+    } as unknown as GeminiClient;
+
+    const mockTool = new MockTool();
+    mockTool.shouldConfirm = true; // Ensure confirmation is triggered
+
+    const toolRegistry = {
+      getTool: () => mockTool,
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getGeminiClient: () => mockGeminiClient, // Provide the mock client
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'cancel-test-2',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const waitingCall = onToolCallsUpdate.mock
+      .calls[1][0][0] as WaitingToolCall;
+
+    await waitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.Cancel,
+    );
+
+    expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(1);
     expect(completedCalls[0].status).toBe('cancelled');
   });
 });
