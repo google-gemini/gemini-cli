@@ -477,19 +477,27 @@ export const useSlashCommandProcessor = (
           switch (subCommand) {
             case 'show':
               showMemoryAction();
-              return; // Explicitly return void
+              return;
             case 'refresh':
               performMemoryRefresh();
-              return; // Explicitly return void
+              return;
             case 'add':
               return addMemoryAction(mainCommand, subCommand, args); // Return the object
+            case undefined:
+              addMessage({
+                type: MessageType.ERROR,
+                content:
+                  'Missing command\nUsage: /memory <show|refresh|add> [text for add]',
+                timestamp: new Date(),
+              });
+              return;
             default:
               addMessage({
                 type: MessageType.ERROR,
                 content: `Unknown /memory command: ${subCommand}. Available: show, refresh, add`,
                 timestamp: new Date(),
               });
-              return; // Explicitly return void
+              return;
           }
         },
       },
@@ -673,6 +681,14 @@ export const useSlashCommandProcessor = (
             addMessage({
               type: MessageType.ERROR,
               content: 'No chat client available for conversation status.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+          if (!subCommand) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Missing command\nUsage: /chat <list|save|resume> [tag]',
               timestamp: new Date(),
             });
             return;
