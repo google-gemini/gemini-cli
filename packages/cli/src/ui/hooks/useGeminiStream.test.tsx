@@ -496,13 +496,17 @@ describe('useGeminiStream', () => {
       } as TrackedCompletedToolCall, // Treat error as a form of completion for submission
     ];
 
-    // 1. On the first render, there are no tool calls.
-    mockUseReactToolScheduler.mockReturnValue([
-      [],
-      mockScheduleToolCalls,
-      mockMarkToolsAsSubmitted,
-    ]);
-    const { rerender } = renderHook(() =>
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
+    });
+
+    renderHook(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -518,16 +522,11 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // 2. Before the second render, change the mock to return the completed tools.
-    mockUseReactToolScheduler.mockReturnValue([
-      completedToolCalls,
-      mockScheduleToolCalls,
-      mockMarkToolsAsSubmitted,
-    ]);
-
-    // 3. Trigger a re-render. The hook will now receive the completed tools, causing the effect to run.
-    act(() => {
-      rerender();
+    // Trigger the onComplete callback with completed tools
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(completedToolCalls);
+      }
     });
 
     await waitFor(() => {
@@ -561,13 +560,17 @@ describe('useGeminiStream', () => {
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
-    // 1. First render: no tool calls.
-    mockUseReactToolScheduler.mockReturnValue([
-      [],
-      mockScheduleToolCalls,
-      mockMarkToolsAsSubmitted,
-    ]);
-    const { rerender } = renderHook(() =>
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
+    });
+
+    renderHook(() =>
       useGeminiStream(
         client,
         [],
@@ -583,16 +586,11 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // 2. Second render: tool calls are now cancelled.
-    mockUseReactToolScheduler.mockReturnValue([
-      cancelledToolCalls,
-      mockScheduleToolCalls,
-      mockMarkToolsAsSubmitted,
-    ]);
-
-    // 3. Trigger the re-render.
-    act(() => {
-      rerender();
+    // Trigger the onComplete callback with cancelled tools
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(cancelledToolCalls);
+      }
     });
 
     await waitFor(() => {
@@ -685,7 +683,12 @@ describe('useGeminiStream', () => {
 
     const initialToolCalls: TrackedToolCall[] = [
       {
-        request: { callId: 'call1', name: 'tool1', args: {} },
+        request: {
+          callId: 'call1',
+          name: 'tool1',
+          args: {},
+          isClientInitiated: false,
+        },
         status: 'executing',
         responseSubmittedToGemini: false,
         tool: {
@@ -711,36 +714,67 @@ describe('useGeminiStream', () => {
       } as TrackedCompletedToolCall,
     ];
 
-    const { result, rerender, client } = renderTestHook(initialToolCalls);
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+    let currentToolCalls = initialToolCalls;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        currentToolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+      ];
+    });
+
+    const { result, rerender } = renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockSetShowHelp,
+        mockConfig,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+      ),
+    );
 
     // 1. Initial state should be Responding because a tool is executing.
     expect(result.current.streamingState).toBe(StreamingState.Responding);
 
-    // 2. Rerender with the completed tool call.
-    // The useEffect should pick this up but hasn't called submitQuery yet.
+    // 2. Update the tool calls to completed state and rerender
+    currentToolCalls = completedToolCalls;
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        completedToolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+      ];
+    });
+
     act(() => {
-      rerender({
-        client,
-        history: [],
-        addItem: mockAddItem,
-        setShowHelp: mockSetShowHelp,
-        config: mockConfig,
-        onDebugMessage: mockOnDebugMessage,
-        handleSlashCommand:
-          mockHandleSlashCommand as unknown as typeof mockHandleSlashCommand,
-        shellModeActive: false,
-        loadedSettings: mockLoadedSettings,
-        // This is the key part of the test: update the toolCalls array
-        // to simulate the tool finishing.
-        toolCalls: completedToolCalls,
-      });
+      rerender();
     });
 
     // 3. The state should *still* be Responding, not Idle.
     // This is because the completed tool's response has not been submitted yet.
     expect(result.current.streamingState).toBe(StreamingState.Responding);
 
-    // 4. Wait for the useEffect to call submitQuery.
+    // 4. Trigger the onComplete callback to simulate tool completion
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(completedToolCalls);
+      }
+    });
+
+    // 5. Wait for submitQuery to be called
     await waitFor(() => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
@@ -748,7 +782,7 @@ describe('useGeminiStream', () => {
       );
     });
 
-    // 5. After submission, the state should remain Responding.
+    // 6. After submission, the state should remain Responding until the stream completes.
     expect(result.current.streamingState).toBe(StreamingState.Responding);
   });
 
@@ -929,14 +963,17 @@ describe('useGeminiStream', () => {
         } as any,
       };
 
-      // 1. Initial render state: no tool calls
-      mockUseReactToolScheduler.mockReturnValue([
-        [],
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-      ]);
+      // Capture the onComplete callback
+      let capturedOnComplete:
+        | ((completedTools: TrackedToolCall[]) => Promise<void>)
+        | null = null;
 
-      const { result, rerender } = renderHook(() =>
+      mockUseReactToolScheduler.mockImplementation((onComplete) => {
+        capturedOnComplete = onComplete;
+        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
+      });
+
+      const { result } = renderHook(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -957,17 +994,11 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/memory add "test fact"');
       });
 
-      // The command handler schedules the tool. Now we simulate the tool completing.
-      // 2. Before the next render, set the mock to return the completed tool.
-      mockUseReactToolScheduler.mockReturnValue([
-        [completedToolCall],
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-      ]);
-
-      // 3. Trigger a re-render to process the completed tool.
-      act(() => {
-        rerender();
+      // Trigger the onComplete callback with the completed client-initiated tool
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedToolCall]);
+        }
       });
 
       // --- Assert the outcome ---
@@ -1007,13 +1038,17 @@ describe('useGeminiStream', () => {
         } as any,
       };
 
-      mockUseReactToolScheduler.mockReturnValue([
-        [completedToolCall],
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-      ]);
+      // Capture the onComplete callback
+      let capturedOnComplete:
+        | ((completedTools: TrackedToolCall[]) => Promise<void>)
+        | null = null;
 
-      const { rerender } = renderHook(() =>
+      mockUseReactToolScheduler.mockImplementation((onComplete) => {
+        capturedOnComplete = onComplete;
+        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
+      });
+
+      renderHook(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -1029,8 +1064,11 @@ describe('useGeminiStream', () => {
         ),
       );
 
-      act(() => {
-        rerender();
+      // Trigger the onComplete callback with the completed save_memory tool
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedToolCall]);
+        }
       });
 
       await waitFor(() => {
