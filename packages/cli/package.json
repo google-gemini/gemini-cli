@@ -35,6 +35,7 @@
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
+    "gaxios": "^6.1.1",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
     "ink": "^5.2.0",
