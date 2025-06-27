@@ -70,7 +70,6 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  //
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
     contentGeneratorConfig.model = await getEffectiveModel(

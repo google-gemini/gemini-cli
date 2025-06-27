@@ -226,11 +226,6 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
-    // Check if this is actually a switch to a different auth method
-    const previousAuthType = this.contentGeneratorConfig?.authType;
-    const _isAuthMethodSwitch =
-      previousAuthType && previousAuthType !== authMethod;
-
     // Always use the original default model when switching auth methods
     // This ensures users don't stay on Flash after switching between auth types
     // and allows API key users to get proper fallback behavior from getEffectiveModel
