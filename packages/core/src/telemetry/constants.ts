@@ -37,3 +37,23 @@ export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+
+// Performance Monitoring Metrics
+export const METRIC_STARTUP_TIME = 'gemini_cli.startup.duration';
+export const METRIC_MEMORY_USAGE = 'gemini_cli.memory.usage';
+export const METRIC_MEMORY_HEAP_USED = 'gemini_cli.memory.heap.used';
+export const METRIC_MEMORY_HEAP_TOTAL = 'gemini_cli.memory.heap.total';
+export const METRIC_CPU_USAGE = 'gemini_cli.cpu.usage';
+export const METRIC_TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
+export const METRIC_TOOL_EXECUTION_BREAKDOWN = 'gemini_cli.tool.execution.breakdown';
+export const METRIC_TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
+export const METRIC_API_REQUEST_BREAKDOWN = 'gemini_cli.api.request.breakdown';
+export const METRIC_PERFORMANCE_SCORE = 'gemini_cli.performance.score';
+export const METRIC_REGRESSION_DETECTION = 'gemini_cli.performance.regression';
+export const METRIC_BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
+
+// Performance Events
+export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';
+export const EVENT_MEMORY_USAGE = 'gemini_cli.memory.usage';
+export const EVENT_PERFORMANCE_BASELINE = 'gemini_cli.performance.baseline';
+export const EVENT_PERFORMANCE_REGRESSION = 'gemini_cli.performance.regression';
