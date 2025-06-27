@@ -5,7 +5,6 @@ The Gemini CLI core (`packages/core`) features a robust system for defining, reg
 ## Core Concepts
 
 - **Tool (`tools.ts`):** An interface and base class (`BaseTool`) that defines the contract for all tools. Each tool must have:
-
   - `name`: A unique internal name (used in API calls to Gemini).
   - `displayName`: A user-friendly name.
   - `description`: A clear explanation of what the tool does, which is provided to the Gemini model.
@@ -16,7 +15,6 @@ The Gemini CLI core (`packages/core`) features a robust system for defining, reg
   - `execute()`: The core method that performs the tool's action and returns a `ToolResult`.
 
 - **`ToolResult` (`tools.ts`):** An interface defining the structure of a tool's execution outcome:
-
   - `llmContent`: The factual string content to be included in the history sent back to the LLM for context.
   - `returnDisplay`: A user-friendly string (often Markdown) or a special object (like `FileDiff`) for display in the CLI.
 

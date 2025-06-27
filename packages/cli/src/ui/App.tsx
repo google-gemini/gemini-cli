@@ -351,18 +351,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       // the user starts interacting with the app.
       enteringConstrainHeightMode = true;
       setConstrainHeight(true);
-
-      // If our pending history item happens to exceed the terminal height we will most likely need to refresh
-      // our static collection to ensure no duplication or tearing. This is currently working around a core bug
-      // in Ink which we have a PR out to fix: https://github.com/vadimdemedes/ink/pull/717
-      if (pendingHistoryItemRef.current && pendingHistoryItems.length > 0) {
-        const pendingItemDimensions = measureElement(
-          pendingHistoryItemRef.current,
-        );
-        if (pendingItemDimensions.height > availableTerminalHeight) {
-          refreshStatic();
-        }
-      }
     }
 
     if (key.ctrl && input === 'o') {
@@ -529,23 +517,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       clearTimeout(handler);
     };
   }, [terminalWidth, terminalHeight, refreshStatic]);
-
-  useEffect(() => {
-    if (!pendingHistoryItems.length) {
-      return;
-    }
-
-    const pendingItemDimensions = measureElement(
-      pendingHistoryItemRef.current!,
-    );
-
-    // If our pending history item happens to exceed the terminal height we will most likely need to refresh
-    // our static collection to ensure no duplication or tearing. This is currently working around a core bug
-    // in Ink which we have a PR out to fix: https://github.com/vadimdemedes/ink/pull/717
-    if (pendingItemDimensions.height > availableTerminalHeight) {
-      setStaticNeedsRefresh(true);
-    }
-  }, [pendingHistoryItems.length, availableTerminalHeight, streamingState]);
 
   useEffect(() => {
     if (streamingState === StreamingState.Idle && staticNeedsRefresh) {

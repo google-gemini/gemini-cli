@@ -6,6 +6,7 @@
 
 import { type MutableRefObject } from 'react';
 import { render } from 'ink-testing-library';
+import { renderHook } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
 import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
@@ -223,21 +224,16 @@ describe('SessionStatsContext', () => {
   });
 
   it('should throw an error when useSessionStats is used outside of a provider', () => {
-    // Suppress the expected console error during this test.
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Suppress console.error for this test since we expect an error
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const contextRef = { current: undefined };
-
-    // We expect rendering to fail, which React will catch and log as an error.
-    render(<TestHarness contextRef={contextRef} />);
-
-    // Assert that the first argument of the first call to console.error
-    // contains the expected message. This is more robust than checking
-    // the exact arguments, which can be affected by React/JSDOM internals.
-    expect(errorSpy.mock.calls[0][0]).toContain(
-      'useSessionStats must be used within a SessionStatsProvider',
-    );
-
-    errorSpy.mockRestore();
+    try {
+      // Expect renderHook itself to throw when the hook is used outside a provider
+      expect(() => {
+        renderHook(() => useSessionStats());
+      }).toThrow('useSessionStats must be used within a SessionStatsProvider');
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });
