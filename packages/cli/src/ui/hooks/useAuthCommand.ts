@@ -74,7 +74,10 @@ export const useAuthCommand = (
 
   const cancelAuthentication = useCallback(() => {
     setIsAuthenticating(false);
-  }, []);
+    // Clear the selected auth type so that when user returns to auth dialog,
+    // pressing ESC will show the proper error message instead of triggering auth again
+    settings.setValue(SettingScope.User, 'selectedAuthType', undefined);
+  }, [settings]);
 
   return {
     isAuthDialogOpen,
