@@ -28,7 +28,7 @@ jobs:
           token: ${{ steps.generate_token.outputs.token }}
 
       - name: Run Gemini Issue Triage
-        uses: google-gemini/gemini-cli-action@main
+        uses: google-gemini/gemini-cli-action@238438ee44e83c7f97a1a9bb61e62853cebe9767
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
         with:
