@@ -15,7 +15,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
-import { GlobTool } from '../tools/glob.js';
+import { FileSearchTool } from '../tools/file-search.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
@@ -484,7 +484,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(LSTool, targetDir, config);
   registerCoreTool(ReadFileTool, targetDir, config);
   registerCoreTool(GrepTool, targetDir);
-  registerCoreTool(GlobTool, targetDir, config);
+  registerCoreTool(FileSearchTool, targetDir, config);
   registerCoreTool(EditTool, config);
   registerCoreTool(WriteFileTool, config);
   registerCoreTool(WebFetchTool, config);

@@ -8,7 +8,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { LSTool } from '../tools/ls.js';
 import { EditTool } from '../tools/edit.js';
-import { GlobTool } from '../tools/glob.js';
+import { FileSearchTool } from '../tools/file-search.js';
 import { GrepTool } from '../tools/grep.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -55,7 +55,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 
 ## Software Engineering Tasks
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
-1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GrepTool.Name}' and '${GlobTool.Name}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${ReadFileTool.Name}' and '${ReadManyFilesTool.Name}' to understand context and validate any assumptions you may have.
+1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GrepTool.Name}' and '${FileSearchTool.Name}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${ReadFileTool.Name}' and '${ReadManyFilesTool.Name}' to understand context and validate any assumptions you may have.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should try to use a self-verification loop by writing unit tests if relevant to the task. Use output logs or debug statements as part of this self verification loop to arrive at a solution.
 3. **Implement:** Use the available tools (e.g., '${EditTool.Name}', '${WriteFileTool.Name}' '${ShellTool.Name}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands.
@@ -178,7 +178,7 @@ model: [tool_call: ${ShellTool.Name} for 'node server.js &' because it must run 
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
 First, I'll analyze the code and check for a test safety net before planning any changes.
-[tool_call: ${GlobTool.Name} for path 'tests/test_auth.py']
+[tool_call: ${FileSearchTool.Name} for path 'tests/test_auth.py']
 [tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
 Great, 'tests/test_auth.py' exists and covers the core authentication logic. With this safety net in place, I can safely plan the refactoring.
@@ -218,7 +218,7 @@ model: I can run \`rm -rf ./temp\`. This will permanently delete the directory a
 user: Write tests for someFile.ts
 model:
 Okay, I can write those tests. First, I'll read \`someFile.ts\` to understand its functionality.
-[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts' or use ${GlobTool.Name} to find \`someFile.ts\` if its location is unknown]
+[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts' or use ${FileSearchTool.Name} to find \`someFile.ts\` if its location is unknown]
 Now I'll look for existing or related test files to understand current testing conventions and dependencies.
 [tool_call: ${ReadManyFilesTool.Name} for paths ['**/*.test.ts', 'src/**/*.spec.ts'] assuming someFile.ts is in the src directory]
 (After reviewing existing tests and the file content)
@@ -242,7 +242,7 @@ It appears the \`updateUserProfile\` method in \`UserProfileService.java\` is re
 <example>
 user: Where are all the 'app.config' files in this project? I need to check their settings.
 model:
-[tool_call: ${GlobTool.Name} for pattern '**/app.config']
+[tool_call: ${FileSearchTool.Name} for pattern '**/app.config']
 (Assuming GlobTool returns a list of paths like ['/path/to/moduleA/app.config', '/path/to/moduleB/app.config'])
 I found the following 'app.config' files:
 - /path/to/moduleA/app.config
