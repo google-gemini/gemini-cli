@@ -6,10 +6,18 @@
 
 import { execSync, spawn } from 'child_process';
 
-export type EditorType = 'vscode' | 'windsurf' | 'cursor' | 'vim' | 'zed';
+export type EditorType =
+  | 'vscode'
+  | 'vscodium'
+  | 'windsurf'
+  | 'cursor'
+  | 'vim'
+  | 'zed';
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return ['vscode', 'windsurf', 'cursor', 'vim', 'zed'].includes(editor);
+  return ['vscode', 'vscodium', 'windsurf', 'cursor', 'vim', 'zed'].includes(
+    editor,
+  );
 }
 
 interface DiffCommand {
@@ -31,6 +39,7 @@ function commandExists(cmd: string): boolean {
 
 const editorCommands: Record<EditorType, { win32: string; default: string }> = {
   vscode: { win32: 'code.cmd', default: 'code' },
+  vscodium: { win32: 'codium.cmd', default: 'codium' },
   windsurf: { win32: 'windsurf', default: 'windsurf' },
   cursor: { win32: 'cursor', default: 'cursor' },
   vim: { win32: 'vim', default: 'vim' },
@@ -46,7 +55,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env.SANDBOX;
-  if (['vscode', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
   return true;
@@ -82,6 +91,7 @@ export function getDiffCommand(
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
   switch (editor) {
     case 'vscode':
+    case 'vscodium':
     case 'windsurf':
     case 'cursor':
     case 'zed':
@@ -138,6 +148,7 @@ export async function openDiff(
   try {
     switch (editor) {
       case 'vscode':
+      case 'vscodium':
       case 'windsurf':
       case 'cursor':
       case 'zed':
