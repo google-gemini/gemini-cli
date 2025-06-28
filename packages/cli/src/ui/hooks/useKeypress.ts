@@ -53,7 +53,11 @@ export function useKeypress(
     let usePassthrough = false;
     const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
     // Example of how you might use it
-    if (nodeMajorVersion < 20) {
+    if (
+      nodeMajorVersion < 20 ||
+      process.env['PASTE_WORKAROUND'] === '1' ||
+      process.env['PASTE_WORKAROUND'] === 'true'
+    ) {
       // Prior to node 20, node's built-in readline does not support bracketed
       // paste mode. We hack by detecting it with our own handler.
       usePassthrough = true;
