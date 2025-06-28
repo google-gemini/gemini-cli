@@ -8,7 +8,7 @@
 
 ## Reviewer Test Plan
 
-<!-- when a person reviewes your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
+<!-- when a person reviews your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
 
 ## Testing Matrix
 
