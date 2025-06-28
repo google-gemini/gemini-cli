@@ -47,12 +47,18 @@ jobs:
 
             2.  **Analyze the Issue:**
                 - Based on the issue title, body, and any comments, determine the most appropriate labels.
-                - Consider the type of issue (e.g., `kind/bug`, `kind/enhancement`, `kind/documentation`), the area of the codebase it affects (e.g., `area/core`, `area/ux`, `area/tools`), and assess the priority if possible (e.g., `priority/p1`, `priority/p2`).
+                - Always apply:
+                  - Kind of issue (e.g., `kind/bug`, `kind/enhancement`, `kind/documentation`)
+                  - Area of the codebase it affects (e.g., `area/core`, `area/ux`, `area/tools`)
+                  - Priority if possible (e.g., `priority/p1`, `priority/p2`).
 
             3.  **Apply Labels:**
                 - Use the `gh` command-line tool to add the selected labels to the issue.
                 - Example command: `gh issue edit ${{ github.event.issue.number }} --add-label "kind/bug,area/core"`
                 - You can add multiple labels in a single command.
+
+            4.  **Finalize:**
+                - Remove the `status/need-triage` label if it exists, as the issue has been triaged.
 
             **Guidelines:**
             - Only use labels that exist in the repository (from the `gh label list` command).
