@@ -34,35 +34,42 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   private whitelist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
-    const toolDisplayName = 'Shell';
-
-    let toolDescription: string;
-    let toolParameterSchema: Record<string, unknown>;
-
-    try {
-      const descriptionUrl = new URL('shell.md', import.meta.url);
-      toolDescription = fs.readFileSync(descriptionUrl, 'utf-8');
-      const schemaUrl = new URL('shell.json', import.meta.url);
-      toolParameterSchema = JSON.parse(fs.readFileSync(schemaUrl, 'utf-8'));
-    } catch {
-      // Fallback with minimal descriptions for tests when file reading fails
-      toolDescription = 'Execute shell commands';
-      toolParameterSchema = {
-        type: 'object',
-        properties: {
-          command: { type: 'string', description: 'Command to execute' },
-          description: { type: 'string', description: 'Command description' },
-          directory: { type: 'string', description: 'Working directory' },
-        },
-        required: ['command'],
-      };
-    }
-
     super(
       ShellTool.Name,
-      toolDisplayName,
-      toolDescription,
-      toolParameterSchema,
+      'Shell',
+      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+The following information is returned:
+
+Command: Executed command.
+Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+Error: Error or \`(none)\` if no error was reported for the subprocess.
+Exit Code: Exit code or \`(none)\` if terminated by signal.
+Signal: Signal number or \`(none)\` if no signal was received.
+Background PIDs: List of background processes started or \`(none)\`.
+Process Group PGID: Process group started or \`(none)\``,
+      {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'Exact bash command to execute as `bash -c <command>`',
+          },
+          description: {
+            type: 'string',
+            description:
+              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
+          },
+          directory: {
+            type: 'string',
+            description:
+              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+          },
+        },
+        required: ['command'],
+      },
       false, // output is not markdown
       true, // output can be updated
     );
