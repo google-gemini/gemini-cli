@@ -52,7 +52,6 @@ export function useKeypress(
     const keypressStream = new PassThrough();
     let usePassthrough = false;
     const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
-    // Example of how you might use it
     if (
       nodeMajorVersion < 20 ||
       process.env['PASTE_WORKAROUND'] === '1' ||
