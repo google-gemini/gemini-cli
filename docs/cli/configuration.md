@@ -64,6 +64,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`gcpProjectId`** (string):
+  - **Description:** Fallback for the `GOOGLE_CLOUD_PROJECT` environment variable used by the CLI for Code Assist and Vertex AI features.
+  - **Default:** Not set.
+  - **Example:** `"gcpProjectId": "my-gcp-project-id"`
+
 - **`coreTools`** (array of strings):
   - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools.
   - **Default:** All tools available for use by the Gemini model.
@@ -236,6 +241,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - You can also set this in `~/.gemini/settings.json` using the `gcpProjectId` key as a fallback.
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:** `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
