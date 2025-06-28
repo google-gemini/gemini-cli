@@ -43,7 +43,8 @@ It's important to always review confirmation prompts carefully before allowing a
 
 Gemini CLI's built-in tools can be broadly categorized as follows:
 
-- **[File System Tools](./file-system.md):** For interacting with files and directories (reading, writing, listing, searching, etc.).
+- **[File Search Tool](./file-search.md) (`fileSearch`):** For searching for files.
+- **[File System Tools](./file-system.md):** For interacting with files and directories (reading, writing, listing).
 - **[Shell Tool](./shell.md) (`run_shell_command`):** For executing shell commands.
 - **[Web Fetch Tool](./web-fetch.md) (`web_fetch`):** For retrieving content from URLs.
 - **[Web Search Tool](./web-search.md) (`web_search`):** For searching the web.
