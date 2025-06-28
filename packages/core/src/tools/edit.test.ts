@@ -549,6 +549,65 @@ describe('EditTool', () => {
         /Attempted to create a file that already exists/,
       );
     });
+
+    it('should include modification message when proposed content is modified', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+        modified_by_user: true,
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
+
+    it('should not include modification message when proposed content is not modified', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+        modified_by_user: false,
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).not.toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
+
+    it('should not include modification message when modified_by_user is not provided', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).not.toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
   });
 
   describe('getDescription', () => {
