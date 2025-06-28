@@ -34,7 +34,7 @@
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "gaxios": "^6.1.1",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
