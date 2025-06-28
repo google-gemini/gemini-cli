@@ -27,6 +27,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+
 import { loadSandboxConfig } from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
@@ -166,7 +167,7 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
 ): Promise<Config> {
-  loadEnvironment();
+  loadEnvironment(settings);
 
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
@@ -294,9 +295,19 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
-export function loadEnvironment(): void {
+export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
   if (envFilePath) {
     dotenv.config({ path: envFilePath, quiet: true });
+  }
+
+  // Fallback to settings.json if GOOGLE_CLOUD_PROJECT is not already set
+  if (!process.env.GOOGLE_CLOUD_PROJECT) {
+    if (typeof settings.gcpProjectId === 'string') {
+      const projectId = settings.gcpProjectId.trim();
+      if (projectId) {
+        process.env.GOOGLE_CLOUD_PROJECT = projectId;
+      }
+    }
   }
 }
