@@ -39,6 +39,10 @@ import {
   type SlashCommand,
 } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
+import {
+  fetchCurrentVersionRelease,
+  formatChangelog,
+} from '../../utils/changelogUtils.js';
 
 // This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -240,6 +244,36 @@ export const useSlashCommandProcessor = (
             });
             await open(docsUrl);
           }
+        },
+      },
+      {
+        name: 'changelog',
+        altName: 'release-notes',
+        description: 'display release notes and changelog for current version',
+        action: async (_mainCommand, _subCommand, _args) => {
+          addMessage({
+            type: MessageType.INFO,
+            content: 'Fetching release information for current version...',
+            timestamp: new Date(),
+          });
+
+          const release = await fetchCurrentVersionRelease();
+          if (!release) {
+            addMessage({
+              type: MessageType.ERROR,
+              content:
+                'Failed to fetch release information. Please check your internet connection or try again later.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          const formattedChangelog = formatChangelog(release);
+          addMessage({
+            type: MessageType.INFO,
+            content: formattedChangelog,
+            timestamp: new Date(),
+          });
         },
       },
       {
