@@ -10,6 +10,7 @@ export interface Suggestion {
   label: string;
   value: string;
   description?: string;
+  completion?: string;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];

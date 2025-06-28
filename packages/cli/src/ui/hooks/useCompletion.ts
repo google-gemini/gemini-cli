@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { glob } from 'glob';
+
 import {
   isNodeError,
   escapePath,
@@ -15,6 +15,9 @@ import {
   getErrorMessage,
   Config,
   FileDiscoveryService,
+  performFileSearch,
+  SearchType,
+  TimeUnit,
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -197,213 +200,86 @@ export function useCompletion(
       return;
     }
 
-    const partialPath = query.substring(atIndex + 1);
-    const lastSlashIndex = partialPath.lastIndexOf('/');
-    const baseDirRelative =
-      lastSlashIndex === -1
-        ? '.'
-        : partialPath.substring(0, lastSlashIndex + 1);
-    const prefix = unescapePath(
-      lastSlashIndex === -1
-        ? partialPath
-        : partialPath.substring(lastSlashIndex + 1),
-    );
-
-    const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
-
     let isMounted = true;
-
-    const findFilesRecursively = async (
-      startDir: string,
-      searchPrefix: string,
-      fileDiscovery: { shouldGitIgnoreFile: (path: string) => boolean } | null,
-      currentRelativePath = '',
-      depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
-    ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
-        return [];
-      }
-
-      const lowerSearchPrefix = searchPrefix.toLowerCase();
-      let foundSuggestions: Suggestion[] = [];
-      try {
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (foundSuggestions.length >= maxResults) break;
-
-          const entryPathRelative = path.join(currentRelativePath, entry.name);
-          const entryPathFromRoot = path.relative(
-            cwd,
-            path.join(startDir, entry.name),
-          );
-
-          // Conditionally ignore dotfiles
-          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
-            continue;
-          }
-
-          // Check if this entry should be ignored by git-aware filtering
-          if (
-            fileDiscovery &&
-            fileDiscovery.shouldGitIgnoreFile(entryPathFromRoot)
-          ) {
-            continue;
-          }
-
-          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
-            foundSuggestions.push({
-              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              value: escapePath(
-                entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              ),
-            });
-          }
-          if (
-            entry.isDirectory() &&
-            entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
-          ) {
-            if (foundSuggestions.length < maxResults) {
-              foundSuggestions = foundSuggestions.concat(
-                await findFilesRecursively(
-                  path.join(startDir, entry.name),
-                  searchPrefix, // Pass original searchPrefix for recursive calls
-                  fileDiscovery,
-                  entryPathRelative,
-                  depth + 1,
-                  maxDepth,
-                  maxResults - foundSuggestions.length,
-                ),
-              );
-            }
-          }
-        }
-      } catch (_err) {
-        // Ignore errors like permission denied or ENOENT during recursive search
-      }
-      return foundSuggestions.slice(0, maxResults);
-    };
-
-    const findFilesWithGlob = async (
-      searchPrefix: string,
-      fileDiscoveryService: FileDiscoveryService,
-      maxResults = 50,
-    ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
-      const files = await glob(globPattern, {
-        cwd,
-        dot: searchPrefix.startsWith('.'),
-        nocase: true,
-      });
-
-      const suggestions: Suggestion[] = files
-        .map((file: string) => {
-          const relativePath = path.relative(cwd, file);
-          return {
-            label: relativePath,
-            value: escapePath(relativePath),
-          };
-        })
-        .filter((s) => {
-          if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldGitIgnoreFile(s.label); // relative path
-          }
-          return true;
-        })
-        .slice(0, maxResults);
-
-      return suggestions;
-    };
 
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
-      const fileDiscoveryService = config ? config.getFileService() : null;
-      const enableRecursiveSearch =
-        config?.getEnableRecursiveFileSearch() ?? true;
-
       try {
-        // If there's no slash, or it's the root, do a recursive search from cwd
-        if (
-          partialPath.indexOf('/') === -1 &&
-          prefix &&
-          enableRecursiveSearch
-        ) {
-          if (fileDiscoveryService) {
-            fetchedSuggestions = await findFilesWithGlob(
-              prefix,
-              fileDiscoveryService,
-            );
-          } else {
-            fetchedSuggestions = await findFilesRecursively(
-              cwd,
-              prefix,
-              fileDiscoveryService,
-            );
+        const pattern = query.substring(query.lastIndexOf('@') + 1);
+        let files: string[] = [];
+        let dirs: string[] = [];
+
+        if (pattern === '') {
+          const timePeriods: { value: number; unit: TimeUnit }[] = [
+            { value: 1, unit: TimeUnit.DAY },
+            { value: 1, unit: TimeUnit.WEEK },
+            { value: 1, unit: TimeUnit.MONTH },
+            { value: 1, unit: TimeUnit.YEAR },
+          ];
+          for (const period of timePeriods) {
+            files = await performFileSearch({
+              pattern: '',
+              rootDirectory: cwd,
+              changed_within: period,
+              max_results: 50,
+            });
+            if (files.length > 0) {
+              break;
+            }
           }
+        } else if (pattern.endsWith(path.sep)) {
+          [files, dirs] = await Promise.all([
+            performFileSearch({
+              pattern,
+              rootDirectory: cwd,
+              max_results: 50,
+            }),
+            performFileSearch({
+              pattern: pattern.slice(0, -1) + '$',
+              rootDirectory: cwd,
+              max_results: 50,
+              search_type: SearchType.DIRECTORY,
+            }),
+          ]);
         } else {
-          // Original behavior: list files in the specific directory
-          const lowerPrefix = prefix.toLowerCase();
-          const entries = await fs.readdir(baseDirAbsolute, {
-            withFileTypes: true,
-          });
-
-          // Filter entries using git-aware filtering
-          const filteredEntries = [];
-          for (const entry of entries) {
-            // Conditionally ignore dotfiles
-            if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
-              continue;
-            }
-            if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
-
-            const relativePath = path.relative(
-              cwd,
-              path.join(baseDirAbsolute, entry.name),
-            );
-            if (
-              fileDiscoveryService &&
-              fileDiscoveryService.shouldGitIgnoreFile(relativePath)
-            ) {
-              continue;
-            }
-
-            filteredEntries.push(entry);
-          }
-
-          fetchedSuggestions = filteredEntries.map((entry) => {
-            const label = entry.isDirectory() ? entry.name + '/' : entry.name;
-            return {
-              label,
-              value: escapePath(label), // Value for completion should be just the name part
-            };
-          });
+          [files, dirs] = await Promise.all([
+            performFileSearch({
+              pattern,
+              rootDirectory: cwd,
+              max_results: 50,
+            }),
+            performFileSearch({
+              pattern,
+              rootDirectory: cwd,
+              max_results: 50,
+              search_type: SearchType.DIRECTORY,
+            }),
+          ]);
         }
 
-        // Sort by depth, then directories first, then alphabetically
-        fetchedSuggestions.sort((a, b) => {
-          const depthA = (a.label.match(/\//g) || []).length;
-          const depthB = (b.label.match(/\//g) || []).length;
-
-          if (depthA !== depthB) {
-            return depthA - depthB;
-          }
-
-          const aIsDir = a.label.endsWith('/');
-          const bIsDir = b.label.endsWith('/');
-          if (aIsDir && !bIsDir) return -1;
-          if (!aIsDir && bIsDir) return 1;
-
-          return a.label.localeCompare(b.label);
-        });
+        const suggestions: Suggestion[] = [
+          ...dirs.map((dir: string) => {
+            const relativePath = path.relative(cwd, dir);
+            return {
+              label: relativePath + path.sep,
+              value: escapePath(relativePath + path.sep),
+            };
+          }),
+          ...files.map((file: string) => {
+            const relativePath = path.relative(cwd, file);
+            return {
+              label: relativePath,
+              value: escapePath(relativePath),
+            };
+          }),
+        ];
 
         if (isMounted) {
-          setSuggestions(fetchedSuggestions);
-          setShowSuggestions(fetchedSuggestions.length > 0);
-          setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
+          setSuggestions(suggestions);
+          setShowSuggestions(suggestions.length > 0);
+          setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
       } catch (error: unknown) {
@@ -414,7 +290,7 @@ export function useCompletion(
           }
         } else {
           console.error(
-            `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(error)}`,
+            `Error fetching completion suggestions for ${query}: ${getErrorMessage(error)}`,
           );
           if (isMounted) {
             resetCompletionState();

@@ -132,14 +132,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
-        const pathPart = query.substring(atIndex + 1);
-        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-        let autoCompleteStartIndex = atIndex + 1;
-        if (lastSlashIndexInPath !== -1) {
-          autoCompleteStartIndex += lastSlashIndexInPath + 1;
-        }
         buffer.replaceRangeByOffset(
-          autoCompleteStartIndex,
+          atIndex + 1,
           buffer.text.length,
           selectedSuggestion.value,
         );
