@@ -213,7 +213,10 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         {} as Record<string, GrepMatch[]>,
       );
 
-      let llmContent = `Found ${matches.length} match(es) for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
+      const matchCount = matches.length;
+      const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
@@ -226,7 +229,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
       return {
         llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matches.length} matche(s)`,
+        returnDisplay: `Found ${matchCount} ${matchTerm}`,
       };
     } catch (error) {
       console.error(`Error during GrepLogic execution: ${error}`);
