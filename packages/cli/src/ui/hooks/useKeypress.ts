@@ -99,8 +99,10 @@ export function useKeypress(
         const suffixPos = data.indexOf(PASTE_MODE_SUFFIX, pos);
 
         // Determine which marker comes first, if any.
-        const isPrefixNext = prefixPos !== -1 && (suffixPos === -1 || prefixPos < suffixPos);
-        const isSuffixNext = suffixPos !== -1 && (prefixPos === -1 || suffixPos < prefixPos);
+        const isPrefixNext =
+          prefixPos !== -1 && (suffixPos === -1 || prefixPos < suffixPos);
+        const isSuffixNext =
+          suffixPos !== -1 && (prefixPos === -1 || suffixPos < prefixPos);
 
         let nextMarkerPos = -1;
         let markerLength = 0;
@@ -120,15 +122,17 @@ export function useKeypress(
 
         const nextData = data.slice(pos, nextMarkerPos);
         if (nextData.length > 0) {
-            keypressStream.write(nextData);
+          keypressStream.write(nextData);
         }
-        const createPasteKeyEvent = (name: 'paste-start' | 'paste-end'): Key => ({
+        const createPasteKeyEvent = (
+          name: 'paste-start' | 'paste-end',
+        ): Key => ({
           name,
-            ctrl: false,
-            meta: false,
-            shift: false,
-            paste: false,
-            sequence: ''
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '',
         });
         if (isPrefixNext) {
           handleKeypress(undefined, createPasteKeyEvent('paste-start'));
@@ -137,18 +141,18 @@ export function useKeypress(
         }
         pos = nextMarkerPos + markerLength;
       }
-    }
+    };
 
     let rl: readline.Interface;
     if (usePassthrough) {
       rl = readline.createInterface({ input: keypressStream });
       readline.emitKeypressEvents(keypressStream, rl);
-      keypressStream.on('keypress', handleKeypress)
+      keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
       rl = readline.createInterface({ input: stdin });
       readline.emitKeypressEvents(stdin, rl);
-      stdin.on('keypress', handleKeypress)
+      stdin.on('keypress', handleKeypress);
     }
 
     return () => {
