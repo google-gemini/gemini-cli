@@ -5,20 +5,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
-import {
-  isNodeError,
-  escapePath,
-  unescapePath,
-  getErrorMessage,
-  Config,
-  FileDiscoveryService,
-  performFileSearch,
-  SearchType,
-  TimeUnit,
-} from '@google/gemini-cli-core';
+import { getAtFileSuggestions } from './atFileCompleter.js';
+import { isNodeError, getErrorMessage, Config } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
@@ -204,82 +193,14 @@ export function useCompletion(
 
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
-      let fetchedSuggestions: Suggestion[] = [];
-
       try {
         const pattern = query.substring(query.lastIndexOf('@') + 1);
-        let files: string[] = [];
-        let dirs: string[] = [];
-
-        if (pattern === '') {
-          const timePeriods: { value: number; unit: TimeUnit }[] = [
-            { value: 1, unit: TimeUnit.DAY },
-            { value: 1, unit: TimeUnit.WEEK },
-            { value: 1, unit: TimeUnit.MONTH },
-            { value: 1, unit: TimeUnit.YEAR },
-          ];
-          for (const period of timePeriods) {
-            files = await performFileSearch({
-              pattern: '',
-              rootDirectory: cwd,
-              changed_within: period,
-              max_results: 50,
-            });
-            if (files.length > 0) {
-              break;
-            }
-          }
-        } else if (pattern.endsWith(path.sep)) {
-          [files, dirs] = await Promise.all([
-            performFileSearch({
-              pattern,
-              rootDirectory: cwd,
-              max_results: 50,
-            }),
-            performFileSearch({
-              pattern: pattern.slice(0, -1) + '$',
-              rootDirectory: cwd,
-              max_results: 50,
-              search_type: SearchType.DIRECTORY,
-            }),
-          ]);
-        } else {
-          [files, dirs] = await Promise.all([
-            performFileSearch({
-              pattern,
-              rootDirectory: cwd,
-              max_results: 50,
-            }),
-            performFileSearch({
-              pattern,
-              rootDirectory: cwd,
-              max_results: 50,
-              search_type: SearchType.DIRECTORY,
-            }),
-          ]);
-        }
-
-        const suggestions: Suggestion[] = [
-          ...dirs.map((dir: string) => {
-            const relativePath = path.relative(cwd, dir);
-            return {
-              label: relativePath + path.sep,
-              value: escapePath(relativePath + path.sep),
-            };
-          }),
-          ...files.map((file: string) => {
-            const relativePath = path.relative(cwd, file);
-            return {
-              label: relativePath,
-              value: escapePath(relativePath),
-            };
-          }),
-        ];
+        const fetchedSuggestions = await getAtFileSuggestions(pattern, cwd);
 
         if (isMounted) {
-          setSuggestions(suggestions);
-          setShowSuggestions(suggestions.length > 0);
-          setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
+          setSuggestions(fetchedSuggestions);
+          setShowSuggestions(fetchedSuggestions.length > 0);
+          setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
       } catch (error: unknown) {
@@ -290,15 +211,18 @@ export function useCompletion(
           }
         } else {
           console.error(
-            `Error fetching completion suggestions for ${query}: ${getErrorMessage(error)}`,
+            `Error fetching completion suggestions for ${query}: ${getErrorMessage(
+              error,
+            )}`,
           );
           if (isMounted) {
             resetCompletionState();
           }
         }
-      }
-      if (isMounted) {
-        setIsLoadingSuggestions(false);
+      } finally {
+        if (isMounted) {
+          setIsLoadingSuggestions(false);
+        }
       }
     };
 

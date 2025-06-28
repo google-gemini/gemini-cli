@@ -45,7 +45,7 @@ export interface PerformFileSearchOptions {
 
 export async function performFileSearch(
   options: PerformFileSearchOptions,
-): Promise<string[]> {
+): Promise<{ entries: string[]; fuzzyPattern?: string }> {
   const {
     pattern,
     rootDirectory,
@@ -59,51 +59,79 @@ export async function performFileSearch(
   } = options;
   const searchDirAbsolute = path.resolve(rootDirectory, searchPath);
 
-  const args = ['--type', search_type, '--absolute-path'];
+  const doSearch = async (searchPattern: string) => {
+    const args = ['--type', search_type, '--absolute-path'];
 
-  if (changed_within) {
-    args.push('--changed-within', `${changed_within.value}${changed_within.unit}`);
+    if (changed_within) {
+      args.push(
+        '--changed-within',
+        `${changed_within.value}${changed_within.unit}`,
+      );
+    }
+
+    if (max_results) {
+      args.push('--max-results', max_results.toString());
+    }
+
+    if (searchPattern.includes(path.sep)) {
+      args.push('--full-path');
+    }
+
+    if (!respect_git_ignore) {
+      args.push('--no-ignore');
+    }
+
+    if (case_sensitive) {
+      args.push('--case-sensitive');
+    } else {
+      args.push('--ignore-case');
+    }
+
+    args.push(searchPattern);
+
+    const fdPackagePath = require.resolve('fd-find/package.json');
+    const fdPath = path.resolve(
+      path.dirname(fdPackagePath),
+      '..',
+      '.bin',
+      'fd',
+    );
+    const child = spawn(fdPath, args, {
+      cwd: searchDirAbsolute,
+      signal: abortSignal,
+    });
+
+    let stdout = '';
+    for await (const chunk of child.stdout) {
+      stdout += chunk;
+    }
+
+    if (!stdout.trim()) {
+      return [];
+    }
+
+    return stdout.trim().split('\n');
+  };
+
+  let entries = await doSearch(pattern);
+  if (entries.length > 0) {
+    return { entries };
   }
 
-  if (max_results) {
-    args.push('--max-results', max_results.toString());
+  // If the initial search returns no results, try a fuzzy search.
+  if (pattern && pattern.includes(path.sep)) {
+    const escapedSeparator = path.sep === '\\' ? '\\\\' : path.sep;
+    const fuzzyPattern = pattern
+      .split(path.sep)
+      .map((part) => part + `[^${escapedSeparator}]*`)
+      .join(path.sep);
+    entries = await doSearch(fuzzyPattern);
+    if (entries.length > 0) {
+      return { entries, fuzzyPattern };
+    }
   }
 
-  if (pattern.includes(path.sep)) {
-    args.push('--full-path');
-  }
-
-  if (!respect_git_ignore) {
-    args.push('--no-ignore');
-  }
-
-  if (case_sensitive) {
-    args.push('--case-sensitive');
-  } else {
-    args.push('--ignore-case');
-  }
-
-  args.push(pattern);
-
-  const fdPackagePath = require.resolve('fd-find/package.json');
-  const fdPath = path.resolve(path.dirname(fdPackagePath), '..', '.bin', 'fd');
-  console.log('fd path:', fdPath);
-  const child = spawn(fdPath, args, {
-    cwd: searchDirAbsolute,
-    signal: abortSignal,
-  });
-
-  let stdout = '';
-  for await (const chunk of child.stdout) {
-    stdout += chunk;
-  }
-
-  if (!stdout.trim()) {
-    return [];
-  }
-
-  const entries = stdout.trim().split('\n');
-  return entries;
+  return { entries: [] };
 }
 
 /**
@@ -250,10 +278,7 @@ export class FileSearchTool extends BaseTool<FileSearchToolParams, ToolResult> {
       return "The 'pattern' parameter cannot be empty.";
     }
 
-    if (
-      params.changed_within &&
-      !/^\d+[dwmy]$/.test(params.changed_within)
-    ) {
+    if (params.changed_within && !/^\d+[dwmy]$/.test(params.changed_within)) {
       return "Invalid format for 'changed_within'. Expected format: <number><unit> (e.g., 2d, 1w, 3m).";
     }
 
@@ -296,12 +321,12 @@ export class FileSearchTool extends BaseTool<FileSearchToolParams, ToolResult> {
 
       let changedWithin: ChangedWithin | undefined;
       if (params.changed_within) {
-        const value = parseInt(params.changed_within.slice(0, -1));
+        const value = parseInt(params.changed_within.slice(0, -1), 10);
         const unit = params.changed_within.slice(-1) as TimeUnit;
         changedWithin = { value, unit };
       }
 
-      const entries = await performFileSearch({
+      const { entries, fuzzyPattern } = await performFileSearch({
         pattern: params.pattern,
         rootDirectory: this.rootDirectory,
         searchPath: params.path,
@@ -324,8 +349,12 @@ export class FileSearchTool extends BaseTool<FileSearchToolParams, ToolResult> {
       const fileListDescription = entries.join('\n');
       const fileCount = entries.length;
 
-      let resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}`;
-      resultMessage += `:\n${fileListDescription}`;
+      let resultMessage;
+      if (fuzzyPattern) {
+        resultMessage = `No exact match found. Found ${fileCount} file(s) with a fuzzy search for "${fuzzyPattern}":\n${fileListDescription}`;
+      } else {
+        resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}:\n${fileListDescription}`;
+      }
 
       return {
         llmContent: resultMessage,
