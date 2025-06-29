@@ -214,7 +214,6 @@ export async function main() {
       if (isPerformanceMonitoringActive()) {
         recordStartupPerformance(config, 'sandbox_setup', sandboxDuration, {
           sandbox_command: sandboxConfig.command,
-          sandbox_image: sandboxConfig.image,
         });
       }
       
@@ -263,7 +262,6 @@ export async function main() {
     recordStartupPerformance(config, 'total_startup', totalStartupDuration, {
       is_tty: process.stdin.isTTY,
       has_question: (input?.length ?? 0) > 0,
-      workspace_root: workspaceRoot,
     });
   }
   
