@@ -786,9 +786,10 @@ export const useGeminiStream = (
   }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
   const handleCircuitBreakerOverride = useCallback(() => {
-    // Manual override bypasses circuit breaker for a single request
-    // This is handled by the client's executeWithManualOverride method
-    console.log('Circuit breaker manual override triggered');
+    // Manual override bypasses circuit breaker for the next request
+    // For now, this is a stub - the actual implementation needs circuit breaker error detection
+    console.log('Circuit breaker manual override activated');
+    // TODO: Implement proper circuit breaker state detection and override
   }, []);
 
   return {
