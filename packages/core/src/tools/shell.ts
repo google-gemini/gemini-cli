@@ -98,7 +98,67 @@ Process Group PGID: Process group started or \`(none)\``,
       .pop(); // take last part and return command root (or undefined if previous line was empty)
   }
 
+  isCommandAllowed(command: string): boolean {
+    const normalize = (cmd: string) => cmd.trim().replace(/\s+/g, ' ');
+
+    const extractCommands = (tools: string[]): string[] =>
+      tools.flatMap((tool) => {
+        if (tool.startsWith(`${ShellTool.name}(`) && tool.endsWith(')')) {
+          return [normalize(tool.slice(ShellTool.name.length + 1, -1))];
+        } else if (
+          tool.startsWith(`${ShellTool.Name}(`) &&
+          tool.endsWith(')')
+        ) {
+          return [normalize(tool.slice(ShellTool.Name.length + 1, -1))];
+        }
+        return [];
+      });
+
+    const coreTools = this.config.getCoreTools() || [];
+    const excludeTools = this.config.getExcludeTools() || [];
+
+    if (
+      excludeTools.includes(ShellTool.name) ||
+      excludeTools.includes(ShellTool.Name)
+    ) {
+      return false;
+    }
+
+    const blockedCommands = extractCommands(excludeTools);
+    const normalizedCommand = normalize(command);
+
+    if (blockedCommands.includes(normalizedCommand)) {
+      return false;
+    }
+
+    const hasSpecificCommands = coreTools.some(
+      (tool) =>
+        (tool.startsWith(`${ShellTool.name}(`) && tool.endsWith(')')) ||
+        (tool.startsWith(`${ShellTool.Name}(`) && tool.endsWith(')')),
+    );
+
+    if (hasSpecificCommands) {
+      // If the generic `ShellTool` is also present, it acts as a wildcard,
+      // allowing all commands (that are not explicitly blocked).
+      if (
+        coreTools.includes(ShellTool.name) ||
+        coreTools.includes(ShellTool.Name)
+      ) {
+        return true;
+      }
+
+      // Otherwise, we are in strict allow-list mode.
+      const allowedCommands = extractCommands(coreTools);
+      return allowedCommands.includes(normalizedCommand);
+    }
+
+    return true;
+  }
+
   validateToolParams(params: ShellToolParams): string | null {
+    if (!this.isCommandAllowed(params.command)) {
+      return `Command is not allowed: ${params.command}`;
+    }
     if (
       !SchemaValidator.validate(
         this.parameterSchema as Record<string, unknown>,
