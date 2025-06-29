@@ -173,13 +173,6 @@ export class MemoryMonitor {
    */
   recordComponentMemoryUsage(component: string, operation?: string): MemorySnapshot {
     const snapshot = this.takeSnapshot(operation ? `${component}_${operation}` : component);
-    
-    // Record additional context if monitoring is active
-    if (isPerformanceMonitoringActive() && operation) {
-      const context = `${component}.${operation}`;
-      recordMemoryUsage(this.config, MemoryMetricType.HEAP_USED, snapshot.heapUsed, context);
-    }
-    
     return snapshot;
   }
 

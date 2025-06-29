@@ -570,8 +570,6 @@ export function recordPerformanceRegression(
 ): void {
   if (!regressionDetectionCounter || !baselineComparisonHistogram || !isPerformanceMonitoringEnabled) return;
   
-  const percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
-  
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     metric,
@@ -581,7 +579,11 @@ export function recordPerformanceRegression(
   };
   
   regressionDetectionCounter.add(1, attributes);
-  baselineComparisonHistogram.record(percentageChange, attributes);
+  
+  if (baselineValue !== 0) {
+    const percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
+    baselineComparisonHistogram.record(percentageChange, attributes);
+  }
 }
 
 export function recordBaselineComparison(
