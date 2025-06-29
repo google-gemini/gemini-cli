@@ -595,6 +595,10 @@ export function recordBaselineComparison(
 ): void {
   if (!baselineComparisonHistogram || !isPerformanceMonitoringEnabled) return;
   
+  if (baselineValue === 0) {
+    console.warn('Baseline value is zero, skipping comparison.');
+    return;
+  }
   const percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
   
   const attributes: Attributes = {

@@ -266,8 +266,10 @@ export function recordCurrentMemoryUsage(config: Config, context: string): Memor
  * Start global memory monitoring
  */
 export function startGlobalMemoryMonitoring(config: Config, intervalMs: number = 5000): void {
-  const monitor = initializeMemoryMonitor(config);
-  monitor.start(intervalMs);
+  if (!getMemoryMonitor()) { // Check if a monitor already exists
+    const monitor = initializeMemoryMonitor(config);
+    monitor.start(intervalMs);
+  }
 }
 
 /**
