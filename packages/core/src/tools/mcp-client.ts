@@ -173,7 +173,21 @@ async function connectAndDiscover(
       new URL(mcpServerConfig.httpUrl),
     );
   } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    const bearerToken = mcpServerConfig.authorization_token;
+
+    if (!bearerToken) {
+      transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    } else {
+      const headers = {
+        'Authorization': bearerToken,
+      };
+      transport = new SSEClientTransport(
+        new URL(mcpServerConfig.url),
+        {
+          requestInit: { headers: headers }
+        }
+      );
+    }
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,

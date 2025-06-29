@@ -267,6 +267,46 @@ describe('discoverMcpTools', () => {
     expect(registeredTool.name).toBe('tool-sse');
   });
 
+  it('should use authorization_token for SSE transport when provided', async () => {
+    const serverConfig = {
+      url: 'http://localhost:5678/sse',
+      authorization_token: 'Bearer my-secret-token',
+    };
+    mockConfig.getMcpServers.mockReturnValue({
+      'sse-auth-server': serverConfig as MCPServerConfig,
+    });
+
+    const mockFuncDecl = {
+      name: 'authed-tool',
+      description: 'An authenticated tool',
+      inputSchema: { type: 'object' as const, properties: {} },
+    };
+    vi.mocked(Client.prototype.listTools).mockResolvedValue({
+      tools: [mockFuncDecl],
+    });
+
+    mockToolRegistry.getToolsByServer.mockReturnValueOnce([
+      expect.any(DiscoveredMCPTool),
+    ]);
+
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
+
+    const expectedHeaders = {
+      Authorization: serverConfig.authorization_token,
+    };
+    expect(SSEClientTransport).toHaveBeenCalledWith(
+      new URL(serverConfig.url!),
+      {
+        requestInit: { headers: expectedHeaders },
+      },
+    );
+    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+  });
+
   it('should prefix tool names if multiple MCP servers are configured', async () => {
     const serverConfig1: MCPServerConfig = { command: './mcp1' };
     const serverConfig2: MCPServerConfig = { url: 'http://mcp2/sse' };
