@@ -75,10 +75,7 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
   if (editor && isValidEditorType(editor)) {
-    return (
-      checkHasEditorType(editor as EditorType) &&
-      allowEditorTypeInSandbox(editor as EditorType)
-    );
+    return checkHasEditorType(editor) && allowEditorTypeInSandbox(editor);
   }
   return false;
 }

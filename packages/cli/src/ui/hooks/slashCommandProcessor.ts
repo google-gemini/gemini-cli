@@ -127,10 +127,7 @@ export const useSlashCommandProcessor = (
         };
       } else {
         historyItemContent = {
-          type: message.type as
-            | MessageType.INFO
-            | MessageType.ERROR
-            | MessageType.USER,
+          type: message.type,
           text: message.content,
         };
       }
