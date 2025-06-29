@@ -24,6 +24,8 @@ import {
   METRIC_MEMORY_USAGE,
   METRIC_MEMORY_HEAP_USED,
   METRIC_MEMORY_HEAP_TOTAL,
+  METRIC_MEMORY_EXTERNAL,
+  METRIC_MEMORY_RSS,
   METRIC_CPU_USAGE,
   METRIC_TOOL_QUEUE_DEPTH,
   METRIC_TOOL_EXECUTION_BREAKDOWN,
@@ -88,6 +90,8 @@ let startupTimeHistogram: Histogram | undefined;
 let memoryUsageGauge: any | undefined; // ObservableGauge when available
 let memoryHeapUsedGauge: any | undefined;
 let memoryHeapTotalGauge: any | undefined;
+let memoryExternalGauge: any | undefined;
+let memoryRssGauge: any | undefined;
 let cpuUsageGauge: any | undefined;
 let toolQueueDepthGauge: any | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
@@ -370,6 +374,18 @@ export function initializePerformanceMonitoring(config: Config): void {
     valueType: ValueType.INT,
   });
 
+  memoryExternalGauge = meter.createHistogram(METRIC_MEMORY_EXTERNAL, {
+    description: 'External memory in bytes.',
+    unit: 'bytes',
+    valueType: ValueType.INT,
+  });
+
+  memoryRssGauge = meter.createHistogram(METRIC_MEMORY_RSS, {
+    description: 'Resident Set Size (RSS) memory in bytes.',
+    unit: 'bytes',
+    valueType: ValueType.INT,
+  });
+
   // Initialize CPU usage histogram
   cpuUsageGauge = meter.createHistogram(METRIC_CPU_USAGE, {
     description: 'CPU usage percentage.',
@@ -457,6 +473,12 @@ export function recordMemoryUsage(
       break;
     case MemoryMetricType.HEAP_TOTAL:
       memoryHeapTotalGauge?.record(bytes, attributes);
+      break;
+    case MemoryMetricType.EXTERNAL:
+      memoryExternalGauge?.record(bytes, attributes);
+      break;
+    case MemoryMetricType.RSS:
+      memoryRssGauge?.record(bytes, attributes);
       break;
     default:
       memoryUsageGauge?.record(bytes, attributes);
