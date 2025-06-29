@@ -100,7 +100,6 @@ export class GeminiClient {
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
-    await this.chat;
   }
 
   private async getEnvironment(): Promise<Part[]> {

@@ -339,7 +339,7 @@ describe('Gemini Client (client.ts)', () => {
   describe('resetChat', () => {
     it('should create a new chat session, clearing the old history', async () => {
       // 1. Get the initial chat instance and add some history.
-      const initialChat = await client.getChat();
+      const initialChat = client.getChat();
       const initialHistory = await client.getHistory();
       await client.addHistory({
         role: 'user',
@@ -354,7 +354,7 @@ describe('Gemini Client (client.ts)', () => {
       await client.resetChat();
 
       // 3. Get the new chat instance and its history.
-      const newChat = await client.getChat();
+      const newChat = client.getChat();
       const newHistory = await client.getHistory();
 
       // 4. Assert that the chat instance is new and the history is reset.
