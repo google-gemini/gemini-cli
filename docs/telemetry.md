@@ -152,6 +152,47 @@ Use the `npm run telemetry -- --target=gcp` command to automate setting up a loc
 1.  **Stop the service**:
     Press `Ctrl+C` in the terminal where the script is running to stop the OTEL Collector.
 
+## Performance Monitoring
+
+Gemini CLI includes comprehensive performance monitoring capabilities that provide insights into startup performance, memory usage, and operational efficiency. These features help identify performance bottlenecks and track system health over time.
+
+### Memory Monitoring
+
+The integrated MemoryMonitor system provides real-time memory tracking with automatic snapshots at key lifecycle points:
+
+- **Startup snapshots**: Captures memory state during CLI initialization phases
+- **Operation snapshots**: Monitors memory usage during tool execution and API calls
+- **Component-specific monitoring**: Tracks memory usage by different CLI components
+- **Growth analysis**: Identifies memory leaks and usage patterns over time
+
+The memory monitor automatically tracks:
+
+- **Heap Usage**: V8 JavaScript heap memory (used and total allocated)
+- **External Memory**: Memory used by C++ objects bound to JavaScript
+- **RSS (Resident Set Size)**: Physical memory currently used by the process
+- **Array Buffers**: Memory used by ArrayBuffer objects
+
+### Performance Scoring and Regression Detection
+
+The performance monitoring system includes automated scoring and regression detection:
+
+- **Baseline comparison**: Compares current performance against established baselines
+- **Regression detection**: Automatically identifies performance degradations with configurable severity levels
+- **Efficiency metrics**: Tracks token usage efficiency and API request optimization
+- **Performance scoring**: Provides composite performance scores (0-100 scale) across different system components
+
+### Startup Performance Analysis
+
+Detailed startup timing analysis breaks down CLI initialization into measurable phases:
+
+- **Settings loading**: Time to load and validate configuration files
+- **Extension loading**: Time to discover and initialize CLI extensions
+- **Service initialization**: Time to set up file, git, and authentication services
+- **Authentication**: Time to validate and refresh authentication credentials
+- **Sandbox setup**: Time to configure and enter sandbox environments (when enabled)
+
+This granular timing data helps identify startup bottlenecks and track performance improvements over time.
+
 ## Logs and metric reference
 
 The following section describes the structure of logs and metrics generated for Gemini CLI.
@@ -250,6 +291,46 @@ Logs are timestamped records of specific events. The following events are logged
     - `command` (string)
     - `subcommand` (string, if applicable)
 
+- `gemini_cli.startup.performance`: This event occurs during CLI startup with detailed performance metrics.
+  - **Attributes**:
+    - `phase` (string): Specific startup phase (settings_loading, config_loading, authentication, etc.)
+    - `startup_duration_ms` (number): Duration of the startup phase
+    - `auth_type` (string): Authentication method used (if applicable)
+    - `telemetry_enabled` (boolean): Whether telemetry was enabled during startup
+    - `settings_sources` (number): Number of settings sources processed (if applicable)
+    - `errors_count` (number): Number of errors encountered during phase (if applicable)
+    - `extensions_count` (number): Number of extensions loaded (if applicable)
+    - `theme_name` (string): Theme name loaded (if applicable)
+    - `sandbox_command` (string): Sandbox command executed (if applicable)
+    - `is_tty` (boolean): Whether running in TTY mode (if applicable)
+    - `has_question` (boolean): Whether input question was provided (if applicable)
+
+- `gemini_cli.memory.usage`: This event occurs during memory monitoring snapshots.
+  - **Attributes**:
+    - `context` (string): Context that triggered the memory snapshot
+    - `heap_used_mb` (number): V8 heap memory in use (megabytes)
+    - `heap_total_mb` (number): Total V8 heap allocated (megabytes)
+    - `rss_mb` (number): Resident Set Size (megabytes)
+    - `external_mb` (number): External memory usage (megabytes)
+    - `array_buffers_mb` (number): Array buffer memory usage (megabytes)
+    - `heap_size_limit_mb` (number): V8 heap size limit (megabytes)
+
+- `gemini_cli.performance.baseline`: This event occurs when establishing performance baselines.
+  - **Attributes**:
+    - `metric_type` (string): Type of performance metric being baselined
+    - `baseline_value` (number): Established baseline value
+    - `confidence_level` (number): Statistical confidence in baseline
+    - `component` (string): Component being monitored
+
+- `gemini_cli.performance.regression`: This event occurs when performance regression is detected.
+  - **Attributes**:
+    - `metric_type` (string): Type of performance metric that regressed
+    - `current_value` (number): Current performance value
+    - `baseline_value` (number): Expected baseline value
+    - `regression_percentage` (number): Percentage of performance degradation
+    - `severity` (string): Regression severity level (low, medium, high)
+    - `component` (string): Component experiencing regression
+
 ### Metrics
 
 Metrics are numerical measurements of behavior over time. The following metrics are collected for Gemini CLI:
@@ -299,3 +380,82 @@ Metrics are numerical measurements of behavior over time. The following metrics 
   - **Attributes**:
     - `tokens_before`: (Int): Number of tokens in context prior to compression
     - `tokens_after`: (Int): Number of tokens in context after compression
+
+- `gemini_cli.startup.duration` (Histogram, ms): Measures CLI startup time with phase breakdown.
+  - **Attributes**:
+    - `phase` (string): Specific startup phase (settings_loading, config_loading, authentication, etc.)
+    - `auth_type` (string): Authentication method used (if applicable)
+    - `telemetry_enabled` (boolean): Whether telemetry was enabled during startup
+    - `settings_sources` (number): Number of settings sources processed (if applicable)
+    - `errors_count` (number): Number of errors encountered during phase (if applicable)
+    - `extensions_count` (number): Number of extensions loaded (if applicable)
+    - `theme_name` (string): Theme name loaded (if applicable)
+    - `sandbox_command` (string): Sandbox command executed (if applicable)
+    - `is_tty` (boolean): Whether running in TTY mode (if applicable)
+    - `has_question` (boolean): Whether input question was provided (if applicable)
+
+- `gemini_cli.memory.usage` (Histogram, bytes): General memory usage measurement.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+    - `memory_type` (string): Type of memory metric (general usage)
+
+- `gemini_cli.memory.heap.used` (Histogram, bytes): V8 heap memory currently in use.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+    - `memory_type` (string): "heap_used"
+
+- `gemini_cli.memory.heap.total` (Histogram, bytes): Total V8 heap memory allocated.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+    - `memory_type` (string): "heap_total"
+
+- `gemini_cli.memory.external` (Histogram, bytes): Memory usage of C++ objects bound to JavaScript.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+    - `memory_type` (string): "external"
+
+- `gemini_cli.memory.rss` (Histogram, bytes): Resident Set Size - physical memory currently used.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+    - `memory_type` (string): "rss"
+
+- `gemini_cli.cpu.usage` (Histogram, percent): CPU usage percentage by component.
+  - **Attributes**:
+    - `component` (string): CLI component being monitored
+
+- `gemini_cli.tool.queue.depth` (Histogram, Int): Number of tool calls waiting in execution queue.
+
+- `gemini_cli.tool.execution.breakdown` (Histogram, ms): Detailed timing of tool execution phases.
+  - **Attributes**:
+    - `function_name` (string): Name of the tool being executed
+    - `phase` (string): Execution phase (validation, preparation, execution, result_processing)
+
+- `gemini_cli.token.efficiency` (Histogram, double): Token efficiency metrics including ratios and cache hit rates.
+  - **Attributes**:
+    - `model` (string): Gemini model used
+    - `metric` (string): Type of efficiency metric being measured
+    - `context` (string): Context for the efficiency measurement
+
+- `gemini_cli.api.request.breakdown` (Histogram, ms): Detailed API request timing by processing phase.
+  - **Attributes**:
+    - `model` (string): Gemini model used
+    - `phase` (string): Request phase (request_preparation, network_latency, response_processing, token_processing)
+
+- `gemini_cli.performance.score` (Histogram, double): Overall performance score (0-100 scale).
+  - **Attributes**:
+    - `category` (string): Performance category being scored
+    - `baseline` (number): Baseline value for comparison (if applicable)
+
+- `gemini_cli.performance.regression` (Counter, Int): Count of detected performance regressions.
+  - **Attributes**:
+    - `metric` (string): Performance metric that regressed
+    - `severity` (string): Regression severity level (low, medium, high)
+    - `current_value` (number): Current performance value
+    - `baseline_value` (number): Expected baseline value
+
+- `gemini_cli.performance.baseline.comparison` (Histogram, percent): Performance comparison to established baseline (percentage change).
+  - **Attributes**:
+    - `metric` (string): Type of performance metric being compared
+    - `category` (string): Performance category
+    - `current_value` (number): Current performance value
+    - `baseline_value` (number): Baseline performance value
