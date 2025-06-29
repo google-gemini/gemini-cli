@@ -239,6 +239,7 @@ export class GeminiClient {
           tools,
         },
         history,
+        this.getOrCreateCircuitBreaker.bind(this),
       );
     } catch (error) {
       await reportError(

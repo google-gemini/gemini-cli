@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType, StructuredError } from '@google/gemini-cli-core';
+import { AuthType, StructuredError, CircuitBreakerOpenError } from '@google/gemini-cli-core';
 
 const RATE_LIMIT_ERROR_MESSAGE_GOOGLE =
   '\nPlease wait and try again later. To increase your limits, upgrade to a plan with higher limits, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey';
@@ -61,24 +61,11 @@ export function parseAndFormatApiError(
   authType?: AuthType,
 ): string {
   // Handle CircuitBreakerOpenError specially
-  if (
-    error &&
-    typeof error === 'object' &&
-    'name' in error &&
-    error.name === 'CircuitBreakerOpenError' &&
-    'authType' in error &&
-    'recoveryTimeMs' in error &&
-    'allowOverride' in error
-  ) {
-    const cbError = error as {
-      authType: string;
-      recoveryTimeMs: number;
-      allowOverride: boolean;
-    };
-    const overrideText = cbError.allowOverride
+  if (error instanceof CircuitBreakerOpenError) {
+    const overrideText = error.allowOverride
       ? " Press 'o' to override (risky)."
       : '';
-    return `[Circuit Breaker Active] Rate limiting protection is active for ${cbError.authType}. Service will be retested in ${Math.ceil(cbError.recoveryTimeMs / 1000)} seconds.${overrideText}`;
+    return `[Circuit Breaker Active] Rate limiting protection is active for ${error.authType}. Service will be retested in ${Math.ceil(error.recoveryTimeMs / 1000)} seconds.${overrideText}`;
   }
 
   if (isStructuredError(error)) {
