@@ -401,8 +401,8 @@ export const useSlashCommandProcessor = (
               const descLines = server.description.trim().split('\n');
               if (descLines) {
                 message += ':\n';
-                for (let i = 0; i < descLines.length; i++) {
-                  message += `    ${greenColor}${descLines[i]}${resetColor}\n`;
+                for (const descLine of descLines) {
+                  message += `    ${greenColor}${descLine}${resetColor}\n`;
                 }
               } else {
                 message += '\n';
@@ -431,8 +431,8 @@ export const useSlashCommandProcessor = (
                   const descLines = tool.description.trim().split('\n');
                   if (descLines) {
                     message += ':\n';
-                    for (let i = 0; i < descLines.length; i++) {
-                      message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
+                    for (const descLine of descLines) {
+                      message += `      ${greenColor}${descLine}${resetColor}\n`;
                     }
                   } else {
                     message += '\n';
@@ -457,8 +457,8 @@ export const useSlashCommandProcessor = (
                     .trim()
                     .split('\n');
                   if (paramsLines) {
-                    for (let i = 0; i < paramsLines.length; i++) {
-                      message += `      ${greenColor}${paramsLines[i]}${resetColor}\n`;
+                    for (const paramsLine of paramsLines) {
+                      message += `      ${greenColor}${paramsLine}${resetColor}\n`;
                     }
                   }
                 }
@@ -561,8 +561,8 @@ export const useSlashCommandProcessor = (
 
                 // If there are multiple lines, add proper indentation for each line
                 if (descLines) {
-                  for (let i = 0; i < descLines.length; i++) {
-                    message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
+                  for (const descLine of descLines) {
+                    message += `      ${greenColor}${descLine}${resetColor}\n`;
                   }
                 }
               } else {
