@@ -754,15 +754,29 @@ export const useSlashCommandProcessor = (
                 // it.
                 chat.addHistory(item);
 
+                // Check if this item contains only text parts
+                const hasOnlyText =
+                  item.parts?.every(
+                    (part) =>
+                      'text' in part &&
+                      !part.functionCall &&
+                      !part.functionResponse,
+                  ) ?? false;
+
+                // Extract text content for display
                 const text =
                   item.parts
                     ?.filter((m) => !!m.text)
                     .map((m) => m.text)
                     .join('') || '';
-                if (!text) {
-                  // Parsing Part[] back to various non-text output not yet implemented.
+
+                // Only display items that have text content and don't contain function calls/responses
+                if (!text || !hasOnlyText) {
+                  // Skip displaying function calls, function responses, and other non-text content
+                  // but keep them in the chat history for proper API interaction
                   continue;
                 }
+
                 if (i === 1 && text.match(/context for our chat/)) {
                   hasSystemPrompt = true;
                 }
@@ -777,6 +791,14 @@ export const useSlashCommandProcessor = (
                   );
                 }
               }
+
+              // Add a message indicating the conversation was loaded
+              addMessage({
+                type: MessageType.INFO,
+                content: `Conversation${tag ? ' with tag "' + tag + '"' : ''} loaded successfully. ${conversation.length} turns restored (including tool interactions).`,
+                timestamp: new Date(),
+              });
+
               console.clear();
               refreshStatic();
               return;
