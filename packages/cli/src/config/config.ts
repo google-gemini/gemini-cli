@@ -298,7 +298,11 @@ function findEnvFile(startDir: string): string | null {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
   if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
+    try {
+      dotenv.config({ path: envFilePath });
+    } catch (_) {
+      logger.warn('Warning: could not parse .env file at', envFilePath);
+    }
   }
 
   // Fallback to settings.json if GOOGLE_CLOUD_PROJECT is not already set
