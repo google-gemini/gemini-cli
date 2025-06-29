@@ -584,7 +584,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           items={[
             <Box flexDirection="column" key="header">
               <Header terminalWidth={terminalWidth} />
-              <Tips config={config} />
+              {!settings.merged.hideTips && <Tips config={config} />}
               {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,
             ...history.map((h) => (
