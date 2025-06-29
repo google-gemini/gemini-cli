@@ -30,6 +30,7 @@ import {
   logCliConfiguration,
   logUserPrompt,
   logToolCall,
+  logModelFallback,
 } from './loggers.js';
 import {
   ApiRequestEvent,
@@ -38,6 +39,7 @@ import {
   ToolCallDecision,
   ToolCallEvent,
   UserPromptEvent,
+  ModelFallbackEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
@@ -641,6 +643,34 @@ describe('loggers', () => {
         false,
         undefined,
       );
+    });
+  });
+
+  describe('logModelFallback', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getTelemetryEnabled: () => true,
+    } as Config;
+
+    beforeEach(() => {
+      mockLogger.emit.mockReset();
+    });
+
+    it('should log a model fallback event', () => {
+      const event = new ModelFallbackEvent('test-reason');
+
+      logModelFallback(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Model fallback because of test-reason.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': 'gemini_cli.model_fallback',
+          reason: 'test-reason',
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+        },
+      });
     });
   });
 });

@@ -14,6 +14,7 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
+  ModelFallbackEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -25,6 +26,7 @@ const tool_call_event_name = 'tool_call';
 const api_request_event_name = 'api_request';
 const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
+const model_fallback_event_name = 'model_fallback';
 const end_session_event_name = 'end_session';
 
 export interface LogResponse {
@@ -371,6 +373,18 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
+    this.flushToClearcut();
+  }
+
+  logModelFallbackEvent(event: ModelFallbackEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_MODEL_FALLBACK_REASON,
+        value: event.reason,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(model_fallback_event_name, data));
     this.flushToClearcut();
   }
 
