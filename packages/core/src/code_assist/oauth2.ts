@@ -41,6 +41,7 @@ const SIGN_IN_FAILURE_URL =
 
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
+const GOOGLE_ACCOUNT_ID_FILENAME = 'google_account_id';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -60,6 +61,21 @@ export async function getOauthClient(): Promise<OAuth2Client> {
 
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
+    // Check if we need to retrieve Google Account ID
+    if (!getCachedGoogleAccountId()) {
+      try {
+        const googleAccountId = await getGoogleAccountId(client);
+        if (googleAccountId) {
+          await cacheGoogleAccountId(googleAccountId);
+        }
+      } catch (error) {
+        console.error(
+          'Failed to retrieve Google Account ID for existing credentials:',
+          error,
+        );
+        // Continue with existing auth flow
+      }
+    }
     return client;
   }
 
@@ -115,6 +131,20 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           });
           client.setCredentials(tokens);
           await cacheCredentials(client.credentials);
+
+          // Retrieve and cache Google Account ID during authentication
+          try {
+            const googleAccountId = await getGoogleAccountId(client);
+            if (googleAccountId) {
+              await cacheGoogleAccountId(googleAccountId);
+            }
+          } catch (error) {
+            console.error(
+              'Failed to retrieve Google Account ID during authentication:',
+              error,
+            );
+            // Don't fail the auth flow if Google Account ID retrieval fails
+          }
 
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
           res.end();
@@ -193,10 +223,76 @@ function getCachedCredentialPath(): string {
   return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
 }
 
+function getGoogleAccountIdCachePath(): string {
+  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNT_ID_FILENAME);
+}
+
+async function cacheGoogleAccountId(googleAccountId: string): Promise<void> {
+  const filePath = getGoogleAccountIdCachePath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, googleAccountId, 'utf-8');
+}
+
+export function getCachedGoogleAccountId(): string | null {
+  try {
+    const filePath = getGoogleAccountIdCachePath();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+    const fs_sync = require('fs');
+    if (fs_sync.existsSync(filePath)) {
+      return fs_sync.readFileSync(filePath, 'utf-8').trim() || null;
+    }
+    return null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(getCachedCredentialPath());
+    await fs.rm(getCachedCredentialPath(), { force: true });
+    // Clear the Google Account ID cache when credentials are cleared
+    await fs.rm(getGoogleAccountIdCachePath(), { force: true });
   } catch (_) {
     /* empty */
+  }
+}
+
+/**
+ * Retrieves the authenticated user's Google Account ID from Google's UserInfo API.
+ * @param client - The authenticated OAuth2Client
+ * @returns The user's Google Account ID or null if not available
+ */
+export async function getGoogleAccountId(
+  client: OAuth2Client,
+): Promise<string | null> {
+  try {
+    const { token } = await client.getAccessToken();
+    if (!token) {
+      return null;
+    }
+
+    const response = await fetch(
+      'https://www.googleapis.com/oauth2/v2/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      console.error(
+        'Failed to fetch user info:',
+        response.status,
+        response.statusText,
+      );
+      return null;
+    }
+
+    const userInfo = await response.json();
+    return userInfo.id || null;
+  } catch (error) {
+    console.error('Error retrieving Google Account ID:', error);
+    return null;
   }
 }

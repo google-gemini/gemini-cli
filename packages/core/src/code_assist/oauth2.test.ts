@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getOauthClient } from './oauth2.js';
+import { getOauthClient, getCachedGoogleAccountId } from './oauth2.js';
 import { OAuth2Client } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -26,6 +26,9 @@ vi.mock('google-auth-library');
 vi.mock('http');
 vi.mock('open');
 vi.mock('crypto');
+
+// Mock fetch globally
+global.fetch = vi.fn();
 
 describe('oauth2', () => {
   let tempHomeDir: string;
@@ -52,16 +55,26 @@ describe('oauth2', () => {
     const mockGenerateAuthUrl = vi.fn().mockReturnValue(mockAuthUrl);
     const mockGetToken = vi.fn().mockResolvedValue({ tokens: mockTokens });
     const mockSetCredentials = vi.fn();
+    const mockGetAccessToken = vi
+      .fn()
+      .mockResolvedValue({ token: 'mock-access-token' });
     const mockOAuth2Client = {
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
       setCredentials: mockSetCredentials,
+      getAccessToken: mockGetAccessToken,
       credentials: mockTokens,
     } as unknown as OAuth2Client;
     vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
     vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
     vi.mocked(open).mockImplementation(async () => ({}) as never);
+
+    // Mock the UserInfo API response
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ id: 'test-google-account-id-123' }),
+    } as unknown as Response);
 
     let requestCallback!: http.RequestListener<
       typeof http.IncomingMessage,
@@ -126,5 +139,18 @@ describe('oauth2', () => {
     const tokenPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
     const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
     expect(tokenData).toEqual(mockTokens);
+
+    // Verify Google Account ID was cached
+    const googleAccountIdPath = path.join(
+      tempHomeDir,
+      '.gemini',
+      'google_account_id',
+    );
+    expect(fs.existsSync(googleAccountIdPath)).toBe(true);
+    const cachedGoogleAccountId = fs.readFileSync(googleAccountIdPath, 'utf-8');
+    expect(cachedGoogleAccountId).toBe('test-google-account-id-123');
+
+    // Verify the getCachedGoogleAccountId function works
+    expect(getCachedGoogleAccountId()).toBe('test-google-account-id-123');
   });
 });

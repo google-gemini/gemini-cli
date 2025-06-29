@@ -12,7 +12,7 @@ import { GEMINI_DIR } from './paths.js';
 
 const homeDir = os.homedir() ?? '';
 const geminiDir = path.join(homeDir, GEMINI_DIR);
-const userIdFile = path.join(geminiDir, 'user_id');
+const installationIdFile = path.join(geminiDir, 'installation_id');
 
 function ensureGeminiDirExists() {
   if (!fs.existsSync(geminiDir)) {
@@ -20,39 +20,62 @@ function ensureGeminiDirExists() {
   }
 }
 
-function readUserIdFromFile(): string | null {
-  if (fs.existsSync(userIdFile)) {
-    const userId = fs.readFileSync(userIdFile, 'utf-8').trim();
-    return userId || null;
+function readInstallationIdFromFile(): string | null {
+  if (fs.existsSync(installationIdFile)) {
+    const installationid = fs.readFileSync(installationIdFile, 'utf-8').trim();
+    return installationid || null;
   }
   return null;
 }
 
-function writeUserIdToFile(userId: string) {
-  fs.writeFileSync(userIdFile, userId, 'utf-8');
+function writeInstallationIdToFile(installationId: string) {
+  fs.writeFileSync(installationIdFile, installationId, 'utf-8');
 }
 
 /**
- * Retrieves the persistent user ID from a file, creating it if it doesn't exist.
- * This ID is used for unique user tracking.
+ * Retrieves the installation ID from a file, creating it if it doesn't exist.
+ * This ID is used for unique user installation tracking.
  * @returns A UUID string for the user.
  */
-export function getPersistentUserId(): string {
+export function getInstallationId(): string {
   try {
     ensureGeminiDirExists();
-    let userId = readUserIdFromFile();
+    let installationId = readInstallationIdFromFile();
 
-    if (!userId) {
-      userId = randomUUID();
-      writeUserIdToFile(userId);
+    if (!installationId) {
+      installationId = randomUUID();
+      writeInstallationIdToFile(installationId);
     }
 
-    return userId;
+    return installationId;
   } catch (error) {
     console.error(
-      'Error accessing persistent user ID file, generating ephemeral ID:',
+      'Error accessing installation ID file, generating ephemeral ID:',
       error,
     );
     return '123456789';
   }
+}
+
+/**
+ * Retrieves the obfuscated Google Account ID for the currently authenticated user.
+ * When OAuth is available, returns the user's cached Google Account ID. Otherwise, returns the installation ID.
+ * @returns A string ID for the user (Google Account ID if available, otherwise installation ID).
+ */
+export function getObfuscatedGoogleAccountId(): string {
+  // Try to get cached Google Account ID first
+  try {
+    // Dynamically import to avoid circular dependencies
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+    const { getCachedGoogleAccountId } = require('../code_assist/oauth2.js');
+    const googleAccountId = getCachedGoogleAccountId();
+    if (googleAccountId) {
+      return googleAccountId;
+    }
+  } catch (_error) {
+    // If there's any error accessing Google Account ID, fall back to installation ID
+  }
+
+  // Fall back to installation ID when no Google Account ID is cached or on error
+  return getInstallationId();
 }
