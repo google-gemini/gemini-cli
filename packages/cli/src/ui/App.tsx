@@ -353,7 +353,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
+    if (
+      input === 'o' &&
+      !key.ctrl &&
+      streamingState === StreamingState.CircuitBreakerOpen
+    ) {
+      // Manual circuit breaker override
+      handleCircuitBreakerOverride?.();
+    } else if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
     } else if (key.ctrl && input === 't') {
       const newValue = !showToolDescriptions;
@@ -408,6 +415,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    handleCircuitBreakerOverride,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,

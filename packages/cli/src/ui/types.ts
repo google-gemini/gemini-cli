@@ -14,6 +14,8 @@ export enum StreamingState {
   Idle = 'idle',
   Responding = 'responding',
   WaitingForConfirmation = 'waiting_for_confirmation',
+  CircuitBreakerOpen = 'circuit_breaker_open',
+  CircuitBreakerHalfOpen = 'circuit_breaker_half_open',
 }
 
 // Copied from server/src/core/turn.ts for CLI usage

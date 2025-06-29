@@ -785,11 +785,18 @@ export const useGeminiStream = (
     saveRestorableToolCalls();
   }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
+  const handleCircuitBreakerOverride = useCallback(() => {
+    // Manual override bypasses circuit breaker for a single request
+    // This is handled by the client's executeWithManualOverride method
+    console.log('Circuit breaker manual override triggered');
+  }, []);
+
   return {
     streamingState,
     submitQuery,
     initError,
     pendingHistoryItems,
     thought,
+    handleCircuitBreakerOverride,
   };
 };

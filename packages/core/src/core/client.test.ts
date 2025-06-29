@@ -129,6 +129,14 @@ describe('Gemini Client (client.ts)', () => {
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
+        getCircuitBreakerConfig: vi.fn().mockReturnValue({
+          enabled: true,
+          failureThreshold: 3,
+          recoveryTimeoutMs: 60000,
+          maxRecoveryTimeoutMs: 480000,
+          halfOpenMaxCalls: 3,
+          allowManualOverride: true,
+        }),
       };
       return mock as unknown as Config;
     });

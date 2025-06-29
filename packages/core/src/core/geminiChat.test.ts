@@ -44,6 +44,14 @@ describe('GeminiChat', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       setModel: vi.fn(),
       flashFallbackHandler: undefined,
+      getCircuitBreakerConfig: vi.fn().mockReturnValue({
+        enabled: true,
+        failureThreshold: 3,
+        recoveryTimeoutMs: 60000,
+        maxRecoveryTimeoutMs: 480000,
+        halfOpenMaxCalls: 3,
+        allowManualOverride: true,
+      }),
     } as unknown as Config;
 
     // Disable 429 simulation for tests

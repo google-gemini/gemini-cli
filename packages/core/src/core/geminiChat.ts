@@ -16,7 +16,7 @@ import {
   Part,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, CircuitBreaker } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -172,6 +172,14 @@ export class GeminiChat {
     );
   }
 
+  private getCircuitBreakerFromConfig(): CircuitBreaker | undefined {
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    if (!authType) return undefined;
+
+    const circuitBreakerConfig = this.config.getCircuitBreakerConfig();
+    return new CircuitBreaker(authType, circuitBreakerConfig);
+  }
+
   private _logApiError(durationMs: number, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
@@ -262,6 +270,8 @@ export class GeminiChat {
           config: { ...this.generationConfig, ...params.config },
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           if (error && error.message) {
@@ -272,7 +282,8 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getCircuitBreakerFromConfig(),
       });
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
@@ -358,6 +369,8 @@ export class GeminiChat {
       // for transient issues internally before yielding the async generator, this retry will re-initiate
       // the stream. For simple 429/500 errors on initial call, this is fine.
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check error messages for status codes, or specific error names if known
@@ -369,7 +382,8 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getCircuitBreakerFromConfig(),
       });
 
       // Resolve the internal tracking of send completion promise - `sendPromise`

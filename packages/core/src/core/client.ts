@@ -28,7 +28,7 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, CircuitBreaker } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
@@ -48,6 +48,7 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -62,6 +63,40 @@ export class GeminiClient {
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+  }
+
+  private getOrCreateCircuitBreaker(authType: string): CircuitBreaker {
+    if (!this.circuitBreakers.has(authType)) {
+      const circuitBreaker = new CircuitBreaker(
+        authType,
+        this.config.getCircuitBreakerConfig(),
+      );
+
+      // Set up state change callbacks
+      circuitBreaker.onStateChange((state, auth) => {
+        console.log(`Circuit breaker for ${auth} changed to ${state}`);
+      });
+
+      this.circuitBreakers.set(authType, circuitBreaker);
+    }
+    return this.circuitBreakers.get(authType)!;
+  }
+
+  executeWithManualOverride<T>(
+    fn: () => Promise<T>,
+    authType?: string,
+  ): Promise<T> {
+    const effectiveAuthType =
+      authType ||
+      this.config.getContentGeneratorConfig()?.authType ||
+      'unknown';
+    return retryWithBackoff(fn, {
+      onPersistent429: async (authType?: string) =>
+        await this.handleFlashFallback(authType),
+      authType: effectiveAuthType,
+      circuitBreaker: this.getOrCreateCircuitBreaker(effectiveAuthType),
+      isManualOverride: true,
+    });
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -280,10 +315,13 @@ export class GeminiClient {
           contents,
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getOrCreateCircuitBreaker(authType),
       });
 
       const text = getResponseText(result);
@@ -368,10 +406,13 @@ export class GeminiClient {
           contents,
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getOrCreateCircuitBreaker(authType),
       });
       return result;
     } catch (error: unknown) {

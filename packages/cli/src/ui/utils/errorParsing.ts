@@ -60,6 +60,24 @@ export function parseAndFormatApiError(
   error: unknown,
   authType?: AuthType,
 ): string {
+  // Handle CircuitBreakerOpenError specially
+  if (
+    error &&
+    typeof error === 'object' &&
+    'name' in error &&
+    error.name === 'CircuitBreakerOpenError'
+  ) {
+    const cbError = error as unknown as {
+      authType: string;
+      recoveryTimeMs: number;
+      allowOverride: boolean;
+    };
+    const overrideText = cbError.allowOverride
+      ? " Press 'o' to override (risky)."
+      : '';
+    return `[Circuit Breaker Active] Rate limiting protection is active for ${cbError.authType}. Service will be retested in ${Math.ceil(cbError.recoveryTimeMs / 1000)} seconds.${overrideText}`;
+  }
+
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
