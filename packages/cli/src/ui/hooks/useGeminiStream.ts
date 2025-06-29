@@ -96,6 +96,12 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [circuitBreakerError, setCircuitBreakerError] = useState<{
+    authType: string;
+    recoveryTimeMs: number;
+    allowOverride: boolean;
+  } | null>(null);
+  const [useManualOverrideNext, setUseManualOverrideNext] = useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
@@ -152,6 +158,9 @@ export const useGeminiStream = (
   );
 
   const streamingState = useMemo(() => {
+    if (circuitBreakerError) {
+      return StreamingState.CircuitBreakerOpen;
+    }
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
       return StreamingState.WaitingForConfirmation;
     }
@@ -172,7 +181,7 @@ export const useGeminiStream = (
       return StreamingState.Responding;
     }
     return StreamingState.Idle;
-  }, [isResponding, toolCalls]);
+  }, [isResponding, toolCalls, circuitBreakerError]);
 
   useInput((_input, key) => {
     if (streamingState === StreamingState.Responding && key.escape) {
@@ -514,7 +523,11 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal);
+        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal, undefined, useManualOverrideNext);
+        // Reset manual override flag after use
+        if (useManualOverrideNext) {
+          setUseManualOverrideNext(false);
+        }
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -532,6 +545,30 @@ export const useGeminiStream = (
       } catch (error: unknown) {
         if (error instanceof UnauthorizedError) {
           onAuthError();
+        } else if (
+          error &&
+          typeof error === 'object' &&
+          'name' in error &&
+          error.name === 'CircuitBreakerOpenError' &&
+          'authType' in error &&
+          'recoveryTimeMs' in error &&
+          'allowOverride' in error
+        ) {
+          // Handle circuit breaker error specially
+          const cbError = error as {
+            authType: string;
+            recoveryTimeMs: number;
+            allowOverride: boolean;
+          };
+          setCircuitBreakerError(cbError);
+          
+          addItem(
+            {
+              type: MessageType.ERROR,
+              text: parseAndFormatApiError(error, config.getContentGeneratorConfig().authType),
+            },
+            userMessageTimestamp,
+          );
         } else if (!isNodeError(error) || error.name !== 'AbortError') {
           addItem(
             {
@@ -560,6 +597,7 @@ export const useGeminiStream = (
       geminiClient,
       onAuthError,
       config,
+      useManualOverrideNext,
     ],
   );
 
@@ -787,10 +825,13 @@ export const useGeminiStream = (
 
   const handleCircuitBreakerOverride = useCallback(() => {
     // Manual override bypasses circuit breaker for the next request
-    // For now, this is a stub - the actual implementation needs circuit breaker error detection
-    console.log('Circuit breaker manual override activated');
-    // TODO: Implement proper circuit breaker state detection and override
-  }, []);
+    if (circuitBreakerError && circuitBreakerError.allowOverride) {
+      console.log('Circuit breaker manual override activated - next request will bypass circuit breaker');
+      // Clear the circuit breaker error state and set manual override flag
+      setCircuitBreakerError(null);
+      setUseManualOverrideNext(true);
+    }
+  }, [circuitBreakerError]);
 
   return {
     streamingState,
@@ -799,5 +840,6 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     handleCircuitBreakerOverride,
+    circuitBreakerError,
   };
 };

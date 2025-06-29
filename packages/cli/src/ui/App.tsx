@@ -416,6 +416,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     handleCircuitBreakerOverride,
+    circuitBreakerError,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -719,6 +720,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     : currentLoadingPhrase
                 }
                 elapsedTime={elapsedTime}
+                circuitBreakerRecoveryTime={circuitBreakerError?.recoveryTimeMs}
+                circuitBreakerAuthType={circuitBreakerError?.authType}
+                circuitBreakerAllowOverride={circuitBreakerError?.allowOverride}
               />
               <Box
                 marginTop={1}

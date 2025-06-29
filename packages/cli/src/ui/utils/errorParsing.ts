@@ -65,9 +65,12 @@ export function parseAndFormatApiError(
     error &&
     typeof error === 'object' &&
     'name' in error &&
-    error.name === 'CircuitBreakerOpenError'
+    error.name === 'CircuitBreakerOpenError' &&
+    'authType' in error &&
+    'recoveryTimeMs' in error &&
+    'allowOverride' in error
   ) {
-    const cbError = error as unknown as {
+    const cbError = error as {
       authType: string;
       recoveryTimeMs: number;
       allowOverride: boolean;
