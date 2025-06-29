@@ -57,7 +57,7 @@ export class MemoryMonitor {
     // Set up periodic monitoring
     this.intervalId = setInterval(() => {
       this.takeSnapshot('periodic');
-    }, this.monitoringInterval);
+    }, this.monitoringInterval).unref();
   }
 
   /**
