@@ -108,6 +108,7 @@ export interface ConfigParameters {
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
+  disablePromptBell?: boolean;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
@@ -129,6 +130,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  projectRoot?: string;
 }
 
 export class Config {
@@ -145,6 +147,7 @@ export class Config {
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
+  private readonly disablePromptBell: boolean | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
@@ -183,6 +186,7 @@ export class Config {
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
+    this.disablePromptBell = params.disablePromptBell;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.userMemory = params.userMemory ?? '';
@@ -335,6 +339,10 @@ export class Config {
 
   getToolCallCommand(): string | undefined {
     return this.toolCallCommand;
+  }
+
+  getDisablePromptBell(): boolean | undefined {
+    return this.disablePromptBell;
   }
 
   getMcpServerCommand(): string | undefined {

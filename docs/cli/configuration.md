@@ -102,6 +102,10 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** Empty
   - **Example:** `"toolCallCommand": "bin/call_tool"`
 
+- **`disablePromptBell`** (boolean, optional):
+  - **Description:** If set to `true`, the bell sound that plays when the model is ready for input will be disabled.
+  - **Default:** `false`
+
 - **`mcpServers`** (object):
   - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility.
   - **Default:** Empty

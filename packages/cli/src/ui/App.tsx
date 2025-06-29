@@ -477,6 +477,20 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 
+  const prevStreamingState = useRef<StreamingState>(streamingState);
+
+  useEffect(() => {
+    const wasStreaming =
+      prevStreamingState.current === StreamingState.Responding;
+    const isNowIdle = streamingState === StreamingState.Idle;
+
+    if (wasStreaming && isNowIdle && !config.getDisablePromptBell()) {
+      process.stdout.write('\x07');
+    }
+
+    prevStreamingState.current = streamingState;
+  }, [streamingState, config]);
+
   const handleClearScreen = useCallback(() => {
     clearItems();
     clearConsoleMessagesState();

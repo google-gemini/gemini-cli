@@ -17,6 +17,8 @@ import {
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
+import { StreamingState } from './types.js';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -30,6 +32,7 @@ interface MockServerConfig {
   coreTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
+  disablePromptBell?: boolean;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>; // Use imported MCPServerConfig
   userAgent: string;
@@ -52,6 +55,7 @@ interface MockServerConfig {
   getCoreTools: Mock<() => string[] | undefined>;
   getToolDiscoveryCommand: Mock<() => string | undefined>;
   getToolCallCommand: Mock<() => string | undefined>;
+  getDisablePromptBell: Mock<() => boolean | undefined>;
   getMcpServerCommand: Mock<() => string | undefined>;
   getMcpServers: Mock<() => Record<string, MCPServerConfig> | undefined>;
   getUserAgent: Mock<() => string>;
@@ -88,6 +92,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         coreTools: opts.coreTools,
         toolDiscoveryCommand: opts.toolDiscoveryCommand,
         toolCallCommand: opts.toolCallCommand,
+        disablePromptBell: opts.disablePromptBell,
         mcpServerCommand: opts.mcpServerCommand,
         mcpServers: opts.mcpServers,
         userAgent: opts.userAgent || 'test-agent',
@@ -110,6 +115,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getCoreTools: vi.fn(() => opts.coreTools),
         getToolDiscoveryCommand: vi.fn(() => opts.toolDiscoveryCommand),
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
+        getDisablePromptBell: vi.fn(() => opts.disablePromptBell),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),
@@ -138,12 +144,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 // Mock heavy dependencies or those with side effects
+const useGeminiStreamMock = vi.mocked(useGeminiStream);
 vi.mock('./hooks/useGeminiStream', () => ({
   useGeminiStream: vi.fn(() => ({
     streamingState: 'Idle',
     submitQuery: vi.fn(),
     initError: null,
     pendingHistoryItems: [],
+    thought: null,
   })),
 }));
 
@@ -207,6 +215,7 @@ describe('App UI', () => {
       sessionId: 'test-session-id',
       cwd: '/tmp',
       model: 'model',
+      projectRoot: '/test/project/root',
     }) as unknown as MockServerConfig;
 
     // Ensure the getShowMemoryUsage mock function is specifically set up if not covered by constructor mock
@@ -423,6 +432,89 @@ describe('App UI', () => {
         'Theme configuration unavailable due to NO_COLOR env variable.',
       );
       expect(lastFrame()).not.toContain('Select Theme');
+    });
+  });
+
+  describe('prompt bell', () => {
+    let stdoutSpy: Mock<typeof process.stdout.write>;
+
+    beforeEach(() => {
+      stdoutSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true) as Mock<typeof process.stdout.write>;
+    });
+
+    afterEach(() => {
+      stdoutSpy.mockRestore();
+    });
+
+    it('should ring the bell when transitioning from Responding to Idle', () => {
+      useGeminiStreamMock.mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      const { rerender } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+        />,
+      );
+
+      useGeminiStreamMock.mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      rerender(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+        />,
+      );
+
+      expect(stdoutSpy).toHaveBeenCalledWith('\x07');
+    });
+
+    it('should not ring the bell when disablePromptBell is true', () => {
+      mockConfig.getDisablePromptBell.mockReturnValue(true);
+      useGeminiStreamMock.mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      const { rerender } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+        />,
+      );
+
+      useGeminiStreamMock.mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      rerender(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\x07');
     });
   });
 });
