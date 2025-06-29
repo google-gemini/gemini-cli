@@ -99,10 +99,23 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
-    return {
+    const deepSettings = {
+      ...((this.user.settings.mcpServers ||
+        this.workspace.settings.mcpServers) && {
+        mcpServers: {
+          ...this.user.settings.mcpServers,
+          ...this.workspace.settings.mcpServers,
+        },
+      }),
+    };
+
+    const merged = {
       ...this.user.settings,
       ...this.workspace.settings,
+      ...deepSettings,
     };
+
+    return merged;
   }
 
   forScope(scope: SettingScope): SettingsFile {
