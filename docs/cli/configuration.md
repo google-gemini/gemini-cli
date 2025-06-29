@@ -113,6 +113,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - `cwd` (string, optional): The working directory in which to start the server.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+      - `oauth` (boolean, optional): When `true`, all requests to this server will include an OAuth 2.0 token in the `Authorization` header (default: `false`).
   - **Example:**
     ```json
     "mcpServers": {

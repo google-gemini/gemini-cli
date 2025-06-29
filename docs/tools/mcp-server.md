@@ -91,6 +91,7 @@ Each server configuration supports the following properties:
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
+- **`oauth`** (boolean): When `true`, all requests to this server will include an OAuth 2.0 token in the `Authorization` header (default: `false`)
 
 ### Example Configurations
 
