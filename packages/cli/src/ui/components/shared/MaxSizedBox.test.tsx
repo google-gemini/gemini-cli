@@ -247,6 +247,20 @@ Line 3`);
 🐶🐶
 🐶`);
   });
+  it('falls back to an ellipsis when width is extremely small', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={2} maxHeight={2}>
+          <Box>
+            <Text>No</Text>
+            <Text wrap="wrap">wrap</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals('N…');
+  });
 
   it('accounts for additionalHiddenLinesCount', () => {
     const { lastFrame } = render(

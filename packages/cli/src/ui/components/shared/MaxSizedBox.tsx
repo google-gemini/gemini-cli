@@ -8,8 +8,9 @@ import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
 import { Colors } from '../../colors.js';
-import { toCodePoints } from '../../utils/textUtils.js';
+import { toCodePoints, cpSlice } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+
 
 let enableDebugLog = false;
 
@@ -430,7 +431,26 @@ function layoutInkElementAsStyledText(
 
   if (availableWidth < 1) {
     // No room to render the wrapping segments. TODO(jacob314): consider an alternative fallback strategy.
-    output.push(nonWrappingContent);
+    // No room to render the wrapping segments. Truncate the non-wrapping
+    // content and append an ellipsis so the line always fits within maxWidth.
+    const truncatedLine: StyledText[] = [];
+    let remainingWidth = Math.max(0, maxWidth - stringWidth('…'));
+    for (const segment of nonWrappingContent) {
+      if (remainingWidth <= 0) break;
+      const segmentWidth = stringWidth(segment.text);
+      if (segmentWidth <= remainingWidth) {
+        truncatedLine.push(segment);
+        remainingWidth -= segmentWidth;
+      } else {
+        const slice = cpSlice(segment.text, 0, remainingWidth);
+        if (slice) {
+          truncatedLine.push({ text: slice, props: segment.props });
+        }
+        remainingWidth = 0;
+      }
+    }
+    truncatedLine.push({ text: '…', props: {} });
+    output.push(truncatedLine);
     return;
   }
 
