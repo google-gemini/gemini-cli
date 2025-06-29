@@ -7,10 +7,10 @@
 import v8 from 'node:v8';
 import process from 'node:process';
 import { Config } from '../config/config.js';
-import { 
-  recordMemoryUsage, 
+import {
+  recordMemoryUsage,
   MemoryMetricType,
-  isPerformanceMonitoringActive 
+  isPerformanceMonitoringActive,
 } from './metrics.js';
 
 export interface MemorySnapshot {
@@ -98,9 +98,24 @@ export class MemoryMonitor {
 
     // Record memory metrics if monitoring is active
     if (isPerformanceMonitoringActive()) {
-      recordMemoryUsage(config, MemoryMetricType.HEAP_USED, snapshot.heapUsed, context);
-      recordMemoryUsage(config, MemoryMetricType.HEAP_TOTAL, snapshot.heapTotal, context);
-      recordMemoryUsage(config, MemoryMetricType.EXTERNAL, snapshot.external, context);
+      recordMemoryUsage(
+        config,
+        MemoryMetricType.HEAP_USED,
+        snapshot.heapUsed,
+        context,
+      );
+      recordMemoryUsage(
+        config,
+        MemoryMetricType.HEAP_TOTAL,
+        snapshot.heapTotal,
+        context,
+      );
+      recordMemoryUsage(
+        config,
+        MemoryMetricType.EXTERNAL,
+        snapshot.external,
+        context,
+      );
       recordMemoryUsage(config, MemoryMetricType.RSS, snapshot.rss, context);
     }
 
@@ -172,8 +187,15 @@ export class MemoryMonitor {
   /**
    * Record memory usage for a specific component or operation
    */
-  recordComponentMemoryUsage(config: Config, component: string, operation?: string): MemorySnapshot {
-    const snapshot = this.takeSnapshot(operation ? `${component}_${operation}` : component, config);
+  recordComponentMemoryUsage(
+    config: Config,
+    component: string,
+    operation?: string,
+  ): MemorySnapshot {
+    const snapshot = this.takeSnapshot(
+      operation ? `${component}_${operation}` : component,
+      config,
+    );
     return snapshot;
   }
 
@@ -181,7 +203,9 @@ export class MemoryMonitor {
    * Force garbage collection and measure memory before/after
    * Only works if --expose-gc flag is used
    */
-  measureGarbageCollection(config: Config): { before: MemorySnapshot; after: MemorySnapshot } | null {
+  measureGarbageCollection(
+    config: Config,
+  ): { before: MemorySnapshot; after: MemorySnapshot } | null {
     if (!global.gc) {
       return null;
     }
@@ -192,7 +216,12 @@ export class MemoryMonitor {
 
     if (isPerformanceMonitoringActive()) {
       const memoryFreed = before.heapUsed - after.heapUsed;
-      recordMemoryUsage(config, MemoryMetricType.HEAP_USED, memoryFreed, 'gc_freed');
+      recordMemoryUsage(
+        config,
+        MemoryMetricType.HEAP_USED,
+        memoryFreed,
+        'gc_freed',
+      );
     }
 
     return { before, after };
@@ -219,11 +248,12 @@ export class MemoryMonitor {
   } {
     const current = this.getCurrentMemoryUsage();
     return {
-      heapUsedMB: Math.round(current.heapUsed / (1024 * 1024) * 100) / 100,
-      heapTotalMB: Math.round(current.heapTotal / (1024 * 1024) * 100) / 100,
-      externalMB: Math.round(current.external / (1024 * 1024) * 100) / 100,
-      rssMB: Math.round(current.rss / (1024 * 1024) * 100) / 100,
-      heapSizeLimitMB: Math.round(current.heapSizeLimit / (1024 * 1024) * 100) / 100,
+      heapUsedMB: Math.round((current.heapUsed / (1024 * 1024)) * 100) / 100,
+      heapTotalMB: Math.round((current.heapTotal / (1024 * 1024)) * 100) / 100,
+      externalMB: Math.round((current.external / (1024 * 1024)) * 100) / 100,
+      rssMB: Math.round((current.rss / (1024 * 1024)) * 100) / 100,
+      heapSizeLimitMB:
+        Math.round((current.heapSizeLimit / (1024 * 1024)) * 100) / 100,
     };
   }
 
@@ -258,7 +288,10 @@ export function getMemoryMonitor(): MemoryMonitor | null {
 /**
  * Record memory usage for current operation
  */
-export function recordCurrentMemoryUsage(config: Config, context: string): MemorySnapshot {
+export function recordCurrentMemoryUsage(
+  config: Config,
+  context: string,
+): MemorySnapshot {
   const monitor = initializeMemoryMonitor();
   return monitor.takeSnapshot(context, config);
 }
@@ -266,7 +299,10 @@ export function recordCurrentMemoryUsage(config: Config, context: string): Memor
 /**
  * Start global memory monitoring
  */
-export function startGlobalMemoryMonitoring(config: Config, intervalMs: number = 5000): void {
+export function startGlobalMemoryMonitoring(
+  config: Config,
+  intervalMs: number = 5000,
+): void {
   const monitor = initializeMemoryMonitor();
   monitor.start(config, intervalMs);
 }
