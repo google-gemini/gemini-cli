@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// ADDED FOR DEBUGGING
+import fs from 'fs';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -158,6 +160,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // ADDED FOR DEBUGGING
+      fs.appendFileSync(
+        'debug.log',
+        `[KEYPRESS] ${JSON.stringify(key, null, 2)}\n---\n`,
+      );
+
       if (!focus) {
         return;
       }
@@ -282,19 +290,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (
-        process.env['TEXTBUFFER_DEBUG'] === '1' ||
-        process.env['TEXTBUFFER_DEBUG'] === 'true'
-      ) {
-        console.log('[InputPromptCombined] event', { key });
-      }
-
       // Ctrl+Enter for newline, Enter for submit
       if (key.name === 'return') {
         const [row, col] = buffer.cursor;
         const line = buffer.lines[row];
         const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-        if (key.ctrl || key.meta || charBefore === '\\' || key.paste) {
+        if (key.ctrl || key.meta || key.shift || charBefore === '\\' || key.paste) {
           // Ctrl+Enter or escaped newline
           if (charBefore === '\\') {
             buffer.backspace();

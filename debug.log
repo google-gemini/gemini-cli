@@ -1,0 +1,1775 @@
+[KEYPRESS] {
+  "sequence": "\r",
+  "name": "return",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "a",
+  "name": "a",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\r",
+  "name": "return",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "h",
+  "name": "h",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "e",
+  "name": "e",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "o",
+  "name": "o",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u001b[B",
+  "name": "down",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "code": "[B",
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "h",
+  "name": "h",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "e",
+  "name": "e",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "o",
+  "name": "o",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\r",
+  "name": "return",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "h",
+  "name": "h",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "e",
+  "name": "e",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "o",
+  "name": "o",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\\",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "x",
+  "name": "x",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "b",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "B",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": true,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\\",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "x",
+  "name": "x",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "b",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "B",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": true,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\\",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "x",
+  "name": "x",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "b",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "B",
+  "name": "b",
+  "ctrl": false,
+  "meta": false,
+  "shift": true,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "s",
+  "name": "s",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "f",
+  "name": "f",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "g",
+  "name": "g",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "s",
+  "name": "s",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "d",
+  "name": "d",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "s",
+  "name": "s",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "d",
+  "name": "d",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "f",
+  "name": "f",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "s",
+  "name": "s",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "f",
+  "name": "f",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "^",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "[",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "1",
+  "name": "1",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "3",
+  "name": "3",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": ";",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "2",
+  "name": "2",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "u",
+  "name": "u",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\r",
+  "name": "return",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "h",
+  "name": "h",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "e",
+  "name": "e",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "l",
+  "name": "l",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "o",
+  "name": "o",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\n",
+  "name": "enter",
+  "ctrl": false,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---
+[KEYPRESS] {
+  "sequence": "\u0003",
+  "name": "c",
+  "ctrl": true,
+  "meta": false,
+  "shift": false,
+  "paste": false
+}
+---

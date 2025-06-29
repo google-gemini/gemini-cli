@@ -53,6 +53,15 @@ export function useKeypress(
     let pasteBuffer = Buffer.alloc(0);
 
     const handleKeypress = (_: unknown, key: Key) => {
+      // NEW: Explicitly check for a common Shift+Enter escape sequence.
+      // The sequence for Shift+Enter can vary, but this is a frequent one.
+      if (key.sequence === '\x1b[13;2u') {
+        // We caught it! Now, we manually fix the `key` object
+        // to what the rest of the app expects for a newline.
+        key.name = 'return';
+        key.shift = true;
+      }
+
       if (key.name === 'paste-start') {
         isPaste = true;
       } else if (key.name === 'paste-end') {
