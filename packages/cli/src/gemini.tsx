@@ -338,8 +338,9 @@ export async function main() {
     const gitServiceStart = performance.now();
     try {
       await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
+    } catch (err) {
+      // Log a warning if the git service fails to initialize, so the user knows checkpointing may not work.
+      console.warn(`Warning: Could not initialize git service. Checkpointing may not be available. Error: ${err instanceof Error ? err.message : String(err)}`);
     }
     const gitServiceEnd = performance.now();
     gitServiceDuration = gitServiceEnd - gitServiceStart;
