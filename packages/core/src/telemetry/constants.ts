@@ -47,12 +47,14 @@ export const METRIC_MEMORY_EXTERNAL = 'gemini_cli.memory.external';
 export const METRIC_MEMORY_RSS = 'gemini_cli.memory.rss';
 export const METRIC_CPU_USAGE = 'gemini_cli.cpu.usage';
 export const METRIC_TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
-export const METRIC_TOOL_EXECUTION_BREAKDOWN = 'gemini_cli.tool.execution.breakdown';
+export const METRIC_TOOL_EXECUTION_BREAKDOWN =
+  'gemini_cli.tool.execution.breakdown';
 export const METRIC_TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
 export const METRIC_API_REQUEST_BREAKDOWN = 'gemini_cli.api.request.breakdown';
 export const METRIC_PERFORMANCE_SCORE = 'gemini_cli.performance.score';
 export const METRIC_REGRESSION_DETECTION = 'gemini_cli.performance.regression';
-export const METRIC_BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
+export const METRIC_BASELINE_COMPARISON =
+  'gemini_cli.performance.baseline.comparison';
 
 // Performance Events
 export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';

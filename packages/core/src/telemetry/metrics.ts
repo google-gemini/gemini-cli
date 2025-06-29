@@ -45,7 +45,7 @@ export enum FileOperation {
 
 export enum PerformanceMetricType {
   STARTUP = 'startup',
-  MEMORY = 'memory', 
+  MEMORY = 'memory',
   CPU = 'cpu',
   TOOL_EXECUTION = 'tool_execution',
   API_REQUEST = 'api_request',
@@ -87,17 +87,17 @@ let contentRetryFailureCounter: Counter | undefined;
 
 // Performance Monitoring Metrics
 let startupTimeHistogram: Histogram | undefined;
-let memoryUsageGauge: any | undefined; // ObservableGauge when available
-let memoryHeapUsedGauge: any | undefined;
-let memoryHeapTotalGauge: any | undefined;
-let memoryExternalGauge: any | undefined;
-let memoryRssGauge: any | undefined;
-let cpuUsageGauge: any | undefined;
-let toolQueueDepthGauge: any | undefined;
+let memoryUsageGauge: Histogram | undefined; // Using Histogram until ObservableGauge is available
+let memoryHeapUsedGauge: Histogram | undefined;
+let memoryHeapTotalGauge: Histogram | undefined;
+let memoryExternalGauge: Histogram | undefined;
+let memoryRssGauge: Histogram | undefined;
+let cpuUsageGauge: Histogram | undefined;
+let toolQueueDepthGauge: Histogram | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
 let tokenEfficiencyHistogram: Histogram | undefined;
 let apiRequestBreakdownHistogram: Histogram | undefined;
-let performanceScoreGauge: any | undefined;
+let performanceScoreGauge: Histogram | undefined;
 let regressionDetectionCounter: Counter | undefined;
 let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
@@ -182,7 +182,7 @@ export function initializeMetrics(config: Config): void {
 
   // Initialize performance monitoring metrics if enabled
   initializePerformanceMonitoring(config);
-  
+
   isMetricsInitialized = true;
 }
 
@@ -350,7 +350,8 @@ export function initializePerformanceMonitoring(config: Config): void {
 
   // Initialize startup time histogram
   startupTimeHistogram = meter.createHistogram(METRIC_STARTUP_TIME, {
-    description: 'CLI startup time in milliseconds, broken down by initialization phase.',
+    description:
+      'CLI startup time in milliseconds, broken down by initialization phase.',
     unit: 'ms',
     valueType: ValueType.DOUBLE,
   });
@@ -364,7 +365,7 @@ export function initializePerformanceMonitoring(config: Config): void {
 
   memoryHeapUsedGauge = meter.createHistogram(METRIC_MEMORY_HEAP_USED, {
     description: 'Heap memory used in bytes.',
-    unit: 'bytes', 
+    unit: 'bytes',
     valueType: ValueType.INT,
   });
 
@@ -400,22 +401,29 @@ export function initializePerformanceMonitoring(config: Config): void {
   });
 
   // Initialize performance breakdowns
-  toolExecutionBreakdownHistogram = meter.createHistogram(METRIC_TOOL_EXECUTION_BREAKDOWN, {
-    description: 'Tool execution time breakdown by phase in milliseconds.',
-    unit: 'ms',
-    valueType: ValueType.INT,
-  });
+  toolExecutionBreakdownHistogram = meter.createHistogram(
+    METRIC_TOOL_EXECUTION_BREAKDOWN,
+    {
+      description: 'Tool execution time breakdown by phase in milliseconds.',
+      unit: 'ms',
+      valueType: ValueType.INT,
+    },
+  );
 
   tokenEfficiencyHistogram = meter.createHistogram(METRIC_TOKEN_EFFICIENCY, {
-    description: 'Token efficiency metrics (tokens per operation, cache hit rate, etc.).',
+    description:
+      'Token efficiency metrics (tokens per operation, cache hit rate, etc.).',
     valueType: ValueType.DOUBLE,
   });
 
-  apiRequestBreakdownHistogram = meter.createHistogram(METRIC_API_REQUEST_BREAKDOWN, {
-    description: 'API request time breakdown by phase in milliseconds.',
-    unit: 'ms',
-    valueType: ValueType.INT,
-  });
+  apiRequestBreakdownHistogram = meter.createHistogram(
+    METRIC_API_REQUEST_BREAKDOWN,
+    {
+      description: 'API request time breakdown by phase in milliseconds.',
+      unit: 'ms',
+      valueType: ValueType.INT,
+    },
+  );
 
   // Initialize performance score and regression detection
   performanceScoreGauge = meter.createHistogram(METRIC_PERFORMANCE_SCORE, {
@@ -424,32 +432,39 @@ export function initializePerformanceMonitoring(config: Config): void {
     valueType: ValueType.DOUBLE,
   });
 
-  regressionDetectionCounter = meter.createCounter(METRIC_REGRESSION_DETECTION, {
-    description: 'Performance regression detection events.',
-    valueType: ValueType.INT,
-  });
+  regressionDetectionCounter = meter.createCounter(
+    METRIC_REGRESSION_DETECTION,
+    {
+      description: 'Performance regression detection events.',
+      valueType: ValueType.INT,
+    },
+  );
 
-  baselineComparisonHistogram = meter.createHistogram(METRIC_BASELINE_COMPARISON, {
-    description: 'Performance comparison to established baseline (percentage change).',
-    unit: 'percent',
-    valueType: ValueType.DOUBLE,
-  });
+  baselineComparisonHistogram = meter.createHistogram(
+    METRIC_BASELINE_COMPARISON,
+    {
+      description:
+        'Performance comparison to established baseline (percentage change).',
+      unit: 'percent',
+      valueType: ValueType.DOUBLE,
+    },
+  );
 }
 
 export function recordStartupPerformance(
   config: Config,
   phase: string,
   durationMs: number,
-  details?: Record<string, any>,
+  details?: Record<string, string | number | boolean>,
 ): void {
   if (!startupTimeHistogram || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     phase,
     ...details,
   };
-  
+
   startupTimeHistogram.record(durationMs, attributes);
 }
 
@@ -460,13 +475,13 @@ export function recordMemoryUsage(
   component?: string,
 ): void {
   if (!isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     memory_type: memoryType,
     component,
   };
-  
+
   switch (memoryType) {
     case MemoryMetricType.HEAP_USED:
       memoryHeapUsedGauge?.record(bytes, attributes);
@@ -491,25 +506,22 @@ export function recordCpuUsage(
   component?: string,
 ): void {
   if (!cpuUsageGauge || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     component,
   };
-  
+
   cpuUsageGauge.record(percentage, attributes);
 }
 
-export function recordToolQueueDepth(
-  config: Config,
-  queueDepth: number,
-): void {
+export function recordToolQueueDepth(config: Config, queueDepth: number): void {
   if (!toolQueueDepthGauge || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
   };
-  
+
   toolQueueDepthGauge.record(queueDepth, attributes);
 }
 
@@ -519,14 +531,15 @@ export function recordToolExecutionBreakdown(
   phase: ToolExecutionPhase,
   durationMs: number,
 ): void {
-  if (!toolExecutionBreakdownHistogram || !isPerformanceMonitoringEnabled) return;
-  
+  if (!toolExecutionBreakdownHistogram || !isPerformanceMonitoringEnabled)
+    return;
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     function_name: functionName,
     phase,
   };
-  
+
   toolExecutionBreakdownHistogram.record(durationMs, attributes);
 }
 
@@ -538,14 +551,14 @@ export function recordTokenEfficiency(
   context?: string,
 ): void {
   if (!tokenEfficiencyHistogram || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     model,
     metric,
     context,
   };
-  
+
   tokenEfficiencyHistogram.record(value, attributes);
 }
 
@@ -556,13 +569,13 @@ export function recordApiRequestBreakdown(
   durationMs: number,
 ): void {
   if (!apiRequestBreakdownHistogram || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     model,
     phase,
   };
-  
+
   apiRequestBreakdownHistogram.record(durationMs, attributes);
 }
 
@@ -573,13 +586,13 @@ export function recordPerformanceScore(
   baseline?: number,
 ): void {
   if (!performanceScoreGauge || !isPerformanceMonitoringEnabled) return;
-  
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     category,
     baseline,
   };
-  
+
   performanceScoreGauge.record(score, attributes);
 }
 
@@ -590,8 +603,13 @@ export function recordPerformanceRegression(
   baselineValue: number,
   severity: 'low' | 'medium' | 'high',
 ): void {
-  if (!regressionDetectionCounter || !baselineComparisonHistogram || !isPerformanceMonitoringEnabled) return;
-  
+  if (
+    !regressionDetectionCounter ||
+    !baselineComparisonHistogram ||
+    !isPerformanceMonitoringEnabled
+  )
+    return;
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     metric,
@@ -599,11 +617,12 @@ export function recordPerformanceRegression(
     current_value: currentValue,
     baseline_value: baselineValue,
   };
-  
+
   regressionDetectionCounter.add(1, attributes);
-  
+
   if (baselineValue !== 0) {
-    const percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
+    const percentageChange =
+      ((currentValue - baselineValue) / baselineValue) * 100;
     baselineComparisonHistogram.record(percentageChange, attributes);
   }
 }
@@ -616,13 +635,14 @@ export function recordBaselineComparison(
   category: string,
 ): void {
   if (!baselineComparisonHistogram || !isPerformanceMonitoringEnabled) return;
-  
+
   if (baselineValue === 0) {
     console.warn('Baseline value is zero, skipping comparison.');
     return;
   }
-  const percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
-  
+  const percentageChange =
+    ((currentValue - baselineValue) / baselineValue) * 100;
+
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     metric,
@@ -630,7 +650,7 @@ export function recordBaselineComparison(
     current_value: currentValue,
     baseline_value: baselineValue,
   };
-  
+
   baselineComparisonHistogram.record(percentageChange, attributes);
 }
 

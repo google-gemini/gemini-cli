@@ -208,7 +208,7 @@ export async function main() {
   setupUnhandledRejectionHandler();
   const startupStart = performance.now();
   const workspaceRoot = process.cwd();
-  
+
   // Settings loading phase
   const settingsStart = performance.now();
   const settings = loadSettings(workspaceRoot);
@@ -220,7 +220,6 @@ export async function main() {
   await cleanupCheckpoints();
   const cleanupEnd = performance.now();
   const cleanupDuration = cleanupEnd - cleanupStart;
-  
 
   const argv = await parseArguments(settings.merged);
   
@@ -229,7 +228,7 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const extensionsEnd = performance.now();
   const extensionsDuration = extensionsEnd - extensionsStart;
-  
+
   // CLI config loading phase
   const configStart = performance.now();
   const config = await loadCliConfig(
@@ -240,7 +239,7 @@ export async function main() {
   );
   const configEnd = performance.now();
   const configDuration = configEnd - configStart;
-  
+
   // Initialize memory monitoring if performance monitoring is enabled
   if (isPerformanceMonitoringActive()) {
     startGlobalMemoryMonitoring(config, 10000); // Monitor every 10 seconds
@@ -331,7 +330,7 @@ export async function main() {
   config.getFileService();
   const fileServiceEnd = performance.now();
   const fileServiceDuration = fileServiceEnd - fileServiceStart;
-  
+
   // Git service initialization phase
   let gitServiceDuration = 0;
   if (config.getCheckpointingEnabled()) {
@@ -340,7 +339,9 @@ export async function main() {
       await config.getGitService();
     } catch (err) {
       // Log a warning if the git service fails to initialize, so the user knows checkpointing may not work.
-      console.warn(`Warning: Could not initialize git service. Checkpointing may not be available. Error: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(
+        `Warning: Could not initialize git service. Checkpointing may not be available. Error: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
     const gitServiceEnd = performance.now();
     gitServiceDuration = gitServiceEnd - gitServiceStart;
@@ -393,7 +394,7 @@ export async function main() {
           await config.refreshAuth(settings.merged.security?.auth?.selectedType);
           const authEnd = performance.now();
           const authDuration = authEnd - authStart;
-          
+
           // Record authentication performance if monitoring is active
           if (isPerformanceMonitoringActive()) {
             recordStartupPerformance(config, 'authentication', authDuration, {
@@ -439,13 +440,14 @@ export async function main() {
       await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
       const sandboxEnd = performance.now();
       const sandboxDuration = sandboxEnd - sandboxStart;
-      
+
       // Record sandbox performance if monitoring is active
       if (isPerformanceMonitoringActive()) {
         recordStartupPerformance(config, 'sandbox_setup', sandboxDuration, {
           sandbox_command: sandboxConfig.command,
         });
       }
+
       process.exit(0);
     } else {
       // Not in a sandbox and not entering one, so relaunch with additional
@@ -481,28 +483,28 @@ export async function main() {
     recordStartupPerformance(config, 'settings_loading', settingsDuration, {
       settings_sources: 3, // system + user + workspace
     });
-    
+
     recordStartupPerformance(config, 'cleanup', cleanupDuration);
-    
+
     recordStartupPerformance(config, 'extensions_loading', extensionsDuration, {
       extensions_count: extensions.length,
     });
-    
+
     recordStartupPerformance(config, 'config_loading', configDuration, {
       auth_type: settings.merged.security?.auth?.selectedType,
       telemetry_enabled: config.getTelemetryEnabled(),
     });
-    
+
     recordStartupPerformance(config, 'file_service_init', fileServiceDuration);
-    
+
     if (gitServiceDuration > 0) {
       recordStartupPerformance(config, 'git_service_init', gitServiceDuration);
     }
-    
+
     recordStartupPerformance(config, 'theme_loading', themeDuration, {
       theme_name: settings.merged.ui?.theme,
     });
-    
+
     const totalStartupDuration = performance.now() - startupStart;
     recordStartupPerformance(config, 'total_startup', totalStartupDuration, {
       is_tty: process.stdin.isTTY,
