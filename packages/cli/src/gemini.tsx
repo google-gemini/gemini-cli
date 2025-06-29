@@ -205,6 +205,13 @@ export async function main() {
     settings,
   );
 
+  // Set up Flash fallback handler for non-interactive mode
+  const flashFallbackHandler = async (): Promise<boolean> => {
+    console.log('⚡ Slow response times detected. Automatically switching to Flash model for faster responses.');
+    return true;
+  };
+  nonInteractiveConfig.setFlashFallbackHandler(flashFallbackHandler);
+
   await runNonInteractive(nonInteractiveConfig, input);
   process.exit(0);
 }
