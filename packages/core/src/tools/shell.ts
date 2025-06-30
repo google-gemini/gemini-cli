@@ -99,17 +99,39 @@ Process Group PGID: Process group started or \`(none)\``,
   }
 
   isCommandAllowed(command: string): boolean {
-    const normalize = (cmd: string) => cmd.trim().replace(/\s+/g, ' ');
+    // 0. Disallow command substitution
+    if (command.includes('$(') || command.includes('`')) {
+      return false;
+    }
 
+    const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
+
+    const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
+
+    /**
+     * Checks if a command string starts with a given prefix, ensuring it's a
+     * whole word match (i.e., followed by a space or it's an exact match).
+     * e.g., `isPrefixedBy('npm install', 'npm')` -> true
+     * e.g., `isPrefixedBy('npm', 'npm')` -> true
+     * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
+     */
+    const isPrefixedBy = (cmd: string, prefix: string): boolean => {
+      if (!cmd.startsWith(prefix)) {
+        return false;
+      }
+      return cmd.length === prefix.length || cmd[prefix.length] === ' ';
+    };
+
+    /**
+     * Extracts and normalizes shell commands from a list of tool strings.
+     * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
+     */
     const extractCommands = (tools: string[]): string[] =>
       tools.flatMap((tool) => {
-        if (tool.startsWith(`${ShellTool.name}(`) && tool.endsWith(')')) {
-          return [normalize(tool.slice(ShellTool.name.length + 1, -1))];
-        } else if (
-          tool.startsWith(`${ShellTool.Name}(`) &&
-          tool.endsWith(')')
-        ) {
-          return [normalize(tool.slice(ShellTool.Name.length + 1, -1))];
+        for (const toolName of SHELL_TOOL_NAMES) {
+          if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
+            return [normalize(tool.slice(toolName.length + 1, -1))];
+          }
         }
         return [];
       });
@@ -117,41 +139,44 @@ Process Group PGID: Process group started or \`(none)\``,
     const coreTools = this.config.getCoreTools() || [];
     const excludeTools = this.config.getExcludeTools() || [];
 
-    if (
-      excludeTools.includes(ShellTool.name) ||
-      excludeTools.includes(ShellTool.Name)
-    ) {
+    // 1. Check if the shell tool is globally disabled.
+    if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
       return false;
     }
 
-    const blockedCommands = extractCommands(excludeTools);
-    const normalizedCommand = normalize(command);
+    const blockedCommands = new Set(extractCommands(excludeTools));
+    const allowedCommands = new Set(extractCommands(coreTools));
 
-    if (blockedCommands.includes(normalizedCommand)) {
-      return false;
-    }
-
-    const hasSpecificCommands = coreTools.some(
-      (tool) =>
-        (tool.startsWith(`${ShellTool.name}(`) && tool.endsWith(')')) ||
-        (tool.startsWith(`${ShellTool.Name}(`) && tool.endsWith(')')),
+    const hasSpecificAllowedCommands = allowedCommands.size > 0;
+    const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
+      coreTools.includes(name),
     );
 
-    if (hasSpecificCommands) {
-      // If the generic `ShellTool` is also present, it acts as a wildcard,
-      // allowing all commands (that are not explicitly blocked).
-      if (
-        coreTools.includes(ShellTool.name) ||
-        coreTools.includes(ShellTool.Name)
-      ) {
-        return true;
+    const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
+
+    for (const cmd of commandsToValidate) {
+      // 2. Check if the command is on the blocklist.
+      const isBlocked = [...blockedCommands].some((blocked) =>
+        isPrefixedBy(cmd, blocked),
+      );
+      if (isBlocked) {
+        return false;
       }
 
-      // Otherwise, we are in strict allow-list mode.
-      const allowedCommands = extractCommands(coreTools);
-      return allowedCommands.includes(normalizedCommand);
+      // 3. If in strict allow-list mode, check if the command is permitted.
+      const isStrictAllowlist =
+        hasSpecificAllowedCommands && !isWildcardAllowed;
+      if (isStrictAllowlist) {
+        const isAllowed = [...allowedCommands].some((allowed) =>
+          isPrefixedBy(cmd, allowed),
+        );
+        if (!isAllowed) {
+          return false;
+        }
+      }
     }
 
+    // 4. If all checks pass, the command is allowed.
     return true;
   }
 
