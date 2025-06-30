@@ -20,6 +20,7 @@
 import { execSync } from 'child_process';
 import { chmodSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import os from 'os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
@@ -112,6 +113,10 @@ chmodSync(
 
 const buildStdout = process.env.VERBOSE ? 'inherit' : 'ignore';
 
+// Determine the appropriate shell based on OS
+const isWindows = os.platform() === 'win32';
+const shellToUse = isWindows ? 'powershell.exe' : '/bin/bash';
+
 function buildImage(imageName, dockerfile) {
   console.log(`building ${imageName} ... (can be slow first time)`);
   const buildCommand =
@@ -127,7 +132,7 @@ function buildImage(imageName, dockerfile) {
     `${buildCommand} ${
       process.env.BUILD_SANDBOX_FLAGS || ''
     } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
-    { stdio: buildStdout, shell: '/bin/bash' },
+    { stdio: buildStdout, shell: shellToUse },
   );
   console.log(`built ${imageName}`);
 }
