@@ -118,15 +118,13 @@ export class GeminiClient {
 
     if (lastTurn?.role === 'model') {
       const newHistory = history.slice(0, -1);
-
-      if (this.contentGenerator) {
-        this.chat = new GeminiChat(
-          this.config,
-          this.contentGenerator,
-          undefined,
-          newHistory,
-        );
-      }
+      const generationConfig = this.chat.getGenerationConfig();
+      this.chat = new GeminiChat(
+        this.config,
+        this.getContentGenerator(),
+        generationConfig,
+        newHistory,
+      );
     }
   }
 
