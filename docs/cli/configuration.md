@@ -185,6 +185,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`proxy`** (string):
+  - **Description:** Sets the proxy server to use for all outbound HTTP/HTTPS requests.
+  - **Default:** `null`
+  - **Example:** `"proxy": "socks5://localhost:1080"`
+
 ### Example `settings.json`:
 
 ```json
@@ -313,6 +318,10 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables [checkpointing](./commands.md#checkpointing-commands).
 - **`--version`**:
   - Displays the version of the CLI.
+
+- **`--proxy <proxy_url>`**:
+  - **Description:** Sets the proxy server to use for all outbound HTTP/HTTPS requests.
+  - **Example:** `npm start -- --proxy socks5://localhost:1080`
 
 ## Context Files (Hierarchical Instructional Context)
 

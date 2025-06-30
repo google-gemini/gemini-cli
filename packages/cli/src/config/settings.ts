@@ -54,6 +54,7 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  proxy?: string;
 
   // Git-aware file filtering settings
   fileFiltering?: {

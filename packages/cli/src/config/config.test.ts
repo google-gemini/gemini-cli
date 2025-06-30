@@ -246,6 +246,93 @@ describe('loadCliConfig telemetry', () => {
   });
 });
 
+describe('loadCliConfig proxy', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should use proxy from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { proxy: 'http://settings.example.com' };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://settings.example.com');
+  });
+
+  it('should use proxy from HTTPS_PROXY env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('HTTPS_PROXY', 'http://https.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://https.example.com');
+  });
+
+  it('should use proxy from https_proxy env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('https_proxy', 'http://https_lower.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://https_lower.example.com');
+  });
+
+  it('should use proxy from HTTP_PROXY env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('HTTP_PROXY', 'http://http.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://http.example.com');
+  });
+
+  it('should use proxy from http_proxy env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('http_proxy', 'http://http_lower.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://http_lower.example.com');
+  });
+
+  it('should use proxy from ALL_PROXY env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('ALL_PROXY', 'http://all.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://all.example.com');
+  });
+
+  it('should use proxy from all_proxy env var', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('all_proxy', 'http://all_lower.example.com');
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://all_lower.example.com');
+  });
+
+  it('should prioritize settings over env vars', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('HTTPS_PROXY', 'http://https.example.com');
+    const settings: Settings = { proxy: 'http://settings.example.com' };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://settings.example.com');
+  });
+
+  it('should prioritize CLI flag over settings and env vars', async () => {
+    process.argv = ['node', 'script.js', '--proxy', 'http://cli.example.com'];
+    vi.stubEnv('HTTPS_PROXY', 'http://https.example.com');
+    const settings: Settings = { proxy: 'http://settings.example.com' };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getProxy()).toBe('http://cli.example.com');
+  });
+});
+
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
