@@ -13,6 +13,7 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as os from 'os';
+import { Gaxios } from 'gaxios';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -53,10 +54,15 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(): Promise<OAuth2Client> {
+export async function getOauthClient(
+  proxy?: string | undefined,
+): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
+    transporter: new Gaxios({
+      proxy,
+    }),
   });
 
   if (await loadCachedCredentials(client)) {

@@ -53,6 +53,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  proxy: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -127,6 +128,10 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
       default: false,
+    })
+    .option('proxy', {
+      type: 'string',
+      description: 'Proxy for gemini client, like schema://user:password@host:port',
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -236,6 +241,7 @@ export async function loadCliConfig(
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
+      argv.proxy || 
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
