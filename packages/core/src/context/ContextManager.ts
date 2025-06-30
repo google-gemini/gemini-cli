@@ -7,6 +7,7 @@
 import { ChunkRegistry } from './ChunkRegistry.js';
 import { ContextPruner } from './ContextPruner.js';
 import { HybridScorer } from './scoring/HybridScorer.js';
+import { ContextLogger, type OptimizationLogEntry } from './ContextLogger.js';
 import type {
   ConversationChunk,
   ContextOptimizationConfig,
@@ -37,14 +38,16 @@ export class ContextManager {
   private chunkRegistry: ChunkRegistry;
   private contextPruner: ContextPruner;
   private hybridScorer: HybridScorer;
+  private logger: ContextLogger;
   private lastOptimizationStats: PruningStats | null = null;
   private cumulativeStats: CumulativeOptimizationStats;
 
-  constructor(config?: ContextOptimizationConfig) {
+  constructor(config?: ContextOptimizationConfig, logLevel: 'debug' | 'info' | 'warn' | 'error' = 'info') {
     this.config = this.validateAndSanitizeConfig(config || this.getDefaultConfig());
     this.chunkRegistry = new ChunkRegistry();
     this.contextPruner = new ContextPruner();
     this.hybridScorer = new HybridScorer(this.config.scoringWeights);
+    this.logger = new ContextLogger(logLevel);
     this.cumulativeStats = this.initializeCumulativeStats();
   }
 
@@ -119,6 +122,8 @@ export class ContextManager {
    * 5. Return optimized context window
    */
   async optimizeContext(query: RelevanceQuery, tokenBudget: number): Promise<ContextWindow> {
+    const startTime = Date.now();
+    
     // Handle optimization disabled
     if (!this.config.enabled) {
       return this.createUnoptimizedContext(tokenBudget);
@@ -143,9 +148,17 @@ export class ContextManager {
       };
     }
 
+    // Log optimization start
+    this.logger.logOptimizationStart(query.text, chunks, tokenBudget);
+
     try {
       // Step 1: Score all chunks
+      const scoringStartTime = Date.now();
       const scoringResults = await this.scoreChunks(chunks, query);
+      const scoringTime = Date.now() - scoringStartTime;
+      
+      // Log scoring completion
+      this.logger.logScoringComplete(scoringResults, scoringTime);
       
       // Step 2: Update chunks with scores in registry
       this.updateChunksWithScores(chunks, scoringResults);
@@ -156,9 +169,45 @@ export class ContextManager {
       // Step 4: Prune chunks using optimization strategy
       const pruningResult = this.contextPruner.pruneChunks(scoredChunks, query, tokenBudget);
       
+      // Count mandatory chunks
+      const mandatoryCount = scoredChunks.filter(chunk => 
+        chunk.metadata.pinned === true ||
+        chunk.metadata.tags?.includes('system-prompt') ||
+        chunk.metadata.tags?.includes('tool-definition')
+      ).length;
+      
+      // Log pruning completion
+      this.logger.logPruningComplete(pruningResult.stats, mandatoryCount, pruningResult.prunedChunks);
+      
       // Step 5: Track statistics
       this.lastOptimizationStats = pruningResult.stats;
       this.updateCumulativeStats(pruningResult.stats);
+      
+      // Create comprehensive log entry
+      const totalTime = Date.now() - startTime;
+      const logEntry: OptimizationLogEntry = {
+        query: query.text,
+        originalChunks: chunks.length,
+        finalChunks: pruningResult.prunedChunks.length,
+        originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+        finalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+        reductionPercentage: pruningResult.stats.reductionPercentage,
+        processingTimeMs: totalTime,
+        scoringBreakdown: this.calculateScoringBreakdown(scoringResults),
+        mandatoryChunks: mandatoryCount,
+        prunedChunks: chunks.filter(c => !pruningResult.prunedChunks.find(p => p.id === c.id)).map(c => c.id),
+        topScoredChunks: scoringResults
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+          .map(r => ({
+            id: r.chunkId,
+            score: r.score,
+            tokens: chunks.find(c => c.id === r.chunkId)?.tokens || 0,
+          })),
+      };
+      
+      // Log complete optimization
+      this.logger.logOptimizationComplete(logEntry);
       
       return {
         chunks: pruningResult.prunedChunks,
@@ -167,6 +216,13 @@ export class ContextManager {
       };
       
     } catch (error) {
+      // Log error
+      this.logger.logError(error as Error, 'optimization workflow', {
+        query: query.text,
+        chunksCount: chunks.length,
+        tokenBudget,
+      });
+      
       // Fallback: proceed with pruning without scoring
       const pruningResult = this.contextPruner.pruneChunks(chunks, query, tokenBudget);
       
@@ -339,5 +395,75 @@ export class ContextManager {
       averageReductionPercentage: 0,
       totalProcessingTimeMs: 0,
     };
+  }
+
+  /**
+   * Calculate scoring breakdown from scoring results.
+   */
+  private calculateScoringBreakdown(results: ScoringResult[]): {
+    bm25Average: number;
+    recencyAverage: number;
+    embeddingAverage: number;
+    hybridAverage: number;
+  } {
+    if (results.length === 0) {
+      return { bm25Average: 0, recencyAverage: 0, embeddingAverage: 0, hybridAverage: 0 };
+    }
+
+    const totals = results.reduce((acc, result) => ({
+      bm25: acc.bm25 + (result.breakdown.bm25 || 0),
+      recency: acc.recency + (result.breakdown.recency || 0),
+      embedding: acc.embedding + (result.breakdown.embedding || 0),
+      hybrid: acc.hybrid + result.score,
+    }), { bm25: 0, recency: 0, embedding: 0, hybrid: 0 });
+
+    return {
+      bm25Average: totals.bm25 / results.length,
+      recencyAverage: totals.recency / results.length,
+      embeddingAverage: totals.embedding / results.length,
+      hybridAverage: totals.hybrid / results.length,
+    };
+  }
+
+  /**
+   * Get the context logger for external monitoring.
+   */
+  getLogger(): ContextLogger {
+    return this.logger;
+  }
+
+  /**
+   * Get performance summary from the logger.
+   */
+  getPerformanceSummary() {
+    return this.logger.getPerformanceSummary();
+  }
+
+  /**
+   * Get recent optimization logs.
+   */
+  getRecentOptimizations(count = 10): OptimizationLogEntry[] {
+    return this.logger.getRecentStats(count);
+  }
+
+  /**
+   * Set logging level.
+   */
+  setLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): void {
+    this.logger.setLogLevel(level);
+  }
+
+  /**
+   * Export all optimization logs for analysis.
+   */
+  exportOptimizationLogs() {
+    return this.logger.exportLogs();
+  }
+
+  /**
+   * Clear optimization logs.
+   */
+  clearOptimizationLogs(): void {
+    this.logger.clearLogs();
   }
 }
