@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { 
-  RecencyFallbackStrategy, 
+import {
+  RecencyFallbackStrategy,
   SimpleTruncationFallbackStrategy,
-  FallbackStrategyManager
+  FallbackStrategyManager,
 } from './FallbackStrategies.js';
 import type { ConversationChunk, RelevanceQuery } from './types.js';
 
@@ -17,7 +17,7 @@ describe('FallbackStrategies', () => {
     id: string,
     tokens: number = 100,
     timestamp: number = Date.now(),
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): ConversationChunk => ({
     id,
     role: 'user',
@@ -51,9 +51,9 @@ describe('FallbackStrategies', () => {
 
       expect(result.chunks).toHaveLength(2);
       // Should include the two most recent chunks (in original order)
-      expect(result.chunks.find(c => c.id === 'recent')).toBeDefined();
-      expect(result.chunks.find(c => c.id === 'newest')).toBeDefined();
-      expect(result.chunks.find(c => c.id === 'old')).toBeUndefined();
+      expect(result.chunks.find((c) => c.id === 'recent')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'newest')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'old')).toBeUndefined();
       expect(result.totalTokens).toBe(200);
     });
 
@@ -68,7 +68,7 @@ describe('FallbackStrategies', () => {
 
       // Should include pinned chunk (mandatory) + normal chunk (fits budget after pinned included)
       expect(result.chunks.length).toBeGreaterThanOrEqual(1);
-      expect(result.chunks.find(c => c.id === 'pinned')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'pinned')).toBeDefined();
       expect(result.totalTokens).toBeGreaterThanOrEqual(150); // At least pinned chunk
     });
 
@@ -76,16 +76,20 @@ describe('FallbackStrategies', () => {
       const now = Date.now();
       const chunks: ConversationChunk[] = [
         createTestChunk('normal', 100, now - 3600000),
-        createTestChunk('system', 100, now - 86400000, { tags: ['system-prompt'] }),
-        createTestChunk('tool', 100, now - 172800000, { tags: ['tool-definition'] }),
+        createTestChunk('system', 100, now - 86400000, {
+          tags: ['system-prompt'],
+        }),
+        createTestChunk('tool', 100, now - 172800000, {
+          tags: ['tool-definition'],
+        }),
       ];
 
       const result = await strategy.execute(chunks, query, 250);
 
       // Should include at least the mandatory chunks
       expect(result.chunks.length).toBeGreaterThanOrEqual(2);
-      expect(result.chunks.find(c => c.id === 'system')).toBeDefined();
-      expect(result.chunks.find(c => c.id === 'tool')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'system')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'tool')).toBeDefined();
     });
 
     it('should handle empty chunks array', async () => {
@@ -139,9 +143,9 @@ describe('FallbackStrategies', () => {
       const result = await strategy.execute(chunks, query, 200);
 
       expect(result.chunks.length).toBeGreaterThanOrEqual(1);
-      expect(result.chunks.find(c => c.id === 'mandatory')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'mandatory')).toBeDefined();
       // Should also include normal2 since it's most recent and fits budget
-      expect(result.chunks.find(c => c.id === 'normal2')).toBeDefined();
+      expect(result.chunks.find((c) => c.id === 'normal2')).toBeDefined();
     });
 
     it('should include mandatory chunks even over budget', async () => {
@@ -213,18 +217,22 @@ describe('FallbackStrategies', () => {
     it('should return empty context if all strategies fail', async () => {
       // Create a manager with only failing strategies
       const emptyManager = new FallbackStrategyManager();
-      
+
       // Clear default strategies by creating new instance
       (emptyManager as { strategies: FallbackStrategy[] }).strategies = [
         {
           name: 'fail1',
           priority: 1,
-          execute: async () => { throw new Error('Fail 1'); },
+          execute: async () => {
+            throw new Error('Fail 1');
+          },
         },
         {
-          name: 'fail2', 
+          name: 'fail2',
           priority: 2,
-          execute: async () => { throw new Error('Fail 2'); },
+          execute: async () => {
+            throw new Error('Fail 2');
+          },
         },
       ];
 
@@ -261,8 +269,12 @@ describe('FallbackStrategies', () => {
       const chunks: ConversationChunk[] = [
         createTestChunk('normal1', 100, now - 3600000),
         createTestChunk('pinned', 100, now - 7200000, { pinned: true }),
-        createTestChunk('system', 100, now - 14400000, { tags: ['system-prompt'] }),
-        createTestChunk('tool', 100, now - 21600000, { tags: ['tool-definition'] }),
+        createTestChunk('system', 100, now - 14400000, {
+          tags: ['system-prompt'],
+        }),
+        createTestChunk('tool', 100, now - 21600000, {
+          tags: ['tool-definition'],
+        }),
         createTestChunk('normal2', 100, now - 1800000),
       ];
 
@@ -271,18 +283,28 @@ describe('FallbackStrategies', () => {
       // Test RecencyFallbackStrategy
       const recencyStrategy = new RecencyFallbackStrategy();
       const recencyResult = await recencyStrategy.execute(chunks, query, 250);
-      
-      expect(recencyResult.chunks.find(c => c.id === 'pinned')).toBeDefined();
-      expect(recencyResult.chunks.find(c => c.id === 'system')).toBeDefined();
-      expect(recencyResult.chunks.find(c => c.id === 'tool')).toBeDefined();
+
+      expect(recencyResult.chunks.find((c) => c.id === 'pinned')).toBeDefined();
+      expect(recencyResult.chunks.find((c) => c.id === 'system')).toBeDefined();
+      expect(recencyResult.chunks.find((c) => c.id === 'tool')).toBeDefined();
 
       // Test SimpleTruncationFallbackStrategy
       const truncationStrategy = new SimpleTruncationFallbackStrategy();
-      const truncationResult = await truncationStrategy.execute(chunks, query, 250);
-      
-      expect(truncationResult.chunks.find(c => c.id === 'pinned')).toBeDefined();
-      expect(truncationResult.chunks.find(c => c.id === 'system')).toBeDefined();
-      expect(truncationResult.chunks.find(c => c.id === 'tool')).toBeDefined();
+      const truncationResult = await truncationStrategy.execute(
+        chunks,
+        query,
+        250,
+      );
+
+      expect(
+        truncationResult.chunks.find((c) => c.id === 'pinned'),
+      ).toBeDefined();
+      expect(
+        truncationResult.chunks.find((c) => c.id === 'system'),
+      ).toBeDefined();
+      expect(
+        truncationResult.chunks.find((c) => c.id === 'tool'),
+      ).toBeDefined();
     });
   });
 });

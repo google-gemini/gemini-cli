@@ -6,10 +6,10 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextManager } from './ContextManager.js';
-import type { 
-  ConversationChunk, 
-  ContextOptimizationConfig, 
-  RelevanceQuery 
+import type {
+  ConversationChunk,
+  ContextOptimizationConfig,
+  RelevanceQuery,
 } from './types.js';
 
 /**
@@ -21,10 +21,10 @@ describe('ContextManager Unit Tests', () => {
   let config: ContextOptimizationConfig;
 
   const createTestChunk = (
-    id: string, 
-    role: 'user' | 'assistant' | 'tool' = 'user', 
+    id: string,
+    role: 'user' | 'assistant' | 'tool' = 'user',
     content: string = 'test content',
-    tokens: number = 100
+    tokens: number = 100,
   ): ConversationChunk => ({
     id,
     role,
@@ -61,7 +61,7 @@ describe('ContextManager Unit Tests', () => {
     it('should initialize with default config when none provided', () => {
       const manager = new ContextManager();
       const defaultConfig = manager.getConfig();
-      
+
       expect(defaultConfig.enabled).toBe(true);
       expect(defaultConfig.maxChunks).toBe(50);
       expect(defaultConfig.embeddingEnabled).toBe(true);
@@ -88,7 +88,7 @@ describe('ContextManager Unit Tests', () => {
     it('should validate configuration parameters', () => {
       const invalidConfig = {
         enabled: 'yes', // Should be boolean
-        maxChunks: -1,  // Should be non-negative
+        maxChunks: -1, // Should be non-negative
         scoringWeights: null, // Should be object
       };
 
@@ -99,9 +99,9 @@ describe('ContextManager Unit Tests', () => {
   describe('Chunk Management API', () => {
     it('should add and retrieve chunks', () => {
       const chunk = createTestChunk('test-1');
-      
+
       contextManager.addChunk(chunk);
-      
+
       const retrieved = contextManager.getChunk('test-1');
       expect(retrieved).toEqual(chunk);
     });
@@ -115,7 +115,7 @@ describe('ContextManager Unit Tests', () => {
 
       contextManager.addChunks(chunks);
 
-      chunks.forEach(chunk => {
+      chunks.forEach((chunk) => {
         const retrieved = contextManager.getChunk(chunk.id);
         expect(retrieved).toEqual(chunk);
       });
@@ -123,10 +123,10 @@ describe('ContextManager Unit Tests', () => {
 
     it('should remove chunks', () => {
       const chunk = createTestChunk('removable');
-      
+
       contextManager.addChunk(chunk);
       expect(contextManager.getChunk('removable')).toBeDefined();
-      
+
       const removed = contextManager.removeChunk('removable');
       expect(removed).toBe(true);
       expect(contextManager.getChunk('removable')).toBeUndefined();
@@ -144,22 +144,19 @@ describe('ContextManager Unit Tests', () => {
         createTestChunk('chunk-3', 'user', 'content', 150),
       ];
 
-      chunks.forEach(chunk => contextManager.addChunk(chunk));
-      
+      chunks.forEach((chunk) => contextManager.addChunk(chunk));
+
       expect(contextManager.getTotalTokens()).toBe(450);
     });
 
     it('should clear all chunks and reset stats', () => {
-      const chunks = [
-        createTestChunk('chunk-1'),
-        createTestChunk('chunk-2'),
-      ];
+      const chunks = [createTestChunk('chunk-1'), createTestChunk('chunk-2')];
 
       contextManager.addChunks(chunks);
       expect(contextManager.getTotalTokens()).toBeGreaterThan(0);
 
       contextManager.clear();
-      
+
       expect(contextManager.getTotalTokens()).toBe(0);
       expect(contextManager.getOptimizationStats()).toBeNull();
     });
@@ -191,7 +188,7 @@ describe('ContextManager Unit Tests', () => {
     it('should handle optimization when disabled', async () => {
       const chunks = [createTestChunk('chunk-1')];
       contextManager.addChunks(chunks);
-      
+
       contextManager.updateConfig({ ...config, enabled: false });
 
       const query: RelevanceQuery = { text: 'test query' };
@@ -253,7 +250,7 @@ describe('ContextManager Unit Tests', () => {
       contextManager.addChunks(chunks);
 
       const query: RelevanceQuery = { text: 'test query' };
-      
+
       // First optimization
       await contextManager.optimizeContext(query, 50);
       let cumStats = contextManager.getCumulativeStats();
@@ -284,17 +281,16 @@ describe('ContextManager Unit Tests', () => {
       contextManager.addChunk(malformedChunk);
 
       const query: RelevanceQuery = { text: 'test query' };
-      
+
       // Should not throw
-      await expect(contextManager.optimizeContext(query, 100)).resolves.toBeDefined();
+      await expect(
+        contextManager.optimizeContext(query, 100),
+      ).resolves.toBeDefined();
     });
 
     it('should maintain thread safety with concurrent requests', async () => {
-      const chunks = [
-        createTestChunk('chunk-1'),
-        createTestChunk('chunk-2'),
-      ];
-      
+      const chunks = [createTestChunk('chunk-1'), createTestChunk('chunk-2')];
+
       contextManager.addChunks(chunks);
 
       const queries = [
@@ -303,14 +299,14 @@ describe('ContextManager Unit Tests', () => {
         { text: 'query 3' },
       ];
 
-      const promises = queries.map(query => 
-        contextManager.optimizeContext(query, 150)
+      const promises = queries.map((query) =>
+        contextManager.optimizeContext(query, 150),
       );
 
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(3);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.chunks).toBeDefined();
         expect(result.totalTokens).toBeGreaterThanOrEqual(0);
       });
@@ -323,7 +319,7 @@ describe('ContextManager Unit Tests', () => {
         ...config,
         scoringWeights: {
           embedding: 1.5, // Invalid: > 1
-          bm25: -0.1,     // Invalid: < 0
+          bm25: -0.1, // Invalid: < 0
           recency: 0.15,
           manual: 0.05,
         },
@@ -339,13 +335,14 @@ describe('ContextManager Unit Tests', () => {
         scoringWeights: {
           embedding: 0.5,
           bm25: 0.5,
-          recency: 0.2,  // Sum = 1.2
+          recency: 0.2, // Sum = 1.2
           manual: 0.1,
         },
       };
 
-      expect(() => contextManager.updateConfig(weightsOverOne))
-        .toThrow(/scoringWeights must sum to 1\.0/);
+      expect(() => contextManager.updateConfig(weightsOverOne)).toThrow(
+        /scoringWeights must sum to 1\.0/,
+      );
 
       // Test case 2: Weights sum to less than 1.0
       const weightsUnderOne = {
@@ -353,13 +350,14 @@ describe('ContextManager Unit Tests', () => {
         scoringWeights: {
           embedding: 0.3,
           bm25: 0.3,
-          recency: 0.1,  // Sum = 0.8
+          recency: 0.1, // Sum = 0.8
           manual: 0.1,
         },
       };
 
-      expect(() => contextManager.updateConfig(weightsUnderOne))
-        .toThrow(/scoringWeights must sum to 1\.0/);
+      expect(() => contextManager.updateConfig(weightsUnderOne)).toThrow(
+        /scoringWeights must sum to 1\.0/,
+      );
 
       // Test case 3: Valid weights that sum to 1.0
       const validWeights = {
@@ -367,7 +365,7 @@ describe('ContextManager Unit Tests', () => {
         scoringWeights: {
           embedding: 0.35,
           bm25: 0.35,
-          recency: 0.2,   // Sum = 1.0
+          recency: 0.2, // Sum = 1.0
           manual: 0.1,
         },
       };
@@ -382,12 +380,14 @@ describe('ContextManager Unit Tests', () => {
         scoringWeights: {
           embedding: 0.333333333,
           bm25: 0.333333333,
-          recency: 0.333333333,  // Sum ≈ 0.999999999 (within epsilon)
+          recency: 0.333333333, // Sum ≈ 0.999999999 (within epsilon)
           manual: 0.000000001,
         },
       };
 
-      expect(() => contextManager.updateConfig(nearlyValidWeights)).not.toThrow();
+      expect(() =>
+        contextManager.updateConfig(nearlyValidWeights),
+      ).not.toThrow();
 
       // Test weights that exceed the epsilon tolerance
       const invalidByEpsilon = {
@@ -395,13 +395,14 @@ describe('ContextManager Unit Tests', () => {
         scoringWeights: {
           embedding: 0.5,
           bm25: 0.5,
-          recency: 0.002,  // Sum = 1.002 (exceeds 0.001 epsilon)
+          recency: 0.002, // Sum = 1.002 (exceeds 0.001 epsilon)
           manual: 0.0,
         },
       };
 
-      expect(() => contextManager.updateConfig(invalidByEpsilon))
-        .toThrow(/scoringWeights must sum to 1\.0/);
+      expect(() => contextManager.updateConfig(invalidByEpsilon)).toThrow(
+        /scoringWeights must sum to 1\.0/,
+      );
     });
 
     it('should validate maxChunks parameter', () => {
@@ -415,7 +416,7 @@ describe('ContextManager Unit Tests', () => {
 
     it('should preserve valid configuration on partial failure', () => {
       const originalConfig = contextManager.getConfig();
-      
+
       const partiallyInvalid = {
         ...config,
         maxChunks: -1, // Invalid
@@ -433,8 +434,8 @@ describe('ContextManager Unit Tests', () => {
   describe('Performance Characteristics', () => {
     it('should handle reasonable loads efficiently', async () => {
       // Create a moderate number of chunks
-      const chunks = Array.from({ length: 50 }, (_, i) => 
-        createTestChunk(`chunk-${i}`, 'user', `Content ${i}`, 100)
+      const chunks = Array.from({ length: 50 }, (_, i) =>
+        createTestChunk(`chunk-${i}`, 'user', `Content ${i}`, 100),
       );
 
       const startTime = Date.now();

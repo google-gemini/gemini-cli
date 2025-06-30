@@ -51,10 +51,12 @@ describe('RecencyScorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      
-      const oldScore = results.find(r => r.chunkId === 'old')?.score || 0;
-      const recentScore = results.find(r => r.chunkId === 'recent')?.score || 0;
-      const newestScore = results.find(r => r.chunkId === 'newest')?.score || 0;
+
+      const oldScore = results.find((r) => r.chunkId === 'old')?.score || 0;
+      const recentScore =
+        results.find((r) => r.chunkId === 'recent')?.score || 0;
+      const newestScore =
+        results.find((r) => r.chunkId === 'newest')?.score || 0;
 
       expect(newestScore).toBeGreaterThan(recentScore);
       expect(recentScore).toBeGreaterThan(oldScore);
@@ -88,9 +90,9 @@ describe('RecencyScorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      
-      const score1 = results.find(r => r.chunkId === '1')?.score || 0;
-      const score2 = results.find(r => r.chunkId === '2')?.score || 0;
+
+      const score1 = results.find((r) => r.chunkId === '1')?.score || 0;
+      const score2 = results.find((r) => r.chunkId === '2')?.score || 0;
 
       expect(score2).toBeGreaterThan(score1);
 
@@ -146,9 +148,10 @@ describe('RecencyScorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      
-      const futureScore = results.find(r => r.chunkId === 'future')?.score || 0;
-      const pastScore = results.find(r => r.chunkId === 'past')?.score || 0;
+
+      const futureScore =
+        results.find((r) => r.chunkId === 'future')?.score || 0;
+      const pastScore = results.find((r) => r.chunkId === 'past')?.score || 0;
 
       // Future chunks should still get some score but less than exact matches
       expect(futureScore).toBeGreaterThan(0);
@@ -160,7 +163,7 @@ describe('RecencyScorer', () => {
     it('should use configurable decay rate', () => {
       const customDecayRate = 2.0; // Faster decay
       const customScorer = new RecencyScorer(customDecayRate);
-      
+
       const queryTime = 1000000;
       const chunks: ConversationChunk[] = [
         {
@@ -213,7 +216,7 @@ describe('RecencyScorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      
+
       expect(results[0].breakdown.recency).toBeDefined();
       expect(results[0].breakdown.recency).toBe(results[0].score);
     });
@@ -236,7 +239,7 @@ describe('RecencyScorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      
+
       expect(results[0].score).toBeGreaterThanOrEqual(0);
       expect(results[0].score).toBeLessThan(1);
       expect(Number.isFinite(results[0].score)).toBe(true);

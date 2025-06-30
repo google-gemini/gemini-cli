@@ -4,11 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationChunk, PruningStats, ScoringResult } from './types.js';
+import type {
+  ConversationChunk,
+  PruningStats,
+  ScoringResult,
+} from './types.js';
 
 export interface ContextOptimizationEvent {
   timestamp: number;
-  type: 'optimization_start' | 'optimization_complete' | 'scoring_complete' | 'pruning_complete' | 'error';
+  type:
+    | 'optimization_start'
+    | 'optimization_complete'
+    | 'scoring_complete'
+    | 'pruning_complete'
+    | 'error';
   data: Record<string, unknown>;
 }
 
@@ -46,7 +55,11 @@ export class ContextLogger {
   /**
    * Log optimization start event.
    */
-  logOptimizationStart(query: string, chunks: ConversationChunk[], maxTokens: number): void {
+  logOptimizationStart(
+    query: string,
+    chunks: ConversationChunk[],
+    maxTokens: number,
+  ): void {
     const event: ContextOptimizationEvent = {
       timestamp: Date.now(),
       type: 'optimization_start',
@@ -60,18 +73,23 @@ export class ContextLogger {
     };
 
     this.addEvent(event);
-    
+
     if (this.shouldLog('info')) {
-      console.log(`🎯 Context optimization started: ${chunks.length} chunks (${event.data.totalTokens} tokens) -> budget: ${maxTokens} tokens`);
+      console.log(
+        `🎯 Context optimization started: ${chunks.length} chunks (${event.data.totalTokens} tokens) -> budget: ${maxTokens} tokens`,
+      );
     }
   }
 
   /**
    * Log scoring completion with detailed breakdown.
    */
-  logScoringComplete(scoringResults: ScoringResult[], processingTimeMs: number): void {
+  logScoringComplete(
+    scoringResults: ScoringResult[],
+    processingTimeMs: number,
+  ): void {
     const breakdown = this.calculateScoringBreakdown(scoringResults);
-    
+
     const event: ContextOptimizationEvent = {
       timestamp: Date.now(),
       type: 'scoring_complete',
@@ -82,30 +100,40 @@ export class ContextLogger {
         topScores: scoringResults
           .sort((a, b) => b.score - a.score)
           .slice(0, 5)
-          .map(r => ({ chunkId: r.chunkId, score: r.score.toFixed(3) })),
+          .map((r) => ({ chunkId: r.chunkId, score: r.score.toFixed(3) })),
       },
     };
 
     this.addEvent(event);
 
     if (this.shouldLog('debug')) {
-      console.log(`📊 Scoring complete: ${scoringResults.length} chunks in ${processingTimeMs}ms`);
-      console.log(`   BM25: ${breakdown.bm25Average.toFixed(3)}, Recency: ${breakdown.recencyAverage.toFixed(3)}`);
-      console.log(`   Embedding: ${breakdown.embeddingAverage.toFixed(3)}, Hybrid: ${breakdown.hybridAverage.toFixed(3)}`);
+      console.log(
+        `📊 Scoring complete: ${scoringResults.length} chunks in ${processingTimeMs}ms`,
+      );
+      console.log(
+        `   BM25: ${breakdown.bm25Average.toFixed(3)}, Recency: ${breakdown.recencyAverage.toFixed(3)}`,
+      );
+      console.log(
+        `   Embedding: ${breakdown.embeddingAverage.toFixed(3)}, Hybrid: ${breakdown.hybridAverage.toFixed(3)}`,
+      );
     }
   }
 
   /**
    * Log pruning completion with statistics.
    */
-  logPruningComplete(stats: PruningStats, mandatoryCount: number, selectedChunks: ConversationChunk[]): void {
+  logPruningComplete(
+    stats: PruningStats,
+    mandatoryCount: number,
+    selectedChunks: ConversationChunk[],
+  ): void {
     const event: ContextOptimizationEvent = {
       timestamp: Date.now(),
       type: 'pruning_complete',
       data: {
         ...stats,
         mandatoryChunks: mandatoryCount,
-        selectedChunkIds: selectedChunks.map(c => c.id),
+        selectedChunkIds: selectedChunks.map((c) => c.id),
         roleDistribution: this.getChunkTypeBreakdown(selectedChunks),
       },
     };
@@ -113,8 +141,12 @@ export class ContextLogger {
     this.addEvent(event);
 
     if (this.shouldLog('info')) {
-      console.log(`✂️  Pruning complete: ${stats.originalChunks} -> ${stats.prunedChunks} chunks (${stats.reductionPercentage.toFixed(1)}% reduction)`);
-      console.log(`   Tokens: ${stats.originalTokens} -> ${stats.prunedTokens} (${((stats.originalTokens - stats.prunedTokens) / stats.originalTokens * 100).toFixed(1)}% reduction)`);
+      console.log(
+        `✂️  Pruning complete: ${stats.originalChunks} -> ${stats.prunedChunks} chunks (${stats.reductionPercentage.toFixed(1)}% reduction)`,
+      );
+      console.log(
+        `   Tokens: ${stats.originalTokens} -> ${stats.prunedTokens} (${(((stats.originalTokens - stats.prunedTokens) / stats.originalTokens) * 100).toFixed(1)}% reduction)`,
+      );
       console.log(`   Mandatory chunks preserved: ${mandatoryCount}`);
     }
   }
@@ -134,22 +166,34 @@ export class ContextLogger {
     if (this.shouldLog('info')) {
       console.log(`🎉 Context optimization complete:`);
       console.log(`   Query: "${this.truncateString(logEntry.query, 50)}"`);
-      console.log(`   Chunks: ${logEntry.originalChunks} -> ${logEntry.finalChunks} (${((logEntry.originalChunks - logEntry.finalChunks) / logEntry.originalChunks * 100).toFixed(1)}% reduction)`);
-      console.log(`   Tokens: ${logEntry.originalTokens} -> ${logEntry.finalTokens} (${logEntry.reductionPercentage.toFixed(1)}% reduction)`);
+      console.log(
+        `   Chunks: ${logEntry.originalChunks} -> ${logEntry.finalChunks} (${(((logEntry.originalChunks - logEntry.finalChunks) / logEntry.originalChunks) * 100).toFixed(1)}% reduction)`,
+      );
+      console.log(
+        `   Tokens: ${logEntry.originalTokens} -> ${logEntry.finalTokens} (${logEntry.reductionPercentage.toFixed(1)}% reduction)`,
+      );
       console.log(`   Processing time: ${logEntry.processingTimeMs}ms`);
-      console.log(`   Top chunks: ${logEntry.topScoredChunks.map(c => `${c.id}(${c.score.toFixed(2)})`).join(', ')}`);
+      console.log(
+        `   Top chunks: ${logEntry.topScoredChunks.map((c) => `${c.id}(${c.score.toFixed(2)})`).join(', ')}`,
+      );
     }
 
     if (this.shouldLog('debug')) {
       console.log(`   Scoring averages:`, logEntry.scoringBreakdown);
-      console.log(`   Pruned chunks: ${logEntry.prunedChunks.slice(0, 5).join(', ')}${logEntry.prunedChunks.length > 5 ? '...' : ''}`);
+      console.log(
+        `   Pruned chunks: ${logEntry.prunedChunks.slice(0, 5).join(', ')}${logEntry.prunedChunks.length > 5 ? '...' : ''}`,
+      );
     }
   }
 
   /**
    * Log error with context.
    */
-  logError(error: Error, context: string, additionalData?: Record<string, unknown>): void {
+  logError(
+    error: Error,
+    context: string,
+    additionalData?: Record<string, unknown>,
+  ): void {
     const event: ContextOptimizationEvent = {
       timestamp: Date.now(),
       type: 'error',
@@ -164,7 +208,10 @@ export class ContextLogger {
     this.addEvent(event);
 
     if (this.shouldLog('error')) {
-      console.error(`❌ Context optimization error in ${context}:`, error.message);
+      console.error(
+        `❌ Context optimization error in ${context}:`,
+        error.message,
+      );
       if (additionalData && this.shouldLog('debug')) {
         console.error(`   Additional data:`, additionalData);
       }
@@ -176,9 +223,9 @@ export class ContextLogger {
    */
   getRecentStats(count = 10): OptimizationLogEntry[] {
     return this.events
-      .filter(e => e.type === 'optimization_complete')
+      .filter((e) => e.type === 'optimization_complete')
       .slice(-count)
-      .map(e => e.data as OptimizationLogEntry);
+      .map((e) => e.data as OptimizationLogEntry);
   }
 
   /**
@@ -191,8 +238,10 @@ export class ContextLogger {
     averageChunkReduction: number;
     errorRate: number;
   } {
-    const optimizations = this.events.filter(e => e.type === 'optimization_complete');
-    const errors = this.events.filter(e => e.type === 'error');
+    const optimizations = this.events.filter(
+      (e) => e.type === 'optimization_complete',
+    );
+    const errors = this.events.filter((e) => e.type === 'error');
 
     if (optimizations.length === 0) {
       return {
@@ -204,12 +253,20 @@ export class ContextLogger {
       };
     }
 
-    const avgProcessingTime = optimizations.reduce((sum, e) => sum + e.data.processingTimeMs, 0) / optimizations.length;
-    const avgTokenReduction = optimizations.reduce((sum, e) => sum + e.data.reductionPercentage, 0) / optimizations.length;
-    const avgChunkReduction = optimizations.reduce((sum, e) => {
-      const reduction = ((e.data.originalChunks - e.data.finalChunks) / e.data.originalChunks) * 100;
-      return sum + reduction;
-    }, 0) / optimizations.length;
+    const avgProcessingTime =
+      optimizations.reduce((sum, e) => sum + e.data.processingTimeMs, 0) /
+      optimizations.length;
+    const avgTokenReduction =
+      optimizations.reduce((sum, e) => sum + e.data.reductionPercentage, 0) /
+      optimizations.length;
+    const avgChunkReduction =
+      optimizations.reduce((sum, e) => {
+        const reduction =
+          ((e.data.originalChunks - e.data.finalChunks) /
+            e.data.originalChunks) *
+          100;
+        return sum + reduction;
+      }, 0) / optimizations.length;
 
     return {
       totalOptimizations: optimizations.length,
@@ -257,8 +314,14 @@ export class ContextLogger {
     return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
   }
 
-  private getChunkTypeBreakdown(chunks: ConversationChunk[]): Record<string, number> {
-    const breakdown: Record<string, number> = { user: 0, assistant: 0, tool: 0 };
+  private getChunkTypeBreakdown(
+    chunks: ConversationChunk[],
+  ): Record<string, number> {
+    const breakdown: Record<string, number> = {
+      user: 0,
+      assistant: 0,
+      tool: 0,
+    };
     for (const chunk of chunks) {
       breakdown[chunk.role] = (breakdown[chunk.role] || 0) + 1;
     }
@@ -272,15 +335,23 @@ export class ContextLogger {
     hybridAverage: number;
   } {
     if (results.length === 0) {
-      return { bm25Average: 0, recencyAverage: 0, embeddingAverage: 0, hybridAverage: 0 };
+      return {
+        bm25Average: 0,
+        recencyAverage: 0,
+        embeddingAverage: 0,
+        hybridAverage: 0,
+      };
     }
 
-    const totals = results.reduce((acc, result) => ({
-      bm25: acc.bm25 + (result.breakdown.bm25 || 0),
-      recency: acc.recency + (result.breakdown.recency || 0),
-      embedding: acc.embedding + (result.breakdown.embedding || 0),
-      hybrid: acc.hybrid + result.score,
-    }), { bm25: 0, recency: 0, embedding: 0, hybrid: 0 });
+    const totals = results.reduce(
+      (acc, result) => ({
+        bm25: acc.bm25 + (result.breakdown.bm25 || 0),
+        recency: acc.recency + (result.breakdown.recency || 0),
+        embedding: acc.embedding + (result.breakdown.embedding || 0),
+        hybrid: acc.hybrid + result.score,
+      }),
+      { bm25: 0, recency: 0, embedding: 0, hybrid: 0 },
+    );
 
     return {
       bm25Average: totals.bm25 / results.length,

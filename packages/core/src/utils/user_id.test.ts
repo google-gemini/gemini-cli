@@ -21,23 +21,25 @@ describe('user_id', () => {
           delete mockStorage[key];
         }),
         clear: vi.fn(() => {
-          Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+          Object.keys(mockStorage).forEach((key) => delete mockStorage[key]);
         }),
         length: 0,
-        key: vi.fn(() => null)
+        key: vi.fn(() => null),
       } as Storage;
     }
 
     // Mock crypto if not available
     if (typeof crypto === 'undefined') {
       global.crypto = {
-        randomUUID: vi.fn(() => 'mock-uuid-' + Math.random().toString(36).substr(2, 9)),
+        randomUUID: vi.fn(
+          () => 'mock-uuid-' + Math.random().toString(36).substr(2, 9),
+        ),
         getRandomValues: vi.fn((array: Uint8Array) => {
           for (let i = 0; i < array.length; i++) {
             array[i] = Math.floor(Math.random() * 256);
           }
           return array;
-        })
+        }),
       } as Crypto;
     }
   });
@@ -65,9 +67,10 @@ describe('user_id', () => {
 
     it('should generate a valid UUID format', () => {
       const installationId = getInstallationId();
-      
+
       // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       expect(installationId).toMatch(uuidRegex);
     });
 
@@ -83,7 +86,7 @@ describe('user_id', () => {
     it('should generate different IDs for different instances', () => {
       localStorage.clear();
       const firstId = getInstallationId();
-      
+
       localStorage.clear();
       const secondId = getInstallationId();
 
@@ -107,9 +110,9 @@ describe('user_id', () => {
           removeItem: vi.fn(),
           clear: vi.fn(),
           length: 0,
-          key: vi.fn()
+          key: vi.fn(),
         },
-        writable: true
+        writable: true,
       });
 
       // Should still return a valid ID even if localStorage fails
@@ -216,7 +219,7 @@ describe('user_id', () => {
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
-      
+
       // Should not be the same as the raw Google Account ID
       expect(result).not.toBe(mockGoogleAccountId);
     });
@@ -258,9 +261,9 @@ describe('user_id', () => {
           removeItem: vi.fn(),
           clear: vi.fn(),
           length: 0,
-          key: vi.fn()
+          key: vi.fn(),
         },
-        writable: true
+        writable: true,
       });
 
       // Should fallback gracefully
@@ -299,7 +302,8 @@ describe('user_id', () => {
     });
 
     it('should handle special characters in Google Account ID', () => {
-      const specialCharsAccountId = 'user@example.com!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const specialCharsAccountId =
+        'user@example.com!@#$%^&*()_+-=[]{}|;:,.<>?';
       localStorage.setItem('google_account_id', specialCharsAccountId);
 
       const result = getObfuscatedGoogleAccountId();
@@ -338,7 +342,7 @@ describe('user_id', () => {
       // Remove both localStorage and crypto
       const originalLocalStorage = global.localStorage;
       const originalCrypto = global.crypto;
-      
+
       delete (global as any).localStorage;
       delete (global as any).crypto;
 
@@ -360,15 +364,15 @@ describe('user_id', () => {
       localStorage.clear();
 
       // Make multiple concurrent calls
-      const promises = Array.from({ length: 10 }, () => 
-        Promise.resolve(getInstallationId())
+      const promises = Array.from({ length: 10 }, () =>
+        Promise.resolve(getInstallationId()),
       );
 
       const results = await Promise.all(promises);
 
       // All results should be the same (consistent)
       const firstResult = results[0];
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBe(firstResult);
       });
     });
@@ -394,7 +398,7 @@ describe('user_id', () => {
         get: () => {
           throw new DOMException('Access denied');
         },
-        configurable: true
+        configurable: true,
       });
 
       const installationId = getInstallationId();
@@ -417,12 +421,12 @@ describe('user_id', () => {
         removeItem: vi.fn(),
         clear: vi.fn(),
         length: 0,
-        key: vi.fn()
+        key: vi.fn(),
       };
 
       Object.defineProperty(global, 'localStorage', {
         value: mockLocalStorage,
-        writable: true
+        writable: true,
       });
 
       const result = getInstallationId();
@@ -435,16 +439,16 @@ describe('user_id', () => {
   describe('Performance and reliability', () => {
     it('should execute quickly for repeated calls', () => {
       const start = performance.now();
-      
+
       // Make 100 calls
       for (let i = 0; i < 100; i++) {
         getInstallationId();
         getObfuscatedGoogleAccountId();
       }
-      
+
       const end = performance.now();
       const duration = end - start;
-      
+
       // Should complete 200 total calls in reasonable time (< 100ms)
       expect(duration).toBeLessThan(100);
     });
@@ -452,32 +456,34 @@ describe('user_id', () => {
     it('should not leak memory with repeated calls', () => {
       // This is more of a conceptual test - in a real environment you'd use memory profiling
       const initialMemoryKeys = Object.keys(localStorage);
-      
+
       // Make many calls
       for (let i = 0; i < 50; i++) {
         getInstallationId();
         getObfuscatedGoogleAccountId();
       }
-      
+
       const finalMemoryKeys = Object.keys(localStorage);
-      
+
       // Should not have significantly increased localStorage usage
-      expect(finalMemoryKeys.length - initialMemoryKeys.length).toBeLessThanOrEqual(2);
+      expect(
+        finalMemoryKeys.length - initialMemoryKeys.length,
+      ).toBeLessThanOrEqual(2);
     });
 
     it('should handle rapid sequential calls without race conditions', () => {
       localStorage.clear();
-      
+
       const results: string[] = [];
-      
+
       // Make rapid sequential calls
       for (let i = 0; i < 20; i++) {
         results.push(getInstallationId());
       }
-      
+
       // All results should be identical
       const firstResult = results[0];
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBe(firstResult);
       });
     });
@@ -485,14 +491,14 @@ describe('user_id', () => {
     it('should be deterministic with same input conditions', () => {
       const testAccountId = 'deterministic-test-account';
       let expectedResult: string;
-      
+
       // Run test multiple times with same conditions
       for (let i = 0; i < 5; i++) {
         localStorage.clear();
         localStorage.setItem('google_account_id', testAccountId);
-        
+
         const result = getObfuscatedGoogleAccountId();
-        
+
         // Should get same result each time with same input
         if (i === 0) {
           expectedResult = result;
@@ -514,7 +520,9 @@ describe('user_id', () => {
     });
 
     it('should handle localStorage returning objects', () => {
-      vi.spyOn(localStorage, 'getItem').mockReturnValue({ invalid: 'object' } as any);
+      vi.spyOn(localStorage, 'getItem').mockReturnValue({
+        invalid: 'object',
+      } as any);
 
       const result = getInstallationId();
       expect(result).toBeDefined();
@@ -524,7 +532,7 @@ describe('user_id', () => {
     it('should handle localStorage with circular references', () => {
       const circular: any = { prop: null };
       circular.prop = circular;
-      
+
       vi.spyOn(localStorage, 'getItem').mockReturnValue(circular);
 
       const result = getInstallationId();

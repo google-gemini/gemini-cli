@@ -6,11 +6,18 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContextLogger } from './ContextLogger.js';
-import type { ConversationChunk, ScoringResult, PruningStats } from './types.js';
+import type {
+  ConversationChunk,
+  ScoringResult,
+  PruningStats,
+} from './types.js';
 
 describe('ContextLogger', () => {
   let logger: ContextLogger;
-  let consoleSpy: { log: ReturnType<typeof vi.spyOn>; error: ReturnType<typeof vi.spyOn> };
+  let consoleSpy: {
+    log: ReturnType<typeof vi.spyOn>;
+    error: ReturnType<typeof vi.spyOn>;
+  };
 
   beforeEach(() => {
     logger = new ContextLogger('debug');
@@ -48,7 +55,9 @@ describe('ContextLogger', () => {
       logger.logOptimizationStart('test query', chunks, 1000);
 
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Context optimization started: 2 chunks (15 tokens) -> budget: 1000 tokens')
+        expect.stringContaining(
+          'Context optimization started: 2 chunks (15 tokens) -> budget: 1000 tokens',
+        ),
       );
 
       const events = logger.exportLogs();
@@ -88,7 +97,7 @@ describe('ContextLogger', () => {
       logger.logScoringComplete(results, 50);
 
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Scoring complete: 2 chunks in 50ms')
+        expect.stringContaining('Scoring complete: 2 chunks in 50ms'),
       );
 
       const events = logger.exportLogs();
@@ -124,10 +133,12 @@ describe('ContextLogger', () => {
       logger.logPruningComplete(stats, 5, selectedChunks);
 
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Pruning complete: 100 -> 60 chunks (40.0% reduction)')
+        expect.stringContaining(
+          'Pruning complete: 100 -> 60 chunks (40.0% reduction)',
+        ),
       );
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Mandatory chunks preserved: 5')
+        expect.stringContaining('Mandatory chunks preserved: 5'),
       );
 
       const events = logger.exportLogs();
@@ -156,17 +167,17 @@ describe('ContextLogger', () => {
         prunedChunks: ['1', '2', '3'],
         topScoredChunks: [
           { id: 'top1', score: 0.95, tokens: 10 },
-          { id: 'top2', score: 0.90, tokens: 15 },
+          { id: 'top2', score: 0.9, tokens: 15 },
         ],
       };
 
       logger.logOptimizationComplete(logEntry);
 
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Context optimization complete:')
+        expect.stringContaining('Context optimization complete:'),
       );
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Processing time: 75ms')
+        expect.stringContaining('Processing time: 75ms'),
       );
 
       const events = logger.exportLogs();
@@ -185,7 +196,7 @@ describe('ContextLogger', () => {
 
       expect(consoleSpy.error).toHaveBeenCalledWith(
         expect.stringContaining('Context optimization error in scoring phase:'),
-        'Test error'
+        'Test error',
       );
 
       const events = logger.exportLogs();
@@ -305,7 +316,7 @@ describe('ContextLogger', () => {
       // Debug logging should not appear
       infoLogger.logScoringComplete([], 10);
       expect(consoleSpy.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Scoring complete')
+        expect.stringContaining('Scoring complete'),
       );
     });
 

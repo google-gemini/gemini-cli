@@ -161,11 +161,11 @@ describe('ChunkRegistry', () => {
         },
       ];
 
-      chunks.forEach(chunk => registry.addChunk(chunk));
+      chunks.forEach((chunk) => registry.addChunk(chunk));
       const retrieved = registry.getAllChunks();
 
       expect(retrieved).toHaveLength(3);
-      expect(retrieved.map(c => c.id)).toEqual(['1', '2', '3']);
+      expect(retrieved.map((c) => c.id)).toEqual(['1', '2', '3']);
     });
   });
 
@@ -206,13 +206,13 @@ describe('ChunkRegistry', () => {
         },
       ];
 
-      chunks.forEach(chunk => registry.addChunk(chunk));
+      chunks.forEach((chunk) => registry.addChunk(chunk));
     });
 
     it('should return chunks filtered by role', () => {
       const userChunks = registry.getChunksByRole('user');
       expect(userChunks).toHaveLength(2);
-      expect(userChunks.map(c => c.id)).toEqual(['1', '3']);
+      expect(userChunks.map((c) => c.id)).toEqual(['1', '3']);
 
       const assistantChunks = registry.getChunksByRole('assistant');
       expect(assistantChunks).toHaveLength(1);
@@ -257,7 +257,7 @@ describe('ChunkRegistry', () => {
         },
       ];
 
-      chunks.forEach(chunk => registry.addChunk(chunk));
+      chunks.forEach((chunk) => registry.addChunk(chunk));
       expect(registry.getTotalTokens()).toBe(50);
     });
 
@@ -312,7 +312,7 @@ describe('ChunkRegistry', () => {
         },
       ];
 
-      chunks.forEach(chunk => registry.addChunk(chunk));
+      chunks.forEach((chunk) => registry.addChunk(chunk));
       expect(registry.getAllChunks()).toHaveLength(2);
       expect(registry.getTotalTokens()).toBe(12);
 

@@ -32,7 +32,7 @@ export class ChunkRegistry {
    */
   addChunk(chunk: ConversationChunk): void {
     const existingNode = this.chunks.get(chunk.id);
-    
+
     if (existingNode) {
       // Update existing chunk in-place without changing position
       existingNode.chunk = chunk;
@@ -43,9 +43,9 @@ export class ChunkRegistry {
         prev: this.tail,
         next: null,
       };
-      
+
       this.chunks.set(chunk.id, newNode);
-      
+
       if (this.tail) {
         this.tail.next = newNode;
         this.tail = newNode;
@@ -54,7 +54,7 @@ export class ChunkRegistry {
         this.head = newNode;
         this.tail = newNode;
       }
-      
+
       this._size++;
     }
   }
@@ -78,7 +78,7 @@ export class ChunkRegistry {
     if (!node) {
       return false;
     }
-    
+
     // Remove from linked list
     if (node.prev) {
       node.prev.next = node.next;
@@ -86,18 +86,18 @@ export class ChunkRegistry {
       // Removing head
       this.head = node.next;
     }
-    
+
     if (node.next) {
       node.next.prev = node.prev;
     } else {
       // Removing tail
       this.tail = node.prev;
     }
-    
+
     // Remove from map
     this.chunks.delete(id);
     this._size--;
-    
+
     return true;
   }
 
@@ -108,12 +108,12 @@ export class ChunkRegistry {
   getAllChunks(): ConversationChunk[] {
     const chunks: ConversationChunk[] = [];
     let current = this.head;
-    
+
     while (current) {
       chunks.push(current.chunk);
       current = current.next;
     }
-    
+
     return chunks;
   }
 
@@ -124,14 +124,14 @@ export class ChunkRegistry {
   getChunksByRole(role: 'user' | 'assistant' | 'tool'): ConversationChunk[] {
     const chunks: ConversationChunk[] = [];
     let current = this.head;
-    
+
     while (current) {
       if (current.chunk.role === role) {
         chunks.push(current.chunk);
       }
       current = current.next;
     }
-    
+
     return chunks;
   }
 
@@ -142,12 +142,12 @@ export class ChunkRegistry {
   getTotalTokens(): number {
     let total = 0;
     let current = this.head;
-    
+
     while (current) {
       total += current.chunk.tokens;
       current = current.next;
     }
-    
+
     return total;
   }
 
@@ -174,17 +174,23 @@ export class ChunkRegistry {
    * Get chunks within a time range.
    * O(n) time complexity, optimized traversal.
    */
-  getChunksByTimeRange(startTime: number, endTime: number): ConversationChunk[] {
+  getChunksByTimeRange(
+    startTime: number,
+    endTime: number,
+  ): ConversationChunk[] {
     const chunks: ConversationChunk[] = [];
     let current = this.head;
-    
+
     while (current) {
-      if (current.chunk.timestamp >= startTime && current.chunk.timestamp <= endTime) {
+      if (
+        current.chunk.timestamp >= startTime &&
+        current.chunk.timestamp <= endTime
+      ) {
         chunks.push(current.chunk);
       }
       current = current.next;
     }
-    
+
     return chunks;
   }
 
@@ -195,14 +201,14 @@ export class ChunkRegistry {
   getPinnedChunks(): ConversationChunk[] {
     const chunks: ConversationChunk[] = [];
     let current = this.head;
-    
+
     while (current) {
       if (current.chunk.metadata.pinned === true) {
         chunks.push(current.chunk);
       }
       current = current.next;
     }
-    
+
     return chunks;
   }
 
@@ -213,14 +219,16 @@ export class ChunkRegistry {
   getChunksByScore(): ConversationChunk[] {
     const chunks: ConversationChunk[] = [];
     let current = this.head;
-    
+
     while (current) {
       if (current.chunk.metadata.finalScore !== undefined) {
         chunks.push(current.chunk);
       }
       current = current.next;
     }
-    
-    return chunks.sort((a, b) => (b.metadata.finalScore || 0) - (a.metadata.finalScore || 0));
+
+    return chunks.sort(
+      (a, b) => (b.metadata.finalScore || 0) - (a.metadata.finalScore || 0),
+    );
   }
 }

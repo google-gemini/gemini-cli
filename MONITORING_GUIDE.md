@@ -30,6 +30,7 @@ When context optimization is enabled, you'll see console output like this:
 ### **2. Environment Variables**
 
 Enable context optimization with:
+
 ```bash
 export GEMINI_CONTEXT_OPTIMIZATION=true
 export GEMINI_CONTEXT_MAX_CHUNKS=200
@@ -46,18 +47,21 @@ export GEMINI_EMBEDDING_ENABLED=false  # Set true when embeddings available
 import { ContextManager } from '@google/gemini-cli-core';
 
 // Initialize with debug logging to see detailed output
-const contextManager = new ContextManager({
-  enabled: true,
-  maxChunks: 200,
-  embeddingEnabled: false,
-  aggressivePruning: false,
-  scoringWeights: {
-    embedding: 0.4,
-    bm25: 0.4,
-    recency: 0.15,
-    manual: 0.05
-  }
-}, 'debug');  // Enable debug-level logging
+const contextManager = new ContextManager(
+  {
+    enabled: true,
+    maxChunks: 200,
+    embeddingEnabled: false,
+    aggressivePruning: false,
+    scoringWeights: {
+      embedding: 0.4,
+      bm25: 0.4,
+      recency: 0.15,
+      manual: 0.05,
+    },
+  },
+  'debug',
+); // Enable debug-level logging
 
 // Add conversation chunks
 await contextManager.addChunk({
@@ -66,13 +70,13 @@ await contextManager.addChunk({
   content: 'How do I implement authentication?',
   tokens: 8,
   timestamp: Date.now(),
-  metadata: {}
+  metadata: {},
 });
 
 // Optimize context
 const optimizedContext = await contextManager.optimizeContext(
-  { text: "authentication implementation help" },
-  50000  // token budget
+  { text: 'authentication implementation help' },
+  50000, // token budget
 );
 
 // Check performance metrics
@@ -104,12 +108,12 @@ console.log('Last optimization:', lastStats);
 
 ### **1. Performance Metrics**
 
-| Metric | Good Value | Warning | Critical |
-|--------|------------|---------|----------|
-| **Processing Time** | <100ms | 100-500ms | >500ms |
-| **Token Reduction** | 30-60% | 10-30% | <10% |
-| **Error Rate** | 0% | 1-5% | >5% |
-| **Throughput** | >5 req/sec | 2-5 req/sec | <2 req/sec |
+| Metric              | Good Value | Warning     | Critical   |
+| ------------------- | ---------- | ----------- | ---------- |
+| **Processing Time** | <100ms     | 100-500ms   | >500ms     |
+| **Token Reduction** | 30-60%     | 10-30%      | <10%       |
+| **Error Rate**      | 0%         | 1-5%        | >5%        |
+| **Throughput**      | >5 req/sec | 2-5 req/sec | <2 req/sec |
 
 ### **2. Quality Metrics**
 
@@ -126,8 +130,10 @@ if (stats) {
 const recent = contextManager.getRecentOptimizations(1)[0];
 if (recent) {
   console.log('Top scored chunks:');
-  recent.topScoredChunks.forEach(chunk => {
-    console.log(`  ${chunk.id}: score=${chunk.score.toFixed(3)}, tokens=${chunk.tokens}`);
+  recent.topScoredChunks.forEach((chunk) => {
+    console.log(
+      `  ${chunk.id}: score=${chunk.score.toFixed(3)}, tokens=${chunk.tokens}`,
+    );
   });
 }
 ```
@@ -138,17 +144,19 @@ if (recent) {
 // Check that all scoring algorithms are working
 const recent = contextManager.getRecentOptimizations(1)[0];
 if (recent) {
-  const { bm25Average, recencyAverage, embeddingAverage, hybridAverage } = recent.scoringBreakdown;
-  
+  const { bm25Average, recencyAverage, embeddingAverage, hybridAverage } =
+    recent.scoringBreakdown;
+
   console.log('Scoring breakdown:');
   console.log(`  BM25 (lexical): ${bm25Average.toFixed(3)}`);
   console.log(`  Recency: ${recencyAverage.toFixed(3)}`);
   console.log(`  Embedding: ${embeddingAverage.toFixed(3)}`);
   console.log(`  Hybrid final: ${hybridAverage.toFixed(3)}`);
-  
+
   // All should be > 0 if working correctly
   if (bm25Average === 0) console.warn('⚠️ BM25 scoring may not be working');
-  if (recencyAverage === 0) console.warn('⚠️ Recency scoring may not be working');
+  if (recencyAverage === 0)
+    console.warn('⚠️ Recency scoring may not be working');
   if (embeddingAverage === 0 && recent.query.includes('embedding')) {
     console.warn('⚠️ Embedding scoring expected but not working');
   }
@@ -162,10 +170,12 @@ if (recent) {
 ### **Problem: No Token Reduction**
 
 **Symptoms:**
+
 - `reductionPercentage: 0`
 - Same number of chunks before/after optimization
 
 **Checks:**
+
 ```typescript
 // 1. Verify optimization is enabled
 const config = contextManager.getConfig();
@@ -177,10 +187,13 @@ console.log(`Budget: ${stats?.originalTokens}, Used: ${stats?.prunedTokens}`);
 
 // 3. Check for mandatory chunks
 const recent = contextManager.getRecentOptimizations(1)[0];
-console.log(`Mandatory chunks: ${recent?.mandatoryChunks} of ${recent?.originalChunks}`);
+console.log(
+  `Mandatory chunks: ${recent?.mandatoryChunks} of ${recent?.originalChunks}`,
+);
 ```
 
 **Solutions:**
+
 - Ensure `GEMINI_CONTEXT_OPTIMIZATION=true`
 - Increase token budget if all chunks are mandatory
 - Check that chunks have token counts > 0
@@ -188,10 +201,12 @@ console.log(`Mandatory chunks: ${recent?.mandatoryChunks} of ${recent?.originalC
 ### **Problem: High Processing Time**
 
 **Symptoms:**
+
 - `processingTimeMs > 500ms`
 - Slow response times
 
 **Checks:**
+
 ```typescript
 // Check chunk count and complexity
 const performance = contextManager.getPerformanceSummary();
@@ -203,6 +218,7 @@ console.log(`Chunk count: ${recent?.originalChunks}`);
 ```
 
 **Solutions:**
+
 - Reduce `maxChunks` configuration
 - Enable `aggressivePruning` for faster processing
 - Consider chunking very large conversations
@@ -210,10 +226,12 @@ console.log(`Chunk count: ${recent?.originalChunks}`);
 ### **Problem: Low Relevance Scores**
 
 **Symptoms:**
+
 - All scores near 0
 - Poor chunk selection
 
 **Checks:**
+
 ```typescript
 // Check scoring breakdown
 const recent = contextManager.getRecentOptimizations(1)[0];
@@ -221,12 +239,13 @@ console.log('Scoring averages:', recent?.scoringBreakdown);
 
 // Check query and content similarity
 console.log(`Query: "${recent?.query}"`);
-recent?.topScoredChunks.forEach(chunk => {
+recent?.topScoredChunks.forEach((chunk) => {
   console.log(`Top chunk ${chunk.id}: ${chunk.score.toFixed(3)}`);
 });
 ```
 
 **Solutions:**
+
 - Verify query text is meaningful
 - Check that chunk content is relevant to queries
 - Adjust scoring weights in configuration
@@ -241,7 +260,7 @@ recent?.topScoredChunks.forEach(chunk => {
 // Production: info level (shows optimization results)
 const contextManager = new ContextManager(config, 'info');
 
-// Development: debug level (shows detailed breakdown)  
+// Development: debug level (shows detailed breakdown)
 const contextManager = new ContextManager(config, 'debug');
 
 // Error tracking: error level only
@@ -254,12 +273,14 @@ const contextManager = new ContextManager(config, 'error');
 // Collect metrics periodically
 setInterval(() => {
   const performance = contextManager.getPerformanceSummary();
-  
+
   // Send to monitoring system
   sendMetrics({
     'context_optimization.total_optimizations': performance.totalOptimizations,
-    'context_optimization.avg_processing_time': performance.averageProcessingTime,
-    'context_optimization.avg_token_reduction': performance.averageTokenReduction,
+    'context_optimization.avg_processing_time':
+      performance.averageProcessingTime,
+    'context_optimization.avg_token_reduction':
+      performance.averageTokenReduction,
     'context_optimization.error_rate': performance.errorRate,
   });
 }, 60000); // Every minute
@@ -289,24 +310,28 @@ if (performance.averageTokenReduction < 10) {
 ## 📋 **Validation Checklist**
 
 ### **✅ Basic Functionality**
+
 - [ ] Console shows optimization start/complete messages
 - [ ] Token count reduces when over budget
 - [ ] Processing time < 100ms for typical conversations
 - [ ] No error messages in logs
 
 ### **✅ Scoring Quality**
+
 - [ ] BM25 scores > 0 for relevant content
 - [ ] Recency scores favor recent messages
 - [ ] Top-scored chunks are actually relevant
 - [ ] Mandatory chunks (pinned, system) preserved
 
 ### **✅ Performance**
+
 - [ ] Handles 100+ chunks efficiently
 - [ ] Memory usage remains stable
 - [ ] No memory leaks in long-running processes
 - [ ] Scales linearly with conversation size
 
 ### **✅ Error Handling**
+
 - [ ] Graceful fallback when scoring fails
 - [ ] Continues working with malformed chunks
 - [ ] Handles edge cases (empty conversations, zero budgets)
@@ -317,19 +342,22 @@ if (performance.averageTokenReduction < 10) {
 ## 🎯 **Success Indicators**
 
 **🟢 Working Well:**
+
 - 30-60% token reduction under budget pressure
 - <100ms processing time for typical conversations
 - Relevant chunks consistently scored higher
 - Error rate < 1%
 
 **🟡 Needs Tuning:**
+
 - 10-30% token reduction (adjust scoring weights)
 - 100-500ms processing time (reduce chunk count)
 - Mixed relevance in top chunks (improve query matching)
 
 **🔴 Requires Investigation:**
+
 - <10% token reduction (check configuration)
-- >500ms processing time (performance issue)
+- > 500ms processing time (performance issue)
 - Frequent errors (system problem)
 - No console output (feature not enabled)
 

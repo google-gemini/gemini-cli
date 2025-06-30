@@ -124,7 +124,8 @@ describe('Context Types', () => {
         manual: 0.05,
       };
 
-      const sum = weights.embedding + weights.bm25 + weights.recency + weights.manual;
+      const sum =
+        weights.embedding + weights.bm25 + weights.recency + weights.manual;
       expect(sum).toBe(1.0);
     });
   });
@@ -256,7 +257,8 @@ describe('Context Types', () => {
     it('should calculate reduction percentage correctly', () => {
       const originalTokens = 1000;
       const prunedTokens = 700;
-      const expectedReduction = ((originalTokens - prunedTokens) / originalTokens) * 100;
+      const expectedReduction =
+        ((originalTokens - prunedTokens) / originalTokens) * 100;
 
       const stats: PruningStats = {
         originalChunks: 50,

@@ -51,7 +51,7 @@ describe('BM25Scorer', () => {
       const results = scorer.scoreChunks(chunks, query);
 
       expect(results).toHaveLength(3);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.chunkId).toBeDefined();
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.breakdown.bm25).toBeDefined();
@@ -63,7 +63,8 @@ describe('BM25Scorer', () => {
         {
           id: 'relevant',
           role: 'assistant',
-          content: 'Authentication is important for security. Use JWT tokens for authentication.',
+          content:
+            'Authentication is important for security. Use JWT tokens for authentication.',
           tokens: 15,
           timestamp: 1,
           metadata: {},
@@ -83,10 +84,12 @@ describe('BM25Scorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      const relevantResult = results.find(r => r.chunkId === 'relevant');
-      const irrelevantResult = results.find(r => r.chunkId === 'irrelevant');
+      const relevantResult = results.find((r) => r.chunkId === 'relevant');
+      const irrelevantResult = results.find((r) => r.chunkId === 'irrelevant');
 
-      expect(relevantResult?.score).toBeGreaterThan(irrelevantResult?.score || 0);
+      expect(relevantResult?.score).toBeGreaterThan(
+        irrelevantResult?.score || 0,
+      );
     });
 
     it('should handle empty query gracefully', () => {
@@ -144,7 +147,7 @@ describe('BM25Scorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
       });
@@ -155,7 +158,8 @@ describe('BM25Scorer', () => {
         {
           id: '1',
           role: 'user',
-          content: 'How to use Node.js? Can you help with Express.js implementation!',
+          content:
+            'How to use Node.js? Can you help with Express.js implementation!',
           tokens: 15,
           timestamp: 1,
           metadata: {},
@@ -216,8 +220,8 @@ describe('BM25Scorer', () => {
       };
 
       const results = scorer.scoreChunks(chunks, query);
-      const result1 = results.find(r => r.chunkId === '1');
-      const result2 = results.find(r => r.chunkId === '2');
+      const result1 = results.find((r) => r.chunkId === '1');
+      const result2 = results.find((r) => r.chunkId === '2');
 
       // Both should have positive scores
       expect(result1?.score).toBeGreaterThan(0);

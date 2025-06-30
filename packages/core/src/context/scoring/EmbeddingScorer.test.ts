@@ -110,21 +110,21 @@ describe('EmbeddingScorer', () => {
       expect(results).toHaveLength(6);
 
       // chunk1: identical embedding should have similarity = 1.0
-      const chunk1Result = results.find(r => r.chunkId === 'chunk1');
+      const chunk1Result = results.find((r) => r.chunkId === 'chunk1');
       expect(chunk1Result?.score).toBeCloseTo(1.0, 3);
       expect(chunk1Result?.breakdown.embedding).toBeCloseTo(1.0, 3);
 
       // chunk2: reverse embedding should have positive similarity but less than 1.0
-      const chunk2Result = results.find(r => r.chunkId === 'chunk2');
+      const chunk2Result = results.find((r) => r.chunkId === 'chunk2');
       expect(chunk2Result?.score).toBeGreaterThan(0);
       expect(chunk2Result?.score).toBeLessThan(1.0);
 
       // chunk3: opposite embedding should have similarity close to -1.0, but normalized to 0
-      const chunk3Result = results.find(r => r.chunkId === 'chunk3');
+      const chunk3Result = results.find((r) => r.chunkId === 'chunk3');
       expect(chunk3Result?.score).toBe(0); // Negative similarities clamped to 0
 
       // chunk5: orthogonal embedding should have similarity close to 0
-      const chunk5Result = results.find(r => r.chunkId === 'chunk5');
+      const chunk5Result = results.find((r) => r.chunkId === 'chunk5');
       expect(chunk5Result?.score).toBeLessThan(0.1); // Should be close to 0
     });
 
@@ -136,7 +136,7 @@ describe('EmbeddingScorer', () => {
       const results = await embeddingScorer.scoreChunks(sampleChunks, query);
 
       // chunk6 has no embedding
-      const chunk6Result = results.find(r => r.chunkId === 'chunk6');
+      const chunk6Result = results.find((r) => r.chunkId === 'chunk6');
       expect(chunk6Result?.score).toBe(0);
       expect(chunk6Result?.breakdown.embedding).toBe(0);
     });
@@ -149,7 +149,7 @@ describe('EmbeddingScorer', () => {
       const results = await embeddingScorer.scoreChunks(sampleChunks, query);
 
       // chunk4 has zero embedding
-      const chunk4Result = results.find(r => r.chunkId === 'chunk4');
+      const chunk4Result = results.find((r) => r.chunkId === 'chunk4');
       expect(chunk4Result?.score).toBe(0); // Zero vector similarity handled gracefully
       expect(chunk4Result?.breakdown.embedding).toBe(0);
     });
@@ -172,7 +172,7 @@ describe('EmbeddingScorer', () => {
 
       // Should still return results with zero scores when query is empty
       expect(results).toHaveLength(6);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBe(0);
       });
     });
@@ -187,7 +187,7 @@ describe('EmbeddingScorer', () => {
       const results = await embeddingScorer.scoreChunks(sampleChunks, query);
 
       // All chunks should get valid scores based on their pre-computed embeddings
-      const validResults = results.filter(r => r.score > 0);
+      const validResults = results.filter((r) => r.score > 0);
       expect(validResults.length).toBeGreaterThan(0);
     });
 
@@ -198,7 +198,7 @@ describe('EmbeddingScorer', () => {
 
       const results = await embeddingScorer.scoreChunks(sampleChunks, query);
 
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
       });
@@ -233,17 +233,22 @@ describe('EmbeddingScorer', () => {
       };
 
       // Should handle dimension mismatches without throwing
-      const results = await embeddingScorer.scoreChunks(chunksWithMismatchedEmbeddings, query);
+      const results = await embeddingScorer.scoreChunks(
+        chunksWithMismatchedEmbeddings,
+        query,
+      );
 
       expect(results).toHaveLength(2);
       // Mismatched dimensions should result in 0 scores
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBe(0);
       });
     });
 
     it('should handle embedding generation failures gracefully', async () => {
-      const mockFailingGenerator = vi.fn().mockRejectedValue(new Error('Embedding API failed'));
+      const mockFailingGenerator = vi
+        .fn()
+        .mockRejectedValue(new Error('Embedding API failed'));
       const failingScorer = new EmbeddingScorer(mockFailingGenerator);
 
       const query: RelevanceQuery = {
@@ -254,7 +259,7 @@ describe('EmbeddingScorer', () => {
 
       // Should return zero scores when embedding generation fails
       expect(results).toHaveLength(6);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBe(0);
         expect(result.breakdown.embedding).toBe(0);
       });
@@ -269,11 +274,14 @@ describe('EmbeddingScorer', () => {
       };
 
       // Should work with pre-computed embeddings only
-      const results = await scorerWithoutGenerator.scoreChunks(sampleChunks.slice(0, 5), query);
+      const results = await scorerWithoutGenerator.scoreChunks(
+        sampleChunks.slice(0, 5),
+        query,
+      );
 
       expect(results).toHaveLength(5);
       // Without query embedding, should return zero scores
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBe(0);
       });
     });
@@ -325,15 +333,15 @@ describe('EmbeddingScorer', () => {
       const results = await scorer.scoreChunks(testChunks, query);
 
       // Identical vectors: cosine similarity = 1.0
-      const identicalResult = results.find(r => r.chunkId === 'identical');
+      const identicalResult = results.find((r) => r.chunkId === 'identical');
       expect(identicalResult?.score).toBeCloseTo(1.0, 3);
 
       // Orthogonal vectors: cosine similarity = 0.0
-      const orthogonalResult = results.find(r => r.chunkId === 'orthogonal');
+      const orthogonalResult = results.find((r) => r.chunkId === 'orthogonal');
       expect(orthogonalResult?.score).toBeCloseTo(0.0, 3);
 
       // Opposite vectors: cosine similarity = -1.0, but clamped to 0
-      const oppositeResult = results.find(r => r.chunkId === 'opposite');
+      const oppositeResult = results.find((r) => r.chunkId === 'opposite');
       expect(oppositeResult?.score).toBe(0);
     });
 
@@ -368,8 +376,10 @@ describe('EmbeddingScorer', () => {
 
   describe('performance and edge cases', () => {
     it('should handle large embedding dimensions efficiently', async () => {
-      const largeEmbedding = new Array(1024).fill(0).map((_, i) => Math.sin(i * 0.1));
-      
+      const largeEmbedding = new Array(1024)
+        .fill(0)
+        .map((_, i) => Math.sin(i * 0.1));
+
       const testChunks: ConversationChunk[] = [
         {
           id: 'large',
@@ -433,7 +443,7 @@ describe('EmbeddingScorer', () => {
 
       // Should handle invalid values gracefully
       expect(results).toHaveLength(2);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
         expect(Number.isFinite(result.score)).toBe(true);

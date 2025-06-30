@@ -664,767 +664,88 @@ describe('EditTool', () => {
   });
 });
 
-  describe('Additional Edge Cases and Error Handling', () => {
-    const testFile = 'edge_case_test.txt';
-    let filePath: string;
+describe('Additional Edge Cases and Error Handling', () => {
+  const testFile = 'edge_case_test.txt';
+  let filePath: string;
 
-    beforeEach(() => {
-      filePath = path.join(rootDir, testFile);
-    });
+  beforeEach(() => {
+    filePath = path.join(rootDir, testFile);
+  });
 
-    describe('File System Error Handling', () => {
-      it('should handle file read permissions errors gracefully', async () => {
-        fs.writeFileSync(filePath, 'content', { mode: 0o000 }); // No read permissions
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-        
-        try {
-          const result = await tool.execute(params, new AbortController().signal);
-          expect(result.llmContent).toMatch(/Error:/);
-        } finally {
-          // Restore permissions for cleanup
-          fs.chmodSync(filePath, 0o644);
-        }
-      });
+  describe('File System Error Handling', () => {
+    it('should handle file read permissions errors gracefully', async () => {
+      fs.writeFileSync(filePath, 'content', { mode: 0o000 }); // No read permissions
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
 
-      it('should handle directory creation errors for nested paths', async () => {
-        const nestedPath = path.join(rootDir, 'deeply', 'nested', 'path', 'file.txt');
-        const params: EditToolParams = {
-          file_path: nestedPath,
-          old_string: '',
-          new_string: 'content',
-        };
-
-        (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(ApprovalMode.AUTO_EDIT);
-        const result = await tool.execute(params, new AbortController().signal);
-        
-        expect(result.llmContent).toMatch(/Created new file/);
-        expect(fs.existsSync(nestedPath)).toBe(true);
-      });
-
-      it('should handle write permission errors gracefully', async () => {
-        // Create a read-only directory
-        const readOnlyDir = path.join(tempDir, 'readonly');
-        fs.mkdirSync(readOnlyDir, { mode: 0o444 });
-        const readOnlyFile = path.join(readOnlyDir, 'readonly.txt');
-        
-        const params: EditToolParams = {
-          file_path: readOnlyFile,
-          old_string: '',
-          new_string: 'content',
-        };
-
-        try {
-          const result = await tool.execute(params, new AbortController().signal);
-          expect(result.llmContent).toMatch(/Error:/);
-        } finally {
-          // Cleanup - restore permissions
-          fs.chmodSync(readOnlyDir, 0o755);
-        }
-      });
-    });
-
-    describe('Unicode and Special Character Handling', () => {
-      it('should handle files with Unicode characters correctly', async () => {
-        const unicodeContent = '🚀 Hello, 世界! Café résumé naïve 🌟';
-        const unicodeOld = '世界';
-        const unicodeNew = 'World';
-        
-        fs.writeFileSync(filePath, unicodeContent, 'utf8');
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: unicodeOld,
-          new_string: unicodeNew,
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toContain(unicodeNew);
-        expect(updatedContent).not.toContain(unicodeOld);
-      });
-
-      it('should handle files with different line endings', async () => {
-        const contentWithCRLF = 'line1\r\nline2\r\nold text\r\nline4';
-        fs.writeFileSync(filePath, contentWithCRLF, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'old text',
-          new_string: 'new text',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toContain('new text');
-        expect(updatedContent).toContain('\r\n'); // Preserves original line endings
-      });
-
-      it('should handle empty files correctly', async () => {
-        fs.writeFileSync(filePath, '', 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: '',
-          new_string: 'first content',
-        };
-
-        const result = await tool.execute(params, new AbortController().signal);
-        expect(result.llmContent).toMatch(/File already exists, cannot create/);
-      });
-
-      it('should handle files with only whitespace', async () => {
-        const whitespaceContent = '   \n\t  \n   ';
-        fs.writeFileSync(filePath, whitespaceContent, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: '   ',
-          new_string: 'content',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-      });
-    });
-
-    describe('Large File Handling', () => {
-      it('should handle moderately large files efficiently', async () => {
-        const largeContent = 'line content '.repeat(10000) + 'target string' + ' more content'.repeat(10000);
-        fs.writeFileSync(filePath, largeContent, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'target string',
-          new_string: 'replaced string',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const startTime = Date.now();
-        const result = await tool.execute(params, new AbortController().signal);
-        const endTime = Date.now();
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        expect(endTime - startTime).toBeLessThan(5000); // Should complete within 5 seconds
-        
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toContain('replaced string');
-        expect(updatedContent).not.toContain('target string');
-      });
-    });
-
-    describe('AbortController Signal Handling', () => {
-      it('should respect abort signal during execution', async () => {
-        fs.writeFileSync(filePath, 'content to replace', 'utf8');
-        const controller = new AbortController();
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-
-        // Abort immediately
-        controller.abort();
-
-        const result = await tool.execute(params, controller.signal);
-        
-        // The behavior might vary based on implementation, but should handle gracefully
-        expect(typeof result.llmContent).toBe('string');
-        expect(typeof result.returnDisplay).toBeDefined();
-      });
-
-      it('should respect abort signal during shouldConfirmExecute', async () => {
-        fs.writeFileSync(filePath, 'content to replace', 'utf8');
-        const controller = new AbortController();
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-
-        // Abort immediately
-        controller.abort();
-
-        const result = await tool.shouldConfirmExecute(params, controller.signal);
-        
-        // Should handle abort gracefully
-        expect(result).toBeDefined();
-      });
-    });
-
-    describe('Path Handling Edge Cases', () => {
-      it('should reject paths with null bytes', () => {
-        const params: EditToolParams = {
-          file_path: path.join(rootDir, 'file\0.txt'),
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        const validationError = tool.validateToolParams(params);
-        expect(validationError).toBeTruthy();
-      });
-
-      it('should handle very long file names', () => {
-        const longFileName = 'a'.repeat(255) + '.txt';
-        const longFilePath = path.join(rootDir, longFileName);
-        
-        const params: EditToolParams = {
-          file_path: longFilePath,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        const validationError = tool.validateToolParams(params);
-        expect(validationError).toBeNull(); // Should be valid if within root
-      });
-
-      it('should handle paths with special characters', () => {
-        const specialFileName = 'file with spaces & symbols!@#$%^&()_+.txt';
-        const specialFilePath = path.join(rootDir, specialFileName);
-        
-        const params: EditToolParams = {
-          file_path: specialFilePath,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        const validationError = tool.validateToolParams(params);
-        expect(validationError).toBeNull(); // Should be valid
-      });
-
-      it('should handle normalized vs non-normalized paths correctly', () => {
-        const unnormalizedPath = path.join(rootDir, 'folder', '..', 'test.txt');
-        const normalizedPath = path.join(rootDir, 'test.txt');
-        
-        const params: EditToolParams = {
-          file_path: unnormalizedPath,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        const validationError = tool.validateToolParams(params);
-        expect(validationError).toBeNull(); // Should be valid as it resolves within root
-      });
-    });
-
-    describe('Mock Dependency Integration', () => {
-      it('should handle ensureCorrectEdit throwing an error', async () => {
-        fs.writeFileSync(filePath, 'content', 'utf8');
-        mockEnsureCorrectEdit.mockRejectedValueOnce(new Error('Network error'));
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-
+      try {
         const result = await tool.execute(params, new AbortController().signal);
         expect(result.llmContent).toMatch(/Error:/);
-      });
-
-      it('should handle generateJson returning unexpected format', async () => {
-        fs.writeFileSync(filePath, 'content', 'utf8');
-        mockGenerateJson.mockResolvedValueOnce({ unexpected: 'format' });
-        
-        // This test would depend on how EditTool handles malformed responses
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-
-        const confirmation = await tool.shouldConfirmExecute(params, new AbortController().signal);
-        // Should handle gracefully
-        expect(confirmation).toBeDefined();
-      });
-
-      it('should handle openDiff being called correctly', async () => {
-        fs.writeFileSync(filePath, 'old content', 'utf8');
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        const confirmation = await tool.shouldConfirmExecute(params, new AbortController().signal) as FileDiff;
-        
-        if (confirmation && confirmation.fileDiff) {
-          // Verify that the diff contains expected content
-          expect(confirmation.fileDiff).toContain('old content');
-          expect(confirmation.fileDiff).toContain('new content');
-        }
-      });
+      } finally {
+        // Restore permissions for cleanup
+        fs.chmodSync(filePath, 0o644);
+      }
     });
 
-    describe('Configuration Edge Cases', () => {
-      it('should handle different ApprovalMode configurations', async () => {
-        fs.writeFileSync(filePath, 'content', 'utf8');
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'content',
-          new_string: 'new content',
-        };
-
-        // Test with AUTO_EDIT
-        (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(ApprovalMode.AUTO_EDIT);
-        let result = await tool.execute(params, new AbortController().signal);
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-
-        // Reset file content
-        fs.writeFileSync(filePath, 'content', 'utf8');
-
-        // Test with DEFAULT (should work the same way in our test setup)
-        (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(ApprovalMode.DEFAULT);
-        result = await tool.execute(params, new AbortController().signal);
-        // This depends on shouldConfirmExecute logic
-        expect(result).toBeDefined();
-      });
-
-      it('should handle missing client gracefully', () => {
-        const configWithoutClient = {
-          ...mockConfig,
-          getGeminiClient: vi.fn().mockReturnValue(null),
-        };
-
-        // This test would depend on how EditTool handles missing client
-        expect(() => new EditTool(configWithoutClient as any)).not.toThrow();
-      });
-    });
-
-    describe('Multi-line String Handling', () => {
-      it('should handle multi-line old_string and new_string correctly', async () => {
-        const multiLineContent = `line 1
-line 2
-old block
-line 3
-line 4`;
-        const multiLineOld = `old block
-line 3`;
-        const multiLineNew = `new block
-updated line 3`;
-        
-        fs.writeFileSync(filePath, multiLineContent, 'utf8');
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: multiLineOld,
-          new_string: multiLineNew,
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toContain('new block');
-        expect(updatedContent).toContain('updated line 3');
-        expect(updatedContent).not.toContain('old block');
-      });
-
-      it('should handle strings with leading/trailing whitespace', async () => {
-        const content = '  old text with spaces  ';
-        fs.writeFileSync(filePath, content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'old text with spaces',
-          new_string: 'new text without extra spaces',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toBe('  new text without extra spaces  ');
-      });
-    });
-
-    describe('Edge Cases for expected_replacements', () => {
-      it('should handle expected_replacements of 0', async () => {
-        fs.writeFileSync(filePath, 'content without target', 'utf8');
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'nonexistent',
-          new_string: 'replacement',
-          expected_replacements: 0,
-        };
-
-        const result = await tool.execute(params, new AbortController().signal);
-        expect(result.llmContent).toMatch(/0 occurrences found/);
-      });
-
-      it('should handle very large expected_replacements', async () => {
-        const repeatedContent = 'target '.repeat(1000);
-        fs.writeFileSync(filePath, repeatedContent, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'target',
-          new_string: 'replaced',
-          expected_replacements: 1000,
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect((updatedContent.match(/replaced/g) || []).length).toBe(1000);
-      });
-    });
-
-    describe('File Extension and Type Handling', () => {
-      it('should handle files without extensions', async () => {
-        const noExtFile = path.join(rootDir, 'README');
-        fs.writeFileSync(noExtFile, 'old content', 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: noExtFile,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-      });
-
-      it('should handle files with multiple dots in name', async () => {
-        const multiDotFile = path.join(rootDir, 'file.config.backup.txt');
-        fs.writeFileSync(multiDotFile, 'old content', 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: multiDotFile,
-          old_string: 'old',
-          new_string: 'new',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-      });
-    });
-
-    describe('Boundary Conditions', () => {
-      it('should handle old_string at the very beginning of file', async () => {
-        const content = 'start of file content continues...';
-        fs.writeFileSync(filePath, content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'start of file',
-          new_string: 'beginning of document',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toStartWith('beginning of document');
-      });
-
-      it('should handle old_string at the very end of file', async () => {
-        const content = 'content continues... end of file';
-        fs.writeFileSync(filePath, content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: 'end of file',
-          new_string: 'final content',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toEndWith('final content');
-      });
-
-      it('should handle old_string that spans entire file content', async () => {
-        const content = 'entire file content';
-        fs.writeFileSync(filePath, content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string: content,
-          new_string: 'completely new content',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        const result = await tool.execute(params, new AbortController().signal);
-        (tool as any).shouldAlwaysEdit = false;
-
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-        const updatedContent = fs.readFileSync(filePath, 'utf8');
-        expect(updatedContent).toBe('completely new content');
-      });
-    });
-  });
-
-  describe('Integration with External Dependencies', () => {
-    describe('ensureCorrectEdit Integration', () => {
-      it('should pass correct parameters to ensureCorrectEdit', async () => {
-        const content = 'test content for correction';
-        fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: path.join(rootDir, 'test.txt'),
-          old_string: 'test',
-          new_string: 'corrected',
-        };
-
-        let capturedContent: string | null = null;
-        let capturedParams: EditToolParams | null = null;
-        let capturedClient: any = null;
-
-        mockEnsureCorrectEdit.mockImplementationOnce(async (fileContent, toolParams, client) => {
-          capturedContent = fileContent;
-          capturedParams = toolParams;
-          capturedClient = client;
-          return { params: toolParams, occurrences: 1 };
-        });
-
-        await tool.shouldConfirmExecute(params, new AbortController().signal);
-
-        expect(capturedContent).toBe(content);
-        expect(capturedParams).toEqual(params);
-        expect(capturedClient).toBeDefined();
-        expect(mockEnsureCorrectEdit).toHaveBeenCalledTimes(1);
-      });
-
-      it('should handle ensureCorrectEdit returning modified parameters', async () => {
-        const content = 'original content with target text';
-        fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
-        
-        const originalParams: EditToolParams = {
-          file_path: path.join(rootDir, 'test.txt'),
-          old_string: 'target',
-          new_string: 'replacement',
-        };
-
-        const correctedParams: EditToolParams = {
-          file_path: path.join(rootDir, 'test.txt'),
-          old_string: 'target text',
-          new_string: 'new replacement text',
-        };
-
-        mockEnsureCorrectEdit.mockResolvedValueOnce({
-          params: correctedParams,
-          occurrences: 1,
-        });
-
-        const confirmation = await tool.shouldConfirmExecute(originalParams, new AbortController().signal) as FileDiff;
-
-        expect(confirmation).toBeDefined();
-        expect(confirmation.fileDiff).toContain('target text'); // Should use corrected old_string
-        expect(confirmation.fileDiff).toContain('new replacement text'); // Should use corrected new_string
-      });
-    });
-
-    describe('GeminiClient Integration', () => {
-      it('should handle client.generateJson being called with correct schema', async () => {
-        const content = 'content for AI correction';
-        fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: path.join(rootDir, 'test.txt'),
-          old_string: 'content',
-          new_string: 'updated content',
-        };
-
-        let capturedContents: Content[] | null = null;
-        let capturedSchema: SchemaUnion | null = null;
-
-        mockGenerateJson.mockImplementationOnce(async (contents: Content[], schema: SchemaUnion) => {
-          capturedContents = contents;
-          capturedSchema = schema;
-          return { corrected_target_snippet: 'corrected content' };
-        });
-
-        // This would trigger through ensureCorrectEdit if it uses generateJson
-        await tool.shouldConfirmExecute(params, new AbortController().signal);
-
-        // The exact behavior depends on ensureCorrectEdit implementation
-        // This test validates the integration pattern
-        expect(mockGenerateJson).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Performance and Resource Management', () => {
-    it('should not leak file descriptors', async () => {
-      const testFiles = Array.from({ length: 10 }, (_, i) => 
-        path.join(rootDir, `test_${i}.txt`)
+    it('should handle directory creation errors for nested paths', async () => {
+      const nestedPath = path.join(
+        rootDir,
+        'deeply',
+        'nested',
+        'path',
+        'file.txt',
       );
-
-      // Create multiple files and perform operations
-      for (const file of testFiles) {
-        fs.writeFileSync(file, `content ${Math.random()}`, 'utf8');
-        
-        const params: EditToolParams = {
-          file_path: file,
-          old_string: 'content',
-          new_string: 'updated',
-        };
-
-        (tool as any).shouldAlwaysEdit = true;
-        await tool.execute(params, new AbortController().signal);
-      }
-
-      (tool as any).shouldAlwaysEdit = false;
-
-      // Verify all files were processed correctly
-      for (const file of testFiles) {
-        const content = fs.readFileSync(file, 'utf8');
-        expect(content).toContain('updated');
-      }
-    });
-
-    it('should handle rapid consecutive operations', async () => {
-      fs.writeFileSync(filePath, 'initial content', 'utf8');
-      
-      const operations = Array.from({ length: 5 }, (_, i) => ({
-        old_string: i === 0 ? 'initial' : `content_${i - 1}`,
-        new_string: `content_${i}`,
-      }));
-
-      (tool as any).shouldAlwaysEdit = true;
-
-      for (const { old_string, new_string } of operations) {
-        const params: EditToolParams = {
-          file_path: filePath,
-          old_string,
-          new_string,
-        };
-
-        const result = await tool.execute(params, new AbortController().signal);
-        expect(result.llmContent).toMatch(/Successfully modified file/);
-      }
-
-      (tool as any).shouldAlwaysEdit = false;
-
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toBe('content_4 content');
-    });
-  });
-
-  describe('getDescription Additional Edge Cases', () => {
-    it('should handle strings with newlines in description', () => {
-      const testFileName = 'multiline.txt';
       const params: EditToolParams = {
-        file_path: path.join(rootDir, testFileName),
-        old_string: 'line1\nline2',
-        new_string: 'newline1\nnewline2',
-      };
-      
-      const description = tool.getDescription(params);
-      expect(description).toContain(testFileName);
-      // Should handle newlines gracefully in truncation
-      expect(description.length).toBeLessThan(200);
-    });
-
-    it('should handle special characters in strings for description', () => {
-      const testFileName = 'special.txt';
-      const params: EditToolParams = {
-        file_path: path.join(rootDir, testFileName),
-        old_string: 'old "quoted" \'text\' with & symbols',
-        new_string: 'new <html> & [brackets] text',
-      };
-      
-      const description = tool.getDescription(params);
-      expect(description).toContain(testFileName);
-      expect(description).toContain('=>');
-    });
-  });
-
-  describe('validateToolParams Additional Edge Cases', () => {
-    it('should handle params with undefined properties', () => {
-      const params = {
-        file_path: path.join(rootDir, 'test.txt'),
-        old_string: undefined,
-        new_string: 'new',
-      } as any;
-      
-      const validationError = tool.validateToolParams(params);
-      expect(validationError).toBeTruthy();
-    });
-
-    it('should handle params with null properties', () => {
-      const params = {
-        file_path: path.join(rootDir, 'test.txt'),
-        old_string: 'old',
-        new_string: null,
-      } as any;
-      
-      const validationError = tool.validateToolParams(params);
-      expect(validationError).toBeTruthy();
-    });
-
-    it('should handle completely malformed params object', () => {
-      const params = {
-        wrong_property: 'value',
-      } as any;
-      
-      const validationError = tool.validateToolParams(params);
-      expect(validationError).toBeTruthy();
-    });
-  });
-
-  describe('File Content Edge Cases', () => {
-    it('should handle binary-like content', async () => {
-      // Content that might be mistaken for binary
-      const binaryLikeContent = '\x00\x01\x02hello world\x03\x04';
-      fs.writeFileSync(filePath, binaryLikeContent, 'binary');
-      
-      const params: EditToolParams = {
-        file_path: filePath,
-        old_string: 'hello world',
-        new_string: 'goodbye world',
+        file_path: nestedPath,
+        old_string: '',
+        new_string: 'content',
       };
 
-      (tool as any).shouldAlwaysEdit = true;
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
       const result = await tool.execute(params, new AbortController().signal);
-      (tool as any).shouldAlwaysEdit = false;
 
-      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.llmContent).toMatch(/Created new file/);
+      expect(fs.existsSync(nestedPath)).toBe(true);
     });
 
-    it('should handle files with mixed encodings gracefully', async () => {
-      // Write content with specific encoding
-      const content = 'Hello, 世界! This is a test.';
-      fs.writeFileSync(filePath, content, 'utf8');
-      
+    it('should handle write permission errors gracefully', async () => {
+      // Create a read-only directory
+      const readOnlyDir = path.join(tempDir, 'readonly');
+      fs.mkdirSync(readOnlyDir, { mode: 0o444 });
+      const readOnlyFile = path.join(readOnlyDir, 'readonly.txt');
+
+      const params: EditToolParams = {
+        file_path: readOnlyFile,
+        old_string: '',
+        new_string: 'content',
+      };
+
+      try {
+        const result = await tool.execute(params, new AbortController().signal);
+        expect(result.llmContent).toMatch(/Error:/);
+      } finally {
+        // Cleanup - restore permissions
+        fs.chmodSync(readOnlyDir, 0o755);
+      }
+    });
+  });
+
+  describe('Unicode and Special Character Handling', () => {
+    it('should handle files with Unicode characters correctly', async () => {
+      const unicodeContent = '🚀 Hello, 世界! Café résumé naïve 🌟';
+      const unicodeOld = '世界';
+      const unicodeNew = 'World';
+
+      fs.writeFileSync(filePath, unicodeContent, 'utf8');
       const params: EditToolParams = {
         file_path: filePath,
-        old_string: 'Hello',
-        new_string: 'Hi',
+        old_string: unicodeOld,
+        new_string: unicodeNew,
       };
 
       (tool as any).shouldAlwaysEdit = true;
@@ -1433,8 +754,714 @@ updated line 3`;
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       const updatedContent = fs.readFileSync(filePath, 'utf8');
-      expect(updatedContent).toContain('Hi');
-      expect(updatedContent).toContain('世界');
+      expect(updatedContent).toContain(unicodeNew);
+      expect(updatedContent).not.toContain(unicodeOld);
     });
+
+    it('should handle files with different line endings', async () => {
+      const contentWithCRLF = 'line1\r\nline2\r\nold text\r\nline4';
+      fs.writeFileSync(filePath, contentWithCRLF, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old text',
+        new_string: 'new text',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toContain('new text');
+      expect(updatedContent).toContain('\r\n'); // Preserves original line endings
+    });
+
+    it('should handle empty files correctly', async () => {
+      fs.writeFileSync(filePath, '', 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: '',
+        new_string: 'first content',
+      };
+
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/File already exists, cannot create/);
+    });
+
+    it('should handle files with only whitespace', async () => {
+      const whitespaceContent = '   \n\t  \n   ';
+      fs.writeFileSync(filePath, whitespaceContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: '   ',
+        new_string: 'content',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+    });
+  });
+
+  describe('Large File Handling', () => {
+    it('should handle moderately large files efficiently', async () => {
+      const largeContent =
+        'line content '.repeat(10000) +
+        'target string' +
+        ' more content'.repeat(10000);
+      fs.writeFileSync(filePath, largeContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'target string',
+        new_string: 'replaced string',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const endTime = Date.now();
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(endTime - startTime).toBeLessThan(5000); // Should complete within 5 seconds
+
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toContain('replaced string');
+      expect(updatedContent).not.toContain('target string');
+    });
+  });
+
+  describe('AbortController Signal Handling', () => {
+    it('should respect abort signal during execution', async () => {
+      fs.writeFileSync(filePath, 'content to replace', 'utf8');
+      const controller = new AbortController();
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+
+      // Abort immediately
+      controller.abort();
+
+      const result = await tool.execute(params, controller.signal);
+
+      // The behavior might vary based on implementation, but should handle gracefully
+      expect(typeof result.llmContent).toBe('string');
+      expect(typeof result.returnDisplay).toBeDefined();
+    });
+
+    it('should respect abort signal during shouldConfirmExecute', async () => {
+      fs.writeFileSync(filePath, 'content to replace', 'utf8');
+      const controller = new AbortController();
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+
+      // Abort immediately
+      controller.abort();
+
+      const result = await tool.shouldConfirmExecute(params, controller.signal);
+
+      // Should handle abort gracefully
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('Path Handling Edge Cases', () => {
+    it('should reject paths with null bytes', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'file\0.txt'),
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationError = tool.validateToolParams(params);
+      expect(validationError).toBeTruthy();
+    });
+
+    it('should handle very long file names', () => {
+      const longFileName = 'a'.repeat(255) + '.txt';
+      const longFilePath = path.join(rootDir, longFileName);
+
+      const params: EditToolParams = {
+        file_path: longFilePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationError = tool.validateToolParams(params);
+      expect(validationError).toBeNull(); // Should be valid if within root
+    });
+
+    it('should handle paths with special characters', () => {
+      const specialFileName = 'file with spaces & symbols!@#$%^&()_+.txt';
+      const specialFilePath = path.join(rootDir, specialFileName);
+
+      const params: EditToolParams = {
+        file_path: specialFilePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationError = tool.validateToolParams(params);
+      expect(validationError).toBeNull(); // Should be valid
+    });
+
+    it('should handle normalized vs non-normalized paths correctly', () => {
+      const unnormalizedPath = path.join(rootDir, 'folder', '..', 'test.txt');
+      const normalizedPath = path.join(rootDir, 'test.txt');
+
+      const params: EditToolParams = {
+        file_path: unnormalizedPath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationError = tool.validateToolParams(params);
+      expect(validationError).toBeNull(); // Should be valid as it resolves within root
+    });
+  });
+
+  describe('Mock Dependency Integration', () => {
+    it('should handle ensureCorrectEdit throwing an error', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      mockEnsureCorrectEdit.mockRejectedValueOnce(new Error('Network error'));
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/Error:/);
+    });
+
+    it('should handle generateJson returning unexpected format', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      mockGenerateJson.mockResolvedValueOnce({ unexpected: 'format' });
+
+      // This test would depend on how EditTool handles malformed responses
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+      // Should handle gracefully
+      expect(confirmation).toBeDefined();
+    });
+
+    it('should handle openDiff being called correctly', async () => {
+      fs.writeFileSync(filePath, 'old content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const confirmation = (await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      )) as FileDiff;
+
+      if (confirmation && confirmation.fileDiff) {
+        // Verify that the diff contains expected content
+        expect(confirmation.fileDiff).toContain('old content');
+        expect(confirmation.fileDiff).toContain('new content');
+      }
+    });
+  });
+
+  describe('Configuration Edge Cases', () => {
+    it('should handle different ApprovalMode configurations', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+
+      // Test with AUTO_EDIT
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      let result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+
+      // Reset file content
+      fs.writeFileSync(filePath, 'content', 'utf8');
+
+      // Test with DEFAULT (should work the same way in our test setup)
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.DEFAULT,
+      );
+      result = await tool.execute(params, new AbortController().signal);
+      // This depends on shouldConfirmExecute logic
+      expect(result).toBeDefined();
+    });
+
+    it('should handle missing client gracefully', () => {
+      const configWithoutClient = {
+        ...mockConfig,
+        getGeminiClient: vi.fn().mockReturnValue(null),
+      };
+
+      // This test would depend on how EditTool handles missing client
+      expect(() => new EditTool(configWithoutClient as any)).not.toThrow();
+    });
+  });
+
+  describe('Multi-line String Handling', () => {
+    it('should handle multi-line old_string and new_string correctly', async () => {
+      const multiLineContent = `line 1
+line 2
+old block
+line 3
+line 4`;
+      const multiLineOld = `old block
+line 3`;
+      const multiLineNew = `new block
+updated line 3`;
+
+      fs.writeFileSync(filePath, multiLineContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: multiLineOld,
+        new_string: multiLineNew,
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toContain('new block');
+      expect(updatedContent).toContain('updated line 3');
+      expect(updatedContent).not.toContain('old block');
+    });
+
+    it('should handle strings with leading/trailing whitespace', async () => {
+      const content = '  old text with spaces  ';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old text with spaces',
+        new_string: 'new text without extra spaces',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toBe('  new text without extra spaces  ');
+    });
+  });
+
+  describe('Edge Cases for expected_replacements', () => {
+    it('should handle expected_replacements of 0', async () => {
+      fs.writeFileSync(filePath, 'content without target', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+        expected_replacements: 0,
+      };
+
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/0 occurrences found/);
+    });
+
+    it('should handle very large expected_replacements', async () => {
+      const repeatedContent = 'target '.repeat(1000);
+      fs.writeFileSync(filePath, repeatedContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'target',
+        new_string: 'replaced',
+        expected_replacements: 1000,
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect((updatedContent.match(/replaced/g) || []).length).toBe(1000);
+    });
+  });
+
+  describe('File Extension and Type Handling', () => {
+    it('should handle files without extensions', async () => {
+      const noExtFile = path.join(rootDir, 'README');
+      fs.writeFileSync(noExtFile, 'old content', 'utf8');
+
+      const params: EditToolParams = {
+        file_path: noExtFile,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+    });
+
+    it('should handle files with multiple dots in name', async () => {
+      const multiDotFile = path.join(rootDir, 'file.config.backup.txt');
+      fs.writeFileSync(multiDotFile, 'old content', 'utf8');
+
+      const params: EditToolParams = {
+        file_path: multiDotFile,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+    });
+  });
+
+  describe('Boundary Conditions', () => {
+    it('should handle old_string at the very beginning of file', async () => {
+      const content = 'start of file content continues...';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'start of file',
+        new_string: 'beginning of document',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toStartWith('beginning of document');
+    });
+
+    it('should handle old_string at the very end of file', async () => {
+      const content = 'content continues... end of file';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'end of file',
+        new_string: 'final content',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toEndWith('final content');
+    });
+
+    it('should handle old_string that spans entire file content', async () => {
+      const content = 'entire file content';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: content,
+        new_string: 'completely new content',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      const result = await tool.execute(params, new AbortController().signal);
+      (tool as any).shouldAlwaysEdit = false;
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      const updatedContent = fs.readFileSync(filePath, 'utf8');
+      expect(updatedContent).toBe('completely new content');
+    });
+  });
+});
+
+describe('Integration with External Dependencies', () => {
+  describe('ensureCorrectEdit Integration', () => {
+    it('should pass correct parameters to ensureCorrectEdit', async () => {
+      const content = 'test content for correction';
+      fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        old_string: 'test',
+        new_string: 'corrected',
+      };
+
+      let capturedContent: string | null = null;
+      let capturedParams: EditToolParams | null = null;
+      let capturedClient: any = null;
+
+      mockEnsureCorrectEdit.mockImplementationOnce(
+        async (fileContent, toolParams, client) => {
+          capturedContent = fileContent;
+          capturedParams = toolParams;
+          capturedClient = client;
+          return { params: toolParams, occurrences: 1 };
+        },
+      );
+
+      await tool.shouldConfirmExecute(params, new AbortController().signal);
+
+      expect(capturedContent).toBe(content);
+      expect(capturedParams).toEqual(params);
+      expect(capturedClient).toBeDefined();
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle ensureCorrectEdit returning modified parameters', async () => {
+      const content = 'original content with target text';
+      fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
+
+      const originalParams: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        old_string: 'target',
+        new_string: 'replacement',
+      };
+
+      const correctedParams: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        old_string: 'target text',
+        new_string: 'new replacement text',
+      };
+
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: correctedParams,
+        occurrences: 1,
+      });
+
+      const confirmation = (await tool.shouldConfirmExecute(
+        originalParams,
+        new AbortController().signal,
+      )) as FileDiff;
+
+      expect(confirmation).toBeDefined();
+      expect(confirmation.fileDiff).toContain('target text'); // Should use corrected old_string
+      expect(confirmation.fileDiff).toContain('new replacement text'); // Should use corrected new_string
+    });
+  });
+
+  describe('GeminiClient Integration', () => {
+    it('should handle client.generateJson being called with correct schema', async () => {
+      const content = 'content for AI correction';
+      fs.writeFileSync(path.join(rootDir, 'test.txt'), content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        old_string: 'content',
+        new_string: 'updated content',
+      };
+
+      let capturedContents: Content[] | null = null;
+      let capturedSchema: SchemaUnion | null = null;
+
+      mockGenerateJson.mockImplementationOnce(
+        async (contents: Content[], schema: SchemaUnion) => {
+          capturedContents = contents;
+          capturedSchema = schema;
+          return { corrected_target_snippet: 'corrected content' };
+        },
+      );
+
+      // This would trigger through ensureCorrectEdit if it uses generateJson
+      await tool.shouldConfirmExecute(params, new AbortController().signal);
+
+      // The exact behavior depends on ensureCorrectEdit implementation
+      // This test validates the integration pattern
+      expect(mockGenerateJson).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('Performance and Resource Management', () => {
+  it('should not leak file descriptors', async () => {
+    const testFiles = Array.from({ length: 10 }, (_, i) =>
+      path.join(rootDir, `test_${i}.txt`),
+    );
+
+    // Create multiple files and perform operations
+    for (const file of testFiles) {
+      fs.writeFileSync(file, `content ${Math.random()}`, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: file,
+        old_string: 'content',
+        new_string: 'updated',
+      };
+
+      (tool as any).shouldAlwaysEdit = true;
+      await tool.execute(params, new AbortController().signal);
+    }
+
+    (tool as any).shouldAlwaysEdit = false;
+
+    // Verify all files were processed correctly
+    for (const file of testFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      expect(content).toContain('updated');
+    }
+  });
+
+  it('should handle rapid consecutive operations', async () => {
+    fs.writeFileSync(filePath, 'initial content', 'utf8');
+
+    const operations = Array.from({ length: 5 }, (_, i) => ({
+      old_string: i === 0 ? 'initial' : `content_${i - 1}`,
+      new_string: `content_${i}`,
+    }));
+
+    (tool as any).shouldAlwaysEdit = true;
+
+    for (const { old_string, new_string } of operations) {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string,
+        new_string,
+      };
+
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+    }
+
+    (tool as any).shouldAlwaysEdit = false;
+
+    const finalContent = fs.readFileSync(filePath, 'utf8');
+    expect(finalContent).toBe('content_4 content');
+  });
+});
+
+describe('getDescription Additional Edge Cases', () => {
+  it('should handle strings with newlines in description', () => {
+    const testFileName = 'multiline.txt';
+    const params: EditToolParams = {
+      file_path: path.join(rootDir, testFileName),
+      old_string: 'line1\nline2',
+      new_string: 'newline1\nnewline2',
+    };
+
+    const description = tool.getDescription(params);
+    expect(description).toContain(testFileName);
+    // Should handle newlines gracefully in truncation
+    expect(description.length).toBeLessThan(200);
+  });
+
+  it('should handle special characters in strings for description', () => {
+    const testFileName = 'special.txt';
+    const params: EditToolParams = {
+      file_path: path.join(rootDir, testFileName),
+      old_string: 'old "quoted" \'text\' with & symbols',
+      new_string: 'new <html> & [brackets] text',
+    };
+
+    const description = tool.getDescription(params);
+    expect(description).toContain(testFileName);
+    expect(description).toContain('=>');
+  });
+});
+
+describe('validateToolParams Additional Edge Cases', () => {
+  it('should handle params with undefined properties', () => {
+    const params = {
+      file_path: path.join(rootDir, 'test.txt'),
+      old_string: undefined,
+      new_string: 'new',
+    } as any;
+
+    const validationError = tool.validateToolParams(params);
+    expect(validationError).toBeTruthy();
+  });
+
+  it('should handle params with null properties', () => {
+    const params = {
+      file_path: path.join(rootDir, 'test.txt'),
+      old_string: 'old',
+      new_string: null,
+    } as any;
+
+    const validationError = tool.validateToolParams(params);
+    expect(validationError).toBeTruthy();
+  });
+
+  it('should handle completely malformed params object', () => {
+    const params = {
+      wrong_property: 'value',
+    } as any;
+
+    const validationError = tool.validateToolParams(params);
+    expect(validationError).toBeTruthy();
+  });
+});
+
+describe('File Content Edge Cases', () => {
+  it('should handle binary-like content', async () => {
+    // Content that might be mistaken for binary
+    const binaryLikeContent = '\x00\x01\x02hello world\x03\x04';
+    fs.writeFileSync(filePath, binaryLikeContent, 'binary');
+
+    const params: EditToolParams = {
+      file_path: filePath,
+      old_string: 'hello world',
+      new_string: 'goodbye world',
+    };
+
+    (tool as any).shouldAlwaysEdit = true;
+    const result = await tool.execute(params, new AbortController().signal);
+    (tool as any).shouldAlwaysEdit = false;
+
+    expect(result.llmContent).toMatch(/Successfully modified file/);
+  });
+
+  it('should handle files with mixed encodings gracefully', async () => {
+    // Write content with specific encoding
+    const content = 'Hello, 世界! This is a test.';
+    fs.writeFileSync(filePath, content, 'utf8');
+
+    const params: EditToolParams = {
+      file_path: filePath,
+      old_string: 'Hello',
+      new_string: 'Hi',
+    };
+
+    (tool as any).shouldAlwaysEdit = true;
+    const result = await tool.execute(params, new AbortController().signal);
+    (tool as any).shouldAlwaysEdit = false;
+
+    expect(result.llmContent).toMatch(/Successfully modified file/);
+    const updatedContent = fs.readFileSync(filePath, 'utf8');
+    expect(updatedContent).toContain('Hi');
+    expect(updatedContent).toContain('世界');
   });
 });

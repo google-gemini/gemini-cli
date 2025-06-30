@@ -9,7 +9,11 @@ import { HybridScorer } from './HybridScorer.js';
 import { EmbeddingScorer } from './EmbeddingScorer.js';
 import { BM25Scorer } from './BM25Scorer.js';
 import { RecencyScorer } from './RecencyScorer.js';
-import type { ConversationChunk, RelevanceQuery, ScoringWeights } from '../types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ScoringWeights,
+} from '../types.js';
 
 describe('Scoring Integration Tests', () => {
   const sampleChunks: ConversationChunk[] = [
@@ -27,7 +31,8 @@ describe('Scoring Integration Tests', () => {
     {
       id: 'chunk2',
       role: 'assistant',
-      content: 'You can use JWT tokens for secure authentication. Here is an example implementation.',
+      content:
+        'You can use JWT tokens for secure authentication. Here is an example implementation.',
       tokens: 15,
       timestamp: Date.now() - 1800000, // 30 minutes ago
       metadata: {
@@ -66,7 +71,7 @@ describe('Scoring Integration Tests', () => {
     expect(results).toHaveLength(3);
 
     // All results should have valid scores
-    results.forEach(result => {
+    results.forEach((result) => {
       expect(result.chunkId).toBeDefined();
       expect(result.score).toBeGreaterThanOrEqual(0);
       expect(result.score).toBeLessThanOrEqual(1);
@@ -78,13 +83,15 @@ describe('Scoring Integration Tests', () => {
     });
 
     // chunk2 should have manual boost because it's pinned
-    const chunk2Result = results.find(r => r.chunkId === 'chunk2');
+    const chunk2Result = results.find((r) => r.chunkId === 'chunk2');
     expect(chunk2Result?.breakdown.manual).toBe(1.0);
 
     // chunk3 should have highest recency score (most recent)
-    const chunk3Result = results.find(r => r.chunkId === 'chunk3');
-    const chunk1Result = results.find(r => r.chunkId === 'chunk1');
-    expect(chunk3Result?.breakdown.recency).toBeGreaterThan(chunk1Result?.breakdown.recency || 0);
+    const chunk3Result = results.find((r) => r.chunkId === 'chunk3');
+    const chunk1Result = results.find((r) => r.chunkId === 'chunk1');
+    expect(chunk3Result?.breakdown.recency).toBeGreaterThan(
+      chunk1Result?.breakdown.recency || 0,
+    );
   });
 
   it('should handle individual scorer components correctly', async () => {
@@ -93,7 +100,10 @@ describe('Scoring Integration Tests', () => {
     const bm25Scorer = new BM25Scorer();
     const recencyScorer = new RecencyScorer();
 
-    const embeddingResults = await embeddingScorer.scoreChunks(sampleChunks, authQuery);
+    const embeddingResults = await embeddingScorer.scoreChunks(
+      sampleChunks,
+      authQuery,
+    );
     const bm25Results = bm25Scorer.scoreChunks(sampleChunks, authQuery);
     const recencyResults = recencyScorer.scoreChunks(sampleChunks, authQuery);
 
@@ -102,8 +112,8 @@ describe('Scoring Integration Tests', () => {
     expect(recencyResults).toHaveLength(3);
 
     // All individual scorers should return valid results
-    [embeddingResults, bm25Results, recencyResults].forEach(results => {
-      results.forEach(result => {
+    [embeddingResults, bm25Results, recencyResults].forEach((results) => {
+      results.forEach((result) => {
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
       });
@@ -132,8 +142,10 @@ describe('Scoring Integration Tests', () => {
     const results2 = await scorer2.scoreChunks(sampleChunks, authQuery);
 
     // Results should be different due to different weights
-    const score1_chunk1 = results1.find(r => r.chunkId === 'chunk1')?.score || 0;
-    const score2_chunk1 = results2.find(r => r.chunkId === 'chunk1')?.score || 0;
+    const score1_chunk1 =
+      results1.find((r) => r.chunkId === 'chunk1')?.score || 0;
+    const score2_chunk1 =
+      results2.find((r) => r.chunkId === 'chunk1')?.score || 0;
 
     // With different weights, scores should generally be different
     // (unless all component scores happen to be identical, which is unlikely)

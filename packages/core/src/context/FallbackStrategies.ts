@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationChunk, RelevanceQuery, ContextWindow } from './types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ContextWindow,
+} from './types.js';
 
 /**
  * Interface for fallback strategies when scoring fails.
@@ -12,7 +16,11 @@ import type { ConversationChunk, RelevanceQuery, ContextWindow } from './types.j
 export interface FallbackStrategy {
   name: string;
   priority: number;
-  execute(chunks: ConversationChunk[], query: RelevanceQuery, budget: number): Promise<ContextWindow>;
+  execute(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+    budget: number,
+  ): Promise<ContextWindow>;
 }
 
 /**
@@ -23,7 +31,11 @@ export class RecencyFallbackStrategy implements FallbackStrategy {
   name = 'recency-fallback';
   priority = 1;
 
-  async execute(chunks: ConversationChunk[], query: RelevanceQuery, budget: number): Promise<ContextWindow> {
+  async execute(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+    budget: number,
+  ): Promise<ContextWindow> {
     if (chunks.length === 0 || budget <= 0) {
       return {
         chunks: [],
@@ -34,24 +46,29 @@ export class RecencyFallbackStrategy implements FallbackStrategy {
 
     // Score chunks based on recency with exponential decay
     const queryTime = query.timestamp || Date.now();
-    const scoredChunks = chunks.map(chunk => {
+    const scoredChunks = chunks.map((chunk) => {
       // Calculate time difference in hours
-      const timeDiffHours = Math.max(0, (queryTime - chunk.timestamp) / (1000 * 60 * 60));
-      
+      const timeDiffHours = Math.max(
+        0,
+        (queryTime - chunk.timestamp) / (1000 * 60 * 60),
+      );
+
       // Exponential decay: more recent chunks get higher scores
       // Half-life of 24 hours (score halves every 24 hours)
       const recencyScore = Math.exp(-timeDiffHours / 24);
-      
+
       // Boost pinned chunks and system prompts
       let finalScore = recencyScore;
       if (chunk.metadata.pinned === true) {
         finalScore += 1.0; // Ensure pinned chunks rank highest
       }
-      if (chunk.metadata.tags?.includes('system-prompt') || 
-          chunk.metadata.tags?.includes('tool-definition')) {
+      if (
+        chunk.metadata.tags?.includes('system-prompt') ||
+        chunk.metadata.tags?.includes('tool-definition')
+      ) {
         finalScore += 0.5; // Boost mandatory chunks
       }
-      
+
       return { chunk, score: finalScore };
     });
 
@@ -64,9 +81,11 @@ export class RecencyFallbackStrategy implements FallbackStrategy {
 
     // First pass: Always include mandatory chunks regardless of budget
     for (const { chunk } of scoredChunks) {
-      if (chunk.metadata.pinned === true || 
-          chunk.metadata.tags?.includes('system-prompt') ||
-          chunk.metadata.tags?.includes('tool-definition')) {
+      if (
+        chunk.metadata.pinned === true ||
+        chunk.metadata.tags?.includes('system-prompt') ||
+        chunk.metadata.tags?.includes('tool-definition')
+      ) {
         selectedChunkIds.add(chunk.id);
         totalTokens += chunk.tokens;
       }
@@ -74,19 +93,29 @@ export class RecencyFallbackStrategy implements FallbackStrategy {
 
     // Second pass: Add non-mandatory chunks within remaining budget
     for (const { chunk } of scoredChunks) {
-      const isMandatory = chunk.metadata.pinned === true || 
-                         chunk.metadata.tags?.includes('system-prompt') ||
-                         chunk.metadata.tags?.includes('tool-definition');
-      
-      if (!isMandatory && !selectedChunkIds.has(chunk.id) && totalTokens + chunk.tokens <= budget) {
+      const isMandatory =
+        chunk.metadata.pinned === true ||
+        chunk.metadata.tags?.includes('system-prompt') ||
+        chunk.metadata.tags?.includes('tool-definition');
+
+      if (
+        !isMandatory &&
+        !selectedChunkIds.has(chunk.id) &&
+        totalTokens + chunk.tokens <= budget
+      ) {
         selectedChunkIds.add(chunk.id);
         totalTokens += chunk.tokens;
       }
     }
 
     // Restore original order while filtering selected chunks
-    const selectedChunks = chunks.filter(chunk => selectedChunkIds.has(chunk.id));
-    const actualTotalTokens = selectedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0);
+    const selectedChunks = chunks.filter((chunk) =>
+      selectedChunkIds.has(chunk.id),
+    );
+    const actualTotalTokens = selectedChunks.reduce(
+      (sum, chunk) => sum + chunk.tokens,
+      0,
+    );
 
     return {
       chunks: selectedChunks,
@@ -104,7 +133,11 @@ export class SimpleTruncationFallbackStrategy implements FallbackStrategy {
   name = 'simple-truncation-fallback';
   priority = 2;
 
-  async execute(chunks: ConversationChunk[], query: RelevanceQuery, budget: number): Promise<ContextWindow> {
+  async execute(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+    budget: number,
+  ): Promise<ContextWindow> {
     if (chunks.length === 0 || budget <= 0) {
       return {
         chunks: [],
@@ -117,10 +150,12 @@ export class SimpleTruncationFallbackStrategy implements FallbackStrategy {
     const mandatoryChunks: ConversationChunk[] = [];
     const optionalChunks: ConversationChunk[] = [];
 
-    chunks.forEach(chunk => {
-      if (chunk.metadata.pinned === true ||
-          chunk.metadata.tags?.includes('system-prompt') ||
-          chunk.metadata.tags?.includes('tool-definition')) {
+    chunks.forEach((chunk) => {
+      if (
+        chunk.metadata.pinned === true ||
+        chunk.metadata.tags?.includes('system-prompt') ||
+        chunk.metadata.tags?.includes('tool-definition')
+      ) {
         mandatoryChunks.push(chunk);
       } else {
         optionalChunks.push(chunk);
@@ -128,7 +163,10 @@ export class SimpleTruncationFallbackStrategy implements FallbackStrategy {
     });
 
     // Always include mandatory chunks
-    let totalTokens = mandatoryChunks.reduce((sum, chunk) => sum + chunk.tokens, 0);
+    let totalTokens = mandatoryChunks.reduce(
+      (sum, chunk) => sum + chunk.tokens,
+      0,
+    );
     const selectedChunks = [...mandatoryChunks];
 
     // Add optional chunks chronologically (most recent first) until budget exhausted
@@ -166,21 +204,25 @@ export class FallbackStrategyManager {
    * Execute fallback strategies in priority order until one succeeds.
    */
   async executeFallback(
-    chunks: ConversationChunk[], 
-    query: RelevanceQuery, 
-    budget: number
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+    budget: number,
   ): Promise<ContextWindow> {
     // Sort strategies by priority
-    const sortedStrategies = [...this.strategies].sort((a, b) => a.priority - b.priority);
+    const sortedStrategies = [...this.strategies].sort(
+      (a, b) => a.priority - b.priority,
+    );
 
     for (const strategy of sortedStrategies) {
       try {
         const result = await strategy.execute(chunks, query, budget);
-        
+
         // Validate result
-        if (result.chunks.length >= 0 && 
-            result.totalTokens >= 0 && 
-            result.maxTokens === budget) {
+        if (
+          result.chunks.length >= 0 &&
+          result.totalTokens >= 0 &&
+          result.maxTokens === budget
+        ) {
           return result;
         }
       } catch (error) {

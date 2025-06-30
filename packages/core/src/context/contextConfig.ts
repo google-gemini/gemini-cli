@@ -56,13 +56,19 @@ export function loadContextConfigFromEnv(): ContextOptimizationConfig {
 
   // Parse embedding enabled
   const embeddingEnabled = process.env[CONTEXT_ENV_VARS.EMBEDDING_ENABLED];
-  if (embeddingEnabled && !['0', 'false'].includes(embeddingEnabled.toLowerCase())) {
+  if (
+    embeddingEnabled &&
+    !['0', 'false'].includes(embeddingEnabled.toLowerCase())
+  ) {
     config.embeddingEnabled = true;
   }
 
   // Parse aggressive pruning
   const aggressivePruning = process.env[CONTEXT_ENV_VARS.AGGRESSIVE_PRUNING];
-  if (aggressivePruning && !['0', 'false'].includes(aggressivePruning.toLowerCase())) {
+  if (
+    aggressivePruning &&
+    !['0', 'false'].includes(aggressivePruning.toLowerCase())
+  ) {
     config.aggressivePruning = true;
   }
 
@@ -74,7 +80,7 @@ export function loadContextConfigFromEnv(): ContextOptimizationConfig {
  */
 export function getLogLevelFromEnv(): 'debug' | 'info' | 'warn' | 'error' {
   const logLevel = process.env[CONTEXT_ENV_VARS.LOG_LEVEL]?.toLowerCase();
-  
+
   switch (logLevel) {
     case 'debug':
     case 'info':
@@ -89,7 +95,9 @@ export function getLogLevelFromEnv(): 'debug' | 'info' | 'warn' | 'error' {
 /**
  * Create a context optimization configuration with environment overrides.
  */
-export function createContextConfig(overrides?: Partial<ContextOptimizationConfig>): ContextOptimizationConfig {
+export function createContextConfig(
+  overrides?: Partial<ContextOptimizationConfig>,
+): ContextOptimizationConfig {
   const envConfig = loadContextConfigFromEnv();
   return {
     ...envConfig,
@@ -104,11 +112,13 @@ export function createContextConfig(overrides?: Partial<ContextOptimizationConfi
 /**
  * Check if context optimization is enabled via environment or configuration.
  */
-export function isContextOptimizationEnabled(config?: ContextOptimizationConfig): boolean {
+export function isContextOptimizationEnabled(
+  config?: ContextOptimizationConfig,
+): boolean {
   if (config) {
     return config.enabled;
   }
-  
+
   const envConfig = loadContextConfigFromEnv();
   return envConfig.enabled;
 }
@@ -132,7 +142,9 @@ export function printContextConfig(config: ContextOptimizationConfig): void {
 /**
  * Validate context optimization configuration.
  */
-export function validateContextConfig(config: ContextOptimizationConfig): string[] {
+export function validateContextConfig(
+  config: ContextOptimizationConfig,
+): string[] {
   const errors: string[] = [];
 
   if (typeof config.enabled !== 'boolean') {
@@ -155,19 +167,19 @@ export function validateContextConfig(config: ContextOptimizationConfig): string
     errors.push('scoringWeights must be an object');
   } else {
     const { embedding, bm25, recency, manual } = config.scoringWeights;
-    
+
     if (typeof embedding !== 'number' || embedding < 0 || embedding > 1) {
       errors.push('embedding weight must be between 0 and 1');
     }
-    
+
     if (typeof bm25 !== 'number' || bm25 < 0 || bm25 > 1) {
       errors.push('bm25 weight must be between 0 and 1');
     }
-    
+
     if (typeof recency !== 'number' || recency < 0 || recency > 1) {
       errors.push('recency weight must be between 0 and 1');
     }
-    
+
     if (typeof manual !== 'number' || manual < 0 || manual > 1) {
       errors.push('manual weight must be between 0 and 1');
     }
@@ -175,7 +187,9 @@ export function validateContextConfig(config: ContextOptimizationConfig): string
     // Weights should sum to approximately 1
     const sum = embedding + bm25 + recency + manual;
     if (Math.abs(sum - 1.0) > 0.1) {
-      errors.push(`scoring weights should sum to 1.0 (current sum: ${sum.toFixed(2)})`);
+      errors.push(
+        `scoring weights should sum to 1.0 (current sum: ${sum.toFixed(2)})`,
+      );
     }
   }
 

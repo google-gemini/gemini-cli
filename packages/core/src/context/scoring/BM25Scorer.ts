@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationChunk, RelevanceQuery, ScoringResult } from '../types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ScoringResult,
+} from '../types.js';
 
 /**
  * BM25 scorer for lexical relevance using TF-IDF with BM25 weighting.
@@ -21,19 +25,22 @@ export class BM25Scorer {
   /**
    * Score chunks based on BM25 relevance to the query.
    */
-  scoreChunks(chunks: ConversationChunk[], query: RelevanceQuery): ScoringResult[] {
+  scoreChunks(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+  ): ScoringResult[] {
     this.updateIndex(chunks);
     const queryTerms = this.tokenize(query.text);
-    
+
     if (queryTerms.length === 0) {
-      return chunks.map(chunk => ({
+      return chunks.map((chunk) => ({
         chunkId: chunk.id,
         score: 0,
         breakdown: { bm25: 0 },
       }));
     }
 
-    const scores = chunks.map(chunk => {
+    const scores = chunks.map((chunk) => {
       const score = this.calculateBM25Score(chunk.id, queryTerms);
       return {
         chunkId: chunk.id,
@@ -43,13 +50,13 @@ export class BM25Scorer {
     });
 
     // Normalize scores to 0-1 range
-    const maxScore = Math.max(...scores.map(s => s.score));
+    const maxScore = Math.max(...scores.map((s) => s.score));
     if (maxScore === 0) {
       // If all scores are 0, return them as-is
       return scores;
     }
-    
-    return scores.map(result => ({
+
+    return scores.map((result) => ({
       ...result,
       score: result.score / maxScore,
       breakdown: { bm25: result.score / maxScore },
@@ -70,7 +77,7 @@ export class BM25Scorer {
     for (const chunk of chunks) {
       const terms = this.tokenize(chunk.content);
       const termFreq = new Map<string, number>();
-      
+
       this.docLengths.set(chunk.id, terms.length);
       totalLength += terms.length;
 
@@ -106,7 +113,7 @@ export class BM25Scorer {
 
       const tf = termDocs.get(docId) || 0;
       const df = termDocs.size; // Number of documents containing the term
-      
+
       // Modified IDF calculation that handles edge cases while maintaining discrimination
       let idf: number;
       if (this.totalDocs === 1) {
@@ -122,8 +129,9 @@ export class BM25Scorer {
       // BM25 formula
       const numerator = tf * (this.k1 + 1);
       const avgDocLengthSafe = this.avgDocLength || 1; // Avoid division by zero
-      const denominator = tf + this.k1 * (1 - this.b + this.b * (docLength / avgDocLengthSafe));
-      
+      const denominator =
+        tf + this.k1 * (1 - this.b + this.b * (docLength / avgDocLengthSafe));
+
       score += idf * (numerator / denominator);
     }
 
@@ -138,8 +146,8 @@ export class BM25Scorer {
       .toLowerCase()
       .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
       .split(/\s+/)
-      .filter(term => term.length > 0)
-      .filter(term => !this.isStopWord(term));
+      .filter((term) => term.length > 0)
+      .filter((term) => !this.isStopWord(term));
   }
 
   /**
@@ -147,10 +155,45 @@ export class BM25Scorer {
    */
   private isStopWord(term: string): boolean {
     const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those',
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'must',
+      'can',
+      'this',
+      'that',
+      'these',
+      'those',
     ]);
     return stopWords.has(term);
   }

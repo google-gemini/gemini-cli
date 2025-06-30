@@ -76,6 +76,7 @@ describe('ReadManyFilesTool', () => {
         throw err;
       },
     );
+  });
 
   describe('performance and stress tests', () => {
     it('should handle files with extremely long names', async () => {
@@ -122,17 +123,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -196,11 +195,13 @@ describe('ReadManyFilesTool', () => {
       
       expect(description).toContain('from .geminiignore');
     });
-  });
   });
 
   afterEach(() => {
     if (fs.existsSync(tempRootDir)) {
+      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    }
+  });
 
   describe('performance and stress tests', () => {
     it('should handle files with extremely long names', async () => {
@@ -247,17 +248,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -322,9 +321,15 @@ describe('ReadManyFilesTool', () => {
       expect(description).toContain('from .geminiignore');
     });
   });
+
+  afterEach(() => {
+    if (fs.existsSync(tempRootDir)) {
       fs.rmSync(tempRootDir, { recursive: true, force: true });
     }
     if (fs.existsSync(tempDirOutsideRoot)) {
+      fs.rmSync(tempDirOutsideRoot, { recursive: true, force: true });
+    }
+  });
 
   describe('performance and stress tests', () => {
     it('should handle files with extremely long names', async () => {
@@ -371,17 +376,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -494,17 +497,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -626,17 +627,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -756,17 +755,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -886,17 +883,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -1016,17 +1011,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -1146,17 +1139,15 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
@@ -1276,23 +1267,23 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should handle maximum path length scenarios', async () => {
-      # workaround for shell: avoid backticks in sed script
-      deepPath="";
-      for i in $(seq 0 19); do
-        if [ "$i" -eq 0 ]; then
-          deepPath="level0";
-        else
-          deepPath="$deepPath/level$i";
-        fi;
-      done;
-      mkdir -p "$deepPath";
-      createFile "$deepPath/deep-file.txt" 'deep content';
+      // Create a deeply nested directory structure
+      let deepPath = 'level0';
+      for (let i = 1; i < 20; i++) {
+        deepPath = path.join(deepPath, `level${i}`);
+      }
+      
+      const fullDeepPath = path.join(testDir, deepPath);
+      fs.mkdirSync(fullDeepPath, { recursive: true });
+      createFile(path.join(fullDeepPath, 'deep-file.txt'), 'deep content');
       
       const params = { paths: ['**/deep-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
       
       if (result.llmContent.length > 0) {
- 
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
     });
 
     it('should return error if paths array contains an empty string', () => {

@@ -6,7 +6,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HybridScorer } from './HybridScorer.js';
-import type { ConversationChunk, RelevanceQuery, ScoringWeights, ScoringResult } from '../types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ScoringWeights,
+  ScoringResult,
+} from '../types.js';
 
 // Create mock functions that will be used by the scorers
 const mockBM25ScoreChunks = vi.fn();
@@ -78,12 +83,12 @@ describe('HybridScorer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Reset all mock functions
     mockBM25ScoreChunks.mockReset();
     mockEmbeddingScoreChunks.mockReset();
     mockRecencyScoreChunks.mockReset();
-    
+
     hybridScorer = new HybridScorer(defaultWeights);
   });
 
@@ -100,7 +105,7 @@ describe('HybridScorer', () => {
         recency: 0.1,
         manual: 0.1,
       };
-      
+
       const scorer = new HybridScorer(customWeights);
       expect(scorer).toBeDefined();
     });
@@ -135,9 +140,9 @@ describe('HybridScorer', () => {
       const results = await hybridScorer.scoreChunks(sampleChunks, sampleQuery);
 
       expect(results).toHaveLength(3);
-      
+
       // Check that each result has the expected structure
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.chunkId).toBeDefined();
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
@@ -149,7 +154,7 @@ describe('HybridScorer', () => {
 
       // Verify the hybrid score calculation for first chunk
       // Expected: 0.4 * 0.7 + 0.4 * 0.8 + 0.15 * 0.3 + 0.05 * 0 = 0.645
-      const chunk1Result = results.find(r => r.chunkId === 'chunk1');
+      const chunk1Result = results.find((r) => r.chunkId === 'chunk1');
       expect(chunk1Result?.score).toBeCloseTo(0.645, 3);
     });
 
@@ -171,10 +176,13 @@ describe('HybridScorer', () => {
 
       const chunksWithPinned = [sampleChunks[0], sampleChunks[1]]; // chunk2 is pinned
 
-      const results = await hybridScorer.scoreChunks(chunksWithPinned, sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        chunksWithPinned,
+        sampleQuery,
+      );
 
-      const pinnedResult = results.find(r => r.chunkId === 'chunk2');
-      const unpinnedResult = results.find(r => r.chunkId === 'chunk1');
+      const pinnedResult = results.find((r) => r.chunkId === 'chunk2');
+      const unpinnedResult = results.find((r) => r.chunkId === 'chunk1');
 
       // Pinned chunk should have higher score due to manual boost
       expect(pinnedResult?.score).toBeGreaterThan(unpinnedResult?.score || 0);
@@ -185,7 +193,7 @@ describe('HybridScorer', () => {
     it('should handle missing scores gracefully with fallback to 0', async () => {
       // BM25 returns no results (empty array)
       mockBM25ScoreChunks.mockReturnValue([]);
-      
+
       // Embedding scorer fails/returns partial results
       mockEmbeddingScoreChunks.mockResolvedValue([
         { chunkId: 'chunk1', score: 0.7, breakdown: { embedding: 0.7 } },
@@ -201,10 +209,10 @@ describe('HybridScorer', () => {
       const results = await hybridScorer.scoreChunks(sampleChunks, sampleQuery);
 
       expect(results).toHaveLength(3);
-      
+
       // chunk1: has embedding (0.7) and recency (0.3), missing BM25 (0)
       // Expected: 0.4 * 0.7 + 0.4 * 0 + 0.15 * 0.3 + 0.05 * 0 = 0.325
-      const chunk1Result = results.find(r => r.chunkId === 'chunk1');
+      const chunk1Result = results.find((r) => r.chunkId === 'chunk1');
       expect(chunk1Result?.score).toBeCloseTo(0.325, 3);
       expect(chunk1Result?.breakdown.bm25).toBe(0);
     });
@@ -238,7 +246,10 @@ describe('HybridScorer', () => {
         { chunkId: 'chunk1', score: 0.8, breakdown: { recency: 0.8 } },
       ]);
 
-      const results = await hybridScorer.scoreChunks(chunksWithoutMetadata, sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        chunksWithoutMetadata,
+        sampleQuery,
+      );
 
       expect(results).toHaveLength(1);
       expect(results[0].breakdown.manual).toBe(0); // No pinned flag
@@ -284,7 +295,10 @@ describe('HybridScorer', () => {
         { chunkId: 'chunk1', score: 0.4, breakdown: { recency: 0.4 } },
       ]);
 
-      const results = await hybridScorer.scoreChunks([sampleChunks[0]], sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        [sampleChunks[0]],
+        sampleQuery,
+      );
 
       const breakdown = results[0].breakdown;
       expect(breakdown.embedding).toBe(0.8);
@@ -300,9 +314,18 @@ describe('HybridScorer', () => {
 
       await hybridScorer.scoreChunks(sampleChunks, sampleQuery);
 
-      expect(mockBM25ScoreChunks).toHaveBeenCalledWith(sampleChunks, sampleQuery);
-      expect(mockEmbeddingScoreChunks).toHaveBeenCalledWith(sampleChunks, sampleQuery);
-      expect(mockRecencyScoreChunks).toHaveBeenCalledWith(sampleChunks, sampleQuery);
+      expect(mockBM25ScoreChunks).toHaveBeenCalledWith(
+        sampleChunks,
+        sampleQuery,
+      );
+      expect(mockEmbeddingScoreChunks).toHaveBeenCalledWith(
+        sampleChunks,
+        sampleQuery,
+      );
+      expect(mockRecencyScoreChunks).toHaveBeenCalledWith(
+        sampleChunks,
+        sampleQuery,
+      );
     });
 
     it('should handle scorer errors gracefully', async () => {
@@ -320,7 +343,10 @@ describe('HybridScorer', () => {
       ]);
 
       // Should not throw, but handle gracefully
-      const results = await hybridScorer.scoreChunks([sampleChunks[0]], sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        [sampleChunks[0]],
+        sampleQuery,
+      );
 
       expect(results).toHaveLength(1);
       expect(results[0].breakdown.bm25).toBe(0); // Falls back to 0
@@ -370,7 +396,10 @@ describe('HybridScorer', () => {
         { chunkId: 'chunk1', score: 0.3, breakdown: { recency: 0.3 } },
       ]);
 
-      const results = await hybridScorer.scoreChunks([sampleChunks[0]], sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        [sampleChunks[0]],
+        sampleQuery,
+      );
 
       expect(results[0].score).toBeGreaterThanOrEqual(0);
     });
@@ -386,8 +415,14 @@ describe('HybridScorer', () => {
       mockEmbeddingScoreChunks.mockResolvedValue(mockScores);
       mockRecencyScoreChunks.mockReturnValue(mockScores);
 
-      const results1 = await hybridScorer.scoreChunks(sampleChunks, sampleQuery);
-      const results2 = await hybridScorer.scoreChunks(sampleChunks, sampleQuery);
+      const results1 = await hybridScorer.scoreChunks(
+        sampleChunks,
+        sampleQuery,
+      );
+      const results2 = await hybridScorer.scoreChunks(
+        sampleChunks,
+        sampleQuery,
+      );
 
       expect(results1).toEqual(results2);
     });
@@ -416,7 +451,10 @@ describe('HybridScorer', () => {
         { chunkId: 'chunk1', score: 0.2, breakdown: { recency: 0.2 } },
       ]);
 
-      const results = await hybridScorer.scoreChunks([sampleChunks[0]], sampleQuery);
+      const results = await hybridScorer.scoreChunks(
+        [sampleChunks[0]],
+        sampleQuery,
+      );
 
       // With high embedding weight (0.8), score should be dominated by embedding score
       // Expected: 0.8 * 0.9 + 0.1 * 0.5 + 0.05 * 0.2 + 0.05 * 0 = 0.78

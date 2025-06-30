@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationChunk, RelevanceQuery, ScoringResult } from '../types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ScoringResult,
+} from '../types.js';
 
 /**
  * Recency scorer that applies time-based decay to conversation chunks.
  * More recent chunks get higher scores with exponential decay over time.
- * 
+ *
  * Implements exponential decay scoring where recency score decreases
  * exponentially with time difference from query timestamp.
  */
@@ -30,10 +34,13 @@ export class RecencyScorer {
    * @param query - Relevance query containing timestamp reference
    * @returns Array of scoring results with recency scores
    */
-  scoreChunks(chunks: ConversationChunk[], query: RelevanceQuery): ScoringResult[] {
+  scoreChunks(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+  ): ScoringResult[] {
     const queryTime = query.timestamp || Date.now();
-    
-    return chunks.map(chunk => {
+
+    return chunks.map((chunk) => {
       const score = this.calculateRecencyScore(chunk.timestamp, queryTime);
       return {
         chunkId: chunk.id,
@@ -46,13 +53,13 @@ export class RecencyScorer {
   /**
    * Calculate recency score using exponential decay.
    * @param chunkTime - Timestamp of the chunk in milliseconds
-   * @param queryTime - Reference timestamp for the query in milliseconds  
+   * @param queryTime - Reference timestamp for the query in milliseconds
    * @returns Recency score between 0 and 1, where 1 is most recent
    */
   private calculateRecencyScore(chunkTime: number, queryTime: number): number {
     const timeDiff = Math.abs(queryTime - chunkTime);
     const hours = timeDiff / (1000 * 60 * 60); // Convert to hours
-    
+
     // Exponential decay: e^(-decay_rate * hours)
     // At 0 hours: score = 1.0
     // At 1 hour: score ≈ 0.37 (with decay_rate = 1.0)

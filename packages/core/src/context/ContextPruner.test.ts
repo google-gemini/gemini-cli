@@ -10,7 +10,7 @@ import { ContextPruner } from './ContextPruner.js';
 
 describe('ContextPruner', () => {
   let pruner: ContextPruner;
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     pruner = new ContextPruner();
@@ -22,7 +22,7 @@ describe('ContextPruner', () => {
     role: 'user' | 'assistant' | 'tool',
     content: string,
     tokens: number,
-    metadata: Partial<ConversationChunk['metadata']> = {}
+    metadata: Partial<ConversationChunk['metadata']> = {},
   ): ConversationChunk => ({
     id,
     role,
@@ -47,7 +47,7 @@ describe('ContextPruner', () => {
       const result = pruner.pruneChunks(chunks, query, 100); // Large budget
 
       expect(result.prunedChunks).toHaveLength(3);
-      expect(result.prunedChunks.map(c => c.id)).toEqual(['1', '2', '3']);
+      expect(result.prunedChunks.map((c) => c.id)).toEqual(['1', '2', '3']);
       expect(result.stats.originalChunks).toBe(3);
       expect(result.stats.prunedChunks).toBe(3);
       expect(result.stats.originalTokens).toBe(23);
@@ -57,15 +57,15 @@ describe('ContextPruner', () => {
 
     it('should preserve pinned chunks regardless of score', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('1', 'user', 'Important context', 20, { 
+        createChunk('1', 'user', 'Important context', 20, {
           pinned: true,
-          finalScore: 0.1 // Low score but pinned
+          finalScore: 0.1, // Low score but pinned
         }),
-        createChunk('2', 'assistant', 'High score response', 15, { 
-          finalScore: 0.9 
+        createChunk('2', 'assistant', 'High score response', 15, {
+          finalScore: 0.9,
         }),
-        createChunk('3', 'user', 'Low score question', 10, { 
-          finalScore: 0.2 
+        createChunk('3', 'user', 'Low score question', 10, {
+          finalScore: 0.2,
         }),
       ];
 
@@ -73,20 +73,20 @@ describe('ContextPruner', () => {
       const result = pruner.pruneChunks(chunks, query, 35); // Budget for pinned + one more
 
       expect(result.prunedChunks).toHaveLength(2);
-      expect(result.prunedChunks.map(c => c.id)).toContain('1'); // Pinned chunk included
-      expect(result.prunedChunks.map(c => c.id)).toContain('2'); // Highest score included
+      expect(result.prunedChunks.map((c) => c.id)).toContain('1'); // Pinned chunk included
+      expect(result.prunedChunks.map((c) => c.id)).toContain('2'); // Highest score included
     });
 
     it('should prioritize chunks by score-per-token ratio', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('1', 'user', 'Inefficient chunk', 100, { 
-          finalScore: 0.5 // Ratio: 0.005
+        createChunk('1', 'user', 'Inefficient chunk', 100, {
+          finalScore: 0.5, // Ratio: 0.005
         }),
-        createChunk('2', 'assistant', 'Efficient', 10, { 
-          finalScore: 0.8 // Ratio: 0.08 - highest
+        createChunk('2', 'assistant', 'Efficient', 10, {
+          finalScore: 0.8, // Ratio: 0.08 - highest
         }),
-        createChunk('3', 'user', 'Medium', 20, { 
-          finalScore: 0.6 // Ratio: 0.03
+        createChunk('3', 'user', 'Medium', 20, {
+          finalScore: 0.6, // Ratio: 0.03
         }),
       ];
 
@@ -94,7 +94,7 @@ describe('ContextPruner', () => {
       const result = pruner.pruneChunks(chunks, query, 30); // Budget for two smaller chunks
 
       expect(result.prunedChunks).toHaveLength(2);
-      expect(result.prunedChunks.map(c => c.id)).toEqual(['2', '3']); // Best ratios first
+      expect(result.prunedChunks.map((c) => c.id)).toEqual(['2', '3']); // Best ratios first
     });
 
     it('should maintain conversation coherence by preserving role alternation', () => {
@@ -109,20 +109,24 @@ describe('ContextPruner', () => {
       const result = pruner.pruneChunks(chunks, query, 40); // Budget tight but should preserve pairs
 
       // Should avoid orphaned assistant responses (assistant responses without preceding user messages)
-      const sortedChunks = result.prunedChunks.sort((a, b) => a.timestamp - b.timestamp);
+      const sortedChunks = result.prunedChunks.sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
       let hasOrphanedAssistant = false;
-      
+
       for (let i = 0; i < sortedChunks.length; i++) {
         if (sortedChunks[i].role === 'assistant') {
           // Check if there's at least one user message before this assistant response
-          const hasUserBefore = sortedChunks.slice(0, i).some(c => c.role === 'user');
+          const hasUserBefore = sortedChunks
+            .slice(0, i)
+            .some((c) => c.role === 'user');
           if (!hasUserBefore) {
             hasOrphanedAssistant = true;
             break;
           }
         }
       }
-      
+
       expect(hasOrphanedAssistant).toBe(false);
     });
 
@@ -153,9 +157,15 @@ describe('ContextPruner', () => {
 
     it('should include mandatory chunks even if they exceed budget', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('1', 'user', 'Large pinned chunk that exceeds budget', 200, { 
-          pinned: true 
-        }),
+        createChunk(
+          '1',
+          'user',
+          'Large pinned chunk that exceeds budget',
+          200,
+          {
+            pinned: true,
+          },
+        ),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
@@ -171,7 +181,9 @@ describe('ContextPruner', () => {
         createChunk('1', 'user', 'Keep this', 10, { finalScore: 0.9 }),
         createChunk('2', 'assistant', 'Keep this too', 15, { finalScore: 0.8 }),
         createChunk('3', 'user', 'Remove this', 20, { finalScore: 0.3 }),
-        createChunk('4', 'assistant', 'Remove this too', 25, { finalScore: 0.2 }),
+        createChunk('4', 'assistant', 'Remove this too', 25, {
+          finalScore: 0.2,
+        }),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
@@ -181,7 +193,9 @@ describe('ContextPruner', () => {
       expect(result.stats.prunedChunks).toBe(2);
       expect(result.stats.originalTokens).toBe(70);
       expect(result.stats.prunedTokens).toBe(25);
-      expect(result.stats.reductionPercentage).toBe(Math.round((45 / 70) * 100));
+      expect(result.stats.reductionPercentage).toBe(
+        Math.round((45 / 70) * 100),
+      );
       expect(result.stats.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
   });
@@ -190,27 +204,33 @@ describe('ContextPruner', () => {
     it('should maintain thread ancestry by including related chunks', () => {
       const chunks: ConversationChunk[] = [
         createChunk('1', 'user', 'Original question', 10, { finalScore: 0.9 }),
-        createChunk('2', 'assistant', 'Answer with context', 15, { finalScore: 0.6 }),
-        createChunk('3', 'user', 'Follow-up based on answer', 12, { finalScore: 0.8 }),
-        createChunk('4', 'assistant', 'Final response', 18, { finalScore: 0.7 }),
+        createChunk('2', 'assistant', 'Answer with context', 15, {
+          finalScore: 0.6,
+        }),
+        createChunk('3', 'user', 'Follow-up based on answer', 12, {
+          finalScore: 0.8,
+        }),
+        createChunk('4', 'assistant', 'Final response', 18, {
+          finalScore: 0.7,
+        }),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
-      
+
       // This should prefer keeping conversational threads together
       const result = pruner.pruneChunks(chunks, query, 45); // Budget for most but not all
 
       // Should maintain some logical conversation flow
       expect(result.prunedChunks.length).toBeGreaterThan(2);
-      
+
       // Check that we don't have orphaned responses
       const hasOrphanedResponse = result.prunedChunks.some((chunk, i) => {
         if (chunk.role !== 'assistant') return false;
         // Assistant response should have a preceding user message in the pruned set
         const precedingChunks = result.prunedChunks.slice(0, i);
-        return !precedingChunks.some(c => c.role === 'user');
+        return !precedingChunks.some((c) => c.role === 'user');
       });
-      
+
       expect(hasOrphanedResponse).toBe(false);
     });
   });
@@ -219,7 +239,9 @@ describe('ContextPruner', () => {
     it('should handle chunks with zero tokens', () => {
       const chunks: ConversationChunk[] = [
         createChunk('1', 'user', '', 0, { finalScore: 0.5 }),
-        createChunk('2', 'assistant', 'Valid response', 10, { finalScore: 0.8 }),
+        createChunk('2', 'assistant', 'Valid response', 10, {
+          finalScore: 0.8,
+        }),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
@@ -240,12 +262,17 @@ describe('ContextPruner', () => {
 
       // Should handle undefined scores gracefully (treat as 0)
       expect(result.prunedChunks).toHaveLength(2);
-      expect(result.prunedChunks.find(c => c.id === '2')).toBeDefined(); // Higher score chunk included
+      expect(result.prunedChunks.find((c) => c.id === '2')).toBeDefined(); // Higher score chunk included
     });
 
     it('should handle single oversized chunk', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('1', 'user', 'Massive chunk that exceeds any reasonable budget', 1000),
+        createChunk(
+          '1',
+          'user',
+          'Massive chunk that exceeds any reasonable budget',
+          1000,
+        ),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
@@ -258,24 +285,26 @@ describe('ContextPruner', () => {
 
     it('should preserve system prompts and tool definitions as mandatory', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('system', 'assistant', 'System prompt content', 50, { 
+        createChunk('system', 'assistant', 'System prompt content', 50, {
           tags: ['system-prompt'],
-          finalScore: 0.1 
+          finalScore: 0.1,
         }),
-        createChunk('tool-def', 'tool', 'Tool definition', 30, { 
+        createChunk('tool-def', 'tool', 'Tool definition', 30, {
           tags: ['tool-definition'],
-          finalScore: 0.2 
+          finalScore: 0.2,
         }),
-        createChunk('user-msg', 'user', 'User message', 20, { finalScore: 0.9 }),
+        createChunk('user-msg', 'user', 'User message', 20, {
+          finalScore: 0.9,
+        }),
       ];
 
       const query: RelevanceQuery = { text: 'test' };
       const result = pruner.pruneChunks(chunks, query, 60); // Tight budget
 
       // System prompts and tool definitions should be preserved
-      const systemChunk = result.prunedChunks.find(c => c.id === 'system');
-      const toolChunk = result.prunedChunks.find(c => c.id === 'tool-def');
-      
+      const systemChunk = result.prunedChunks.find((c) => c.id === 'system');
+      const toolChunk = result.prunedChunks.find((c) => c.id === 'tool-def');
+
       expect(systemChunk).toBeDefined();
       expect(toolChunk).toBeDefined();
     });
@@ -283,13 +312,15 @@ describe('ContextPruner', () => {
     it('should handle very large number of chunks efficiently', () => {
       const chunks: ConversationChunk[] = [];
       for (let i = 0; i < 1000; i++) {
-        chunks.push(createChunk(
-          i.toString(),
-          i % 2 === 0 ? 'user' : 'assistant',
-          `Message ${i}`,
-          10,
-          { finalScore: Math.random() }
-        ));
+        chunks.push(
+          createChunk(
+            i.toString(),
+            i % 2 === 0 ? 'user' : 'assistant',
+            `Message ${i}`,
+            10,
+            { finalScore: Math.random() },
+          ),
+        );
       }
 
       const query: RelevanceQuery = { text: 'test' };
@@ -306,9 +337,15 @@ describe('ContextPruner', () => {
   describe('algorithm correctness', () => {
     it('should implement greedy selection by score-per-token ratio', () => {
       const chunks: ConversationChunk[] = [
-        createChunk('low-ratio', 'user', 'Low efficiency chunk', 100, { finalScore: 0.3 }), // Ratio: 0.003
-        createChunk('high-ratio', 'assistant', 'High efficiency', 10, { finalScore: 0.9 }), // Ratio: 0.09
-        createChunk('med-ratio', 'user', 'Medium efficiency', 30, { finalScore: 0.6 }), // Ratio: 0.02
+        createChunk('low-ratio', 'user', 'Low efficiency chunk', 100, {
+          finalScore: 0.3,
+        }), // Ratio: 0.003
+        createChunk('high-ratio', 'assistant', 'High efficiency', 10, {
+          finalScore: 0.9,
+        }), // Ratio: 0.09
+        createChunk('med-ratio', 'user', 'Medium efficiency', 30, {
+          finalScore: 0.6,
+        }), // Ratio: 0.02
       ];
 
       const query: RelevanceQuery = { text: 'test' };

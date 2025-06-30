@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationChunk, RelevanceQuery, ScoringResult } from '../types.js';
+import type {
+  ConversationChunk,
+  RelevanceQuery,
+  ScoringResult,
+} from '../types.js';
 
 /**
  * Function type for generating embeddings from text.
@@ -25,7 +29,10 @@ export class EmbeddingScorer {
   /**
    * Score chunks based on semantic similarity to the query using embeddings.
    */
-  async scoreChunks(chunks: ConversationChunk[], query: RelevanceQuery): Promise<ScoringResult[]> {
+  async scoreChunks(
+    chunks: ConversationChunk[],
+    query: RelevanceQuery,
+  ): Promise<ScoringResult[]> {
     if (chunks.length === 0) {
       return [];
     }
@@ -33,7 +40,7 @@ export class EmbeddingScorer {
     try {
       // Generate query embedding if possible
       let queryEmbedding: number[] | null = null;
-      
+
       if (this.embeddingGenerator && query.text.trim()) {
         try {
           queryEmbedding = await this.embeddingGenerator(query.text);
@@ -44,9 +51,12 @@ export class EmbeddingScorer {
       }
 
       // Score each chunk
-      const results = chunks.map(chunk => {
-        const score = this.calculateSimilarity(queryEmbedding, chunk.metadata.embedding);
-        
+      const results = chunks.map((chunk) => {
+        const score = this.calculateSimilarity(
+          queryEmbedding,
+          chunk.metadata.embedding,
+        );
+
         return {
           chunkId: chunk.id,
           score: this.clampScore(score),
@@ -57,7 +67,7 @@ export class EmbeddingScorer {
       return results;
     } catch (error) {
       // Fallback: return zero scores for all chunks
-      return chunks.map(chunk => ({
+      return chunks.map((chunk) => ({
         chunkId: chunk.id,
         score: 0,
         breakdown: { embedding: 0 },
@@ -68,7 +78,10 @@ export class EmbeddingScorer {
   /**
    * Calculate cosine similarity between query and chunk embeddings.
    */
-  private calculateSimilarity(queryEmbedding: number[] | null, chunkEmbedding?: number[]): number {
+  private calculateSimilarity(
+    queryEmbedding: number[] | null,
+    chunkEmbedding?: number[],
+  ): number {
     // Return 0 if either embedding is missing
     if (!queryEmbedding || !chunkEmbedding) {
       return 0;
@@ -86,7 +99,7 @@ export class EmbeddingScorer {
 
     try {
       const similarity = this.cosineSimilarity(queryEmbedding, chunkEmbedding);
-      
+
       // Handle invalid similarity values
       if (!Number.isFinite(similarity)) {
         return 0;
@@ -108,12 +121,12 @@ export class EmbeddingScorer {
     for (let i = 0; i < vectorA.length; i++) {
       const a = vectorA[i];
       const b = vectorB[i];
-      
+
       // Skip invalid values
       if (!Number.isFinite(a) || !Number.isFinite(b)) {
         continue;
       }
-      
+
       dotProduct += a * b;
     }
 
