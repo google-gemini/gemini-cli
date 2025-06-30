@@ -72,6 +72,7 @@ export async function createContentGeneratorConfig(
 
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
+    contentGeneratorConfig.vertexai = false;
     contentGeneratorConfig.model = await getEffectiveModel(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
@@ -82,16 +83,10 @@ export async function createContentGeneratorConfig(
 
   if (
     authType === AuthType.USE_VERTEX_AI &&
-    !!googleApiKey &&
-    googleCloudProject &&
-    googleCloudLocation
+    (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
-    contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-    );
 
     return contentGeneratorConfig;
   }
