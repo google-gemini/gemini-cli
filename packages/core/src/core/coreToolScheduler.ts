@@ -515,6 +515,7 @@ export class CoreToolScheduler {
         'cancelled',
         'User did not allow tool call',
       );
+      await this.config.getGeminiClient().undoLastModelTurn();
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableTool(waitingToolCall.tool)) {
