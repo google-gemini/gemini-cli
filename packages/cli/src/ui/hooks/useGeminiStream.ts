@@ -164,7 +164,6 @@ export const useGeminiStream = (
   const pendingFilesRef = useRef<Set<string>>(new Set()); // Track files pending Gemini processing
   const geminiContextFilesRef = useRef<Set<string>>(new Set()); // Track files actually in Gemini's context
   const logger = useLogger();
-  const { startNewTurn, addUsage } = useSessionStats();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
