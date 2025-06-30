@@ -785,6 +785,37 @@ export const useGeminiStream = (
     saveRestorableToolCalls();
   }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
+  // Auto-save chat history when auto-chat is enabled
+  useEffect(() => {
+    const autoSaveChat = async () => {
+      if (!config.getAutoChatEnabled()) {
+        return;
+      }
+
+      // Only auto-save when not actively responding and there's actual conversation history
+      if (streamingState !== StreamingState.Idle || history.length === 0) {
+        return;
+      }
+
+      try {
+        const chat = await geminiClient?.getChat();
+        if (chat && logger) {
+          const chatHistory = chat.getHistory();
+          if (chatHistory.length > 0) {
+            await logger.saveCheckpoint(chatHistory, 'auto-save');
+            onDebugMessage('Auto-saved conversation checkpoint');
+          }
+        }
+      } catch (error) {
+        onDebugMessage(`Failed to auto-save conversation: ${getErrorMessage(error)}`);
+      }
+    };
+
+    // Debounce auto-save to avoid saving too frequently
+    const timeoutId = setTimeout(autoSaveChat, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [config, streamingState, history.length, geminiClient, logger, onDebugMessage]);
+
   return {
     streamingState,
     submitQuery,

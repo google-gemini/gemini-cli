@@ -50,6 +50,7 @@ interface CliArgs {
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
+  'auto-chat': boolean | undefined;
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
@@ -126,6 +127,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'c',
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
+      default: false,
+    })
+    .option('auto-chat', {
+      type: 'boolean',
+      description: 'Enables automatic saving of chat conversations',
       default: false,
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -235,6 +241,7 @@ export async function loadCliConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
+    autoChat: argv['auto-chat'] || settings.autoChat?.enabled,
     proxy:
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||

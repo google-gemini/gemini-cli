@@ -146,6 +146,13 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/restore` command is available.
 
+- **`autoChat`** (object):
+
+  - **Description:** Configures automatic saving of chat conversations. When enabled, the CLI will automatically save conversation checkpoints after each interaction.
+  - **Default:** `{"enabled": false}`
+  - **Properties:**
+    - **`enabled`** (boolean): When `true`, chat conversations are automatically saved as checkpoints.
+
 - **`preferredEditor`** (string):
   - **Description:** Specifies the preferred editor to use for viewing diffs.
   - **Default:** `vscode`
@@ -311,6 +318,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
   - Enables [checkpointing](./commands.md#checkpointing-commands).
+- **`--auto-chat`**:
+  - Enables automatic saving of chat conversations. When enabled, the CLI will automatically save conversation checkpoints after each interaction, eliminating the need to manually use the `/save` command.
 - **`--version`**:
   - Displays the version of the CLI.
 
