@@ -38,6 +38,8 @@ import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
+import { StatusDisplay } from './components/StatusDisplay.js';
+import { useStatusCheck } from './hooks/useStatusCheck.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
@@ -113,6 +115,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [showStatus, setShowStatus] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -136,6 +139,17 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+
+  const statusInfo = useStatusCheck(config, settings, showStatus);
+
+  useEffect(() => {
+    if (statusInfo.isComplete) {
+      const timer = setTimeout(() => {
+        setShowStatus(false);
+      }, 3000); // Hide status after 3 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [statusInfo.isComplete]);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -275,6 +289,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     loadHistory,
     refreshStatic,
     setShowHelp,
+    setShowStatus,
     setDebugMessage,
     openThemeDialog,
     openAuthDialog,
@@ -623,6 +638,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         </OverflowProvider>
 
         {showHelp && <Help commands={slashCommands} />}
+        {showStatus && <StatusDisplay statusInfo={statusInfo} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
           {startupWarnings.length > 0 && (

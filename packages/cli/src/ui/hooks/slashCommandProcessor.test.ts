@@ -93,6 +93,7 @@ describe('useSlashCommandProcessor', () => {
   let mockLoadHistory: ReturnType<typeof vi.fn>;
   let mockRefreshStatic: ReturnType<typeof vi.fn>;
   let mockSetShowHelp: ReturnType<typeof vi.fn>;
+  let mockSetShowStatus: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
@@ -111,6 +112,7 @@ describe('useSlashCommandProcessor', () => {
     mockLoadHistory = vi.fn();
     mockRefreshStatic = vi.fn();
     mockSetShowHelp = vi.fn();
+    mockSetShowStatus = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
@@ -169,6 +171,7 @@ describe('useSlashCommandProcessor', () => {
         mockLoadHistory,
         mockRefreshStatic,
         mockSetShowHelp,
+        mockSetShowStatus,
         mockOnDebugMessage,
         mockOpenThemeDialog,
         mockOpenAuthDialog,

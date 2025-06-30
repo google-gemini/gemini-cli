@@ -260,6 +260,22 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('checkConnectivity', () => {
+    it('should call countTokens on the content generator', async () => {
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      await client.checkConnectivity();
+
+      expect(mockGenerator.countTokens).toHaveBeenCalledWith({
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'health check' }] }],
+      });
+    });
+  });
+
   describe('generateContent', () => {
     it('should call generateContent with the correct parameters', async () => {
       const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];

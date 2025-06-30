@@ -79,6 +79,14 @@ export class GeminiClient {
     return this.contentGenerator;
   }
 
+  async checkConnectivity(): Promise<void> {
+    // Use countTokens as a lightweight, non-destructive way to check API connectivity.
+    await this.getContentGenerator().countTokens({
+      model: this.model,
+      contents: [{ role: 'user', parts: [{ text: 'health check' }] }],
+    });
+  }
+
   async addHistory(content: Content) {
     this.getChat().addHistory(content);
   }
