@@ -626,7 +626,7 @@ export function useTextBuffer({
     setPreferredCol(null);
 
     // Clear the queue after processing
-    setOpQueue([]);
+    setOpQueue((prev) => prev.slice(opQueue.length));
   }, [opQueue, lines, cursorRow, cursorCol, pushUndo, setPreferredCol]);
 
   const insert = useCallback(
@@ -643,8 +643,8 @@ export function useTextBuffer({
         let potentialPath = ch;
         if (
           potentialPath.length > 2 &&
-          potentialPath.startsWith('') &&
-          potentialPath.endsWith('')
+          potentialPath.startsWith("'") &&
+          potentialPath.endsWith("'")
         ) {
           potentialPath = ch.slice(1, -1);
         }
