@@ -122,7 +122,6 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
     )}
     {status === ToolCallStatus.Executing && (
       <GeminiRespondingSpinner
-        spinnerType="toggle"
         nonRespondingDisplay={'⊷'}
       />
     )}

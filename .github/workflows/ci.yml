@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate git commit info
+        run: node scripts/utils/generate-git-commit-info.js
+
       - name: Run formatter check
         run: |
           npm run format

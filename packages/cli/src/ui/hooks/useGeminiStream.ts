@@ -25,7 +25,7 @@ import {
   UnauthorizedError,
   UserPromptEvent,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion } from '@google/genai';
+import { type Part, type PartListUnion, Content } from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -194,6 +194,11 @@ export const useGeminiStream = (
       config,
       setPendingHistoryItem,
       getPreferredEditor,
+      history.map(item => ({ 
+        role: item.type === MessageType.USER ? 'user' : 'model', 
+        parts: [{ text: item.text || '' }] 
+      })) as Content[],
+      undefined,
     );
 
   const pendingToolCallGroupDisplay = useMemo(

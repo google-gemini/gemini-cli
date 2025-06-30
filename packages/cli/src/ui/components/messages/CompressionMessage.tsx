@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { CompressionProps } from '../../types.js';
-import Spinner from 'ink-spinner';
+import CustomSpinner from '../CustomSpinner.js';
 import { Colors } from '../../colors.js';
 
 export interface CompressionDisplayProps {
@@ -30,7 +30,7 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
     <Box flexDirection="row">
       <Box marginRight={1}>
         {compression.isPending ? (
-          <Spinner type="dots" />
+          <CustomSpinner />
         ) : (
           <Text color={Colors.AccentPurple}>✦</Text>
         )}

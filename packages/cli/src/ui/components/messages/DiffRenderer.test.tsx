@@ -9,16 +9,23 @@ import { render } from 'ink-testing-library';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';
+import { Text } from 'ink';
 
 describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
 
   beforeEach(() => {
     mockColorizeCode.mockClear();
-    // Mock colorizeCode to return a string representation for testing
+    // Mock colorizeCode to return a valid React element for testing
     mockColorizeCode.mockImplementation((code: string) => {
       const lines = code.split('\n');
-      return lines.map((line, index) => `${index + 1} ${line}`).join('\n');
+      return (
+        <>
+          {lines.map((line, index) => (
+            <Text key={index}>{`${index + 1} ${line}`}</Text>
+          ))}
+        </>
+      );
     });
   });
 

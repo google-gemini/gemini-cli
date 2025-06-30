@@ -2,7 +2,7 @@
   "name": "@google/gemini-cli",
   "version": "0.1.8",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
   "type": "module",
   "workspaces": [
@@ -11,6 +11,11 @@
   "repository": "google-gemini/gemini-cli",
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.7"
+  },
+  "overrides": {
+    "react": "^19.1.0",
+    "ink": "^6.0.1",
+    "react-reconciler": "^0.32.0"
   },
   "scripts": {
     "generate": "node scripts/utils/generate-git-commit-info.js",
@@ -43,10 +48,11 @@
     "build:core": "npm run build --workspace packages/core",
     "build:packages": "npm run build:core && npm run build:cli",
     "build:sandbox:fast": "node scripts/build/build_sandbox.js --skip-npm-install-build",
+    "prepare:core-package": "node scripts/prepare-core-package.js",
     "prepare:cli-packagejson": "node scripts/deploy/prepare-cli-packagejson.js",
     "publish:sandbox": "node scripts/deploy/publish-sandbox.js",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
-    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
+    "publish:release": "npm run build:packages && npm run prepare:core-package && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
     "telemetry": "node scripts/telemetry/telemetry.js",
     "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\""
   },
@@ -83,7 +89,6 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.1.1",
-    "ink-gradient": "^3.0.0"
+    "@google/gemini-cli": "^0.1.1"
   }
 }

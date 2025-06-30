@@ -6,10 +6,9 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
-import { Colors } from '../colors.js';
 import { shortAsciiLogo, longAsciiLogo } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
+import { Colors } from '../colors.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -39,13 +38,9 @@ export const Header: React.FC<HeaderProps> = ({
       width={artWidth}
       flexShrink={0}
     >
-      {Colors.GradientColors ? (
-        <Gradient colors={Colors.GradientColors}>
-          <Text>{displayTitle}</Text>
-        </Gradient>
-      ) : (
-        <Text>{displayTitle}</Text>
-      )}
+      <Text color={Colors.GradientColors?.[0] || Colors.AccentBlue}>
+        {displayTitle}
+      </Text>
     </Box>
   );
 };

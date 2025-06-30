@@ -6,8 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import Spinner from 'ink-spinner';
-import type { SpinnerName } from 'cli-spinners';
+import CustomSpinner from './CustomSpinner.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 
@@ -17,16 +16,15 @@ interface GeminiRespondingSpinnerProps {
    * If not provided and not Responding, renders null.
    */
   nonRespondingDisplay?: string;
-  spinnerType?: SpinnerName;
 }
 
 export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
-> = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
+> = ({ nonRespondingDisplay }) => {
   const streamingState = useStreamingContext();
 
   if (streamingState === StreamingState.Responding) {
-    return <Spinner type={spinnerType} />;
+    return <CustomSpinner />;
   } else if (nonRespondingDisplay) {
     return <Text>{nonRespondingDisplay}</Text>;
   }

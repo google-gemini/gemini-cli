@@ -18,13 +18,14 @@ import {
   logToolCall,
   ToolCallEvent,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
+import { Part, PartListUnion, Content } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import {
   isModifiableTool,
   ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
+import { CheckpointingService } from '../services/checkpointingService.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -230,15 +231,24 @@ export class CoreToolScheduler {
   private approvalMode: ApprovalMode;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private checkpointingService: CheckpointingService;
+  private history: Content[] = [];
+  private clientHistory: Content[] = [];
 
   constructor(options: CoreToolSchedulerOptions) {
-    this.config = options.config;
     this.toolRegistry = options.toolRegistry;
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.config = options.config;
+    this.checkpointingService = new CheckpointingService(this.config);
+  }
+
+  setHistory(history: Content[], clientHistory?: Content[]): void {
+    this.history = history;
+    this.clientHistory = clientHistory || [];
   }
 
   private setStatusInternal(
@@ -495,7 +505,7 @@ export class CoreToolScheduler {
         );
       }
     }
-    this.attemptExecutionOfScheduledCalls(signal);
+    this.attemptExecutionOfScheduledCalls(signal, this.history, this.clientHistory);
     this.checkAndNotifyCompletion();
   }
 
@@ -559,10 +569,14 @@ export class CoreToolScheduler {
     } else {
       this.setStatusInternal(callId, 'scheduled');
     }
-    this.attemptExecutionOfScheduledCalls(signal);
+    this.attemptExecutionOfScheduledCalls(signal, this.history, this.clientHistory);
   }
 
-  private attemptExecutionOfScheduledCalls(signal: AbortSignal): void {
+  private attemptExecutionOfScheduledCalls(
+    signal: AbortSignal,
+    history?: Content[],
+    clientHistory?: Content[],
+  ): void {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
@@ -576,12 +590,26 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
-      callsToExecute.forEach((toolCall) => {
+      callsToExecute.forEach(async (toolCall) => {
         if (toolCall.status !== 'scheduled') return;
 
         const scheduledCall = toolCall as ScheduledToolCall;
         const { callId, name: toolName } = scheduledCall.request;
         this.setStatusInternal(callId, 'executing');
+
+        // Create checkpoint before execution if needed
+        if (this.checkpointingService.shouldCheckpoint(scheduledCall.request)) {
+          try {
+            await this.checkpointingService.createCheckpoint(
+              scheduledCall.request,
+              history || [],
+              clientHistory,
+            );
+          } catch (error) {
+            console.error('Failed to create checkpoint:', error);
+            // Continue with execution even if checkpointing fails
+          }
+        }
 
         const liveOutputCallback =
           scheduledCall.tool.canUpdateOutput && this.outputUpdateHandler

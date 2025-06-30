@@ -698,6 +698,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}
               config={config}
+              settings={settings}
             />
           ) : (
             <>

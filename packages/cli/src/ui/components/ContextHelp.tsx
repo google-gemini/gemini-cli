@@ -6,17 +6,11 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
 
-const GradientHeading = ({ children }: { children: React.ReactNode }) =>
-  Colors.GradientColors ? (
-    <Gradient colors={Colors.GradientColors}>
-      <Text bold>{children}</Text>
-    </Gradient>
-  ) : (
-    <Text bold color={Colors.Foreground}>{children}</Text>
-  );
+const GradientHeading = ({ children }: { children: React.ReactNode }) => (
+  <Text bold color={Colors.Foreground}>{children}</Text>
+);
 
 export const ContextHelp: React.FC = () => (
   <Box

@@ -9,18 +9,22 @@ import { type Config, AuthType } from '@google/gemini-cli-core';
 import { GeminiPrivacyNotice } from './GeminiPrivacyNotice.js';
 import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
 import { CloudFreePrivacyNotice } from './CloudFreePrivacyNotice.js';
+import { type LoadedSettings } from '../../config/settings.js';
 
 interface PrivacyNoticeProps {
   onExit: () => void;
   config: Config;
+  settings: LoadedSettings;
 }
 
 const PrivacyNoticeText = ({
   config,
   onExit,
+  settings,
 }: {
   config: Config;
   onExit: () => void;
+  settings: LoadedSettings;
 }) => {
   const authType = config.getContentGeneratorConfig()?.authType;
 
@@ -31,12 +35,12 @@ const PrivacyNoticeText = ({
       return <CloudPaidPrivacyNotice onExit={onExit} />;
     case AuthType.LOGIN_WITH_GOOGLE_PERSONAL:
     default:
-      return <CloudFreePrivacyNotice config={config} onExit={onExit} />;
+      return <CloudFreePrivacyNotice _config={config} onExit={onExit} settings={settings} />;
   }
 };
 
-export const PrivacyNotice = ({ onExit, config }: PrivacyNoticeProps) => (
+export const PrivacyNotice = ({ onExit, config, settings }: PrivacyNoticeProps) => (
   <Box borderStyle="round" padding={1} flexDirection="column">
-    <PrivacyNoticeText config={config} onExit={onExit} />
+    <PrivacyNoticeText config={config} onExit={onExit} settings={settings} />
   </Box>
 );
