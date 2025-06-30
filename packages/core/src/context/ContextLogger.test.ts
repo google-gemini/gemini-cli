@@ -10,7 +10,7 @@ import type { ConversationChunk, ScoringResult, PruningStats } from './types.js'
 
 describe('ContextLogger', () => {
   let logger: ContextLogger;
-  let consoleSpy: any;
+  let consoleSpy: { log: ReturnType<typeof vi.spyOn>; error: ReturnType<typeof vi.spyOn> };
 
   beforeEach(() => {
     logger = new ContextLogger('debug');
@@ -66,7 +66,7 @@ describe('ContextLogger', () => {
 
       const events = logger.exportLogs();
       expect(events[0].data.query).toHaveLength(103); // 100 + "..."
-      expect(events[0].data.query).toEndWith('...');
+      expect(events[0].data.query).toMatch(/\.\.\.$/); // Should end with "..."
     });
   });
 
@@ -275,7 +275,7 @@ describe('ContextLogger', () => {
       expect(summary.totalOptimizations).toBe(2);
       expect(summary.averageProcessingTime).toBe(55); // (50 + 60) / 2
       expect(summary.averageTokenReduction).toBe(38.75); // (40 + 37.5) / 2
-      expect(summary.averageChunkReduction).toBe(40); // ((40 + 37.5) / 2)
+      expect(summary.averageChunkReduction).toBe(38.75); // ((40 + 37.5) / 2)
       expect(summary.errorRate).toBeCloseTo(33.33); // 1 error out of 3 total events
     });
 
@@ -324,7 +324,7 @@ describe('ContextLogger', () => {
     it('should limit maximum events', () => {
       const smallLogger = new ContextLogger('debug');
       // Set private property for testing
-      (smallLogger as any).maxEvents = 3;
+      (smallLogger as unknown as { maxEvents: number }).maxEvents = 3;
 
       // Add more events than the limit
       for (let i = 0; i < 5; i++) {

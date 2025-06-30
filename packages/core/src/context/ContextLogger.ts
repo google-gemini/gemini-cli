@@ -9,7 +9,7 @@ import type { ConversationChunk, PruningStats, ScoringResult } from './types.js'
 export interface ContextOptimizationEvent {
   timestamp: number;
   type: 'optimization_start' | 'optimization_complete' | 'scoring_complete' | 'pruning_complete' | 'error';
-  data: any;
+  data: Record<string, unknown>;
 }
 
 export interface OptimizationLogEntry {
@@ -149,7 +149,7 @@ export class ContextLogger {
   /**
    * Log error with context.
    */
-  logError(error: Error, context: string, additionalData?: any): void {
+  logError(error: Error, context: string, additionalData?: Record<string, unknown>): void {
     const event: ContextOptimizationEvent = {
       timestamp: Date.now(),
       type: 'error',

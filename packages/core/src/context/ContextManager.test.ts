@@ -86,7 +86,7 @@ describe('ContextManager Unit Tests', () => {
     });
 
     it('should validate configuration parameters', () => {
-      const invalidConfig: any = {
+      const invalidConfig = {
         enabled: 'yes', // Should be boolean
         maxChunks: -1,  // Should be non-negative
         scoringWeights: null, // Should be object
@@ -269,7 +269,7 @@ describe('ContextManager Unit Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle malformed chunks gracefully', async () => {
-      const malformedChunk: any = {
+      const malformedChunk = {
         id: 'malformed',
         role: 'user',
         content: 'test',

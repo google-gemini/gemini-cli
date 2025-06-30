@@ -206,7 +206,7 @@ export class ContextPruner {
    */
   private findOrphanedResponses(
     selectedChunks: ConversationChunk[],
-    allChunks: ConversationChunk[]
+    _allChunks: ConversationChunk[]
   ): ConversationChunk[] {
     const sortedSelected = selectedChunks.sort((a, b) => a.timestamp - b.timestamp);
     const orphaned: ConversationChunk[] = [];

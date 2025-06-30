@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { ConversationChunk, RelevanceQuery, PruningStats } from './types.js';
+import type { ConversationChunk, RelevanceQuery } from './types.js';
 import { ContextPruner } from './ContextPruner.js';
 
 describe('ContextPruner', () => {
@@ -28,7 +28,7 @@ describe('ContextPruner', () => {
     role,
     content,
     tokens,
-    timestamp: Date.now() + parseInt(id) * 1000, // Increasing timestamps to maintain order
+    timestamp: Date.now() + parseInt(id, 10) * 1000, // Increasing timestamps to maintain order
     metadata: {
       finalScore: 0.5, // Default score
       ...metadata,
