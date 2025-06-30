@@ -62,10 +62,6 @@ import {
 import { MessageType } from '../types.js';
 import {
   Config,
-  MCPDiscoveryState,
-  MCPServerStatus,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
   GeminiClient,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -692,8 +688,6 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toBe(true);
     });
   });
-
-  // [Additional nested describes omitted for brevity...]
 
   describe('Command Completeness and Coverage', () => {
     it('should handle all documented commands without errors', async () => {

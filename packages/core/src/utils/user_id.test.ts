@@ -8,10 +8,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getInstallationId, getObfuscatedGoogleAccountId } from './user_id.js';
 
 describe('user_id', () => {
-  // Store original values to restore after tests
-  let originalLocalStorage: Storage | undefined;
-  let originalCrypto: Crypto | undefined;
-
   beforeEach(() => {
     // Mock localStorage if not available in test environment
     if (typeof localStorage === 'undefined') {
@@ -49,7 +45,9 @@ describe('user_id', () => {
   afterEach(() => {
     // Clean up mocks
     vi.clearAllMocks();
-    localStorage?.clear();
+    try {
+      localStorage.clear();
+    } catch {}
   });
 
   describe('getInstallationId', () => {
