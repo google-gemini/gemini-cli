@@ -29,14 +29,20 @@ describe('checkForUpdates', () => {
   });
 
   it('should return null if there is no update', async () => {
-    getPackageJson.mockResolvedValue({ name: 'test-package', version: '1.0.0' });
+    getPackageJson.mockResolvedValue({
+      name: 'test-package',
+      version: '1.0.0',
+    });
     updateNotifier.mockReturnValue({ update: null });
     const result = await checkForUpdates();
     expect(result).toBeNull();
   });
 
   it('should return a message if a newer version is available', async () => {
-    getPackageJson.mockResolvedValue({ name: 'test-package', version: '1.0.0' });
+    getPackageJson.mockResolvedValue({
+      name: 'test-package',
+      version: '1.0.0',
+    });
     updateNotifier.mockReturnValue({
       update: { current: '1.0.0', latest: '1.1.0' },
     });
@@ -45,7 +51,10 @@ describe('checkForUpdates', () => {
   });
 
   it('should return null if the latest version is the same as the current version', async () => {
-    getPackageJson.mockResolvedValue({ name: 'test-package', version: '1.0.0' });
+    getPackageJson.mockResolvedValue({
+      name: 'test-package',
+      version: '1.0.0',
+    });
     updateNotifier.mockReturnValue({
       update: { current: '1.0.0', latest: '1.0.0' },
     });
@@ -54,7 +63,10 @@ describe('checkForUpdates', () => {
   });
 
   it('should return null if the latest version is older than the current version', async () => {
-    getPackageJson.mockResolvedValue({ name: 'test-package', version: '1.1.0' });
+    getPackageJson.mockResolvedValue({
+      name: 'test-package',
+      version: '1.1.0',
+    });
     updateNotifier.mockReturnValue({
       update: { current: '1.1.0', latest: '1.0.0' },
     });
