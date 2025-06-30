@@ -435,8 +435,7 @@ describe('ModuleValidator', () => {
     it('should test user memory integration', async () => {
       const userMemory = 'Test user memory content for validation';
       const mockAssembler = {
-        assemblePrompt: vi.fn().mockImplementation((context, memory) => {
-          return Promise.resolve({
+        assemblePrompt: vi.fn().mockImplementation((context, memory) => Promise.resolve({
             prompt: memory ? `Base prompt with ${memory}` : 'Base prompt',
             includedModules: mockModules.slice(0, 2),
             totalTokens: 600,
@@ -455,8 +454,7 @@ describe('ModuleValidator', () => {
               assemblyVersion: '1.0.0',
               moduleSelectionStrategy: 'default',
             },
-          });
-        }),
+          })),
       };
 
       const qualityTests = await validator.runQualityTests(mockAssembler);

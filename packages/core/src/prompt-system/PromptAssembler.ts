@@ -364,7 +364,7 @@ export class PromptAssembler {
   /**
    * Get assembly statistics
    */
-  public async getAssemblyStats(): Promise<{
+  async getAssemblyStats(): Promise<{
     availableModules: number;
     cacheStats: { modules: number; metadata: number };
   }> {
@@ -380,7 +380,7 @@ export class PromptAssembler {
   /**
    * Clear all caches (useful for development and testing)
    */
-  public clearCache(): void {
+  clearCache(): void {
     (this.moduleLoader as ModuleLoaderImpl).clearCache();
     (this.contextDetector as ContextDetectorImpl).clearCache();
     this.performanceOptimizer.clearCache();
@@ -389,7 +389,7 @@ export class PromptAssembler {
   /**
    * Pre-warm the cache with common contexts for better performance
    */
-  public async preWarmCache(): Promise<void> {
+  async preWarmCache(): Promise<void> {
     await this.performanceOptimizer.preWarmCache((context: TaskContext) =>
       this.assemblePrompt(context),
     );
@@ -398,7 +398,7 @@ export class PromptAssembler {
   /**
    * Get comprehensive performance statistics
    */
-  public getPerformanceStats(): {
+  getPerformanceStats(): {
     cacheStats: ReturnType<typeof this.performanceOptimizer.getCacheStats>;
     moduleLoaderStats: ReturnType<
       (typeof this.moduleLoader & ModuleLoaderImpl)['getCacheStats']
@@ -415,7 +415,7 @@ export class PromptAssembler {
   /**
    * Clear expired cache entries to manage memory usage
    */
-  public clearExpiredCaches(): {
+  clearExpiredCaches(): {
     assemblyEntriesCleared: number;
   } {
     return {

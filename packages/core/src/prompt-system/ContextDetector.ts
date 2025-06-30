@@ -179,7 +179,7 @@ export class ContextDetectorImpl implements ContextDetector {
   /**
    * Clear the cached context (useful for testing)
    */
-  public clearCache(): void {
+  clearCache(): void {
     this.cachedContext = null;
     this.cacheTimestamp = 0;
   }

@@ -1289,4 +1289,3 @@ describe('Gemini Client (client.ts)', () => {
       });
     });
   });
-});

@@ -1437,4 +1437,3 @@ updated line 3`;
       expect(updatedContent).toContain('世界');
     });
   });
-});

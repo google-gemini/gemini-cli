@@ -267,7 +267,7 @@ export class ModuleSelectorImpl implements ModuleSelector {
   /**
    * Get selection statistics
    */
-  public getSelectionStats(selectedModules: PromptModule[]): {
+  getSelectionStats(selectedModules: PromptModule[]): {
     totalTokens: number;
     moduleCount: number;
     categoryBreakdown: Record<string, number>;

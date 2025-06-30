@@ -78,7 +78,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
    * Load all available modules
    */
   async loadAllModules(): Promise<PromptModule[]> {
-    const categories: PromptModule['category'][] = [
+    const categories: Array<PromptModule['category']> = [
       'core',
       'policies',
       'playbook',
@@ -104,7 +104,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
     }
 
     // Check all possible locations for the module
-    const categories: PromptModule['category'][] = [
+    const categories: Array<PromptModule['category']> = [
       'core',
       'policies',
       'playbook',
@@ -158,7 +158,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
    */
   private async loadModuleFromDisk(id: string): Promise<PromptModule> {
     // Try to find the module in different categories
-    const categories: PromptModule['category'][] = [
+    const categories: Array<PromptModule['category']> = [
       'core',
       'policies',
       'playbook',
@@ -267,7 +267,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
   /**
    * Clear all caches (useful for testing and hot-reloading)
    */
-  public clearCache(): void {
+  clearCache(): void {
     this.moduleCache.clear();
     this.metadataCache.clear();
   }
@@ -275,7 +275,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
   /**
    * Get cache statistics
    */
-  public getCacheStats(): { modules: number; metadata: number } {
+  getCacheStats(): { modules: number; metadata: number } {
     return {
       modules: this.moduleCache.size,
       metadata: this.metadataCache.size,

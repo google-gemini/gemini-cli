@@ -697,9 +697,7 @@ vi.mock('os', async (importOriginal) => {
         close: vi.fn(),
         on: vi.fn(),
       };
-      vi.mocked(http.createServer).mockImplementation(() => {
-        return mockHttpServer as unknown as http.Server;
-      });
+      vi.mocked(http.createServer).mockImplementation(() => mockHttpServer as unknown as http.Server);
 
       const mockGenerateAuthUrl = vi.fn().mockReturnValue("https://example.com/auth");
       const mockOAuth2Client = {
@@ -1732,9 +1730,7 @@ describe('oauth2', () => {
         close: vi.fn(),
         on: vi.fn(),
       };
-      vi.mocked(http.createServer).mockImplementation(() => {
-        return mockHttpServer as unknown as http.Server;
-      });
+      vi.mocked(http.createServer).mockImplementation(() => mockHttpServer as unknown as http.Server);
 
       const mockGenerateAuthUrl = vi.fn().mockReturnValue("https://example.com/auth");
       const mockOAuth2Client = {

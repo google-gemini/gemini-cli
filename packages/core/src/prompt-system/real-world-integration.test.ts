@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PromptAssembler } from './PromptAssembler';
 import * as path from 'node:path';

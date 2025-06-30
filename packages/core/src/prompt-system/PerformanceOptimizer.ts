@@ -110,7 +110,7 @@ export class PerformanceOptimizer {
   async preWarmCache(
     assemblyFunction: (context: TaskContext) => Promise<AssemblyResult>,
   ): Promise<void> {
-    const commonContexts: Partial<TaskContext>[] = [
+    const commonContexts: Array<Partial<TaskContext>> = [
       { taskType: 'general', hasGitRepo: false, sandboxMode: false },
       { taskType: 'general', hasGitRepo: true, sandboxMode: false },
       { taskType: 'debug', hasGitRepo: false, sandboxMode: false },
@@ -154,8 +154,8 @@ export class PerformanceOptimizer {
     hitRate: number;
   } {
     let totalSize = 0;
-    let totalHits = 0;
-    let totalRequests = 0;
+    const totalHits = 0;
+    const totalRequests = 0;
 
     for (const result of this.assemblyCache.values()) {
       totalSize += result.prompt.length;
