@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import { StringDecoder } from 'string_decoder';
+import { spawn, execSync } from 'child_process';
+import { TextDecoder } from 'util';
 import type { HistoryItemWithoutId } from '../types.js';
 import { useCallback } from 'react';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
@@ -21,6 +21,62 @@ import stripAnsi from 'strip-ansi';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
+
+function getSystemEncoding() {
+  // Windows
+  if (os.platform() === 'win32') {
+    try {
+      const output = execSync('chcp', { encoding: 'utf8' });
+      const match = output.match(/:\s*(\d+)/);
+      if (match) {
+        const codePage = parseInt(match[1], 10);
+        return windowsCodePageToEncoding(codePage);
+      }
+    } catch (e) {
+      console.warn('Failed to get Windows code page. Falling back to utf-8.');
+    }
+    return 'utf-8';
+  }
+
+  // Unix-like
+  const env = process.env;
+  const locale = env.LC_ALL || env.LC_CTYPE || env.LANG || '';
+  const match = locale.match(/\.(.+)/); // e.g., "en_US.UTF-8"
+  if (match && match[1]) {
+    return match[1].toLowerCase();
+  }
+
+  return 'utf-8'; // fallback
+}
+
+function windowsCodePageToEncoding(cp: number) {
+  // Most common mappings; extend as needed
+  const map: { [key: number]: string } = {
+    437: 'cp437',
+    850: 'cp850',
+    852: 'cp852',
+    866: 'cp866',
+    874: 'windows-874',
+    932: 'shift_jis',
+    936: 'gb2312',
+    949: 'euc-kr',
+    950: 'big5',
+    1200: 'utf-16le',
+    1201: 'utf-16be',
+    1250: 'windows-1250',
+    1251: 'windows-1251',
+    1252: 'windows-1252',
+    1253: 'windows-1253',
+    1254: 'windows-1254',
+    1255: 'windows-1255',
+    1256: 'windows-1256',
+    1257: 'windows-1257',
+    1258: 'windows-1258',
+    65001: 'utf-8'
+  };
+
+  return map[cp] || `cp${cp}`;
+}
 
 /**
  * A structured result from a shell command execution.
@@ -66,8 +122,9 @@ function executeShellCommand(
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const stdoutDecoder = new StringDecoder('utf8');
-    const stderrDecoder = new StringDecoder('utf8');
+    const systemEncoding = getSystemEncoding();
+    const stdoutDecoder = new TextDecoder(systemEncoding);
+    const stderrDecoder = new TextDecoder(systemEncoding);
 
     let stdout = '';
     let stderr = '';
@@ -96,8 +153,8 @@ function executeShellCommand(
 
       const decodedChunk =
         stream === 'stdout'
-          ? stdoutDecoder.write(data)
-          : stderrDecoder.write(data);
+          ? stdoutDecoder.decode(data)
+          : stderrDecoder.decode(data);
       if (stream === 'stdout') {
         stdout += stripAnsi(decodedChunk);
       } else {
@@ -154,9 +211,6 @@ function executeShellCommand(
       exited = true;
       abortSignal.removeEventListener('abort', abortHandler);
 
-      // Handle any final bytes lingering in the decoders
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
 
       const finalBuffer = Buffer.concat(outputChunks);
 
