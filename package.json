@@ -89,7 +89,6 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.1.1",
     "dom-accessibility-api": "^0.7.0"
   }
 }

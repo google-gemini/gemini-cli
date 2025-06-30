@@ -4,38 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
-import { Config } from '@google/gemini-cli-core';
-
-export interface PrivacyState {
-  isLoading: boolean;
-  error: string | null;
-  isFreeTier: boolean | null;
-  dataCollectionOptIn: boolean;
-}
+import { useCallback } from 'react';
+import { type LoadedSettings, SettingScope } from '../../config/settings.js';
 
 export interface PrivacySettings {
-  privacyState: PrivacyState;
-  updateDataCollectionOptIn: (enabled: boolean) => void;
+  usageStatisticsEnabled: boolean;
+  setUsageStatisticsEnabled: (enabled: boolean, scope: SettingScope) => void;
 }
 
-export const usePrivacySettings = (config: Config): PrivacySettings => {
-  const [privacyState, setPrivacyState] = useState<PrivacyState>({
-    isLoading: false,
-    error: null,
-    isFreeTier: true, // Default to free tier
-    dataCollectionOptIn: true, // Default to enabled
-  });
-
-  const updateDataCollectionOptIn = useCallback((enabled: boolean) => {
-    setPrivacyState(prev => ({
-      ...prev,
-      dataCollectionOptIn: enabled,
-    }));
-  }, []);
+export const usePrivacySettings = (settings: LoadedSettings): PrivacySettings => {
+  const setUsageStatisticsEnabled = useCallback(
+    (enabled: boolean, scope: SettingScope) => {
+      // @ts-expect-error - setValue method has restrictive typing but supports boolean values
+      settings.setValue(scope, 'usageStatisticsEnabled', enabled);
+    },
+    [settings],
+  );
 
   return {
-    privacyState,
-    updateDataCollectionOptIn,
+    usageStatisticsEnabled: settings.merged.usageStatisticsEnabled ?? true,
+    setUsageStatisticsEnabled,
   };
 }; 
