@@ -33,21 +33,36 @@ export class SchemaValidator {
 
     // Check property types if properties are defined
     if (schema.properties && typeof schema.properties === 'object') {
-      const properties = schema.properties as Record<string, { type?: string }>;
+      const properties = schema.properties as Record<
+        string,
+        { type?: string; enum?: unknown[] }
+      >;
       const dataObj = data as Record<string, unknown>;
 
       for (const [key, prop] of Object.entries(properties)) {
-        if (dataObj[key] !== undefined && prop.type) {
-          const expectedType = prop.type;
-          const actualType = Array.isArray(dataObj[key])
-            ? 'array'
-            : typeof dataObj[key];
+        if (dataObj[key] !== undefined) {
+          // Type check
+          if (prop.type) {
+            const expectedType = prop.type;
+            const actualType = Array.isArray(dataObj[key])
+              ? 'array'
+              : typeof dataObj[key];
 
-          if (expectedType !== actualType) {
-            console.error(
-              `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`,
-            );
-            return false;
+            if (expectedType !== actualType) {
+              console.error(
+                `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`,
+              );
+              return false;
+            }
+          }
+          // Enum check
+          if (prop.enum && Array.isArray(prop.enum)) {
+            if (!prop.enum.includes(dataObj[key])) {
+              console.error(
+                `Invalid value for property "${key}": ${dataObj[key]} is not in enum ${JSON.stringify(prop.enum)}`,
+              );
+              return false;
+            }
           }
         }
       }

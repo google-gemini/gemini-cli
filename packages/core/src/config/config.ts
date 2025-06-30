@@ -27,6 +27,7 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
 } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { GetOperatingSystemInfoTool } from '../tools/get-operating-system-info.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -499,6 +500,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);
+  registerCoreTool(GetOperatingSystemInfoTool);
   return (async () => {
     await registry.discoverTools();
     return registry;
