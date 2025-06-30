@@ -126,16 +126,17 @@ function buildImage(imageName, dockerfile) {
   console.log(`building ${imageName} ... (can be slow first time)`);
 
   let buildCommandArgs = '';
-  let tempAuthFile = ''; // This will store the path to our temp file
+  let tempAuthFile = '';
 
   if (sandboxCommand === 'podman') {
     if (isWindows) {
-      // This is the Windows + Podman case
+      // PowerShell doesn't support <() process substitution.
+      // Create a temporary auth file that we will clean up after.
       tempAuthFile = join(os.tmpdir(), `gemini-auth-${Date.now()}.json`);
       writeFileSync(tempAuthFile, '{}');
       buildCommandArgs = `--authfile="${tempAuthFile}"`;
     } else {
-      // This is the Mac/Linux + Podman case
+      // Use bash-specific syntax for Linux/macOS
       buildCommandArgs = `--authfile=<(echo '{}')`;
     }
   }
