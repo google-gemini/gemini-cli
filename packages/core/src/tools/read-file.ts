@@ -9,10 +9,23 @@ import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
-import { isWithinRoot, processSingleFileContent } from '../utils/fileUtils.js';
+import {
+  isWithinRoot,
+  processSingleFileContent,
+  getSpecificMimeType,
+} from '../utils/fileUtils.js';
 import { Config } from '../config/config.js';
+<<<<<<< HEAD
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { recordFileOperationMetric,
+||||||| 601d9ba
+import { getSpecificMimeType } from '../utils/fileUtils.js';
+import {
+  recordFileOperationMetric,
+=======
+import {
+  recordFileOperationMetric,
+>>>>>>> 5c4c833ddde197e19ec192896710f6b4c8e178d7
   FileOperation,
 } from '../telemetry/metrics.js';
 import { logger } from '../core/logger.js';

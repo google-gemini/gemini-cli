@@ -347,9 +347,12 @@ Expectation for required parameters:
         };
         logger.error(`String to replace not found in ${params.file_path}.`);
       } else if (occurrences !== expectedReplacements) {
+        const occurenceTerm =
+          expectedReplacements === 1 ? 'occurrence' : 'occurrences';
+
         error = {
-          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
+          display: `Failed to edit, expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences}.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
         };
         logger.error(`Mismatched occurrences for edit in ${params.file_path}. Expected ${expectedReplacements}, found ${occurrences}.`);
       }

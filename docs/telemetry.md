@@ -81,7 +81,7 @@ Use the `npm run telemetry -- --target=local` command to automate the process of
     Open your web browser and navigate to **http://localhost:16686** to access the Jaeger UI. Here you can inspect detailed traces of Gemini CLI operations.
 
 1.  **Inspect logs and metrics**:
-    The script redirects the OTEL collector output (which includes logs and metrics) to `~/.gemini/tmp/<projectHash>/otel/collector.log`. The script will provide links to view and command to tail your telemetry data (traces, metrics, logs) locally.
+    The script redirects the OTEL collector output (which includes logs and metrics) to `~/.gemini/tmp/<projectHash>/otel/collector.log`. The script will provide links to view and a command to tail your telemetry data (traces, metrics, logs) locally.
 
 1.  **Stop the services**:
     Press `Ctrl+C` in the terminal where the script is running to stop the OTEL Collector and Jaeger services.

@@ -20,9 +20,9 @@ import { ProjectIdRequiredError } from './errors.js';
  * @param projectId the user's project id, if any
  * @returns the user's actual project id
  */
-export async function setupUser(authClient: OAuth2Client): Promise<string> {
+export async function setupUser(client: OAuth2Client): Promise<string> {
   let projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  const caServer = new CodeAssistServer(authClient, projectId);
+  const caServer = new CodeAssistServer(client, projectId);
 
   const clientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',

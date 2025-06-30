@@ -18,8 +18,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the generateContent endpoint', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
       response: {
         candidates: [
@@ -53,8 +53,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the generateContentStream endpoint', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = (async function* () {
       yield {
         response: {
@@ -90,8 +90,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the onboardUser endpoint', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
       name: 'operations/123',
       done: true,
@@ -112,8 +112,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the loadCodeAssist endpoint', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
       // TODO: Add mock response
     };
@@ -131,8 +131,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should return 0 for countTokens', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
       totalTokens: 100,
     };
@@ -146,8 +146,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should throw an error for embedContent', async () => {
-    const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(client, 'test-project');
     await expect(
       server.embedContent({
         model: 'test-model',

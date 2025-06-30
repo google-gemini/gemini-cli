@@ -12,12 +12,19 @@ export type EditorType =
   | 'windsurf'
   | 'cursor'
   | 'vim'
+  | 'neovim'
   | 'zed';
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return ['vscode', 'vscodium', 'windsurf', 'cursor', 'vim', 'zed'].includes(
-    editor,
-  );
+  return [
+    'vscode',
+    'vscodium',
+    'windsurf',
+    'cursor',
+    'vim',
+    'neovim',
+    'zed',
+  ].includes(editor);
 }
 
 interface DiffCommand {
@@ -43,6 +50,7 @@ const editorCommands: Record<EditorType, { win32: string; default: string }> = {
   windsurf: { win32: 'windsurf', default: 'windsurf' },
   cursor: { win32: 'cursor', default: 'cursor' },
   vim: { win32: 'vim', default: 'vim' },
+  neovim: { win32: 'nvim', default: 'nvim' },
   zed: { win32: 'zed', default: 'zed' },
 };
 
@@ -67,10 +75,7 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
   if (editor && isValidEditorType(editor)) {
-    return (
-      checkHasEditorType(editor as EditorType) &&
-      allowEditorTypeInSandbox(editor as EditorType)
-    );
+    return checkHasEditorType(editor) && allowEditorTypeInSandbox(editor);
   }
   return false;
 }
@@ -97,8 +102,9 @@ export function getDiffCommand(
     case 'zed':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
+    case 'neovim':
       return {
-        command: 'vim',
+        command,
         args: [
           '-d',
           // skip viminfo file to avoid E138 errors
@@ -172,7 +178,8 @@ export async function openDiff(
           });
         });
 
-      case 'vim': {
+      case 'vim':
+      case 'neovim': {
         // Use execSync for terminal-based editors
         const command =
           process.platform === 'win32'

@@ -35,7 +35,7 @@ You will typically see messages in the CLI indicating when a tool is being calle
 Many tools, especially those that can modify your file system or execute commands (`write_file`, `edit`, `run_shell_command`), are designed with safety in mind. The Gemini CLI will typically:
 
 - **Require confirmation:** Prompt you before executing potentially sensitive operations, showing you what action is about to be taken.
-- **Utilize sandboxing:** All tools are subject to restrictions enforced by sandboxing (see [README](../../README.md#sandboxing)). This means that when operating in a sandbox, any tools (including MCP servers) you wish to use must be available _inside_ the sandbox environment. For example, to run an MCP server through `npx`, the `npx` executable must be installed within the sandbox's Docker image or be available in the `sandbox-exec` environment.
+- **Utilize sandboxing:** All tools are subject to restrictions enforced by sandboxing (see [Sandboxing in the Gemini CLI](../sandbox.md)). This means that when operating in a sandbox, any tools (including MCP servers) you wish to use must be available _inside_ the sandbox environment. For example, to run an MCP server through `npx`, the `npx` executable must be installed within the sandbox's Docker image or be available in the `sandbox-exec` environment.
 
 It's important to always review confirmation prompts carefully before allowing a tool to proceed.
 

@@ -110,14 +110,19 @@ export const useSlashCommandProcessor = (
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
           type: 'stats',
-          stats: message.stats,
-          lastTurnStats: message.lastTurnStats,
           duration: message.duration,
+        };
+      } else if (message.type === MessageType.MODEL_STATS) {
+        historyItemContent = {
+          type: 'model_stats',
+        };
+      } else if (message.type === MessageType.TOOL_STATS) {
+        historyItemContent = {
+          type: 'tool_stats',
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
           type: 'quit',
-          stats: message.stats,
           duration: message.duration,
         };
       } else if (message.type === MessageType.COMPRESSION) {
@@ -127,10 +132,7 @@ export const useSlashCommandProcessor = (
         };
       } else {
         historyItemContent = {
-          type: message.type as
-            | MessageType.INFO
-            | MessageType.ERROR
-            | MessageType.USER,
+          type: message.type,
           text: message.content,
         };
       }
@@ -265,16 +267,28 @@ export const useSlashCommandProcessor = (
       {
         name: 'stats',
         altName: 'usage',
-        description: 'check session stats',
-        action: (_mainCommand, _subCommand, _args) => {
+        description: 'check session stats. Usage: /stats [model|tools]',
+        action: (_mainCommand, subCommand, _args) => {
+          if (subCommand === 'model') {
+            addMessage({
+              type: MessageType.MODEL_STATS,
+              timestamp: new Date(),
+            });
+            return;
+          } else if (subCommand === 'tools') {
+            addMessage({
+              type: MessageType.TOOL_STATS,
+              timestamp: new Date(),
+            });
+            return;
+          }
+
           const now = new Date();
-          const { sessionStartTime, cumulative, currentTurn } = session.stats;
+          const { sessionStartTime } = session.stats;
           const wallDuration = now.getTime() - sessionStartTime.getTime();
 
           addMessage({
             type: MessageType.STATS,
-            stats: cumulative,
-            lastTurnStats: currentTurn,
             duration: formatDuration(wallDuration),
             timestamp: new Date(),
           });
@@ -401,8 +415,8 @@ export const useSlashCommandProcessor = (
               const descLines = server.description.trim().split('\n');
               if (descLines) {
                 message += ':\n';
-                for (let i = 0; i < descLines.length; i++) {
-                  message += `    ${greenColor}${descLines[i]}${resetColor}\n`;
+                for (const descLine of descLines) {
+                  message += `    ${greenColor}${descLine}${resetColor}\n`;
                 }
               } else {
                 message += '\n';
@@ -431,8 +445,8 @@ export const useSlashCommandProcessor = (
                   const descLines = tool.description.trim().split('\n');
                   if (descLines) {
                     message += ':\n';
-                    for (let i = 0; i < descLines.length; i++) {
-                      message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
+                    for (const descLine of descLines) {
+                      message += `      ${greenColor}${descLine}${resetColor}\n`;
                     }
                   } else {
                     message += '\n';
@@ -457,8 +471,8 @@ export const useSlashCommandProcessor = (
                     .trim()
                     .split('\n');
                   if (paramsLines) {
-                    for (let i = 0; i < paramsLines.length; i++) {
-                      message += `      ${greenColor}${paramsLines[i]}${resetColor}\n`;
+                    for (const paramsLine of paramsLines) {
+                      message += `      ${greenColor}${paramsLine}${resetColor}\n`;
                     }
                   }
                 }
@@ -561,8 +575,8 @@ export const useSlashCommandProcessor = (
 
                 // If there are multiple lines, add proper indentation for each line
                 if (descLines) {
-                  for (let i = 0; i < descLines.length; i++) {
-                    message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
+                  for (const descLine of descLines) {
+                    message += `      ${greenColor}${descLine}${resetColor}\n`;
                   }
                 }
               } else {
@@ -808,7 +822,7 @@ export const useSlashCommandProcessor = (
         description: 'exit the cli',
         action: async (mainCommand, _subCommand, _args) => {
           const now = new Date();
-          const { sessionStartTime, cumulative } = session.stats;
+          const { sessionStartTime } = session.stats;
           const wallDuration = now.getTime() - sessionStartTime.getTime();
 
           setQuittingMessages([
@@ -819,7 +833,6 @@ export const useSlashCommandProcessor = (
             },
             {
               type: 'quit',
-              stats: cumulative,
               duration: formatDuration(wallDuration),
               id: now.getTime(),
             },
