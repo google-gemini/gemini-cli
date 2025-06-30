@@ -14,11 +14,7 @@ import {
 import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
-
-const execAsync = promisify(exec);
 
 const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise and meaningful git commit messages following the Conventional Commits format.
 
@@ -143,7 +139,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const hasUntrackedFiles = statusOutput?.includes('??') || false;
       
       let commitMode: 'staged-only' | 'all-changes';
-      let filesToStage: string[] = [];
+      const filesToStage: string[] = [];
       
       if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
         // Only staged changes exist, commit staged files only
@@ -200,7 +196,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         },
       };
       return confirmationDetails;
-    } catch (error) {
+    } catch (_error) {
       // If we can't gather git info or generate message, skip confirmation
       return false;
     }
@@ -219,8 +215,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         finalCommitMessage = this.cachedCommitData.finalCommitMessage;
         statusOutput = this.cachedCommitData.statusOutput;
         
-        // Clear cache after use
-        this.cachedCommitData = null;
+        // Keep cache for staging strategy execution - don't clear yet
       } else {
         console.debug('[GenerateCommitMessage] No valid cache, generating fresh commit message...');
         
@@ -233,8 +228,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         ]);
         
         const diffOutput = stagedDiff?.trim() ? stagedDiff : unstagedDiff;
-        const hasOnlyStagedChanges = stagedDiff?.trim() && !unstagedDiff?.trim();
-        const hasOnlyUnstagedChanges = !stagedDiff?.trim() && unstagedDiff?.trim();
 
         statusOutput = statusOut || '';
 
@@ -256,15 +249,16 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         finalCommitMessage = this.addGeminiSignature(commitMessage);
       }
 
-      // Step 3: Handle staging based on cached strategy
-      if (this.cachedCommitData && this.cachedCommitData.commitMode === 'all-changes') {
+      // Step 3: Handle staging based on cached strategy or current state
+      const cachedData = this.cachedCommitData;
+      if (cachedData && cachedData.commitMode === 'all-changes') {
         // Execute the staging plan determined during confirmation
-        const filesToStage = this.cachedCommitData.filesToStage;
+        const filesToStage = cachedData.filesToStage;
         if (filesToStage.length > 0) {
           console.debug('[GenerateCommitMessage] Staging files based on cached strategy:', filesToStage);
           await this.executeGitCommand(['add', ...filesToStage], signal);
         }
-      } else if (!this.cachedCommitData) {
+      } else if (!cachedData) {
         // Fallback for non-cached execution - determine staging strategy
         const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
         const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
@@ -291,24 +285,42 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       try {
         await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
         
+        // Clear cache after successful commit
+        this.cachedCommitData = null;
+        
         // Step 5: Verify commit was successful
-        const finalStatus = await this.executeGitCommand(['status', '--porcelain'], signal);
+        await this.executeGitCommand(['status', '--porcelain'], signal);
         
         return {
           llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
           returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
         };
       } catch (commitError) {
-        // Handle pre-commit hook modifications
-        if (commitError instanceof Error && commitError.message.includes('pre-commit')) {
-          console.debug('[GenerateCommitMessage] Pre-commit hook modified files, retrying...');
-          await this.executeGitCommand(['add', '-u'], signal);
-          await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
+        // Handle pre-commit hook modifications with comprehensive retry
+        if (commitError instanceof Error && 
+            (commitError.message.includes('pre-commit') || 
+             commitError.message.includes('index.lock') ||
+             commitError.message.includes('hook'))) {
+          console.debug('[GenerateCommitMessage] Pre-commit hook or staging issue detected, implementing comprehensive retry...');
           
-          return {
-            llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
-            returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
-          };
+          // Stage all modified files comprehensively
+          await this.executeGitCommand(['add', '.'], signal);
+          
+          try {
+            await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
+            
+            // Clear cache after successful retry commit
+            this.cachedCommitData = null;
+            
+            return {
+              llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+            };
+          } catch (retryError) {
+            // If retry fails, provide detailed error information
+            const errorDetails = retryError instanceof Error ? retryError.message : String(retryError);
+            throw new Error(`Commit failed after pre-commit hook retry. Original error: ${commitError.message}. Retry error: ${errorDetails}`);
+          }
         }
         throw commitError;
       }
@@ -328,30 +340,93 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     signal: AbortSignal,
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
-      const child = spawn('git', args, { signal, stdio: 'pipe' });
-      let stdout = '';
-      let stderr = '';
+      const commandString = `git ${args.join(' ')}`;
+      console.debug(`[GenerateCommitMessage] Executing: ${commandString}`);
+      
+      try {
+        const child = spawn('git', args, { signal, stdio: 'pipe' });
+        let stdout = '';
+        let stderr = '';
 
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
+        child.stdout?.on('data', (data) => {
+          stdout += data.toString();
+        });
 
-      child.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
+        child.stderr?.on('data', (data) => {
+          stderr += data.toString();
+        });
 
-      child.on('close', (exitCode) => {
-        if (exitCode !== 0) {
-          reject(new Error(`Git command failed (${args.join(' ')}): ${stderr}`));
-        } else {
-          resolve(stdout.trim() || null);
+        child.on('close', (exitCode) => {
+          if (exitCode !== 0) {
+            const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
+            console.error(`[GenerateCommitMessage] Command failed: ${commandString}, Error: ${errorMessage}`);
+            reject(new Error(errorMessage));
+          } else {
+            console.debug(`[GenerateCommitMessage] Command succeeded: ${commandString}`);
+            resolve(stdout.trim() || null);
+          }
+        });
+
+        child.on('error', (err) => {
+          const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
+          console.error(`[GenerateCommitMessage] Spawn error: ${errorMessage}`);
+          
+          // Provide helpful error context
+          if (err.message.includes('ENOENT')) {
+            reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
+          } else if (err.message.includes('EACCES')) {
+            reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
+          } else {
+            reject(new Error(errorMessage));
+          }
+        });
+
+        // Handle abort signal
+        signal.addEventListener('abort', () => {
+          child.kill('SIGTERM');
+          reject(new Error(`Git command '${commandString}' was aborted`));
+        });
+
+        if (signal.aborted) {
+          child.kill('SIGTERM');
+          reject(new Error(`Git command '${commandString}' was aborted before starting`));
+          return;
         }
-      });
-
-      child.on('error', (err) => {
-        reject(new Error(`Failed to execute git ${args.join(' ')}: ${err.message}`));
-      });
+        
+      } catch (error) {
+        const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`[GenerateCommitMessage] Spawn setup error: ${errorMessage}`);
+        reject(new Error(errorMessage));
+      }
     });
+  }
+
+  private formatGitError(args: string[], exitCode: number, stderr: string): string {
+    const command = args.join(' ');
+    const baseError = `Git command failed (${command}) with exit code ${exitCode}`;
+    
+    if (!stderr.trim()) {
+      return `${baseError}: No error details available`;
+    }
+
+    // Provide more specific error messages for common scenarios
+    if (stderr.includes('not a git repository')) {
+      return 'This directory is not a Git repository. Please run this command from within a Git repository.';
+    } else if (stderr.includes('no changes added to commit')) {
+      return 'No changes have been staged for commit. Use "git add" to stage changes first.';
+    } else if (stderr.includes('nothing to commit')) {
+      return 'No changes detected. There is nothing to commit.';
+    } else if (stderr.includes('index.lock')) {
+      return 'Git index is locked. Another git process may be running. Please wait and try again.';
+    } else if (stderr.includes('refusing to merge unrelated histories')) {
+      return 'Cannot merge unrelated Git histories. This may require manual intervention.';
+    } else if (stderr.includes('pathspec') && stderr.includes('did not match any files')) {
+      return 'No files match the specified path. Please check the file paths and try again.';
+    } else if (stderr.includes('fatal: could not read') || stderr.includes('fatal: unable to read')) {
+      return 'Unable to read Git repository data. The repository may be corrupted.';
+    } else {
+      return `${baseError}: ${stderr.trim()}`;
+    }
   }
 
   private parseUntrackedFiles(statusOutput: string): string[] {
