@@ -16,6 +16,7 @@ import {
 } from '../config/settings.js';
 import { promisify } from 'util';
 import { SandboxConfig } from '@google/gemini-cli-core';
+import { logger } from '../../core/src/core/logger.js';
 
 const execAsync = promisify(exec);
 
@@ -82,7 +83,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
         osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) // Covers derivatives
       ) {
         // note here and below we use console.error for informational messages on stderr
-        console.error(
+        logger.info(
           'INFO: Defaulting to use current user UID/GID for Debian/Ubuntu-based Linux.',
         );
         return true;
@@ -90,7 +91,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     } catch (_err) {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
-      console.warn(
+      logger.warn(
         'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu for UID/GID default.',
       );
     }
@@ -187,7 +188,7 @@ export async function start_sandbox(
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
-      console.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
+      logger.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
       process.exit(1);
     }
     const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
@@ -201,13 +202,13 @@ export async function start_sandbox(
       );
     }
     if (!fs.existsSync(profileFile)) {
-      console.error(
-        `ERROR: missing macos seatbelt profile file '${profileFile}'`,
-      );
+      logger.error(
+      `ERROR: missing macos seatbelt profile file '${profileFile}'`,
+    );
       process.exit(1);
     }
     // Log on STDERR so it doesn't clutter the output on STDOUT
-    console.error(`using macos seatbelt (profile: ${profile}) ...`);
+    logger.error(`using macos seatbelt (profile: ${profile}) ...`);
     // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
     const nodeOptions = [
       ...(process.env.DEBUG ? ['--inspect-brk'] : []),
@@ -261,7 +262,7 @@ export async function start_sandbox(
       });
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
-        console.log('stopping proxy ...');
+        logger.info('stopping proxy ...');
         if (proxyProcess?.pid) {
           process.kill(-proxyProcess.pid, 'SIGTERM');
         }
@@ -275,12 +276,12 @@ export async function start_sandbox(
       //   console.info(data.toString());
       // });
       proxyProcess.stderr?.on('data', (data) => {
-        console.error(data.toString());
+        logger.error(data.toString());
       });
       proxyProcess.on('close', (code, signal) => {
-        console.error(
-          `ERROR: proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
-        );
+        logger.error(
+        `ERROR: proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+      );
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }

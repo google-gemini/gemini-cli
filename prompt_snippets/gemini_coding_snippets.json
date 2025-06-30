@@ -1,0 +1,203 @@
+
+[
+  {
+    "id": 1,
+    "command": "Create a new tool in packages/core/src/tools/code-complete.ts to provide code completion suggestions for Python files using Gemini API"
+  },
+  {
+    "id": 2,
+    "command": "Add a /complete command in packages/cli/src/gemini.tsx to trigger code completion for the current file"
+  },
+  {
+    "id": 3,
+    "command": "Create a tool in packages/core/src/tools/lint-python.ts to run pylint on Python files and summarize issues"
+  },
+  {
+    "id": 4,
+    "command": "Add a /lint command in packages/cli/src/gemini.tsx to lint Python files in the current directory"
+  },
+  {
+    "id": 5,
+    "command": "Create a tool in packages/core/src/tools/test-generate.ts to generate unit tests for Python functions using unittest"
+  },
+  {
+    "id": 6,
+    "command": "Add a /test-gen command in packages/cli/src/gemini.tsx to create unit tests for Python files"
+  },
+  {
+    "id": 7,
+    "command": "Write a script in /sdcard/scripts/format-python.sh to format Python files using black"
+  },
+  {
+    "id": 8,
+    "command": "Add a /format command in packages/cli/src/gemini.tsx to format Python files with black"
+  },
+  {
+    "id": 9,
+    "command": "Create a tool in packages/core/src/tools/debug-log.ts to insert debug print statements in Python functions"
+  },
+  {
+    "id": 10,
+    "command": "Add a /debug command in packages/cli/src/gemini.tsx to add debug logs to Python files"
+  },
+  {
+    "id": 11,
+    "command": "Create a tool in packages/core/src/tools/refactor-python.ts to refactor Python code to use type hints"
+  },
+  {
+    "id": 12,
+    "command": "Add a /type-hint command in packages/cli/src/gemini.tsx to add type hints to Python files"
+  },
+  {
+    "id": 13,
+    "command": "Write a script in /sdcard/scripts/run-tests.sh to run all Python unit tests with pytest"
+  },
+  {
+    "id": 14,
+    "command": "Add a /test-run command in packages/cli/src/gemini.tsx to execute pytest on Python tests"
+  },
+  {
+    "id": 15,
+    "command": "Create a tool in packages/core/src/tools/docstring.ts to generate docstrings for Python functions"
+  },
+  {
+    "id": 16,
+    "command": "Add a /docstring command in packages/cli/src/gemini.tsx to add docstrings to Python files"
+  },
+  {
+    "id": 17,
+    "command": "Create a tool in packages/core/src/tools/code-explain.ts to generate explanations for selected code snippets"
+  },
+  {
+    "id": 18,
+    "command": "Add a /explain command in packages/cli/src/gemini.tsx to explain code in the current file"
+  },
+  {
+    "id": 19,
+    "command": "Write a script in /sdcard/scripts/lint-js.sh to run ESLint on JavaScript/TypeScript files"
+  },
+  {
+    "id": 20,
+    "command": "Add a /lint-js command in packages/cli/src/gemini.tsx to lint JavaScript/TypeScript files"
+  },
+  {
+    "id": 21,
+    "command": "Create a tool in packages/core/src/tools/code-template.ts to generate boilerplate code for Python classes"
+  },
+  {
+    "id": 22,
+    "command": "Add a /template command in packages/cli/src/gemini.tsx to create Python class boilerplate"
+  },
+  {
+    "id": 23,
+    "command": "Write a script in /sdcard/scripts/git-commit.sh to automate git commits with generated messages"
+  },
+  {
+    "id": 24,
+    "command": "Add a /commit command in packages/cli/src/gemini.tsx to automate git commits"
+  },
+  {
+    "id": 25,
+    "command": "Create a tool in packages/core/src/tools/error-fix.ts to suggest fixes for Python syntax errors"
+  },
+  {
+    "id": 26,
+    "command": "Add a /fix-error command in packages/cli/src/gemini.tsx to fix Python syntax errors"
+  },
+  {
+    "id": 27,
+    "command": "Write a script in /sdcard/scripts/code-search.sh to search code for specific patterns using grep"
+  },
+  {
+    "id": 28,
+    "command": "Add a /code-search command in packages/cli/src/gemini.tsx to search code with regex"
+  },
+  {
+    "id": 29,
+    "command": "Create a tool in packages/core/src/tools/termux-clipboard-code.ts to copy code snippets to clipboard using termux-clipboard-set"
+  },
+  {
+    "id": 30,
+    "command": "Add a /copy-code command in packages/cli/src/gemini.tsx to copy code to clipboard"
+  },
+  {
+    "id": 31,
+    "command": "Create a tool in packages/core/src/tools/code-outline.ts to generate a code structure outline for Python files"
+  },
+  {
+    "id": 32,
+    "command": "Add a /outline command in packages/cli/src/gemini.tsx to display code structure"
+  },
+  {
+    "id": 33,
+    "command": "Write a script in /sdcard/scripts/format-js.sh to format JavaScript/TypeScript files with Prettier"
+  },
+  {
+    "id": 34,
+    "command": "Add a /format-js command in packages/cli/src/gemini.tsx to format JavaScript/TypeScript files"
+  },
+  {
+    "id": 35,
+    "command": "Create a tool in packages/core/src/tools/code-optimize.ts to optimize Python loops and conditionals"
+  },
+  {
+    "id": 36,
+    "command": "Add a /optimize command in packages/cli/src/gemini.tsx to optimize Python code"
+  },
+  {
+    "id": 37,
+    "command": "Write a script in /sdcard/scripts/termux-notify-code.sh to send termux-toast notifications for code errors"
+  },
+  {
+    "id": 38,
+    "command": "Add a /notify-error command in packages/cli/src/gemini.tsx to notify code errors via termux-toast"
+  },
+  {
+    "id": 39,
+    "command": "Create a tool in packages/core/src/tools/code-coverage.ts to generate Python code coverage reports"
+  },
+  {
+    "id": 40,
+    "command": "Add a /coverage command in packages/cli/src/gemini.tsx to display code coverage"
+  },
+  {
+    "id": 41,
+    "command": "Write a script in /sdcard/scripts/termux-run.sh to run Python scripts and log output"
+  },
+  {
+    "id": 42,
+    "command": "Add a /run command in packages/cli/src/gemini.tsx to execute Python scripts"
+  },
+  {
+    "id": 43,
+    "command": "Create a tool in packages/core/src/tools/code-refactor.ts to convert Python functions to async"
+  },
+  {
+    "id": 44,
+    "command": "Add a /async command in packages/cli/src/gemini.tsx to convert functions to async"
+  },
+  {
+    "id": 45,
+    "command": "Write a script in /sdcard/scripts/termux-code-backup.sh to backup code files to /sdcard/backup"
+  },
+  {
+    "id": 46,
+    "command": "Add a /code-backup command in packages/cli/src/gemini.tsx to backup code files"
+  },
+  {
+    "id": 47,
+    "command": "Create a tool in packages/core/src/tools/code-comment.ts to add inline comments to Python code"
+  },
+  {
+    "id": 48,
+    "command": "Add a /comment command in packages/cli/src/gemini.tsx to add inline comments"
+  },
+  {
+    "id": 49,
+    "command": "Write a script in /sdcard/scripts/termux-lint-notify.sh to notify linting results via termux-toast"
+  },
+  {
+    "id": 50,
+    "command": "Add a /ide command in packages/cli/src/gemini.tsx to combine lint, format, and test commands for a full IDE experience"
+  }
+]

@@ -14,7 +14,17 @@ const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 
 export enum MessageSenderType {
   USER = 'user',
+  MODEL = 'model',
+  SYSTEM = 'system',
 }
+
+enum LogLevel {
+  DEBUG,
+  INFO,
+  WARN,
+  ERROR,
+}
+
 
 export interface LogEntry {
   sessionId: string;
@@ -25,7 +35,7 @@ export interface LogEntry {
 }
 
 export class Logger {
-  private geminiDir: string | undefined;
+  private logLevel: LogLevel = LogLevel.INFO;
   private logFilePath: string | undefined;
   private checkpointFilePath: string | undefined;
   private sessionId: string | undefined;
@@ -33,8 +43,12 @@ export class Logger {
   private initialized = false;
   private logs: LogEntry[] = []; // In-memory cache, ideally reflects the last known state of the file
 
-  constructor(sessionId: string) {
+  constructor(sessionId?: string) {
     this.sessionId = sessionId;
+  }
+
+  setLogLevel(level: LogLevel) {
+    this.logLevel = level;
   }
 
   private async _readLogFile(): Promise<LogEntry[]> {
@@ -204,34 +218,60 @@ export class Logger {
       .map((entry) => entry.message);
   }
 
-  async logMessage(type: MessageSenderType, message: string): Promise<void> {
-    if (!this.initialized || this.sessionId === undefined) {
-      console.debug(
-        'Logger not initialized or session ID missing. Cannot log message.',
-      );
+  private log(level: LogLevel, message: string, ...args: unknown[]) {
+    if (level < this.logLevel) {
       return;
     }
 
-    // The messageId used here is the instance's idea of the next ID.
-    // _updateLogFile will verify and potentially recalculate based on the file's actual state.
-    const newEntryObject: LogEntry = {
-      sessionId: this.sessionId,
-      messageId: this.messageId, // This will be recalculated in _updateLogFile
-      type,
-      message,
-      timestamp: new Date().toISOString(),
-    };
+    const timestamp = new Date().toISOString();
+    const levelStr = LogLevel[level];
+    const formattedMessage = `${timestamp} [${levelStr}] ${message}`;
+    console.log(formattedMessage, ...args);
 
-    try {
-      const writtenEntry = await this._updateLogFile(newEntryObject);
-      if (writtenEntry) {
-        // If an entry was actually written (not a duplicate skip),
-        // then this instance can increment its idea of the next messageId for this session.
-        this.messageId = writtenEntry.messageId + 1;
-      }
-    } catch (_error) {
-      // Error already logged by _updateLogFile or _readLogFile
+    // Also log to file if initialized and session ID is available
+    if (this.initialized && this.sessionId !== undefined) {
+      const newEntryObject: LogEntry = {
+        sessionId: this.sessionId,
+        messageId: this.messageId, // This will be recalculated in _updateLogFile
+        type: this.mapLogLevelToMessageSenderType(level),
+        message: formattedMessage + ' ' + args.map(String).join(' '),
+        timestamp: new Date().toISOString(),
+      };
+      this._updateLogFile(newEntryObject).catch((err) => {
+        console.error('Failed to write log entry to file:', err);
+      });
     }
+  }
+
+  private mapLogLevelToMessageSenderType(level: LogLevel): MessageSenderType {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return MessageSenderType.SYSTEM; // Or a new DEBUG type if needed
+      case LogLevel.INFO:
+        return MessageSenderType.SYSTEM;
+      case LogLevel.WARN:
+        return MessageSenderType.SYSTEM;
+      case LogLevel.ERROR:
+        return MessageSenderType.SYSTEM;
+      default:
+        return MessageSenderType.SYSTEM;
+    }
+  }
+
+  debug(message: string, ...args: unknown[]) {
+    this.log(LogLevel.DEBUG, message, ...args);
+  }
+
+  info(message: string, ...args: unknown[]) {
+    this.log(LogLevel.INFO, message, ...args);
+  }
+
+  warn(message: string, ...args: unknown[]) {
+    this.log(LogLevel.WARN, message, ...args);
+  }
+
+  error(message: string, ...args: unknown[]) {
+    this.log(LogLevel.ERROR, message, ...args);
   }
 
   _checkpointPath(tag: string | undefined): string {
@@ -299,3 +339,5 @@ export class Logger {
     this.messageId = 0;
   }
 }
+
+export const logger = new Logger();

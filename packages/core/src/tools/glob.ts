@@ -5,13 +5,14 @@
  */
 
 import fs from 'fs';
+import * as fsp from 'node:fs/promises';
 import path from 'path';
 import { glob } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../core/logger.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -141,7 +142,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  override validateToolParams(params: GlobToolParams): string | null {
+  override async validateToolParams(params: GlobToolParams): Promise<string | null> {
     logger.debug(`Validating glob tool parameters: ${JSON.stringify(params)}`);
     if (
       this.schema.parameters &&
@@ -166,15 +167,16 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
 
     const targetDir = searchDirAbsolute || this.rootDirectory;
     try {
-      if (!fs.existsSync(targetDir)) {
-        logger.error(`Search path does not exist: ${targetDir}`);
-        return `Search path does not exist ${targetDir}`;
-      }
-      if (!fs.statSync(targetDir).isDirectory()) {
+      const stats = await fsp.stat(targetDir);
+      if (!stats.isDirectory()) {
         logger.error(`Search path is not a directory: ${targetDir}`);
         return `Search path is not a directory: ${targetDir}`;
       }
     } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.error(`Search path does not exist: ${targetDir}`);
+        return `Search path does not exist ${targetDir}`;
+      }
       logger.error(`Error accessing search path: ${e}`);
       return `Error accessing search path: ${e}`;
     }

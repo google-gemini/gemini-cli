@@ -30,7 +30,7 @@ import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../core/logger.js';
 
 /**
  * Parameters for the WriteFile tool

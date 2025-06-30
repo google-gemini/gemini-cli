@@ -1,0 +1,203 @@
+
+[
+  {
+    "id": 1,
+    "command": "Create a new tool in packages/core/src/tools/termux-notify.ts to send notifications using termux-toast with customizable messages"
+  },
+  {
+    "id": 2,
+    "command": "Add a /notify command in packages/cli/src/gemini.tsx to trigger termux-toast notifications for command completion"
+  },
+  {
+    "id": 3,
+    "command": "Write a script in /sdcard/scripts/termux-sms-monitor.sh to log incoming SMS using termux-sms-list"
+  },
+  {
+    "id": 4,
+    "command": "Add a /sms-send command in packages/cli/src/gemini.tsx to send SMS via termux-sms-send"
+  },
+  {
+    "id": 5,
+    "command": "Create a tool in packages/core/src/tools/termux-camera.ts to capture photos using termux-camera-photo and save to /sdcard/photos"
+  },
+  {
+    "id": 6,
+    "command": "Add a /camera command in packages/cli/src/gemini.tsx to trigger termux-camera-photo with user-specified filenames"
+  },
+  {
+    "id": 7,
+    "command": "Write a script in /sdcard/scripts/termux-battery.sh to monitor battery status using termux-battery-status"
+  },
+  {
+    "id": 8,
+    "command": "Add a /battery command in packages/cli/src/gemini.tsx to display battery status via termux-battery-status"
+  },
+  {
+    "id": 9,
+    "command": "Create a tool in packages/core/src/tools/termux-location.ts to fetch GPS data using termux-location"
+  },
+  {
+    "id": 10,
+    "command": "Add a /location command in packages/cli/src/gemini.tsx to retrieve and display GPS coordinates"
+  },
+  {
+    "id": 11,
+    "command": "Organize all files in /sdcard/Download by moving them into folders based on file type (e.g., images, documents)"
+  },
+  {
+    "id": 12,
+    "command": "Create a script in /sdcard/scripts/termux-backup.sh to back up Termux home directory to /sdcard/backup"
+  },
+  {
+    "id": 13,
+    "command": "Add a /vibrate command in packages/cli/src/gemini.tsx to trigger device vibration using termux-vibrate"
+  },
+  {
+    "id": 14,
+    "command": "Create a tool in packages/core/src/tools/termux-clipboard.ts to read/write clipboard using termux-clipboard-get/set"
+  },
+  {
+    "id": 15,
+    "command": "Add a /clipboard command in packages/cli/src/gemini.tsx to manage clipboard content"
+  },
+  {
+    "id": 16,
+    "command": "Write a script in /sdcard/scripts/termux-call-log.sh to log call history using termux-call-log"
+  },
+  {
+    "id": 17,
+    "command": "Add a /call-log command in packages/cli/src/gemini.tsx to display call history"
+  },
+  {
+    "id": 18,
+    "command": "Create a tool in packages/core/src/tools/termux-brightness.ts to adjust screen brightness using termux-brightness"
+  },
+  {
+    "id": 19,
+    "command": "Add a /brightness command in packages/cli/src/gemini.tsx to set screen brightness"
+  },
+  {
+    "id": 20,
+    "command": "Write a script in /sdcard/scripts/termux-wifi.sh to toggle WiFi using termux-wifi-enable"
+  },
+  {
+    "id": 21,
+    "command": "Add a /wifi command in packages/cli/src/gemini.tsx to enable/disable WiFi"
+  },
+  {
+    "id": 22,
+    "command": "Create a new tool in packages/core/src/tools/termux-speech.ts to convert text to speech using termux-tts-speak"
+  },
+  {
+    "id": 23,
+    "command": "Add a /speech command in packages/cli/src/gemini.tsx to read command output aloud"
+  },
+  {
+    "id": 24,
+    "command": "Organize photos in /sdcard/DCIM into folders by month using creation dates"
+  },
+  {
+    "id": 25,
+    "command": "Add error handling for Termux API failures in packages/core/src/tools/shell.ts"
+  },
+  {
+    "id": 26,
+    "command": "Create a script in /sdcard/scripts/termux-contacts.sh to list contacts using termux-contact-list"
+  },
+  {
+    "id": 27,
+    "command": "Add a /contacts command in packages/cli/src/gemini.tsx to display contacts"
+  },
+  {
+    "id": 28,
+    "command": "Write a script in /sdcard/scripts/termux-sensors.sh to log sensor data using termux-sensor"
+  },
+  {
+    "id": 29,
+    "command": "Add a /sensors command in packages/cli/src/gemini.tsx to display sensor data"
+  },
+  {
+    "id": 30,
+    "command": "Create a tool in packages/core/src/tools/termux-mic.ts to record audio using termux-microphone-record"
+  },
+  {
+    "id": 31,
+    "command": "Add a /record command in packages/cli/src/gemini.tsx to start/stop audio recording"
+  },
+  {
+    "id": 32,
+    "command": "Add a /storage command in packages/cli/src/gemini.tsx to list files in /sdcard"
+  },
+  {
+    "id": 33,
+    "command": "Create a script in /sdcard/scripts/termux-notify-loop.sh to send termux-toast every 10 minutes"
+  },
+  {
+    "id": 34,
+    "command": "Add a /torch command in packages/cli/src/gemini.tsx to toggle flashlight using termux-torch"
+  },
+  {
+    "id": 35,
+    "command": "Write a script in /sdcard/scripts/termux-sms-backup.sh to backup SMS to /sdcard/backup/sms.json"
+  },
+  {
+    "id": 36,
+    "command": "Add a /sms-backup command in packages/cli/src/gemini.tsx to backup SMS"
+  },
+  {
+    "id": 37,
+    "command": "Create a tool in packages/core/src/tools/termux-volume.ts to adjust volume using termux-volume"
+  },
+  {
+    "id": 38,
+    "command": "Add a /volume command in packages/cli/src/gemini.tsx to set volume levels"
+  },
+  {
+    "id": 39,
+    "command": "Write a script in /sdcard/scripts/termux-location-log.sh to log GPS data hourly"
+  },
+  {
+    "id": 40,
+    "command": "Add a /location-log command in packages/cli/src/gemini.tsx to manage GPS logging"
+  },
+  {
+    "id": 41,
+    "command": "Add Termux API error logging to packages/core/src/tools/shell.ts for debugging"
+  },
+  {
+    "id": 42,
+    "command": "Create a script in /sdcard/scripts/termux-clean.sh to remove old files in /sdcard/Download"
+  },
+  {
+    "id": 43,
+    "command": "Add a /clean command in packages/cli/src/gemini.tsx to delete temporary files"
+  },
+  {
+    "id": 44,
+    "command": "Write a script in /sdcard/scripts/termux-photo-organize.sh to sort photos by date"
+  },
+  {
+    "id": 45,
+    "command": "Add a /photo-organize command in packages/cli/src/gemini.tsx to organize photos"
+  },
+  {
+    "id": 46,
+    "command": "Create a tool in packages/core/src/tools/termux-share.ts to share files using termux-share"
+  },
+  {
+    "id": 47,
+    "command": "Add a /share command in packages/cli/src/gemini.tsx to share files via Termux"
+  },
+  {
+    "id": 48,
+    "command": "Write a script in /sdcard/scripts/termux-call-dial.sh to dial numbers using termux-telephony-call"
+  },
+  {
+    "id": 49,
+    "command": "Add a /dial command in packages/cli/src/gemini.tsx to make calls via Termux"
+  },
+  {
+    "id": 50,
+    "command": "Add a /termux-info command in packages/cli/src/gemini.tsx to display Termux version and environment details"
+  }
+]

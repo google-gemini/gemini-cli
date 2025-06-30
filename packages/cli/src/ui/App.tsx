@@ -79,6 +79,7 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
+  validateInput: (input: string) => boolean;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -87,7 +88,7 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+const App = ({ config, settings, startupWarnings = [], validateInput }: AppProps) => {
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -132,6 +133,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [lastRequestTime, setLastRequestTime] = useState<number>(0);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -206,7 +208,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         Date.now(),
       );
       if (config.getDebugMode()) {
-        console.log(
+        logger.debug(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,
         );
       }
@@ -219,7 +221,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         },
         Date.now(),
       );
-      console.error('Error refreshing memory:', error);
+      logger.error('Error refreshing memory:', error);
     }
   }, [config, addItem]);
 
@@ -429,7 +431,22 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTime;
+      const MIN_INTERVAL_MS = (60 / 60) * 1000; // 1 request per second for 60 requests/minute
+
+      if (trimmedValue.length > 0 && validateInput(trimmedValue)) {
+        if (timeSinceLastRequest < MIN_INTERVAL_MS) {
+          addItem(
+            {
+              type: MessageType.ERROR,
+              text: `Rate limit exceeded. Please wait ${((MIN_INTERVAL_MS - timeSinceLastRequest) / 1000).toFixed(1)} seconds before sending another request.`,
+            },
+            Date.now(),
+          );
+          return;
+        }
+        setLastRequestTime(now);
         submitQuery(trimmedValue);
       }
     },
@@ -480,7 +497,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleClearScreen = useCallback(() => {
     clearItems();
     clearConsoleMessagesState();
-    console.clear();
+    logger.clear();
     refreshStatic();
   }, [clearItems, clearConsoleMessagesState, refreshStatic]);
 
@@ -574,7 +591,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
          * ensure that it's statically rendered.
          *
          * Background on the Static Item: Anything in the Static component is written a single time
-         * to the console. Think of it like doing a console.log and then never using ANSI codes to
+         * to the console. Think of it like doing a logger.info and then never using ANSI codes to
          * clear that content ever again. Effectively it has a moving frame that every time new static
          * content is set it'll flush content to the terminal and move the area which it's "clearing"
          * down a notch. Without Static the area which gets erased and redrawn continuously grows.

@@ -13,7 +13,7 @@ import { useStateAndRef } from './useStateAndRef.js';
 import {
   Config,
   GitService,
-  Logger,
+  logger,
   MCPDiscoveryState,
   MCPServerStatus,
   getMCPDiscoveryState,

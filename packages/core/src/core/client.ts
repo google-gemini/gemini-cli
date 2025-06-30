@@ -27,7 +27,7 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
-import { logger } from '../utils/logger.js';
+import { logger } from './logger.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';

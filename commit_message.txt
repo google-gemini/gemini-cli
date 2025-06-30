@@ -1,0 +1,20 @@
+feat: Centralize logging and enhance error handling
+
+Introduced a new centralized logging utility ()
+to provide consistent and colorized logging across the Gemini CLI.
+
+Integrated this new logger into the following core modules and tools:
+- : Replaced internal logging with the new utility.
+- : Updated to export the new logger.
+- : Enhanced with new logger calls and  blocks.
+- : Integrated logger for better tracing and error reporting.
+- : Added logger calls and  for file operations.
+- : Enhanced with logger and error handling for file writes.
+- : Integrated logger for validation, calculation, and execution.
+- : Added logger for directory listing operations.
+- : Integrated logger for file globbing.
+- : Added logger for file content searching.
+- : Enhanced with logger for web content fetching.
+
+These changes improve the observability and robustness of the CLI by providing
+detailed and consistent logging, and better error handling across critical operations.

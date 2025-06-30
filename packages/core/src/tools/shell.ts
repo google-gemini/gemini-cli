@@ -19,7 +19,7 @@ import {
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
-import { logger } from '../utils/logger.js';
+import { logger } from '../core/logger.js';
 
 export interface ShellToolParams {
   command: string;
@@ -32,6 +32,18 @@ const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'run_shell_command';
+  private dangerousCommands: RegExp[] = [
+    /rm -rf/,
+    /mkfs/,
+    /dd /,
+    /sudo/,
+    /reboot/,
+    /shutdown/,
+    /init 0/,
+    /poweroff/,
+    /wipe/,
+    /format/,
+  ];
   private whitelist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
@@ -111,6 +123,14 @@ Process Group PGID: Process group started or \`(none)\``,
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
     }
+
+    // Check for dangerous commands
+    for (const pattern of this.dangerousCommands) {
+      if (pattern.test(params.command)) {
+        return `Dangerous command detected: ${pattern.source}. Command execution blocked for safety.`;
+      }
+    }
+
     if (!this.getCommandRoot(params.command)) {
       return 'Could not identify command root to obtain permission from user.';
     }
@@ -318,8 +338,7 @@ Process Group PGID: Process group started or \`(none)\``,
             .split('\n')
             .filter(Boolean);
           for (const line of pgrepLines) {
-            if (!/^
-\d+$/.test(line)) {
+            if (!/^\d+$/.test(line)) {
               console.error(`pgrep: ${line}`);
             }
             const pid = Number(line);

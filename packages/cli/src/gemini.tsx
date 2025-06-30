@@ -8,6 +8,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { basename } from 'node:path';
+
 import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
@@ -42,7 +43,7 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 
 // --- Arcane Constants & Colors ---
 // Improvement 1: Centralized color constants for mystical terminal outputs.
-import { logger } from '../../core/src/utils/logger.js';
+import { logger } from '../../core/src/core/logger.js';
 
 // Improvement 4: A constant for the memory allocation target.
 const TARGET_MEMORY_MULTIPLIER = 0.5; // 50% of total memory.
@@ -119,6 +120,21 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
+function validateInput(input: string): boolean {
+  // Reject input that contains control characters, except for whitespace.
+  // This is a basic security measure to prevent command injection.
+  const invalidCharRegex = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
+  if (invalidCharRegex.test(input)) {
+    logger.error(
+      'Invalid characters detected in input. Please use only printable characters.',
+    );
+    return false;
+  }
+  return true;
+}
+
+
+
 // --- Core Logic Spells ---
 
 /**
@@ -127,23 +143,28 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
 async function handleSettingsInitialization(
   workspaceRoot: string,
 ): Promise<LoadedSettings> {
-  await cleanupCheckpoints();
-  const settings = loadSettings(workspaceRoot);
+  try {
+    await cleanupCheckpoints();
+    const settings = loadSettings(workspaceRoot);
 
-  if (settings.errors.length > 0) {
-    // Improvement 19: More descriptive error logging for settings issues.
-    logger.error(
-      'Errors were found in your configuration scrolls. The ritual cannot proceed.',
-    );
-    for (const error of settings.errors) {
+    if (settings.errors.length > 0) {
+      // Improvement 19: More descriptive error logging for settings issues.
       logger.error(
-        `In ${error.path}: ${error.message}`,
-        `Please mend the scroll and try again.`,
+        'Errors were found in your configuration scrolls. The ritual cannot proceed.',
       );
+      for (const error of settings.errors) {
+        logger.error(
+          `In ${error.path}: ${error.message}`,
+          `Please mend the scroll and try again.`,
+        );
+      }
+      process.exit(1);
     }
+    return settings;
+  } catch (err) {
+    logger.error('An error occurred during settings initialization.', err);
     process.exit(1);
   }
-  return settings;
 }
 
 /**
@@ -153,44 +174,49 @@ async function initializeCoreServices(
   settings: LoadedSettings,
   workspaceRoot: string,
 ) {
-  const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  try {
+    const extensions = loadExtensions(workspaceRoot);
+    const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // Improvement 20: A fallback enchantment to use GEMINI_API_KEY if no other auth method is chosen.
-  // This must be cast after loadCliConfig, which summons the environment variables.
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
-    settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.USE_GEMINI,
-    );
-  }
-
-  setMaxSizedBoxDebugging(config.getDebugMode());
-
-  // Initialize centralized services.
-  config.getFileService();
-  if (config.getCheckpointingEnabled()) {
-    try {
-      await config.getGitService();
-    } catch {
-      // Improvement 13: Log a warning instead of silently swallowing the Git service error.
-      logger.warn(
-        'Could not initialize Git service. Checkpointing may be affected.',
+    // Improvement 20: A fallback enchantment to use GEMINI_API_KEY if no other auth method is chosen.
+    // This must be cast after loadCliConfig, which summons the environment variables.
+    if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_GEMINI,
       );
     }
-  }
 
-  // Improvement 21: An enchantment to load the user's chosen theme.
-  if (settings.merged.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.theme)) {
-      logger.warn(
-        `Theme "${settings.merged.theme}" not found. The default theme will be used.`,
-      );
+    setMaxSizedBoxDebugging(config.getDebugMode());
+
+    // Initialize centralized services.
+    config.getFileService();
+    if (config.getCheckpointingEnabled()) {
+      try {
+        await config.getGitService();
+      } catch {
+        // Improvement 13: Log a warning instead of silently swallowing the Git service error.
+        logger.warn(
+          'Could not initialize Git service. Checkpointing may be affected.',
+        );
+      }
     }
-  }
 
-  return { config, extensions };
+    // Improvement 21: An enchantment to load the user's chosen theme.
+    if (settings.merged.theme) {
+      if (!themeManager.setActiveTheme(settings.merged.theme)) {
+        logger.warn(
+          `Theme "${settings.merged.theme}" not found. The default theme will be used.`,
+        );
+      }
+    }
+
+    return { config, extensions };
+  } catch (err) {
+    logger.error('An error occurred during core service initialization.', err);
+    process.exit(1);
+  }
 }
 
 /**
@@ -200,34 +226,39 @@ async function prepareExecutionEnvironment(
   config: Config,
   settings: LoadedSettings,
 ) {
-  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
-    ? getNodeMemoryArgs(config)
-    : [];
+  try {
+    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+      ? getNodeMemoryArgs(config)
+      : [];
 
-  // If not already in a sandbox, and sandboxing is enabled, we must enter it.
-  if (!process.env.SANDBOX) {
-    const sandboxConfig = config.getSandbox();
-    if (sandboxConfig) {
-      // Validate authentication before entering the sandbox, as it can interfere with web redirects.
-      if (settings.merged.selectedAuthType) {
-        try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
-          if (err) throw new Error(err);
-          await config.refreshAuth(settings.merged.selectedAuthType);
-        } catch (err) {
-          logger.error('Authentication failed before entering the sandbox:', err);
-          process.exit(1);
+    // If not already in a sandbox, and sandboxing is enabled, we must enter it.
+    if (!process.env.SANDBOX) {
+      const sandboxConfig = config.getSandbox();
+      if (sandboxConfig) {
+        // Validate authentication before entering the sandbox, as it can interfere with web redirects.
+        if (settings.merged.selectedAuthType) {
+          try {
+            const err = validateAuthMethod(settings.merged.selectedAuthType);
+            if (err) throw new Error(err);
+            await config.refreshAuth(settings.merged.selectedAuthType);
+          } catch (err) {
+            logger.error('Authentication failed before entering the sandbox:', err);
+            process.exit(1);
+          }
+        }
+        await start_sandbox(sandboxConfig, memoryArgs);
+        process.exit(0);
+      } else {
+        // Not in a sandbox and not entering one. Relaunch for memory if needed.
+        if (memoryArgs.length > 0) {
+          await relaunchWithAdditionalArgs(memoryArgs);
+          process.exit(0);
         }
       }
-      await start_sandbox(sandboxConfig, memoryArgs);
-      process.exit(0);
-    } else {
-      // Not in a sandbox and not entering one. Relaunch for memory if needed.
-      if (memoryArgs.length > 0) {
-        await relaunchWithAdditionalArgs(memoryArgs);
-        process.exit(0);
-      }
     }
+  } catch (err) {
+    logger.error('An error occurred during execution environment preparation.', err);
+    process.exit(1);
   }
 }
 
@@ -239,22 +270,28 @@ async function runInteractiveMode(
   settings: LoadedSettings,
   workspaceRoot: string,
 ) {
-  const startupWarnings = await getStartupWarnings();
-  // Improvement 14: Set the window title to orient the user in their terminal.
-  setWindowTitle(basename(workspaceRoot), settings);
+  try {
+    const startupWarnings = await getStartupWarnings();
+    // Improvement 14: Set the window title to orient the user in their terminal.
+    setWindowTitle(basename(workspaceRoot), settings);
 
-  // Improvement 24: React.StrictMode is a ward that detects potential problems in the component tree.
-  // Improvement 25: exitOnCtrlC is false because we have our own graceful shutdown handler in index.ts.
-  render(
-    <React.StrictMode>
-      <AppWrapper
-        config={config}
-        settings={settings}
-        startupWarnings={startupWarnings}
-      />
-    </React.StrictMode>,
-    { exitOnCtrlC: false },
-  );
+    // Improvement 24: React.StrictMode is a ward that detects potential problems in the component tree.
+    // Improvement 25: exitOnCtrlC is false because we have our own graceful shutdown handler in index.ts.
+    render(
+      <React.StrictMode>
+        <AppWrapper
+          config={config}
+          settings={settings}
+          startupWarnings={startupWarnings}
+          validateInput={validateInput}
+        />
+      </React.StrictMode>,
+      { exitOnCtrlC: false },
+    );
+  } catch (err) {
+    logger.error('An error occurred during interactive mode.', err);
+    process.exit(1);
+  }
 }
 
 /**
@@ -266,31 +303,36 @@ async function runNonInteractiveMode(
   extensions: Extension[],
   initialInput: string,
 ) {
-  let input = initialInput;
-  // If not a TTY, we must read the sacred input from stdin.
-  if (!process.stdin.isTTY) {
-    input += await readStdin();
-  }
+  try {
+    let input = initialInput;
+    // If not a TTY, we must read the sacred input from stdin.
+    if (!process.stdin.isTTY) {
+      input += await readStdin();
+    }
 
-  if (!input) {
-    logger.error('No input was provided via stdin for non-interactive mode.');
+    if (!input) {
+      logger.error('No input was provided via stdin for non-interactive mode.');
+      process.exit(1);
+    }
+
+    logUserPrompt(config, {
+      'event.name': 'user_prompt',
+      'event.timestamp': new Date().toISOString(),
+      prompt: input,
+      prompt_length: input.length,
+    });
+
+    const nonInteractiveConfig = await loadNonInteractiveConfig(
+      config,
+      extensions,
+      settings,
+    );
+    await runNonInteractive(nonInteractiveConfig, input);
+    process.exit(0);
+  } catch (err) {
+    logger.error('An error occurred during non-interactive mode.', err);
     process.exit(1);
   }
-
-  logUserPrompt(config, {
-    'event.name': 'user_prompt',
-    'event.timestamp': new Date().toISOString(),
-    prompt: input,
-    prompt_length: input.length,
-  });
-
-  const nonInteractiveConfig = await loadNonInteractiveConfig(
-    config,
-    extensions,
-    settings,
-  );
-  await runNonInteractive(nonInteractiveConfig, input);
-  process.exit(0);
 }
 
 // --- Main Orchestration Spell ---
@@ -299,22 +341,33 @@ async function runNonInteractiveMode(
  * Improvement 7: The main function, refactored into a grand orchestrator of spells.
  */
 export async function main() {
-  const workspaceRoot = process.cwd();
-  const settings = await handleSettingsInitialization(workspaceRoot);
-  const { config, extensions } = await initializeCoreServices(
-    settings,
-    workspaceRoot,
-  );
+  try {
+    const workspaceRoot = process.cwd();
+    const settings = await handleSettingsInitialization(workspaceRoot);
+    const { config, extensions } = await initializeCoreServices(
+      settings,
+      workspaceRoot,
+    );
 
-  await prepareExecutionEnvironment(config, settings);
+    await prepareExecutionEnvironment(config, settings);
 
-  const input = config.getQuestion();
+    const input = config.getQuestion();
 
-  // We enter interactive mode only if we are in a TTY and no direct question was asked.
-  if (process.stdin.isTTY && input?.length === 0) {
-    await runInteractiveMode(config, settings, workspaceRoot);
-  } else {
-    runNonInteractiveMode(config, settings, extensions, input);
+    // We enter interactive mode only if we are in a TTY and no direct question was asked.
+    switch (process.stdin.isTTY && input?.length === 0) {
+      case true:
+        await runInteractiveMode(config, settings, workspaceRoot);
+        break;
+      case false:
+        runNonInteractiveMode(config, settings, extensions, input);
+        break;
+      default:
+        logger.error('Unexpected error determining execution mode.');
+        process.exit(1);
+    }
+  } catch (err) {
+    logger.error('An unexpected error occurred.', err);
+    process.exit(1);
   }
 }
 

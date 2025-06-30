@@ -24,7 +24,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../core/logger.js';
 
 /**
  * Parameters for the Edit tool
