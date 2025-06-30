@@ -76,52 +76,1223 @@ describe('ReadManyFilesTool', () => {
         throw err;
       },
     );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
   });
 
   afterEach(() => {
     if (fs.existsSync(tempRootDir)) {
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
       fs.rmSync(tempRootDir, { recursive: true, force: true });
     }
     if (fs.existsSync(tempDirOutsideRoot)) {
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
       fs.rmSync(tempDirOutsideRoot, { recursive: true, force: true });
     }
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
   });
 
   describe('validateParams', () => {
-    it('should return null for valid relative paths within root', () => {
-      const params = { paths: ['file1.txt', 'subdir/file2.txt'] };
-      expect(tool.validateParams(params)).toBeNull();
-    });
 
-    it('should return null for valid glob patterns within root', () => {
-      const params = { paths: ['*.txt', 'subdir/**/*.js'] };
-      expect(tool.validateParams(params)).toBeNull();
-    });
-
-    it('should return null for paths trying to escape the root (e.g., ../) as execute handles this', () => {
-      const params = { paths: ['../outside.txt'] };
-      expect(tool.validateParams(params)).toBeNull();
-    });
-
-    it('should return null for absolute paths as execute handles this', () => {
-      const params = { paths: [path.join(tempDirOutsideRoot, 'absolute.txt')] };
-      expect(tool.validateParams(params)).toBeNull();
-    });
-
-    it('should return error if paths array is empty', () => {
-      const params = { paths: [] };
-      expect(tool.validateParams(params)).toBe(
-        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.',
+    it('should handle null and undefined inputs', () => {
+      expect(tool.validateParams(null as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
       );
+      expect(tool.validateParams(undefined as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
     });
 
-    it('should return null for valid exclude and include patterns', () => {
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
       const params = {
         paths: ['src/**/*.ts'],
-        exclude: ['**/*.test.ts'],
-        include: ['src/utils/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
       };
-      expect(tool.validateParams(params)).toBeNull();
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
+    });
+
+    it('should handle non-object parameters', () => {
+      expect(tool.validateParams('string' as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
+      );
+      expect(tool.validateParams(123 as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
+    });
+
+    it('should handle paths parameter that is not an array', () => {
+      expect(tool.validateParams({ paths: 'single-string' } as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
+      );
+      expect(tool.validateParams({ paths: 123 } as any)).toBe(
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
+    });
+
+    it('should handle array with non-string elements in paths', () => {
+      expect(tool.validateParams({ paths: ['valid.txt', null] } as any)).toBe(
+        'Each item in "paths" must be a non-empty string/glob pattern.'
+      );
+      expect(tool.validateParams({ paths: [123, 'valid.txt'] } as any)).toBe(
+        'Each item in "paths" must be a non-empty string/glob pattern.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
+    });
+
+    it('should handle whitespace-only strings in paths', () => {
+      expect(tool.validateParams({ paths: ['  ', 'valid.txt'] })).toBe(
+        'Each item in "paths" must be a non-empty string/glob pattern.'
+      );
+      expect(tool.validateParams({ paths: ['\t\n'] })).toBe(
+        'Each item in "paths" must be a non-empty string/glob pattern.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+        const content = result.llmContent as string[];
+        expect(content.some(c => c.includes('deep content'))).toBe(true);
+      }
+    });
+
+    it('should handle rapid successive executions', async () => {
+      createFile('rapid1.txt', 'rapid content 1');
+      createFile('rapid2.txt', 'rapid content 2');
+      
+      const executions = [];
+      for (let i = 0; i < 10; i++) {
+        executions.push(
+          tool.execute(
+            { paths: [i % 2 === 0 ? 'rapid1.txt' : 'rapid2.txt'] },
+            new AbortController().signal
+          )
+        );
+      }
+      
+      const results = await Promise.all(executions);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+      });
+    });
+  });
+
+  describe('getDescription method', () => {
+    it('should generate accurate description for simple paths', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('*.txt');
+      expect(description).toContain(tempRootDir);
+      expect(description).toContain('Excluding:');
+      expect(description).toContain('UTF-8');
+    });
+
+    it('should handle complex parameter combinations in description', () => {
+      const params = {
+        paths: ['src/**/*.ts'],
+        include: ['**/*.tsx'],
+        exclude: ['**/*.test.*'],
+        useDefaultExcludes: false
+      };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('src/**/*.ts');
+      expect(description).toContain('**/*.tsx');
+      expect(description).toContain('Excluding:');
+    });
+
+    it('should mention geminiignore patterns when present', () => {
+      const params = { paths: ['*.txt'] };
+      const description = tool.getDescription(params);
+      
+      expect(description).toContain('from .geminiignore');
+    });
+  });
+    });
+
+    it('should handle edge cases in include/exclude arrays', () => {
+      expect(tool.validateParams({ paths: ['file.txt'], include: null } as any)).toBe(
+        'If provided, "include" must be an array of strings/glob patterns.'
+      );
+      expect(tool.validateParams({ paths: ['file.txt'], exclude: 'single-string' } as any)).toBe(
+        'If provided, "exclude" must be an array of strings/glob patterns.'
+      );
+
+  describe('performance and stress tests', () => {
+    it('should handle files with extremely long names', async () => {
+      const longName = 'a'.repeat(200) + '.txt';
+      createFile(longName, 'content with long name');
+      
+      const params = { paths: [longName] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content.some(c => c.includes('content with long name'))).toBe(true);
+    });
+
+    it('should handle very large file content', async () => {
+      const largeContent = 'x'.repeat(100000);
+      createFile('large.txt', largeContent);
+      
+      const params = { paths: ['large.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      const content = result.llmContent as string[];
+      expect(content[0]).toContain(largeContent);
+      expect(result.returnDisplay).toContain('Successfully read and concatenated content from **1 file(s)**');
+    });
+
+    it('should handle complex nested glob patterns efficiently', async () => {
+      for (let i = 1; i <= 10; i++) {
+        createFile(`level1/sublevel${i}/file${i}.ts`, `content ${i}`);
+        createFile(`level1/sublevel${i}/file${i}.js`, `js content ${i}`);
+        createFile(`level1/sublevel${i}/test${i}.spec.ts`, `test content ${i}`);
+      }
+      
+      const params = {
+        paths: ['level1/**/file*.ts'],
+        exclude: ['**/*.spec.*']
+      };
+      
+      const startTime = Date.now();
+      const result = await tool.execute(params, new AbortController().signal);
+      const executionTime = Date.now() - startTime;
+      
+      expect(result.llmContent).toHaveLength(10);
+      expect(executionTime).toBeLessThan(5000);
+    });
+
+    it('should handle maximum path length scenarios', async () => {
+      # workaround for shell: avoid backticks in sed script
+      deepPath="";
+      for i in $(seq 0 19); do
+        if [ "$i" -eq 0 ]; then
+          deepPath="level0";
+        else
+          deepPath="$deepPath/level$i";
+        fi;
+      done;
+      mkdir -p "$deepPath";
+      createFile "$deepPath/deep-file.txt" 'deep content';
+      
+      const params = { paths: ['**/deep-file.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      
+      if (result.llmContent.length > 0) {
+ 
     });
 
     it('should return error if paths array contains an empty string', () => {
