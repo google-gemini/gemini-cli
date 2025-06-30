@@ -111,13 +111,14 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
     try {
       // First gather git information
-      const [statusOutput, diffOutput, logOutput] = await Promise.all([
+      const [statusOutput, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
         this.executeGitCommand(['status', '--porcelain'], signal),
-        this.executeGitCommand(['diff', '--cached'], signal).then(staged => 
-          staged || this.executeGitCommand(['diff'], signal)
-        ),
+        this.executeGitCommand(['diff', '--cached'], signal),
+        this.executeGitCommand(['diff'], signal),
         this.executeGitCommand(['log', '--oneline', '-10'], signal)
       ]);
+      
+      const diffOutput = stagedDiff?.trim() ? stagedDiff : unstagedDiff;
 
       if (!diffOutput?.trim()) {
         // No changes to confirm
@@ -181,13 +182,16 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         console.debug('[GenerateCommitMessage] No valid cache, generating fresh commit message...');
         
         // Step 1: Gather git information (parallel execution)
-        const [statusOut, diffOutput, logOutput] = await Promise.all([
+        const [statusOut, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
           this.executeGitCommand(['status', '--porcelain'], signal),
-          this.executeGitCommand(['diff', '--cached'], signal).then(staged => 
-            staged || this.executeGitCommand(['diff'], signal)
-          ),
+          this.executeGitCommand(['diff', '--cached'], signal),
+          this.executeGitCommand(['diff'], signal),
           this.executeGitCommand(['log', '--oneline', '-10'], signal)
         ]);
+        
+        const diffOutput = stagedDiff?.trim() ? stagedDiff : unstagedDiff;
+        const hasOnlyStagedChanges = stagedDiff?.trim() && !unstagedDiff?.trim();
+        const hasOnlyUnstagedChanges = !stagedDiff?.trim() && unstagedDiff?.trim();
 
         statusOutput = statusOut || '';
 
@@ -209,7 +213,30 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         finalCommitMessage = this.addGeminiSignature(commitMessage);
       }
 
-      // Step 3: Add relevant files to staging area if needed
+      // Step 3: Handle staging based on change type
+      if (this.cachedCommitData) {
+        // Check if we need to stage changes from cached data
+        const stagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
+        const unstagedDiff = await this.executeGitCommand(['diff'], signal);
+        const hasOnlyUnstagedChanges = !stagedDiff?.trim() && unstagedDiff?.trim();
+        
+        if (hasOnlyUnstagedChanges) {
+          console.debug('[GenerateCommitMessage] Staging unstaged changes...');
+          await this.executeGitCommand(['add', '-u'], signal);
+        }
+      } else {
+        // Check if we need to stage changes for non-cached execution
+        const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
+        const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
+        const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && currentUnstagedDiff?.trim();
+        
+        if (hasOnlyUnstagedChanges) {
+          console.debug('[GenerateCommitMessage] Staging unstaged changes...');
+          await this.executeGitCommand(['add', '-u'], signal);
+        }
+      }
+      
+      // Add untracked files if any
       if (statusOutput?.includes('??')) {
         console.debug('[GenerateCommitMessage] Adding untracked files to staging...');
         const untrackedFiles = this.parseUntrackedFiles(statusOutput);
