@@ -366,6 +366,11 @@ export async function start_sandbox(
   // run init binary inside container to forward signals & reap zombies
   const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
 
+  // add custom flags from SANDBOX_FLAGS
+  if (process.env.SANDBOX_FLAGS) {
+    args.push(...process.env.SANDBOX_FLAGS.split(' '));
+  }
+
   // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
   if (process.stdin.isTTY) {
     args.push('-t');
