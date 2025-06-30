@@ -79,9 +79,9 @@ const REDACTED_VALUE = '[REDACTED]';
  * Checks if a key name suggests it contains sensitive information
  */
 function isSensitiveKey(key: string): boolean {
-  const lowerKey = key.toLowerCase();
+  const normalizedKey = key.toLowerCase().replace(/[-_]/g, '');
   return SENSITIVE_KEYS.some((sensitiveKey) =>
-    lowerKey.includes(sensitiveKey.toLowerCase()),
+    normalizedKey.includes(sensitiveKey.toLowerCase().replace(/[-_]/g, '')),
   );
 }
 
