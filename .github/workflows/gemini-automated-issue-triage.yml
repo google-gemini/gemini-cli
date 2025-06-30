@@ -1,0 +1,77 @@
+name: Gemini Issue Triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  triage-issue:
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: read
+      id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Run Gemini Issue Triage
+        uses: google-gemini/gemini-cli-action@1efc0bac9e0b2da6c6cab95df513324d8dfc2a79
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+        with:
+          version: main
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(gh label list)",
+                "run_shell_command(gh issue edit)",
+              ],
+            }
+          prompt: |
+            You are an issue triage assistant for GitHub issues.
+            Your task is to analyze the issue and apply appropriate labels from the repository's list of available labels.
+
+            **IMPORTANT: Your only action should be to apply labels. Do not post any comments or modify any code.**
+
+            **Triage Workflow:**
+
+            1. **Fetch Available Labels:**
+               Execute: `gh label list`
+
+            2. **Get Issue Information:**
+               The issue details are available in environment variables:
+               - Repository: $REPOSITORY
+               - Issue Number: $ISSUE_NUMBER
+               - Issue Title: $ISSUE_TITLE
+               - Issue Body: $ISSUE_BODY
+
+            3. **Analyze and Apply Labels:**
+               Based on the issue title and body, determine appropriate labels and apply them using:
+               `gh issue edit $ISSUE_NUMBER --add-label "label1,label2"`
+
+            **Guidelines:**
+            - Only use labels that exist in the repository
+            - Do not add comments to the issue
+            - Common label patterns: kind/bug, kind/enhancement, kind/documentation, area/*, priority/*
