@@ -17,6 +17,8 @@ import { CompressionMessage } from './messages/CompressionMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
+import { ModelStatsDisplay } from './ModelStatsDisplay.js';
+import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Config } from '@google/gemini-cli-core';
 
@@ -69,16 +71,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         gcpProject={item.gcpProject}
       />
     )}
-    {item.type === 'stats' && (
-      <StatsDisplay
-        stats={item.stats}
-        lastTurnStats={item.lastTurnStats}
-        duration={item.duration}
-      />
-    )}
-    {item.type === 'quit' && (
-      <SessionSummaryDisplay stats={item.stats} duration={item.duration} />
-    )}
+    {item.type === 'stats' && <StatsDisplay duration={item.duration} />}
+    {item.type === 'model_stats' && <ModelStatsDisplay />}
+    {item.type === 'tool_stats' && <ToolStatsDisplay />}
+    {item.type === 'quit' && <SessionSummaryDisplay duration={item.duration} />}
     {item.type === 'tool_group' && (
       <ToolGroupMessage
         toolCalls={item.tools}

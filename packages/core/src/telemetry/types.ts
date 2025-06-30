@@ -183,6 +183,7 @@ export class ApiResponseEvent {
   cached_content_token_count: number;
   thoughts_token_count: number;
   tool_token_count: number;
+  total_token_count: number;
   response_text?: string;
 
   constructor(
@@ -202,6 +203,7 @@ export class ApiResponseEvent {
     this.cached_content_token_count = usage_data?.cachedContentTokenCount ?? 0;
     this.thoughts_token_count = usage_data?.thoughtsTokenCount ?? 0;
     this.tool_token_count = usage_data?.toolUsePromptTokenCount ?? 0;
+    this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
     this.error = error;
   }

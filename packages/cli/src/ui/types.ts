@@ -8,7 +8,6 @@ import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
-import { CumulativeStats } from './contexts/SessionContext.js';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {
@@ -100,14 +99,19 @@ export type HistoryItemAbout = HistoryItemBase & {
 
 export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
-  stats: CumulativeStats;
-  lastTurnStats: CumulativeStats;
   duration: string;
+};
+
+export type HistoryItemModelStats = HistoryItemBase & {
+  type: 'model_stats';
+};
+
+export type HistoryItemToolStats = HistoryItemBase & {
+  type: 'tool_stats';
 };
 
 export type HistoryItemQuit = HistoryItemBase & {
   type: 'quit';
-  stats: CumulativeStats;
   duration: string;
 };
 
@@ -140,6 +144,8 @@ export type HistoryItemWithoutId =
   | HistoryItemAbout
   | HistoryItemToolGroup
   | HistoryItemStats
+  | HistoryItemModelStats
+  | HistoryItemToolStats
   | HistoryItemQuit
   | HistoryItemCompression;
 
@@ -152,6 +158,8 @@ export enum MessageType {
   USER = 'user',
   ABOUT = 'about',
   STATS = 'stats',
+  MODEL_STATS = 'model_stats',
+  TOOL_STATS = 'tool_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
@@ -178,15 +186,22 @@ export type Message =
   | {
       type: MessageType.STATS;
       timestamp: Date;
-      stats: CumulativeStats;
-      lastTurnStats: CumulativeStats;
       duration: string;
+      content?: string;
+    }
+  | {
+      type: MessageType.MODEL_STATS;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.TOOL_STATS;
+      timestamp: Date;
       content?: string;
     }
   | {
       type: MessageType.QUIT;
       timestamp: Date;
-      stats: CumulativeStats;
       duration: string;
       content?: string;
     }

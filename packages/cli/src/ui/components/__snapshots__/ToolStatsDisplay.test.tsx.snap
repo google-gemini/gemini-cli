@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolStatsDisplay /> > should display stats for a single tool correctly 1`] = `
+"╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  Tool Stats For Nerds                                              │
+│                                                                    │
+│  Tool Name                   Calls   Success Rate   Avg Duration   │
+│  ────────────────────────────────────────────────────────────────  │
+│  test-tool                       1         100.0%          100ms   │
+│                                                                    │
+│  User Decision Summary                                             │
+│  Total Reviewed Suggestions:                                   1   │
+│   » Accepted:                                                  1   │
+│   » Rejected:                                                  0   │
+│   » Modified:                                                  0   │
+│  ────────────────────────────────────────────────────────────────  │
+│   Overall Agreement Rate:                                 100.0%   │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctly 1`] = `
+"╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  Tool Stats For Nerds                                              │
+│                                                                    │
+│  Tool Name                   Calls   Success Rate   Avg Duration   │
+│  ────────────────────────────────────────────────────────────────  │
+│  tool-a                          2          50.0%          100ms   │
+│  tool-b                          1         100.0%          100ms   │
+│                                                                    │
+│  User Decision Summary                                             │
+│  Total Reviewed Suggestions:                                   3   │
+│   » Accepted:                                                  1   │
+│   » Rejected:                                                  1   │
+│   » Modified:                                                  1   │
+│  ────────────────────────────────────────────────────────────────  │
+│   Overall Agreement Rate:                                  33.3%   │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolStatsDisplay /> > should handle large values without wrapping or overlapping 1`] = `
+"╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  Tool Stats For Nerds                                              │
+│                                                                    │
+│  Tool Name                   Calls   Success Rate   Avg Duration   │
+│  ────────────────────────────────────────────────────────────────  │
+│  long-named-tool-for-testi99999999          88.9%            1ms   │
+│  ng-wrapping-and-such     9                                        │
+│                                                                    │
+│  User Decision Summary                                             │
+│  Total Reviewed Suggestions:                           222234566   │
+│   » Accepted:                                          123456789   │
+│   » Rejected:                                           98765432   │
+│   » Modified:                                              12345   │
+│  ────────────────────────────────────────────────────────────────  │
+│   Overall Agreement Rate:                                  55.6%   │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolStatsDisplay /> > should handle zero decisions gracefully 1`] = `
+"╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  Tool Stats For Nerds                                              │
+│                                                                    │
+│  Tool Name                   Calls   Success Rate   Avg Duration   │
+│  ────────────────────────────────────────────────────────────────  │
+│  test-tool                       1         100.0%          100ms   │
+│                                                                    │
+│  User Decision Summary                                             │
+│  Total Reviewed Suggestions:                                   0   │
+│   » Accepted:                                                  0   │
+│   » Rejected:                                                  0   │
+│   » Modified:                                                  0   │
+│  ────────────────────────────────────────────────────────────────  │
+│   Overall Agreement Rate:                                     --   │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolStatsDisplay /> > should render "no tool calls" message when there are no active tools 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  No tool calls have been made in this session.                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
