@@ -1,0 +1,72 @@
+name: Gemini Scheduled Issue Triage
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch: {}
+
+jobs:
+  triage-issues:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Find untriaged issues
+        id: find_issues
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          NO_LABEL_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue no:label" --json number,title,body)
+          NEEDS_TRIAGE_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue label:\"status/needs-triage\"" --json number,title,body)
+          ISSUES=$(echo "$NO_LABEL_ISSUES" "$NEEDS_TRIAGE_ISSUES" | jq -c -s 'add | unique_by(.number)')
+          echo "issues_to_triage=$ISSUES" >> "$GITHUB_OUTPUT"
+
+      - name: Run Gemini Issue Triage
+        if: steps.find_issues.outputs.issues_to_triage != '[]'
+        uses: google-gemini/gemini-cli-action@1efc0bac9e0b2da6c6cab95df513324d8dfc2a79
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          ISSUES_TO_TRIAGE: ${{ steps.find_issues.outputs.issues_to_triage }}
+          REPOSITORY: ${{ github.repository }}
+        with:
+          version: main
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(gh label list)",
+                "run_shell_command(gh issue edit)",
+                "run_shell_command(gh issue list)"
+              ],
+            }
+          prompt: |
+            You are an issue triage assistant. Analyze issues and apply appropriate labels.
+
+            Steps:
+            1. Run: `gh label list --limit 100`
+            2. Check environment variable: $ISSUES_TO_TRIAGE (JSON array of issues)
+            3. For each issue, apply labels: `gh issue edit ISSUE_NUMBER --add-label "label1,label2"`
+
+            Guidelines:
+            - Only use existing repository labels
+            - Do not add comments
+            - Triage each issue independently
+            - Focus on: kind/*, area/*, priority/* labels
