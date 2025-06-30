@@ -107,23 +107,51 @@ describe('GenerateCommitMessageTool', () => {
   });
 
   it('should generate a commit message and create commit when there are staged changes', async () => {
-    const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+    const diff =
+      'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
     const statusOutput = 'M  file.txt';
     const logOutput = 'abc1234 Previous commit message';
+    const commitMessage = 'feat: new feature';
 
-    mockSpawn.mockImplementation(createGitCommandMock({
-      'status': statusOutput,
-      'diff --cached': diff,
-      'diff': '', // No unstaged changes
-      'log': logOutput,
-      'commit': ''
-    }));
+    const mockStdin = {
+      write: vi.fn(),
+      end: vi.fn(),
+    };
+
+    mockSpawn.mockImplementation((command: string, args: string[]) => {
+      const child = new EventEmitter() as any;
+      const argString = args.join(' ');
+
+      if (command === 'git' && argString === 'commit -F -') {
+        child.stdin = mockStdin;
+      }
+
+      child.stdout = {
+        on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data') {
+            if (argString.includes('status'))
+              listener(Buffer.from(statusOutput));
+            else if (argString.includes('diff --cached'))
+              listener(Buffer.from(diff));
+            else if (argString.includes('diff') && !args.includes('--cached'))
+              listener(Buffer.from(''));
+            else if (argString.includes('log'))
+              listener(Buffer.from(logOutput));
+            else listener(Buffer.from(''));
+          }
+        }),
+      };
+
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
 
     (mockClient.generateContent as Mock).mockResolvedValue({
       candidates: [
         {
           content: {
-            parts: [{ text: 'feat: new feature' }],
+            parts: [{ text: commitMessage }],
           },
         },
       ],
@@ -132,8 +160,12 @@ describe('GenerateCommitMessageTool', () => {
     const controller = new AbortController();
     const result = await tool.execute(undefined, controller.signal);
 
-    expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: new feature');
-    expect(result.returnDisplay).toBe('Commit created successfully!\n\nCommit message:\nfeat: new feature');
+    expect(result.llmContent).toBe(
+      'Commit created successfully!\n\nCommit message:\nfeat: new feature',
+    );
+    expect(result.returnDisplay).toBe(
+      'Commit created successfully!\n\nCommit message:\nfeat: new feature',
+    );
     expect(mockClient.generateContent).toHaveBeenCalledWith(
       [
         {
@@ -148,11 +180,27 @@ describe('GenerateCommitMessageTool', () => {
       {},
       controller.signal,
     );
-    
+
     // Verify git commands were called in correct sequence
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['status', '--porcelain'], expect.any(Object));
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['diff', '--cached'], expect.any(Object));
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['commit', '-m', 'feat: new feature'], expect.any(Object));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'git',
+      ['status', '--porcelain'],
+      expect.any(Object),
+    );
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'git',
+      ['diff', '--cached'],
+      expect.any(Object),
+    );
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'git',
+      ['commit', '-F', '-'],
+      expect.any(Object),
+    );
+    expect(mockStdin.write).toHaveBeenCalledWith(
+      expect.stringContaining(commitMessage),
+    );
+    expect(mockStdin.end).toHaveBeenCalled();
   });
 
   it('should generate a commit message when there are only unstaged changes', async () => {
@@ -200,7 +248,7 @@ describe('GenerateCommitMessageTool', () => {
     );
     
     // Verify staging command was called for unstaged changes
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '-u'], expect.any(Object));
+    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.any(Object));
   });
 
   it('should handle pre-commit hook modifications and retry', async () => {
@@ -326,6 +374,6 @@ describe('GenerateCommitMessageTool', () => {
     expect(result.returnDisplay).toBe('Commit created successfully!\n\nCommit message:\nfeat: mixed changes');
     
     // In the non-cached path, it should check for untracked files and stage them
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', 'newfile.txt'], expect.any(Object));
+    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.any(Object));
   });
 });
