@@ -48,7 +48,8 @@ export class CheckpointingService {
 
       // Create git snapshot
       const commitMessage = `Checkpoint before ${toolCall.name} tool call`;
-      const commitHash = await this.gitService.createFileSnapshot(commitMessage);
+      const commitHash =
+        await this.gitService.createFileSnapshot(commitMessage);
 
       // Create checkpoint data
       const checkpoint: ToolCallCheckpoint = {
@@ -60,15 +61,24 @@ export class CheckpointingService {
       };
 
       // Save checkpoint to file
-      const checkpointDir = path.join(this.config.getProjectTempDir(), 'checkpoints');
+      const checkpointDir = path.join(
+        this.config.getProjectTempDir(),
+        'checkpoints',
+      );
       await fs.mkdir(checkpointDir, { recursive: true });
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filePath = (toolCall.args as { file_path?: string } | undefined)?.file_path || 'unknown';
+      const filePath =
+        (toolCall.args as { file_path?: string } | undefined)?.file_path ||
+        'unknown';
       const fileName = `${timestamp}_${path.basename(filePath)}_${toolCall.name}.json`;
       const checkpointPath = path.join(checkpointDir, fileName);
 
-      await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
+      await fs.writeFile(
+        checkpointPath,
+        JSON.stringify(checkpoint, null, 2),
+        'utf-8',
+      );
 
       return fileName;
     } catch (error) {
@@ -89,4 +99,4 @@ export class CheckpointingService {
     const fileModifyingTools = ['write_file', 'edit', 'replace'];
     return fileModifyingTools.includes(toolCall.name);
   }
-} 
+}

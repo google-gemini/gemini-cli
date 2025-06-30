@@ -134,35 +134,32 @@ export function useReactToolScheduler(
     [setToolCallsForDisplay],
   );
 
-  const scheduler = useMemo(
-    () => {
-      const schedulerInstance = new CoreToolScheduler({
-        toolRegistry: config.getToolRegistry(),
-        outputUpdateHandler,
-        onAllToolCallsComplete: allToolCallsCompleteHandler,
-        onToolCallsUpdate: toolCallsUpdateHandler,
-        approvalMode: config.getApprovalMode(),
-        getPreferredEditor,
-        config,
-      });
-      
-      // Set history for checkpointing
-      if (history || clientHistory) {
-        schedulerInstance.setHistory(history || [], clientHistory);
-      }
-      
-      return schedulerInstance;
-    },
-    [
-      config,
+  const scheduler = useMemo(() => {
+    const schedulerInstance = new CoreToolScheduler({
+      toolRegistry: config.getToolRegistry(),
       outputUpdateHandler,
-      allToolCallsCompleteHandler,
-      toolCallsUpdateHandler,
+      onAllToolCallsComplete: allToolCallsCompleteHandler,
+      onToolCallsUpdate: toolCallsUpdateHandler,
+      approvalMode: config.getApprovalMode(),
       getPreferredEditor,
-      history,
-      clientHistory,
-    ],
-  );
+      config,
+    });
+
+    // Set history for checkpointing
+    if (history || clientHistory) {
+      schedulerInstance.setHistory(history || [], clientHistory);
+    }
+
+    return schedulerInstance;
+  }, [
+    config,
+    outputUpdateHandler,
+    allToolCallsCompleteHandler,
+    toolCallsUpdateHandler,
+    getPreferredEditor,
+    history,
+    clientHistory,
+  ]);
 
   const schedule: ScheduleFn = useCallback(
     (

@@ -35,11 +35,21 @@ const PrivacyNoticeText = ({
       return <CloudPaidPrivacyNotice onExit={onExit} />;
     case AuthType.LOGIN_WITH_GOOGLE_PERSONAL:
     default:
-      return <CloudFreePrivacyNotice _config={config} onExit={onExit} settings={settings} />;
+      return (
+        <CloudFreePrivacyNotice
+          _config={config}
+          onExit={onExit}
+          settings={settings}
+        />
+      );
   }
 };
 
-export const PrivacyNotice = ({ onExit, config, settings }: PrivacyNoticeProps) => (
+export const PrivacyNotice = ({
+  onExit,
+  config,
+  settings,
+}: PrivacyNoticeProps) => (
   <Box borderStyle="round" padding={1} flexDirection="column">
     <PrivacyNoticeText config={config} onExit={onExit} settings={settings} />
   </Box>

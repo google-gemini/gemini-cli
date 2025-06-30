@@ -9,7 +9,9 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 
 const GradientHeading = ({ children }: { children: React.ReactNode }) => (
-  <Text bold color={Colors.Foreground}>{children}</Text>
+  <Text bold color={Colors.Foreground}>
+    {children}
+  </Text>
 );
 
 export const ContextHelp: React.FC = () => (
@@ -112,4 +114,4 @@ export const ContextHelp: React.FC = () => (
       to see what files are currently in your context
     </Text>
   </Box>
-); 
+);

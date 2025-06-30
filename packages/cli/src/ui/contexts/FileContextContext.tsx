@@ -36,12 +36,20 @@ export interface FileContextState {
 }
 
 export interface FileContextActions {
-  addFile: (filepath: string) => Promise<{ success: boolean; error?: string; info?: FileContextInfo }>;
+  addFile: (
+    filepath: string,
+  ) => Promise<{ success: boolean; error?: string; info?: FileContextInfo }>;
   removeFile: (filepath: string) => boolean;
   clearContext: () => void;
   getFileInfo: (filepath: string) => FileContextInfo | undefined;
   isFileInContext: (filepath: string) => boolean;
-  getContextStatus: () => { files: number; processedFiles: number; pendingFiles: number; tokens: number; percentage: number };
+  getContextStatus: () => {
+    files: number;
+    processedFiles: number;
+    pendingFiles: number;
+    tokens: number;
+    percentage: number;
+  };
   updateFileAccess: (filepath: string) => void;
   markFileAsProcessedByGemini: (filepath: string) => void;
   getGeminiContextFiles: () => string[];
@@ -72,11 +80,14 @@ function estimateTokenCount(fileSize: number): number {
 /**
  * Get file information including size and estimated tokens
  */
-async function getFileInfoFromFS(filepath: string, config: Config): Promise<FileContextInfo | null> {
+async function getFileInfoFromFS(
+  filepath: string,
+  config: Config,
+): Promise<FileContextInfo | null> {
   try {
     const absolutePath = path.resolve(config.getTargetDir(), filepath);
     const stats = await fs.stat(absolutePath);
-    
+
     if (stats.isDirectory()) {
       return null; // Directories are not supported for context
     }
@@ -118,42 +129,47 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
 
   const totalFiles = useMemo(() => files.size, [files]);
 
-  const addFile = useCallback(async (filepath: string) => {
-    console.log(`[DEBUG] addFile called with: ${filepath}`);
-    
-    const fileInfo = await getFileInfoFromFS(filepath, config);
-    if (!fileInfo) {
-      console.log(`[DEBUG] Failed to get file info for: ${filepath}`);
-      return {
-        success: false,
-        error: `Could not read file '${filepath}'`,
-      };
-    }
+  const addFile = useCallback(
+    async (filepath: string) => {
+      console.log(`[DEBUG] addFile called with: ${filepath}`);
 
-    setFiles(prevFiles => {
-      // Check if file is already in context using the current state
-      if (prevFiles.has(filepath)) {
-        console.log(`[DEBUG] File already exists: ${filepath}`);
-        return prevFiles; // Don't update if already exists
+      const fileInfo = await getFileInfoFromFS(filepath, config);
+      if (!fileInfo) {
+        console.log(`[DEBUG] Failed to get file info for: ${filepath}`);
+        return {
+          success: false,
+          error: `Could not read file '${filepath}'`,
+        };
       }
-      
-      console.log(`[DEBUG] Adding file to context: ${filepath}`);
-      const newFiles = new Map(prevFiles);
-      newFiles.set(filepath, fileInfo);
-      console.log(`[DEBUG] Context now has ${newFiles.size} files: ${Array.from(newFiles.keys()).join(', ')}`);
-      return newFiles;
-    });
 
-    return {
-      success: true,
-      info: fileInfo,
-    };
-  }, [config]);
+      setFiles((prevFiles) => {
+        // Check if file is already in context using the current state
+        if (prevFiles.has(filepath)) {
+          console.log(`[DEBUG] File already exists: ${filepath}`);
+          return prevFiles; // Don't update if already exists
+        }
+
+        console.log(`[DEBUG] Adding file to context: ${filepath}`);
+        const newFiles = new Map(prevFiles);
+        newFiles.set(filepath, fileInfo);
+        console.log(
+          `[DEBUG] Context now has ${newFiles.size} files: ${Array.from(newFiles.keys()).join(', ')}`,
+        );
+        return newFiles;
+      });
+
+      return {
+        success: true,
+        info: fileInfo,
+      };
+    },
+    [config],
+  );
 
   const removeFile = useCallback((filepath: string) => {
     let wasRemoved = false;
-    
-    setFiles(prevFiles => {
+
+    setFiles((prevFiles) => {
       if (prevFiles.has(filepath)) {
         wasRemoved = true;
         const newFiles = new Map(prevFiles);
@@ -162,7 +178,7 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
       }
       return prevFiles;
     });
-    
+
     return wasRemoved;
   }, []);
 
@@ -170,30 +186,48 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
     setFiles(new Map());
   }, []);
 
-  const getFileInfo = useCallback((filepath: string) => files.get(filepath), [files]);
+  const getFileInfo = useCallback(
+    (filepath: string) => files.get(filepath),
+    [files],
+  );
 
-  const isFileInContext = useCallback((filepath: string) => files.has(filepath), [files]);
+  const isFileInContext = useCallback(
+    (filepath: string) => files.has(filepath),
+    [files],
+  );
 
   const getContextStatus = useCallback(() => {
     const fileEntries = Array.from(files.entries());
-    const totalTokens = fileEntries.reduce((sum: number, [_, fileInfo]: [string, FileContextInfo]) => sum + (fileInfo.estimatedTokens || 0), 0);
-    const processedFiles = fileEntries.filter(([_, fileInfo]: [string, FileContextInfo]) => fileInfo.processedByGemini);
-    const pendingFiles = fileEntries.filter(([_, fileInfo]: [string, FileContextInfo]) => !fileInfo.processedByGemini);
-    
-    console.log(`[DEBUG] getContextStatus - Total files: ${fileEntries.length}, Processed: ${processedFiles.length}, Pending: ${pendingFiles.length}`);
-    console.log(`[DEBUG] All files: ${fileEntries.map(([path, info]) => `${path}(${info.processedByGemini ? 'processed' : 'pending'})`).join(', ')}`);
-    
+    const totalTokens = fileEntries.reduce(
+      (sum: number, [_, fileInfo]: [string, FileContextInfo]) =>
+        sum + (fileInfo.estimatedTokens || 0),
+      0,
+    );
+    const processedFiles = fileEntries.filter(
+      ([_, fileInfo]: [string, FileContextInfo]) => fileInfo.processedByGemini,
+    );
+    const pendingFiles = fileEntries.filter(
+      ([_, fileInfo]: [string, FileContextInfo]) => !fileInfo.processedByGemini,
+    );
+
+    console.log(
+      `[DEBUG] getContextStatus - Total files: ${fileEntries.length}, Processed: ${processedFiles.length}, Pending: ${pendingFiles.length}`,
+    );
+    console.log(
+      `[DEBUG] All files: ${fileEntries.map(([path, info]) => `${path}(${info.processedByGemini ? 'processed' : 'pending'})`).join(', ')}`,
+    );
+
     return {
       files: fileEntries.length,
       processedFiles: processedFiles.length,
       pendingFiles: pendingFiles.length,
       tokens: totalTokens,
-      percentage: Math.round((totalTokens / TOKEN_LIMIT) * 100)
+      percentage: Math.round((totalTokens / TOKEN_LIMIT) * 100),
     };
   }, [files]);
 
   const updateFileAccess = useCallback((filepath: string) => {
-    setFiles(prevFiles => {
+    setFiles((prevFiles) => {
       const fileInfo = prevFiles.get(filepath);
       if (fileInfo) {
         const newFiles = new Map(prevFiles);
@@ -209,8 +243,8 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
 
   const markFileAsProcessedByGemini = useCallback((filepath: string) => {
     console.log(`[DEBUG] markFileAsProcessedByGemini called with: ${filepath}`);
-    
-    setFiles(prev => {
+
+    setFiles((prev) => {
       const newFiles = new Map(prev);
       const fileInfo = newFiles.get(filepath);
       if (fileInfo) {
@@ -218,15 +252,17 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
         newFiles.set(filepath, {
           ...fileInfo,
           processedByGemini: true,
-          processedAt: Date.now()
+          processedAt: Date.now(),
         });
-        
+
         const processedFiles = Array.from(newFiles.entries())
           .filter(([_, info]) => info.processedByGemini)
           .map(([path, _]) => path);
         console.log(`[DEBUG] Processed files: ${processedFiles.join(', ')}`);
       } else {
-        console.log(`[DEBUG] File not found for marking as processed: ${filepath}`);
+        console.log(
+          `[DEBUG] File not found for marking as processed: ${filepath}`,
+        );
       }
       return newFiles;
     });
@@ -236,8 +272,10 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
     const processedFiles = Array.from(files.entries())
       .filter(([_, fileInfo]) => fileInfo.processedByGemini)
       .map(([filePath, _]) => filePath);
-    
-    console.log(`[DEBUG] getGeminiContextFiles - Returning: ${processedFiles.join(', ')}`);
+
+    console.log(
+      `[DEBUG] getGeminiContextFiles - Returning: ${processedFiles.join(', ')}`,
+    );
     return processedFiles;
   }, [files]);
 
@@ -245,34 +283,56 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
     const pendingFiles = Array.from(files.entries())
       .filter(([_, fileInfo]) => !fileInfo.processedByGemini)
       .map(([filePath, _]) => filePath);
-    
-    console.log(`[DEBUG] getPendingFiles - Returning: ${pendingFiles.join(', ')}`);
+
+    console.log(
+      `[DEBUG] getPendingFiles - Returning: ${pendingFiles.join(', ')}`,
+    );
     return pendingFiles;
   }, [files]);
 
-  const state: FileContextState = useMemo(() => ({
-    files,
-    totalTokens,
-    totalFiles,
-  }), [files, totalTokens, totalFiles]);
+  const state: FileContextState = useMemo(
+    () => ({
+      files,
+      totalTokens,
+      totalFiles,
+    }),
+    [files, totalTokens, totalFiles],
+  );
 
-  const actions: FileContextActions = useMemo(() => ({
-    addFile,
-    removeFile,
-    clearContext,
-    getFileInfo,
-    isFileInContext,
-    getContextStatus,
-    updateFileAccess,
-    markFileAsProcessedByGemini,
-    getGeminiContextFiles,
-    getPendingFiles,
-  }), [addFile, removeFile, clearContext, getFileInfo, isFileInContext, getContextStatus, updateFileAccess, markFileAsProcessedByGemini, getGeminiContextFiles, getPendingFiles]);
+  const actions: FileContextActions = useMemo(
+    () => ({
+      addFile,
+      removeFile,
+      clearContext,
+      getFileInfo,
+      isFileInContext,
+      getContextStatus,
+      updateFileAccess,
+      markFileAsProcessedByGemini,
+      getGeminiContextFiles,
+      getPendingFiles,
+    }),
+    [
+      addFile,
+      removeFile,
+      clearContext,
+      getFileInfo,
+      isFileInContext,
+      getContextStatus,
+      updateFileAccess,
+      markFileAsProcessedByGemini,
+      getGeminiContextFiles,
+      getPendingFiles,
+    ],
+  );
 
-  const value: FileContextValue = useMemo(() => ({
-    state,
-    actions,
-  }), [state, actions]);
+  const value: FileContextValue = useMemo(
+    () => ({
+      state,
+      actions,
+    }),
+    [state, actions],
+  );
 
   return (
     <FileContextContext.Provider value={value}>
@@ -286,9 +346,7 @@ export const FileContextProvider: React.FC<FileContextProviderProps> = ({
 export const useFileContext = () => {
   const context = useContext(FileContextContext);
   if (context === undefined) {
-    throw new Error(
-      'useFileContext must be used within a FileContextProvider',
-    );
+    throw new Error('useFileContext must be used within a FileContextProvider');
   }
   return context;
-}; 
+};

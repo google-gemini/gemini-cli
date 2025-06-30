@@ -8,13 +8,8 @@ import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
-import {
-  Config,
-  FileDiscoveryService,
-} from '@google/gemini-cli-core';
-import {
-  MAX_SUGGESTIONS_TO_SHOW,
-} from '../components/SuggestionsDisplay.js';
+import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 import { SlashCommand } from './slashCommandProcessor.js';
 import { useFileContext } from '../contexts/FileContextContext.js';
 import { EnhancedFileSuggestion } from '../components/EnhancedFilePicker.js';
@@ -204,9 +199,17 @@ export function useEnhancedCompletion(
     const partialPath = query.substring(atIndex + 1);
 
     // Check if this is a context management command
-    const contextCommands = ['list', 'show', 'status', 'remove', 'clear', 'clear-all', 'help'];
-    const isContextCommand = contextCommands.some(cmd => 
-      partialPath === cmd || partialPath.startsWith(cmd + ' ')
+    const contextCommands = [
+      'list',
+      'show',
+      'status',
+      'remove',
+      'clear',
+      'clear-all',
+      'help',
+    ];
+    const isContextCommand = contextCommands.some(
+      (cmd) => partialPath === cmd || partialPath.startsWith(cmd + ' '),
     );
 
     if (isContextCommand) {
@@ -221,7 +224,9 @@ export function useEnhancedCompletion(
         // Suggest files that are in context for removal
         const contextFiles = Array.from(state.files.keys());
         contextSuggestions = contextFiles
-          .filter((filepath: string) => filepath.toLowerCase().includes(partialPath.toLowerCase()))
+          .filter((filepath: string) =>
+            filepath.toLowerCase().includes(partialPath.toLowerCase()),
+          )
           .map((filepath: string) => {
             const fileInfo = actions.getFileInfo(filepath);
             return {
@@ -236,8 +241,8 @@ export function useEnhancedCompletion(
       } else {
         // Suggest available context commands
         contextSuggestions = contextCommands
-          .filter(cmd => cmd.startsWith(command))
-          .map(cmd => ({
+          .filter((cmd) => cmd.startsWith(command))
+          .map((cmd) => ({
             label: cmd,
             value: `@${cmd}`,
             filepath: '',
@@ -270,13 +275,17 @@ export function useEnhancedCompletion(
 
       try {
         const entries = await fs.readdir(startDir, { withFileTypes: true });
-        const sortedEntries = entries.sort((a, b) => a.name.localeCompare(b.name));
+        const sortedEntries = entries.sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
 
         for (const entry of sortedEntries) {
           if (results.length >= maxResults) break;
 
           const entryPath = path.join(startDir, entry.name);
-          const relativePath = path.join(currentRelativePath, entry.name).replace(/\\/g, '/');
+          const relativePath = path
+            .join(currentRelativePath, entry.name)
+            .replace(/\\/g, '/');
 
           // Skip git-ignored files
           if (fileDiscovery?.shouldGitIgnoreFile(relativePath)) {
@@ -304,7 +313,7 @@ export function useEnhancedCompletion(
               try {
                 const stats = await fs.stat(entryPath);
                 const isInContext = actions.isFileInContext(relativePath);
-                
+
                 results.push({
                   label: relativePath,
                   value: `@${relativePath}`,
@@ -345,7 +354,7 @@ export function useEnhancedCompletion(
             const filePath = path.join(cwd, file);
             const stats = await fs.stat(filePath);
             const isInContext = actions.isFileInContext(file);
-            
+
             results.push({
               label: file,
               value: `@${file}`,
@@ -387,7 +396,11 @@ export function useEnhancedCompletion(
           // Use glob search
           const fileDiscovery = config?.getFileService();
           if (fileDiscovery) {
-            fileSuggestions = await findFilesWithGlob(partialPath, fileDiscovery, 50);
+            fileSuggestions = await findFilesWithGlob(
+              partialPath,
+              fileDiscovery,
+              50,
+            );
           }
         }
 
@@ -436,4 +449,4 @@ export function useEnhancedCompletion(
     navigateUp,
     navigateDown,
   };
-} 
+}

@@ -16,6 +16,7 @@ scripts/
 ## Script Categories
 
 ### Build Scripts (`scripts/build/`)
+
 Scripts responsible for building and compiling the project:
 
 - **`build.js`** - Main build script that orchestrates the entire build process
@@ -26,6 +27,7 @@ Scripts responsible for building and compiling the project:
 - **`esbuild-banner.js`** - Adds license banners to built files
 
 **Usage:**
+
 ```bash
 npm run build              # Full build
 npm run build:sandbox      # Build with sandbox
@@ -33,18 +35,21 @@ npm run build:packages     # Build individual packages
 ```
 
 ### Deployment Scripts (`scripts/deploy/`)
+
 Scripts for publishing and releasing the project:
 
 - **`publish-sandbox.js`** - Publishes the sandbox container
 - **`prepare-cli-packagejson.js`** - Prepares package.json for CLI distribution
 
 **Usage:**
+
 ```bash
 npm run publish:sandbox    # Publish sandbox container
 npm run publish:release    # Full release process
 ```
 
 ### Development Scripts (`scripts/dev/`)
+
 Scripts for development workflow and debugging:
 
 - **`start.js`** - Starts the development server
@@ -53,6 +58,7 @@ Scripts for development workflow and debugging:
 - **`clean.js`** - Cleans build artifacts
 
 **Usage:**
+
 ```bash
 npm start                  # Start development server
 npm run debug             # Start with debugging enabled
@@ -60,6 +66,7 @@ npm run clean             # Clean build artifacts
 ```
 
 ### Telemetry Scripts (`scripts/telemetry/`)
+
 Scripts for monitoring and telemetry:
 
 - **`telemetry.js`** - Main telemetry orchestrator
@@ -68,12 +75,14 @@ Scripts for monitoring and telemetry:
 - **`telemetry_utils.js`** - Telemetry utilities
 
 **Usage:**
+
 ```bash
 npm run telemetry         # Run telemetry collection
 npm run start:gcp         # Start with GCP telemetry
 ```
 
 ### Utility Scripts (`scripts/utils/`)
+
 General utility and helper scripts:
 
 - **`generate-git-commit-info.js`** - Generates git commit information
@@ -85,6 +94,7 @@ General utility and helper scripts:
 - **`create_alias.sh`** - Creates shell aliases
 
 **Usage:**
+
 ```bash
 npm run generate          # Generate git commit info
 npm run prerelease:dev    # Prepare for development release
@@ -116,4 +126,4 @@ This organization was migrated from a flat structure where all scripts were in t
 - **Easier navigation**: Developers can quickly find relevant scripts
 - **Clearer dependencies**: Related scripts are co-located
 - **Improved maintainability**: Easier to understand and modify scripts
-- **Scalability**: Easy to add new script categories as needed 
+- **Scalability**: Easy to add new script categories as needed

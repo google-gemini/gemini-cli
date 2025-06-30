@@ -101,7 +101,7 @@ export function EnhancedFilePicker({
                 {suggestion.isInContext ? (
                   <Text color={Colors.AccentGreen}>✓ [Added]</Text>
                 ) : (
-                  <Text color={Colors.Gray}>  [Available]</Text>
+                  <Text color={Colors.Gray}> [Available]</Text>
                 )}
               </Box>
 
@@ -113,7 +113,8 @@ export function EnhancedFilePicker({
               {/* File size and token info */}
               <Box width={20} flexShrink={0}>
                 <Text color={Colors.Gray}>
-                  {formatFileSize(suggestion.size)} ({formatTokenCount(suggestion.estimatedTokens)} tokens)
+                  {formatFileSize(suggestion.size)} (
+                  {formatTokenCount(suggestion.estimatedTokens)} tokens)
                 </Text>
               </Box>
             </Box>
@@ -126,7 +127,9 @@ export function EnhancedFilePicker({
       {/* Context status */}
       <Box marginTop={1} borderStyle="single" paddingX={1}>
         <Text color={Colors.AccentBlue}>
-          Context: {actions.getContextStatus().files} files, {formatTokenCount(actions.getContextStatus().tokens)} tokens ({actions.getContextStatus().percentage}% of limit)
+          Context: {actions.getContextStatus().files} files,{' '}
+          {formatTokenCount(actions.getContextStatus().tokens)} tokens (
+          {actions.getContextStatus().percentage}% of limit)
         </Text>
       </Box>
 
@@ -137,4 +140,4 @@ export function EnhancedFilePicker({
       )}
     </Box>
   );
-} 
+}

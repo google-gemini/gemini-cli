@@ -493,7 +493,11 @@ export class CoreToolScheduler {
         );
       }
     }
-    this.attemptExecutionOfScheduledCalls(signal, this.history, this.clientHistory);
+    this.attemptExecutionOfScheduledCalls(
+      signal,
+      this.history,
+      this.clientHistory,
+    );
     this.checkAndNotifyCompletion();
   }
 
@@ -557,7 +561,11 @@ export class CoreToolScheduler {
     } else {
       this.setStatusInternal(callId, 'scheduled');
     }
-    this.attemptExecutionOfScheduledCalls(signal, this.history, this.clientHistory);
+    this.attemptExecutionOfScheduledCalls(
+      signal,
+      this.history,
+      this.clientHistory,
+    );
   }
 
   private attemptExecutionOfScheduledCalls(

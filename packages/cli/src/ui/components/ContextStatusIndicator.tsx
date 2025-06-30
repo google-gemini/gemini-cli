@@ -44,7 +44,17 @@ export function ContextStatusIndicator({
       const command = parts[0];
       const args = parts.slice(1);
 
-      if (['list', 'show', 'status', 'remove', 'clear', 'clear-all', 'help'].includes(command)) {
+      if (
+        [
+          'list',
+          'show',
+          'status',
+          'remove',
+          'clear',
+          'clear-all',
+          'help',
+        ].includes(command)
+      ) {
         setContextCommand(command);
         setContextArgs(args);
         setShowContextManager(true);
@@ -61,14 +71,12 @@ export function ContextStatusIndicator({
   if (showContextManager) {
     return (
       <Box flexDirection="column">
-        <ContextManagementCommands 
-          command={contextCommand} 
-          args={contextArgs} 
+        <ContextManagementCommands
+          command={contextCommand}
+          args={contextArgs}
         />
         <Box marginTop={1}>
-          <Text color={Colors.Gray}>
-            Press any key to continue...
-          </Text>
+          <Text color={Colors.Gray}>Press any key to continue...</Text>
         </Box>
       </Box>
     );
@@ -89,13 +97,11 @@ export function ContextStatusIndicator({
     <Box flexDirection="row" alignItems="center">
       <Text color={Colors.AccentBlue}>📁</Text>
       <Text color={getStatusColor()}>
-        {' '}Context: {state.totalFiles} files, {formatTokenCount(status.tokens)} tokens ({status.percentage}%)
+        {' '}
+        Context: {state.totalFiles} files, {formatTokenCount(status.tokens)}{' '}
+        tokens ({status.percentage}%)
       </Text>
-      {isFocused && (
-        <Text color={Colors.Gray}>
-          {' '}(Press Enter to manage)
-        </Text>
-      )}
+      {isFocused && <Text color={Colors.Gray}> (Press Enter to manage)</Text>}
     </Box>
   );
-} 
+}

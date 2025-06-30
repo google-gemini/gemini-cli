@@ -198,14 +198,22 @@ export function useCompletion(
     }
 
     const partialPath = query.substring(atIndex + 1);
-    
+
     // Check if this is a context management command
-    const contextCommands = ['list', 'show', 'status', 'remove', 'clear', 'clear-all', 'help'];
+    const contextCommands = [
+      'list',
+      'show',
+      'status',
+      'remove',
+      'clear',
+      'clear-all',
+      'help',
+    ];
     const isExactContextCommand = contextCommands.includes(partialPath);
-    const isContextCommandWithArgs = contextCommands.some(cmd => 
-      partialPath.startsWith(cmd + ' ')
+    const isContextCommandWithArgs = contextCommands.some((cmd) =>
+      partialPath.startsWith(cmd + ' '),
     );
-    
+
     // Don't show file suggestions for context commands
     if (isExactContextCommand || isContextCommandWithArgs) {
       resetCompletionState();

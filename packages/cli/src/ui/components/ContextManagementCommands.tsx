@@ -56,16 +56,14 @@ export function ContextManagementCommands({
         return renderClearResult();
       default:
         return (
-          <Text color={Colors.AccentRed}>
-            Unknown command: @{command}
-          </Text>
+          <Text color={Colors.AccentRed}>Unknown command: @{command}</Text>
         );
     }
   };
 
   const renderContextList = () => {
     const files = Array.from(state.files.values());
-    
+
     if (files.length === 0) {
       return (
         <Box flexDirection="column">
@@ -77,7 +75,8 @@ export function ContextManagementCommands({
     return (
       <Box flexDirection="column">
         <Text color={Colors.AccentBlue} bold>
-          📋 Current Context ({files.length} files, {formatTokenCount(state.totalTokens)} tokens):
+          📋 Current Context ({files.length} files,{' '}
+          {formatTokenCount(state.totalTokens)} tokens):
         </Text>
         {files.map((fileInfo, index) => (
           <Box key={fileInfo.filepath} marginLeft={2}>
@@ -85,13 +84,16 @@ export function ContextManagementCommands({
               {index + 1}. {fileInfo.filepath}
             </Text>
             <Text color={Colors.Gray}>
-              {' '}({formatFileSize(fileInfo.size)}, ~{formatTokenCount(fileInfo.estimatedTokens)} tokens)
+              {' '}
+              ({formatFileSize(fileInfo.size)}, ~
+              {formatTokenCount(fileInfo.estimatedTokens)} tokens)
             </Text>
           </Box>
         ))}
         <Box marginTop={1}>
           <Text color={Colors.AccentBlue}>
-            Total: {actions.getContextStatus().percentage}% of context window used
+            Total: {actions.getContextStatus().percentage}% of context window
+            used
           </Text>
         </Box>
       </Box>
@@ -100,21 +102,20 @@ export function ContextManagementCommands({
 
   const renderContextStatus = () => {
     const status = actions.getContextStatus();
-    
+
     return (
       <Box flexDirection="column">
         <Text color={Colors.AccentBlue} bold>
           📊 Context Status:
         </Text>
         <Box marginLeft={2} flexDirection="column">
-          <Text color={Colors.Gray}>
-            Files: {status.files}/∞
-          </Text>
+          <Text color={Colors.Gray}>Files: {status.files}/∞</Text>
           <Text color={Colors.Gray}>
             Tokens: {formatTokenCount(status.tokens)}/1M ({status.percentage}%)
           </Text>
           <Text color={Colors.Gray}>
-            Remaining: {formatTokenCount(1_048_576 - status.tokens)} tokens available
+            Remaining: {formatTokenCount(1_048_576 - status.tokens)} tokens
+            available
           </Text>
         </Box>
       </Box>
@@ -126,7 +127,8 @@ export function ContextManagementCommands({
     if (!filename) {
       return (
         <Text color={Colors.AccentRed}>
-          Error: Please specify a filename to remove (e.g., @remove filename.txt)
+          Error: Please specify a filename to remove (e.g., @remove
+          filename.txt)
         </Text>
       );
     }
@@ -150,9 +152,7 @@ export function ContextManagementCommands({
   const renderClearResult = () => {
     actions.clearContext();
     return (
-      <Text color={Colors.AccentGreen}>
-        ✓ Cleared all files from context
-      </Text>
+      <Text color={Colors.AccentGreen}>✓ Cleared all files from context</Text>
     );
   };
 
@@ -161,4 +161,4 @@ export function ContextManagementCommands({
       {renderCommandResult()}
     </Box>
   );
-} 
+}

@@ -12,7 +12,9 @@ export interface PrivacySettings {
   setUsageStatisticsEnabled: (enabled: boolean, scope: SettingScope) => void;
 }
 
-export const usePrivacySettings = (settings: LoadedSettings): PrivacySettings => {
+export const usePrivacySettings = (
+  settings: LoadedSettings,
+): PrivacySettings => {
   const setUsageStatisticsEnabled = useCallback(
     (enabled: boolean, scope: SettingScope) => {
       // @ts-expect-error - setValue method has restrictive typing but supports boolean values
@@ -25,4 +27,4 @@ export const usePrivacySettings = (settings: LoadedSettings): PrivacySettings =>
     usageStatisticsEnabled: settings.merged.usageStatisticsEnabled ?? true,
     setUsageStatisticsEnabled,
   };
-}; 
+};

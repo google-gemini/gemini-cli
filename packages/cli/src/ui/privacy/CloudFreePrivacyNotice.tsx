@@ -22,8 +22,11 @@ export const CloudFreePrivacyNotice = ({
   onExit,
   settings,
 }: CloudFreePrivacyNoticeProps) => {
-  const { usageStatisticsEnabled, setUsageStatisticsEnabled } = usePrivacySettings(settings);
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(SettingScope.User);
+  const { usageStatisticsEnabled, setUsageStatisticsEnabled } =
+    usePrivacySettings(settings);
+  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+    SettingScope.User,
+  );
   const [showOptOut, setShowOptOut] = useState(false);
 
   useInput((input, key) => {
@@ -35,7 +38,9 @@ export const CloudFreePrivacyNotice = ({
       setUsageStatisticsEnabled(usageStatisticsEnabled, selectedScope);
       onExit();
     } else if (showOptOut && (input === '1' || input === '2')) {
-      setSelectedScope(input === '1' ? SettingScope.User : SettingScope.Workspace);
+      setSelectedScope(
+        input === '1' ? SettingScope.User : SettingScope.Workspace,
+      );
     } else if (showOptOut && input === ' ') {
       setUsageStatisticsEnabled(!usageStatisticsEnabled, selectedScope);
     }
@@ -55,23 +60,23 @@ export const CloudFreePrivacyNotice = ({
         </Text>
         <Newline />
         <Text>
-          When you use Gemini Code Assist for individuals with Gemini CLI, Google
-          collects your prompts, related code, generated output, code edits,
-          related feature usage information, and your feedback to provide,
-          improve, and develop Google products and services and machine learning
-          technologies.
+          When you use Gemini Code Assist for individuals with Gemini CLI,
+          Google collects your prompts, related code, generated output, code
+          edits, related feature usage information, and your feedback to
+          provide, improve, and develop Google products and services and machine
+          learning technologies.
         </Text>
         <Newline />
         <Text>
           To help with quality and improve our products (such as generative
           machine-learning models), human reviewers may read, annotate, and
-          process the data collected above. We take steps to protect your privacy
-          as part of this process. This includes disconnecting the data from your
-          Google Account before reviewers see or annotate it, and storing those
-          disconnected copies for up to 18 months. Please don&apos;t submit
-          confidential information or any data you wouldn&apos;t want a reviewer
-          to see or Google to use to improve our products, services and
-          machine-learning technologies.
+          process the data collected above. We take steps to protect your
+          privacy as part of this process. This includes disconnecting the data
+          from your Google Account before reviewers see or annotate it, and
+          storing those disconnected copies for up to 18 months. Please
+          don&apos;t submit confidential information or any data you
+          wouldn&apos;t want a reviewer to see or Google to use to improve our
+          products, services and machine-learning technologies.
         </Text>
         <Newline />
         <Text>
@@ -79,7 +84,9 @@ export const CloudFreePrivacyNotice = ({
           https://policies.google.com/privacy
         </Text>
         <Newline />
-        <Text color={Colors.Gray}>Press Enter to configure data collection settings.</Text>
+        <Text color={Colors.Gray}>
+          Press Enter to configure data collection settings.
+        </Text>
       </Box>
     );
   }
@@ -91,28 +98,38 @@ export const CloudFreePrivacyNotice = ({
       </Text>
       <Newline />
       <Text>
-        You can control whether Gemini CLI collects usage statistics to help improve the tool.
+        You can control whether Gemini CLI collects usage statistics to help
+        improve the tool.
       </Text>
       <Newline />
       <Text>
         <Text bold>Current setting:</Text> Usage statistics collection is{' '}
-        <Text color={usageStatisticsEnabled ? Colors.AccentGreen : Colors.AccentRed}>
+        <Text
+          color={usageStatisticsEnabled ? Colors.AccentGreen : Colors.AccentRed}
+        >
           {usageStatisticsEnabled ? 'ENABLED' : 'DISABLED'}
         </Text>
       </Text>
       <Newline />
       <Text>
-        <Text bold>Scope:</Text> {selectedScope === SettingScope.User ? 'User (global)' : 'Workspace (project-specific)'}
+        <Text bold>Scope:</Text>{' '}
+        {selectedScope === SettingScope.User
+          ? 'User (global)'
+          : 'Workspace (project-specific)'}
       </Text>
       <Newline />
       <Text>
-        Press <Text color={Colors.AccentYellow}>1</Text> for User settings (global) or{' '}
-        <Text color={Colors.AccentYellow}>2</Text> for Workspace settings (project-specific)
+        Press <Text color={Colors.AccentYellow}>1</Text> for User settings
+        (global) or <Text color={Colors.AccentYellow}>2</Text> for Workspace
+        settings (project-specific)
       </Text>
       <Newline />
       <Text>
-        Press <Text color={Colors.AccentYellow}>Space</Text> to toggle data collection{' '}
-        <Text color={Colors.AccentYellow}>(currently {usageStatisticsEnabled ? 'ON' : 'OFF'})</Text>
+        Press <Text color={Colors.AccentYellow}>Space</Text> to toggle data
+        collection{' '}
+        <Text color={Colors.AccentYellow}>
+          (currently {usageStatisticsEnabled ? 'ON' : 'OFF'})
+        </Text>
       </Text>
       <Newline />
       <Text color={Colors.Gray}>Press Enter to save and continue.</Text>

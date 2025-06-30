@@ -134,20 +134,24 @@ The `!` prefix lets you interact with your system's shell directly from within G
 ## Basic Commands
 
 ### `@help`
+
 Displays comprehensive help information for context management commands in a beautifully formatted ASCII art box.
 
 **Usage:**
+
 ```bash
 @help
 ```
 
 **What it shows:**
+
 - File inclusion commands (`@filename`, `@directory/`)
 - Context management commands (`@list`, `@status`, `@remove`, `@clear`)
 - Helpful tips for using the context system
 - Token usage information and best practices
 
 **Example output:**
+
 ```
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Context Management Commands:                                                                              │
@@ -174,35 +178,43 @@ Displays comprehensive help information for context management commands in a bea
 ### Context Management Commands
 
 #### `@list` or `@show`
+
 Shows all files currently in your conversation context with their sizes and estimated token counts.
 
 **Usage:**
+
 ```bash
 @list
 @show
 ```
 
 #### `@status`
+
 Displays current context usage statistics including file count, token usage, and percentage of context window used.
 
 **Usage:**
+
 ```bash
 @status
 ```
 
 #### `@remove <filename>`
+
 Removes a specific file from your conversation context.
 
 **Usage:**
+
 ```bash
 @remove package.json
 @remove src/main.ts
 ```
 
 #### `@clear` or `@clear-all`
+
 Removes all files from your conversation context.
 
 **Usage:**
+
 ```bash
 @clear
 @clear-all
@@ -211,9 +223,11 @@ Removes all files from your conversation context.
 ## File Inclusion
 
 ### `@filename`
+
 Include a specific file in your conversation context.
 
 **Usage:**
+
 ```bash
 @package.json
 @src/main.ts
@@ -221,9 +235,11 @@ Include a specific file in your conversation context.
 ```
 
 ### `@directory/`
+
 Include all files in a directory in your conversation context.
 
 **Usage:**
+
 ```bash
 @src/
 @docs/

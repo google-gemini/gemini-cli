@@ -55,9 +55,11 @@ import { useFileContext } from '../contexts/FileContextContext.js';
 /**
  * Extract file paths from a processed query containing file content
  */
-function _extractFilePathsFromProcessedQuery(processedQuery: PartListUnion): string[] {
+function _extractFilePathsFromProcessedQuery(
+  processedQuery: PartListUnion,
+): string[] {
   const filePaths: string[] = [];
-  
+
   if (Array.isArray(processedQuery)) {
     for (const part of processedQuery) {
       if (typeof part === 'string') {
@@ -67,18 +69,18 @@ function _extractFilePathsFromProcessedQuery(processedQuery: PartListUnion): str
         while ((match = fileContentRegex.exec(part)) !== null) {
           filePaths.push(match[1]);
         }
-        
+
         // Also look for "Successfully read: filename1, filename2" patterns
         const successRegex = /Successfully read: (.+)/;
         const successMatch = successRegex.exec(part);
         if (successMatch) {
-          const files = successMatch[1].split(',').map(f => f.trim());
+          const files = successMatch[1].split(',').map((f) => f.trim());
           filePaths.push(...files);
         }
       }
     }
   }
-  
+
   // Remove duplicates
   return [...new Set(filePaths)];
 }
@@ -88,28 +90,35 @@ function _extractFilePathsFromProcessedQuery(processedQuery: PartListUnion): str
  */
 function _extractFilePathsFromQuery(query: string): string[] {
   const filePaths: string[] = [];
-  const contextCommands = ['list', 'show', 'status', 'remove', 'clear', 'clear-all'];
-  
+  const contextCommands = [
+    'list',
+    'show',
+    'status',
+    'remove',
+    'clear',
+    'clear-all',
+  ];
+
   // Updated regex to handle consecutive @ commands without spaces
   // This pattern matches @ followed by non-whitespace characters, but stops at the next @
   const regex = /@([^\s@\\]+(?:\\\s[^\s@\\]+)*)/g;
   let match;
-  
+
   while ((match = regex.exec(query)) !== null) {
     const commandContent = match[1].replace(/\\\s/g, ' '); // Unescape spaces
-    
+
     // Check if this is a context command
     const isExactContextCommand = contextCommands.includes(commandContent);
-    const isContextCommandWithArgs = contextCommands.some(cmd => 
-      commandContent.startsWith(cmd + ' ')
+    const isContextCommandWithArgs = contextCommands.some((cmd) =>
+      commandContent.startsWith(cmd + ' '),
     );
-    
+
     // Only add to file paths if it's not a context command
     if (!isExactContextCommand && !isContextCommandWithArgs) {
       filePaths.push(commandContent);
     }
   }
-  
+
   return filePaths;
 }
 
@@ -193,9 +202,9 @@ export const useGeminiStream = (
       config,
       setPendingHistoryItem,
       getPreferredEditor,
-      history.map(item => ({ 
-        role: item.type === MessageType.USER ? 'user' : 'model', 
-        parts: [{ text: item.text || '' }] 
+      history.map((item) => ({
+        role: item.type === MessageType.USER ? 'user' : 'model',
+        parts: [{ text: item.text || '' }],
       })) as Content[],
       undefined,
     );
@@ -220,57 +229,65 @@ export const useGeminiStream = (
   }, [geminiClient, onDebugMessage]);
 
   // Method to remove specific files from Gemini's context
-  const removeFilesFromGeminiContext = useCallback(async (filesToRemove: string[]) => {
-    try {
-      // Get current history
-      const currentHistory = await geminiClient.getHistory();
-      
-      // Filter out history entries that contain the specified files
-      const filteredHistory = currentHistory.filter(content => {
-        if (content.role === 'user' && content.parts) {
-          const contentText = content.parts
-            .map(part => part.text || '')
-            .join(' ');
-          
-          // Check if this content contains any of the files to remove
-          return !filesToRemove.some(file => 
-            contentText.includes(`@${file}`) || contentText.includes(file)
-          );
+  const removeFilesFromGeminiContext = useCallback(
+    async (filesToRemove: string[]) => {
+      try {
+        // Get current history
+        const currentHistory = await geminiClient.getHistory();
+
+        // Filter out history entries that contain the specified files
+        const filteredHistory = currentHistory.filter((content) => {
+          if (content.role === 'user' && content.parts) {
+            const contentText = content.parts
+              .map((part) => part.text || '')
+              .join(' ');
+
+            // Check if this content contains any of the files to remove
+            return !filesToRemove.some(
+              (file) =>
+                contentText.includes(`@${file}`) || contentText.includes(file),
+            );
+          }
+          return true;
+        });
+
+        // Set the filtered history back to Gemini
+        await geminiClient.setHistory(filteredHistory);
+
+        // Update our tracking
+        for (const file of filesToRemove) {
+          geminiContextFilesRef.current.delete(file);
         }
+
+        onDebugMessage(
+          `✓ Removed ${filesToRemove.length} files from Gemini context`,
+        );
         return true;
-      });
-      
-      // Set the filtered history back to Gemini
-      await geminiClient.setHistory(filteredHistory);
-      
-      // Update our tracking
-      for (const file of filesToRemove) {
-        geminiContextFilesRef.current.delete(file);
+      } catch (error) {
+        onDebugMessage(`Error removing files from Gemini context: ${error}`);
+        return false;
       }
-      
-      onDebugMessage(`✓ Removed ${filesToRemove.length} files from Gemini context`);
-      return true;
-    } catch (error) {
-      onDebugMessage(`Error removing files from Gemini context: ${error}`);
-      return false;
-    }
-  }, [geminiClient, onDebugMessage]);
+    },
+    [geminiClient, onDebugMessage],
+  );
 
   // Method to sync our tracking with Gemini's actual context
   const _syncContextWithGemini = useCallback(async () => {
     try {
       const geminiHistory = await geminiClient.getHistory();
       const filesInGeminiContext = new Set<string>();
-      
+
       // Extract files from Gemini's history
       for (const content of geminiHistory) {
         if (content.role === 'user' && content.parts) {
           const contentText = content.parts
-            .map(part => part.text || '')
+            .map((part) => part.text || '')
             .join(' ');
-          
+
           // Extract @file references
-          const fileMatches = contentText.match(/@([^\s\\]+(?:\\\s[^\s\\]+)*)/g);
+          const fileMatches = contentText.match(
+            /@([^\s\\]+(?:\\\s[^\s\\]+)*)/g,
+          );
           if (fileMatches) {
             for (const match of fileMatches) {
               const filePath = match.substring(1).replace(/\\\s/g, ' ');
@@ -279,9 +296,11 @@ export const useGeminiStream = (
           }
         }
       }
-      
+
       geminiContextFilesRef.current = filesInGeminiContext;
-      onDebugMessage(`Synced context: ${filesInGeminiContext.size} files in Gemini context`);
+      onDebugMessage(
+        `Synced context: ${filesInGeminiContext.size} files in Gemini context`,
+      );
     } catch (error) {
       onDebugMessage(`Error syncing context with Gemini: ${error}`);
     }
@@ -331,13 +350,15 @@ export const useGeminiStream = (
       }
       turnCancelledRef.current = true;
       abortControllerRef.current?.abort();
-      
+
       // Clear pending files on user cancellation
       if (pendingFilesRef.current.size > 0) {
-        onDebugMessage(`Clearing ${pendingFilesRef.current.size} pending files due to user cancellation`);
+        onDebugMessage(
+          `Clearing ${pendingFilesRef.current.size} pending files due to user cancellation`,
+        );
         pendingFilesRef.current.clear();
       }
-      
+
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, Date.now());
       }
@@ -419,7 +440,10 @@ export const useGeminiStream = (
           });
 
           // Handle context management commands
-          if (atCommandResult.isContextCommand && atCommandResult.contextCommand) {
+          if (
+            atCommandResult.isContextCommand &&
+            atCommandResult.contextCommand
+          ) {
             const command = atCommandResult.contextCommand;
             const args = atCommandResult.contextArgs || [];
 
@@ -460,7 +484,7 @@ export const useGeminiStream = (
                 // Get files from both local tracking and Gemini's actual context
                 const localFiles = actions.getGeminiContextFiles();
                 const geminiFiles = Array.from(geminiContextFilesRef.current);
-                
+
                 if (localFiles.length === 0 && geminiFiles.length === 0) {
                   addItem(
                     { type: MessageType.INFO, text: 'No files in context.' },
@@ -469,11 +493,11 @@ export const useGeminiStream = (
                 } else {
                   let message = '';
                   if (localFiles.length > 0) {
-                    message += `Files in local tracking:\n${localFiles.map(f => `- ${f}`).join('\n')}`;
+                    message += `Files in local tracking:\n${localFiles.map((f) => `- ${f}`).join('\n')}`;
                   }
                   if (geminiFiles.length > 0) {
                     if (message) message += '\n\n';
-                    message += `Files in Gemini context:\n${geminiFiles.map(f => `- ${f}`).join('\n')}`;
+                    message += `Files in Gemini context:\n${geminiFiles.map((f) => `- ${f}`).join('\n')}`;
                   }
                   addItem(
                     { type: MessageType.INFO, text: message },
@@ -488,9 +512,9 @@ export const useGeminiStream = (
                 const localFilesCount = actions.getGeminiContextFiles().length;
                 const geminiFilesCount = geminiContextFilesRef.current.size;
                 addItem(
-                  { 
-                    type: MessageType.INFO, 
-                    text: `Context Status: ${localFilesCount} files tracked locally, ${geminiFilesCount} files in Gemini context, ${status.tokens} tokens (${status.percentage}% of limit)` 
+                  {
+                    type: MessageType.INFO,
+                    text: `Context Status: ${localFilesCount} files tracked locally, ${geminiFilesCount} files in Gemini context, ${status.tokens} tokens (${status.percentage}% of limit)`,
                   },
                   userMessageTimestamp,
                 );
@@ -498,10 +522,16 @@ export const useGeminiStream = (
               }
 
               case 'remove': {
-                onDebugMessage(`[DEBUG] @remove command args: ${JSON.stringify(args)}`);
-                onDebugMessage(`[DEBUG] Current state files count: ${state.files.size}`);
-                onDebugMessage(`[DEBUG] Current state files: ${Array.from(state.files.keys()).join(', ')}`);
-                
+                onDebugMessage(
+                  `[DEBUG] @remove command args: ${JSON.stringify(args)}`,
+                );
+                onDebugMessage(
+                  `[DEBUG] Current state files count: ${state.files.size}`,
+                );
+                onDebugMessage(
+                  `[DEBUG] Current state files: ${Array.from(state.files.keys()).join(', ')}`,
+                );
+
                 if (args.length === 0) {
                   // Show suggestions of available files - use state directly
                   const fileEntries = Array.from(state.files.entries());
@@ -512,26 +542,36 @@ export const useGeminiStream = (
                     .filter(([_, fileInfo]) => !fileInfo.processedByGemini)
                     .map(([filePath, _]) => filePath);
                   const allFiles = [...availableFiles, ...pendingFiles];
-                  
-                  onDebugMessage(`[DEBUG] Available files: ${JSON.stringify(availableFiles)}`);
-                  onDebugMessage(`[DEBUG] Pending files: ${JSON.stringify(pendingFiles)}`);
-                  onDebugMessage(`[DEBUG] All files: ${JSON.stringify(allFiles)}`);
-                  
+
+                  onDebugMessage(
+                    `[DEBUG] Available files: ${JSON.stringify(availableFiles)}`,
+                  );
+                  onDebugMessage(
+                    `[DEBUG] Pending files: ${JSON.stringify(pendingFiles)}`,
+                  );
+                  onDebugMessage(
+                    `[DEBUG] All files: ${JSON.stringify(allFiles)}`,
+                  );
+
                   if (allFiles.length === 0) {
                     addItem(
-                      { type: MessageType.INFO, text: 'No files in context to remove.' },
+                      {
+                        type: MessageType.INFO,
+                        text: 'No files in context to remove.',
+                      },
                       userMessageTimestamp,
                     );
                   } else {
                     let message = 'Available files for removal:\n';
                     if (availableFiles.length > 0) {
-                      message += `\nProcessed files:\n${availableFiles.map(f => `  - ${f}`).join('\n')}`;
+                      message += `\nProcessed files:\n${availableFiles.map((f) => `  - ${f}`).join('\n')}`;
                     }
                     if (pendingFiles.length > 0) {
-                      message += `\n\nPending files:\n${pendingFiles.map(f => `  - ${f}`).join('\n')}`;
+                      message += `\n\nPending files:\n${pendingFiles.map((f) => `  - ${f}`).join('\n')}`;
                     }
-                    message += '\n\nUsage: @remove <filename> (e.g., @remove package.json)';
-                    
+                    message +=
+                      '\n\nUsage: @remove <filename> (e.g., @remove package.json)';
+
                     addItem(
                       { type: MessageType.INFO, text: message },
                       userMessageTimestamp,
@@ -540,27 +580,38 @@ export const useGeminiStream = (
                 } else {
                   const filename = args[0];
                   onDebugMessage(`[DEBUG] Attempting to remove: ${filename}`);
-                  
+
                   const wasRemoved = actions.removeFile(filename);
-                  
+
                   // Also remove from Gemini's actual context
-                  const removedFromGemini = await removeFilesFromGeminiContext([filename]);
-                  
+                  const removedFromGemini = await removeFilesFromGeminiContext([
+                    filename,
+                  ]);
+
                   if (wasRemoved) {
                     addItem(
-                      { type: MessageType.INFO, text: `✓ Removed '${filename}' from context tracking` },
+                      {
+                        type: MessageType.INFO,
+                        text: `✓ Removed '${filename}' from context tracking`,
+                      },
                       userMessageTimestamp,
                     );
                   } else {
                     addItem(
-                      { type: MessageType.INFO, text: `File '${filename}' was not in context tracking` },
+                      {
+                        type: MessageType.INFO,
+                        text: `File '${filename}' was not in context tracking`,
+                      },
                       userMessageTimestamp,
                     );
                   }
-                  
+
                   if (removedFromGemini) {
                     addItem(
-                      { type: MessageType.INFO, text: `✓ Removed '${filename}' from Gemini's context` },
+                      {
+                        type: MessageType.INFO,
+                        text: `✓ Removed '${filename}' from Gemini's context`,
+                      },
                       userMessageTimestamp,
                     );
                   }
@@ -572,28 +623,34 @@ export const useGeminiStream = (
               case 'clear-all': {
                 const filesToRemove = Array.from(state.files.keys());
                 actions.clearContext();
-                
+
                 // Actually clear Gemini's chat history
                 const clearedGemini = await clearGeminiContext();
-                
+
                 if (filesToRemove.length > 0) {
                   addItem(
-                    { 
-                      type: MessageType.INFO, 
-                      text: `✓ Cleared ${filesToRemove.length} files from context tracking` 
+                    {
+                      type: MessageType.INFO,
+                      text: `✓ Cleared ${filesToRemove.length} files from context tracking`,
                     },
                     userMessageTimestamp,
                   );
                 } else {
                   addItem(
-                    { type: MessageType.INFO, text: '✓ Cleared all files from context tracking' },
+                    {
+                      type: MessageType.INFO,
+                      text: '✓ Cleared all files from context tracking',
+                    },
                     userMessageTimestamp,
                   );
                 }
-                
+
                 if (clearedGemini) {
                   addItem(
-                    { type: MessageType.INFO, text: '✓ Cleared Gemini chat history' },
+                    {
+                      type: MessageType.INFO,
+                      text: '✓ Cleared Gemini chat history',
+                    },
                     userMessageTimestamp,
                   );
                 }
@@ -602,7 +659,10 @@ export const useGeminiStream = (
 
               default:
                 addItem(
-                  { type: MessageType.ERROR, text: `Unknown context command: ${command}` },
+                  {
+                    type: MessageType.ERROR,
+                    text: `Unknown context command: ${command}`,
+                  },
                   userMessageTimestamp,
                 );
                 return { queryToSend: null, shouldProceed: false };
@@ -613,8 +673,10 @@ export const useGeminiStream = (
           if (atCommandResult.shouldProceed && atCommandResult.processedQuery) {
             // Use the resolved file paths from the enhanced at command processor
             const resolvedFilePaths = atCommandResult.resolvedFilePaths || [];
-            onDebugMessage(`[DEBUG] Resolved file paths from at command processor: ${JSON.stringify(resolvedFilePaths)}`);
-            
+            onDebugMessage(
+              `[DEBUG] Resolved file paths from at command processor: ${JSON.stringify(resolvedFilePaths)}`,
+            );
+
             for (const filePath of resolvedFilePaths) {
               pendingFilesRef.current.add(filePath);
               onDebugMessage(`Pending ${filePath} for Gemini processing`);
@@ -898,15 +960,21 @@ export const useGeminiStream = (
         // Finalize pending files after successful Gemini processing
         if (pendingFilesRef.current.size > 0) {
           const pendingFiles = Array.from(pendingFilesRef.current);
-          onDebugMessage(`[DEBUG] Marking as processed: ${JSON.stringify(pendingFiles)}`);
+          onDebugMessage(
+            `[DEBUG] Marking as processed: ${JSON.stringify(pendingFiles)}`,
+          );
           for (const filePath of pendingFiles) {
             try {
               const result = await actions.addFile(filePath);
               if (result.success) {
-                onDebugMessage(`✓ Added ${filePath} to context (${result.info?.estimatedTokens} tokens)`);
+                onDebugMessage(
+                  `✓ Added ${filePath} to context (${result.info?.estimatedTokens} tokens)`,
+                );
                 actions.markFileAsProcessedByGemini(filePath);
               } else {
-                onDebugMessage(`Failed to add ${filePath} to context: ${result.error}`);
+                onDebugMessage(
+                  `Failed to add ${filePath} to context: ${result.error}`,
+                );
               }
             } catch (error) {
               onDebugMessage(`Error adding ${filePath} to context: ${error}`);
@@ -917,7 +985,9 @@ export const useGeminiStream = (
       } catch (error: unknown) {
         // Clear pending files on error/cancellation
         if (pendingFilesRef.current.size > 0) {
-          onDebugMessage(`Clearing ${pendingFilesRef.current.size} pending files due to error/cancellation`);
+          onDebugMessage(
+            `Clearing ${pendingFilesRef.current.size} pending files due to error/cancellation`,
+          );
           pendingFilesRef.current.clear();
         }
         if (error instanceof UnauthorizedError) {

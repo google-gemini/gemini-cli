@@ -99,10 +99,21 @@ function parseEnhancedAtCommands(query: string): AtCommandPart[] {
       } else if (/\s/.test(char)) {
         // For context commands with arguments, continue parsing after whitespace
         const commandContent = query.substring(atIndex + 1, commandEndIndex);
-        const contextCommands = ['list', 'show', 'status', 'remove', 'clear', 'clear-all', 'help'];
+        const contextCommands = [
+          'list',
+          'show',
+          'status',
+          'remove',
+          'clear',
+          'clear-all',
+          'help',
+        ];
         const isContextCommand = contextCommands.includes(commandContent);
-        
-        if (isContextCommand && (commandContent === 'remove' || commandContent === 'clear')) {
+
+        if (
+          isContextCommand &&
+          (commandContent === 'remove' || commandContent === 'clear')
+        ) {
           // For commands that expect arguments, continue parsing
           commandEndIndex++;
           continue;
@@ -119,23 +130,31 @@ function parseEnhancedAtCommands(query: string): AtCommandPart[] {
 
     // Check if this is a context management command
     // First, check for exact matches (like @list, @status, etc.)
-    const contextCommands = ['list', 'show', 'status', 'remove', 'clear', 'clear-all', 'help'];
+    const contextCommands = [
+      'list',
+      'show',
+      'status',
+      'remove',
+      'clear',
+      'clear-all',
+      'help',
+    ];
     const isExactContextCommand = contextCommands.includes(commandContent);
-    
+
     // Then check for commands with arguments (like @remove filename)
-    const isContextCommandWithArgs = contextCommands.some(cmd => 
-      commandContent.startsWith(cmd + ' ')
+    const isContextCommandWithArgs = contextCommands.some((cmd) =>
+      commandContent.startsWith(cmd + ' '),
     );
 
     if (isExactContextCommand || isContextCommandWithArgs) {
       const commandParts = commandContent.split(' ');
       const command = commandParts[0];
       const args = commandParts.slice(1);
-      parts.push({ 
-        type: 'contextCommand', 
+      parts.push({
+        type: 'contextCommand',
         content: rawAtCommand,
         command,
-        args
+        args,
       });
     } else {
       // Regular file path
@@ -176,7 +195,7 @@ export async function handleEnhancedAtCommand({
   if (contextCommandParts.length > 0) {
     const contextCommand = contextCommandParts[0];
     addItem({ type: 'user', text: query }, userMessageTimestamp);
-    
+
     return {
       processedQuery: null,
       shouldProceed: false,
@@ -189,10 +208,10 @@ export async function handleEnhancedAtCommand({
   // Handle regular file inclusion (existing logic)
   if (atPathCommandParts.length === 0) {
     addItem({ type: 'user', text: query }, userMessageTimestamp);
-    return { 
-      processedQuery: [{ text: query }], 
+    return {
+      processedQuery: [{ text: query }],
       shouldProceed: true,
-      isContextCommand: false
+      isContextCommand: false,
     };
   }
 
@@ -216,10 +235,10 @@ export async function handleEnhancedAtCommand({
       { type: 'error', text: 'Error: read_many_files tool not found.' },
       userMessageTimestamp,
     );
-    return { 
-      processedQuery: null, 
+    return {
+      processedQuery: null,
       shouldProceed: false,
-      isContextCommand: false
+      isContextCommand: false,
     };
   }
 
@@ -243,10 +262,10 @@ export async function handleEnhancedAtCommand({
         },
         userMessageTimestamp,
       );
-      return { 
-        processedQuery: null, 
+      return {
+        processedQuery: null,
         shouldProceed: false,
-        isContextCommand: false
+        isContextCommand: false,
       };
     }
 
@@ -357,24 +376,24 @@ export async function handleEnhancedAtCommand({
       .filter((part) => part.type === 'text')
       .map((part) => part.content)
       .join('');
-    
+
     if (initialQueryText === '@' && query.trim() === '@') {
-      return { 
-        processedQuery: [{ text: query }], 
+      return {
+        processedQuery: [{ text: query }],
         shouldProceed: true,
-        isContextCommand: false
+        isContextCommand: false,
       };
     } else if (!initialQueryText && query) {
-      return { 
-        processedQuery: [{ text: query }], 
+      return {
+        processedQuery: [{ text: query }],
         shouldProceed: true,
-        isContextCommand: false
+        isContextCommand: false,
       };
     }
     return {
       processedQuery: [{ text: initialQueryText || query }],
       shouldProceed: true,
-      isContextCommand: false
+      isContextCommand: false,
     };
   }
 
@@ -440,11 +459,11 @@ export async function handleEnhancedAtCommand({
       >,
       userMessageTimestamp,
     );
-    return { 
-      processedQuery: processedQueryParts, 
+    return {
+      processedQuery: processedQueryParts,
       shouldProceed: true,
       isContextCommand: false,
-      resolvedFilePaths: contentLabelsForDisplay
+      resolvedFilePaths: contentLabelsForDisplay,
     };
   } catch (error) {
     toolCallDisplay = {
@@ -462,10 +481,10 @@ export async function handleEnhancedAtCommand({
       >,
       userMessageTimestamp,
     );
-    return { 
-      processedQuery: null, 
+    return {
+      processedQuery: null,
       shouldProceed: false,
-      isContextCommand: false
+      isContextCommand: false,
     };
   }
-} 
+}

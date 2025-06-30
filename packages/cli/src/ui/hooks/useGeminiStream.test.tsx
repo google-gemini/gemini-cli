@@ -512,20 +512,21 @@ describe('useGeminiStream', () => {
       return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
     });
 
-    renderHook(() =>
-      useGeminiStream(
-        new MockedGeminiClientClass(mockConfig),
-        [],
-        mockAddItem,
-        mockSetShowHelp,
-        mockConfig,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false,
-        () => 'vscode' as EditorType,
-        () => {},
-        () => Promise.resolve(),
-      ),
+    renderHook(
+      () =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+        ),
       {
         wrapper: ({ children }) => (
           <FileContextProvider config={mockConfig}>
@@ -583,20 +584,21 @@ describe('useGeminiStream', () => {
       return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
     });
 
-    renderHook(() =>
-      useGeminiStream(
-        client,
-        [],
-        mockAddItem,
-        mockSetShowHelp,
-        mockConfig,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false,
-        () => 'vscode' as EditorType,
-        () => {},
-        () => Promise.resolve(),
-      ),
+    renderHook(
+      () =>
+        useGeminiStream(
+          client,
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+        ),
       {
         wrapper: ({ children }) => (
           <FileContextProvider config={mockConfig}>
@@ -921,20 +923,21 @@ describe('useGeminiStream', () => {
         return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
       });
 
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockSetShowHelp,
-          mockConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-        ),
+      const { result } = renderHook(
+        () =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockSetShowHelp,
+            mockConfig,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+          ),
         {
           wrapper: ({ children }) => (
             <FileContextProvider config={mockConfig}>
@@ -1003,20 +1006,21 @@ describe('useGeminiStream', () => {
         return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted];
       });
 
-      renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockSetShowHelp,
-          mockConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          mockPerformMemoryRefresh,
-        ),
+      renderHook(
+        () =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockSetShowHelp,
+            mockConfig,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            mockPerformMemoryRefresh,
+          ),
         {
           wrapper: ({ children }) => (
             <FileContextProvider config={mockConfig}>
@@ -1059,20 +1063,21 @@ describe('useGeminiStream', () => {
         })),
       } as unknown as Config;
 
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(testConfig),
-          [],
-          mockAddItem,
-          mockSetShowHelp,
-          testConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-        ),
+      const { result } = renderHook(
+        () =>
+          useGeminiStream(
+            new MockedGeminiClientClass(testConfig),
+            [],
+            mockAddItem,
+            mockSetShowHelp,
+            testConfig,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+          ),
         {
           wrapper: ({ children }) => (
             <FileContextProvider config={testConfig}>

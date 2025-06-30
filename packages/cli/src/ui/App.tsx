@@ -86,7 +86,7 @@ interface AppProps {
 export const AppWrapper = (props: AppProps) => (
   <SessionStatsProvider>
     <FileContextProvider config={props.config}>
-    <App {...props} />
+      <App {...props} />
     </FileContextProvider>
   </SessionStatsProvider>
 );
@@ -734,12 +734,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     </Text>
                   ) : (
                     <>
-                    <ContextSummaryDisplay
-                      geminiMdFileCount={geminiMdFileCount}
-                      contextFileNames={contextFileNames}
-                      mcpServers={config.getMcpServers()}
-                      showToolDescriptions={showToolDescriptions}
-                    />
+                      <ContextSummaryDisplay
+                        geminiMdFileCount={geminiMdFileCount}
+                        contextFileNames={contextFileNames}
+                        mcpServers={config.getMcpServers()}
+                        showToolDescriptions={showToolDescriptions}
+                      />
                       <ContextStatusIndicator />
                     </>
                   )}
