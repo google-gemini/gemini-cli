@@ -145,10 +145,19 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         timestamp: Date.now()
       };
 
+      // Determine which files will be committed
+      const hasStagedChanges = stagedDiff?.trim() !== '';
+      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', hasStagedChanges);
+      
+      let filesDisplay = '';
+      if (filesToCommit.length > 0) {
+        filesDisplay = `\n\nFiles to be committed:\n${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+      }
+
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
         title: 'Confirm Git Commit',
-        command: `Commit with message:\n\n${finalCommitMessage}`,
+        command: `Commit with message:\n\n${finalCommitMessage}${filesDisplay}`,
         rootCommand: 'git-commit',
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -320,6 +329,36 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       .filter(line => line.startsWith('??'))
       .map(line => line.substring(3).trim())
       .filter(file => !file.includes('node_modules/') && !file.includes('.git/'));
+  }
+
+  private parseFilesToBeCommitted(statusOutput: string, hasStagedChanges: boolean): string[] {
+    const lines = statusOutput.split('\n').filter(line => line.trim());
+    const files: string[] = [];
+
+    for (const line of lines) {
+      if (line.length < 3) continue;
+      
+      const status = line.substring(0, 2);
+      const filename = line.substring(3).trim();
+      
+      // Skip files in node_modules and .git
+      if (filename.includes('node_modules/') || filename.includes('.git/')) continue;
+      
+      // If we have staged changes, only show staged files
+      if (hasStagedChanges) {
+        // First character represents staged status
+        if (status[0] !== ' ' && status[0] !== '?') {
+          files.push(filename);
+        }
+      } else {
+        // If no staged changes, show all modified and untracked files
+        if (status[0] !== ' ' || status[1] !== ' ') {
+          files.push(filename);
+        }
+      }
+    }
+
+    return files;
   }
 
   private async generateCommitMessage(
