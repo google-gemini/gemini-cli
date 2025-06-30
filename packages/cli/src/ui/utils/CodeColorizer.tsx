@@ -144,9 +144,6 @@ export function colorizeCode(
           const contentToRender = renderedNode !== null ? renderedNode : line;
           return (
             <Box key={index}>
-              <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
-              </Text>
               <Text color={activeTheme.defaultColor} wrap="wrap">
                 {contentToRender}
               </Text>
