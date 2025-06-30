@@ -123,6 +123,9 @@ export async function main() {
     }
   }
 
+  // Load custom themes from settings
+  themeManager.loadCustomThemes(settings.merged.customThemes);
+
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
