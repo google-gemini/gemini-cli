@@ -118,8 +118,8 @@ export async function main() {
   if (config.getCheckpointingEnabled()) {
     try {
       await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
+    } catch (error) {
+      console.error('Failed to initialize the Git service for checkpointing. This feature will be disabled for the current session. Reason:', error instanceof Error ? (config.getDebugMode() ? error.stack : error.message) : error);
     }
   }
 
