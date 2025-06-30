@@ -33,6 +33,10 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import {
+  fetchLatestRelease,
+  formatChangelog,
+} from '../../utils/changelogUtils.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -223,6 +227,36 @@ export const useSlashCommandProcessor = (
             });
             await open(docsUrl);
           }
+        },
+      },
+      {
+        name: 'changelog',
+        altName: 'release-notes',
+        description: 'display the latest release notes and changelog',
+        action: async (_mainCommand, _subCommand, _args) => {
+          addMessage({
+            type: MessageType.INFO,
+            content: 'Fetching latest release information...',
+            timestamp: new Date(),
+          });
+
+          const release = await fetchLatestRelease();
+          if (!release) {
+            addMessage({
+              type: MessageType.ERROR,
+              content:
+                'Failed to fetch release information. Please check your internet connection or try again later.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          const formattedChangelog = formatChangelog(release);
+          addMessage({
+            type: MessageType.INFO,
+            content: formattedChangelog,
+            timestamp: new Date(),
+          });
         },
       },
       {
