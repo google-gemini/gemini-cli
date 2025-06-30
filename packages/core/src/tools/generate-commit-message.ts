@@ -235,7 +235,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         // Handle pre-commit hook modifications
         if (commitError instanceof Error && commitError.message.includes('pre-commit')) {
           console.debug('[GenerateCommitMessage] Pre-commit hook modified files, retrying...');
-          await this.executeGitCommand(['add', '.'], signal);
+          await this.executeGitCommand(['add', '-u'], signal);
           await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
           
           return {

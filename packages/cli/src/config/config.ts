@@ -29,6 +29,9 @@ import { Settings } from './settings.js';
 import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
+import * as dotenv from 'dotenv';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -491,4 +494,23 @@ function mergeExcludeTools(
     }
   }
   return [...allExcludeTools];
+}
+
+function findEnvFile(startDir: string): string | null {
+  let currentDir = startDir;
+  while (currentDir !== dirname(currentDir)) {
+    const envPath = join(currentDir, '.env');
+    if (existsSync(envPath)) {
+      return envPath;
+    }
+    currentDir = dirname(currentDir);
+  }
+  return null;
+}
+
+export function loadEnvironment(): void {
+  const envFilePath = findEnvFile(process.cwd());
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath });
+  }
 }
