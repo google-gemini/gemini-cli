@@ -823,11 +823,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             showMemoryUsage={
               config.getDebugMode() || config.getShowMemoryUsage()
             }
-            promptTokenCount={sessionStats.currentResponse.promptTokenCount}
-            candidatesTokenCount={
-              sessionStats.currentResponse.candidatesTokenCount
-            }
-            totalTokenCount={sessionStats.currentResponse.totalTokenCount}
+            promptTokenCount={sessionStats.lastPromptTokenCount}
           />
         </Box>
       </Box>
