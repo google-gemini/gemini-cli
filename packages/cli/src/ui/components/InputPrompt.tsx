@@ -178,26 +178,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const [row, col] = buffer.cursor;
-          
+
           // Calculate offset from row/col
           let offset = 0;
           for (let i = 0; i < row; i++) {
             offset += buffer.lines[i].length + 1; // +1 for newline
           }
           offset += col;
-          
+
           // Add spaces around the path if needed
           let textToInsert = insertText;
           const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter = offset < currentText.length ? currentText[offset] : '';
-          
+          const charAfter =
+            offset < currentText.length ? currentText[offset] : '';
+
           if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
             textToInsert = ' ' + textToInsert;
           }
           if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
             textToInsert = textToInsert + ' ';
           }
-          
+
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
         }
@@ -453,31 +454,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               if (visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
-                  if (relativeVisualColForHighlight >= 0) {
-                    if (relativeVisualColForHighlight < cpLen(display)) {
-                      const charToHighlight =
-                        cpSlice(
-                          display,
-                          relativeVisualColForHighlight,
-                          relativeVisualColForHighlight + 1,
-                        ) || ' ';
-                      const highlighted = chalk.inverse(charToHighlight);
-                      display =
-                        cpSlice(display, 0, relativeVisualColForHighlight) +
-                        highlighted +
-                        cpSlice(display, relativeVisualColForHighlight + 1);
-                    } else if (
-                      relativeVisualColForHighlight === cpLen(display) &&
-                      cpLen(display) === inputWidth
-                    ) {
-                      display = display + chalk.inverse(' ');
-                    }
+                if (relativeVisualColForHighlight >= 0) {
+                  if (relativeVisualColForHighlight < cpLen(display)) {
+                    const charToHighlight =
+                      cpSlice(
+                        display,
+                        relativeVisualColForHighlight,
+                        relativeVisualColForHighlight + 1,
+                      ) || ' ';
+                    const highlighted = chalk.inverse(charToHighlight);
+                    display =
+                      cpSlice(display, 0, relativeVisualColForHighlight) +
+                      highlighted +
+                      cpSlice(display, relativeVisualColForHighlight + 1);
+                  } else if (
+                    relativeVisualColForHighlight === cpLen(display) &&
+                    cpLen(display) === inputWidth
+                  ) {
+                    display = display + chalk.inverse(' ');
                   }
                 }
-                return (
-                  <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-                );
-              })
+              }
+              return (
+                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+              );
+            })
           )}
         </Box>
       </Box>

@@ -23,7 +23,7 @@ export async function clipboardHasImage(): Promise<boolean> {
   try {
     // Use osascript to check clipboard type
     const { stdout } = await execAsync(
-      `osascript -e 'clipboard info' 2>/dev/null | grep -q "«class PNGf»\\|TIFF\\|JPEG" && echo "true" || echo "false"`,
+      `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
       { shell: '/bin/bash' },
     );
     return stdout.trim() === 'true';
@@ -53,41 +53,60 @@ export async function saveClipboardImage(
 
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
-    const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
 
-    // Use a simpler, more reliable AppleScript approach
-    const script = `
-      try
-        set imageData to the clipboard as «class PNGf»
-        set fileRef to open for access POSIX file "${tempFilePath}" with write permission
-        write imageData to fileRef
-        close access fileRef
-        return "success"
-      on error errMsg
+    // Try different image formats in order of preference
+    const formats = [
+      { class: 'PNGf', extension: 'png' },
+      { class: 'JPEG', extension: 'jpg' },
+      { class: 'TIFF', extension: 'tiff' },
+      { class: 'GIFf', extension: 'gif' },
+    ];
+
+    for (const format of formats) {
+      const tempFilePath = path.join(
+        tempDir,
+        `clipboard-${timestamp}.${format.extension}`,
+      );
+
+      // Try to save clipboard as this format
+      const script = `
         try
-          close access POSIX file "${tempFilePath}"
+          set imageData to the clipboard as «class ${format.class}»
+          set fileRef to open for access POSIX file "${tempFilePath}" with write permission
+          write imageData to fileRef
+          close access fileRef
+          return "success"
+        on error errMsg
+          try
+            close access POSIX file "${tempFilePath}"
+          end try
+          return "error"
         end try
-        return "error"
-      end try
-    `;
+      `;
 
-    const { stdout } = await execAsync(`osascript -e '${script}'`);
+      const { stdout } = await execAsync(`osascript -e '${script}'`);
 
-    if (stdout.trim() === 'success') {
-      // Verify the file was created and has content
-      const stats = await fs.stat(tempFilePath);
-      if (stats.size > 0) {
-        return tempFilePath;
+      if (stdout.trim() === 'success') {
+        // Verify the file was created and has content
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // File doesn't exist, continue to next format
+        }
+      }
+
+      // Clean up failed attempt
+      try {
+        await fs.unlink(tempFilePath);
+      } catch {
+        // Ignore cleanup errors
       }
     }
 
-    // Clean up on failure
-    try {
-      await fs.unlink(tempFilePath);
-    } catch {
-      // Ignore cleanup errors
-    }
-
+    // No format worked
     return null;
   } catch (error) {
     console.error('Error saving clipboard image:', error);
@@ -110,7 +129,13 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
-      if (file.startsWith('clipboard-') && file.endsWith('.png')) {
+      if (
+        file.startsWith('clipboard-') &&
+        (file.endsWith('.png') ||
+          file.endsWith('.jpg') ||
+          file.endsWith('.tiff') ||
+          file.endsWith('.gif'))
+      ) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
         if (stats.mtimeMs < oneHourAgo) {
@@ -122,4 +147,3 @@ export async function cleanupOldClipboardImages(
     // Ignore errors in cleanup
   }
 }
-
