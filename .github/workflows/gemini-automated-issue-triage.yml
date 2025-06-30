@@ -1,4 +1,4 @@
-name: Gemini Issue Triage
+name: Gemini Automated Issue Triage
 
 on:
   issues:
@@ -28,6 +28,9 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Run Gemini Issue Triage
         uses: google-gemini/gemini-cli-action@1efc0bac9e0b2da6c6cab95df513324d8dfc2a79
         env:
@@ -47,6 +50,7 @@ jobs:
               "coreTools": [
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
+                "run_shell_command(gh issue list)"
               ],
             }
           prompt: |
