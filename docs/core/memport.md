@@ -26,6 +26,18 @@ More content here.
 @./shared/configuration.md
 ```
 
+### Code spans and code blocks
+
+Imports inside of code spans `like this: @./example.md` are ignored.
+
+Imports inside of both indented and fenced code blocks are ignored:
+
+    Imports in indented code blocks like this: @./example.md are ignored.
+
+```markdown
+Imports in fenced code blocks like this: @./example.md are ignored.
+```
+
 ## Supported Path Formats
 
 ### Relative Paths

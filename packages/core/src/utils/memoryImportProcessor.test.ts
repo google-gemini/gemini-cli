@@ -165,6 +165,83 @@ describe('memoryImportProcessor', () => {
       );
     });
 
+    it('should not process imports within indented code blocks', async () => {
+      const content =
+        '\n' +
+        '    Some code with @./test.md in it\n' +
+        '\n' +
+        'Some text with @./real.md';
+      const basePath = '/test/path';
+      const importedContent = 'Real imported content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result).not.toContain('<!-- Imported from: ./test.md -->');
+      expect(result).toContain('<!-- Imported from: ./real.md -->');
+      expect(result).toContain(importedContent);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, './real.md'),
+        'utf-8',
+      );
+      expect(mockedFs.readFile).not.toHaveBeenCalledWith(
+        path.resolve(basePath, './test.md'),
+        'utf-8',
+      );
+    });
+
+    it('should not process imports within fenced code blocks', async () => {
+      const content =
+        '```\n' +
+        'Some code with @./test.md in it\n' +
+        '```\n' +
+        'Some text with @./real.md';
+      const basePath = '/test/path';
+      const importedContent = 'Real imported content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result).not.toContain('<!-- Imported from: ./test.md -->');
+      expect(result).toContain('<!-- Imported from: ./real.md -->');
+      expect(result).toContain(importedContent);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, './real.md'),
+        'utf-8',
+      );
+      expect(mockedFs.readFile).not.toHaveBeenCalledWith(
+        path.resolve(basePath, './test.md'),
+        'utf-8',
+      );
+    });
+
+    it('should not process imports within inline code spans', async () => {
+      const content = 'Some text `with @./test.md` and @./real.md';
+      const basePath = '/test/path';
+      const importedContent = 'Real imported content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result).not.toContain('<!-- Imported from: ./test.md -->');
+      expect(result).toContain('<!-- Imported from: ./real.md -->');
+      expect(result).toContain(importedContent);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, './real.md'),
+        'utf-8',
+      );
+      expect(mockedFs.readFile).not.toHaveBeenCalledWith(
+        path.resolve(basePath, './test.md'),
+        'utf-8',
+      );
+    });
+
     it('should handle multiple imports in same content', async () => {
       const content = 'Start @./first.md middle @./second.md end';
       const basePath = '/test/path';
