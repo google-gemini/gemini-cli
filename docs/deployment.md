@@ -45,6 +45,12 @@ For security and isolation, Gemini CLI can be run inside a container. This is th
   ```bash
   gemini --sandbox "your prompt here"
   ```
+  
+  You can also combine flags:
+  ```bash
+  # Use a specific model and disable automatic model switching
+  gemini --model gemini-1.5-pro-latest --force-model
+  ```
 
 ---
 
