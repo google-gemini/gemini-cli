@@ -35,14 +35,15 @@ export const useAuthCommand = (
 
   useEffect(() => {
     const authFlow = async () => {
-      if (isAuthDialogOpen || !settings.merged.selectedAuthType) {
-        return;
+      if (isAuthDialogOpen) {
+        return; // Only check if the auth dialog is open.
       }
 
       try {
-        setIsAuthenticating(true);
+        setIsAuthenticating(true); // Remove unnecessary cast since selectedAuthType is not nullable now.
         await performAuthFlow(
-          settings.merged.selectedAuthType as AuthType,
+          // Use selectedAuthType directly.
+          settings.merged.selectedAuthType,
           config,
         );
       } catch (e) {
