@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const VERSION = 'v10.2.0';
-const BIN_DIR = path.resolve(__dirname, 'dist', 'bin');
+const BIN_DIR = path.resolve(__dirname, '..', 'bundle');
 
 function getPlatformInfo() {
   const platform = os.platform();

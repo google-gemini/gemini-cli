@@ -10,6 +10,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1"
   },
   "scripts": {
+    "postinstall": "node scripts/postinstall.js",
     "generate": "node scripts/generate-git-commit-info.js",
     "build": "node scripts/build.js",
     "build:sandbox": "node scripts/build_sandbox.js",
