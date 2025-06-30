@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
-    "clean": "rm -rf dist",
+    "clean": "npx rimraf dist",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
