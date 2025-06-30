@@ -244,3 +244,13 @@ export enum ToolConfirmationOutcome {
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
 }
+
+export interface GetActiveApplicationInfoParams {
+  // No parameters needed for this tool
+}
+
+export interface GetActiveApplicationInfoResult extends ToolResult {
+  pid: number;
+  title: string;
+  executablePath: string;
+}

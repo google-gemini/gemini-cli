@@ -49,8 +49,17 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
 - **[Web Search Tool](./web-search.md) (`web_search`):** For searching the web.
 - **[Multi-File Read Tool](./multi-file.md) (`read_many_files`):** A specialized tool for reading content from multiple files or directories, often used by the `@` command.
 - **[Memory Tool](./memory.md) (`save_memory`):** For saving and recalling information across sessions.
+- **[Platform-Specific Tools](#platform-specific-tools):** Tools that are designed to work on a particular operating system.
 
 Additionally, these tools incorporate:
 
 - **[MCP servers](./mcp-server.md)**: MCP servers act as a bridge between the Gemini model and your local environment or other services like APIs.
 - **[Sandboxing](../sandbox.md)**: Sandboxing isolates the model and its changes from your environment to reduce potential risk.
+
+---
+
+### Platform-Specific Tools
+
+Some tools are designed to work only on specific operating systems due to their reliance on platform-dependent APIs or functionalities.
+
+*   **[`getActiveApplicationInfo`](./get-active-application-info.md):** (Windows-specific) Retrieves information about the currently active application window.
