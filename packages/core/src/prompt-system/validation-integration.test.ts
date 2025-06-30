@@ -191,7 +191,7 @@ describe('Validation Integration Tests', () => {
         `,
         dependencies: [],
         tokenCount: 250,
-        category: 'policy' as const,
+        category: 'policies' as const,
       };
 
       const result = validator.validateModule(mockSecurityModule);

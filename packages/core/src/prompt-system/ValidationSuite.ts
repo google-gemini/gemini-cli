@@ -443,11 +443,11 @@ export class ValidationSuite {
     try {
       return await this.moduleLoader.loadAllModules();
     } catch (error) {
-      // Return empty array if modules can't be loaded (test environment)
-      console.warn(
-        'Could not load actual modules, using mock data for validation',
+      // Fail loudly if modules cannot be loaded - this indicates a critical issue
+      throw new Error(
+        `Failed to load modules for validation: ${error instanceof Error ? error.message : String(error)}. ` +
+        `This prevents proper validation and must be resolved before proceeding.`,
       );
-      return [];
     }
   }
 
@@ -486,7 +486,7 @@ export class ValidationSuite {
 
     // Check for security policy preservation
     const securityModule = modules.find(
-      (m) => m.id === 'security' || m.category === 'policy',
+      (m) => m.id === 'security' || m.category === 'policies',
     );
     const securityPolicyPreserved =
       !!securityModule &&

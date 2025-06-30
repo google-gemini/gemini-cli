@@ -18,8 +18,8 @@ export interface PromptModule {
   dependencies: string[];
   /** Estimated token count for this module */
   tokenCount: number;
-  /** Category of the module (core, policy, playbook, context, example) */
-  category: 'core' | 'policy' | 'playbook' | 'context' | 'example';
+  /** Category of the module (core, policies, playbook, context, example) */
+  category: 'core' | 'policies' | 'playbook' | 'context' | 'example';
   /** Optional priority for module ordering */
   priority?: number;
 }

@@ -52,7 +52,7 @@ describe('PromptAssembler', () => {
         content: '# Security Policies\n\nPrioritize user safety.',
         dependencies: [],
         tokenCount: 200,
-        category: 'policy',
+        category: 'policies',
         priority: 1,
       },
     ];

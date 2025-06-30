@@ -48,7 +48,7 @@ describe('ModuleValidator', () => {
           '# Security Policies\n\n- Prioritize user safety\n- Apply security best practices\n- Explain critical commands before execution',
         dependencies: [],
         tokenCount: 250,
-        category: 'policy',
+        category: 'policies',
         priority: 1,
       },
       {
@@ -117,7 +117,7 @@ describe('ModuleValidator', () => {
         'Module tokenCount must be a non-negative number',
       );
       expect(result.errors).toContain(
-        'Module category must be one of: core, policy, playbook, context, example',
+        'Module category must be one of: core, policies, playbook, context, example',
       );
     });
 

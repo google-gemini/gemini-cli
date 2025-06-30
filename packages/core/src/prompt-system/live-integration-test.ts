@@ -38,26 +38,26 @@ export class LiveIntegrationTest {
    * Test the complete end-to-end prompt generation workflow
    */
   async testEndToEndWorkflow(): Promise<boolean> {
-    const testResults: Array<{ name: string; passed: boolean; details?: any }> = [];
+    const testResults: Array<{ name: string; passed: boolean; details?: unknown }> = [];
 
     // Test 1: Basic prompt assembly
     try {
       const basicContext: TaskContext = {
         taskType: 'general',
-        environment: {},
         hasGitRepo: false,
-        sandboxMode: 'none',
-        userMemory: 'Test user memory content',
+        sandboxMode: false,
+        hasUserMemory: true,
+        contextFlags: {},
+        environmentContext: {},
       };
 
       const basicResult = await this.assembler.assemblePrompt(basicContext);
       testResults.push({
         name: 'Basic prompt assembly',
-        passed: basicResult.success && basicResult.content.length > 0,
+        passed: basicResult.prompt.length > 0,
         details: { 
-          tokenCount: basicResult.metadata.tokenCount,
-          moduleCount: basicResult.metadata.modulesLoaded?.length,
-          success: basicResult.success 
+          tokenCount: basicResult.totalTokens,
+          moduleCount: basicResult.includedModules.length,
         },
       });
     } catch (error) {
@@ -72,19 +72,23 @@ export class LiveIntegrationTest {
     try {
       const debugContext: TaskContext = {
         taskType: 'debug',
-        environment: { NODE_ENV: 'development' },
         hasGitRepo: true,
-        sandboxMode: 'sandbox-exec',
-        userMemory: '',
+        sandboxMode: true,
+        sandboxType: 'sandbox-exec',
+        hasUserMemory: false,
+        contextFlags: {
+          requiresDebuggingGuidance: true,
+        },
+        environmentContext: { NODE_ENV: 'development' },
       };
 
       const debugResult = await this.assembler.assemblePrompt(debugContext);
       testResults.push({
         name: 'Debug context assembly',
-        passed: debugResult.success && debugResult.metadata.modulesLoaded?.includes('debugging'),
+        passed: debugResult.includedModules.some(m => m.id.includes('debugging')),
         details: { 
-          modulesLoaded: debugResult.metadata.modulesLoaded,
-          hasDebugging: debugResult.metadata.modulesLoaded?.includes('debugging'),
+          modulesLoaded: debugResult.includedModules.map(m => m.id),
+          hasDebugging: debugResult.includedModules.some(m => m.id.includes('debugging')),
         },
       });
     } catch (error) {
@@ -99,14 +103,15 @@ export class LiveIntegrationTest {
     try {
       const minimalContext: TaskContext = {
         taskType: 'general',
-        environment: {},
         hasGitRepo: false,
-        sandboxMode: 'none',
-        userMemory: '',
+        sandboxMode: false,
+        hasUserMemory: false,
+        contextFlags: {},
+        environmentContext: {},
       };
 
       const result = await this.assembler.assemblePrompt(minimalContext);
-      const tokenCount = result.metadata.tokenCount || 0;
+      const tokenCount = result.totalTokens;
       const targetReduction = tokenCount <= 1500; // PLAN.md target
 
       testResults.push({

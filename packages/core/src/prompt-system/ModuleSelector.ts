@@ -238,7 +238,7 @@ export class ModuleSelectorImpl implements ModuleSelector {
     // Define category priority order
     const categoryPriority: Record<PromptModule['category'], number> = {
       core: 1,
-      policy: 2,
+      policies: 2,
       playbook: 3,
       context: 4,
       example: 5,

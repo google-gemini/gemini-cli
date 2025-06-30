@@ -49,7 +49,7 @@ describe('Token Reduction Verification', () => {
         '# Security Policies\n\n- Prioritize user safety\n- Apply security best practices',
       dependencies: [],
       tokenCount: 200,
-      category: 'policy',
+      category: 'policies',
       priority: 1,
     },
     {
@@ -68,7 +68,7 @@ describe('Token Reduction Verification', () => {
         '# Tool Usage Guidelines\n\n- Use absolute paths\n- Execute in parallel when possible',
       dependencies: [],
       tokenCount: 150,
-      category: 'policy',
+      category: 'policies',
     },
   ];
 

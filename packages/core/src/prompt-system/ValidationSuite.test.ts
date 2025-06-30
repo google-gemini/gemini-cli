@@ -50,7 +50,7 @@ describe('ValidationSuite', () => {
           '# Security Policies\n\n- Prioritize user safety\n- Apply security best practices',
         dependencies: [],
         tokenCount: 250,
-        category: 'policy',
+        category: 'policies',
         priority: 1,
       },
     ];

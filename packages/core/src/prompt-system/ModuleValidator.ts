@@ -174,12 +174,12 @@ export class ModuleValidator {
 
     if (
       !module.category ||
-      !['core', 'policy', 'playbook', 'context', 'example'].includes(
+      !['core', 'policies', 'playbook', 'context', 'example'].includes(
         module.category,
       )
     ) {
       errors.push(
-        'Module category must be one of: core, policy, playbook, context, example',
+        'Module category must be one of: core, policies, playbook, context, example',
       );
     }
 

@@ -44,7 +44,7 @@ describe('ModuleSelector', () => {
         content: '# Security',
         dependencies: [],
         tokenCount: 200,
-        category: 'policy',
+        category: 'policies',
         priority: 1,
       },
       {
@@ -85,7 +85,7 @@ describe('ModuleSelector', () => {
         content: '# Tool Usage',
         dependencies: [],
         tokenCount: 150,
-        category: 'policy',
+        category: 'policies',
       },
     ];
 
@@ -333,7 +333,7 @@ describe('ModuleSelector', () => {
         moduleCount: 4,
         categoryBreakdown: {
           core: 2,
-          policy: 1,
+          policies: 1,
           playbook: 1,
         },
       });
@@ -367,7 +367,7 @@ describe('ModuleSelector', () => {
 
       // Core modules should come first
       const coreIndex = selected.findIndex((m) => m.category === 'core');
-      const policyIndex = selected.findIndex((m) => m.category === 'policy');
+      const policyIndex = selected.findIndex((m) => m.category === 'policies');
       const playbookIndex = selected.findIndex(
         (m) => m.category === 'playbook',
       );

@@ -66,7 +66,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 - Data Protection: Never expose sensitive information in logs or outputs`,
     dependencies: [],
     tokenCount: 200,
-    category: 'policy',
+    category: 'policies',
     priority: 1,
   },
 ];
