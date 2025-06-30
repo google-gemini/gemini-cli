@@ -72,6 +72,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { PendingMessagesDisplay } from './components/PendingMessagesDisplay.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -132,6 +133,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [pendingMessages, setPendingMessages] = useState<string[]>([]);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -429,12 +431,26 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
+      if (trimmedValue.length === 0) {
+        return;
+      }
+
+      if (streamingState !== StreamingState.Idle) {
+        setPendingMessages((prev) => [...prev, trimmedValue]);
+      } else {
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, streamingState],
   );
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle && pendingMessages.length > 0) {
+      const combinedMessage = pendingMessages.join('\n');
+      setPendingMessages([]);
+      submitQuery(combinedMessage);
+    }
+  }, [streamingState, pendingMessages, submitQuery]);
 
   const logger = useLogger();
   const [userMessages, setUserMessages] = useState<string[]>([]);
@@ -475,7 +491,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputActive =
+    streamingState !== StreamingState.WaitingForConfirmation && !initError;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -762,19 +779,24 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 </OverflowProvider>
               )}
 
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                />
+              {isInputActive ? (
+                <>
+                  <PendingMessagesDisplay messages={pendingMessages} />
+                  <InputPrompt
+                    buffer={buffer}
+                    inputWidth={inputWidth}
+                    suggestionsWidth={suggestionsWidth}
+                    onSubmit={handleFinalSubmit}
+                    userMessages={userMessages}
+                    onClearScreen={handleClearScreen}
+                    config={config}
+                    slashCommands={slashCommands}
+                    shellModeActive={shellModeActive}
+                    setShellModeActive={setShellModeActive}
+                  />
+                </>
+              ) : (
+                <PendingMessagesDisplay messages={pendingMessages} />
               )}
             </>
           )}
