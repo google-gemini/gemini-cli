@@ -6,7 +6,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "gemini": "dist/index.js",
+    "gemini-execute-tool": "dist/execute-tool-cli.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",

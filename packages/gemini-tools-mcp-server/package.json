@@ -1,0 +1,22 @@
+{
+  "name": "@google/gemini-tools-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for exposing Gemini CLI's built-in tools.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -42,6 +42,7 @@
     "build:cli": "npm run build --workspace packages/cli",
     "build:core": "npm run build --workspace packages/core",
     "build:packages": "npm run build:core && npm run build:cli",
+    "generate-tool-schemas": "node --loader ts-node/esm --no-warnings scripts/generate-tool-schemas.ts",
     "build:sandbox:fast": "node scripts/build_sandbox.js --skip-npm-install-build",
     "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
     "prepare:packages": "node scripts/prepare-cli-packagejson.js && node scripts/prepare-core-package.js",
