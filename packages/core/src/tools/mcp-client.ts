@@ -7,7 +7,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -169,8 +172,17 @@ async function connectAndDiscover(
 
   let transport;
   if (mcpServerConfig.httpUrl) {
+    const transportOptions: StreamableHTTPClientTransportOptions = {};
+
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+
     transport = new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.httpUrl),
+      transportOptions,
     );
   } else if (mcpServerConfig.url) {
     transport = new SSEClientTransport(new URL(mcpServerConfig.url));
@@ -222,10 +234,11 @@ async function connectAndDiscover(
     const safeConfig = {
       command: mcpServerConfig.command,
       url: mcpServerConfig.url,
+      httpUrl: mcpServerConfig.httpUrl,
       cwd: mcpServerConfig.cwd,
       timeout: mcpServerConfig.timeout,
       trust: mcpServerConfig.trust,
-      // Exclude args and env which may contain sensitive data
+      // Exclude args, env, and headers which may contain sensitive data
     };
 
     let errorString =
