@@ -58,6 +58,9 @@ export async function getOauthClient(): Promise<OAuth2Client> {
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
   });
+  client.on('tokens', async (tokens: Credentials) => {
+    await cacheCredentials(tokens);
+  });
 
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
@@ -130,8 +133,6 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
             redirect_uri: redirectUri,
           });
           client.setCredentials(tokens);
-          await cacheCredentials(client.credentials);
-
           // Retrieve and cache Google Account ID during authentication
           try {
             const googleAccountId = await getGoogleAccountId(client);
