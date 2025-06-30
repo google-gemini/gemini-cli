@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   Content,
-  Models,
   GenerateContentConfig,
   Part,
   GenerateContentResponse,
@@ -15,6 +14,7 @@ import {
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
+import { ContentGenerator } from '../core/contentGenerator.js';
 
 // Mocks
 const mockModelsModule = {
@@ -23,7 +23,8 @@ const mockModelsModule = {
   countTokens: vi.fn(),
   embedContent: vi.fn(),
   batchEmbedContents: vi.fn(),
-} as unknown as Models;
+  resetSession: vi.fn(),
+} as unknown as ContentGenerator;
 
 describe('GeminiChat', () => {
   let chat: GeminiChat;

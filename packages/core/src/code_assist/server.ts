@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'crypto';
 import { AuthClient } from 'google-auth-library';
 import {
   CodeAssistGlobalUserSettingResponse,
@@ -45,18 +46,26 @@ export const CODE_ASSIST_ENDPOINT =
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
+  private sessionId: string;
+
   constructor(
     readonly auth: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
-  ) {}
+  ) {
+    this.sessionId = randomUUID();
+  }
+
+  resetSessionId(): void {
+    this.sessionId = randomUUID();
+  }
 
   async generateContentStream(
     req: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const resps = await this.streamEndpoint<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.sessionId, this.projectId),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -71,7 +80,7 @@ export class CodeAssistServer implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const resp = await this.callEndpoint<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.sessionId, this.projectId),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);

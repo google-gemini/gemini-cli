@@ -232,6 +232,7 @@ export const useSlashCommandProcessor = (
           onDebugMessage('Clearing terminal and resetting chat.');
           clearItems();
           await config?.getGeminiClient()?.resetChat();
+          config?.getGeminiClient()?.resetSessionId();
           console.clear();
           refreshStatic();
         },
@@ -869,6 +870,7 @@ export const useSlashCommandProcessor = (
             const compressed = await config!
               .getGeminiClient()!
               .tryCompressChat(true);
+            config?.getGeminiClient()?.resetSessionId();
             if (compressed) {
               addMessage({
                 type: MessageType.COMPRESSION,

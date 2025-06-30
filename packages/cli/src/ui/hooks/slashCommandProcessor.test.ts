@@ -120,6 +120,7 @@ describe('useSlashCommandProcessor', () => {
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
       tryCompressChat: mockTryCompressChat,
+      resetSession: vi.fn(),
     } as unknown as GeminiClient;
     mockConfig = {
       getDebugMode: vi.fn(() => false),
@@ -459,10 +460,12 @@ describe('useSlashCommandProcessor', () => {
 
     it('/clear should clear items, reset chat, and refresh static', async () => {
       const mockResetChat = vi.fn();
+      const mockResetSession = vi.fn();
       mockConfig = {
         ...mockConfig,
         getGeminiClient: () => ({
           resetChat: mockResetChat,
+          resetSession: mockResetSession,
         }),
       } as unknown as Config;
 
@@ -474,6 +477,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockClearItems).toHaveBeenCalled();
       expect(mockResetChat).toHaveBeenCalled();
+      expect(mockResetSession).toHaveBeenCalled();
       expect(mockRefreshStatic).toHaveBeenCalled();
       expect(commandResult).toBe(true);
     });

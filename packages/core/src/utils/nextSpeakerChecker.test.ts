@@ -5,11 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, Mock, afterEach } from 'vitest';
-import { Content, GoogleGenAI, Models } from '@google/genai';
+import { Content, GoogleGenAI } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import { checkNextSpeaker, NextSpeakerResponse } from './nextSpeakerChecker.js';
 import { GeminiChat } from '../core/geminiChat.js';
+import { ContentGenerator } from '../core/contentGenerator.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -22,7 +23,8 @@ const mockModelsInstance = {
   countTokens: vi.fn(),
   embedContent: vi.fn(),
   batchEmbedContents: vi.fn(),
-} as unknown as Models;
+  resetSession: vi.fn(),
+} as unknown as ContentGenerator;
 
 const mockGoogleGenAIInstance = {
   getGenerativeModel: vi.fn().mockReturnValue(mockModelsInstance),
