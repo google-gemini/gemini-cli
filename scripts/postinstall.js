@@ -97,13 +97,13 @@ async function downloadAndExtract() {
 
 function handleResponse(response, platformInfo) {
   if (platformInfo.isZip) {
-    response.pipe(unzipper.Extract({ path: BIN_DIR })).on('close', () => {
-      const extractedPath = path.join(
-        BIN_DIR,
-        platformInfo.binaryPathInArchive,
-      );
-      const finalPath = path.join(BIN_DIR, platformInfo.finalBinaryName);
-      fs.renameSync(extractedPath, finalPath);
+    response.pipe(unzipper.Parse()).on('entry', (entry) => {
+      if (entry.path === platformInfo.binaryPathInArchive) {
+        const finalPath = path.join(BIN_DIR, platformInfo.finalBinaryName);
+        entry.pipe(fs.createWriteStream(finalPath));
+      } else {
+        entry.autodrain();
+      }
     });
   } else {
     response.pipe(
