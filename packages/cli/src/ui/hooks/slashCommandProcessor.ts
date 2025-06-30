@@ -610,7 +610,7 @@ export const useSlashCommandProcessor = (
           const modelVersion = config?.getModel() || 'Unknown';
           const cliVersion = await getCliVersion();
           const selectedAuthType = settings.merged.selectedAuthType || '';
-          const gcpProject = process.env.GOOGLE_CLOUD_PROJECT || '';
+          const gcpProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT_ID || '';
           addMessage({
             type: MessageType.ABOUT,
             timestamp: new Date(),
