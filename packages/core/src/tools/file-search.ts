@@ -11,6 +11,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
+import { fdPath } from '../utils/fd-path.js';
 
 export enum SearchType {
   FILE = 'f',
@@ -28,8 +29,6 @@ export interface ChangedWithin {
   value: number;
   unit: TimeUnit;
 }
-
-declare const require: NodeJS.Require;
 
 export interface PerformFileSearchOptions {
   pattern: string;
@@ -89,13 +88,6 @@ export async function performFileSearch(
 
     args.push(searchPattern);
 
-    const fdPackagePath = require.resolve('fd-find/package.json');
-    const fdPath = path.resolve(
-      path.dirname(fdPackagePath),
-      '..',
-      '.bin',
-      'fd',
-    );
     const child = spawn(fdPath, args, {
       cwd: searchDirAbsolute,
       signal: abortSignal,

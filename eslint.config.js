@@ -33,6 +33,7 @@ export default tseslint.config(
       'packages/cli/dist/**',
       'packages/core/dist/**',
       'packages/server/dist/**',
+      'packages/core/postinstall.js',
       'eslint-rules/*',
       'bundle/**',
     ],

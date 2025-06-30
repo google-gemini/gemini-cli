@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "postinstall": "node ./postinstall.js"
   },
   "files": [
     "dist"
@@ -33,7 +34,6 @@
     "@types/html-to-text": "^9.0.4",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",
-    "fd-find": "^1.1.0",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
@@ -43,6 +43,8 @@
     "shell-quote": "^1.8.2",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
+    "tar": "^6.2.0",
+    "unzipper": "^0.10.14",
     "undici": "^7.10.0",
     "ws": "^8.18.0"
   },
