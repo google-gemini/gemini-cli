@@ -584,7 +584,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           items={[
             <Box flexDirection="column" key="header">
               <Header terminalWidth={terminalWidth} />
-              <Tips config={config} />
+              {!settings.merged.hideTips && <Tips config={config} />}
               {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,
             ...history.map((h) => (
@@ -823,11 +823,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             showMemoryUsage={
               config.getDebugMode() || config.getShowMemoryUsage()
             }
-            promptTokenCount={sessionStats.currentResponse.promptTokenCount}
-            candidatesTokenCount={
-              sessionStats.currentResponse.candidatesTokenCount
-            }
-            totalTokenCount={sessionStats.currentResponse.totalTokenCount}
+            promptTokenCount={sessionStats.lastPromptTokenCount}
           />
         </Box>
       </Box>
