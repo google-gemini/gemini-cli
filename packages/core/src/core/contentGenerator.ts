@@ -18,6 +18,27 @@ import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
 
 /**
+ * Maps Gemini model names to OpenRouter model IDs
+ */
+function mapGeminiModelToOpenRouter(model: string): string {
+  const modelMap: Record<string, string> = {
+    'gemini-2.5-pro': 'google/gemini-2.5-pro',
+    'gemini-2.5-flash': 'google/gemini-2.5-flash',
+    'gemini-2.5-pro-preview': 'google/gemini-2.5-pro-preview',
+    'gemini-2.5-flash-preview': 'google/gemini-2.5-flash-preview',
+    'gemini-2.0-flash-thinking-exp': 'google/gemini-2.0-flash-thinking-exp',
+    'gemini-2.0-flash-exp': 'google/gemini-2.0-flash-exp',
+    'gemini-pro': 'google/gemini-pro',
+    'gemini-pro-vision': 'google/gemini-pro-vision',
+    'gemini-flash-1.5': 'google/gemini-flash-1.5',
+    'gemini-1.5-pro': 'google/gemini-pro-1.5',
+    'gemini-1.5-flash': 'google/gemini-flash-1.5',
+  };
+
+  return modelMap[model] || `google/${model}`;
+}
+
+/**
  * Interface abstracting the core functionalities for generating content and counting tokens.
  */
 export interface ContentGenerator {
@@ -38,6 +59,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE_PERSONAL = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  USE_OPENROUTER = 'openrouter',
 }
 
 export type ContentGeneratorConfig = {
@@ -45,6 +67,7 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  openRouterBaseUrl?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -56,6 +79,8 @@ export async function createContentGeneratorConfig(
   const googleApiKey = process.env.GOOGLE_API_KEY;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterBaseUrl = process.env.OPENROUTER_BASE_URL;
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
@@ -96,6 +121,18 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (authType === AuthType.USE_OPENROUTER && openRouterApiKey) {
+    contentGeneratorConfig.apiKey = openRouterApiKey;
+    contentGeneratorConfig.openRouterBaseUrl =
+      openRouterBaseUrl || 'https://openrouter.ai/api/v1';
+    // Map Gemini model names to OpenRouter format
+    contentGeneratorConfig.model = mapGeminiModelToOpenRouter(
+      contentGeneratorConfig.model,
+    );
+
+    return contentGeneratorConfig;
+  }
+
   return contentGeneratorConfig;
 }
 
@@ -123,6 +160,13 @@ export async function createContentGenerator(
     });
 
     return googleGenAI.models;
+  }
+
+  if (config.authType === AuthType.USE_OPENROUTER) {
+    const { createOpenRouterContentGenerator } = await import(
+      './openRouterContentGenerator.js'
+    );
+    return createOpenRouterContentGenerator(config, httpOptions);
   }
 
   throw new Error(

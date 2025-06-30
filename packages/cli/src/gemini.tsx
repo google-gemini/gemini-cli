@@ -277,14 +277,15 @@ async function validateNonInterActiveAuth(
   // making a special case for the cli. many headless environments might not have a settings.json set
   // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
   // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
+  if (!selectedAuthType && !process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
     console.error(
-      'Please set an Auth method in your .gemini/settings.json OR specify GEMINI_API_KEY env variable file before running',
+      'Please set an Auth method in your .gemini/settings.json OR specify GEMINI_API_KEY or OPENROUTER_API_KEY env variable file before running',
     );
     process.exit(1);
   }
 
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
+  selectedAuthType = selectedAuthType || 
+    (process.env.OPENROUTER_API_KEY ? AuthType.USE_OPENROUTER : AuthType.USE_GEMINI);
   const err = validateAuthMethod(selectedAuthType);
   if (err != null) {
     console.error(err);

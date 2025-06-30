@@ -35,5 +35,12 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.USE_OPENROUTER) {
+    if (!process.env.OPENROUTER_API_KEY) {
+      return 'OPENROUTER_API_KEY environment variable not found. Add that to your .env and try again, no reload needed!';
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 };
