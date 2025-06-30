@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { AboutBox } from './AboutBox';
+import { AboutBox } from './AboutBox.js';
 
 // Mock git commit info
 vi.mock('../../generated/git-commit.js', () => ({
@@ -158,7 +158,7 @@ describe('AboutBox Component', () => {
     const output = lastFrame();
 
     // Should have content and proper structure
-    expect(output.length).toBeGreaterThan(0);
+    expect(output?.length).toBeGreaterThan(0);
     expect(output).toContain('About Gemini CLI');
   });
 

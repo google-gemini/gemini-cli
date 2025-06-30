@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { AuthInProgress } from './AuthInProgress';
+import { AuthInProgress } from './AuthInProgress.js';
 
 describe('AuthInProgress Component', () => {
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe('AuthInProgress Component', () => {
 
     // Should contain spinner characters
     const output = lastFrame();
-    expect(output.length).toBeGreaterThan(0);
+    expect(output?.length).toBeGreaterThan(0);
     expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/); // Spinner characters
   });
 
@@ -124,7 +124,7 @@ describe('AuthInProgress Component', () => {
     const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
 
     const output = lastFrame();
-    expect(output.length).toBeGreaterThan(0);
+    expect(output?.length).toBeGreaterThan(0);
     expect(output).not.toContain('undefined');
     expect(output).not.toContain('null');
   });

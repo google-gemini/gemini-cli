@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { Footer } from './Footer';
+import { Footer } from './Footer.js';
 
 // Mock core utilities
 vi.mock('@google/gemini-cli-core', () => ({
@@ -55,7 +55,7 @@ describe('Footer Component', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-pro');
     expect(output).toContain('/home/user/project');
-    expect(output.length).toBeGreaterThan(0);
+    expect(output?.length).toBeGreaterThan(0);
   });
 
   it('should display model information', () => {

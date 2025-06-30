@@ -13,6 +13,10 @@ import {
   offsetToLogicalPos,
 } from './text-buffer.js';
 
+// Import the utility functions for testing
+// We need to create a way to access them for testing since they're internal
+// For now, we'll test them through the public API
+
 // Helper to get the state from the hook
 const getBufferState = (result: { current: TextBuffer }) => ({
   text: result.current.text,
@@ -1119,5 +1123,352 @@ describe('offsetToLogicalPos', () => {
     expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]);
     expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After 🐶
     expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // After 🐱
+  });
+});
+
+// Test the refactored logic through the public API
+describe('Refactored Text Insertion Logic', () => {
+  let viewport: Viewport;
+
+  beforeEach(() => {
+    viewport = { width: 10, height: 3 };
+  });
+
+  describe('insertStr with normalizeText utility', () => {
+    it('should normalize various line ending formats', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      // Test \r\n normalization
+      act(() => result.current.insertStr('line1\r\nline2'));
+      expect(getBufferState(result).text).toBe('line1\nline2');
+      expect(getBufferState(result).lines).toEqual(['line1', 'line2']);
+
+      // Clear buffer and test \r normalization
+      act(() => result.current.setText(''));
+      act(() => result.current.insertStr('line1\rline2'));
+      expect(getBufferState(result).text).toBe('line1\nline2');
+      expect(getBufferState(result).lines).toEqual(['line1', 'line2']);
+    });
+
+    it('should strip unsafe characters', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      // Test control character stripping (except newlines)
+      const textWithControlChars = 'H\x07e\x08l\x0Bl\x0Co'; // BELL, BACKSPACE, VT, FF
+      act(() => result.current.insertStr(textWithControlChars));
+      expect(getBufferState(result).text).toBe('Hello');
+
+      // Clear buffer and test ANSI escape codes
+      act(() => result.current.setText(''));
+      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
+      act(() => result.current.insertStr(textWithAnsi));
+      expect(getBufferState(result).text).toBe('Hello World');
+    });
+
+    it('should preserve newlines and carriage returns in normalization', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      // Test that newlines are preserved
+      act(() => result.current.insertStr('line1\nline2\nline3'));
+      expect(getBufferState(result).lines).toEqual(['line1', 'line2', 'line3']);
+    });
+  });
+
+  describe('insertStr with insertTextAtCursor utility', () => {
+    it('should handle single-line insertion correctly', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abc',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Move cursor to middle and insert
+      act(() => result.current.move('right')); // cursor at [0,1]
+      act(() => result.current.insertStr('XY'));
+      expect(getBufferState(result).text).toBe('aXYbc');
+      expect(getBufferState(result).cursor).toEqual([0, 3]); // after 'XY'
+    });
+
+    it('should handle multi-line insertion correctly', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abc',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Move cursor to middle and insert multi-line text
+      act(() => result.current.move('right')); // cursor at [0,1]
+      act(() => result.current.insertStr('X\nY\nZ'));
+      expect(getBufferState(result).text).toBe('aX\nY\nZbc');
+      expect(getBufferState(result).lines).toEqual(['aX', 'Y', 'Zbc']);
+      expect(getBufferState(result).cursor).toEqual([2, 1]); // after 'Z'
+    });
+
+    it('should handle insertion at line boundaries', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'line1\nline2',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Insert at end of first line
+      act(() => result.current.move('end')); // cursor at [0,5]
+      act(() => result.current.insertStr('\nNEW'));
+      expect(getBufferState(result).text).toBe('line1\nNEW\nline2');
+      expect(getBufferState(result).cursor).toEqual([1, 3]); // after 'NEW'
+
+      // Insert at beginning of a line
+      act(() => result.current.move('down')); // move to line 2
+      act(() => result.current.move('home')); // cursor at [2,0]
+      act(() => result.current.insertStr('PREFIX'));
+      expect(getBufferState(result).text).toBe('line1\nNEW\nPREFIXline2');
+      expect(getBufferState(result).cursor).toEqual([2, 6]); // after 'PREFIX'
+    });
+
+    it('should handle empty line insertion', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'test',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Insert multiple empty lines
+      act(() => result.current.move('end'));
+      act(() => result.current.insertStr('\n\n\n'));
+      expect(getBufferState(result).text).toBe('test\n\n\n');
+      expect(getBufferState(result).lines).toEqual(['test', '', '', '']);
+      expect(getBufferState(result).cursor).toEqual([3, 0]);
+    });
+  });
+
+  describe('applyOperations with extracted utilities', () => {
+    it('should handle single operation with normalization', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: 'test\r\nline' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('test\nline');
+      expect(getBufferState(result).lines).toEqual(['test', 'line']);
+    });
+
+    it('should handle multiple operations in sequence', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'initial',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => result.current.move('end')); // cursor at [0,7]
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: '\nfirst' },
+          { type: 'insert', payload: '\nsecond' },
+          { type: 'backspace' },
+          { type: 'insert', payload: 'X' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('initial\nfirst\nseconX');
+    });
+
+    it('should handle operations with control characters and ANSI codes', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      act(() => {
+        result.current.applyOperations([
+          { type: 'insert', payload: '\x1B[31mColored\x1B[0m\r\nText\x07' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('Colored\nText');
+    });
+
+    it('should handle mixed insert and backspace operations', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abcdef',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => result.current.move('end')); // cursor at [0,6]
+      act(() => {
+        result.current.applyOperations([
+          { type: 'backspace' },
+          { type: 'backspace' },
+          { type: 'insert', payload: 'XY\nZ' },
+        ]);
+      });
+      expect(getBufferState(result).text).toBe('abcdXY\nZ');
+      expect(getBufferState(result).cursor).toEqual([1, 1]); // after 'Z'
+    });
+  });
+
+  describe('Consistency between insertStr and applyOperations', () => {
+    it('should produce identical results for single-line insertions', () => {
+      const testText = 'Hello World';
+
+      // Test with insertStr
+      const { result: result1 } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abc',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result1.current.move('right')); // cursor at [0,1]
+      act(() => result1.current.insertStr(testText));
+      const state1 = getBufferState(result1);
+
+      // Test with applyOperations
+      const { result: result2 } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'abc',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result2.current.move('right')); // cursor at [0,1]
+      act(() => {
+        result2.current.applyOperations([
+          { type: 'insert', payload: testText },
+        ]);
+      });
+      const state2 = getBufferState(result2);
+
+      expect(state1.text).toBe(state2.text);
+      expect(state1.lines).toEqual(state2.lines);
+      expect(state1.cursor).toEqual(state2.cursor);
+    });
+
+    it('should produce identical results for multi-line insertions', () => {
+      const testText = 'Line1\nLine2\nLine3';
+
+      // Test with insertStr
+      const { result: result1 } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'start\nend',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result1.current.move('down')); // move to second line
+      act(() => result1.current.move('home')); // cursor at [1,0]
+      act(() => result1.current.insertStr(testText));
+      const state1 = getBufferState(result1);
+
+      // Test with applyOperations
+      const { result: result2 } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'start\nend',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      act(() => result2.current.move('down')); // move to second line
+      act(() => result2.current.move('home')); // cursor at [1,0]
+      act(() => {
+        result2.current.applyOperations([
+          { type: 'insert', payload: testText },
+        ]);
+      });
+      const state2 = getBufferState(result2);
+
+      expect(state1.text).toBe(state2.text);
+      expect(state1.lines).toEqual(state2.lines);
+      expect(state1.cursor).toEqual(state2.cursor);
+    });
+
+    it('should produce identical results for text normalization', () => {
+      const testText = 'Line1\r\nLine2\rLine3\x1B[31mColored\x1B[0m';
+
+      // Test with insertStr
+      const { result: result1 } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() => result1.current.insertStr(testText));
+      const state1 = getBufferState(result1);
+
+      // Test with applyOperations
+      const { result: result2 } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() => {
+        result2.current.applyOperations([
+          { type: 'insert', payload: testText },
+        ]);
+      });
+      const state2 = getBufferState(result2);
+
+      expect(state1.text).toBe(state2.text);
+      expect(state1.lines).toEqual(state2.lines);
+      expect(state1.cursor).toEqual(state2.cursor);
+    });
+
+    it('should handle edge cases consistently', () => {
+      const edgeCases = [
+        '', // empty string
+        '\n', // single newline
+        '\n\n\n', // multiple newlines
+        '🐶🐱', // unicode characters
+        'a\nb\nc\nd\ne\nf', // many lines
+      ];
+
+      for (const testText of edgeCases) {
+        // Test with insertStr
+        const { result: result1 } = renderHook(() =>
+          useTextBuffer({
+            initialText: 'prefix',
+            viewport,
+            isValidPath: () => false,
+          }),
+        );
+        act(() => result1.current.move('end'));
+        act(() => result1.current.insertStr(testText));
+        const state1 = getBufferState(result1);
+
+        // Test with applyOperations
+        const { result: result2 } = renderHook(() =>
+          useTextBuffer({
+            initialText: 'prefix',
+            viewport,
+            isValidPath: () => false,
+          }),
+        );
+        act(() => result2.current.move('end'));
+        act(() => {
+          result2.current.applyOperations([
+            { type: 'insert', payload: testText },
+          ]);
+        });
+        const state2 = getBufferState(result2);
+
+        expect(state1.text).toBe(state2.text);
+        expect(state1.lines).toEqual(state2.lines);
+        expect(state1.cursor).toEqual(state2.cursor);
+      }
+    });
   });
 });

@@ -560,8 +560,8 @@ describe('useReactToolScheduler', () => {
 
     (mockToolWithLiveOutput.execute as Mock).mockImplementation(
       async (
-        _args: any,
-        _signal: any,
+        _args: unknown,
+        _signal: unknown,
         updateFn: ((output: string) => void) | undefined,
       ) => {
         liveUpdateFn = updateFn;
