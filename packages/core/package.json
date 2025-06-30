@@ -20,7 +20,8 @@
     "prepublishOnly": "node ../../scripts/prepublish.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/google-gemini-cli-core-*.tgz"
   ],
   "dependencies": {
     "@google/genai": "^1.4.0",
