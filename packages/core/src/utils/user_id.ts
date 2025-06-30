@@ -73,9 +73,8 @@ export function getObfuscatedGoogleAccountId(): string {
       return googleAccountId;
     }
   } catch (_error) {
-    // If there's any error accessing Google Account ID, fall back to installation ID
+    // If there's any error accessing Google Account ID, just return empty string
   }
 
-  // Fall back to installation ID when no Google Account ID is cached or on error
-  return getInstallationId();
+  return '';
 }
