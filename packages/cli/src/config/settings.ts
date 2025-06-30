@@ -61,6 +61,8 @@ export interface Settings {
     enableRecursiveFileSearch?: boolean;
   };
 
+  gcpProjectId?: string;
+
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
   hideTips?: boolean;

@@ -6,10 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
-import { loadCliConfig } from './config.js';
+import { loadCliConfig, loadEnvironment } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
+import { mkdirSync, rmSync } from 'fs';
+import path from 'path';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -348,5 +350,50 @@ describe('mergeMcpServers', () => {
     const originalSettings = JSON.parse(JSON.stringify(settings));
     await loadCliConfig(settings, extensions, 'test-session');
     expect(settings).toEqual(originalSettings);
+  });
+});
+
+describe('loadEnvironment', () => {
+  const tempHomeDir = path.join(os.tmpdir(), 'gemini-test-home-env');
+  const settingsDir = path.join(tempHomeDir, '.gemini');
+  const originalGoogleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
+
+  beforeEach(() => {
+    // Mock homedir for this test suite
+    vi.spyOn(os, 'homedir').mockReturnValue(tempHomeDir);
+    mkdirSync(settingsDir, { recursive: true });
+    // Reset env var
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+  });
+
+  afterEach(() => {
+    // Clean up created files and mocks
+    rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+    // Restore env var
+    if (originalGoogleCloudProject !== undefined) {
+      process.env.GOOGLE_CLOUD_PROJECT = originalGoogleCloudProject;
+    } else {
+      delete process.env.GOOGLE_CLOUD_PROJECT;
+    }
+  });
+
+  it('should load GOOGLE_CLOUD_PROJECT from gcpProjectId in settings.json', () => {
+    const settings: Settings = { gcpProjectId: 'project-from-settings' };
+    loadEnvironment(settings);
+    expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('project-from-settings');
+  });
+
+  it('should not override an existing GOOGLE_CLOUD_PROJECT environment variable', () => {
+    process.env.GOOGLE_CLOUD_PROJECT = 'existing-project';
+    const settings: Settings = { gcpProjectId: 'project-from-settings' };
+    loadEnvironment(settings);
+    expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('existing-project');
+  });
+
+  it('should not set GOOGLE_CLOUD_PROJECT if gcpProjectId is not a string', () => {
+    const settings: Settings = { gcpProjectId: 12345 as unknown as string };
+    loadEnvironment(settings);
+    expect(process.env.GOOGLE_CLOUD_PROJECT).toBeUndefined();
   });
 });
