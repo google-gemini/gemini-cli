@@ -229,7 +229,7 @@ export class Logger {
         // then this instance can increment its idea of the next messageId for this session.
         this.messageId = writtenEntry.messageId + 1;
       }
-    } catch (_error) {
+    } catch (error) {
       // Error already logged by _updateLogFile or _readLogFile
     }
   }

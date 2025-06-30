@@ -60,7 +60,7 @@ export async function getEffectiveModel(
     }
     // For any other case (success, other error codes), we stick to the original model.
     return currentConfiguredModel;
-  } catch (_error) {
+  } catch (error) {
     clearTimeout(timeoutId);
     // On timeout or any other fetch error, stick to the original model.
     return currentConfiguredModel;
