@@ -290,6 +290,30 @@ export class Logger {
     }
   }
 
+  async deleteCheckpoint(tag: string): Promise<boolean> {
+    if (!this.initialized || !this.checkpointFilePath) {
+      console.error(
+        'Logger not initialized or checkpoint file path not set. Cannot delete checkpoint.',
+      );
+      return false;
+    }
+
+    const path = this._checkpointPath(tag);
+
+    try {
+      await fs.unlink(path);
+      return true;
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        // File doesn't exist, which is fine.
+        return false;
+      }
+      console.error(`Failed to delete checkpoint file ${path}:`, error);
+      throw error;
+    }
+  }
+
   close(): void {
     this.initialized = false;
     this.logFilePath = undefined;

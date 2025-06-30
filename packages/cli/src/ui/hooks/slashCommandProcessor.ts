@@ -699,7 +699,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'chat',
         description:
-          'Manage conversation history. Usage: /chat <list|save|resume> [tag]',
+          'Manage conversation history. Usage: /chat <list|save|resume|delete> [tag]',
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
@@ -716,7 +716,8 @@ export const useSlashCommandProcessor = (
           if (!subCommand) {
             addMessage({
               type: MessageType.ERROR,
-              content: 'Missing command\nUsage: /chat <list|save|resume> [tag]',
+              content:
+                'Missing command\nUsage: /chat <list|save|resume|delete> [tag]',
               timestamp: new Date(),
             });
             return;
@@ -804,10 +805,43 @@ export const useSlashCommandProcessor = (
                 timestamp: new Date(),
               });
               return;
+            case 'delete': {
+              if (!tag) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: 'Error: Tag is required. Usage: /chat delete <tag>',
+                  timestamp: new Date(),
+                });
+                return;
+              }
+              try {
+                const deleted = await logger.deleteCheckpoint(tag);
+                if (deleted) {
+                  addMessage({
+                    type: MessageType.INFO,
+                    content: `Conversation checkpoint '${tag}' has been deleted.`,
+                    timestamp: new Date(),
+                  });
+                } else {
+                  addMessage({
+                    type: MessageType.ERROR,
+                    content: `Error: No checkpoint found with tag '${tag}'.`,
+                    timestamp: new Date(),
+                  });
+                }
+              } catch (error) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
+                  timestamp: new Date(),
+                });
+              }
+              return;
+            }
             default:
               addMessage({
                 type: MessageType.ERROR,
-                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume`,
+                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume, delete`,
                 timestamp: new Date(),
               });
               return;
