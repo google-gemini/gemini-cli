@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-06-30",
+    "purpose": "Index of canonical examples for modular prompt system"
+  },
+  "examples": [
+    {
+      "id": "basic-testing",
+      "title": "Basic Code Analysis and Testing",
+      "description": "Demonstrates systematic approach to understanding code and writing tests",
+      "tags": ["testing", "code-analysis", "workflow"],
+      "tools": [
+        "ReadFileTool",
+        "GlobTool",
+        "ReadManyFilesTool",
+        "WriteFileTool",
+        "ShellTool"
+      ],
+      "workflow_type": "software-engineering",
+      "complexity": "medium",
+      "estimated_tokens": 150
+    },
+    {
+      "id": "refactoring-with-verification",
+      "title": "Refactoring with Safety Verification",
+      "description": "Shows proper refactoring workflow with safety checks and verification",
+      "tags": ["refactoring", "testing", "verification", "safety"],
+      "tools": [
+        "GlobTool",
+        "ReadFileTool",
+        "EditTool",
+        "WriteFileTool",
+        "ShellTool"
+      ],
+      "workflow_type": "software-engineering",
+      "complexity": "high",
+      "estimated_tokens": 160
+    }
+  ],
+  "usage_patterns": {
+    "tool_combinations": [
+      "search_then_read",
+      "analyze_then_implement",
+      "implement_then_verify"
+    ],
+    "safety_patterns": [
+      "check_tests_before_refactoring",
+      "verify_dependencies_before_use",
+      "run_verification_after_changes"
+    ],
+    "communication_patterns": [
+      "concise_acknowledgment",
+      "clear_plan_presentation",
+      "step_by_step_explanation"
+    ]
+  }
+}

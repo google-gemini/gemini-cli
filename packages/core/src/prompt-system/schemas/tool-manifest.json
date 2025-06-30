@@ -1,0 +1,70 @@
+{
+  "manifest_version": "1.0",
+  "last_updated": "2025-06-30",
+  "tools": {
+    "file_operations": {
+      "read": {
+        "name": "read_file",
+        "version": "2.1.0",
+        "description": "Read file contents with absolute path support"
+      },
+      "read_many": {
+        "name": "read_many_files",
+        "version": "2.1.0",
+        "description": "Read multiple files efficiently"
+      },
+      "write": {
+        "name": "write_file",
+        "version": "2.1.0",
+        "description": "Write content to files with absolute paths"
+      },
+      "edit": {
+        "name": "replace",
+        "version": "1.5.0",
+        "description": "Edit files with precise string replacement"
+      },
+      "glob": {
+        "name": "glob",
+        "version": "1.3.0",
+        "description": "Pattern-based file discovery"
+      },
+      "list": {
+        "name": "ls",
+        "version": "1.2.0",
+        "description": "List directory contents with filtering"
+      }
+    },
+    "search_operations": {
+      "grep": {
+        "name": "grep",
+        "version": "1.4.0",
+        "description": "Search file contents with regex support"
+      }
+    },
+    "system": {
+      "shell": {
+        "name": "shell",
+        "version": "1.8.0",
+        "description": "Execute shell commands with safety checks"
+      }
+    },
+    "memory": {
+      "remember": {
+        "name": "memoryTool",
+        "version": "1.0.0",
+        "description": "Store user-specific facts and preferences"
+      }
+    }
+  },
+  "tool_references": {
+    "ReadFileTool.Name": "file_operations.read.name",
+    "ReadManyFilesTool.Name": "file_operations.read_many.name",
+    "WriteFileTool.Name": "file_operations.write.name",
+    "EditTool.Name": "file_operations.edit.name",
+    "GlobTool.Name": "file_operations.glob.name",
+    "LSTool.Name": "file_operations.list.name",
+    "GrepTool.Name": "search_operations.grep.name",
+    "ShellTool.Name": "system.shell.name",
+    "MemoryTool.Name": "memory.remember.name"
+  }
+}
