@@ -25,6 +25,7 @@ import {
   ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
+import { summarizeToolOutput } from '../utils/toolOutputSummarizer.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -134,17 +135,30 @@ function createFunctionResponsePart(
   };
 }
 
-export function convertToFunctionResponse(
+export async function convertToFunctionResponse(
   toolName: string,
   callId: string,
   llmContent: PartListUnion,
-): PartListUnion {
+  config: Config,
+  abortSignal: AbortSignal,
+): Promise<PartListUnion> {
   const contentToProcess =
     Array.isArray(llmContent) && llmContent.length === 1
       ? llmContent[0]
       : llmContent;
 
+  const geminiClient = config.getGeminiClient();
+  const coreTools =
+    (await config.getToolRegistry()).getAllTools().map((t) => t.name) || [];
   if (typeof contentToProcess === 'string') {
+    if (toolName === 'run_shell_command' || !coreTools.includes(toolName)) {
+      const summarizedContent = await summarizeToolOutput(
+        contentToProcess,
+        geminiClient,
+        abortSignal,
+      );
+      return createFunctionResponsePart(callId, toolName, summarizedContent);
+    }
     return createFunctionResponsePart(callId, toolName, contentToProcess);
   }
 
@@ -164,7 +178,12 @@ export function convertToFunctionResponse(
         getResponseTextFromParts(
           contentToProcess.functionResponse.response.content as Part[],
         ) || '';
-      return createFunctionResponsePart(callId, toolName, stringifiedOutput);
+      const summarizedContent = await summarizeToolOutput(
+        stringifiedOutput,
+        geminiClient,
+        abortSignal,
+      );
+      return createFunctionResponsePart(callId, toolName, summarizedContent);
     }
     // It's a functionResponse that we should pass through as is.
     return contentToProcess;
@@ -409,7 +428,6 @@ export class CoreToolScheduler {
     }
     const requestsToProcess = Array.isArray(request) ? request : [request];
     const toolRegistry = await this.toolRegistry;
-
     const newToolCalls: ToolCall[] = requestsToProcess.map(
       (reqInfo): ToolCall => {
         const toolInstance = toolRegistry.getTool(reqInfo.name);
@@ -424,6 +442,7 @@ export class CoreToolScheduler {
             durationMs: 0,
           };
         }
+
         return {
           status: 'validating',
           request: reqInfo,
@@ -432,7 +451,6 @@ export class CoreToolScheduler {
         };
       },
     );
-
     this.toolCalls = this.toolCalls.concat(newToolCalls);
     this.notifyToolCallsUpdate();
 
@@ -450,7 +468,6 @@ export class CoreToolScheduler {
             reqInfo.args,
             signal,
           );
-
           if (confirmationDetails) {
             const originalOnConfirm = confirmationDetails.onConfirm;
             const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
@@ -483,6 +500,7 @@ export class CoreToolScheduler {
         );
       }
     }
+
     this.attemptExecutionOfScheduledCalls(signal);
     this.checkAndNotifyCompletion();
   }
@@ -588,7 +606,7 @@ export class CoreToolScheduler {
 
         scheduledCall.tool
           .execute(scheduledCall.request.args, signal, liveOutputCallback)
-          .then((toolResult: ToolResult) => {
+          .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(
                 callId,
@@ -598,10 +616,12 @@ export class CoreToolScheduler {
               return;
             }
 
-            const response = convertToFunctionResponse(
+            const response = await convertToFunctionResponse(
               toolName,
               callId,
               toolResult.llmContent,
+              this.config,
+              signal,
             );
 
             const successResponse: ToolCallResponseInfo = {
@@ -612,7 +632,7 @@ export class CoreToolScheduler {
             };
             this.setStatusInternal(callId, 'success', successResponse);
           })
-          .catch((executionError: Error) => {
+          .catch(async (executionError: Error) => {
             this.setStatusInternal(
               callId,
               'error',

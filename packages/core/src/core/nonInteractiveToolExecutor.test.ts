@@ -13,13 +13,25 @@ import {
   Tool,
   ToolCallConfirmationDetails,
   Config,
+  GeminiClient,
 } from '../index.js';
 import { Part, Type } from '@google/genai';
+
+const mockGeminiClient = {
+  generateContent: vi.fn(),
+} as unknown as GeminiClient;
 
 const mockConfig = {
   getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getGeminiClient: () => mockGeminiClient,
+  getToolRegistry: () =>
+    ({
+      getTool: vi.fn(),
+      getAllTools: vi.fn(() => []),
+      // Add other ToolRegistry methods if needed, or use a more complete mock
+    }) as unknown as ToolRegistry,
 } as unknown as Config;
 
 describe('executeToolCall', () => {
@@ -55,6 +67,7 @@ describe('executeToolCall', () => {
 
     mockToolRegistry = {
       getTool: vi.fn(),
+      getAllTools: vi.fn(() => [mockTool]),
       // Add other ToolRegistry methods if needed, or use a more complete mock
     } as unknown as ToolRegistry;
 
