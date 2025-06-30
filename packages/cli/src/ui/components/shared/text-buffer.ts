@@ -9,7 +9,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
@@ -417,6 +417,23 @@ export function useTextBuffer({
   const [cursorCol, setCursorCol] = useState<number>(initialCursorCol);
   const [preferredCol, setPreferredCol] = useState<number | null>(null); // Visual preferred col
 
+  // Refs to access the latest state values in callbacks
+  const linesRef = useRef(lines);
+  const cursorRowRef = useRef(cursorRow);
+  const cursorColRef = useRef(cursorCol);
+
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
+
+  useEffect(() => {
+    cursorRowRef.current = cursorRow;
+  }, [cursorRow]);
+
+  useEffect(() => {
+    cursorColRef.current = cursorCol;
+  }, [cursorCol]);
+
   const [undoStack, setUndoStack] = useState<UndoHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<UndoHistoryEntry[]>([]);
   const historyLimit = 100;
@@ -569,6 +586,11 @@ export function useTextBuffer({
     (ops: UpdateOperation[]) => {
       if (ops.length === 0) return;
 
+      // Use refs to get the latest state values
+      const currentLines = linesRef.current;
+      const currentCursorRow = cursorRowRef.current;
+      const currentCursorCol = cursorColRef.current;
+
       const expandedOps: UpdateOperation[] = [];
       for (const op of ops) {
         if (op.type === 'insert') {
@@ -599,9 +621,9 @@ export function useTextBuffer({
 
       pushUndo(); // Snapshot before applying batch of updates
 
-      const newLines = [...lines];
-      let newCursorRow = cursorRow;
-      let newCursorCol = cursorCol;
+      const newLines = [...currentLines];
+      let newCursorRow = currentCursorRow;
+      let newCursorCol = currentCursorCol;
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
@@ -658,8 +680,13 @@ export function useTextBuffer({
       setCursorRow(newCursorRow);
       setCursorCol(newCursorCol);
       setPreferredCol(null);
+
+      // Update refs immediately
+      linesRef.current = newLines;
+      cursorRowRef.current = newCursorRow;
+      cursorColRef.current = newCursorCol;
     },
-    [lines, cursorRow, cursorCol, pushUndo, setPreferredCol],
+    [pushUndo, setPreferredCol],
   );
 
   const insert = useCallback(
