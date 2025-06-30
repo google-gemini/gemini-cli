@@ -700,7 +700,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                    config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : thought
                 }
