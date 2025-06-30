@@ -39,28 +39,25 @@ async function debugLiveTest() {
     const result = await assembler.assemblePrompt(basicContext);
     
     console.log('📊 Assembly Results:');
-    console.log(`  - Success: ${result.success}`);
-    console.log(`  - Content Length: ${result.content.length}`);
-    console.log(`  - Token Count: ${result.metadata.tokenCount}`);
-    console.log(`  - Modules Loaded: ${result.metadata.modulesLoaded?.length || 0}`);
-    console.log(`  - Modules: ${result.metadata.modulesLoaded?.join(', ') || 'None'}`);
+    console.log(`  - Success: ${result.prompt.length > 0}`);
+    console.log(`  - Content Length: ${result.prompt.length}`);
+    console.log(`  - Token Count: ${result.totalTokens}`);
+    console.log(`  - Modules Loaded: ${result.includedModules.length || 0}`);
+    console.log(`  - Modules: ${result.includedModules.map(m => m.id).join(', ') || 'None'}`);
     
     if (result.warnings && result.warnings.length > 0) {
       console.log('⚠️  Warnings:');
       result.warnings.forEach(warning => console.log(`  - ${warning}`));
     }
 
-    if (result.errors && result.errors.length > 0) {
-      console.log('❌ Errors:');
-      result.errors.forEach(error => console.log(`  - ${error}`));
-    }
+    // Note: AssemblyResult interface only has warnings, not errors
 
     console.log('\n📄 Generated Content Preview:');
     console.log('---');
-    console.log(result.content.substring(0, 500) + '...');
+    console.log(result.prompt.substring(0, 500) + '...');
     console.log('---');
 
-    return result.success;
+    return result.prompt.length > 0 && result.warnings.length === 0;
 
   } catch (error) {
     console.error(`❌ Test failed: ${error.message}`);

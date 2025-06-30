@@ -26,9 +26,9 @@ async function testIntegration() {
 
     console.log('✅ Integration Test Results:');
     console.log(`   Modules included: ${result.includedModules.length}`);
-    console.log(`   Token estimate: ${result.tokenCount}`);
+    console.log(`   Token estimate: ${result.totalTokens}`);
     console.log(`   Warnings: ${result.warnings.length}`);
-    console.log(`   Assembly time: ${result.assemblyTime}ms`);
+    console.log(`   Assembly time: ${result.metadata.assemblyTime}ms`);
     console.log(`   Prompt length: ${result.prompt.length} chars`);
 
     if (result.warnings.length > 0) {
@@ -46,7 +46,7 @@ async function testIntegration() {
 
     const gitResult = await assembler.assemblePrompt(gitContext);
     console.log(
-      `\n✅ Git Context Test - Modules: ${gitResult.includedModules.length}, Tokens: ${gitResult.tokenCount}`,
+      `\n✅ Git Context Test - Modules: ${gitResult.includedModules.length}, Tokens: ${gitResult.totalTokens}`,
     );
 
     // Test with sandbox context
@@ -59,16 +59,16 @@ async function testIntegration() {
 
     const sandboxResult = await assembler.assemblePrompt(sandboxContext);
     console.log(
-      `✅ Sandbox Context Test - Modules: ${sandboxResult.includedModules.length}, Tokens: ${sandboxResult.tokenCount}`,
+      `✅ Sandbox Context Test - Modules: ${sandboxResult.includedModules.length}, Tokens: ${sandboxResult.totalTokens}`,
     );
 
     // Test token reduction calculation
     const estimatedOriginal = 4200; // From PLAN.md
     const reductionPercentage =
-      ((estimatedOriginal - result.tokenCount) / estimatedOriginal) * 100;
+      ((estimatedOriginal - result.totalTokens) / estimatedOriginal) * 100;
     console.log(`\n📊 Token Efficiency Analysis:`);
     console.log(`   Original estimate: ${estimatedOriginal} tokens`);
-    console.log(`   Current dynamic: ${result.tokenCount} tokens`);
+    console.log(`   Current dynamic: ${result.totalTokens} tokens`);
     console.log(`   Reduction achieved: ${reductionPercentage.toFixed(1)}%`);
     console.log(
       `   Target (60%+): ${reductionPercentage >= 60 ? '✅ MET' : '❌ NOT MET'}`,

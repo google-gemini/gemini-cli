@@ -108,12 +108,15 @@ describe('Real-world Integration Testing', () => {
       });
       expect(lowBudgetResult.prompt.length).toBeGreaterThan(0);
 
-      // Complex context
+      // Complex context  
       const complexResult = await promptAssembler.assemblePrompt({
+        taskType: 'general',
         hasGitRepo: true,
         sandboxMode: true,
-        userMemory: 'Long user memory content that takes up space',
+        hasUserMemory: true,
+        contextFlags: {},
         tokenBudget: 3000,
+        environmentContext: {},
       });
       expect(complexResult.prompt.length).toBeGreaterThan(0);
 
@@ -149,10 +152,13 @@ describe('Real-world Integration Testing', () => {
   describe('System integration', () => {
     it('should integrate all components seamlessly', async () => {
       const result = await promptAssembler.assemblePrompt({
+        taskType: 'general',
         hasGitRepo: true,
         sandboxMode: false,
-        userMemory: 'Integration test memory',
+        hasUserMemory: true,
+        contextFlags: {},
         tokenBudget: 1800,
+        environmentContext: {},
       });
 
       // Verify all major components worked

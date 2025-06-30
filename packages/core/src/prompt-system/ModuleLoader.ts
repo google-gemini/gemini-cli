@@ -80,7 +80,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
   async loadAllModules(): Promise<PromptModule[]> {
     const categories: PromptModule['category'][] = [
       'core',
-      'policy',
+      'policies',
       'playbook',
       'context',
       'example',
@@ -106,7 +106,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
     // Check all possible locations for the module
     const categories: PromptModule['category'][] = [
       'core',
-      'policy',
+      'policies',
       'playbook',
       'context',
       'example',
@@ -160,7 +160,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
     // Try to find the module in different categories
     const categories: PromptModule['category'][] = [
       'core',
-      'policy',
+      'policies',
       'playbook',
       'context',
       'example',

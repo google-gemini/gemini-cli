@@ -17,6 +17,18 @@ export interface ToolDefinition {
 }
 
 /**
+ * Represents a tool reference mapping for better type safety
+ */
+export interface ToolReference {
+  /** The target tool name */
+  targetTool: string;
+  /** The category the target tool belongs to */
+  category: string;
+  /** Optional description of the reference */
+  description?: string;
+}
+
+/**
  * Represents a category of tools (e.g., file_operations, search_operations)
  */
 export interface ToolCategory {
@@ -35,9 +47,9 @@ export interface ToolManifest {
   tools: {
     [categoryName: string]: ToolCategory;
   };
-  /** Reference mappings for tool name resolution */
+  /** Reference mappings for tool name resolution with enhanced type safety */
   tool_references: {
-    [referenceKey: string]: string;
+    [referenceKey: string]: ToolReference | string; // Support both new structured format and legacy string format
   };
 }
 

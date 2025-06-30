@@ -84,7 +84,7 @@ export class ContextDetectorImpl implements ContextDetector {
   /**
    * Detect sandbox mode and type from environment variables
    */
-  detectSandboxMode(): { sandboxMode: boolean; sandboxType?: string } {
+  detectSandboxMode(): { sandboxMode: boolean; sandboxType?: 'sandbox-exec' | 'generic' | 'none' } {
     const sandboxEnv = process.env.SANDBOX;
 
     if (!sandboxEnv) {

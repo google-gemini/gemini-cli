@@ -136,9 +136,33 @@ export class LiveIntegrationTest {
       const start = performance.now();
       
       const contexts: TaskContext[] = [
-        { taskType: 'general', environment: {}, hasGitRepo: false, sandboxMode: 'none' },
-        { taskType: 'debug', environment: {}, hasGitRepo: true, sandboxMode: 'sandbox-exec' },
-        { taskType: 'general', environment: {}, hasGitRepo: true, sandboxMode: 'none' },
+        { 
+          taskType: 'general', 
+          hasGitRepo: false, 
+          sandboxMode: false, 
+          sandboxType: 'none',
+          hasUserMemory: false,
+          contextFlags: {},
+          environmentContext: {}
+        },
+        { 
+          taskType: 'debug', 
+          hasGitRepo: true, 
+          sandboxMode: true, 
+          sandboxType: 'sandbox-exec',
+          hasUserMemory: false,
+          contextFlags: {},
+          environmentContext: {}
+        },
+        { 
+          taskType: 'general', 
+          hasGitRepo: true, 
+          sandboxMode: false, 
+          sandboxType: 'none',
+          hasUserMemory: false,
+          contextFlags: {},
+          environmentContext: {}
+        },
       ];
 
       for (const context of contexts) {
@@ -174,7 +198,7 @@ export class LiveIntegrationTest {
         details: { 
           overallScore: validationReport.overallScore,
           criticalIssues: validationReport.criticalIssues.length,
-          categories: validationReport.categories,
+          categoryScores: validationReport.categoryScores,
         },
       });
     } catch (error) {
