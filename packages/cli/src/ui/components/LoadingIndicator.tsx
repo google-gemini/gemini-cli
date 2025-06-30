@@ -17,6 +17,9 @@ interface LoadingIndicatorProps {
   elapsedTime: number;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  circuitBreakerRecoveryTime?: number;
+  circuitBreakerAuthType?: string;
+  circuitBreakerAllowOverride?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -24,11 +27,53 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   elapsedTime,
   rightContent,
   thought,
+  circuitBreakerRecoveryTime,
+  circuitBreakerAuthType,
+  circuitBreakerAllowOverride,
 }) => {
   const streamingState = useStreamingContext();
 
   if (streamingState === StreamingState.Idle) {
     return null;
+  }
+
+  // Circuit breaker display logic
+  if (
+    streamingState === StreamingState.CircuitBreakerOpen ||
+    streamingState === StreamingState.CircuitBreakerHalfOpen
+  ) {
+    const recoveryTimeSeconds = Math.ceil(
+      (circuitBreakerRecoveryTime || 0) / 1000,
+    );
+    const isOpen = streamingState === StreamingState.CircuitBreakerOpen;
+    const statusText = isOpen ? 'Circuit breaker open' : 'Testing recovery...';
+    const overrideText =
+      isOpen && circuitBreakerAllowOverride
+        ? " Press 'o' to override (risky)"
+        : '';
+
+    return (
+      <Box marginTop={1} paddingLeft={0} flexDirection="column">
+        <Box>
+          <Box marginRight={1}>
+            <Text color={Colors.Gray}>🚫</Text>
+          </Box>
+          <Text color={Colors.AccentPurple}>{statusText}</Text>
+          {isOpen && recoveryTimeSeconds > 0 && (
+            <Text color={Colors.Gray}>
+              {' '}
+              - Recovery in {recoveryTimeSeconds}s
+            </Text>
+          )}
+          {overrideText && <Text color={Colors.Gray}>{overrideText}</Text>}
+        </Box>
+        {circuitBreakerAuthType && (
+          <Box marginLeft={2}>
+            <Text color={Colors.Gray}>Auth type: {circuitBreakerAuthType}</Text>
+          </Box>
+        )}
+      </Box>
+    );
   }
 
   const primaryText = thought?.subject || currentLoadingPhrase;

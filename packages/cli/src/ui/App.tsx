@@ -317,7 +317,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     (
       pressedOnce: boolean,
       setPressedOnce: (value: boolean) => void,
-      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+      timerRef: ReturnType<typeof useRef<NodeJS.Timeout | null>>,
     ) => {
       if (pressedOnce) {
         if (timerRef.current) {
@@ -353,7 +353,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
+    if (
+      input === 'o' &&
+      !key.ctrl &&
+      streamingState === StreamingState.CircuitBreakerOpen
+    ) {
+      // Manual circuit breaker override
+      handleCircuitBreakerOverride?.();
+    } else if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
     } else if (key.ctrl && input === 't') {
       const newValue = !showToolDescriptions;
@@ -408,6 +415,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    handleCircuitBreakerOverride,
+    circuitBreakerError,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -710,6 +719,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     : currentLoadingPhrase
                 }
                 elapsedTime={elapsedTime}
+                circuitBreakerRecoveryTime={circuitBreakerError?.recoveryTimeMs}
+                circuitBreakerAuthType={circuitBreakerError?.authType}
+                circuitBreakerAllowOverride={circuitBreakerError?.allowOverride}
               />
               <Box
                 marginTop={1}

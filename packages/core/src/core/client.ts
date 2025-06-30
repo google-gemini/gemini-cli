@@ -28,7 +28,7 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, CircuitBreaker } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
@@ -48,6 +48,7 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
   private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -63,6 +64,40 @@ export class GeminiClient {
 
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
+  }
+
+  private getOrCreateCircuitBreaker(authType: string): CircuitBreaker {
+    if (!this.circuitBreakers.has(authType)) {
+      const circuitBreaker = new CircuitBreaker(
+        authType,
+        this.config.getCircuitBreakerConfig(),
+      );
+
+      // Set up state change callbacks
+      circuitBreaker.onStateChange((state, auth) => {
+        console.log(`Circuit breaker for ${auth} changed to ${state}`);
+      });
+
+      this.circuitBreakers.set(authType, circuitBreaker);
+    }
+    return this.circuitBreakers.get(authType)!;
+  }
+
+  executeWithManualOverride<T>(
+    fn: () => Promise<T>,
+    authType?: string,
+  ): Promise<T> {
+    const effectiveAuthType =
+      authType ||
+      this.config.getContentGeneratorConfig()?.authType ||
+      'unknown';
+    return retryWithBackoff(fn, {
+      onPersistent429: async (authType?: string) =>
+        await this.handleFlashFallback(authType),
+      authType: effectiveAuthType,
+      circuitBreaker: this.getOrCreateCircuitBreaker(effectiveAuthType),
+      isManualOverride: true,
+    });
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -202,6 +237,7 @@ export class GeminiClient {
           tools,
         },
         history,
+        this.getOrCreateCircuitBreaker.bind(this),
       );
     } catch (error) {
       await reportError(
@@ -218,6 +254,7 @@ export class GeminiClient {
     request: PartListUnion,
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
+    isManualOverride?: boolean,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!turns) {
       return new Turn(this.getChat());
@@ -228,7 +265,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
     const turn = new Turn(this.getChat());
-    const resultStream = turn.run(request, signal);
+    const resultStream = turn.run(request, signal, isManualOverride);
     for await (const event of resultStream) {
       yield event;
     }
@@ -242,7 +279,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, turns - 1, isManualOverride);
       }
     }
     return turn;
@@ -276,10 +313,13 @@ export class GeminiClient {
           contents,
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getOrCreateCircuitBreaker(authType),
       });
 
       const text = getResponseText(result);
@@ -364,10 +404,13 @@ export class GeminiClient {
           contents,
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getOrCreateCircuitBreaker(authType),
       });
       return result;
     } catch (error: unknown) {
