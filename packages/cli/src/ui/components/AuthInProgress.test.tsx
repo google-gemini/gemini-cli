@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { AuthInProgress } from './AuthInProgress';
 
@@ -16,152 +15,157 @@ describe('AuthInProgress Component', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
   it('should display authentication in progress message', () => {
-    const { lastFrame } = render(<AuthInProgress />);
-    
-    expect(lastFrame()).toContain('Authenticating');
+    const onTimeout = vi.fn();
+    const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    expect(lastFrame()).toContain('Waiting for auth...');
   });
 
-  it('should show loading indicator', () => {
-    const { lastFrame } = render(<AuthInProgress />);
-    
-    // Should contain some form of loading indicator
+  it('should show loading indicator with spinner', () => {
+    const onTimeout = vi.fn();
+    const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Should contain spinner characters
     const output = lastFrame();
     expect(output.length).toBeGreaterThan(0);
     expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/); // Spinner characters
   });
 
-  it('should handle authentication timeout', async () => {
+  it('should display ESC cancellation instruction', () => {
     const onTimeout = vi.fn();
-    
-    render(<AuthInProgress onTimeout={onTimeout} timeout={100} />);
-    
-    // Fast-forward time
-    vi.advanceTimersByTime(150);
-    
+    const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    expect(lastFrame()).toContain('Press ESC to cancel');
+  });
+
+  it('should handle authentication timeout after 180 seconds', () => {
+    const onTimeout = vi.fn();
+
+    render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Fast-forward time to 180 seconds
+    vi.advanceTimersByTime(180000);
+
     expect(onTimeout).toHaveBeenCalled();
   });
 
-  it('should display progress steps', () => {
-    const steps = ['Connecting to Google', 'Verifying credentials', 'Completing setup'];
-    
-    const { lastFrame } = render(
-      <AuthInProgress steps={steps} currentStep={1} />
-    );
-    
-    expect(lastFrame()).toContain('Verifying credentials');
-    expect(lastFrame()).toContain('2/3'); // Step indicator
+  it('should not timeout before 180 seconds', () => {
+    const onTimeout = vi.fn();
+
+    render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Fast-forward time to just before timeout
+    vi.advanceTimersByTime(179000);
+
+    expect(onTimeout).not.toHaveBeenCalled();
   });
 
-  it('should handle authentication success', () => {
-    const onSuccess = vi.fn();
-    
-    const { rerender } = render(
-      <AuthInProgress onSuccess={onSuccess} />
+  it('should display timeout message when timed out', () => {
+    const onTimeout = vi.fn();
+
+    const { lastFrame, rerender } = render(
+      <AuthInProgress onTimeout={onTimeout} />,
     );
-    
-    // Simulate success
-    rerender(<AuthInProgress onSuccess={onSuccess} success={true} />);
-    
-    expect(onSuccess).toHaveBeenCalled();
+
+    // Fast-forward to trigger timeout
+    vi.advanceTimersByTime(180000);
+
+    // Rerender to see the timeout state
+    rerender(<AuthInProgress onTimeout={onTimeout} />);
+
+    expect(lastFrame()).toContain(
+      'Authentication timed out. Please try again.',
+    );
   });
 
-  it('should handle authentication error', () => {
-    const onError = vi.fn();
-    const error = new Error('Authentication failed: Invalid credentials');
-    
-    const { lastFrame } = render(
-      <AuthInProgress onError={onError} error={error} />
-    );
-    
-    expect(lastFrame()).toContain('failed');
-    expect(lastFrame()).toContain('Invalid credentials');
-    expect(onError).toHaveBeenCalledWith(error);
+  it('should handle ESC key press to call onTimeout', () => {
+    const onTimeout = vi.fn();
+
+    const { stdin } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Simulate ESC key press
+    stdin.write('\u001b'); // ESC key
+
+    expect(onTimeout).toHaveBeenCalled();
   });
 
-  it('should show cancel option', () => {
-    const onCancel = vi.fn();
-    
-    const { lastFrame } = render(
-      <AuthInProgress onCancel={onCancel} showCancel={true} />
-    );
-    
-    expect(lastFrame()).toContain('Cancel');
-    expect(lastFrame()).toMatch(/ctrl\+c|esc/i);
+  it('should not call onTimeout on other key presses', () => {
+    const onTimeout = vi.fn();
+
+    const { stdin } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Simulate other key presses
+    stdin.write('\u0003'); // Ctrl+C
+    stdin.write('q');
+    stdin.write('\r'); // Enter
+
+    expect(onTimeout).not.toHaveBeenCalled();
   });
 
-  it('should animate loading spinner', () => {
-    const { lastFrame } = render(<AuthInProgress animated={true} />);
-    
-    const frame1 = lastFrame();
-    
-    // Advance animation frame
-    vi.advanceTimersByTime(100);
-    
-    const frame2 = lastFrame();
-    
-    // Animation should cause different frames (spinner rotation)
-    expect(frame1).toBeDefined();
-    expect(frame2).toBeDefined();
+  it('should render with rounded border', () => {
+    const onTimeout = vi.fn();
+    const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    const output = lastFrame();
+    // Should have border characters for rounded border
+    expect(output).toContain('╭');
+    expect(output).toContain('╮');
+    expect(output).toContain('╰');
+    expect(output).toContain('╯');
   });
 
-  it('should display authentication URL when provided', () => {
-    const authUrl = 'https://accounts.google.com/oauth/authorize?client_id=123';
-    
-    const { lastFrame } = render(
-      <AuthInProgress authUrl={authUrl} />
-    );
-    
-    expect(lastFrame()).toContain('accounts.google.com');
-    expect(lastFrame()).toContain('Open this URL');
+  it('should have proper component structure', () => {
+    const onTimeout = vi.fn();
+    const { lastFrame } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    const output = lastFrame();
+    expect(output.length).toBeGreaterThan(0);
+    expect(output).not.toContain('undefined');
+    expect(output).not.toContain('null');
   });
 
-  it('should handle different authentication methods', () => {
-    const { lastFrame: browserFrame } = render(
-      <AuthInProgress method="browser" />
-    );
-    
-    const { lastFrame: deviceFrame } = render(
-      <AuthInProgress method="device" />
-    );
-    
-    expect(browserFrame()).toContain('browser');
-    expect(deviceFrame()).toContain('device');
+  it('should call timeout only once during timeout period', () => {
+    const onTimeout = vi.fn();
+
+    render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Fast-forward well past timeout
+    vi.advanceTimersByTime(200000);
+
+    expect(onTimeout).toHaveBeenCalledTimes(1);
   });
 
-  it('should show retry option on failure', () => {
-    const onRetry = vi.fn();
-    const error = new Error('Network timeout');
-    
-    const { lastFrame } = render(
-      <AuthInProgress error={error} onRetry={onRetry} showRetry={true} />
-    );
-    
-    expect(lastFrame()).toContain('Retry');
-    expect(lastFrame()).toContain('R');
+  it('should cleanup timeout on unmount', () => {
+    const onTimeout = vi.fn();
+
+    const { unmount } = render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Unmount before timeout
+    unmount();
+
+    // Fast-forward past timeout time
+    vi.advanceTimersByTime(200000);
+
+    expect(onTimeout).not.toHaveBeenCalled();
   });
 
-  it('should display estimated time remaining', () => {
-    const { lastFrame } = render(
-      <AuthInProgress estimatedTime={30} />
-    );
-    
-    expect(lastFrame()).toMatch(/\d+\s*seconds?/);
-  });
+  it('should set internal timeout state and call onTimeout after 180 seconds', () => {
+    const onTimeout = vi.fn();
 
-  it('should handle keyboard input for cancellation', () => {
-    const onCancel = vi.fn();
-    
-    const { stdin } = render(
-      <AuthInProgress onCancel={onCancel} showCancel={true} />
-    );
-    
-    // Simulate Ctrl+C
-    stdin.write('\u0003');
-    
-    expect(onCancel).toHaveBeenCalled();
+    render(<AuthInProgress onTimeout={onTimeout} />);
+
+    // Should not timeout immediately
+    expect(onTimeout).not.toHaveBeenCalled();
+
+    // Advance to timeout
+    vi.advanceTimersByTime(180000);
+
+    // Should call onTimeout after timer expires
+    expect(onTimeout).toHaveBeenCalledTimes(1);
   });
 });

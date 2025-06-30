@@ -4,93 +4,119 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import fs from 'fs/promises';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('fs/promises');
+// Mock the package utility
+vi.mock('./package.js', () => ({
+  getPackageJson: vi.fn(),
+}));
 
-const mockFs = vi.mocked(fs);
+const mockGetPackageJson = (await import('./package.js')).getPackageJson;
 
 describe('Version Utilities', () => {
+  let originalEnv: NodeJS.ProcessEnv;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    originalEnv = process.env;
+    process.env = { ...originalEnv };
   });
 
-  it('should return current version from package.json', async () => {
-    const mockPackageJson = JSON.stringify({
-      name: 'gemini-cli',
-      version: '1.2.3',
-      description: 'CLI for Google Gemini AI'
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.env = originalEnv;
+  });
+
+  describe('getCliVersion', () => {
+    it('should return version from package.json', async () => {
+      vi.mocked(mockGetPackageJson).mockResolvedValue({
+        name: 'gemini-cli',
+        version: '1.2.3',
+      });
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('1.2.3');
     });
-    
-    mockFs.readFile.mockResolvedValue(mockPackageJson);
-    
-    const { getVersion } = await import('./version');
-    const version = await getVersion();
-    
-    expect(version).toBe('1.2.3');
-  });
 
-  it('should handle missing package.json', async () => {
-    mockFs.readFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+    it('should return version from CLI_VERSION environment variable', async () => {
+      process.env.CLI_VERSION = '2.0.0-dev';
+      vi.mocked(mockGetPackageJson).mockResolvedValue({
+        version: '1.2.3',
+      });
 
-    const { getVersion } = await import('./version');
-    const version = await getVersion();
-    
-    expect(version).toBe('unknown');
-  });
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
 
-  it('should handle invalid JSON in package.json', async () => {
-    mockFs.readFile.mockResolvedValue('{ invalid json }');
-
-    const { getVersion } = await import('./version');
-    const version = await getVersion();
-    
-    expect(version).toBe('unknown');
-  });
-
-  it('should validate version format', async () => {
-    const { isValidVersion } = await import('./version');
-    
-    expect(isValidVersion('1.0.0')).toBe(true);
-    expect(isValidVersion('1.0.0-beta')).toBe(true);
-    expect(isValidVersion('1.0.0-alpha.1')).toBe(true);
-    expect(isValidVersion('10.20.30')).toBe(true);
-    expect(isValidVersion('invalid')).toBe(false);
-    expect(isValidVersion('1.0')).toBe(false);
-    expect(isValidVersion('')).toBe(false);
-  });
-
-  it('should get build information', async () => {
-    const { getBuildInfo } = await import('./version');
-    const buildInfo = getBuildInfo();
-    
-    expect(buildInfo).toMatchObject({
-      date: expect.any(String),
-      commit: expect.any(String),
-      branch: expect.any(String)
+      expect(version).toBe('2.0.0-dev');
     });
-  });
 
-  it('should format version display string', async () => {
-    const { formatVersionDisplay } = await import('./version');
-    
-    const display = formatVersionDisplay('1.2.3', {
-      date: '2025-01-01',
-      commit: 'abc123',
-      branch: 'main'
+    it('should return "unknown" when package.json has no version', async () => {
+      vi.mocked(mockGetPackageJson).mockResolvedValue({
+        name: 'gemini-cli',
+      });
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('unknown');
     });
-    
-    expect(display).toContain('1.2.3');
-    expect(display).toContain('abc123');
-  });
 
-  it('should compare versions correctly', async () => {
-    const { compareVersions } = await import('./version');
-    
-    expect(compareVersions('1.0.0', '1.0.1')).toBe(-1);
-    expect(compareVersions('1.0.1', '1.0.0')).toBe(1);
-    expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
-    expect(compareVersions('2.0.0', '1.9.9')).toBe(1);
+    it('should return "unknown" when package.json is null', async () => {
+      vi.mocked(mockGetPackageJson).mockResolvedValue(null);
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('unknown');
+    });
+
+    it('should prioritize CLI_VERSION over package.json', async () => {
+      process.env.CLI_VERSION = '3.0.0-beta';
+      vi.mocked(mockGetPackageJson).mockResolvedValue({
+        version: '1.2.3',
+      });
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('3.0.0-beta');
+    });
+
+    it('should handle empty CLI_VERSION environment variable', async () => {
+      process.env.CLI_VERSION = '';
+      vi.mocked(mockGetPackageJson).mockResolvedValue({
+        version: '1.2.3',
+      });
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('1.2.3');
+    });
+
+    it('should handle package loading errors gracefully', async () => {
+      vi.mocked(mockGetPackageJson).mockRejectedValue(
+        new Error('File not found'),
+      );
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('unknown');
+    });
+
+    it('should handle package loading errors gracefully with environment variable fallback', async () => {
+      process.env.CLI_VERSION = '3.0.0-error-fallback';
+      vi.mocked(mockGetPackageJson).mockRejectedValue(
+        new Error('Package loading failed'),
+      );
+
+      const { getCliVersion } = await import('./version');
+      const version = await getCliVersion();
+
+      expect(version).toBe('3.0.0-error-fallback');
+    });
   });
 });

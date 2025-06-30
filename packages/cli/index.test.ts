@@ -4,16 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the main module since it likely has side effects
 vi.mock('./src/gemini', () => ({
-  default: vi.fn(),
+  main: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('CLI Entry Point', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should export the main CLI function', async () => {
@@ -22,10 +26,8 @@ describe('CLI Entry Point', () => {
   });
 
   it('should handle module import errors gracefully', async () => {
-    // Test error handling during module initialization
-    expect(async () => {
-      await import('./index');
-    }).not.toThrow();
+    // Test that module import resolves successfully
+    await expect(import('./index')).resolves.toBeDefined();
   });
 
   it('should have proper CLI structure', async () => {
@@ -36,7 +38,7 @@ describe('CLI Entry Point', () => {
   it('should handle process arguments correctly', async () => {
     const originalArgv = process.argv;
     process.argv = ['node', 'gemini-cli', '--help'];
-    
+
     try {
       const cliModule = await import('./index');
       expect(cliModule).toBeDefined();
@@ -48,7 +50,7 @@ describe('CLI Entry Point', () => {
   it('should handle environment variables', async () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
-    
+
     try {
       const cliModule = await import('./index');
       expect(cliModule).toBeDefined();

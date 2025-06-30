@@ -56,12 +56,20 @@ const editorCommands: Record<EditorType, { win32: string; default: string }> = {
 
 export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
+  if (!commandConfig) {
+    console.warn(`Unknown editor type: ${editor}`);
+    return false;
+  }
   const command =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
   return commandExists(command);
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
+  if (!editor) {
+    console.warn(`Invalid editor type: ${editor}`);
+    return false;
+  }
   const notUsingSandbox = !process.env.SANDBOX;
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
