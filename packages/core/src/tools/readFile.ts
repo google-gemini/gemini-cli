@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { Tool } from '../types/toolTypes';
-import { logger } from '../utils/logger'; // Assuming logger path
+import { logger } from '../core/logger.js';
 
 export interface ReadFileArgs {
   filePath: string;

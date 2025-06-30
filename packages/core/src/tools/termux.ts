@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import util from 'util';
 import { Tool } from '../types/toolTypes';
-import { logger } from '../utils/logger'; // Assuming logger path
+import { logger } from '../core/logger.js';
 
 const execAsync = util.promisify(exec);
 

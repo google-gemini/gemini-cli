@@ -16,7 +16,7 @@ import {
 } from '../config/settings.js';
 import { promisify } from 'util';
 import { SandboxConfig } from '@google/gemini-cli-core';
-import { logger } from '../../core/src/core/logger.js';
+import { logger } from '../../../core/src/core/logger.js';
 
 const execAsync = promisify(exec);
 
