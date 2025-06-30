@@ -31,7 +31,6 @@ describe('AuthDialog', () => {
     const { lastFrame } = render(
       <AuthDialog
         onSelect={() => {}}
-        onHighlight={() => {}}
         settings={settings}
         initialErrorMessage="GEMINI_API_KEY  environment variable not found"
       />,
@@ -59,11 +58,7 @@ describe('AuthDialog', () => {
     );
 
     const { lastFrame, stdin, unmount } = render(
-      <AuthDialog
-        onSelect={onSelect}
-        onHighlight={() => {}}
-        settings={settings}
-      />,
+      <AuthDialog onSelect={onSelect} settings={settings} />,
     );
     await wait();
 
@@ -96,11 +91,7 @@ describe('AuthDialog', () => {
     );
 
     const { stdin, unmount } = render(
-      <AuthDialog
-        onSelect={onSelect}
-        onHighlight={() => {}}
-        settings={settings}
-      />,
+      <AuthDialog onSelect={onSelect} settings={settings} />,
     );
     await wait();
 
