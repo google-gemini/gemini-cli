@@ -46,7 +46,16 @@ If you need to use a specific model or require a higher request capacity, you ca
 2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
 
    ```bash
+   in Linux or macOS
    export GEMINI_API_KEY="YOUR_API_KEY"
+   ```
+    ```bash
+   in power shell(windows)
+   $env:GOOGLE_CLOUD_PROJECT="your-project-id-here"
+   ```
+   ```bash
+   in CMD(windows)
+   set GOOGLE_CLOUD_PROJECT="your-project-id-here"
    ```
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
