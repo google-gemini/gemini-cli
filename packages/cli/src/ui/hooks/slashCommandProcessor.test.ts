@@ -655,8 +655,7 @@ describe('useSlashCommandProcessor', () => {
         expect.objectContaining({
           type: MessageType.ERROR,
           text: 'Could not retrieve tools.',
-        }),
-        expect.any(Number),
+        }),         expect.any(Number),
       );
       expect(commandResult).toBe(true);
     });
