@@ -8,6 +8,7 @@ import { ChunkRegistry } from './ChunkRegistry.js';
 import { ContextPruner } from './ContextPruner.js';
 import { HybridScorer } from './scoring/HybridScorer.js';
 import { ContextLogger, type OptimizationLogEntry } from './ContextLogger.js';
+import { FallbackStrategyManager } from './FallbackStrategies.js';
 import type {
   ConversationChunk,
   ContextOptimizationConfig,
@@ -39,6 +40,7 @@ export class ContextManager {
   private contextPruner: ContextPruner;
   private hybridScorer: HybridScorer;
   private logger: ContextLogger;
+  private fallbackManager: FallbackStrategyManager;
   private lastOptimizationStats: PruningStats | null = null;
   private cumulativeStats: CumulativeOptimizationStats;
 
@@ -48,6 +50,7 @@ export class ContextManager {
     this.contextPruner = new ContextPruner();
     this.hybridScorer = new HybridScorer(this.config.scoringWeights);
     this.logger = new ContextLogger(logLevel);
+    this.fallbackManager = new FallbackStrategyManager();
     this.cumulativeStats = this.initializeCumulativeStats();
   }
 
@@ -114,12 +117,11 @@ export class ContextManager {
   }
 
   /**
-   * Optimize context using the complete workflow:
-   * 1. Retrieve all chunks from registry
-   * 2. Score chunks using HybridScorer
-   * 3. Update chunks with scores in registry
-   * 4. Prune chunks using ContextPruner
-   * 5. Return optimized context window
+   * Optimize context using the complete workflow with robust fallback hierarchy:
+   * 1. Primary: Full hybrid scoring workflow
+   * 2. Fallback 1: Recency-based deterministic scoring
+   * 3. Fallback 2: Simple chronological truncation
+   * Always preserves mandatory chunks (system prompt, pinned memories)
    */
   async optimizeContext(query: RelevanceQuery, tokenBudget: number): Promise<ContextWindow> {
     const startTime = Date.now();
@@ -152,88 +154,84 @@ export class ContextManager {
     this.logger.logOptimizationStart(query.text, chunks, tokenBudget);
 
     try {
-      // Step 1: Score all chunks
-      const scoringStartTime = Date.now();
-      const scoringResults = await this.scoreChunks(chunks, query);
-      const scoringTime = Date.now() - scoringStartTime;
+      // PRIMARY: Full hybrid scoring workflow
+      return await this.fullScoringWorkflow(chunks, query, tokenBudget, startTime);
       
-      // Log scoring completion
-      this.logger.logScoringComplete(scoringResults, scoringTime);
-      
-      // Step 2: Update chunks with scores in registry
-      this.updateChunksWithScores(chunks, scoringResults);
-      
-      // Step 3: Get updated chunks with scores for pruning
-      const scoredChunks = this.chunkRegistry.getAllChunks();
-      
-      // Step 4: Prune chunks using optimization strategy
-      const pruningResult = this.contextPruner.pruneChunks(scoredChunks, query, tokenBudget);
-      
-      // Count mandatory chunks
-      const mandatoryCount = scoredChunks.filter(chunk => 
-        chunk.metadata.pinned === true ||
-        chunk.metadata.tags?.includes('system-prompt') ||
-        chunk.metadata.tags?.includes('tool-definition')
-      ).length;
-      
-      // Log pruning completion
-      this.logger.logPruningComplete(pruningResult.stats, mandatoryCount, pruningResult.prunedChunks);
-      
-      // Step 5: Track statistics
-      this.lastOptimizationStats = pruningResult.stats;
-      this.updateCumulativeStats(pruningResult.stats);
-      
-      // Create comprehensive log entry
-      const totalTime = Date.now() - startTime;
-      const logEntry: OptimizationLogEntry = {
-        query: query.text,
-        originalChunks: chunks.length,
-        finalChunks: pruningResult.prunedChunks.length,
-        originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
-        finalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
-        reductionPercentage: pruningResult.stats.reductionPercentage,
-        processingTimeMs: totalTime,
-        scoringBreakdown: this.calculateScoringBreakdown(scoringResults),
-        mandatoryChunks: mandatoryCount,
-        prunedChunks: chunks.filter(c => !pruningResult.prunedChunks.find(p => p.id === c.id)).map(c => c.id),
-        topScoredChunks: scoringResults
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 5)
-          .map(r => ({
-            id: r.chunkId,
-            score: r.score,
-            tokens: chunks.find(c => c.id === r.chunkId)?.tokens || 0,
-          })),
-      };
-      
-      // Log complete optimization
-      this.logger.logOptimizationComplete(logEntry);
-      
-      return {
-        chunks: pruningResult.prunedChunks,
-        totalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
-        maxTokens: tokenBudget,
-      };
-      
-    } catch (error) {
-      // Log error
-      this.logger.logError(error as Error, 'optimization workflow', {
+    } catch (scoringError) {
+      this.logger.logError(scoringError as Error, 'primary scoring workflow', {
         query: query.text,
         chunksCount: chunks.length,
         tokenBudget,
       });
       
-      // Fallback: proceed with pruning without scoring
-      const pruningResult = this.contextPruner.pruneChunks(chunks, query, tokenBudget);
-      
-      this.lastOptimizationStats = pruningResult.stats;
-      this.updateCumulativeStats(pruningResult.stats);
-      
-      return {
-        chunks: pruningResult.prunedChunks,
-        totalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
-        maxTokens: tokenBudget,
-      };
+      try {
+        // FALLBACK 1: Recency-based deterministic fallback
+        this.logger.logOptimizationStart(query.text + ' [RECENCY-FALLBACK]', chunks, tokenBudget);
+        const fallbackResult = await this.fallbackManager.executeFallback(chunks, query, tokenBudget);
+        
+        // Track fallback statistics
+        const fallbackStats: PruningStats = {
+          originalChunks: chunks.length,
+          prunedChunks: fallbackResult.chunks.length,
+          originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+          prunedTokens: fallbackResult.totalTokens,
+          reductionPercentage: Math.round(
+            ((chunks.reduce((sum, chunk) => sum + chunk.tokens, 0) - fallbackResult.totalTokens) / 
+             chunks.reduce((sum, chunk) => sum + chunk.tokens, 0)) * 100
+          ),
+          processingTimeMs: Date.now() - startTime,
+        };
+        
+        this.lastOptimizationStats = fallbackStats;
+        this.updateCumulativeStats(fallbackStats);
+        
+        this.logger.logOptimizationComplete({
+          query: query.text + ' [RECENCY-FALLBACK]',
+          originalChunks: chunks.length,
+          finalChunks: fallbackResult.chunks.length,
+          originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+          finalTokens: fallbackResult.totalTokens,
+          reductionPercentage: fallbackStats.reductionPercentage,
+          processingTimeMs: fallbackStats.processingTimeMs,
+          scoringBreakdown: { bm25Average: 0, recencyAverage: 1, embeddingAverage: 0, hybridAverage: 0.5 },
+          mandatoryChunks: chunks.filter(chunk => 
+            chunk.metadata.pinned === true ||
+            chunk.metadata.tags?.includes('system-prompt') ||
+            chunk.metadata.tags?.includes('tool-definition')
+          ).length,
+          prunedChunks: chunks.filter(c => !fallbackResult.chunks.find(p => p.id === c.id)).map(c => c.id),
+          topScoredChunks: [],
+        });
+        
+        return fallbackResult;
+        
+      } catch (fallbackError) {
+        this.logger.logError(fallbackError as Error, 'recency fallback', {
+          query: query.text,
+          chunksCount: chunks.length,
+          tokenBudget,
+        });
+        
+        // FALLBACK 2: Simple chronological truncation (ultimate fallback)
+        const simpleTruncationResult = await this.simpleTruncationFallback(chunks, tokenBudget);
+        
+        const ultimateStats: PruningStats = {
+          originalChunks: chunks.length,
+          prunedChunks: simpleTruncationResult.chunks.length,
+          originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+          prunedTokens: simpleTruncationResult.totalTokens,
+          reductionPercentage: Math.round(
+            ((chunks.reduce((sum, chunk) => sum + chunk.tokens, 0) - simpleTruncationResult.totalTokens) / 
+             chunks.reduce((sum, chunk) => sum + chunk.tokens, 0)) * 100
+          ),
+          processingTimeMs: Date.now() - startTime,
+        };
+        
+        this.lastOptimizationStats = ultimateStats;
+        this.updateCumulativeStats(ultimateStats);
+        
+        return simpleTruncationResult;
+      }
     }
   }
 
@@ -249,6 +247,121 @@ export class ContextManager {
    */
   getCumulativeStats(): CumulativeOptimizationStats {
     return { ...this.cumulativeStats };
+  }
+
+  /**
+   * Execute the full scoring workflow (primary path).
+   */
+  private async fullScoringWorkflow(
+    chunks: ConversationChunk[], 
+    query: RelevanceQuery, 
+    tokenBudget: number, 
+    startTime: number
+  ): Promise<ContextWindow> {
+    // Step 1: Score all chunks
+    const scoringStartTime = Date.now();
+    const scoringResults = await this.scoreChunks(chunks, query);
+    const scoringTime = Date.now() - scoringStartTime;
+    
+    // Log scoring completion
+    this.logger.logScoringComplete(scoringResults, scoringTime);
+    
+    // Step 2: Update chunks with scores in registry
+    this.updateChunksWithScores(chunks, scoringResults);
+    
+    // Step 3: Get updated chunks with scores for pruning
+    const scoredChunks = this.chunkRegistry.getAllChunks();
+    
+    // Step 4: Prune chunks using optimization strategy
+    const pruningResult = this.contextPruner.pruneChunks(scoredChunks, query, tokenBudget);
+    
+    // Count mandatory chunks
+    const mandatoryCount = scoredChunks.filter(chunk => 
+      chunk.metadata.pinned === true ||
+      chunk.metadata.tags?.includes('system-prompt') ||
+      chunk.metadata.tags?.includes('tool-definition')
+    ).length;
+    
+    // Log pruning completion
+    this.logger.logPruningComplete(pruningResult.stats, mandatoryCount, pruningResult.prunedChunks);
+    
+    // Step 5: Track statistics
+    this.lastOptimizationStats = pruningResult.stats;
+    this.updateCumulativeStats(pruningResult.stats);
+    
+    // Create comprehensive log entry
+    const totalTime = Date.now() - startTime;
+    const logEntry: OptimizationLogEntry = {
+      query: query.text,
+      originalChunks: chunks.length,
+      finalChunks: pruningResult.prunedChunks.length,
+      originalTokens: chunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+      finalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+      reductionPercentage: pruningResult.stats.reductionPercentage,
+      processingTimeMs: totalTime,
+      scoringBreakdown: this.calculateScoringBreakdown(scoringResults),
+      mandatoryChunks: mandatoryCount,
+      prunedChunks: chunks.filter(c => !pruningResult.prunedChunks.find(p => p.id === c.id)).map(c => c.id),
+      topScoredChunks: scoringResults
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+        .map(r => ({
+          id: r.chunkId,
+          score: r.score,
+          tokens: chunks.find(c => c.id === r.chunkId)?.tokens || 0,
+        })),
+    };
+    
+    // Log complete optimization
+    this.logger.logOptimizationComplete(logEntry);
+    
+    return {
+      chunks: pruningResult.prunedChunks,
+      totalTokens: pruningResult.prunedChunks.reduce((sum, chunk) => sum + chunk.tokens, 0),
+      maxTokens: tokenBudget,
+    };
+  }
+
+  /**
+   * Simple truncation fallback (ultimate fallback).
+   */
+  private async simpleTruncationFallback(chunks: ConversationChunk[], tokenBudget: number): Promise<ContextWindow> {
+    // Separate mandatory and optional chunks
+    const mandatoryChunks: ConversationChunk[] = [];
+    const optionalChunks: ConversationChunk[] = [];
+
+    chunks.forEach(chunk => {
+      if (chunk.metadata.pinned === true ||
+          chunk.metadata.tags?.includes('system-prompt') ||
+          chunk.metadata.tags?.includes('tool-definition')) {
+        mandatoryChunks.push(chunk);
+      } else {
+        optionalChunks.push(chunk);
+      }
+    });
+
+    // Always include mandatory chunks
+    let totalTokens = mandatoryChunks.reduce((sum, chunk) => sum + chunk.tokens, 0);
+    const selectedChunks = [...mandatoryChunks];
+
+    // Add optional chunks chronologically (most recent first) until budget exhausted
+    optionalChunks.sort((a, b) => b.timestamp - a.timestamp);
+
+    for (const chunk of optionalChunks) {
+      if (totalTokens + chunk.tokens <= tokenBudget) {
+        selectedChunks.push(chunk);
+        totalTokens += chunk.tokens;
+      }
+    }
+
+    // Restore chronological order for final output
+    selectedChunks.sort((a, b) => a.timestamp - b.timestamp);
+
+    return {
+      chunks: selectedChunks,
+      totalTokens,
+      maxTokens: tokenBudget,
+    };
   }
 
   /**
@@ -379,6 +492,17 @@ export class ContextManager {
     
     if (typeof manual !== 'number' || manual < 0 || manual > 1) {
       throw new Error('Configuration validation failed: manual weight must be a number between 0 and 1');
+    }
+
+    // Critical enhancement: Validate that scoring weights sum to 1.0
+    const totalWeight = embedding + bm25 + recency + manual;
+    
+    // Use epsilon for floating point comparison to handle precision issues
+    if (Math.abs(totalWeight - 1.0) > 0.001) {
+      throw new Error(
+        `Configuration validation failed: scoringWeights must sum to 1.0, but sum to ${totalWeight.toFixed(6)}. ` +
+        `Current weights: embedding=${embedding}, bm25=${bm25}, recency=${recency}, manual=${manual}`
+      );
     }
 
     return { ...config };

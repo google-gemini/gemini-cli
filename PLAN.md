@@ -1,208 +1,267 @@
-# Context Optimization Implementation Plan
+# Context Optimization PR Review Response Plan
 
 ## Overview
 
-This plan implements smart context pruning and relevance scoring for the Gemini CLI to efficiently manage large conversation histories while preserving important information within token limits.
+This plan addresses the high-priority issues identified in the PR review comments for the context optimization system implementation. All issues have been identified as "high priority" by the review bots and require immediate attention to ensure the system is production-ready.
 
-## Current State Analysis
+## Issues to Address
 
-- **Token Management**: The system supports 1M+ token contexts with different limits per model (tokenLimits.ts)
-- **Prompt Construction**: Central prompt building in prompts.ts combines system instructions, conversation history, and tool outputs
-- **Memory System**: Persistent conversation state via memoryTool.ts
-- **Content Generation**: Handles streaming responses and token counting via contentGenerator.ts
+### 1. ChunkRegistry Performance Issue (HIGH PRIORITY)
 
-## Architecture Design
+**Problem**: O(n) removal complexity in `removeChunk()` method
+- `indexOf()` and `splice()` operations create performance bottlenecks
+- Critical for systems handling 1000+ chunks with frequent removals
 
-### Core Components
+**Solution**: Implement doubly-linked list data structure
+```typescript
+interface ChunkNode {
+  chunk: ConversationChunk;
+  prev: ChunkNode | null;
+  next: ChunkNode | null;
+}
 
-#### 1. Context Manager (`packages/core/src/context/`)
-- **ContextManager**: Central orchestrator for context optimization
-- **ChunkRegistry**: In-memory store with persistent backing for conversation chunks
-- **RelevanceScorer**: Multi-algorithm scoring system
-- **ContextPruner**: Smart pruning with coherence preservation
+class ChunkRegistry {
+  private chunks: Map<string, ChunkNode> = new Map();
+  private head: ChunkNode | null = null;
+  private tail: ChunkNode | null = null;
+}
+```
 
-#### 2. Scoring Algorithms (`packages/core/src/context/scoring/`)
-- **BM25Scorer**: Fast lexical relevance using TF-IDF
-- **EmbeddingScorer**: Semantic similarity via embeddings
-- **RecencyScorer**: Time-based decay scoring
-- **HybridScorer**: Weighted combination of all scorers
+**Benefits**:
+- O(1) removal time complexity
+- Maintains insertion order
+- Efficient for large-scale chunk management
 
-#### 3. Data Structures (`packages/core/src/context/types/`)
-- **ConversationChunk**: Atomic unit (user+assistant exchange or tool output)
-- **ChunkMetadata**: Scoring data, embeddings, token counts
-- **ContextWindow**: Current active context with token tracking
+### 2. ContextManager Fallback Strategy (HIGH PRIORITY)
 
-### Implementation Strategy
+**Problem**: Poor context quality when scoring fails
+- Unscored chunks default to `finalScore = 0`
+- Greedy selection becomes arbitrary due to unstable sort
+- Degrades core feature goal of maintaining context quality
 
-#### Phase 1: Foundation (Week 1)
-1. **Basic chunking system** with token counting
-2. **BM25 lexical scoring** using `wink-bm25` library
-3. **Greedy pruning** by score-per-token ratio
-4. **Integration** with existing prompt construction
+**Solution**: Implement robust fallback hierarchy
+```typescript
+async optimizeContext(query: RelevanceQuery, tokenBudget: number): Promise<ContextWindow> {
+  try {
+    // Primary: Full hybrid scoring
+    return await this.fullScoringWorkflow(query, tokenBudget);
+  } catch (scoringError) {
+    try {
+      // Fallback 1: Recency-based deterministic truncation
+      return this.recencyBasedFallback(query, tokenBudget);
+    } catch (fallbackError) {
+      // Fallback 2: Simple chronological truncation
+      return this.simpleTruncationFallback(tokenBudget);
+    }
+  }
+}
+```
 
-#### Phase 2: Enhanced Scoring (Week 2)
-1. **Embedding integration** with Vertex AI text embeddings
-2. **HNSW index** for fast similarity search
-3. **Recency weighting** with exponential decay
-4. **Hybrid scoring** with configurable weights
+**Implementation Strategy**:
+- **Primary**: Hybrid scoring with BM25 + embedding + recency
+- **Fallback 1**: Recency-only scoring with exponential decay
+- **Fallback 2**: Simple chronological truncation respecting mandatory chunks
+- Always preserve mandatory chunks (system prompt, pinned memories)
 
-#### Phase 3: Advanced Features (Week 3)
-1. **Hierarchical summaries** for old conversation segments
-2. **Coherence preservation** with thread ancestry tracking
-3. **Memory slots** for persistent facts
-4. **Background processing** for expensive operations
+### 3. Configuration Validation Enhancement (HIGH PRIORITY)
+
+**Problem**: Missing weight sum validation
+- Scoring weights don't validate sum = 1.0
+- Improper normalization skews relevance ranking
+- Leads to suboptimal context pruning decisions
+
+**Solution**: Add comprehensive weight validation
+```typescript
+private validateAndSanitizeConfig(config: ContextOptimizationConfig): ContextOptimizationConfig {
+  // ... existing validations ...
+  
+  const { embedding, bm25, recency, manual } = config.scoringWeights;
+  const totalWeight = embedding + bm25 + recency + manual;
+  
+  // Use epsilon for floating point comparison
+  if (Math.abs(totalWeight - 1.0) > 0.001) {
+    throw new Error(
+      `Configuration validation failed: scoringWeights must sum to 1.0, but sum to ${totalWeight}`
+    );
+  }
+  
+  return { ...config };
+}
+```
+
+### 4. Documentation Standards (MINOR)
+
+**Problem**: Missing JSDoc completion notices in RecencyScorer
+- CodeRabbit identified incomplete documentation
+- Consistency with project documentation standards
+
+**Solution**: Add standardized JSDoc completion notices
+
+## Implementation Timeline
+
+### Phase 1: Critical Performance Fix (Day 1)
+- [ ] Implement doubly-linked list in ChunkRegistry
+- [ ] Update all registry methods for O(1) operations
+- [ ] Add comprehensive unit tests for new data structure
+- [ ] Performance benchmarks comparing old vs new implementation
+
+### Phase 2: Robust Fallback Strategy (Day 2)
+- [ ] Design and implement fallback hierarchy
+- [ ] Create recency-based fallback scorer
+- [ ] Add simple truncation fallback
+- [ ] Test all fallback scenarios with comprehensive error simulation
+
+### Phase 3: Configuration Validation (Day 2)
+- [ ] Add weight sum validation logic
+- [ ] Implement configuration sanitization
+- [ ] Add validation unit tests
+- [ ] Document configuration requirements
+
+### Phase 4: Documentation & Testing (Day 3)
+- [ ] Complete JSDoc standardization
+- [ ] Add integration tests for all fixes
+- [ ] Performance regression testing
+- [ ] Update monitoring and alerting
 
 ## Technical Specifications
 
-### Chunk Structure
+### ChunkRegistry Redesign
 ```typescript
-interface ConversationChunk {
-  id: string;
-  role: 'user' | 'assistant' | 'tool';
-  content: string;
-  tokens: number;
-  timestamp: number;
-  metadata: ChunkMetadata;
+export class ChunkRegistry {
+  private chunks: Map<string, ChunkNode> = new Map();
+  private head: ChunkNode | null = null;
+  private tail: ChunkNode | null = null;
+  private size: number = 0;
+
+  addChunk(chunk: ConversationChunk): void {
+    // O(1) insertion at tail
+  }
+
+  removeChunk(id: string): boolean {
+    // O(1) removal with node references
+  }
+
+  getAllChunks(): ConversationChunk[] {
+    // O(n) traversal, but maintains order
+  }
+}
+```
+
+### Fallback Strategy Architecture
+```typescript
+interface FallbackStrategy {
+  name: string;
+  priority: number;
+  execute(chunks: ConversationChunk[], query: RelevanceQuery, budget: number): Promise<ContextWindow>;
 }
 
-interface ChunkMetadata {
-  embedding?: number[];
-  bm25Score?: number;
-  recencyScore?: number;
-  finalScore?: number;
-  pinned?: boolean;
-  summaryOf?: string;
-  tags?: string[];
+class RecencyFallbackStrategy implements FallbackStrategy {
+  async execute(chunks: ConversationChunk[], query: RelevanceQuery, budget: number): Promise<ContextWindow> {
+    // Deterministic recency-based scoring
+    // Exponential decay from query timestamp
+    // Respects mandatory chunks
+  }
 }
 ```
 
-### Scoring Function
-```
-final_score = α × embedding_similarity + β × bm25_score + γ × recency_score + δ × manual_boost
-
-Default weights: α=0.4, β=0.4, γ=0.15, δ=0.05
-```
-
-### Pruning Algorithm
-1. **Mandatory inclusion**: System prompt, pinned memories, tool definitions
-2. **Candidate scoring**: All chunks scored by relevance to current query  
-3. **Greedy selection**: Sort by score/token ratio, select until budget reached
-4. **Coherence checks**: Preserve conversation flow and role alternation
-
-## Integration Points
-
-### Modified Files
-- `packages/core/src/core/prompts.ts`: Add context optimization calls
-- `packages/core/src/core/tokenLimits.ts`: Add pruning configuration
-- `packages/core/src/tools/memoryTool.ts`: Integrate with chunk registry
-- `packages/cli/src/ui/components/ContextSummaryDisplay.tsx`: Show optimization stats
-
-### New Dependencies
-- `wink-bm25`: Lexical scoring
-- `hnswlib-node`: Fast similarity search  
-- `@google-cloud/aiplatform`: Embedding generation
-- `tiktoken` or `gpt-3-tokenizer`: Accurate token counting
-
-## Configuration
-
-### Environment Variables
-```bash
-GEMINI_CONTEXT_OPTIMIZATION=true
-GEMINI_CONTEXT_MAX_CHUNKS=200
-GEMINI_EMBEDDING_ENABLED=false
-GEMINI_PRUNING_AGGRESSIVE=false
-```
-
-### Scoring Weights (tokenLimits.ts)
+### Configuration Validation Enhancement
 ```typescript
-export const CONTEXT_SCORING_WEIGHTS = {
-  embedding: 0.4,
-  bm25: 0.4, 
-  recency: 0.15,
-  manual: 0.05
-};
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  sanitizedConfig?: ContextOptimizationConfig;
+}
+
+private validateScoringWeights(weights: ScoringWeights): ValidationResult {
+  const errors: string[] = [];
+  
+  // Individual weight validation
+  Object.entries(weights).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value < 0 || value > 1) {
+      errors.push(`${key} weight must be between 0 and 1`);
+    }
+  });
+  
+  // Sum validation
+  const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+  if (Math.abs(sum - 1.0) > 0.001) {
+    errors.push(`Weights must sum to 1.0, current sum: ${sum}`);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
 ```
 
-## Performance Targets
+## Quality Assurance Plan
 
-- **Prompt building**: < 50ms for 1000 chunks
-- **Memory usage**: < 100MB for embeddings cache
-- **Token reduction**: 30-50% with <5% relevance loss
-- **Latency impact**: < 10ms added per request
+### Performance Testing
+- [ ] Benchmark ChunkRegistry operations with 1000+ chunks
+- [ ] Memory usage analysis for new data structures
+- [ ] Latency impact measurement for fallback scenarios
+- [ ] Token counting accuracy validation
 
-## Testing Strategy
+### Reliability Testing
+- [ ] Error injection testing for scoring failures
+- [ ] Configuration edge case validation
+- [ ] Fallback chain stress testing
+- [ ] Memory leak detection
 
-### Unit Tests
-- Individual scorer accuracy
-- Pruning algorithm correctness  
-- Token counting precision
-- Chunk serialization/deserialization
+### Integration Testing
+- [ ] End-to-end optimization workflows
+- [ ] Cross-component compatibility verification
+- [ ] Backward compatibility validation
+- [ ] Performance regression prevention
 
-### Integration Tests  
-- End-to-end conversation flows
-- Memory persistence across sessions
-- Performance benchmarks
-- Edge cases (empty history, oversized chunks)
+## Success Criteria
 
-### Validation Metrics
-- **Relevance preservation**: Manual evaluation of pruned contexts
-- **Performance impact**: Latency measurements  
-- **Memory efficiency**: Heap usage tracking
-- **Token budget compliance**: Never exceed model limits
+### Performance Targets
+- **ChunkRegistry removal**: O(1) complexity maintained
+- **Fallback latency**: < 5ms additional overhead
+- **Memory efficiency**: No memory leaks in linked list operations
+- **Configuration validation**: < 1ms validation time
+
+### Quality Targets
+- **Fallback quality**: Deterministic, predictable context selection
+- **Configuration robustness**: Comprehensive validation coverage
+- **Documentation completeness**: 100% JSDoc coverage
+- **Test coverage**: 95%+ for all modified components
 
 ## Risk Mitigation
 
-### Fallback Strategies
-- **Embedding failures**: Fall back to BM25-only scoring
-- **Performance issues**: Disable optimization, use simple truncation
-- **Memory pressure**: Aggressive LRU eviction of embeddings
+### Performance Risks
+- **Mitigation**: Comprehensive benchmarking before deployment
+- **Fallback**: Ability to revert to original array-based registry
 
-### Monitoring
-- **Context optimization metrics** via telemetry
-- **Token usage tracking** before/after optimization  
-- **Error rate monitoring** for embedding/scoring failures
+### Quality Risks
+- **Mitigation**: Extensive fallback scenario testing
+- **Monitoring**: Real-time context quality metrics
 
-## Migration Plan
+### Integration Risks
+- **Mitigation**: Backward compatibility testing
+- **Deployment**: Feature flag controlled rollout
 
-### Phase 1: Feature Flag
-- Deploy behind `GEMINI_CONTEXT_OPTIMIZATION` flag
-- A/B test with subset of users
-- Monitor performance and accuracy metrics
+## Monitoring & Observability
 
-### Phase 2: Gradual Rollout
-- Enable for power users first
-- Collect feedback and iterate
-- Performance tuning based on real usage
+### Metrics to Track
+- ChunkRegistry operation latencies
+- Fallback strategy activation rates
+- Configuration validation error rates
+- Context optimization success/failure ratios
 
-### Phase 3: Default Enable
-- Make optimization default for all users
-- Maintain backward compatibility
-- Add UI controls for customization
+### Alerting Thresholds
+- ChunkRegistry operations > 10ms (should be ~1ms)
+- Fallback activation rate > 5%
+- Configuration validation failures > 1%
+- Context optimization errors > 0.1%
 
-## Success Metrics
+## Implementation Order
 
-- **30-50% reduction** in token usage for large conversations
-- **< 10ms latency** added to prompt construction
-- **95% user satisfaction** with context relevance
-- **Zero regression** in core CLI functionality
+1. **ChunkRegistry Performance Fix** (Critical Path)
+2. **Configuration Validation** (Blocks deployment)
+3. **Fallback Strategy** (Quality assurance)
+4. **Documentation & Testing** (Completion)
 
-## Dependencies
-
-### Technical Dependencies
-- Node.js embedding libraries
-- Fast similarity search (HNSW)  
-- Tokenization libraries
-- Performance monitoring tools
-
-### Team Dependencies
-- Backend: Core context management system
-- Frontend: UI components for optimization display
-- DevOps: Feature flag infrastructure  
-- QA: Comprehensive testing across conversation types
-
-## Timeline
-
-- **Week 1**: Foundation implementation and basic testing
-- **Week 2**: Enhanced scoring and performance optimization  
-- **Week 3**: Advanced features and comprehensive testing
-- **Week 4**: Integration, documentation, and rollout preparation
+This plan ensures all high-priority issues are addressed systematically while maintaining system reliability and performance standards.

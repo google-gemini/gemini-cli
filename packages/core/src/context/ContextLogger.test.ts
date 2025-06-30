@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContextLogger } from './ContextLogger.js';
 import type { ConversationChunk, ScoringResult, PruningStats } from './types.js';
 

@@ -714,14 +714,17 @@ describe('Context Optimization Performance and Validation', () => {
       
       // Rapidly change configuration and optimize
       for (let i = 0; i < 10; i++) {
+        // Create valid weight configurations that sum to 1.0
+        const configs = [
+          { embedding: 0.4, bm25: 0.4, recency: 0.15, manual: 0.05 },
+          { embedding: 0.3, bm25: 0.5, recency: 0.15, manual: 0.05 },
+          { embedding: 0.5, bm25: 0.3, recency: 0.15, manual: 0.05 },
+          { embedding: 0.35, bm25: 0.35, recency: 0.25, manual: 0.05 },
+          { embedding: 0.35, bm25: 0.35, recency: 0.2, manual: 0.1 },
+        ];
         contextManager.updateConfig({
           ...config,
-          scoringWeights: {
-            embedding: 0.1 + (i % 3) * 0.3,
-            bm25: 0.1 + (i % 4) * 0.3,
-            recency: 0.1 + (i % 2) * 0.4,
-            manual: 0.05,
-          },
+          scoringWeights: configs[i % configs.length],
         });
         
         await contextManager.optimizeContext(query, 1500);

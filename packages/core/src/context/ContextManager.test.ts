@@ -332,6 +332,78 @@ describe('ContextManager Unit Tests', () => {
       expect(() => contextManager.updateConfig(invalidWeights)).toThrow();
     });
 
+    it('should validate weight sum equals 1.0', () => {
+      // Test case 1: Weights sum to more than 1.0
+      const weightsOverOne = {
+        ...config,
+        scoringWeights: {
+          embedding: 0.5,
+          bm25: 0.5,
+          recency: 0.2,  // Sum = 1.2
+          manual: 0.1,
+        },
+      };
+
+      expect(() => contextManager.updateConfig(weightsOverOne))
+        .toThrow(/scoringWeights must sum to 1\.0/);
+
+      // Test case 2: Weights sum to less than 1.0
+      const weightsUnderOne = {
+        ...config,
+        scoringWeights: {
+          embedding: 0.3,
+          bm25: 0.3,
+          recency: 0.1,  // Sum = 0.8
+          manual: 0.1,
+        },
+      };
+
+      expect(() => contextManager.updateConfig(weightsUnderOne))
+        .toThrow(/scoringWeights must sum to 1\.0/);
+
+      // Test case 3: Valid weights that sum to 1.0
+      const validWeights = {
+        ...config,
+        scoringWeights: {
+          embedding: 0.35,
+          bm25: 0.35,
+          recency: 0.2,   // Sum = 1.0
+          manual: 0.1,
+        },
+      };
+
+      expect(() => contextManager.updateConfig(validWeights)).not.toThrow();
+    });
+
+    it('should handle floating point precision in weight validation', () => {
+      // Test weights that are very close to 1.0 but not exact due to floating point precision
+      const nearlyValidWeights = {
+        ...config,
+        scoringWeights: {
+          embedding: 0.333333333,
+          bm25: 0.333333333,
+          recency: 0.333333333,  // Sum ≈ 0.999999999 (within epsilon)
+          manual: 0.000000001,
+        },
+      };
+
+      expect(() => contextManager.updateConfig(nearlyValidWeights)).not.toThrow();
+
+      // Test weights that exceed the epsilon tolerance
+      const invalidByEpsilon = {
+        ...config,
+        scoringWeights: {
+          embedding: 0.5,
+          bm25: 0.5,
+          recency: 0.002,  // Sum = 1.002 (exceeds 0.001 epsilon)
+          manual: 0.0,
+        },
+      };
+
+      expect(() => contextManager.updateConfig(invalidByEpsilon))
+        .toThrow(/scoringWeights must sum to 1\.0/);
+    });
+
     it('should validate maxChunks parameter', () => {
       const invalidMaxChunks = {
         ...config,
