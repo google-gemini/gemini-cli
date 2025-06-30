@@ -211,6 +211,16 @@ describe('fileUtils', () => {
       expect(detectFileType('file.pdf')).toBe('pdf');
     });
 
+    it('should detect audio type by extension', () => {
+      mockMimeLookup.mockReturnValueOnce('audio/mpeg');
+      expect(detectFileType('song.mp3')).toBe('audio');
+    });
+
+    it('should detect video type by extension', () => {
+      mockMimeLookup.mockReturnValueOnce('video/mp4');
+      expect(detectFileType('movie.mp4')).toBe('video');
+    });
+
     it('should detect known binary extensions as binary (e.g. .zip)', () => {
       mockMimeLookup.mockReturnValueOnce('application/zip');
       expect(detectFileType('archive.zip')).toBe('binary');
@@ -426,6 +436,24 @@ describe('fileUtils', () => {
         '[File content partially truncated: some lines exceeded maximum length of 2000 characters.]',
       );
       expect(result.isTruncated).toBe(true);
+    });
+
+    it('should return an error if the file size exceeds 20MB', async () => {
+      // Create a file just over 20MB
+      const twentyOneMB = 21 * 1024 * 1024;
+      const buffer = Buffer.alloc(twentyOneMB, 0x61); // Fill with 'a'
+      actualNodeFs.writeFileSync(testTextFilePath, buffer);
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+      );
+
+      expect(result.error).toContain('File size exceeds the 20MB limit');
+      expect(result.returnDisplay).toContain(
+        'File size exceeds the 20MB limit',
+      );
+      expect(result.llmContent).toContain('File size exceeds the 20MB limit');
     });
   });
 });
