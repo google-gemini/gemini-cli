@@ -33,6 +33,7 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import { listSessions, loadSession, saveSession } from '../../utils/session.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -45,7 +46,7 @@ export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
-  completion?: () => Promise<string[]>;
+  completion?: (mainCommand: string, subCommand?: string) => Promise<string[]>;
   action: (
     mainCommand: string,
     subCommand?: string,
@@ -804,17 +805,120 @@ export const useSlashCommandProcessor = (
                 timestamp: new Date(),
               });
               return;
+            case 'list-auto': {
+              const sessions = await listSessions();
+              if (sessions.length === 0) {
+                addMessage({
+                  type: MessageType.INFO,
+                  content: 'No automatically saved sessions found.',
+                  timestamp: new Date(),
+                });
+              } else {
+                let messageContent =
+                  'Automatically saved sessions (ID - Full ID - Saved Time):\n';
+                sessions.forEach((session) => {
+                  messageContent += `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`;
+                });
+                addMessage({
+                  type: MessageType.INFO,
+                  content: messageContent,
+                  timestamp: new Date(),
+                });
+              }
+              return;
+            }
+            case 'resume-auto': {
+              if (!tag) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: 'Please provide a session ID to resume.',
+                  timestamp: new Date(),
+                });
+                return;
+              }
+
+              const sessions = await listSessions();
+              const targetSession = sessions.find(
+                (s) => s.shortId.toString() === tag || s.fullId === tag,
+              );
+
+              if (!targetSession) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: `Session with ID '${tag}' not found.`,
+                  timestamp: new Date(),
+                });
+                return;
+              }
+
+              const loadedHistory = await loadSession(targetSession.fullId);
+              if (loadedHistory) {
+                clearItems();
+                chat.clearHistory();
+                const rolemap: { [key: string]: MessageType } = {
+                  user: MessageType.USER,
+                  model: MessageType.GEMINI,
+                };
+                let hasSystemPrompt = false;
+                let i = 0;
+                for (const item of loadedHistory) {
+                  i += 1;
+                  chat.addHistory(item);
+                  const text =
+                    item.parts
+                      ?.filter((m) => !!m.text)
+                      .map((m) => m.text)
+                      .join('') || '';
+                  if (!text) {
+                    continue;
+                  }
+                  if (i === 1 && text.match(/context for our chat/)) {
+                    hasSystemPrompt = true;
+                  }
+                  if (i > 2 || !hasSystemPrompt) {
+                    addItem(
+                      {
+                        type:
+                          (item.role && rolemap[item.role]) ||
+                          MessageType.GEMINI,
+                        text,
+                      } as HistoryItemWithoutId,
+                      i,
+                    );
+                  }
+                }
+                console.clear();
+                refreshStatic();
+                addMessage({
+                  type: MessageType.INFO,
+                  content: `Session ${targetSession.fullId} loaded successfully.`,
+                  timestamp: new Date(),
+                });
+              } else {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: `Failed to load session ${targetSession.fullId}.`,
+                  timestamp: new Date(),
+                });
+              }
+              return;
+            }
             default:
               addMessage({
                 type: MessageType.ERROR,
-                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume`,
+                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume, list-auto, resume-auto`,
                 timestamp: new Date(),
               });
               return;
           }
         },
-        completion: async () =>
-          (await savedChatTags()).map((tag) => 'resume ' + tag),
+        completion: async (mainCommand, subCommand) => {
+          if (subCommand === 'resume-auto') {
+            const sessions = await listSessions();
+            return sessions.map((session) => session.shortId.toString());
+          }
+          return (await savedChatTags()).map((tag) => 'resume ' + tag);
+        },
       },
       {
         name: 'quit',
@@ -825,12 +929,21 @@ export const useSlashCommandProcessor = (
           const { sessionStartTime } = session.stats;
           const wallDuration = now.getTime() - sessionStartTime.getTime();
 
-          setQuittingMessages([
+          // Explicitly save the session before quitting
+          const chat = await config?.getGeminiClient()?.getChat();
+          const chatHistory = chat?.getHistory() || [];
+          if (chatHistory.length > 0) {
+            await saveSession(chatHistory);
+          }
+
+          addItem(
             {
-              type: 'user',
+              type: MessageType.USER,
               text: `/${mainCommand}`,
-              id: now.getTime() - 1,
             },
+            now.getTime() - 1,
+          );
+          setQuittingMessages([
             {
               type: 'quit',
               duration: formatDuration(wallDuration),

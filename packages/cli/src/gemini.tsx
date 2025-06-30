@@ -23,7 +23,8 @@ import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
-import { cleanupCheckpoints } from './utils/cleanup.js';
+import { cleanupOldCheckpoints } from './utils/cleanup.js';
+import { saveSession, loadSession, listSessions } from './utils/session.js';
 import {
   ApprovalMode,
   Config,
@@ -33,9 +34,96 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getProjectTempDir,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { Content } from '@google/genai';
+import fs from 'fs';
+import path from 'path';
+
+let lastSessionHistory: Content[] = [];
+
+// Synchronous session save for immediate exits
+function saveSessionSync(history: Content[]) {
+  try {
+    const tempDir = getProjectTempDir(process.cwd());
+    const sessionsDir = path.join(tempDir, 'sessions');
+    fs.mkdirSync(sessionsDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `session-${timestamp}.json`;
+    const filePath = path.join(sessionsDir, fileName);
+
+    fs.writeFileSync(filePath, JSON.stringify(history, null, 2));
+    console.log(`Session saved to ${filePath}`);
+  } catch (error) {
+    console.error('Failed to save session on exit:', error);
+  }
+}
+
+// Track if we're already in the exit process to avoid double-saving
+let isExiting = false;
+
+// Handle graceful shutdown with async operations
+process.on('beforeExit', async () => {
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    try {
+      await saveSession(lastSessionHistory);
+    } catch (error) {
+      console.error('Failed to save session on beforeExit:', error);
+      // Fallback to sync save if async fails
+      saveSessionSync(lastSessionHistory);
+    }
+  }
+});
+
+// Handle various exit signals
+function handleExitSignal(signal: string) {
+  return () => {
+    if (!isExiting && lastSessionHistory.length > 0) {
+      isExiting = true;
+      console.log(`\nReceived ${signal}, saving session...`);
+      saveSessionSync(lastSessionHistory);
+    }
+    process.exit(0);
+  };
+}
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', handleExitSignal('SIGINT'));
+
+// Handle SIGTERM (termination)
+process.on('SIGTERM', handleExitSignal('SIGTERM'));
+
+// Handle SIGHUP (hang up)
+process.on('SIGHUP', handleExitSignal('SIGHUP'));
+
+// Handle SIGQUIT (quit)
+process.on('SIGQUIT', handleExitSignal('SIGQUIT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    console.log('Saving session before crash...');
+    saveSessionSync(lastSessionHistory);
+  }
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    console.log('Saving session before crash...');
+    saveSessionSync(lastSessionHistory);
+  }
+  process.exit(1);
+});
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -85,7 +173,7 @@ export async function main() {
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
-  await cleanupCheckpoints();
+  await cleanupOldCheckpoints();
   if (settings.errors.length > 0) {
     for (const error of settings.errors) {
       let errorMessage = `Error in ${error.path}: ${error.message}`;
@@ -163,8 +251,44 @@ export async function main() {
       }
     }
   }
-  let input = config.getQuestion();
+  let input: string | undefined = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
+
+  let initialHistory: Content[] = [];
+
+  if (input?.startsWith('/chat resume-auto ')) {
+    const sessionId = input.substring('/chat resume-auto '.length).trim();
+    if (sessionId) {
+      const loadedHistory = await loadSession(sessionId);
+      if (loadedHistory) {
+        initialHistory = loadedHistory;
+        console.log(`Session ${sessionId} loaded successfully.`);
+        // Clear the input so it doesn't get processed as a new prompt
+        input = '';
+      } else {
+        console.error(`Failed to load session ${sessionId}.`);
+        process.exit(1);
+      }
+    } else {
+      console.error('Please provide a session ID to resume.');
+      process.exit(1);
+    }
+  } else if (input?.startsWith('/chat list-auto')) {
+    const sessions = await listSessions();
+    if (sessions.length === 0) {
+      console.log('No automatically saved sessions found.');
+    } else {
+      console.log('Automatically saved sessions:');
+      sessions.forEach(
+        (session: { shortId: number; fullId: string; timestamp: string }) => {
+          console.log(
+            `  ${session.shortId} - ${session.fullId} - ${session.timestamp}`,
+          );
+        },
+      );
+    }
+    process.exit(0);
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
@@ -175,6 +299,7 @@ export async function main() {
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}
+          initialHistory={initialHistory}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
@@ -184,9 +309,9 @@ export async function main() {
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
-    input += await readStdin();
+    input = (input || '') + (await readStdin());
   }
-  if (!input) {
+  if (!input && initialHistory.length === 0) {
     console.error('No input provided via stdin.');
     process.exit(1);
   }
@@ -194,8 +319,8 @@ export async function main() {
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
-    prompt: input,
-    prompt_length: input.length,
+    prompt: input || '',
+    prompt_length: input?.length || 0,
   });
 
   // Non-interactive mode handled by runNonInteractive
@@ -205,7 +330,16 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  try {
+    lastSessionHistory = await runNonInteractive(
+      nonInteractiveConfig,
+      input || '',
+      initialHistory,
+    );
+  } catch (error) {
+    console.error('Error in non-interactive mode:', error);
+    process.exit(1);
+  }
   process.exit(0);
 }
 

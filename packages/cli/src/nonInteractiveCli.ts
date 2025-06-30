@@ -18,6 +18,7 @@ import {
   FunctionCall,
   GenerateContentResponse,
 } from '@google/genai';
+import { listSessions, loadSession } from './utils/session.js';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 
@@ -46,7 +47,8 @@ function getResponseText(response: GenerateContentResponse): string | null {
 export async function runNonInteractive(
   config: Config,
   input: string,
-): Promise<void> {
+  initialHistory: Content[] = [],
+): Promise<Content[]> {
   // Handle EPIPE errors when the output is piped to a command that closes early.
   process.stdout.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EPIPE') {
@@ -60,7 +62,39 @@ export async function runNonInteractive(
 
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
+  let currentMessages: Content[] =
+    initialHistory.length > 0
+      ? initialHistory
+      : [{ role: 'user', parts: [{ text: input }] }];
+
+  if (input.startsWith('/chat list-auto')) {
+    const sessions = await listSessions();
+    if (sessions.length === 0) {
+      process.stdout.write('No automatically saved sessions found.\n');
+    } else {
+      process.stdout.write('Automatically saved sessions:\n');
+      sessions.forEach((session) => {
+        process.stdout.write(
+          `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`,
+        );
+      });
+    }
+    return currentMessages;
+  } else if (input.startsWith('/chat resume-auto ')) {
+    const sessionId = input.substring('/chat resume-auto '.length).trim();
+    if (sessionId) {
+      const loadedHistory = await loadSession(sessionId);
+      if (loadedHistory) {
+        process.stdout.write(`Session ${sessionId} loaded successfully.\n`);
+        return loadedHistory;
+      } else {
+        process.stdout.write(`Failed to load session ${sessionId}.\n`);
+      }
+    } else {
+      process.stdout.write('Please provide a session ID to resume.\n');
+    }
+    return currentMessages;
+  }
 
   try {
     while (true) {
@@ -78,8 +112,7 @@ export async function runNonInteractive(
 
       for await (const resp of responseStream) {
         if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
-          return;
+          return currentMessages;
         }
         const textPart = getResponseText(resp);
         if (textPart) {
@@ -117,7 +150,9 @@ export async function runNonInteractive(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
             if (!isToolNotFound) {
-              process.exit(1);
+              throw new Error(
+                `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
+              );
             }
           }
 
@@ -137,7 +172,7 @@ export async function runNonInteractive(
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
         process.stdout.write('\n'); // Ensure a final newline
-        return;
+        return currentMessages;
       }
     }
   } catch (error) {
@@ -147,7 +182,7 @@ export async function runNonInteractive(
         config.getContentGeneratorConfig().authType,
       ),
     );
-    process.exit(1);
+    throw error; // Re-throw the error to be handled by the caller
   } finally {
     if (isTelemetrySdkInitialized()) {
       await shutdownTelemetry();

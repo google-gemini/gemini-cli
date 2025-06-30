@@ -17,6 +17,7 @@ import {
   type Key as InkKeyType,
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import { Content } from '@google/genai';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -79,6 +80,7 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
+  initialHistory?: Content[];
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -87,7 +89,12 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+const App = ({
+  config,
+  settings,
+  startupWarnings = [],
+  initialHistory = [],
+}: AppProps) => {
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -96,7 +103,20 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     checkForUpdates().then(setUpdateMessage);
   }, []);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
+  const convertedInitialHistory: HistoryItem[] = useMemo(
+    () =>
+      initialHistory.map((content, index) => ({
+        id: index, // Simple ID for now, will be replaced by useHistory
+        type: content.role === 'user' ? MessageType.USER : MessageType.GEMINI,
+        text: content.parts?.map((part) => part.text).join('') || '',
+        timestamp: Date.now(),
+      })),
+    [initialHistory],
+  );
+
+  const { history, addItem, clearItems, loadHistory } = useHistory(
+    convertedInitialHistory,
+  );
   const {
     consoleMessages,
     handleNewMessage,

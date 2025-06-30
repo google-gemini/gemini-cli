@@ -120,6 +120,12 @@ describe('useSlashCommandProcessor', () => {
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
       tryCompressChat: mockTryCompressChat,
+      getChat: vi.fn().mockResolvedValue({
+        getHistory: vi.fn().mockReturnValue([
+          { role: 'user', parts: [{ text: 'test message' }] },
+          { role: 'model', parts: [{ text: 'test response' }] },
+        ]),
+      }),
     } as unknown as GeminiClient;
     mockConfig = {
       getDebugMode: vi.fn(() => false),
@@ -605,24 +611,45 @@ describe('useSlashCommandProcessor', () => {
       vi.useRealTimers();
     });
 
-    it.each([['/quit'], ['/exit']])(
+    it.each([
+      ['/quit', 'quit'],
+      ['/exit', 'exit'],
+    ])(
       'should handle %s, set quitting messages, and exit the process',
-      async (command) => {
-        const { handleSlashCommand } = getProcessor();
+      async (command, mainCommand) => {
+        const { slashCommands } = getProcessor();
+        const quitCommand = slashCommands.find(
+          (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
+        );
+        expect(quitCommand).toBeDefined();
+
         const mockDate = new Date('2025-01-01T01:02:03.000Z');
         vi.setSystemTime(mockDate);
 
+        const mockChat = {
+          getHistory: vi.fn().mockReturnValue([
+            {
+              role: 'user',
+              parts: [{ text: 'test message' }],
+            },
+            {
+              role: 'model',
+              parts: [{ text: 'test response' }],
+            },
+          ]),
+        };
+        mockConfig = {
+          ...mockConfig,
+          getGeminiClient: () => ({
+            getChat: () => mockChat,
+          }),
+        } as unknown as Config;
+
         await act(async () => {
-          handleSlashCommand(command);
+          await quitCommand?.action(mainCommand, undefined, undefined);
         });
 
-        expect(mockAddItem).not.toHaveBeenCalled();
         expect(mockSetQuittingMessages).toHaveBeenCalledWith([
-          {
-            type: 'user',
-            text: command,
-            id: expect.any(Number),
-          },
           {
             type: 'quit',
             duration: '1h 2m 3s',

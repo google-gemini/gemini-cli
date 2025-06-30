@@ -189,30 +189,28 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Trigger tool error');
+    await expect(
+      runNonInteractive(mockConfig, 'Trigger tool error'),
+    ).rejects.toThrow(
+      'Error executing tool errorTool: Tool execution failed badly',
+    );
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Error executing tool errorTool: Tool execution failed badly',
     );
-    expect(mockChat.sendMessageStream).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        message: [errorResponsePart],
-      }),
-    );
-    expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
-      'Could not complete request.',
-    );
   });
 
-  it('should exit with error if sendMessageStream throws initially', async () => {
+  it('should throw an error if sendMessageStream throws initially', async () => {
     const apiError = new Error('API connection failed');
     mockChat.sendMessageStream.mockRejectedValue(apiError);
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Initial fail');
+    await expect(runNonInteractive(mockConfig, 'Initial fail')).rejects.toThrow(
+      'API connection failed',
+    );
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[API Error: API connection failed]',

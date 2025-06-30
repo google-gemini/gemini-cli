@@ -139,7 +139,7 @@ export function useCompletion(
         const fetchAndSetSuggestions = async () => {
           setIsLoadingSuggestions(true);
           if (command.completion) {
-            const results = await command.completion();
+            const results = await command.completion(commandName, subCommand);
             const filtered = results.filter((r) => r.startsWith(subCommand));
             const newSuggestions = filtered.map((s) => ({
               label: s,

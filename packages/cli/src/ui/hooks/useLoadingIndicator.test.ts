@@ -32,25 +32,42 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reflect values when Responding', async () => {
+    // Mock Math.random to control phrase cycling
+    let randomCalls = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      randomCalls++;
+      // Return different values to ensure phrase changes
+      if (randomCalls === 1) return 0; // First phrase
+      if (randomCalls === 2) return 0.5; // Middle phrase
+      return 0.9; // Last phrase
+    });
+
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Responding),
     );
 
     // Initial state before timers advance
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
-    const initialPhrase = result.current.currentLoadingPhrase;
+    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
     });
 
     // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
-    expect(result.current.currentLoadingPhrase).not.toBe(initialPhrase);
+    expect(result.current.currentLoadingPhrase).toBe(
+      WITTY_LOADING_PHRASES[Math.floor(0.5 * WITTY_LOADING_PHRASES.length)],
+    );
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
+    );
+
+    // Advance again to ensure it cycles further
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    });
+    expect(result.current.currentLoadingPhrase).toBe(
+      WITTY_LOADING_PHRASES[Math.floor(0.9 * WITTY_LOADING_PHRASES.length)],
     );
   });
 

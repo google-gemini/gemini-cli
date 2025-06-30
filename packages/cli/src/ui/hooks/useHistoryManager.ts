@@ -29,8 +29,10 @@ export interface UseHistoryManagerReturn {
  * Encapsulates the history array, message ID generation, adding items,
  * updating items, and clearing the history.
  */
-export function useHistory(): UseHistoryManagerReturn {
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+export function useHistory(
+  initialHistory: HistoryItem[] = [],
+): UseHistoryManagerReturn {
+  const [history, setHistory] = useState<HistoryItem[]>(initialHistory);
   const messageIdCounterRef = useRef(0);
 
   // Generates a unique message ID based on a timestamp and a counter.
