@@ -43,6 +43,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { ContextualCodeSearchTool } from '../tools/contextual-code-search.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -500,6 +501,16 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);
   return (async () => {
+    try {
+      const data =
+        await ContextualCodeSearchTool.getCodeCustomizationAvailability();
+      if (data && data.state === 'ENABLED') {
+        registerCoreTool(ContextualCodeSearchTool);
+      }
+    } catch (error) {
+      // If the request fails, log the error and continue without the tool.
+      console.error('Failed to register contextual code search tool.', error);
+    }
     await registry.discoverTools();
     return registry;
   })();
