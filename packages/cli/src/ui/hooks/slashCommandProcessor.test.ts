@@ -1279,4 +1279,575 @@ describe('useSlashCommandProcessor', () => {
       );
     });
   });
+
+  describe('/export command', () => {
+    let mockWriteFile: Mock;
+    let mockMkdir: Mock;
+    let mockReadFile: Mock;
+
+    beforeEach(async () => {
+      const fs = await import('node:fs/promises');
+      mockWriteFile = fs.writeFile as Mock;
+      mockMkdir = fs.mkdir as Mock;
+      mockReadFile = fs.readFile as Mock;
+
+      mockWriteFile.mockResolvedValue(undefined);
+      mockMkdir.mockResolvedValue(undefined);
+      mockReadFile.mockResolvedValue('test content');
+
+      // Set up environment for sandbox detection
+      delete process.env.SANDBOX;
+      delete process.env.SEATBELT_PROFILE;
+      delete process.env.GOOGLE_CLOUD_PROJECT;
+
+      // Mock additional config methods needed for export
+      mockConfig = {
+        ...mockConfig,
+        getSessionId: vi.fn(() => 'test-session-123'),
+        getGeminiClient: vi.fn(() => ({
+          getChat: vi.fn(() => ({
+            getHistory: vi.fn().mockResolvedValue([
+              { role: 'user', parts: [{ text: 'test user input' }] },
+              { role: 'model', parts: [{ text: 'test ai response' }] },
+            ]),
+          })),
+        })),
+      } as unknown as Config;
+
+      // Mock session stats with more comprehensive data
+      mockUseSessionStats.mockReturnValue({
+        stats: {
+          sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
+          cumulative: {
+            turnCount: 5,
+            promptTokenCount: 1000,
+            candidatesTokenCount: 800,
+            totalTokenCount: 1800,
+            cachedContentTokenCount: 200,
+            toolUsePromptTokenCount: 150,
+            thoughtsTokenCount: 50,
+            apiTimeMs: 5000,
+          },
+          currentTurn: {
+            promptTokenCount: 100,
+            candidatesTokenCount: 80,
+          },
+        },
+      });
+    });
+
+    it('should export conversation with default filename when no args provided', async () => {
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Hello', timestamp: new Date() },
+        { id: 2, type: 'gemini', text: 'Hi there!', timestamp: new Date() },
+      ];
+
+      // Create hook with mock history
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await hook.result.current.handleSlashCommand('/export');
+      });
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /gemini-conversation-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.md$/,
+        ),
+        expect.stringContaining('# Gemini CLI Conversation Export'),
+        'utf-8',
+      );
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Second call should be the success message
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Conversation exported successfully!'),
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should export conversation with custom filename', async () => {
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test message', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'google_login',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await hook.result.current.handleSlashCommand(
+          '/export my-conversation.md',
+        );
+      });
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/my-conversation\.md$/),
+        expect.stringContaining('# Gemini CLI Conversation Export'),
+        'utf-8',
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should handle different sandbox environments correctly', async () => {
+      // Test Docker sandbox
+      process.env.SANDBOX = 'docker';
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      let _commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        _commandResult =
+          await hook.result.current.handleSlashCommand('/export test.md');
+      });
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining('| **Sandbox Environment** | docker |'),
+        'utf-8',
+      );
+
+      // Test sandbox-exec
+      process.env.SANDBOX = 'sandbox-exec';
+      process.env.SEATBELT_PROFILE = 'restrictive';
+
+      await act(async () => {
+        _commandResult =
+          await hook.result.current.handleSlashCommand('/export test2.md');
+      });
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining(
+          '| **Sandbox Environment** | sandbox-exec (restrictive) |',
+        ),
+        'utf-8',
+      );
+    });
+
+    it('should include session statistics in export', async () => {
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'vertex_ai',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      await act(async () => {
+        await hook.result.current.handleSlashCommand('/export stats-test.md');
+      });
+
+      const exportContent = mockWriteFile.mock.calls[0][1];
+      expect(exportContent).toContain('## 📊 Session Statistics');
+      expect(exportContent).toContain('| **Total Turns** | 5 |');
+      expect(exportContent).toContain('| **Total Tokens** | 1,800 |');
+      expect(exportContent).toContain('| **Prompt Tokens** | 1,000 |');
+      expect(exportContent).toContain('| **Response Tokens** | 800 |');
+      expect(exportContent).toContain('| **Total API Time** | 5,000 ms |');
+    });
+
+    it('should handle core history retrieval failure gracefully', async () => {
+      // Mock getGeminiClient to throw an error
+      mockConfig = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => ({
+          getChat: vi.fn(() => {
+            throw new Error('Core history unavailable');
+          }),
+        })),
+      } as unknown as Config;
+
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      // Should not throw error and still export successfully
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await hook.result.current.handleSlashCommand(
+          '/export error-test.md',
+        );
+      });
+
+      expect(commandResult).toBe(true);
+      expect(mockWriteFile).toHaveBeenCalled();
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Second call should be the success message
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Conversation exported successfully!'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should handle file write errors gracefully', async () => {
+      mockWriteFile.mockRejectedValue(new Error('Permission denied'));
+
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await hook.result.current.handleSlashCommand(
+          '/export fail-test.md',
+        );
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Second call should be the error message
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining(
+            '❌ Failed to export conversation: Permission denied',
+          ),
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('should generate valid markdown export with correct filename', async () => {
+      const { handleSlashCommand } = getProcessor();
+
+      let _commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        _commandResult = await handleSlashCommand('/export test-export.md');
+      });
+
+      // Verify file was written with correct filename
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/test-export\.md$/),
+        expect.any(String),
+        'utf-8',
+      );
+
+      // Verify the exported content has required structural elements
+      const exportContent = mockWriteFile.mock.calls[0][1];
+      expect(exportContent).toContain('**Export Time**');
+      expect(exportContent).toContain('# Gemini CLI Conversation Export');
+      expect(exportContent).toContain('Generated by Gemini CLI');
+    });
+
+    it('should block path traversal attempts with clear error message', async () => {
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      // Test various path traversal attempts
+      const pathTraversalAttempts = [
+        '../../malicious.md',
+        '../../../etc/passwd',
+        '/tmp/malicious.md',
+        '../outside.md',
+      ];
+
+      for (const maliciousPath of pathTraversalAttempts) {
+        mockWriteFile.mockClear();
+        mockAddItem.mockClear();
+
+        let commandResult: SlashCommandActionReturn | boolean = false;
+        await act(async () => {
+          commandResult = await hook.result.current.handleSlashCommand(
+            `/export ${maliciousPath}`,
+          );
+        });
+
+        // Should not write file
+        expect(mockWriteFile).not.toHaveBeenCalled();
+
+        // Should show security error (look for the second call after user message)
+        expect(mockAddItem).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: expect.stringContaining(
+              'Security error: Cannot write outside current working directory',
+            ),
+          }),
+          expect.any(Number),
+        );
+
+        expect(commandResult).toBe(true);
+      }
+    });
+
+    it('should allow legitimate subdirectory exports', async () => {
+      const { handleSlashCommand: _handleSlashCommand } = getProcessor();
+      const mockHistory = [
+        { id: 1, type: 'user', text: 'Test', timestamp: new Date() },
+      ];
+
+      const settings = {
+        merged: {
+          contextFileName: 'GEMINI.md',
+          selectedAuthType: 'api_key',
+        },
+      } as LoadedSettings;
+
+      const hook = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          mockHistory,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      // Test legitimate subdirectory paths
+      const legitimatePaths = [
+        'exports/session.md',
+        'logs/conversation.md',
+        'data/export-2025.md',
+        'local-export.md',
+      ];
+
+      for (const legitimatePath of legitimatePaths) {
+        let commandResult: SlashCommandActionReturn | boolean = false;
+        await act(async () => {
+          commandResult = await hook.result.current.handleSlashCommand(
+            `/export ${legitimatePath}`,
+          );
+        });
+
+        // Should create directory and write file
+        expect(mockMkdir).toHaveBeenCalledWith(expect.any(String), {
+          recursive: true,
+        });
+        expect(mockWriteFile).toHaveBeenCalledWith(
+          expect.stringContaining(legitimatePath),
+          expect.stringContaining('# Gemini CLI Conversation Export'),
+          'utf-8',
+        );
+
+        // Should show success message
+        expect(mockAddItem).toHaveBeenNthCalledWith(
+          2, // After user message
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: expect.stringContaining(
+              'Conversation exported successfully!',
+            ),
+          }),
+          expect.any(Number),
+        );
+
+        expect(commandResult).toBe(true);
+
+        // Clear mocks for next iteration
+        mockWriteFile.mockClear();
+        mockMkdir.mockClear();
+        mockAddItem.mockClear();
+      }
+    });
+  });
 });

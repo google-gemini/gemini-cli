@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { type PartListUnion } from '@google/genai';
+import { type Content, type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -33,6 +33,10 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import {
+  generateComprehensiveMarkdown,
+  type ExportData,
+} from '../utils/exportMarkdown.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -803,6 +807,126 @@ export const useSlashCommandProcessor = (
           (await savedChatTags()).map((tag) => 'resume ' + tag),
       },
       {
+        name: 'export',
+        description:
+          'Export conversation history to markdown file. Usage: /export [filename]',
+        action: async (_mainCommand, _subCommand, args) => {
+          try {
+            // Generate filename with timestamp if not provided
+            const timestamp = new Date()
+              .toISOString()
+              .slice(0, 19)
+              .replace(/:/g, '-');
+            // Check both subCommand and args for filename
+            const userFilename = _subCommand || (args || '').trim();
+            const filename =
+              userFilename || `gemini-conversation-${timestamp}.md`;
+
+            // Get sandbox environment info
+            let sandboxEnv = 'no sandbox';
+            if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+              sandboxEnv = process.env.SANDBOX;
+            } else if (process.env.SANDBOX === 'sandbox-exec') {
+              sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
+            }
+
+            // Get session information
+            const sessionInfo = {
+              exportTime: new Date().toISOString(),
+              cliVersion: await getCliVersion(),
+              gitCommit: GIT_COMMIT_INFO,
+              osVersion: `${process.platform} ${process.version}`,
+              modelVersion: config?.getModel() || 'Unknown',
+              selectedAuthType: settings.merged.selectedAuthType || 'Unknown',
+              gcpProject: process.env.GOOGLE_CLOUD_PROJECT || '',
+              sessionId: config?.getSessionId() || 'Unknown',
+              memoryUsage: formatMemoryUsage(process.memoryUsage().rss),
+              sandboxEnv,
+            };
+
+            // Get session statistics
+            const { sessionStartTime, cumulative, currentTurn } = session.stats;
+            const wallDuration =
+              new Date().getTime() - sessionStartTime.getTime();
+
+            const sessionStats = {
+              sessionStartTime: sessionStartTime.toISOString(),
+              wallDuration: formatDuration(wallDuration),
+              cumulative,
+              currentTurn,
+            };
+
+            // Get core conversation history if available
+            let coreHistory: Content[] = [];
+            try {
+              const chat = config?.getGeminiClient()?.getChat();
+              if (chat) {
+                coreHistory = await chat.getHistory();
+              }
+            } catch (error) {
+              console.warn(
+                'Could not retrieve core conversation history:',
+                error,
+              );
+            }
+
+            // Create comprehensive export data
+            const exportData: ExportData = {
+              metadata: {
+                exportInfo: sessionInfo,
+                sessionStats,
+                conversationLength: history.length,
+                coreHistoryLength: coreHistory.length,
+              },
+              uiHistory: history,
+              coreHistory,
+            };
+
+            // Generate markdown content
+            const markdownContent = generateComprehensiveMarkdown(exportData);
+
+            // Write to file with security validation
+            const fs = await import('fs/promises');
+            const path = await import('path');
+
+            // Resolve and validate the output path for security
+            const cwd = process.cwd();
+            const outputPath = path.resolve(cwd, filename);
+
+            // Security check: ensure the resolved path is within the current working directory
+            if (!outputPath.startsWith(cwd + path.sep) && outputPath !== cwd) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
+                timestamp: new Date(),
+              });
+              return;
+            }
+
+            // Create directory if it doesn't exist
+            const outputDir = path.dirname(outputPath);
+            await fs.mkdir(outputDir, { recursive: true });
+
+            // Write the markdown content to file
+            await fs.writeFile(outputPath, markdownContent, 'utf-8');
+
+            addMessage({
+              type: MessageType.INFO,
+              content: `Conversation exported successfully!\nFile: ${outputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(markdownContent.length / 1024)} KB`,
+              timestamp: new Date(),
+            });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            addMessage({
+              type: MessageType.ERROR,
+              content: `❌ Failed to export conversation: ${errorMessage}`,
+              timestamp: new Date(),
+            });
+          }
+        },
+      },
+      {
         name: 'quit',
         altName: 'exit',
         description: 'exit the cli',
@@ -1031,6 +1155,7 @@ export const useSlashCommandProcessor = (
     pendingCompressionItemRef,
     setPendingCompressionItem,
     openPrivacyNotice,
+    history,
   ]);
 
   const handleSlashCommand = useCallback(
