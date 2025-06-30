@@ -97,11 +97,9 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
+        Ctrl+j
       </Text>{' '}
-      {process.platform === 'linux'
-        ? '- New line (Alt+Enter works for certain linux distros)'
-        : '- New line'}
+      - New line
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
