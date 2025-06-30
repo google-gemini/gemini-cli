@@ -48,7 +48,6 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
-  private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -61,7 +60,6 @@ export class GeminiClient {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
   }
 
@@ -185,7 +183,9 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+      const generateContentConfigWithThinking = isThinkingSupported(
+        this.config.getModel(),
+      )
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -341,7 +341,7 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
+    const modelToUse = this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -435,9 +435,11 @@ export class GeminiClient {
       return null;
     }
 
+    const model = this.config.getModel();
+
     const { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        model,
         contents: history,
       });
 
@@ -446,17 +448,17 @@ export class GeminiClient {
       if (originalTokenCount === undefined) {
         // If token count is undefined, we can't determine if we need to compress.
         console.warn(
-          `Could not determine token count for model ${this.model}. Skipping compression check.`,
+          `Could not determine token count for model ${model}. Skipping compression check.`,
         );
         return null;
       }
       const tokenCount = originalTokenCount; // Now guaranteed to be a number
 
-      const limit = tokenLimit(this.model);
+      const limit = tokenLimit(model);
       if (!limit) {
         // If no limit is defined for the model, we can't compress.
         console.warn(
-          `No token limit defined for model ${this.model}. Skipping compression check.`,
+          `No token limit defined for model ${model}. Skipping compression check.`,
         );
         return null;
       }
@@ -485,7 +487,8 @@ export class GeminiClient {
     this.chat = await this.startChat(newHistory);
     const newTokenCount = (
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        // model might change after calling `sendMessage`, so we get the newest value from config
+        model: this.config.getModel(),
         contents: newHistory,
       })
     ).totalTokens;
@@ -508,7 +511,7 @@ export class GeminiClient {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -523,7 +526,6 @@ export class GeminiClient {
         const accepted = await fallbackHandler(currentModel, fallbackModel);
         if (accepted) {
           this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
           return fallbackModel;
         }
       } catch (error) {
