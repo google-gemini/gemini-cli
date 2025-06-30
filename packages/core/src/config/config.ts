@@ -455,7 +455,7 @@ export class Config {
     this.isPlanMode = isPlanMode;
     // Recreate tool registry when plan mode changes
     if (this.toolRegistry) {
-      this.toolRegistry = undefined!;
+this.toolRegistry = undefined as any;
     }
   }
 
