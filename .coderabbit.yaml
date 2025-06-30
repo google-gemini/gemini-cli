@@ -1,0 +1,47 @@
+reviews:
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        Review the TypeScript code for:
+        - Missing docstrings/JSDoc comments
+        - Functions without proper documentation
+        - Complex logic that needs explanation
+        - Missing test coverage
+        End all docstrings with a notice that says "Generated with CodeRabbit assistance."
+        Do not omit the closing tags; the docstring must be valid.
+    - path: "**/*.js"
+      instructions: |
+        Review the JavaScript code for:
+        - Missing JSDoc comments
+        - Functions without proper documentation
+        - Complex logic that needs explanation
+        - Missing test coverage
+        End all docstrings with a notice that says "Generated with CodeRabbit assistance."
+    - path: "**/*.tsx"
+      instructions: |
+        Review the React TypeScript components for:
+        - Missing component documentation
+        - Props without proper documentation
+        - Complex logic that needs explanation
+        - Missing test coverage
+        End all docstrings with a notice that says "Generated with CodeRabbit assistance."
+
+code_generation:
+  docstrings:
+    path_instructions:
+      - path: "**/*.ts"
+        instructions: |
+          Generate comprehensive JSDoc comments for all functions, classes, and methods.
+          Include parameter descriptions, return value descriptions, and examples where helpful.
+          End all docstrings with a notice that says "Generated with CodeRabbit assistance."
+          Do not omit the closing tags; the docstring must be valid.
+      - path: "**/*.js"
+        instructions: |
+          Generate comprehensive JSDoc comments for all functions, classes, and methods.
+          Include parameter descriptions, return value descriptions, and examples where helpful.
+          End all docstrings with a notice that says "Generated with CodeRabbit assistance."
+      - path: "**/*.tsx"
+        instructions: |
+          Generate comprehensive JSDoc comments for all React components, hooks, and utility functions.
+          Include prop descriptions, return value descriptions, and usage examples.
+          End all docstrings with a notice that says "Generated with CodeRabbit assistance."
