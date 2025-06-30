@@ -7,6 +7,15 @@
 // Export config
 export * from './config/config.js';
 
+// Export context management
+export * from './context/types.js';
+export * from './context/ChunkRegistry.js';
+export * from './context/ContextPruner.js';
+export * from './context/scoring/BM25Scorer.js';
+export * from './context/scoring/RecencyScorer.js';
+export * from './context/scoring/EmbeddingScorer.js';
+export * from './context/scoring/HybridScorer.js';
+
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
