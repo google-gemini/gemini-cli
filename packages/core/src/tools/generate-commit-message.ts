@@ -75,6 +75,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     commitMessage: string;
     finalCommitMessage: string;
     timestamp: number;
+    commitMode: 'staged-only' | 'all-changes';
+    filesToStage: string[];
   } | null = null;
 
   constructor(config: Config) {
@@ -135,6 +137,37 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
       const finalCommitMessage = this.addGeminiSignature(commitMessage);
       
+      // Determine commit strategy based on current git state
+      const hasStagedChanges = stagedDiff?.trim() !== '';
+      const hasUnstagedChanges = unstagedDiff?.trim() !== '';
+      const hasUntrackedFiles = statusOutput?.includes('??') || false;
+      
+      let commitMode: 'staged-only' | 'all-changes';
+      let filesToStage: string[] = [];
+      
+      if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
+        // Only staged changes exist, commit staged files only
+        commitMode = 'staged-only';
+      } else if (!hasStagedChanges && (hasUnstagedChanges || hasUntrackedFiles)) {
+        // Only unstaged/untracked changes exist, need to stage everything
+        commitMode = 'all-changes';
+        if (hasUnstagedChanges) {
+          filesToStage.push('-u'); // Stage all tracked files
+        }
+        if (hasUntrackedFiles) {
+          filesToStage.push(...this.parseUntrackedFiles(statusOutput || ''));
+        }
+      } else {
+        // Mixed state - default to staging all changes
+        commitMode = 'all-changes';
+        if (hasUnstagedChanges) {
+          filesToStage.push('-u');
+        }
+        if (hasUntrackedFiles) {
+          filesToStage.push(...this.parseUntrackedFiles(statusOutput || ''));
+        }
+      }
+      
       // Cache the data for execute method
       this.cachedCommitData = {
         statusOutput: statusOutput || '',
@@ -142,12 +175,13 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         logOutput: logOutput || '',
         commitMessage,
         finalCommitMessage,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        commitMode,
+        filesToStage
       };
 
-      // Determine which files will be committed
-      const hasStagedChanges = stagedDiff?.trim() !== '';
-      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', hasStagedChanges);
+      // Determine which files will be committed for display
+      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', commitMode === 'staged-only');
       
       let filesDisplay = '';
       if (filesToCommit.length > 0) {
@@ -222,19 +256,16 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         finalCommitMessage = this.addGeminiSignature(commitMessage);
       }
 
-      // Step 3: Handle staging based on change type
-      if (this.cachedCommitData) {
-        // Check if we need to stage changes from cached data
-        const stagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
-        const unstagedDiff = await this.executeGitCommand(['diff'], signal);
-        const hasOnlyUnstagedChanges = !stagedDiff?.trim() && unstagedDiff?.trim();
-        
-        if (hasOnlyUnstagedChanges) {
-          console.debug('[GenerateCommitMessage] Staging unstaged changes...');
-          await this.executeGitCommand(['add', '-u'], signal);
+      // Step 3: Handle staging based on cached strategy
+      if (this.cachedCommitData && this.cachedCommitData.commitMode === 'all-changes') {
+        // Execute the staging plan determined during confirmation
+        const filesToStage = this.cachedCommitData.filesToStage;
+        if (filesToStage.length > 0) {
+          console.debug('[GenerateCommitMessage] Staging files based on cached strategy:', filesToStage);
+          await this.executeGitCommand(['add', ...filesToStage], signal);
         }
-      } else {
-        // Check if we need to stage changes for non-cached execution
+      } else if (!this.cachedCommitData) {
+        // Fallback for non-cached execution - determine staging strategy
         const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
         const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
         const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && currentUnstagedDiff?.trim();
@@ -243,14 +274,14 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           console.debug('[GenerateCommitMessage] Staging unstaged changes...');
           await this.executeGitCommand(['add', '-u'], signal);
         }
-      }
-      
-      // Add untracked files if any
-      if (statusOutput?.includes('??')) {
-        console.debug('[GenerateCommitMessage] Adding untracked files to staging...');
-        const untrackedFiles = this.parseUntrackedFiles(statusOutput);
-        if (untrackedFiles.length > 0) {
-          await this.executeGitCommand(['add', ...untrackedFiles], signal);
+        
+        // Add untracked files if any
+        if (statusOutput?.includes('??')) {
+          console.debug('[GenerateCommitMessage] Adding untracked files to staging...');
+          const untrackedFiles = this.parseUntrackedFiles(statusOutput);
+          if (untrackedFiles.length > 0) {
+            await this.executeGitCommand(['add', ...untrackedFiles], signal);
+          }
         }
       }
 
