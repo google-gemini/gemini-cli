@@ -486,6 +486,7 @@ describe('user_id', () => {
 
     it('should be deterministic with same input conditions', () => {
       const testAccountId = 'deterministic-test-account';
+      let expectedResult: string;
       
       // Run test multiple times with same conditions
       for (let i = 0; i < 5; i++) {
@@ -496,7 +497,7 @@ describe('user_id', () => {
         
         // Should get same result each time with same input
         if (i === 0) {
-          var expectedResult = result;
+          expectedResult = result;
         } else {
           expect(result).toBe(expectedResult);
         }
