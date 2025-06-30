@@ -72,7 +72,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     finalCommitMessage: string;
     timestamp: number;
     commitMode: 'staged-only' | 'all-changes';
-    filesToStage: string[];
   } | null = null;
 
   constructor(config: Config) {
@@ -139,29 +138,13 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const hasUntrackedFiles = statusOutput?.includes('??') || false;
       
       let commitMode: 'staged-only' | 'all-changes';
-      const filesToStage: string[] = [];
       
       if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
         // Only staged changes exist, commit staged files only
         commitMode = 'staged-only';
-      } else if (!hasStagedChanges && (hasUnstagedChanges || hasUntrackedFiles)) {
-        // Only unstaged/untracked changes exist, need to stage everything
-        commitMode = 'all-changes';
-        if (hasUnstagedChanges) {
-          filesToStage.push('-u'); // Stage all tracked files
-        }
-        if (hasUntrackedFiles) {
-          filesToStage.push(...this.parseUntrackedFiles(statusOutput || ''));
-        }
       } else {
-        // Mixed state - default to staging all changes
+        // In all other cases (unstaged, untracked, or mixed), we'll stage all changes.
         commitMode = 'all-changes';
-        if (hasUnstagedChanges) {
-          filesToStage.push('-u');
-        }
-        if (hasUntrackedFiles) {
-          filesToStage.push(...this.parseUntrackedFiles(statusOutput || ''));
-        }
       }
       
       // Cache the data for execute method
@@ -172,8 +155,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         commitMessage,
         finalCommitMessage,
         timestamp: Date.now(),
-        commitMode,
-        filesToStage
+        commitMode
       };
 
       // Determine which files will be committed for display
@@ -252,30 +234,19 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       // Step 3: Handle staging based on cached strategy or current state
       const cachedData = this.cachedCommitData;
       if (cachedData && cachedData.commitMode === 'all-changes') {
-        // Execute the staging plan determined during confirmation
-        const filesToStage = cachedData.filesToStage;
-        if (filesToStage.length > 0) {
-          console.debug('[GenerateCommitMessage] Staging files based on cached strategy:', filesToStage);
-          await this.executeGitCommand(['add', ...filesToStage], signal);
-        }
+        // Stage all changes using git add .
+        console.debug('[GenerateCommitMessage] Staging all changes using git add .');
+        await this.executeGitCommand(['add', '.'], signal);
       } else if (!cachedData) {
         // Fallback for non-cached execution - determine staging strategy
         const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
         const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
         const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && currentUnstagedDiff?.trim();
+        const hasUntrackedFiles = statusOutput?.includes('??');
         
-        if (hasOnlyUnstagedChanges) {
-          console.debug('[GenerateCommitMessage] Staging unstaged changes...');
-          await this.executeGitCommand(['add', '-u'], signal);
-        }
-        
-        // Add untracked files if any
-        if (statusOutput?.includes('??')) {
-          console.debug('[GenerateCommitMessage] Adding untracked files to staging...');
-          const untrackedFiles = this.parseUntrackedFiles(statusOutput);
-          if (untrackedFiles.length > 0) {
-            await this.executeGitCommand(['add', ...untrackedFiles], signal);
-          }
+        if (hasOnlyUnstagedChanges || hasUntrackedFiles) {
+          console.debug('[GenerateCommitMessage] Staging all changes using git add .');
+          await this.executeGitCommand(['add', '.'], signal);
         }
       }
 
@@ -283,7 +254,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       console.debug('[GenerateCommitMessage] Creating commit with message:', finalCommitMessage.substring(0, 100) + '...');
       
       try {
-        await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
+        await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
         
         // Clear cache after successful commit
         this.cachedCommitData = null;
@@ -307,7 +278,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           await this.executeGitCommand(['add', '.'], signal);
           
           try {
-            await this.executeGitCommand(['commit', '-m', finalCommitMessage], signal);
+            await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
             
             // Clear cache after successful retry commit
             this.cachedCommitData = null;
@@ -338,6 +309,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   private async executeGitCommand(
     args: string[],
     signal: AbortSignal,
+    stdin?: string,
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const commandString = `git ${args.join(' ')}`;
@@ -355,6 +327,12 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         child.stderr?.on('data', (data) => {
           stderr += data.toString();
         });
+
+        // Write stdin if provided
+        if (stdin && child.stdin) {
+          child.stdin.write(stdin);
+          child.stdin.end();
+        }
 
         child.on('close', (exitCode) => {
           if (exitCode !== 0) {
