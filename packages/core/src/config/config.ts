@@ -21,10 +21,13 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import {
+  MemoryTool,
+  setGeminiMdFilename,
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
+} from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
-import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import { getProjectTempDir } from '../utils/paths.js';
@@ -73,6 +76,7 @@ export class MCPServerConfig {
     readonly url?: string,
     // For streamable http transport
     readonly httpUrl?: string,
+    readonly headers?: Record<string, string>,
     // For websocket transport
     readonly tcp?: string,
     // Common
@@ -453,25 +457,33 @@ export class Config {
 export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
-  const tools = config.getCoreTools()
-    ? new Set(config.getCoreTools())
-    : undefined;
-  const excludeTools = config.getExcludeTools()
-    ? new Set(config.getExcludeTools())
-    : undefined;
 
   // helper to create & register core tools that are enabled
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
-    // check both the tool name (.Name) and the class name (.name)
-    if (
-      // coreTools contain tool name
-      (!tools || tools.has(ToolClass.Name) || tools.has(ToolClass.name)) &&
-      // excludeTools don't contain tool name
-      (!excludeTools ||
-        (!excludeTools.has(ToolClass.Name) &&
-          !excludeTools.has(ToolClass.name)))
-    ) {
+    const className = ToolClass.name;
+    const toolName = ToolClass.Name || className;
+    const coreTools = config.getCoreTools();
+    const excludeTools = config.getExcludeTools();
+
+    let isEnabled = false;
+    if (coreTools === undefined) {
+      isEnabled = true;
+    } else {
+      isEnabled = coreTools.some(
+        (tool) =>
+          tool === className ||
+          tool === toolName ||
+          tool.startsWith(`${className}(`) ||
+          tool.startsWith(`${toolName}(`),
+      );
+    }
+
+    if (excludeTools?.includes(className) || excludeTools?.includes(toolName)) {
+      isEnabled = false;
+    }
+
+    if (isEnabled) {
       registry.registerTool(new ToolClass(...args));
     }
   };

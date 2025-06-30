@@ -65,14 +65,17 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     ```
 
 - **`coreTools`** (array of strings):
-  - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools.
+  - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"coreTools": ["ShellTool(ls -l)"]` will only allow the `ls -l` command to be executed.
   - **Default:** All tools available for use by the Gemini model.
-  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "SearchText"]`.
+  - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]`.
 
 - **`excludeTools`** (array of strings):
-  - **Description:** Allows you to specify a list of core tool names that should be excluded from the model. A tool listed in both `excludeTools` and `coreTools` is excluded.
+  - **Description:** Allows you to specify a list of core tool names that should be excluded from the model. A tool listed in both `excludeTools` and `coreTools` is excluded. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"excludeTools": ["ShellTool(rm -rf)"]` will block the `rm -rf` command.
   - **Default**: No tools excluded.
   - **Example:** `"excludeTools": ["run_shell_command", "findFiles"]`.
+  - **Security Note:** Command-specific restrictions in
+    `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
+    that can be executed.
 
 - **`autoAccept`** (boolean):
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
@@ -173,6 +176,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "usageStatisticsEnabled": false
     ```
 
+- **`hideTips`** (boolean):
+  - **Description:** Enables or disables helpful tips in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideTips": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -196,7 +208,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "otlpEndpoint": "http://localhost:4317",
     "logPrompts": true
   },
-  "usageStatisticsEnabled": true
+  "usageStatisticsEnabled": true,
+  "hideTips": false
 }
 ```
 
