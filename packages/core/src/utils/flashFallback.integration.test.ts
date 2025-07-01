@@ -78,14 +78,14 @@ describe('Flash Fallback Integration', () => {
         return status === 429;
       },
       onPersistent429: mockFallbackHandler,
-      authType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
     });
 
     // Verify fallback was triggered
     expect(fallbackCalled).toBe(true);
     expect(fallbackModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     expect(mockFallbackHandler).toHaveBeenCalledWith(
-      AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toBe('success after fallback');
     // Should have: 2 failures, then fallback triggered, then 1 success after retry reset
