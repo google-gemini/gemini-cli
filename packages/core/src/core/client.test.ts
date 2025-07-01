@@ -21,6 +21,7 @@ import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
+import { tokenLimit } from './tokenLimits.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -82,8 +83,7 @@ describe('Gemini Client (client.ts)', () => {
           embedContent: mockEmbedContentFn,
         },
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mock as any;
+      return mock as unknown as GoogleGenAI;
     });
 
     mockChatCreateFn.mockResolvedValue({} as Chat);
@@ -130,14 +130,12 @@ describe('Gemini Client (client.ts)', () => {
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mock as any;
+      return mock as unknown as Config;
     });
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockConfig = new Config({} as any);
+    const mockConfig = new Config({} as never);
     client = new GeminiClient(mockConfig);
     await client.initialize(contentGeneratorConfig);
   });
@@ -361,6 +359,113 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).not.toBe(initialChat);
       expect(newHistory.length).toBe(initialHistory.length);
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
+    });
+  });
+
+  describe('tryCompressChat', () => {
+    const mockCountTokens = vi.fn();
+    const mockSendMessage = vi.fn();
+
+    beforeEach(() => {
+      vi.mock('./tokenLimits', () => ({
+        tokenLimit: vi.fn(),
+      }));
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: mockCountTokens,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Mock the chat's sendMessage method
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn()
+          .mockReturnValue([
+            { role: 'user', parts: [{ text: '...history...' }] },
+          ]),
+        addHistory: vi.fn(),
+        sendMessage: mockSendMessage,
+      };
+      client['chat'] = mockChat as GeminiChat;
+    });
+
+    it('should not trigger summarization if token count is below threshold', async () => {
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      mockCountTokens.mockResolvedValue({
+        totalTokens: MOCKED_TOKEN_LIMIT * 0.699, // TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat();
+      const newChat = client.getChat();
+
+      expect(tokenLimit).toHaveBeenCalled(); 
+      expect(result).toBeNull();
+      expect(newChat).toBe(initialChat);
+    });
+
+    it('should trigger summarization if token count is at threshold', async () => {
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const originalTokenCount = 1000 * 0.7;
+      const newTokenCount = 100;
+      
+      mockCountTokens
+        .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
+        .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
+
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat();
+      const newChat = client.getChat();
+
+      expect(tokenLimit).toHaveBeenCalled();
+      expect(mockSendMessage).toHaveBeenCalled();
+
+      // Assert that summarization happened and returned the correct stats
+      expect(result).toEqual({
+        originalTokenCount,
+        newTokenCount,
+      });
+
+      // Assert that the chat was reset
+      expect(newChat).not.toBe(initialChat);
+    });
+
+    it('should always trigger summarization when force is true, regardless of token count', async () => {
+      const originalTokenCount = 10; // Well below threshold
+      const newTokenCount = 5;
+
+      mockCountTokens
+        .mockResolvedValueOnce({ totalTokens: originalTokenCount })
+        .mockResolvedValueOnce({ totalTokens: newTokenCount });
+      
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat(true); // force = true
+      const newChat = client.getChat();
+
+      expect(mockSendMessage).toHaveBeenCalled();
+
+      expect(result).toEqual({
+        originalTokenCount,
+        newTokenCount,
+      });
+
+      // Assert that the chat was reset
+      expect(newChat).not.toBe(initialChat);
     });
   });
 
