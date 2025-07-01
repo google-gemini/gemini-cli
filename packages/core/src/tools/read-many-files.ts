@@ -70,7 +70,7 @@ export interface ReadManyFilesParams {
 /**
  * Default exclusion patterns for commonly ignored directories and binary file types.
  * These are compatible with glob ignore patterns.
- * TODO(adh): Consider making this configurable or extendable through a command line arguement.
+ * TODO(adh): Consider making this configurable or extendable through a command line argument.
  * TODO(adh): Look into sharing this list with the glob tool.
  */
 const DEFAULT_EXCLUDES: string[] = [

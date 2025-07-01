@@ -218,4 +218,69 @@ describe('runNonInteractive', () => {
       '[API Error: API connection failed]',
     );
   });
+
+  it('should not exit if a tool is not found, and should send error back to model', async () => {
+    const functionCall: FunctionCall = {
+      id: 'fcNotFound',
+      name: 'nonExistentTool',
+      args: {},
+    };
+    const errorResponsePart: Part = {
+      functionResponse: {
+        name: 'nonExistentTool',
+        id: 'fcNotFound',
+        response: { error: 'Tool "nonExistentTool" not found in registry.' },
+      },
+    };
+
+    const { executeToolCall: mockCoreExecuteToolCall } = await import(
+      '@google/gemini-cli-core'
+    );
+    vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
+      callId: 'fcNotFound',
+      responseParts: [errorResponsePart],
+      resultDisplay: 'Tool "nonExistentTool" not found in registry.',
+      error: new Error('Tool "nonExistentTool" not found in registry.'),
+    });
+
+    const stream1 = (async function* () {
+      yield { functionCalls: [functionCall] } as GenerateContentResponse;
+    })();
+    const stream2 = (async function* () {
+      yield {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Unfortunately the tool does not exist.' }],
+            },
+          },
+        ],
+      } as GenerateContentResponse;
+    })();
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await runNonInteractive(mockConfig, 'Trigger tool not found');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error executing tool nonExistentTool: Tool "nonExistentTool" not found in registry.',
+    );
+
+    expect(mockProcessExit).not.toHaveBeenCalled();
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockChat.sendMessageStream).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: [errorResponsePart],
+      }),
+    );
+
+    expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
+      'Unfortunately the tool does not exist.',
+    );
+  });
 });

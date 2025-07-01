@@ -41,9 +41,9 @@ steps:
 
   # Step 6: Prepare CLI package.json for publishing
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
-    id: 'Prepare @google/gemini-cli package.json and readme'
+    id: 'Prepare @google/gemini-cli and @google/gemini-cli-core packages'
     entrypoint: 'npm'
-    args: ['run', 'prepare:cli-packagejson']
+    args: ['run', 'prepare:packages']
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
       - 'SANDBOX_IMAGE_REGISTRY=$_SANDBOX_IMAGE_REGISTRY'
@@ -70,6 +70,9 @@ steps:
       - 'SANDBOX_IMAGE_NAME=$_SANDBOX_IMAGE_NAME'
 
   # Pre-Step 9: authenticate to our intermediate npm registry
+  # NOTE: when running locally, run this instead (from the `packages/core` directory):
+  #   - `npm login --registry https://wombat-dressing-room.appspot.com`
+  #   - use a 24hr token
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Setup @google/gemini-cli-core auth token for publishing'
     entrypoint: 'bash'
@@ -97,6 +100,9 @@ steps:
       - 'SANDBOX_IMAGE_NAME=$_SANDBOX_IMAGE_NAME'
 
   # Pre-Step 10: authenticate to our intermediate npm registry
+  # NOTE: when running locally, run this instead (from the `packages/cli` directory)
+  #   - `npm login --registry https://wombat-dressing-room.appspot.com`
+  #   - use a 24hr token
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Setup @google/gemini-cli auth token for publishing'
     entrypoint: 'bash'

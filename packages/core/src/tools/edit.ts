@@ -49,6 +49,11 @@ export interface EditToolParams {
    * Use when you want to replace multiple occurrences.
    */
   expected_replacements?: number;
+
+  /**
+   * Whether the edit was modified manually by the user.
+   */
+  modified_by_user?: boolean;
 }
 
 interface CalculatedEdit {
@@ -80,6 +85,8 @@ export class EditTool
       EditTool.Name,
       'Edit',
       `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
+
+      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
 
 Expectation for required parameters:
 1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
@@ -250,9 +257,12 @@ Expectation for required parameters:
           raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
         };
       } else if (occurrences !== expectedReplacements) {
+        const occurenceTerm =
+          expectedReplacements === 1 ? 'occurrence' : 'occurrences';
+
         error = {
-          display: `Failed to edit, expected ${expectedReplacements} occurrence(s) but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} occurrences but found ${occurrences} for old_string in file: ${params.file_path}`,
+          display: `Failed to edit, expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences}.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
         };
       }
     } else {
@@ -414,12 +424,19 @@ Expectation for required parameters:
         displayResult = { fileDiff, fileName };
       }
 
-      const llmSuccessMessage = editData.isNewFile
-        ? `Created new file: ${params.file_path} with provided content.`
-        : `Successfully modified file: ${params.file_path} (${editData.occurrences} replacements).`;
+      const llmSuccessMessageParts = [
+        editData.isNewFile
+          ? `Created new file: ${params.file_path} with provided content.`
+          : `Successfully modified file: ${params.file_path} (${editData.occurrences} replacements).`,
+      ];
+      if (params.modified_by_user) {
+        llmSuccessMessageParts.push(
+          `User modified the \`new_string\` content to be: ${params.new_string}.`,
+        );
+      }
 
       return {
-        llmContent: llmSuccessMessage,
+        llmContent: llmSuccessMessageParts.join(' '),
         returnDisplay: displayResult,
       };
     } catch (error) {
@@ -474,6 +491,7 @@ Expectation for required parameters:
         ...originalParams,
         old_string: oldContent,
         new_string: modifiedProposedContent,
+        modified_by_user: true,
       }),
     };
   }

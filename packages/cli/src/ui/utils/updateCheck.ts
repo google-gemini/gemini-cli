@@ -5,6 +5,7 @@
  */
 
 import updateNotifier from 'update-notifier';
+import semver from 'semver';
 import { getPackageJson } from '../../utils/package.js';
 
 export async function checkForUpdates(): Promise<string | null> {
@@ -24,7 +25,10 @@ export async function checkForUpdates(): Promise<string | null> {
       shouldNotifyInNpmScript: true,
     });
 
-    if (notifier.update) {
+    if (
+      notifier.update &&
+      semver.gt(notifier.update.latest, notifier.update.current)
+    ) {
       return `Gemini CLI update available! ${notifier.update.current} → ${notifier.update.latest}\nRun npm install -g ${packageJson.name} to update`;
     }
 
