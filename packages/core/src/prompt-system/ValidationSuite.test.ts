@@ -109,7 +109,8 @@ describe('ValidationSuite', () => {
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
       vi.mocked(ModuleValidator).mockImplementation(
-        MockModuleValidator as unknown as typeof ModuleValidator,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        MockModuleValidator as any,
       );
 
       const report = await validationSuite.runCompleteValidation();
@@ -431,7 +432,8 @@ describe('ValidationSuite', () => {
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
       vi.mocked(ModuleValidator).mockImplementation(
-        MockModuleValidator as unknown as typeof ModuleValidator,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        MockModuleValidator as any,
       );
 
       const report = await strictSuite.runCompleteValidation();

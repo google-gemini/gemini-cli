@@ -15,7 +15,6 @@ import {
   CacheStats,
   MemoryStats,
   SerializedMemory,
-  MemoryEventEmitter,
 } from './memory-interfaces.js';
 import { FileContextManager } from './FileContextManager.js';
 import { ProjectContextManager } from './ProjectContextManager.js';
@@ -28,7 +27,7 @@ import { EventEmitter } from 'events';
 /**
  * Main memory manager that orchestrates all memory operations
  */
-export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
+export class MemoryManager implements MemoryOperations {
   private config!: MemoryConfig;
   private contextMemory: ContextMemory = {
     fileStates: new Map(),
@@ -364,28 +363,6 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Event emitter methods
    */
-  on(event: 'initialized', listener: (config: MemoryConfig) => void): void;
-  on(
-    event: 'fileContextUpdated',
-    listener: (filePath: string, context: FileContext) => void,
-  ): void;
-  on(
-    event: 'projectContextUpdated',
-    listener: (context: ProjectContext) => void,
-  ): void;
-  on(
-    event: 'conversationSummaryAdded',
-    listener: (summary: ConversationSummary) => void,
-  ): void;
-  on(
-    event: 'toolResultCached',
-    listener: (toolName: string, key: string, result: CachedToolResult) => void,
-  ): void;
-  on(event: 'memoryCleanup', listener: (stats: MemoryStats) => void): void;
-  on(
-    event: 'memoryPressureChanged',
-    listener: (level: 'low' | 'medium' | 'high') => void,
-  ): void;
   on(event: string, listener: (...args: unknown[]) => void): void {
     this.eventEmitter.on(event, listener);
   }

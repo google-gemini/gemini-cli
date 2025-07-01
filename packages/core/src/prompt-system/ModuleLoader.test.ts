@@ -129,7 +129,8 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['identity.md', 'mandates.md', 'other.txt'];
       const mockContent = '# Test Module';
 
-      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (vi.mocked(fs.readdir) as any).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -156,7 +157,8 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (vi.mocked(fs.readdir) as any).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -170,7 +172,8 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (vi.mocked(fs.readdir) as any).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadAllModules();

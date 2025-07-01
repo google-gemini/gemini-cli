@@ -270,11 +270,10 @@ black>=22.0.0
         'package.json',
       ];
 
-      mockFs.readdir.mockImplementation(
-        async (
-          dirPath: PathLike | FileHandle,
-          options?: { withFileTypes?: boolean },
-        ): Promise<string[] | Dirent[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mockFs.readdir as any).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (dirPath: any, options?: any): Promise<any> => {
           const pathStr = dirPath.toString();
 
           // Handle withFileTypes: true case
@@ -384,11 +383,10 @@ black>=22.0.0
     });
 
     it('should calculate file counts correctly', async () => {
-      mockFs.readdir.mockImplementation(
-        async (
-          dirPath: PathLike | FileHandle,
-          options?: { withFileTypes?: boolean },
-        ): Promise<string[] | Dirent[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mockFs.readdir as any).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (dirPath: any, options?: any): Promise<any> => {
           const pathStr = dirPath.toString();
 
           // Handle withFileTypes: true case
