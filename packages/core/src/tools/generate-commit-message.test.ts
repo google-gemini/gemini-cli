@@ -1230,6 +1230,7 @@ That should work better!`;
         'diff --cached': diff,
         'diff': '',
         'log': logOutput,
+        'commit': ''
       }));
 
       (mockClient.generateContent as Mock).mockResolvedValue({
@@ -1261,8 +1262,57 @@ That should work better!`;
 
       const result = await tool.execute(undefined, new AbortController().signal);
 
-      expect(result.llmContent).toContain('AI response parsing failed');
-      expect(result.llmContent).toContain('body lines should not exceed 72 characters');
+      // With relaxed line length validation (200 chars instead of 72), this should now succeed
+      expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: add complex nested JSON structure\n\nThis change introduces a sophisticated nested JSON structure that includes:\n- Nested objects with multiple levels\n- Arrays containing numeric data\n- Enhanced data representation capabilities\n\nCloses #123');
+    });
+
+    it('should reject extremely long commit message lines (>200 chars)', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+      
+      // Create a line that's over 200 characters
+      const veryLongLine = 'This is an extremely long line that exceeds 200 characters and should be rejected as it likely indicates malformed content or parsing errors in the AI response that could cause issues with the commit message format and readability for users and tools that process git commits.';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    analysis: {
+                      changedFiles: ['file.txt'],
+                      changeType: 'feat',
+                      purpose: 'Add feature with extremely long description',
+                      impact: 'Should be rejected due to excessive line length',
+                      hasSensitiveInfo: false,
+                    },
+                    commitMessage: {
+                      header: 'feat: add feature with long description',
+                      body: veryLongLine,
+                      footer: '',
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('exceptionally long');
+      expect(result.llmContent).toContain('malformed content');
     });
 
     it('should handle network timeout errors gracefully', async () => {

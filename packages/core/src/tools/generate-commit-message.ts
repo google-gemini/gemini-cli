@@ -1182,9 +1182,10 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     for (const line of bodyLines) {
       if (line.trim().length === 0) continue;
       
-      // Check for overly long lines
-      if (line.length > 72) {
-        return 'AI response validation failed: commit message body lines should not exceed 72 characters for readability';
+      // Only reject extremely long lines that could indicate parsing errors or malformed content
+      // The 72-character limit is a style preference, not a functional requirement
+      if (line.length > 200) {
+        return 'AI response validation failed: commit message body line is exceptionally long (>200 chars), which may indicate malformed content';
       }
     }
 
