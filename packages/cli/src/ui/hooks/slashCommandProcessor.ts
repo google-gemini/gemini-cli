@@ -724,20 +724,19 @@ export const useSlashCommandProcessor = (
           switch (subCommand) {
             case 'save': {
               // Validate tag
-              if (tag) {
-                const validTagRegex = /^[a-zA-Z0-9_-]+$/;
-                if (!validTagRegex.test(tag)) {
-                  addMessage({
-                    type: MessageType.ERROR,
-                    content: 'Invalid tag. Only letters, numbers, hyphens, and underscores are allowed.',
-                    timestamp: new Date(),
-                  });
-                  return;
-                }
-              }else {
+              if (!tag) {
                 addMessage({
                   type: MessageType.ERROR,
                   content: 'Missing tag\nUsage: /chat save <tag>',
+                  timestamp: new Date(),
+                });
+                return;
+              }
+              const validTagRegex = /^[a-zA-Z0-9_-]+$/;
+              if (!validTagRegex.test(tag)) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: 'Invalid tag. Only letters, numbers, hyphens, and underscores are allowed.',
                   timestamp: new Date(),
                 });
                 return;
