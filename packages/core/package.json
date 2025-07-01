@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "Gemini CLI Server",
   "repository": "google-gemini/gemini-cli",
   "type": "module",
@@ -34,7 +34,8 @@
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
     "diff": "^7.0.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
+    "gaxios": "^6.1.1",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",

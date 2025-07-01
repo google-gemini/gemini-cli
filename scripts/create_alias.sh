@@ -4,7 +4,7 @@
 
 # Determine the project directory
 PROJECT_DIR=$(cd "$(dirname "$0")/.." && pwd)
-ALIAS_COMMAND="alias gemini='$PROJECT_DIR/scripts/start.sh'"
+ALIAS_COMMAND="alias gemini='node $PROJECT_DIR/scripts/start.js'"
 
 # Detect shell and set config file path
 if [[ "$SHELL" == *"/bash" ]]; then
