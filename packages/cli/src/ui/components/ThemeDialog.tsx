@@ -254,15 +254,19 @@ export function ThemeDialog({
                 flexDirection="column"
               >
                 {colorizeCode(
-                  `# function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a`,
+                  `# function
+-def fibonacci(n):
+-    a, b = 0, 1
+-    for _ in range(n):
+-        a, b = b, a + b
+-    return a`,
                   'python',
                   codeBlockHeight,
                   colorizeCodeWidth,
-                  previewTheme,
                 )}
                 <Box marginTop={1} />
                 <DiffRenderer
-                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,4 +1,5 @@\n This is a context line.\n--This line was deleted.\n+This line was added.\n`}
+                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,6 +1,7 @@\n # function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a\n+def fibonacci(n):\n+    a, b = 0, 1\n+    for _ in range(n):\n+        a, b = b, a + b\n+    return a\n+\n+print(fibonacci(10))\n`}
                   availableTerminalHeight={diffHeight}
                   terminalWidth={colorizeCodeWidth}
                   theme={previewTheme}

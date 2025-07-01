@@ -157,6 +157,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       tabWidth,
       availableTerminalHeight,
       terminalWidth,
+      theme,
     );
   }
 
@@ -169,6 +170,7 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  theme?: import('../../themes/theme.js').Theme,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -249,13 +251,13 @@ const renderDiffContent = (
         switch (line.type) {
           case 'add':
             gutterNumStr = (line.newLine ?? '').toString();
-            color = 'green';
+            color = theme?.colors?.AccentGreen || 'green';
             prefixSymbol = '+';
             lastLineNumber = line.newLine ?? null;
             break;
           case 'del':
             gutterNumStr = (line.oldLine ?? '').toString();
-            color = 'red';
+            color = theme?.colors?.AccentRed || 'red';
             prefixSymbol = '-';
             // For deletions, update lastLineNumber based on oldLine if it's advancing.
             // This helps manage gaps correctly if there are multiple consecutive deletions
