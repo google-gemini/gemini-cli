@@ -2,6 +2,8 @@
 
 The Gemini CLI requires you to authenticate with Google's AI services. On initial startup you'll need to configure **one** of the following authentication methods:
 
+**Note:** While this document focuses on environment variables, you can also configure your preferred authentication method and credentials in `settings.json`. For details, see the [`auth` property in the configuration guide](./configuration.md#available-settings-in-settingsjson).
+
 1.  **Login with Google (Gemini Code Assist):**
     - Use this option to log in with your google account.
     - During initial startup, Gemini CLI will direct you to a webpage for authentication. Once authenticated, your credentials will be cached locally so the web login can be skipped on subsequent runs.

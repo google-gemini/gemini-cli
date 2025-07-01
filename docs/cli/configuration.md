@@ -185,13 +185,38 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
-- **`labels`** (object)
-  - **Description:** The user-defined labels for the Vertex AI API requests. See [the Vertex AI document](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/projects.locations.endpoints/generateContent) for more information.
+- **`model`** (string)
+  - **Description:** Specifies the Gemini model to use.
   - **Default:** Empty
   - **Example:**
     ```json
-    "labels": {
-      "example": "value"
+    "model": "gemini-2.5-flash"
+    ```
+
+- **`auth`** (object)
+  - **Description:** Configures the authentication settings for Gemini and Vertex AI.
+  - **Default:** Empty
+  - **Properties:**
+    - **`gemini`** (object): Gemini-specific authentication settings.
+      - **`apiKey`** (string): Your API key for the Gemini API.
+    - **`vertex`** (object): Vertex AI-specific authentication settings.
+      - **`apiKey`** (string): Your Google Cloud API key.
+      - **`project`** (string): Your Google Cloud Project ID.
+      - **`location`** (string): Your Google Cloud Project Location (e.g., us-central1).
+  - **Example:**
+    ```json
+    "selectedAuthType": "oauth-personal", // oauth-personal, gemini-api-key, vertex-ai
+    "auth": {
+      // for gemini-api-key
+      "gemini": {
+        "apiKey": "YOUR_GEMINI_API_KEY"
+      },
+      // for vertex-ai
+      "vertex": {
+        "apiKey": "YOUR_GOOGLE_API_KEY",
+        "project": "YOUR_GCP_PROJECT",
+        "location": "VERTEX_AI_LOCATION"
+      }
     }
     ```
 
@@ -245,20 +270,24 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Your API key for the Gemini API.
   - **Crucial for operation.** The CLI will not function without it.
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
+  - Alternatively, you can configure this in `settings.json` using the `auth.gemini.apiKey` property.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+  - Alternatively, you can configure this in `settings.json` using the `model` property.
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
   - Ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
+  - Alternatively, you can configure this in `settings.json` using the `auth.vertex.apiKey` property.
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - Alternatively, you can configure this in `settings.json` using the `auth.vertex.project` property.
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:** `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
@@ -270,6 +299,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Required for using Vertex AI in non express mode.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
+  - Alternatively, you can configure this in `settings.json` using the `auth.vertex.location` property.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
