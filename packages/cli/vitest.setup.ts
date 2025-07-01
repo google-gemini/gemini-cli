@@ -6,4 +6,4 @@
 
 // Unset the GEMINI_CONFIG_DIR environment variable before tests run.
 // This ensures that tests use the default config directory.
-process.env.GEMINI_CONFIG_DIR = '';
+delete process.env.GEMINI_CONFIG_DIR;
