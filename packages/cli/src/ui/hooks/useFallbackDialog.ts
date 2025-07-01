@@ -15,9 +15,15 @@ interface ConfirmationState {
 export const useFallbackDialog = () => {
   const [dialogState, setDialogState] = useState<ConfirmationState | null>(null);
 
-  const requestConfirmation = useCallback((fallbackModel: string): Promise<boolean> => new Promise<boolean>((resolve) => {
+  const requestConfirmation = useCallback((fallbackModel: string): Promise<boolean> => {
+    if (dialogState) {
+      // A confirmation is already in progress, so we deny this new request to fallback.
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
       setDialogState({ model: fallbackModel, resolver: resolve });
-    }), []);
+    });
+  }, [dialogState]);
 
   const handleSelection = useCallback((confirmed: boolean) => {
     if (dialogState) {
