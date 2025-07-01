@@ -196,6 +196,11 @@ describe('fileUtils', () => {
       vi.restoreAllMocks(); // Restore spies on actualNodeFs
     });
 
+    it('should detect typescript type by extension (ts)', () => {
+      expect(detectFileType('file.ts')).toBe('text');
+      expect(detectFileType('file.test.ts')).toBe('text');
+    });
+
     it('should detect image type by extension (png)', () => {
       mockMimeLookup.mockReturnValueOnce('image/png');
       expect(detectFileType('file.png')).toBe('image');
