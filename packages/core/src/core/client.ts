@@ -22,7 +22,7 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -171,7 +171,7 @@ export class GeminiClient {
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    const initialHistory: Content[] = [
+    const history: Content[] = [
       {
         role: 'user',
         parts: envParts,
@@ -180,8 +180,8 @@ export class GeminiClient {
         role: 'model',
         parts: [{ text: 'Got it. Thanks for the context!' }],
       },
+      ...(extraHistory ?? []),
     ];
-    const history = initialHistory.concat(extraHistory ?? []);
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -428,74 +428,61 @@ export class GeminiClient {
   async tryCompressChat(
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
-    const history = this.getChat().getHistory(true); // Get curated history
+    const curatedHistory = this.getChat().getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
-    if (history.length === 0) {
+    if (curatedHistory.length === 0) {
       return null;
     }
 
-    const { totalTokens: originalTokenCount } =
+    let { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
         model: this.model,
-        contents: history,
+        contents: curatedHistory,
       });
-
-    // If not forced, check if we should compress based on context size.
-    if (!force) {
-      if (originalTokenCount === undefined) {
-        // If token count is undefined, we can't determine if we need to compress.
-        console.warn(
-          `Could not determine token count for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-      const tokenCount = originalTokenCount; // Now guaranteed to be a number
-
-      const limit = tokenLimit(this.model);
-      if (!limit) {
-        // If no limit is defined for the model, we can't compress.
-        console.warn(
-          `No token limit defined for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-
-      if (tokenCount < 0.95 * limit) {
-        return null;
-      }
+    if (originalTokenCount === undefined) {
+      console.warn(`Could not determine token count for model ${this.model}.`);
+      originalTokenCount = 0;
     }
 
-    const summarizationRequestMessage = {
-      text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
-    };
-    const response = await this.getChat().sendMessage({
-      message: summarizationRequestMessage,
+    // Don't compress if not forced and we are under the limit.
+    if (!force && originalTokenCount < 0.95 * tokenLimit(this.model)) {
+      return null;
+    }
+
+    const { text: summary } = await this.getChat().sendMessage({
+      message: {
+        text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+      },
+      config: {
+        systemInstruction: { text: getCompressionPrompt() },
+      },
     });
-    const newHistory = [
+    this.chat = await this.startChat([
       {
         role: 'user',
-        parts: [summarizationRequestMessage],
+        parts: [{ text: summary }],
       },
       {
         role: 'model',
-        parts: [{ text: response.text }],
+        parts: [{ text: 'Got it. Thanks for the additional context!' }],
       },
-    ];
-    this.chat = await this.startChat(newHistory);
-    const newTokenCount = (
+    ]);
+
+    const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({
         model: this.model,
-        contents: newHistory,
-      })
-    ).totalTokens;
+        contents: this.getChat().getHistory(),
+      });
+    if (newTokenCount === undefined) {
+      console.warn('Could not determine compressed history token count.');
+      return null;
+    }
 
-    return originalTokenCount && newTokenCount
-      ? {
-          originalTokenCount,
-          newTokenCount,
-        }
-      : null;
+    return {
+      originalTokenCount,
+      newTokenCount,
+    };
   }
 
   /**
@@ -504,7 +491,7 @@ export class GeminiClient {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
     }
 
