@@ -23,9 +23,9 @@ export const validateAuthMethod = (
     const apiKey = auth?.gemini?.apiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return (
-        'Unale to find Gemini API Key. You need to do either:\n' +
-        '• Set the environment variable GEMINI_API_KEY then try again, no reload needed!\n' +
-        '• Configure `auth.gemini.apiKey` in your settings.json then reload gemini-cli.'
+        'Unable to find Gemini API Key. You need to do either:\n' +
+        '• Set the environment variable `GEMINI_API_KEY` then try again, no reload needed!\n' +
+        '• Configure `auth.gemini.apiKey` in your `settings.json` then reload gemini-cli.\n'
       );
     }
     return null;
@@ -43,13 +43,12 @@ export const validateAuthMethod = (
     }
     return (
       'Unable to find valid Vertex AI configuration. You need to do one of:\n' +
-      '• Set the environment variable GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION.\n' +
-      '• Configure `auth.vertex.project` and `auth.vertex.location` in your settings.json.\n' +
-      '• Set the environment variable GOOGLE_API_KEY environment variable (if using express mode).\n' +
-      '• Configure `auth.vertex.apiKey` in your settings.json (if using express mode).\n' +
+      '• Set the environment variable `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`.\n' +
+      '• Configure `auth.vertex.project` and `auth.vertex.location` in your `settings.json`.\n' +
+      '• Set the environment variable `GOOGLE_API_KEY` environment variable (if using express mode).\n' +
+      '• Configure `auth.vertex.apiKey` in your `settings.json` (if using express mode).\n' +
       'If you use the environment variables, update your .env and try again, no reload needed!\n' +
-      'Otherwise, reload reload gemini-cli.'
-    );
+      'Otherwise, reload reload gemini-cli.\n'
   }
 
   return 'Invalid auth method selected.';
