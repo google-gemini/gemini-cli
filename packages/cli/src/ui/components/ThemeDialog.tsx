@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -19,7 +19,6 @@ interface ThemeDialogProps {
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
-
   /** The settings object */
   settings: LoadedSettings;
   availableTerminalHeight?: number;
@@ -28,6 +27,7 @@ interface ThemeDialogProps {
 
 export function ThemeDialog({
   onSelect,
+  onHighlight,
   settings,
   availableTerminalHeight,
   terminalWidth,
@@ -37,26 +37,15 @@ export function ThemeDialog({
   );
 
   // Generate theme items
-  // Ensure custom themes are loaded before rendering
-  useEffect(() => {
-    if (settings.merged.customThemes) {
-      themeManager.loadCustomThemes(settings.merged.customThemes);
-    }
-  }, [settings.merged.customThemes]);
-
-  const availableThemes = themeManager.getAvailableThemes();
-  const themeItems = availableThemes.map((theme) => {
+  const themeItems = themeManager.getAvailableThemes().map((theme) => {
     const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
-    const label = theme.isCustom ? `[Custom] ${theme.name}` : theme.name;
     return {
-      label,
+      label: theme.name,
       value: theme.name,
       themeNameDisplay: theme.name,
       themeTypeDisplay: typeString,
-      isCustom: theme.isCustom,
     };
   });
-
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Determine which radio button should be initially selected in the theme list
@@ -87,27 +76,10 @@ export function ThemeDialog({
   const [focusedSection, setFocusedSection] = useState<'theme' | 'scope'>(
     'theme',
   );
-  const [selectedThemeIndex, setSelectedThemeIndex] = useState(
-    initialThemeIndex >= 0 ? initialThemeIndex : 0,
-  );
 
-  // Add a handler for navigation
   useInput((input, key) => {
     if (key.tab) {
-      if (focusedSection === 'theme') {
-        setFocusedSection('scope');
-      } else {
-        setFocusedSection('theme');
-      }
-      return;
-    }
-    if (key.return) {
-      if (focusedSection === 'theme') {
-        handleThemeSelect(themeItems[selectedThemeIndex].value);
-      } else if (focusedSection === 'scope') {
-        // No-op for now
-      }
-      return;
+      setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
     }
     if (key.escape) {
       onSelect(undefined, selectedScope);
@@ -137,8 +109,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-      PREVIEW_PANE_WIDTH_PERCENTAGE *
-      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+        PREVIEW_PANE_WIDTH_PERCENTAGE *
+        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
@@ -193,21 +165,6 @@ export function ThemeDialog({
   const diffHeight = Math.floor(availableTerminalHeightCodeBlock / 2) - 1;
   const codeBlockHeight = Math.ceil(availableTerminalHeightCodeBlock / 2) + 1;
 
-  // useEffect for previewing theme
-  useEffect(() => {
-    const previewThemeObj = themeManager.findThemeByName(
-      themeItems[selectedThemeIndex]?.value,
-    );
-    if (previewThemeObj) {
-      themeManager.setActiveTheme(previewThemeObj.name);
-    }
-  }, [selectedThemeIndex, themeItems]);
-
-  let themeInstructions = '';
-  if (focusedSection === 'theme') {
-    themeInstructions = 'Press Enter to select.';
-  }
-
   return (
     <Box
       borderStyle="round"
@@ -222,33 +179,24 @@ export function ThemeDialog({
       <Box flexDirection="row">
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={focusedSection === 'theme'} wrap="truncate">
-            {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text bold={currenFocusedSection === 'theme'} wrap="truncate">
+            {currenFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
             key={selectInputKey}
             items={themeItems}
-            initialIndex={selectedThemeIndex}
+            initialIndex={initialThemeIndex}
             onSelect={handleThemeSelect}
-            onHighlight={(themeName) => {
-              const idx = themeItems.findIndex(
-                (item) => item.value === themeName,
-              );
-              if (idx !== -1) setSelectedThemeIndex(idx);
-              // Optionally preview theme here if needed
-              if (themeName) themeManager.setActiveTheme(themeName);
-            }}
+            onHighlight={onHighlight}
             isFocused={currenFocusedSection === 'theme'}
           />
-          <Box marginTop={1}>
-            <Text color={Colors.Gray}>{themeInstructions}</Text>
-          </Box>
+
           {/* Scope Selection */}
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
-              <Text bold={focusedSection === 'scope'} wrap="truncate">
-                {focusedSection === 'scope' ? '> ' : '  '}Apply To
+              <Text bold={currenFocusedSection === 'scope'} wrap="truncate">
+                {currenFocusedSection === 'scope' ? '> ' : '  '}Apply To
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
@@ -274,14 +222,25 @@ export function ThemeDialog({
             flexDirection="column"
           >
             {colorizeCode(
-              `# function\ndef fibonacci(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a`,
+              `# function
+-def fibonacci(n):
+-    a, b = 0, 1
+-    for _ in range(n):
+-        a, b = b, a + b
+-    return a`,
               'python',
               codeBlockHeight,
               colorizeCodeWidth,
             )}
             <Box marginTop={1} />
             <DiffRenderer
-              diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,4 +1,5 @@\n This is a context line.\n-This line was deleted.\n+This line was added.\n`}
+              diffContent={`--- a/old_file.txt
+-+++ b/new_file.txt
+-@@ -1,4 +1,5 @@
+- This is a context line.
+--This line was deleted.
+-+This line was added.
+-`}
               availableTerminalHeight={diffHeight}
               terminalWidth={colorizeCodeWidth}
             />
