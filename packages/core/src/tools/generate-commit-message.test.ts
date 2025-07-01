@@ -19,6 +19,9 @@ vi.mock('child_process', () => ({
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     generateContent: vi.fn(),
+    getContentGenerator: vi.fn(() => ({
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
+    })),
   })),
 }));
 
@@ -28,7 +31,7 @@ function createGitCommandMock(outputs: { [key: string]: string }) {
     const child = new EventEmitter() as EventEmitter & {
       stdout: { on: ReturnType<typeof vi.fn> };
       stderr: { on: ReturnType<typeof vi.fn> };
-      stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+      stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> };
     };
 
     const argString = args.join(' ');
@@ -37,6 +40,7 @@ function createGitCommandMock(outputs: { [key: string]: string }) {
         write: vi.fn(),
         end: vi.fn(),
         on: vi.fn(),
+        once: vi.fn(),
       };
     }
 
@@ -72,6 +76,7 @@ describe('GenerateCommitMessageTool', () => {
       getGeminiClient: () => mockClient,
       getApprovalMode: () => ApprovalMode.DEFAULT,
       setApprovalMode: vi.fn(),
+      getModel: () => 'gemini-1.5-flash',
     } as unknown as Config;
     tool = new GenerateCommitMessageTool(mockConfig);
     mockSpawn = spawn as Mock;
@@ -154,7 +159,7 @@ describe('GenerateCommitMessageTool', () => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: { on: ReturnType<typeof vi.fn> };
         stderr: { on: ReturnType<typeof vi.fn> };
-        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> };
       };
       const argString = args.join(' ');
 
@@ -181,6 +186,7 @@ describe('GenerateCommitMessageTool', () => {
           write: vi.fn(),
           end: vi.fn(),
           on: vi.fn(),
+          once: vi.fn(),
         };
       }
 
@@ -278,7 +284,7 @@ describe('GenerateCommitMessageTool', () => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: { on: ReturnType<typeof vi.fn> };
         stderr: { on: ReturnType<typeof vi.fn> };
-        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> };
       };
       
       child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
@@ -309,6 +315,7 @@ describe('GenerateCommitMessageTool', () => {
           write: vi.fn(),
           end: vi.fn(),
           on: vi.fn(),
+          once: vi.fn(),
         };
       }
       
@@ -813,7 +820,7 @@ describe('GenerateCommitMessageTool', () => {
         const child = new EventEmitter() as EventEmitter & {
           stdout: { on: ReturnType<typeof vi.fn> };
           stderr: { on: ReturnType<typeof vi.fn> };
-          stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+          stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> };
         };
         
         child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
@@ -842,6 +849,7 @@ describe('GenerateCommitMessageTool', () => {
             }),
             end: vi.fn(),
             on: vi.fn(),
+            once: vi.fn(),
           };
         }
         
@@ -864,7 +872,7 @@ describe('GenerateCommitMessageTool', () => {
         const child = new EventEmitter() as EventEmitter & {
           stdout: { on: ReturnType<typeof vi.fn> };
           stderr: { on: ReturnType<typeof vi.fn> };
-          stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+          stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> };
         };
         
         child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
@@ -897,6 +905,7 @@ describe('GenerateCommitMessageTool', () => {
                 listener(error);
               }
             }),
+            once: vi.fn(),
           };
         }
         
@@ -1271,6 +1280,76 @@ describe('GenerateCommitMessageTool', () => {
 
       expect(result.llmContent).toContain('Error during commit workflow');
       expect(result.llmContent).toContain('Failed to parse');
+    });
+
+    it('should truncate large diffs when token count exceeds threshold', async () => {
+      const statusOutput = 'M  large-file.txt';
+      const largeDiff = 'diff --git a/large-file.txt b/large-file.txt\n' + 'A'.repeat(10000); // Large diff
+      const logOutput = 'abc1234 Previous commit message';
+
+      // Create a new tool with fresh mocks for this test  
+      // With 1% threshold, even small token counts will trigger truncation
+      // gemini-1.5-flash limit: 1,048,576 * 0.01 = 10,485 tokens threshold
+      const mockCountTokens = vi.fn().mockResolvedValue({ totalTokens: 15000 }); // Exceeds 1% threshold
+      const testMockClient = {
+        generateContent: vi.fn().mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      analysis: {
+                        changedFiles: ['large-file.txt'],
+                        changeType: 'feat',
+                        purpose: 'Add large content',
+                        impact: 'Large change',
+                        hasSensitiveInfo: false,
+                      },
+                      commitMessage: {
+                        header: 'feat: add large content',
+                        body: '',
+                        footer: '',
+                      },
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        getContentGenerator: vi.fn(() => ({
+          countTokens: mockCountTokens,
+        })),
+      };
+
+      const testMockConfig = {
+        getGeminiClient: () => testMockClient,
+        getApprovalMode: () => ApprovalMode.DEFAULT,
+        setApprovalMode: vi.fn(),
+        getModel: () => 'gemini-1.5-flash',
+      } as unknown as Config;
+
+      const testTool = new GenerateCommitMessageTool(testMockConfig);
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': largeDiff,
+        'diff': '',
+        'log': logOutput,
+        'commit': ''
+      }));
+
+      const result = await testTool.execute(undefined, new AbortController().signal);
+
+      // Verify that countTokens was called
+      expect(mockCountTokens).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Commit created successfully!');
+      // Verify that generateContent was called with truncated diff
+      expect(testMockClient.generateContent).toHaveBeenCalled();
+      const callArgs = (testMockClient.generateContent as Mock).mock.calls[0];
+      const promptText = callArgs[0][0].parts[0].text;
+      expect(promptText).toContain('... (diff truncated due to size limits) ...');
     });
   });
 });

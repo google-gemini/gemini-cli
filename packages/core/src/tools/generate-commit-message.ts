@@ -15,6 +15,7 @@ import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { spawn, ChildProcess } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 
 // ============================================================================
 // Type Definitions
@@ -571,9 +572,10 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     log: string,
     signal: AbortSignal,
   ): Promise<string> {
+    const truncatedDiff = await this.truncateDiffIfNeeded(diff, signal);
     const prompt = COMMIT_ANALYSIS_PROMPT
       .replace('{{status}}', status)
-      .replace('{{diff}}', diff)
+      .replace('{{diff}}', truncatedDiff)
       .replace('{{log}}', log);
 
     console.debug('[GenerateCommitMessage] Calling Gemini API for commit analysis...');
@@ -598,6 +600,62 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       console.error('[GenerateCommitMessage] Error during Gemini API call:', error);
       throw this.formatAPIError(error);
     }
+  }
+
+  private async truncateDiffIfNeeded(diff: string, signal: AbortSignal): Promise<string> {
+    try {
+      const tokenCount = await this.countTokensForDiff(diff, signal);
+      const model = this.config.getModel();
+      const limit = tokenLimit(model);
+      const threshold = Math.floor(limit * 0.01); // 1% threshold for maximum safety
+
+      if (tokenCount > threshold) {
+        console.debug(`[GenerateCommitMessage] Diff token count (${tokenCount}) exceeds threshold (${threshold}), truncating...`);
+        // Calculate available tokens for diff (subtract prompt overhead)
+        const promptOverhead = 2000; // Estimate for prompt text, status, log etc.
+        const availableForDiff = Math.max(1000, threshold - promptOverhead);
+        return this.truncateDiffContent(diff, availableForDiff);
+      }
+
+      return diff;
+    } catch (error) {
+      console.warn('[GenerateCommitMessage] Failed to count tokens for diff, proceeding without truncation:', error);
+      return diff;
+    }
+  }
+
+  private async countTokensForDiff(diff: string, _signal: AbortSignal): Promise<number> {
+    const testPrompt = COMMIT_ANALYSIS_PROMPT
+      .replace('{{status}}', '') // Empty status for token counting
+      .replace('{{diff}}', diff)
+      .replace('{{log}}', ''); // Empty log for token counting
+
+    const response = await this.client.getContentGenerator().countTokens({
+      model: this.config.getModel(),
+      contents: [{ role: 'user', parts: [{ text: testPrompt }] }],
+    });
+
+    return response.totalTokens || 0;
+  }
+
+  private truncateDiffContent(diff: string, maxTokens: number): string {
+    const truncationMessage = '\n... (diff truncated due to size limits) ...';
+    // Rough estimate: 1 token ≈ 4 characters for text
+    const estimatedCharsPerToken = 4;
+    const maxChars = Math.floor(maxTokens * estimatedCharsPerToken * 0.8); // Use 80% for safety
+    
+    if (diff.length <= maxChars) {
+      return diff;
+    }
+
+    // Find a good truncation point (try to end at a line boundary)
+    let truncateAt = maxChars;
+    const lastNewline = diff.lastIndexOf('\n', maxChars);
+    if (lastNewline > maxChars * 0.7) { // If we can find a line break in the last 30%
+      truncateAt = lastNewline;
+    }
+
+    return diff.substring(0, truncateAt) + truncationMessage;
   }
 
   private parseAIResponse(generatedText: string): AICommitResponse {
