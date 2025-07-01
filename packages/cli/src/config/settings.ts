@@ -132,17 +132,12 @@ export class LoadedSettings {
     }
   }
 
-  setValue(
+  setValue<K extends keyof Settings>(
     scope: SettingScope,
-    key: keyof Settings,
-    value:
-      | string
-      | Record<string, MCPServerConfig>
-      | Record<string, CustomTheme>
-      | undefined,
+    key: K,
+    value: Settings[K],
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig> | Record<string, CustomTheme>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
