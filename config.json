@@ -1,0 +1,25 @@
+{
+  "model": "gemini-2.5-flash",
+  "contextFileName": "GEMINI.md",
+  "debug": false,
+  "coreTools": [],
+  "excludeTools": [],
+  "toolDiscoveryCommand": "",
+  "toolCallCommand": "",
+  "bugCommand": "",
+  "telemetry": {
+    "enabled": true,
+    "target": "gcp",
+    "otlpEndpoint": "",
+    "logPrompts": false
+  },
+  "checkpointing": {
+    "enabled": true
+  },
+  "showMemoryUsage": false,
+  "accessibility": {},
+  "fileFiltering": {
+    "respectGitIgnore": true,
+    "enableRecursiveFileSearch": true
+  }
+}
