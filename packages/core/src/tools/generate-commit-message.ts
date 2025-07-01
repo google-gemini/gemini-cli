@@ -230,17 +230,27 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         indexHash
       };
 
-      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', commitMode === 'staged-only');
+      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', commitMode);
       
       let filesDisplay = '';
-      if (filesToCommit.length > 0) {
-        filesDisplay = `\n\nFiles to be committed:\n${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+      let strategyDisplay = '';
+      
+      if (commitMode === 'staged-only') {
+        strategyDisplay = '\nStrategy: Committing staged changes only';
+        if (filesToCommit.length > 0) {
+          filesDisplay = `\n\nStaged files to be committed:\n${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+        }
+      } else {
+        strategyDisplay = '\nStrategy: Staging all changes and committing';
+        if (filesToCommit.length > 0) {
+          filesDisplay = `\n\nFiles to be staged and committed:\n${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+        }
       }
 
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
         title: 'Confirm Git Commit',
-        command: `Commit with message:\n\n${finalCommitMessage}${filesDisplay}`,
+        command: `Commit with message:\n\n${finalCommitMessage}${strategyDisplay}${filesDisplay}`,
         rootCommand: 'git-commit',
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -303,53 +313,20 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         finalCommitMessage = this.addGeminiSignature(commitMessage);
       }
 
+      // Determine commit mode for execution
+      let commitMode: CommitMode;
       const cachedData = this.cachedCommitData;
       if (cachedData) {
-        await this.executeCommitStrategy(cachedData.commitMode, signal);
+        commitMode = cachedData.commitMode;
       } else {
         const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
         const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
         const currentGitState = this.analyzeGitState(statusOutput, currentStagedDiff || '', currentUnstagedDiff || '');
-        const currentCommitMode = this.determineCommitStrategy(currentGitState);
-        
-        await this.executeCommitStrategy(currentCommitMode, signal);
+        commitMode = this.determineCommitStrategy(currentGitState);
       }
 
-      console.debug('[GenerateCommitMessage] Creating commit with message:', finalCommitMessage.substring(0, 100) + '...');
-      
-      try {
-        await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
-        this.cachedCommitData = null;
-        await this.executeGitCommand(['status', '--porcelain'], signal);
-        
-        return {
-          llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
-          returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
-        };
-      } catch (commitError) {
-        if (commitError instanceof Error && 
-            (commitError.message.includes('pre-commit') || 
-             commitError.message.includes('index.lock') ||
-             commitError.message.includes('hook'))) {
-          console.debug('[GenerateCommitMessage] Pre-commit hook or staging issue detected, implementing comprehensive retry...');
-          
-          await this.executeGitCommand(['add', '.'], signal);
-          
-          try {
-            await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
-            this.cachedCommitData = null;
-            
-            return {
-              llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
-              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
-            };
-          } catch (retryError) {
-            const errorDetails = retryError instanceof Error ? retryError.message : String(retryError);
-            throw new Error(`Commit failed after pre-commit hook retry. Original error: ${commitError.message}. Retry error: ${errorDetails}`);
-          }
-        }
-        throw commitError;
-      }
+      // Execute commit with automatic rollback on failure
+      return await this.executeCommitWithRollback(commitMode, finalCommitMessage, signal);
     } catch (error) {
       console.error('[GenerateCommitMessage] Error during execution:', error);
       const errorDetails = this.formatExecutionError(error);
@@ -508,26 +485,31 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       throw new Error('Git conflicts detected. Please resolve conflicts before committing.');
     }
 
-    if (gitState.hasStagedChanges) {
+    // If we have staged changes, always prioritize them unless there are also unstaged changes
+    if (gitState.hasStagedChanges && !gitState.hasUnstagedChanges && !gitState.hasUntrackedFiles) {
+      console.debug('[GenerateCommitMessage] Only staged changes detected, will commit staged files only');
       return 'staged-only';
     }
 
+    // If we have both staged and unstaged changes, prefer staged-only to avoid unintended commits
+    if (gitState.hasStagedChanges && (gitState.hasUnstagedChanges || gitState.hasUntrackedFiles)) {
+      console.debug('[GenerateCommitMessage] Both staged and unstaged changes detected, will commit staged files only for safety');
+      return 'staged-only';
+    }
+
+    // Only if no staged changes exist, consider all changes
     if (gitState.hasUnstagedChanges || gitState.hasUntrackedFiles) {
+      console.debug('[GenerateCommitMessage] No staged changes, will stage and commit all changes');
       return 'all-changes';
     }
 
-    return 'staged-only';
+    // Fallback case - no changes to commit
+    throw new Error('No changes detected to commit. Please stage changes or modify files first.');
   }
 
-  private parseUntrackedFiles(statusOutput: string): string[] {
-    return statusOutput
-      .split('\n')
-      .filter(line => line.startsWith('??'))
-      .map(line => line.substring(3).trim())
-      .filter(file => !file.includes('node_modules/') && !file.includes('.git/'));
-  }
 
-  private parseFilesToBeCommitted(statusOutput: string, hasStagedChanges: boolean): string[] {
+
+  private parseFilesToBeCommitted(statusOutput: string, commitMode: CommitMode): string[] {
     const lines = statusOutput.split('\n').filter(line => line.trim());
     const files: string[] = [];
 
@@ -535,15 +517,18 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       if (line.length < 3) continue;
       
       const status = line.substring(0, 2);
-      const filename = line.substring(3).trim();
+      const filename = line.substring(2).trim();
       
       if (filename.includes('node_modules/') || filename.includes('.git/')) continue;
       
-      if (hasStagedChanges) {
+      if (commitMode === 'staged-only') {
+        // Only include files that are already staged (first character is not space and not untracked)
         if (status[0] !== ' ' && status[0] !== '?') {
           files.push(filename);
         }
       } else {
+        // For 'all-changes' mode, include all files that will be staged and committed
+        // This includes: staged files, unstaged changes, and untracked files
         if (status[0] !== ' ' || status[1] !== ' ') {
           files.push(filename);
         }
@@ -559,6 +544,104 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       await this.executeGitCommand(['add', '.'], signal);
     } else {
       console.debug('[GenerateCommitMessage] Executing staged-only strategy: committing staged files only');
+    }
+  }
+
+  private async executeCommitWithRollback(
+    commitMode: CommitMode,
+    finalCommitMessage: string,
+    signal: AbortSignal
+  ): Promise<{ llmContent: string; returnDisplay: string }> {
+    let originalIndexState: string | null = null;
+    
+    // Store original state before any modifications for rollback
+    if (commitMode === 'all-changes') {
+      try {
+        originalIndexState = await this.executeGitCommand(['diff', '--cached'], signal);
+      } catch (error) {
+        console.debug('[GenerateCommitMessage] Warning: Could not capture original index state:', error);
+      }
+    }
+
+    try {
+      // Execute the commit strategy (staging for all-changes mode)
+      await this.executeCommitStrategy(commitMode, signal);
+
+      console.debug('[GenerateCommitMessage] Creating commit with message:', finalCommitMessage.substring(0, 100) + '...');
+      
+      try {
+        await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
+        this.cachedCommitData = null;
+        await this.executeGitCommand(['status', '--porcelain'], signal);
+        
+        return {
+          llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
+          returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
+        };
+      } catch (commitError) {
+        // Handle pre-commit hook modifications
+        if (commitError instanceof Error && 
+            (commitError.message.includes('pre-commit') || 
+             commitError.message.includes('index.lock') ||
+             commitError.message.includes('hook'))) {
+          console.debug('[GenerateCommitMessage] Pre-commit hook or staging issue detected, implementing comprehensive retry...');
+          
+          await this.executeGitCommand(['add', '.'], signal);
+          
+          try {
+            await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
+            this.cachedCommitData = null;
+            
+            return {
+              llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+            };
+          } catch (retryError) {
+            // Rollback staging changes if commit fails after retry
+            await this.rollbackStagingChanges(commitMode, originalIndexState, signal);
+            const errorDetails = retryError instanceof Error ? retryError.message : String(retryError);
+            throw new Error(`Commit failed after pre-commit hook retry. Staging changes have been rolled back. Original error: ${commitError.message}. Retry error: ${errorDetails}`);
+          }
+        }
+        
+        // Rollback staging changes for any other commit failure
+        await this.rollbackStagingChanges(commitMode, originalIndexState, signal);
+        throw commitError;
+      }
+    } catch (error) {
+      // Rollback staging changes if commit strategy execution fails
+      await this.rollbackStagingChanges(commitMode, originalIndexState, signal);
+      throw error;
+    }
+  }
+
+  private async rollbackStagingChanges(
+    commitMode: CommitMode,
+    originalIndexState: string | null,
+    signal: AbortSignal
+  ): Promise<void> {
+    if (commitMode !== 'all-changes') {
+      return; // No rollback needed for staged-only mode
+    }
+
+    try {
+      console.debug('[GenerateCommitMessage] Rolling back staging changes to restore original state...');
+      
+      // Reset the index to its original state
+      await this.executeGitCommand(['reset', 'HEAD'], signal);
+      
+      // If we had original staged changes, attempt to restore them
+      if (originalIndexState && originalIndexState.trim()) {
+        console.debug('[GenerateCommitMessage] Attempting to restore original staged changes...');
+        // Note: This is a best-effort restoration. Perfect restoration is complex
+        // and would require storing more detailed state information.
+        console.debug('[GenerateCommitMessage] Warning: Original staged changes may need to be manually re-staged');
+      }
+      
+      console.debug('[GenerateCommitMessage] Successfully rolled back staging changes');
+    } catch (rollbackError) {
+      console.error('[GenerateCommitMessage] Failed to rollback staging changes:', rollbackError);
+      console.warn('[GenerateCommitMessage] Warning: Your working directory may be left with unexpected staged changes. Please check "git status" and manually restore if needed.');
     }
   }
 
@@ -607,22 +690,23 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       // Quick size check first - avoid token counting for small diffs
       const model = this.config.getModel();
       const limit = tokenLimit(model);
-      const threshold = Math.floor(limit * 0.01); // 1% threshold for maximum safety
+      const threshold = Math.floor(limit * 0.6); // More reasonable threshold for diff content
       
-      // Rough estimate: if diff is small enough, skip token counting
-      const estimatedTokens = Math.ceil(diff.length / 4); // Conservative estimate
-      if (estimatedTokens <= threshold * 0.5) {
+      // Improved token estimation for different content types
+      const estimatedTokens = this.estimateTokenCount(diff);
+      if (estimatedTokens <= threshold * 0.3) {
         console.debug(`[GenerateCommitMessage] Diff size (${estimatedTokens} estimated tokens) is small enough, skipping token counting`);
         return diff;
       }
 
+      // Use actual token counting for more accurate results
       const tokenCount = await this.countTokensForDiff(diff, signal);
 
       if (tokenCount > threshold) {
         console.debug(`[GenerateCommitMessage] Diff token count (${tokenCount}) exceeds threshold (${threshold}), truncating...`);
         // Calculate available tokens for diff (subtract prompt overhead)
-        const promptOverhead = 2000; // Estimate for prompt text, status, log etc.
-        const availableForDiff = Math.max(1000, threshold - promptOverhead);
+        const promptOverhead = 3000; // More accurate estimate for prompt text, status, log etc.
+        const availableForDiff = Math.max(2000, threshold - promptOverhead);
         return this.truncateDiffContent(diff, availableForDiff);
       }
 
@@ -631,6 +715,27 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       console.warn('[GenerateCommitMessage] Failed to count tokens for diff, proceeding without truncation:', error);
       return diff;
     }
+  }
+
+  private estimateTokenCount(text: string): number {
+    // More sophisticated token estimation
+    const lines = text.split('\n');
+    let tokenCount = 0;
+    
+    for (const line of lines) {
+      if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+        // Diff headers typically use fewer tokens per character
+        tokenCount += Math.ceil(line.length / 6);
+      } else if (line.startsWith('+') || line.startsWith('-')) {
+        // Changed lines may contain code, estimate more conservatively
+        tokenCount += Math.ceil(line.length / 3.5);
+      } else {
+        // Context lines
+        tokenCount += Math.ceil(line.length / 4);
+      }
+    }
+    
+    return tokenCount;
   }
 
   private async countTokensForDiff(diff: string, _signal: AbortSignal): Promise<number> {
@@ -649,22 +754,66 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   private truncateDiffContent(diff: string, maxTokens: number): string {
     const truncationMessage = '\n... (diff truncated due to size limits) ...';
-    // Rough estimate: 1 token ≈ 4 characters for text
-    const estimatedCharsPerToken = 4;
-    const maxChars = Math.floor(maxTokens * estimatedCharsPerToken * 0.8); // Use 80% for safety
     
-    if (diff.length <= maxChars) {
+    // Use the same token estimation logic as estimateTokenCount for consistency
+    if (this.estimateTokenCount(diff) <= maxTokens) {
       return diff;
     }
 
+    // Use binary search to find the optimal truncation point
+    const optimalLength = this.findOptimalTruncationLength(diff, maxTokens);
+    
     // Find a good truncation point (try to end at a line boundary)
-    let truncateAt = maxChars;
-    const lastNewline = diff.lastIndexOf('\n', maxChars);
-    if (lastNewline > maxChars * 0.7) { // If we can find a line break in the last 30%
+    let truncateAt = optimalLength;
+    const lastNewline = diff.lastIndexOf('\n', optimalLength);
+    if (lastNewline > optimalLength * 0.7) { // If we can find a line break in the last 30%
       truncateAt = lastNewline;
     }
 
     return diff.substring(0, truncateAt) + truncationMessage;
+  }
+
+  /**
+   * Use binary search to find the maximum length that stays under the token limit
+   */
+  private findOptimalTruncationLength(diff: string, maxTokens: number): number {
+    // Performance optimization: avoid binary search for very small diffs
+    if (diff.length < 1000) {
+      return diff.length;
+    }
+
+    let left = 0;
+    let right = diff.length;
+    let bestLength = 0;
+
+    // Binary search with maximum iterations to prevent infinite loops
+    const maxIterations = Math.ceil(Math.log2(diff.length)) + 5;
+    let iterations = 0;
+
+    while (left <= right && iterations < maxIterations) {
+      const mid = Math.floor((left + right) / 2);
+      const substring = diff.substring(0, mid);
+      
+      try {
+        const estimatedTokens = this.estimateTokenCount(substring);
+
+        if (estimatedTokens <= maxTokens) {
+          bestLength = mid;
+          left = mid + 1;
+        } else {
+          right = mid - 1;
+        }
+      } catch (error) {
+        console.debug('[GenerateCommitMessage] Error during token estimation in binary search:', error);
+        // Fallback to a safe length if estimation fails
+        return Math.floor(diff.length * 0.5);
+      }
+
+      iterations++;
+    }
+
+    // Ensure we don't return 0 length
+    return Math.max(bestLength, Math.floor(diff.length * 0.1));
   }
 
   private parseAIResponse(generatedText: string): AICommitResponse {
@@ -845,8 +994,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       if (typeof analysisObj.scope !== 'string') {
         return 'AI response validation failed: analysis.scope must be a string when provided, received: ' + typeof analysisObj.scope;
       }
-      if (analysisObj.scope.length > 50) {
-        return 'AI response validation failed: analysis.scope exceeds maximum length of 50 characters';
+      if (analysisObj.scope.length > 200) {
+        return 'AI response validation failed: analysis.scope exceeds maximum length of 200 characters (note: Conventional Commits specification does not define scope length limits)';
       }
     }
 
@@ -874,8 +1023,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     }
 
     const scopeMatch = commitObj.header.match(/\((.+)\)/);
-    if (scopeMatch && scopeMatch[1] && scopeMatch[1].length > 30) {
-      return 'AI response validation failed: commit message scope exceeds maximum length of 30 characters';
+    if (scopeMatch && scopeMatch[1] && scopeMatch[1].length > 200) {
+      return 'AI response validation failed: commit message scope exceeds maximum length of 200 characters (note: Conventional Commits specification does not define scope length limits)';
     }
 
     // Enhanced validation for conventional commit structure
@@ -937,10 +1086,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const scope = afterType.substring(1, scopeEndIndex);
       if (!scope.trim()) {
         return 'AI response validation failed: commit header scope cannot be empty';
-      }
-      
-      if (scope.includes(' ')) {
-        return 'AI response validation failed: commit header scope cannot contain spaces';
       }
       
       const afterScope = afterType.substring(scopeEndIndex + 1);
@@ -1313,19 +1458,33 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const errorMsg = error.message.toLowerCase();
       
       if (error.message.includes('JSON')) {
-        return new Error(`AI response parsing failed: ${error.message}. The AI may have returned an unexpected format.`);
+        return new Error(`AI response parsing failed: ${error.message}. The AI may have returned an unexpected format. Try regenerating the commit message.`);
       } else if (error.message.includes('sensitive information')) {
         return error;
-      } else if (errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('enotfound') || errorMsg.includes('econnrefused')) {
+      } else if (errorMsg.includes('enotfound') || errorMsg.includes('dns')) {
+        return new Error(`DNS resolution failed during commit message generation: ${error.message}. Check your internet connection and DNS settings.`);
+      } else if (errorMsg.includes('econnrefused') || errorMsg.includes('connection refused')) {
+        return new Error(`Connection refused during commit message generation: ${error.message}. The AI service may be temporarily unavailable.`);
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('etimedout')) {
+        return new Error(`Request timeout during commit message generation: ${error.message}. The AI service is responding slowly, try again.`);
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
         return new Error(`Network error during commit message generation: ${error.message}. Please check your internet connection and try again.`);
-      } else if (errorMsg.includes('api') || errorMsg.includes('quota') || errorMsg.includes('rate limit') || errorMsg.includes('billing')) {
-        return new Error(`API error during commit message generation: ${error.message}. Please check your API key, quota, and billing status.`);
-      } else if (errorMsg.includes('unauthorized') || errorMsg.includes('forbidden') || errorMsg.includes('401') || errorMsg.includes('403')) {
-        return new Error(`Authentication error during commit message generation: ${error.message}. Please verify your API key is valid and has the necessary permissions.`);
+      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests') || errorMsg.includes('429')) {
+        return new Error(`Rate limit exceeded during commit message generation: ${error.message}. Please wait before trying again.`);
+      } else if (errorMsg.includes('quota') || errorMsg.includes('billing') || errorMsg.includes('payment')) {
+        return new Error(`Quota or billing error during commit message generation: ${error.message}. Please check your account status and billing.`);
+      } else if (errorMsg.includes('api key') || errorMsg.includes('invalid key')) {
+        return new Error(`Invalid API key during commit message generation: ${error.message}. Please verify your API key configuration.`);
+      } else if (errorMsg.includes('unauthorized') || errorMsg.includes('401')) {
+        return new Error(`Authentication failed during commit message generation: ${error.message}. Your API key may be invalid or expired.`);
+      } else if (errorMsg.includes('forbidden') || errorMsg.includes('403')) {
+        return new Error(`Access forbidden during commit message generation: ${error.message}. Your API key may lack necessary permissions.`);
       } else if (errorMsg.includes('model') || errorMsg.includes('unavailable') || errorMsg.includes('503')) {
-        return new Error(`AI model error during commit message generation: ${error.message}. The model may be temporarily unavailable. Please try again later.`);
+        return new Error(`AI model unavailable during commit message generation: ${error.message}. The service may be temporarily down, try again later.`);
       } else if (errorMsg.includes('content') || errorMsg.includes('safety') || errorMsg.includes('policy')) {
-        return new Error(`Content policy error during commit message generation: ${error.message}. The changes may have triggered safety filters.`);
+        return new Error(`Content policy violation during commit message generation: ${error.message}. Your changes may have triggered safety filters.`);
+      } else if (errorMsg.includes('token') && errorMsg.includes('limit')) {
+        return new Error(`Token limit exceeded during commit message generation: ${error.message}. Your diff may be too large, try staging fewer changes.`);
       }
     }
     
