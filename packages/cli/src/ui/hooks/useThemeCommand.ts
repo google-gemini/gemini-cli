@@ -22,8 +22,8 @@ interface UseThemeCommandReturn {
 
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
-  addItem: (item: HistoryItem, timestamp: number) => void,
   setThemeError: (error: string | null) => void,
+  addItem: (item: HistoryItem, timestamp: number) => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
 
