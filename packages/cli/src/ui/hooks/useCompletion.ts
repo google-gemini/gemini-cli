@@ -189,48 +189,49 @@ export function useCompletion(
       return;
     }
 
-    let isMounted = true;
+    const controller = new AbortController();
+    const signal = controller.signal;
 
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
       try {
         const pattern = query.substring(query.lastIndexOf('@') + 1);
-        const fetchedSuggestions = await getAtFileSuggestions(pattern, cwd);
+        const fetchedSuggestions = await getAtFileSuggestions(
+          pattern,
+          cwd,
+          signal,
+        );
 
-        if (isMounted) {
-          setSuggestions(fetchedSuggestions);
-          setShowSuggestions(fetchedSuggestions.length > 0);
-          setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
-          setVisibleStartIndex(0);
-        }
+        setSuggestions(fetchedSuggestions);
+        setShowSuggestions(fetchedSuggestions.length > 0);
+        setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
+        setVisibleStartIndex(0);
       } catch (error: unknown) {
+        if (isNodeError(error) && error.name === 'AbortError') {
+          // Ignore abort errors, this is expected.
+          return;
+        }
+
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (isMounted) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-          }
+          setSuggestions([]);
+          setShowSuggestions(false);
         } else {
           console.error(
             `Error fetching completion suggestions for ${query}: ${getErrorMessage(
               error,
             )}`,
           );
-          if (isMounted) {
-            resetCompletionState();
-          }
+          resetCompletionState();
         }
       } finally {
-        if (isMounted) {
-          setIsLoadingSuggestions(false);
-        }
+        setIsLoadingSuggestions(false);
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 100);
+    fetchSuggestions();
 
     return () => {
-      isMounted = false;
-      clearTimeout(debounceTimeout);
+      controller.abort();
     };
   }, [query, cwd, isActive, resetCompletionState, slashCommands, config]);
 

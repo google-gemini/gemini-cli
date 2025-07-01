@@ -38,12 +38,13 @@ describe('useCompletion simplified integration test', () => {
     );
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150)); // Debounce
+      await new Promise((resolve) => setImmediate(resolve));
     });
 
     expect(atFileCompleter.getAtFileSuggestions).toHaveBeenCalledWith(
       'file',
       testCwd,
+      expect.any(AbortSignal),
     );
     expect(result.current.suggestions).toEqual(mockSuggestions);
     expect(result.current.showSuggestions).toBe(true);
@@ -60,7 +61,7 @@ describe('useCompletion simplified integration test', () => {
     );
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise((resolve) => setImmediate(resolve));
     });
 
     expect(result.current.suggestions).toEqual([]);

@@ -93,6 +93,13 @@ export async function performFileSearch(
       signal: abortSignal,
     });
 
+    child.on('error', (err) => {
+      // Ignore abort errors.
+      if ((err as NodeJS.ErrnoException).code === 'ABORT_ERR') {
+        return;
+      }
+    });
+
     let stdout = '';
     for await (const chunk of child.stdout) {
       stdout += chunk;

@@ -18,13 +18,21 @@ async function search(
   cwd: string,
   type: SearchType,
   changed_within?: { value: number; unit: TimeUnit },
+  abortSignal?: AbortSignal,
 ): Promise<string[]> {
+  // On Windows, normalize slashes to Windows-style.
+  if (path.sep === '\\') {
+    pattern = pattern.replace(/\//g, '\\');
+    pattern = pattern.replace(/\\/g, '\\\\');
+  }
+
   const { entries } = await performFileSearch({
     pattern,
     rootDirectory: cwd,
     max_results: 50,
     search_type: type,
     changed_within,
+    abortSignal,
   });
   return entries;
 }
@@ -55,6 +63,7 @@ function mapResults(
 export async function getAtFileSuggestions(
   pattern: string,
   cwd: string,
+  abortSignal?: AbortSignal,
 ): Promise<Suggestion[]> {
   if (pattern === '') {
     const timePeriods: Array<{ value: number; unit: TimeUnit }> = [
@@ -64,7 +73,7 @@ export async function getAtFileSuggestions(
       { value: 1, unit: TimeUnit.YEAR },
     ];
     for (const period of timePeriods) {
-      const files = await search('', cwd, SearchType.FILE, period);
+      const files = await search('', cwd, SearchType.FILE, period, abortSignal);
       if (files.length > 0) {
         return mapResults(files, [], cwd);
       }
@@ -77,16 +86,30 @@ export async function getAtFileSuggestions(
   if (pattern.endsWith(path.sep)) {
     // For a path ending in '/', we want the exact directory match to appear first.
     dirSearchPromises.push(
-      search(pattern.slice(0, -1) + '$', cwd, SearchType.DIRECTORY),
+      search(
+        pattern.slice(0, -1) + '$',
+        cwd,
+        SearchType.DIRECTORY,
+        undefined,
+        abortSignal,
+      ),
     );
   }
 
   // Always search for directories matching the pattern.
   // If it ends with '/', this will find subdirectories.
   // If it doesn't, it finds matching directories.
-  dirSearchPromises.push(search(pattern, cwd, SearchType.DIRECTORY));
+  dirSearchPromises.push(
+    search(pattern, cwd, SearchType.DIRECTORY, undefined, abortSignal),
+  );
 
-  const fileSearchPromise = search(pattern, cwd, SearchType.FILE);
+  const fileSearchPromise = search(
+    pattern,
+    cwd,
+    SearchType.FILE,
+    undefined,
+    abortSignal,
+  );
 
   const [files, ...dirResults] = await Promise.all([
     fileSearchPromise,
