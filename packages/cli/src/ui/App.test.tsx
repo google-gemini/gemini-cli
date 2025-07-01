@@ -67,6 +67,7 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getAsciiArt: Mock<() => string | undefined>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -128,6 +129,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
+        getAsciiArt: vi.fn(() => opts.asciiArt),
       };
     });
   return {
@@ -410,6 +412,22 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(vi.mocked(Tips)).not.toHaveBeenCalled();
+  });
+
+  it('should display an empty string when customAsciiArt is an empty string', async () => {
+    mockConfig.getAsciiArt.mockReturnValue('');
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    // Assert that the default ASCII art is NOT present
+    expect(lastFrame()).not.toContain('  ______'); // Part of shortAsciiLogo
+    expect(lastFrame()).not.toContain('  ██████'); // Part of longAsciiLogo
   });
 
   describe('when no theme is set', () => {

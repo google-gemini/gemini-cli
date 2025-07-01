@@ -582,7 +582,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header terminalWidth={terminalWidth} />
+              <Header
+                terminalWidth={terminalWidth}
+                customAsciiArt={config.getAsciiArt()}
+              />
               {!settings.merged.hideTips && <Tips config={config} />}
               {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,

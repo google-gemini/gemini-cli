@@ -23,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   let displayTitle;
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
 
-  if (customAsciiArt) {
+  if (customAsciiArt !== undefined) {
     displayTitle = customAsciiArt;
   } else {
     displayTitle =
