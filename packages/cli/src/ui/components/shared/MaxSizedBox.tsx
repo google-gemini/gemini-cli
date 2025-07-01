@@ -278,7 +278,10 @@ function visitBoxRow(element: React.ReactNode): Row {
       // Allow the key prop, which is automatically added by React.
       maxExpectedProps += 1;
     }
-    if (boxProps.flexDirection !== 'row') {
+    if (
+      boxProps.flexDirection !== undefined &&
+      boxProps.flexDirection !== 'row'
+    ) {
       debugReportError(
         'MaxSizedBox children must have flexDirection="row".',
         element,
