@@ -36,6 +36,11 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+  // Track the currently highlighted theme name
+  const [highlightedThemeName, setHighlightedThemeName] = useState<
+    string | undefined
+  >(settings.merged.theme || DEFAULT_THEME.name);
+
   // Generate theme items
   const themeItems = themeManager.getAvailableThemes().map((theme) => {
     const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
@@ -61,6 +66,12 @@ export function ThemeDialog({
 
   const handleThemeSelect = (themeName: string) => {
     onSelect(themeName, selectedScope);
+  };
+
+  // Update highlighted theme name and call onHighlight
+  const handleThemeHighlight = (themeName: string) => {
+    setHighlightedThemeName(themeName);
+    onHighlight(themeName);
   };
 
   const handleScopeHighlight = (scope: SettingScope) => {
@@ -188,7 +199,7 @@ export function ThemeDialog({
             items={themeItems}
             initialIndex={initialThemeIndex}
             onSelect={handleThemeSelect}
-            onHighlight={onHighlight}
+            onHighlight={handleThemeHighlight}
             isFocused={currenFocusedSection === 'theme'}
           />
 
@@ -212,39 +223,39 @@ export function ThemeDialog({
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
           <Text bold>Preview</Text>
-          <Box
-            borderStyle="single"
-            borderColor={Colors.Gray}
-            paddingTop={includePadding ? 1 : 0}
-            paddingBottom={includePadding ? 1 : 0}
-            paddingLeft={1}
-            paddingRight={1}
-            flexDirection="column"
-          >
-            {colorizeCode(
-              `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
-              'python',
-              codeBlockHeight,
-              colorizeCodeWidth,
-            )}
-            <Box marginTop={1} />
-            <DiffRenderer
-              diffContent={`--- a/old_file.txt
--+++ b/new_file.txt
--@@ -1,4 +1,5 @@
-- This is a context line.
---This line was deleted.
--+This line was added.
--`}
-              availableTerminalHeight={diffHeight}
-              terminalWidth={colorizeCodeWidth}
-            />
-          </Box>
+          {/* Get the Theme object for the highlighted theme, fallback to default if not found */}
+          {(() => {
+            const previewTheme =
+              themeManager.getTheme(
+                highlightedThemeName || DEFAULT_THEME.name,
+              ) || DEFAULT_THEME;
+            return (
+              <Box
+                borderStyle="single"
+                borderColor={Colors.Gray}
+                paddingTop={includePadding ? 1 : 0}
+                paddingBottom={includePadding ? 1 : 0}
+                paddingLeft={1}
+                paddingRight={1}
+                flexDirection="column"
+              >
+                {colorizeCode(
+                  `# function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a`,
+                  'python',
+                  codeBlockHeight,
+                  colorizeCodeWidth,
+                  previewTheme,
+                )}
+                <Box marginTop={1} />
+                <DiffRenderer
+                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,4 +1,5 @@\n This is a context line.\n--This line was deleted.\n+This line was added.\n`}
+                  availableTerminalHeight={diffHeight}
+                  terminalWidth={colorizeCodeWidth}
+                  theme={previewTheme}
+                />
+              </Box>
+            );
+          })()}
         </Box>
       </Box>
       <Box marginTop={1}>

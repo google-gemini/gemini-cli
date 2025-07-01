@@ -93,6 +93,7 @@ interface DiffRendererProps {
   tabWidth?: number;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  theme?: import('../../themes/theme.js').Theme;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -103,6 +104,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight,
   terminalWidth,
+  theme,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
     return <Text color={Colors.AccentYellow}>No diff content.</Text>;
@@ -146,6 +148,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       language,
       availableTerminalHeight,
       terminalWidth,
+      theme,
     );
   } else {
     renderedOutput = renderDiffContent(
