@@ -27,43 +27,68 @@ export const useAuthCommand = (
   }, []);
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [pendingAuthSelection, setPendingAuthSelection] = useState<
+    | {
+        authType: AuthType;
+        scope: SettingScope;
+      }
+    | undefined
+  >(
+    // If user already has a saved auth method, set it as pending for auto-authentication
+    settings.merged.selectedAuthType
+      ? { authType: settings.merged.selectedAuthType, scope: SettingScope.User }
+      : undefined,
+  );
 
   useEffect(() => {
     const authFlow = async () => {
-      const authType = settings.merged.selectedAuthType;
-      if (isAuthDialogOpen || !authType) {
+      if (isAuthDialogOpen || !pendingAuthSelection) {
         return;
       }
 
       try {
         setIsAuthenticating(true);
-        await config.refreshAuth(authType);
-        console.log(`Authenticated via "${authType}".`);
+        await config.refreshAuth(pendingAuthSelection.authType);
+        settings.setValue(
+          pendingAuthSelection.scope,
+          'selectedAuthType',
+          pendingAuthSelection.authType,
+        );
+        console.log(`Authenticated via "${pendingAuthSelection.authType}".`);
       } catch (e) {
         setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
         openAuthDialog();
       } finally {
         setIsAuthenticating(false);
+        setPendingAuthSelection(undefined);
       }
     };
 
     void authFlow();
-  }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
+  }, [
+    isAuthDialogOpen,
+    pendingAuthSelection,
+    settings,
+    config,
+    setAuthError,
+    openAuthDialog,
+  ]);
 
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: SettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
-        settings.setValue(scope, 'selectedAuthType', authType);
+        setPendingAuthSelection({ authType, scope });
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
     },
-    [settings, setAuthError],
+    [setAuthError],
   );
 
   const cancelAuthentication = useCallback(() => {
     setIsAuthenticating(false);
+    setPendingAuthSelection(undefined);
   }, []);
 
   return {
