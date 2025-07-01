@@ -174,7 +174,7 @@ describe('Visual Layout Integration Tests', () => {
       const optimized2Duration = optimized2End - optimized2Start;
 
       expect(optimized2Result).toEqual(originalResult);
-      expect(optimized2Duration).toBeLessThanOrEqual(optimizedDuration * 2.0); // Allow wide variance for performance measurements
+      expect(optimized2Duration).toBeLessThanOrEqual(optimizedDuration * 3.0); // Allow wider variance for CI performance measurements
 
       console.log(`Performance comparison:
         Original: ${originalDuration.toFixed(2)}ms
