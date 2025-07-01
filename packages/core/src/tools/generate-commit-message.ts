@@ -876,46 +876,108 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   private extractAllJsonObjects(text: string): string[] {
     const jsonObjects: string[] = [];
-    let braceCount = 0;
-    let startIndex = -1;
+    
+    // Strategy 1: Look for balanced brace structures and validate with JSON.parse
+    // This approach is more reliable than regex for complex nested structures
+    let braceDepth = 0;
+    let start = -1;
     let inString = false;
-    let escapeNext = false;
-
+    let escaped = false;
+    
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       
-      if (escapeNext) {
-        escapeNext = false;
+      if (escaped) {
+        escaped = false;
         continue;
       }
       
-      if (char === '\\') {
-        escapeNext = true;
+      if (char === '\\' && inString) {
+        escaped = true;
         continue;
       }
       
-      if (char === '"' && !escapeNext) {
+      if (char === '"') {
         inString = !inString;
         continue;
       }
       
       if (!inString) {
         if (char === '{') {
-          if (braceCount === 0) {
-            startIndex = i;
+          if (braceDepth === 0) {
+            start = i;
           }
-          braceCount++;
+          braceDepth++;
         } else if (char === '}') {
-          braceCount--;
-          if (braceCount === 0 && startIndex !== -1) {
-            const jsonString = text.substring(startIndex, i + 1);
-            jsonObjects.push(jsonString);
-            startIndex = -1;
+          braceDepth--;
+          if (braceDepth === 0 && start !== -1) {
+            const candidate = text.substring(start, i + 1);
+            try {
+              // Use JSON.parse as the authoritative validator
+              const parsed = JSON.parse(candidate);
+              if (parsed && typeof parsed === 'object') {
+                jsonObjects.push(candidate);
+              }
+            } catch {
+              // Invalid JSON, continue searching
+            }
+            start = -1;
           }
         }
       }
     }
-
+    
+    // Strategy 2: If no valid JSON found, try markdown code block extraction
+    if (jsonObjects.length === 0) {
+      const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g;
+      const matches = Array.from(text.matchAll(codeBlockPattern));
+      
+      for (const match of matches) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          if (parsed && typeof parsed === 'object') {
+            jsonObjects.push(match[1]);
+          }
+        } catch {
+          // Invalid JSON in code block, continue
+        }
+      }
+    }
+    
+    // Strategy 3: Fallback - try to find any JSON-like structures at line boundaries
+    if (jsonObjects.length === 0) {
+      const lines = text.split('\n');
+      let currentJson = '';
+      let inJsonBlock = false;
+      let jsonBraceDepth = 0;
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (trimmedLine.startsWith('{')) {
+          inJsonBlock = true;
+          currentJson = line;
+          jsonBraceDepth = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+        } else if (inJsonBlock) {
+          currentJson += '\n' + line;
+          jsonBraceDepth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+          
+          if (jsonBraceDepth === 0) {
+            try {
+              const parsed = JSON.parse(currentJson);
+              if (parsed && typeof parsed === 'object') {
+                jsonObjects.push(currentJson);
+              }
+            } catch {
+              // Not valid JSON
+            }
+            inJsonBlock = false;
+            currentJson = '';
+          }
+        }
+      }
+    }
+    
     return jsonObjects;
   }
 
