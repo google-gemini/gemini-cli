@@ -43,5 +43,4 @@ eslint-rules
 *.md
 LICENSE
 Makefile
-Dockerfile
 .dockerignore
