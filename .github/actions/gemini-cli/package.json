@@ -1,5 +1,4 @@
 {
   "name": "gemini-cli-action",
-  "main": "entrypoint.js",
-  "type": "module"
+  "main": "entrypoint.js"
 }

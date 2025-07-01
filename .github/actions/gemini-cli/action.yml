@@ -2,7 +2,7 @@ name: 'Gemini CLI Action'
 description: 'Run Gemini CLI in GitHub Actions'
 author: 'Gosling-dude'
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'entrypoint.js'
 inputs:
   args:
