@@ -25,11 +25,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Calculate column widths
   const columnWidths = headers.map((header, index) => {
-    const headerWidth = header.length;
+    const headerWidth = stringWidth(header);
     const maxRowWidth = Math.max(
-      ...rows.map((row) => (row[index] || '').length),
+      ...rows.map((row) => stringWidth(row[index] || '')),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
