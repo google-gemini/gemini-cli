@@ -18,6 +18,7 @@ import {
   LoadedSettings,
   loadSettings,
   SettingScope,
+  USER_SETTINGS_PATH,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -279,7 +280,7 @@ async function validateNonInterActiveAuth(
   // still expect that exists
   if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
     console.error(
-      'Please set an Auth method in your .gemini/settings.json OR specify GEMINI_API_KEY env variable file before running',
+      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
     );
     process.exit(1);
   }
