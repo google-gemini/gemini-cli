@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getResponseText,
   getResponseTextFromParts,
@@ -97,7 +97,7 @@ const createLargeResponse = (partCount: number): GenerateContentResponse => {
 };
 
 // Error formatting helper inspired by commit message tool
-const formatTestError = (error: unknown): string => {
+const _formatTestError = (error: unknown): string => {
   if (error instanceof Error) {
     return `${error.name}: ${error.message}`;
   }
@@ -434,7 +434,7 @@ describe('generateContentResponseUtilities', () => {
       });
 
       it('should handle parts with circular references in args', () => {
-        const circularArgs: any = { data: 'test' };
+        const circularArgs: Record<string, unknown> = { data: 'test' };
         circularArgs.self = circularArgs;
         
         const parts = [
@@ -549,7 +549,7 @@ describe('generateContentResponseUtilities', () => {
 
       it('should handle JSON.stringify errors gracefully', () => {
         // Test with a function that would cause JSON.stringify to fail
-        const problematicArgs = {
+        const _problematicArgs = {
           func: () => 'test',
           symbol: Symbol('test'),
         };

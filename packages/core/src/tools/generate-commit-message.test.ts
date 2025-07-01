@@ -802,7 +802,7 @@ describe('GenerateCommitMessageTool', () => {
       }));
 
       // Create a response with multiple JSON objects - some invalid, one valid
-      const invalidJson1 = '{"incomplete": "json"'; // Malformed - will be ignored by extractAllJsonObjects
+      const _invalidJson1 = '{"incomplete": "json"'; // Malformed - will be ignored by extractAllJsonObjects
       const invalidJson2 = JSON.stringify({
         analysis: { changedFiles: [] }, // Invalid - empty changedFiles
         commitMessage: { header: 'invalid' }
@@ -1782,7 +1782,7 @@ That should work better!`;
       const tool = new GenerateCommitMessageTool(mockConfig);
       
       // Test staged-only mode
-      const stagedOnlyFiles = (tool as any).parseFilesToBeCommitted(statusOutput, 'staged-only');
+      const stagedOnlyFiles = (tool as unknown as { parseFilesToBeCommitted: (output: string, mode: string) => string[] }).parseFilesToBeCommitted(statusOutput, 'staged-only');
       expect(stagedOnlyFiles).toEqual([
         'staged-file.ts',
         'staged-new-file.ts', 
@@ -1790,7 +1790,7 @@ That should work better!`;
       ]);
       
       // Test all-changes mode - should include all files that will be affected
-      const allChangesFiles = (tool as any).parseFilesToBeCommitted(statusOutput, 'all-changes');
+      const allChangesFiles = (tool as unknown as { parseFilesToBeCommitted: (output: string, mode: string) => string[] }).parseFilesToBeCommitted(statusOutput, 'all-changes');
       expect(allChangesFiles).toEqual([
         'staged-file.ts',
         'unstaged-file.ts',
@@ -1849,7 +1849,7 @@ That should work better!`;
         hasSensitiveInfo: false
       };
       
-      const validationResult = (tool as any).validateAnalysis(analysisWithLongScope);
+      const validationResult = (tool as unknown as { validateAnalysis: (analysis: unknown) => string | null }).validateAnalysis(analysisWithLongScope);
       expect(validationResult).toBeNull(); // Should be valid
     });
 
@@ -1867,7 +1867,7 @@ That should work better!`;
         hasSensitiveInfo: false
       };
       
-      const validationResult = (tool as any).validateAnalysis(analysisWithTooLongScope);
+      const validationResult = (tool as unknown as { validateAnalysis: (analysis: unknown) => string | null }).validateAnalysis(analysisWithTooLongScope);
       expect(validationResult).toContain('exceeds maximum length of 200 characters');
       expect(validationResult).toContain('Conventional Commits specification does not define scope length limits');
     });
@@ -1883,7 +1883,7 @@ That should work better!`;
         footer: undefined
       };
       
-      const validationResult = (tool as any).validateCommitMessage(commitMessage);
+      const validationResult = (tool as unknown as { validateCommitMessage: (message: unknown) => string | null }).validateCommitMessage(commitMessage);
       expect(validationResult).toBeNull(); // Should be valid
     });
 
