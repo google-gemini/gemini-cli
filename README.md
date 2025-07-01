@@ -48,6 +48,7 @@ The Gemini API provides a free tier with [100 requets per day](https://ai.google
    ```bash
    export GEMINI_API_KEY="YOUR_API_KEY"
    ```
+
 3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
