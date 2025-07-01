@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -10,7 +10,7 @@
   ],
   "repository": "google-gemini/gemini-cli",
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.7"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.8"
   },
   "scripts": {
     "generate": "node scripts/generate-git-commit-info.js",
