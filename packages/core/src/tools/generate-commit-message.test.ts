@@ -1315,6 +1315,54 @@ That should work better!`;
       expect(result.llmContent).toContain('malformed content');
     });
 
+    it('should reject extremely long commit message headers (>150 chars)', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+      
+      // Create a header that's over 150 characters
+      const veryLongHeader = 'feat(very-long-scope-name): add an extremely long feature description that goes well beyond the reasonable limits for a commit message header and should be rejected as malformed';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    analysis: {
+                      changedFiles: ['file.txt'],
+                      changeType: 'feat',
+                      purpose: 'Add feature with extremely long header',
+                      impact: 'Should be rejected due to excessive header length',
+                      hasSensitiveInfo: false,
+                    },
+                    commitMessage: {
+                      header: veryLongHeader,
+                      body: 'This should be rejected due to header length',
+                      footer: '',
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('exceeds maximum length of 150 characters');
+    });
+
     it('should handle network timeout errors gracefully', async () => {
       const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
       const statusOutput = 'M  file.txt';

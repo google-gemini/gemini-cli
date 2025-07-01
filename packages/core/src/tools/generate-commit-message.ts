@@ -1076,8 +1076,10 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       return 'AI response validation failed: commitMessage.header must be a non-empty string, received: ' + (typeof commitObj.header === 'string' ? 'empty string' : typeof commitObj.header);
     }
 
-    if (commitObj.header.length > 100) {
-      return 'AI response validation failed: commitMessage.header exceeds maximum length of 100 characters';
+    // Allow reasonable header lengths - most tools handle up to 120-150 characters well
+    // Only reject extremely long headers that likely indicate parsing errors
+    if (commitObj.header.length > 150) {
+      return 'AI response validation failed: commitMessage.header exceeds maximum length of 150 characters (recommended: 50-72 characters for best tool compatibility)';
     }
 
     const headerPattern = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+/;
