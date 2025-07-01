@@ -146,6 +146,25 @@ The CLI supports multiple sandboxing approaches for secure tool execution:
 - Custom sandbox builds with `.gemini/sandbox.Dockerfile`
 - Proxied networking support for controlled external access
 
+## Code Quality & Git Workflow
+
+### Pre-commit Hooks - CRITICAL RULE
+
+**NEVER bypass pre-commit hooks under any circumstances.**
+
+- Pre-commit hooks run ESLint, Prettier, TypeScript checks, and tests
+- They exist to maintain code quality and prevent breaking changes
+- If hooks fail, fix the underlying issues - don't use `--no-verify`
+- All tests must pass before commits can be made
+- If pre-existing test failures block your commit, fix them first or ask for guidance
+
+### Git Commit Standards
+
+- Use conventional commit format with emoji prefixes
+- Include detailed descriptions of changes and their impact
+- All commits must pass pre-commit validation
+- Co-author attribution for AI-assisted commits
+
 ## Code Conventions
 
 ### TypeScript/JavaScript Patterns

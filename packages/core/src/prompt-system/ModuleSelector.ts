@@ -246,24 +246,33 @@ export class ModuleSelectorImpl implements ModuleSelector {
     // Calculate current token count
     let currentTokens = 0;
     const optimized: PromptModule[] = [];
-    const required = new Set([
-      'identity',
-      'mandates',
-      'security',
-      'quality-gates',
-    ]); // Always keep base modules and quality gates
 
+    // Define absolutely essential modules (minimal viable set)
+    const essential = new Set(['identity', 'mandates', 'security']);
+
+    // Add quality-gates as essential if it was selected (means the context requires it)
+    const hasQualityGates = selectedModules.some(
+      (m) => m.id === 'quality-gates',
+    );
+    if (hasQualityGates) {
+      essential.add('quality-gates');
+    }
+
+    // First pass: Add essential modules
     for (const module of prioritized) {
-      const newTotal = currentTokens + module.tokenCount;
-
-      // Always include required modules, even if they exceed budget
-      if (required.has(module.id)) {
+      if (essential.has(module.id)) {
         optimized.push(module);
-        currentTokens = newTotal;
-        continue;
+        currentTokens += module.tokenCount;
+      }
+    }
+
+    // Second pass: Add optional modules if they fit in budget
+    for (const module of prioritized) {
+      if (essential.has(module.id)) {
+        continue; // Already added
       }
 
-      // Include optional modules only if they fit in budget
+      const newTotal = currentTokens + module.tokenCount;
       if (newTotal <= tokenBudget) {
         optimized.push(module);
         currentTokens = newTotal;

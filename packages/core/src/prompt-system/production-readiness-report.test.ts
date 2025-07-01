@@ -160,9 +160,18 @@ describe('Production Readiness Assessment', () => {
       'ToolManifestLoader',
     ];
 
+    const componentChecks = {
+      ModuleValidator: () => import('./ModuleValidator.js'),
+      ValidationSuite: () => import('./ValidationSuite.js'),
+      PromptAssembler: () => import('./PromptAssembler.js'),
+      ModuleLoader: () => import('./ModuleLoader.js'),
+      ContextDetector: () => import('./ContextDetector.js'),
+      ToolManifestLoader: () => import('./ToolManifestLoader.js'),
+    };
+
     for (const component of requiredComponents) {
       try {
-        await import(`./${component}.js`);
+        await componentChecks[component as keyof typeof componentChecks]();
         console.log(`  ✅ ${component} available`);
       } catch {
         console.log(`  ❌ ${component} missing`);

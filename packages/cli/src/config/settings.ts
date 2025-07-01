@@ -100,10 +100,34 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
-    return {
-      ...this.user.settings,
-      ...this.workspace.settings,
-    };
+    return this.deepMerge(this.user.settings, this.workspace.settings);
+  }
+
+  private deepMerge(target: Settings, source: Settings): Settings {
+    const result = { ...target };
+
+    for (const key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const settingsKey = key as keyof Settings;
+        const sourceValue = source[settingsKey];
+        const targetValue = target[settingsKey];
+
+        if (this.isObject(sourceValue) && this.isObject(targetValue)) {
+          (result as Record<string, unknown>)[settingsKey] = this.deepMerge(
+            targetValue as Record<string, unknown>,
+            sourceValue as Record<string, unknown>,
+          );
+        } else {
+          (result as Record<string, unknown>)[settingsKey] = sourceValue;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private isObject(item: unknown): boolean {
+    return item !== null && typeof item === 'object' && !Array.isArray(item);
   }
 
   forScope(scope: SettingScope): SettingsFile {

@@ -62,11 +62,12 @@ vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
 
-describe('Settings Loading and Merging', () => {
-  let mockFsExistsSync: Mocked<typeof fs.existsSync>;
-  let mockStripJsonComments: Mocked<typeof stripJsonComments>;
-  let mockFsMkdirSync: Mocked<typeof fs.mkdirSync>;
+// Global mock variables that can be used across all describe blocks
+let mockFsExistsSync: Mocked<typeof fs.existsSync>;
+let mockStripJsonComments: Mocked<typeof stripJsonComments>;
+let mockFsMkdirSync: Mocked<typeof fs.mkdirSync>;
 
+describe('Settings Loading and Merging', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
@@ -81,6 +82,7 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -692,23 +694,51 @@ describe('Additional Edge Cases and Error Handling', () => {
       throw mkdirError;
     });
 
-    expect(() => {
-      loadedSettings.setValue(SettingScope.User, 'theme', 'dark');
-    }).toThrow(mkdirError);
+    // Mock console.error to capture the error
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    // setValue doesn't throw errors, it catches them and logs to console
+    loadedSettings.setValue(SettingScope.User, 'theme', 'dark');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error saving user settings file:',
+      mkdirError,
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 
   it('should handle writeFileSync failures in setValue', () => {
-    (mockFsExistsSync as Mock).mockReturnValue(false);
+    // Mock fs.existsSync to simulate that the directory exists but writeFileSync will fail
+    (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+      // For the settings directory check, return true to indicate directory exists
+      const pathStr = p.toString();
+      return pathStr.includes('.gemini') && !pathStr.includes('settings.json');
+    });
+
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
-    const writeError = new Error('ENOSPC: no space left on device');
+    const writeError = new Error('EACCES: permission denied, open');
     vi.mocked(fs.writeFileSync).mockImplementation(() => {
       throw writeError;
     });
 
-    expect(() => {
-      loadedSettings.setValue(SettingScope.User, 'theme', 'dark');
-    }).toThrow(writeError);
+    // Mock console.error to capture the error
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    // setValue doesn't throw errors, it catches them and logs to console
+    loadedSettings.setValue(SettingScope.User, 'theme', 'dark');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error saving user settings file:',
+      writeError,
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 
   it('should handle empty workspace directory path', () => {
@@ -1306,10 +1336,23 @@ describe('strip-json-comments Integration', () => {
 });
 
 describe('LoadedSettings setValue Advanced Scenarios', () => {
-  it('should handle setValue with complex nested objects and arrays', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockFsExistsSync = vi.mocked(fs.existsSync);
+    mockFsMkdirSync = vi.mocked(fs.mkdirSync);
+    mockStripJsonComments = vi.mocked(stripJsonComments);
+    vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
+    (mockStripJsonComments as unknown as Mock).mockImplementation(
+      (jsonString: string) => jsonString,
+    );
     (mockFsExistsSync as Mock).mockReturnValue(false);
-    const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+    (fs.readFileSync as Mock).mockReturnValue('{}');
+    (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
     vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+  });
+
+  it('should handle setValue with complex nested objects and arrays', () => {
+    const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
     const complexValue = {
       nested: {
@@ -1332,7 +1375,7 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
 
     expect(loadedSettings.user.settings.complex).toEqual(complexValue);
     expect(loadedSettings.merged.complex).toEqual(complexValue);
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
+    expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
       USER_SETTINGS_PATH,
       JSON.stringify({ complex: complexValue }, null, 2),
       'utf-8',
@@ -1340,9 +1383,7 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
   });
 
   it('should handle setValue with special values (null, undefined, functions)', () => {
-    (mockFsExistsSync as Mock).mockReturnValue(false);
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
     loadedSettings.setValue(SettingScope.User, 'nullValue', null);
     loadedSettings.setValue(SettingScope.User, 'undefinedValue', undefined);
@@ -1370,7 +1411,7 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
       emptyObject: {},
     };
 
-    expect(fs.writeFileSync).toHaveBeenLastCalledWith(
+    expect(vi.mocked(fs.writeFileSync)).toHaveBeenLastCalledWith(
       USER_SETTINGS_PATH,
       JSON.stringify(expectedSettings, null, 2),
       'utf-8',
@@ -1403,7 +1444,10 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
     );
 
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+
+    // Verify the settings were loaded correctly
+    expect(loadedSettings.user.settings.theme).toBe('dark');
+    expect(loadedSettings.user.settings.api.endpoint).toBe('https://api.com');
 
     // Add new settings
     loadedSettings.setValue(SettingScope.User, 'newSetting', 'newValue');
@@ -1432,7 +1476,7 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
       anotherSetting: { complex: true },
     };
 
-    expect(fs.writeFileSync).toHaveBeenLastCalledWith(
+    expect(vi.mocked(fs.writeFileSync)).toHaveBeenLastCalledWith(
       USER_SETTINGS_PATH,
       JSON.stringify(expectedFinalSettings, null, 2),
       'utf-8',
@@ -1440,9 +1484,7 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
   });
 
   it('should handle rapid successive setValue calls', () => {
-    (mockFsExistsSync as Mock).mockReturnValue(false);
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
     // Make many rapid setValue calls
     for (let i = 0; i < 100; i++) {
@@ -1465,11 +1507,26 @@ describe('LoadedSettings setValue Advanced Scenarios', () => {
     }
 
     // Should have been called 200 times (100 user + 100 workspace)
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(200);
+    expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledTimes(200);
   });
 });
 
 describe('Unicode and International Character Support', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockFsExistsSync = vi.mocked(fs.existsSync);
+    mockFsMkdirSync = vi.mocked(fs.mkdirSync);
+    mockStripJsonComments = vi.mocked(stripJsonComments);
+    vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
+    (mockStripJsonComments as unknown as Mock).mockImplementation(
+      (jsonString: string) => jsonString,
+    );
+    (mockFsExistsSync as Mock).mockReturnValue(false);
+    (fs.readFileSync as Mock).mockReturnValue('{}');
+    (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+  });
+
   it('should handle Unicode characters in settings keys and values', () => {
     const unicodeSettings = {
       '🌟greeting': '🚀 Hello 世界! こんにちは',
@@ -1503,6 +1560,7 @@ describe('Unicode and International Character Support', () => {
     expect(settings.user.settings['العربية']).toBe('مرحبا بالعالم');
     expect(settings.user.settings['emojis']).toBe('✅ ❌ ⚠️ 🔥 💯 🎉');
     expect(settings.user.settings['symbols']).toBe('©®™€£¥₹₽¢');
+    expect(settings.merged['🌟greeting']).toBe('🚀 Hello 世界! こんにちは');
   });
 
   it('should handle Unicode in environment variables', () => {
@@ -1533,6 +1591,9 @@ describe('Unicode and International Character Support', () => {
     expect(result.user.settings.combined).toBe(
       'prefix_🌟 Unicode value 世界 тест العربية_🚀🎉✨_suffix',
     );
+    expect(result.merged.unicodeFromEnv).toBe(
+      '🌟 Unicode value 世界 тест العربية',
+    );
 
     delete process.env.UNICODE_VAR;
     delete process.env.EMOJI_VAR;
@@ -1541,7 +1602,12 @@ describe('Unicode and International Character Support', () => {
   it('should handle Unicode in setValue operations', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+
+    // Clear the mock call history
+    const writeFilesSpy = vi
+      .mocked(fs.writeFileSync)
+      .mockImplementation(() => {});
+    writeFilesSpy.mockClear();
 
     const unicodeKey = '🔧settings';
     const unicodeValue = '🎨 Custom theme with émojis and 中文';
@@ -1555,7 +1621,7 @@ describe('Unicode and International Character Support', () => {
       [unicodeKey]: unicodeValue,
     };
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
+    expect(writeFilesSpy).toHaveBeenCalledWith(
       USER_SETTINGS_PATH,
       JSON.stringify(expectedSettings, null, 2),
       'utf-8',
@@ -1584,7 +1650,6 @@ describe('Performance and Memory Management', () => {
   it('should handle multiple setValue calls efficiently without memory leaks', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
     const startTime = Date.now();
 
@@ -1617,7 +1682,6 @@ describe('Performance and Memory Management', () => {
   it('should handle concurrent access patterns', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
     // Simulate concurrent access by rapidly switching between different operations
     for (let i = 0; i < 100; i++) {
