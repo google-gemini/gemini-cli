@@ -156,6 +156,14 @@ To block all shell commands, you can add the `ShellTool` wildcard to `excludeToo
 - `npm install`: Blocked
 - `any other command`: Blocked
 
+## Fine-Grained Command Control
+
+For more advanced command access control, see [Shell Command Access Control](../shell-command-control.md) which provides:
+- `allowCommands` - Pre-approve safe commands
+- `denyCommands` - Always require confirmation for dangerous commands
+- Pattern matching (exact, glob, regex)
+- Session learning with `/pushcmdz`
+
 ## Security Note for `excludeTools`
 
 Command-specific restrictions in

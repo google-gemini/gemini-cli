@@ -253,7 +253,7 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toBeUndefined();
     });
@@ -270,7 +270,7 @@ describe('Configuration Integration Tests', () => {
         model: 'test-model',
         allowCommands: ['ls', 'pwd', 'git*'],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual(['ls', 'pwd', 'git*']);
     });
@@ -287,7 +287,7 @@ describe('Configuration Integration Tests', () => {
         model: 'test-model',
         allowCommands: [],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual([]);
     });
@@ -303,15 +303,15 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
         allowCommands: [
-          'ls',                    // exact match
-          'git*',                  // glob pattern
-          '*.sh',                  // glob pattern
-          'test?',                 // glob pattern
-          '/^npm\\s+test$/',       // regex pattern
-          'git status',            // exact match with space
+          'ls', // exact match
+          'git*', // glob pattern
+          '*.sh', // glob pattern
+          'test?', // glob pattern
+          '/^npm\\s+test$/', // regex pattern
+          'git status', // exact match with space
         ],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual([
         'ls',
@@ -336,7 +336,7 @@ describe('Configuration Integration Tests', () => {
         allowCommands: ['git*', 'npm*'],
         excludeTools: ['ShellTool(git push --force)'],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual(['git*', 'npm*']);
       expect(config.getExcludeTools()).toEqual(['ShellTool(git push --force)']);
@@ -355,7 +355,7 @@ describe('Configuration Integration Tests', () => {
         allowCommands: ['ls', 'pwd'],
         coreTools: ['ShellTool', 'ReadFileTool'],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual(['ls', 'pwd']);
       expect(config.getCoreTools()).toEqual(['ShellTool', 'ReadFileTool']);
@@ -380,7 +380,7 @@ describe('Configuration Integration Tests', () => {
           '/usr/bin/ls',
         ],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual([
         'git-flow',
@@ -409,7 +409,7 @@ describe('Configuration Integration Tests', () => {
           '/^make\\s+[a-z]+$/',
         ],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual([
         '/^(ls|pwd|cd)$/',
@@ -432,7 +432,7 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
       };
-      
+
       const config = new Config(configParams);
       expect(config.getDenyCommands()).toBeUndefined();
     });
@@ -449,9 +449,13 @@ describe('Configuration Integration Tests', () => {
         model: 'test-model',
         denyCommands: ['rm -rf', 'sudo*', 'chmod 777'],
       };
-      
+
       const config = new Config(configParams);
-      expect(config.getDenyCommands()).toEqual(['rm -rf', 'sudo*', 'chmod 777']);
+      expect(config.getDenyCommands()).toEqual([
+        'rm -rf',
+        'sudo*',
+        'chmod 777',
+      ]);
     });
 
     it('should handle empty denyCommands array', () => {
@@ -466,7 +470,7 @@ describe('Configuration Integration Tests', () => {
         model: 'test-model',
         denyCommands: [],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getDenyCommands()).toEqual([]);
     });
@@ -484,10 +488,13 @@ describe('Configuration Integration Tests', () => {
         allowCommands: ['git*', 'npm*'],
         denyCommands: ['git push --force', 'npm publish'],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual(['git*', 'npm*']);
-      expect(config.getDenyCommands()).toEqual(['git push --force', 'npm publish']);
+      expect(config.getDenyCommands()).toEqual([
+        'git push --force',
+        'npm publish',
+      ]);
     });
 
     it('should handle various pattern types in denyCommands', () => {
@@ -501,14 +508,14 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
         denyCommands: [
-          'rm -rf',                 // exact match
-          'sudo*',                  // glob pattern
-          '*.sh',                   // glob pattern
-          '/^chmod\\s+777/',        // regex pattern
-          'git push --force',       // exact match with spaces
+          'rm -rf', // exact match
+          'sudo*', // glob pattern
+          '*.sh', // glob pattern
+          '/^chmod\\s+777/', // regex pattern
+          'git push --force', // exact match with spaces
         ],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getDenyCommands()).toEqual([
         'rm -rf',
@@ -529,13 +536,7 @@ describe('Configuration Integration Tests', () => {
         debugMode: false,
         sessionId: 'test-session',
         model: 'test-model',
-        allowCommands: [
-          'ls',
-          'pwd',
-          'git status',
-          'git log',
-          'npm test',
-        ],
+        allowCommands: ['ls', 'pwd', 'git status', 'git log', 'npm test'],
         denyCommands: [
           'sudo*',
           'rm -rf',
@@ -546,7 +547,7 @@ describe('Configuration Integration Tests', () => {
         ],
         excludeTools: ['ShellTool(rm -rf /)'],
       };
-      
+
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toBeDefined();
       expect(config.getDenyCommands()).toBeDefined();

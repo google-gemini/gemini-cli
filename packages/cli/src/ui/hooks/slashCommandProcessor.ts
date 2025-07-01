@@ -882,7 +882,8 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'pushcmdz',
-        description: 'Save currently allowed shell commands to project settings',
+        description:
+          'Save currently allowed shell commands to project settings',
         action: async (_mainCommand, _subCommand, _args) => {
           const toolRegistry = await config?.getToolRegistry();
           if (!toolRegistry) {
@@ -895,9 +896,9 @@ export const useSlashCommandProcessor = (
           }
 
           // Get the shell tool from the registry
-          const shellTool = toolRegistry.getAllTools().find(
-            tool => tool.name === 'run_shell_command'
-          );
+          const shellTool = toolRegistry
+            .getAllTools()
+            .find((tool) => tool.name === 'run_shell_command');
 
           if (!shellTool) {
             addMessage({
@@ -922,7 +923,7 @@ export const useSlashCommandProcessor = (
 
           const whitelist = getWhitelist.call(shellTool);
           const allowedCommands = Array.from(whitelist);
-          
+
           if (allowedCommands.length === 0) {
             addMessage({
               type: MessageType.INFO,
@@ -933,14 +934,21 @@ export const useSlashCommandProcessor = (
           }
 
           // Get existing allowCommands from settings
-          const existingAllowCommands = settings.workspace.settings.allowCommands || [];
-          
+          const existingAllowCommands =
+            settings.workspace.settings.allowCommands || [];
+
           // Merge with existing commands, avoiding duplicates
-          const mergedCommands = Array.from(new Set([...existingAllowCommands, ...allowedCommands]));
-          
+          const mergedCommands = Array.from(
+            new Set([...existingAllowCommands, ...allowedCommands]),
+          );
+
           // Save to workspace settings
-          settings.setValue(SettingScope.Workspace, 'allowCommands', mergedCommands as string[]);
-          
+          settings.setValue(
+            SettingScope.Workspace,
+            'allowCommands',
+            mergedCommands as string[],
+          );
+
           addMessage({
             type: MessageType.INFO,
             content: `Saved ${allowedCommands.length} command(s) to project settings:\n  - ${allowedCommands.join('\n  - ')}\n\nTotal allowed commands: ${mergedCommands.length}`,
@@ -963,9 +971,9 @@ export const useSlashCommandProcessor = (
           }
 
           // Get the shell tool from the registry
-          const shellTool = toolRegistry.getAllTools().find(
-            tool => tool.name === 'run_shell_command'
-          );
+          const shellTool = toolRegistry
+            .getAllTools()
+            .find((tool) => tool.name === 'run_shell_command');
 
           if (!shellTool) {
             addMessage({
@@ -991,19 +999,21 @@ export const useSlashCommandProcessor = (
 
           const whitelist = getWhitelist.call(shellTool);
           const sessionCommands = Array.from(whitelist);
-          
+
           if (sessionCommands.length === 0) {
             addMessage({
               type: MessageType.INFO,
-              content: 'No commands have been run in this session yet to suggest for deny list.',
+              content:
+                'No commands have been run in this session yet to suggest for deny list.',
               timestamp: new Date(),
             });
             return;
           }
 
           // Get existing denyCommands from settings
-          const existingDenyCommands = settings.workspace.settings.denyCommands || [];
-          
+          const existingDenyCommands =
+            settings.workspace.settings.denyCommands || [];
+
           // Show the user what commands they can add to denyCommands
           addMessage({
             type: MessageType.INFO,

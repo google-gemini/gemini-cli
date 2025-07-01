@@ -42,6 +42,7 @@
     "ignore": "^7.0.0",
     "micromatch": "^4.0.8",
     "open": "^10.1.2",
+    "safe-regex": "^2.1.1",
     "shell-quote": "^1.8.2",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",

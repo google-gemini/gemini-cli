@@ -217,11 +217,11 @@ export async function loadCliConfig(
     fullContext: argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
-    allowCommands: argv.allow_commands 
-      ? argv.allow_commands.split(',').map(cmd => cmd.trim())
+    allowCommands: argv.allow_commands
+      ? argv.allow_commands.split(',').map((cmd) => cmd.trim())
       : settings.allowCommands || undefined,
     denyCommands: argv.deny_commands
-      ? argv.deny_commands.split(',').map(cmd => cmd.trim())
+      ? argv.deny_commands.split(',').map((cmd) => cmd.trim())
       : settings.denyCommands || undefined,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
