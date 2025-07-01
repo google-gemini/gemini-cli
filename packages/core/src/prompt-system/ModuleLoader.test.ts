@@ -204,8 +204,8 @@ This is a test module with some content that should have tokens estimated.`;
     });
 
     it('should check file system when not in cache', async () => {
-      const { accessSync } = await import('node:fs');
-      const mockAccessSync = vi.spyOn({ accessSync }, 'accessSync');
+      const fs = await import('node:fs');
+      const mockAccessSync = vi.mocked(fs.accessSync);
       mockAccessSync.mockImplementation(() => true);
 
       const exists = moduleLoader.moduleExists('test');
@@ -215,8 +215,8 @@ This is a test module with some content that should have tokens estimated.`;
     });
 
     it('should return false when module does not exist', async () => {
-      const { accessSync } = await import('node:fs');
-      const mockAccessSync = vi.spyOn({ accessSync }, 'accessSync');
+      const fs = await import('node:fs');
+      const mockAccessSync = vi.mocked(fs.accessSync);
       mockAccessSync.mockImplementation(() => {
         throw new Error('File not found');
       });

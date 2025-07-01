@@ -203,6 +203,7 @@ Use this tool when the user's query implies needing the content of several files
 
   validateParams(params: ReadManyFilesParams): string | null {
     if (
+      !params ||
       !params.paths ||
       !Array.isArray(params.paths) ||
       params.paths.length === 0

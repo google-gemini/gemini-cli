@@ -147,7 +147,7 @@ export async function discoverMcpTools(
       };
     }
 
-    const discoveryPromises = Object.entries(mcpServers).map(
+    const discoveryPromises = Object.entries(mcpServers || {}).map(
       ([mcpServerName, mcpServerConfig]) =>
         connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
     );
@@ -171,35 +171,44 @@ async function connectAndDiscover(
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
   let transport;
-  if (mcpServerConfig.httpUrl) {
-    const transportOptions: StreamableHTTPClientTransportOptions = {};
+  try {
+    if (mcpServerConfig.httpUrl) {
+      const transportOptions: StreamableHTTPClientTransportOptions = {};
 
-    if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
-      };
+      if (mcpServerConfig.headers) {
+        transportOptions.requestInit = {
+          headers: mcpServerConfig.headers,
+        };
+      }
+
+      transport = new StreamableHTTPClientTransport(
+        new URL(mcpServerConfig.httpUrl),
+        transportOptions,
+      );
+    } else if (mcpServerConfig.url) {
+      transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    } else if (mcpServerConfig.command) {
+      transport = new StdioClientTransport({
+        command: mcpServerConfig.command,
+        args: mcpServerConfig.args || [],
+        env: {
+          ...process.env,
+          ...(mcpServerConfig.env || {}),
+        } as Record<string, string>,
+        cwd: mcpServerConfig.cwd,
+        stderr: 'pipe',
+      });
+    } else {
+      console.error(
+        `MCP server '${mcpServerName}' has invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio). Skipping.`,
+      );
+      // Update status to disconnected
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+      return;
     }
-
-    transport = new StreamableHTTPClientTransport(
-      new URL(mcpServerConfig.httpUrl),
-      transportOptions,
-    );
-  } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
-  } else if (mcpServerConfig.command) {
-    transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
-      env: {
-        ...process.env,
-        ...(mcpServerConfig.env || {}),
-      } as Record<string, string>,
-      cwd: mcpServerConfig.cwd,
-      stderr: 'pipe',
-    });
-  } else {
+  } catch (error) {
     console.error(
-      `MCP server '${mcpServerName}' has invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio). Skipping.`,
+      `failed to start or connect to MCP server '${mcpServerName}': ${error}`,
     );
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
@@ -281,11 +290,17 @@ async function connectAndDiscover(
         `MCP server '${mcpServerName}' did not return valid tool function declarations. Skipping.`,
       );
       if (
-        transport instanceof StdioClientTransport ||
-        transport instanceof SSEClientTransport ||
-        transport instanceof StreamableHTTPClientTransport
+        transport &&
+        (transport instanceof StdioClientTransport ||
+          transport instanceof SSEClientTransport ||
+          transport instanceof StreamableHTTPClientTransport) &&
+        typeof transport.close === 'function'
       ) {
-        await transport.close();
+        try {
+          await transport.close();
+        } catch (_closeError) {
+          // Silently handle close errors as they're not critical
+        }
       }
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
@@ -344,11 +359,17 @@ async function connectAndDiscover(
     );
     // Ensure transport is cleaned up on error too
     if (
-      transport instanceof StdioClientTransport ||
-      transport instanceof SSEClientTransport ||
-      transport instanceof StreamableHTTPClientTransport
+      transport &&
+      (transport instanceof StdioClientTransport ||
+        transport instanceof SSEClientTransport ||
+        transport instanceof StreamableHTTPClientTransport) &&
+      typeof transport.close === 'function'
     ) {
-      await transport.close();
+      try {
+        await transport.close();
+      } catch (_closeError) {
+        // Silently handle close errors as they're not critical
+      }
     }
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
@@ -364,34 +385,54 @@ async function connectAndDiscover(
       `No tools registered from MCP server '${mcpServerName}'. Closing connection.`,
     );
     if (
-      transport instanceof StdioClientTransport ||
-      transport instanceof SSEClientTransport ||
-      transport instanceof StreamableHTTPClientTransport
+      transport &&
+      (transport instanceof StdioClientTransport ||
+        transport instanceof SSEClientTransport ||
+        transport instanceof StreamableHTTPClientTransport) &&
+      typeof transport.close === 'function'
     ) {
-      await transport.close();
+      try {
+        await transport.close();
+      } catch (_closeError) {
+        // Silently handle close errors as they're not critical
+      }
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     }
   }
 }
 
-export function sanitizeParameters(schema?: Schema) {
+export function sanitizeParameters(
+  schema?: Schema,
+  visited = new WeakSet(),
+  inAnyOf = false,
+) {
   if (!schema) {
     return;
   }
-  if (schema.anyOf) {
-    // Vertex AI gets confused if both anyOf and default are set.
+
+  // Handle circular references
+  if (visited.has(schema)) {
+    return;
+  }
+  visited.add(schema);
+
+  // Remove default if this schema has anyOf OR if we're inside an anyOf
+  if (schema.anyOf || inAnyOf) {
     schema.default = undefined;
+  }
+
+  if (schema.anyOf) {
     for (const item of schema.anyOf) {
-      sanitizeParameters(item);
+      sanitizeParameters(item, visited, true);
     }
   }
   if (schema.items) {
-    sanitizeParameters(schema.items);
+    sanitizeParameters(schema.items, visited, inAnyOf);
   }
   if (schema.properties) {
     for (const item of Object.values(schema.properties)) {
-      sanitizeParameters(item);
+      sanitizeParameters(item, visited, inAnyOf);
     }
   }
 }

@@ -169,6 +169,10 @@ Expectation for required parameters:
       return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
     }
 
+    if (params.file_path.includes('\0')) {
+      return `File path contains null bytes which are not allowed: ${params.file_path}`;
+    }
+
     return null;
   }
 
@@ -213,8 +217,6 @@ Expectation for required parameters:
 
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
-      // Normalize line endings to LF for consistent processing.
-      currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {

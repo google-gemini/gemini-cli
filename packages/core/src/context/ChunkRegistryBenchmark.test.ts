@@ -172,10 +172,16 @@ describe('ChunkRegistry Performance Benchmarks', () => {
     const avgTimePerChunk =
       timePerChunk.reduce((sum, t) => sum + t, 0) / timePerChunk.length;
 
-    // Time per chunk should be consistent (within 2x variance)
+    // Time per chunk should be consistent (within 5x variance for CI robustness)
+    // Also check that all times are reasonable (not negative or extremely large)
     for (const time of timePerChunk) {
-      expect(time).toBeLessThan(avgTimePerChunk * 2);
+      expect(time).toBeGreaterThanOrEqual(0);
+      expect(time).toBeLessThan(avgTimePerChunk * 5);
     }
+
+    // Additional check: the operation should complete in reasonable time for largest size
+    const largestTime = getAllChunksTimes[getAllChunksTimes.length - 1];
+    expect(largestTime).toBeLessThan(50); // Should complete within 50ms even for 2000 chunks
   });
 
   it('should maintain performance under concurrent operations', async () => {

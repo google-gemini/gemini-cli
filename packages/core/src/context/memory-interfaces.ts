@@ -307,6 +307,8 @@ export interface ToolResultCache {
   cleanup(): Promise<void>;
   /** Clear all cached entries */
   clear(): Promise<void>;
+  /** Get all cache entries for serialization */
+  getAllEntries(): Map<string, CachedToolResult>;
   /** Destroy the cache and cleanup timers */
   destroy(): void;
 }

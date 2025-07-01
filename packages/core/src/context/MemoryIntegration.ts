@@ -248,16 +248,73 @@ export class MemoryAwarePromptAssembler {
    * Find relevant files in project structure relative to base path
    */
   private findRelevantFilesInStructure(
-    _structure: DirectoryNode,
-    _basePath: string,
+    structure: DirectoryNode,
+    basePath: string,
   ): string[] {
     const relevantFiles: string[] = [];
 
-    // This is a simplified implementation - in reality, you'd traverse the DirectoryNode structure
-    // and find files that are in or near the basePath, prioritizing by relevance
+    const traverseNode = (node: DirectoryNode, currentDepth: number = 0) => {
+      // Stop if we've gone too deep
+      if (currentDepth > 5) return;
 
-    // For now, return empty array - this would need full implementation based on DirectoryNode structure
+      // If this is the base path or a child of it, prioritize its files
+      const isRelevantPath =
+        node.path.includes(basePath) || basePath.includes(node.path);
+
+      // If it's a file (no children), add it to relevantFiles
+      if (!node.children || node.children.length === 0) {
+        if (isRelevantPath) {
+          relevantFiles.push(node.path);
+        }
+        return;
+      }
+
+      // For directories, traverse children
+      for (const child of node.children) {
+        traverseNode(child, currentDepth + 1);
+      }
+
+      // Also add the current directory path if it contains files
+      if (node.fileCount > 0 && isRelevantPath) {
+        // Don't add directory paths, just traverse them
+      }
+    };
+
+    traverseNode(structure);
+
+    // Sort by relevance (files closer to basePath first)
+    relevantFiles.sort((a, b) => {
+      const aDistance = this.calculatePathDistance(a, basePath);
+      const bDistance = this.calculatePathDistance(b, basePath);
+      return aDistance - bDistance;
+    });
+
     return relevantFiles;
+  }
+
+  /**
+   * Calculate distance between two paths (lower is closer)
+   */
+  private calculatePathDistance(filePath: string, basePath: string): number {
+    const fileSegments = filePath.split('/');
+    const baseSegments = basePath.split('/');
+
+    // Find common prefix length
+    let commonLength = 0;
+    const minLength = Math.min(fileSegments.length, baseSegments.length);
+
+    for (let i = 0; i < minLength; i++) {
+      if (fileSegments[i] === baseSegments[i]) {
+        commonLength++;
+      } else {
+        break;
+      }
+    }
+
+    // Distance is the sum of remaining segments
+    return (
+      fileSegments.length - commonLength + (baseSegments.length - commonLength)
+    );
   }
 
   /**

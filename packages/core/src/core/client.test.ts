@@ -1388,16 +1388,14 @@ describe('GeminiClient - Additional comprehensive tests', () => {
   describe('integration scenarios', () => {
     it('should handle a complete conversation flow', async () => {
       // Setup mocks for a complete conversation
+      const expectedFinalHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hello there!' }] },
+      ];
+
       const mockChat = {
         addHistory: vi.fn(),
-        getHistory: vi
-          .fn()
-          .mockReturnValueOnce([]) // Initially empty
-          .mockReturnValueOnce([{ role: 'user', parts: [{ text: 'Hello' }] }])
-          .mockReturnValueOnce([
-            { role: 'user', parts: [{ text: 'Hello' }] },
-            { role: 'model', parts: [{ text: 'Hello there!' }] },
-          ]),
+        getHistory: vi.fn().mockReturnValue(expectedFinalHistory), // Return the expected final state
         setHistory: vi.fn(),
         sendMessage: vi.fn(),
         sendMessageStream: vi.fn(),
@@ -1468,39 +1466,60 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     });
 
     it('should handle reset and continue conversation', async () => {
-      // Add initial history
-      const mockChat = {
+      // Create fresh mock for new chat after reset
+      const newMockChat = {
         addHistory: vi.fn(),
-        getHistory: vi
-          .fn()
-          .mockReturnValueOnce([
-            { role: 'user', parts: [{ text: 'old message' }] },
-          ])
-          .mockReturnValueOnce([]), // After reset
+        getHistory: vi.fn().mockReturnValue([]),
         setHistory: vi.fn(),
         sendMessage: vi.fn(),
         sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as unknown as GeminiChat;
+
+      // Mock startChat to return our new mock chat instance
+      const startChatSpy = vi
+        .spyOn(
+          client as unknown as { startChat: () => Promise<unknown> },
+          'startChat',
+        )
+        .mockResolvedValue(newMockChat);
+
+      // Add initial history
+      const initialMockChat = {
+        addHistory: vi.fn(),
+        getHistory: vi
+          .fn()
+          .mockReturnValue([
+            { role: 'user', parts: [{ text: 'old message' }] },
+          ]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
+      };
+      client['chat'] = initialMockChat as unknown as GeminiChat;
 
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'old message' }],
       });
 
-      // Reset and verify
+      // Reset and verify - this should create a new chat
       await client.resetChat();
+      expect(startChatSpy).toHaveBeenCalled();
 
-      // Continue conversation after reset
+      // Continue conversation after reset - should use new chat instance
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'new message' }],
       });
 
-      expect(mockChat.addHistory).toHaveBeenCalledWith({
+      // Verify the new message was added to the NEW chat instance
+      expect(newMockChat.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: [{ text: 'new message' }],
       });
+
+      // Cleanup
+      startChatSpy.mockRestore();
     });
   });
 });

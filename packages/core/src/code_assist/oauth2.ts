@@ -86,7 +86,14 @@ export async function getOauthClient(): Promise<OAuth2Client> {
       `Attempting to open authentication page in your browser.\n` +
       `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
   );
-  await open(webLogin.authUrl);
+  try {
+    await open(webLogin.authUrl);
+  } catch (_error) {
+    // Browser opening failed, but user can still manually navigate to the URL
+    console.log(
+      'Failed to open browser automatically. Please navigate to the URL above manually.',
+    );
+  }
   console.log('Waiting for authentication...');
 
   await webLogin.loginCompletePromise;
@@ -108,10 +115,11 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
-        if (req.url!.indexOf('/oauth2callback') === -1) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
+        if (!req.url!.startsWith('/oauth2callback')) {
+          res.writeHead(404, { 'Content-Type': 'text/html' });
+          res.end('Not Found');
           reject(new Error('Unexpected request: ' + req.url));
+          return;
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
@@ -121,6 +129,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
 
           reject(new Error(`Error during authentication: ${qs.get('error')}`));
         } else if (qs.get('state') !== state) {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
           res.end('State mismatch. Possible CSRF attack');
 
           reject(new Error('State mismatch. Possible CSRF attack'));
@@ -150,6 +159,8 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           res.end();
           resolve();
         } else {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end('Bad Request: Missing authorization code');
           reject(new Error('No code found in request'));
         }
       } catch (e) {
@@ -207,6 +218,7 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
 
     return true;
   } catch (_) {
+    console.log('Cached credentials are invalid, re-authenticating...');
     return false;
   }
 }

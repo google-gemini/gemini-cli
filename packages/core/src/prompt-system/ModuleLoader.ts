@@ -194,8 +194,12 @@ export class ModuleLoaderImpl implements ModuleLoader {
     // Extract metadata from HTML comments at the top of the file
     const metadata = this.parseMetadataComments(content);
 
-    // Calculate token count (rough approximation: 1 token ≈ 4 characters)
-    const tokenCount = Math.ceil(content.length / 4);
+    // Calculate token count based on content without metadata comments (matches final assembly)
+    // This ensures consistency with PromptAssembler which removes HTML comments
+    const contentWithoutComments = content
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .trim();
+    const tokenCount = Math.ceil(contentWithoutComments.length / 4);
 
     return {
       id,

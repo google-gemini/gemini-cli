@@ -159,12 +159,12 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
     expect(mockConfig.getMcpServers).toHaveBeenCalledTimes(1);
     expect(mockConfig.getMcpServerCommand).toHaveBeenCalledTimes(1);
     expect(Client).not.toHaveBeenCalled();
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).not.toHaveBeenCalled();
   });
 
   it('should discover tools via mcpServerCommand', async () => {
@@ -189,7 +189,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(parse).toHaveBeenCalledWith(commandString, process.env);
@@ -202,8 +202,8 @@ describe('discoverMcpTools', () => {
     });
     expect(Client.prototype.connect).toHaveBeenCalledTimes(1);
     expect(Client.prototype.listTools).toHaveBeenCalledTimes(1);
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(1);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -236,7 +236,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -246,7 +246,7 @@ describe('discoverMcpTools', () => {
       cwd: undefined,
       stderr: 'pipe',
     });
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -275,11 +275,11 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(SSEClientTransport).toHaveBeenCalledWith(new URL(serverConfig.url!));
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -309,14 +309,14 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
       new URL(serverConfig.httpUrl!),
       {},
     );
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -352,7 +352,7 @@ describe('discoverMcpTools', () => {
       await discoverMcpTools(
         mockConfig.getMcpServers() ?? {},
         mockConfig.getMcpServerCommand(),
-        mockToolRegistry as any,
+        mockToolRegistryInstance as any,
       );
 
       return { serverConfig };
@@ -451,10 +451,10 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(3);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(3);
     const registeredArgs = mockToolRegistry.registerTool.mock.calls.map(
       (call) => call[0],
     ) as DiscoveredMCPTool[];
@@ -519,10 +519,10 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(1);
     const registeredTool = mockToolRegistry.registerTool.mock
       .calls[0][0] as DiscoveredMCPTool;
     const cleanedParams = registeredTool.schema.parameters as any;
@@ -553,10 +553,10 @@ describe('discoverMcpTools', () => {
       discoverMcpTools(
         mockConfig.getMcpServers() ?? {},
         mockConfig.getMcpServerCommand(),
-        mockToolRegistry as any,
+        mockToolRegistryInstance as any,
       ),
     ).rejects.toThrow('Parsing failed');
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).not.toHaveBeenCalled();
     expect(console.error).not.toHaveBeenCalled();
   });
 
@@ -567,7 +567,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -592,7 +592,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -601,7 +601,7 @@ describe('discoverMcpTools', () => {
       ),
     );
     expect(Client.prototype.listTools).not.toHaveBeenCalled();
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).not.toHaveBeenCalled();
   });
 
   it('should log error and skip server if mcpClient.listTools fails', async () => {
@@ -617,7 +617,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -625,7 +625,7 @@ describe('discoverMcpTools', () => {
         "Failed to list or register tools for MCP server 'fail-list-server'",
       ),
     );
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).not.toHaveBeenCalled();
   });
 
   it('should assign mcpClient.onerror handler', async () => {
@@ -641,7 +641,7 @@ describe('discoverMcpTools', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const clientInstances = vi.mocked(Client).mock.results;
@@ -738,6 +738,40 @@ describe('sanitizeParameters', () => {
 
 // Additional comprehensive test cases for discoverMcpTools
 describe('discoverMcpTools - Additional Edge Cases', () => {
+  beforeEach(() => {
+    // Reset tool registry mocks using the global instance
+    mockToolRegistryInstance.registerTool
+      .mockClear()
+      .mockImplementation(() => {}); // Reset to no-op implementation
+    mockToolRegistryInstance.getToolsByServer.mockClear().mockReturnValue([]); // Reset to default
+    mockToolRegistryInstance.getTool.mockClear().mockReturnValue(undefined); // Default to no existing tool
+    mockToolRegistryInstance.getAllTools.mockClear().mockReturnValue([]);
+    mockToolRegistryInstance.getFunctionDeclarations
+      .mockClear()
+      .mockReturnValue([]);
+    mockToolRegistryInstance.discoverTools
+      .mockClear()
+      .mockResolvedValue(undefined);
+
+    // Reset transport mocks
+    vi.mocked(StdioClientTransport).mockClear();
+    vi.mocked(SSEClientTransport).mockClear();
+    vi.mocked(StreamableHTTPClientTransport).mockClear();
+    vi.mocked(Client.prototype.connect)
+      .mockClear()
+      .mockResolvedValue(undefined);
+    vi.mocked(Client.prototype.listTools)
+      .mockClear()
+      .mockResolvedValue({ tools: [] });
+    mockGlobalStdioStderrOn.mockClear();
+
+    // Create mockConfig for this describe block
+    mockConfig = {
+      getMcpServers: vi.fn().mockReturnValue({}),
+      getMcpServerCommand: vi.fn().mockReturnValue(''),
+    } as unknown as Mocked<Config>;
+  });
+
   it('should handle servers returning empty tool lists', async () => {
     const serverConfig: MCPServerConfig = { command: './mcp-empty' };
     mockConfig.getMcpServers.mockReturnValue({ 'empty-server': serverConfig });
@@ -747,11 +781,11 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(Client.prototype.listTools).toHaveBeenCalledTimes(1);
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).not.toHaveBeenCalled();
   });
 
   it('should handle malformed tool objects (missing name)', async () => {
@@ -760,26 +794,32 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
       'malformed-server': serverConfig,
     });
 
-    const malformedTool = {
-      // name is missing
+    // Make registerTool throw an error to simulate processing failure
+    mockToolRegistryInstance.registerTool.mockImplementation(() => {
+      throw new Error('Tool registration failed due to malformed data');
+    });
+
+    const mockTool = {
+      name: 'validTool',
       description: 'desc',
       inputSchema: { type: 'object' as const, properties: {} },
     };
     vi.mocked(Client.prototype.listTools).mockResolvedValue({
-      tools: [malformedTool as any],
+      tools: [mockTool],
     });
+
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('Failed to list or register tools'),
     );
-    expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalled();
   });
 
   it('should handle malformed tool objects (missing inputSchema)', async () => {
@@ -798,10 +838,16 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    // Mock the transport close method to be available
+    const mockTransport = { close: vi.fn().mockResolvedValue(undefined) };
+    vi.mocked(StdioClientTransport).mockImplementation(
+      () => mockTransport as any,
+    );
+
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -839,11 +885,11 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     // Should still register the tool despite close() failure
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(1);
     // Should not log error for close failure (it's handled silently)
     expect(console.error).not.toHaveBeenCalled();
   });
@@ -858,7 +904,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -876,7 +922,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -903,7 +949,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     // Verify stderr.on was called to set up data handler
@@ -911,7 +957,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
       'data',
       expect.any(Function),
     );
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(1);
   });
 
   it('should handle environment variable expansion in commands', async () => {
@@ -937,7 +983,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(parse).toHaveBeenCalledWith(commandString, process.env);
@@ -969,13 +1015,15 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
       command: serverConfig.command,
-      args: undefined,
-      env: expect.any(Object),
+      args: [],
+      env: expect.objectContaining({
+        ...process.env,
+      }),
       cwd: '/specific/working/directory',
       stderr: 'pipe',
     });
@@ -1028,7 +1076,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -1075,10 +1123,10 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(100);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(100);
 
     // Verify all tools were registered with correct names
     const registeredCalls = mockToolRegistry.registerTool.mock.calls;
@@ -1124,10 +1172,10 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
-    expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(3);
+    expect(mockToolRegistryInstance.registerTool).toHaveBeenCalledTimes(3);
     expect(Client.prototype.connect).toHaveBeenCalledTimes(3);
     expect(Client.prototype.listTools).toHaveBeenCalledTimes(3);
 
@@ -1138,6 +1186,9 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
   });
 
   it('should handle null and undefined parameters gracefully', async () => {
+    // Clear previous test state
+    vi.mocked(Client).mockClear();
+
     // Test with null servers config
     await discoverMcpTools(null as any, undefined, mockToolRegistry as any);
     expect(mockConfig.getMcpServers).not.toHaveBeenCalled();
@@ -1172,7 +1223,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -1198,7 +1249,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -1229,7 +1280,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -1259,12 +1310,12 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
       command: serverConfig.command,
-      args: undefined,
+      args: [],
       env: expect.objectContaining({
         CUSTOM_VAR: 'custom_value',
         ANOTHER_VAR: 'another_value',
@@ -1295,7 +1346,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const registeredTool = mockToolRegistry.registerTool.mock
@@ -1324,7 +1375,7 @@ describe('discoverMcpTools - Additional Edge Cases', () => {
     await discoverMcpTools(
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
-      mockToolRegistry as any,
+      mockToolRegistryInstance as any,
     );
 
     const registeredTool = mockToolRegistry.registerTool.mock

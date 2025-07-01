@@ -71,12 +71,13 @@ describe('ProjectContextManager', () => {
           test: 'vitest',
         },
         dependencies: {
-          react: '^18.0.0',
-          typescript: '^5.0.0',
+          express: '^4.18.0',
+          lodash: '^4.17.21',
         },
         devDependencies: {
           vitest: '^1.0.0',
           '@types/node': '^20.0.0',
+          typescript: '^5.0.0',
         },
       };
 
@@ -105,9 +106,9 @@ describe('ProjectContextManager', () => {
       expect(context.type).toBe('nodejs');
       expect(context.buildSystem).toBe('npm');
       expect(context.testFramework).toBe('vitest');
-      expect(context.dependencies).toHaveLength(4);
+      expect(context.dependencies).toHaveLength(5);
       expect(
-        context.dependencies.find((d) => d.name === 'react'),
+        context.dependencies.find((d) => d.name === 'express'),
       ).toBeDefined();
       expect(
         context.dependencies.find((d) => d.name === 'typescript'),
@@ -132,7 +133,13 @@ describe('ProjectContextManager', () => {
             return JSON.stringify(tsConfig);
           }
           if (filePath.toString().includes('package.json')) {
-            return JSON.stringify({ name: 'ts-project' });
+            return JSON.stringify({
+              name: 'ts-project',
+              dependencies: {
+                react: '^18.0.0',
+                'react-dom': '^18.0.0',
+              },
+            });
           }
           throw new Error('File not found');
         },
@@ -147,6 +154,62 @@ describe('ProjectContextManager', () => {
             return;
           }
           throw new Error('File not found');
+        },
+      );
+
+      // Mock readdir for language detection
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mockFs.readdir as any).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (dirPath: any, options?: any): Promise<any> => {
+          const pathStr = dirPath.toString();
+
+          // Handle withFileTypes: true case
+          if (options && options.withFileTypes) {
+            if (pathStr === mockProjectRoot) {
+              return [
+                createMockDirEntry(
+                  'src',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/src`,
+                ),
+                createMockDirEntry(
+                  'App.tsx',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/App.tsx`,
+                ),
+                createMockDirEntry(
+                  'index.ts',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/index.ts`,
+                ),
+              ] as Dirent[];
+            }
+            if (pathStr.includes('src')) {
+              const srcPath = `${mockProjectRoot}/src`;
+              return [
+                createMockDirEntry(
+                  'Component.tsx',
+                  false,
+                  srcPath,
+                  `${srcPath}/Component.tsx`,
+                ),
+              ] as Dirent[];
+            }
+            return [];
+          }
+
+          // Default case - return string array
+          if (pathStr === mockProjectRoot) {
+            return ['src', 'App.tsx', 'index.ts'];
+          }
+          if (pathStr.includes('src')) {
+            return ['Component.tsx'];
+          }
+          return [];
         },
       );
 
@@ -244,6 +307,62 @@ black>=22.0.0
         },
       );
 
+      // Mock readdir for language detection
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mockFs.readdir as any).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (dirPath: any, options?: any): Promise<any> => {
+          const pathStr = dirPath.toString();
+
+          // Handle withFileTypes: true case
+          if (options && options.withFileTypes) {
+            if (pathStr === mockProjectRoot) {
+              return [
+                createMockDirEntry(
+                  'src',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/src`,
+                ),
+                createMockDirEntry(
+                  'main.py',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/main.py`,
+                ),
+                createMockDirEntry(
+                  'models.py',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/models.py`,
+                ),
+              ] as Dirent[];
+            }
+            if (pathStr.includes('src')) {
+              const srcPath = `${mockProjectRoot}/src`;
+              return [
+                createMockDirEntry(
+                  'utils.py',
+                  false,
+                  srcPath,
+                  `${srcPath}/utils.py`,
+                ),
+              ] as Dirent[];
+            }
+            return [];
+          }
+
+          // Default case - return string array
+          if (pathStr === mockProjectRoot) {
+            return ['src', 'main.py', 'models.py'];
+          }
+          if (pathStr.includes('src')) {
+            return ['utils.py'];
+          }
+          return [];
+        },
+      );
+
       const context =
         await projectContextManager.analyzeProject(mockProjectRoot);
 
@@ -259,6 +378,13 @@ black>=22.0.0
 
   describe('directory structure analysis', () => {
     it('should analyze project directory structure', async () => {
+      // Clear all mocks to ensure clean state
+      vi.clearAllMocks();
+
+      // Mock access and readFile to prevent errors
+      mockFs.access.mockRejectedValue(new Error('File not found'));
+      mockFs.readFile.mockRejectedValue(new Error('File not found'));
+
       const _mockDirStructure = [
         'src/components/Button.tsx',
         'src/components/Input.tsx',
@@ -325,7 +451,7 @@ black>=22.0.0
                 createMockDirEntry('utils', true, srcPath, `${srcPath}/utils`),
               ] as Dirent[];
             }
-            if (pathStr.includes('components')) {
+            if (pathStr === `${mockProjectRoot}/src/components`) {
               const componentsPath = `${mockProjectRoot}/src/components`;
               return [
                 createMockDirEntry(
@@ -349,10 +475,10 @@ black>=22.0.0
           if (pathStr === mockProjectRoot) {
             return ['src', 'tests', 'public', 'README.md', 'package.json'];
           }
-          if (pathStr.includes('src')) {
+          if (pathStr === `${mockProjectRoot}/src`) {
             return ['components', 'hooks', 'utils'];
           }
-          if (pathStr.includes('components')) {
+          if (pathStr === `${mockProjectRoot}/src/components`) {
             return ['Button.tsx', 'Input.tsx'];
           }
           return [];
@@ -379,7 +505,9 @@ black>=22.0.0
         (child) => child.name === 'components',
       );
       expect(componentsDir).toBeDefined();
-      expect(componentsDir?.children).toHaveLength(2);
+
+      // Components directory should have files as children
+      expect(componentsDir?.children).toHaveLength(3);
     });
 
     it('should calculate file counts correctly', async () => {
@@ -762,6 +890,10 @@ export const slugify = (text: string) => {
           content: 'export const formatString = () => {};', // camelCase
         },
         {
+          path: '/test/project/src/helpers/date-utils.ts', // kebab-case
+          content: 'export const parseDate = () => {};',
+        },
+        {
           path: '/test/project/src/hooks/useAuth.ts', // camelCase
           content: 'export const useAuth = () => {};',
         },
@@ -796,6 +928,30 @@ export const slugify = (text: string) => {
 
   describe('project context updates', () => {
     it('should update project context incrementally', async () => {
+      // Mock basic package.json for this test
+      const basicPackageJson = {
+        name: 'basic-project',
+        version: '1.0.0',
+      };
+
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return JSON.stringify(basicPackageJson);
+          }
+          throw new Error('File not found');
+        },
+      );
+
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
+
       // Start with basic context
       let context = await projectContextManager.analyzeProject(mockProjectRoot);
 
@@ -816,6 +972,33 @@ export const slugify = (text: string) => {
     });
 
     it('should merge dependencies without duplicates', async () => {
+      // Mock basic package.json for this test
+      const basicPackageJson = {
+        name: 'basic-project',
+        version: '1.0.0',
+        dependencies: {
+          react: '^18.0.0',
+        },
+      };
+
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return JSON.stringify(basicPackageJson);
+          }
+          throw new Error('File not found');
+        },
+      );
+
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
+
       let context = await projectContextManager.analyzeProject(mockProjectRoot);
 
       const newDependency: ProjectDependency = {

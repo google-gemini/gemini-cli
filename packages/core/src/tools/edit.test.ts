@@ -790,7 +790,7 @@ describe('Additional Edge Cases and Error Handling', () => {
 
       try {
         const result = await tool.execute(params, new AbortController().signal);
-        expect(result.llmContent).toMatch(/Error:/);
+        expect(result.llmContent).toMatch(/Error preparing edit:/);
       } finally {
         // Restore permissions for cleanup
         fs.chmodSync(filePath, 0o644);
@@ -906,6 +906,7 @@ describe('Additional Edge Cases and Error Handling', () => {
         file_path: filePath,
         old_string: '   ',
         new_string: 'content',
+        expected_replacements: 2, // There are 2 occurrences of '   ' in the content
       };
 
       (tool as any).shouldAlwaysEdit = true;
@@ -1053,7 +1054,7 @@ describe('Additional Edge Cases and Error Handling', () => {
       };
 
       const result = await tool.execute(params, new AbortController().signal);
-      expect(result.llmContent).toMatch(/Error:/);
+      expect(result.llmContent).toMatch(/Error preparing edit:/);
     });
 
     it('should handle generateJson returning unexpected format', async () => {
@@ -1499,7 +1500,7 @@ describe('Integration with External Dependencies', () => {
 
       const params: EditToolParams = {
         file_path: path.join(rootDir, 'test.txt'),
-        old_string: 'content',
+        old_string: 'nonexistent', // This will trigger LLM correction path
         new_string: 'updated content',
       };
 
@@ -1510,7 +1511,23 @@ describe('Integration with External Dependencies', () => {
         async (contents: Content[], schema: SchemaUnion) => {
           _capturedContents = contents;
           _capturedSchema = schema;
-          return { corrected_target_snippet: 'corrected content' };
+          return { corrected_target_snippet: 'content' }; // Return the corrected match
+        },
+      );
+
+      // Reset the ensureCorrectEdit mock to actually call the client
+      mockEnsureCorrectEdit.mockImplementationOnce(
+        async (fileContent, toolParams, client) => {
+          // Call generateJson to satisfy the test expectation
+          await client.generateJson(
+            [{ role: 'user', parts: [{ text: 'test prompt' }] }],
+            {
+              type: 'object',
+              properties: { corrected_target_snippet: { type: 'string' } },
+            },
+            new AbortController().signal,
+          );
+          return { params: toolParams, occurrences: 1 };
         },
       );
 

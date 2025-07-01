@@ -303,11 +303,35 @@ export class MemoryManager implements MemoryOperations {
       const results: Record<string, CachedToolResult> = {};
 
       // Extract cached results from the Map
-      for (const [key, cachedResult] of cache.results.entries()) {
-        // Only serialize non-expired results
-        const age = Date.now() - cachedResult.timestamp;
-        if (age <= cachedResult.ttl) {
-          results[key] = cachedResult;
+      // First check if cache has a results property and iterate over it
+      if (cache && typeof cache.getAllEntries === 'function') {
+        const allEntries = cache.getAllEntries();
+        for (const [key, cachedResult] of allEntries) {
+          // Only serialize non-expired results
+          const age = Date.now() - cachedResult.timestamp;
+          if (age <= cachedResult.ttl) {
+            results[key] = cachedResult;
+          }
+        }
+      } else {
+        // Fallback: try to access results directly if available
+        try {
+          const cacheEntries = cache as unknown as {
+            results?: Map<string, CachedToolResult>;
+          };
+          if (cacheEntries.results && cacheEntries.results instanceof Map) {
+            for (const [key, cachedResult] of cacheEntries.results.entries()) {
+              const age = Date.now() - cachedResult.timestamp;
+              if (age <= cachedResult.ttl) {
+                results[key] = cachedResult;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to serialize tool results for ${toolName}:`,
+            error,
+          );
         }
       }
 
@@ -347,15 +371,28 @@ export class MemoryManager implements MemoryOperations {
     // Restore session history
     this.contextMemory.sessionHistory = data.sessionHistory;
 
-    // Restore tool results (simplified - would need better implementation)
+    // Restore tool results with cached data
     this.contextMemory.toolResults.clear();
-    for (const [toolName, _cacheData] of Object.entries(data.toolResults)) {
+    for (const [toolName, cacheData] of Object.entries(data.toolResults)) {
       const cache = new ToolResultCache(toolName, {
         maxSize: this.config.toolResultsConfig.maxCacheSize,
         defaultTtl: this.config.toolResultsConfig.defaultTtl,
         maxResultSize: this.config.toolResultsConfig.maxResultSize,
         cleanupInterval: 5 * 60 * 1000,
       });
+
+      // Restore cached results if available
+      if (cacheData.results && typeof cacheData.results === 'object') {
+        for (const [key, cachedResult] of Object.entries(cacheData.results)) {
+          // Check if result is still valid (not expired)
+          const age = Date.now() - cachedResult.timestamp;
+          if (age <= cachedResult.ttl) {
+            // Use the cache's set method to properly restore the result
+            await cache.set(key, cachedResult);
+          }
+        }
+      }
+
       this.contextMemory.toolResults.set(toolName, cache);
     }
   }

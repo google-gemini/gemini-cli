@@ -24,7 +24,22 @@ export class ProjectContextManager {
    */
   async analyzeProject(rootPath: string): Promise<ProjectContext> {
     const normalizedRoot = path.resolve(rootPath);
-    const name = path.basename(normalizedRoot);
+    let name = path.basename(normalizedRoot);
+
+    // Try to get name from package.json first
+    try {
+      const packageJsonPath = path.join(normalizedRoot, 'package.json');
+      if (await this.fileExists(packageJsonPath)) {
+        const packageJson = JSON.parse(
+          await fs.readFile(packageJsonPath, 'utf-8'),
+        ) as Record<string, unknown>;
+        if (packageJson.name && typeof packageJson.name === 'string') {
+          name = packageJson.name;
+        }
+      }
+    } catch {
+      // Fall back to directory name if package.json can't be read
+    }
 
     // Detect project type and configuration
     const { type, buildSystem, testFramework } =
@@ -100,22 +115,22 @@ export class ProjectContextManager {
           };
         }
 
-        // Check for React
-        if ((packageJson.dependencies as Record<string, unknown>)?.react) {
-          return {
-            type: 'react',
-            buildSystem: 'npm',
-            testFramework: this.detectTestFramework(packageJson),
-          };
-        }
-
-        // Check for TypeScript
+        // Check for TypeScript (check before React since TS projects often have React)
         if (
           (packageJson.dependencies as Record<string, unknown>)?.typescript ||
           (await this.fileExists(path.join(rootPath, 'tsconfig.json')))
         ) {
           return {
             type: 'typescript',
+            buildSystem: 'npm',
+            testFramework: this.detectTestFramework(packageJson),
+          };
+        }
+
+        // Check for React
+        if ((packageJson.dependencies as Record<string, unknown>)?.react) {
+          return {
+            type: 'react',
             buildSystem: 'npm',
             testFramework: this.detectTestFramework(packageJson),
           };
@@ -506,6 +521,15 @@ export class ProjectContextManager {
           children.push(childNode);
           fileCount += childNode.fileCount;
         } else if (entry.isFile()) {
+          // Add files as leaf nodes
+          children.push({
+            name: entry.name,
+            path: fullPath,
+            isDirectory: false,
+            children: [],
+            fileCount: 1,
+            purpose: undefined,
+          });
           fileCount++;
         }
       }
@@ -694,6 +718,43 @@ export class ProjectContextManager {
           files: propsFiles.map((f) => f.path),
         });
       }
+
+      // React Hooks pattern
+      const hookFiles = reactFiles.filter(
+        (f) =>
+          f.content.includes('useState') ||
+          f.content.includes('useEffect') ||
+          f.content.includes('useContext') ||
+          f.content.includes('useReducer') ||
+          f.content.includes('useMemo') ||
+          f.content.includes('useCallback'),
+      );
+
+      if (hookFiles.length > 0) {
+        const hookExamples: string[] = [];
+        const hookPatterns = [
+          'useState',
+          'useEffect',
+          'useContext',
+          'useReducer',
+          'useMemo',
+          'useCallback',
+        ];
+        for (const pattern of hookPatterns) {
+          if (hookFiles.some((f) => f.content.includes(pattern))) {
+            hookExamples.push(pattern);
+          }
+        }
+
+        patterns.push({
+          name: 'React Hooks Pattern',
+          description:
+            'Usage of React hooks for state management and side effects',
+          examples: hookExamples,
+          confidence: hookFiles.length / reactFiles.length,
+          files: hookFiles.map((f) => f.path),
+        });
+      }
     }
 
     return patterns;
@@ -727,7 +788,7 @@ export class ProjectContextManager {
         name: 'Custom Hook Pattern',
         description: 'Custom React hooks for shared logic',
         examples: [...new Set(examples)].slice(0, 5),
-        confidence: 0.9,
+        confidence: 0.95,
         files: hookFiles.map((f) => f.path),
       });
     }

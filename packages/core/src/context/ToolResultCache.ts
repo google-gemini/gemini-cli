@@ -193,6 +193,13 @@ export class ToolResultCache implements IToolResultCache {
   }
 
   /**
+   * Get all cache entries for serialization
+   */
+  getAllEntries(): Map<string, CachedToolResult> {
+    return new Map(this.results);
+  }
+
+  /**
    * Generate a cache key from parameters
    */
   generateKey(parameters: Record<string, unknown>): string {
