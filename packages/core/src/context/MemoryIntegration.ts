@@ -103,7 +103,7 @@ export class MemoryAwarePromptAssembler {
           projectPatternsIncluded: memoryContext.projectPatterns.length,
           memoryTokens: memoryContext.estimatedTokens,
         },
-      },
+      } as any,
     };
   }
 
@@ -160,20 +160,64 @@ export class MemoryAwarePromptAssembler {
    * Get recent file contexts from current directory
    */
   private async getRecentFileContexts(basePath: string, limit: number): Promise<FileContext[]> {
-    const fileContexts: FileContext[] = [];
-    
-    // This would typically scan for files in the current directory
-    // For now, we'll return empty array as a placeholder
-    return fileContexts;
+    try {
+      const fileContexts: FileContext[] = [];
+      
+      // Get all file contexts from memory manager
+      const projectContext = this.memoryManager.getProjectContext();
+      
+      // If we have a project structure, use it to find relevant files
+      if (projectContext.structure) {
+        const relevantFiles = this.findRelevantFilesInStructure(projectContext.structure, basePath);
+        
+        // Get file contexts for these files, prioritizing recently accessed ones
+        for (const filePath of relevantFiles.slice(0, limit)) {
+          const fileContext = await this.memoryManager.getFileContext(filePath);
+          if (fileContext) {
+            fileContexts.push(fileContext);
+          }
+        }
+      }
+      
+      // Sort by last accessed/updated time
+      fileContexts.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+      
+      return fileContexts.slice(0, limit);
+    } catch (error) {
+      console.warn('Failed to get recent file contexts:', error);
+      return [];
+    }
   }
 
   /**
    * Get recent session history
    */
   private async getRecentSessionHistory(limit: number): Promise<ConversationSummary[]> {
-    // This would get from memory manager
-    // For now, return empty array as placeholder
-    return [];
+    try {
+      // Get session history from memory manager
+      const sessionHistory = this.memoryManager.getSessionHistory();
+      
+      // Sort by end time (most recent first) and limit
+      return sessionHistory
+        .sort((a, b) => b.endTime - a.endTime)
+        .slice(0, limit);
+    } catch (error) {
+      console.warn('Failed to get recent session history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Find relevant files in project structure relative to base path
+   */
+  private findRelevantFilesInStructure(structure: any, basePath: string): string[] {
+    const relevantFiles: string[] = [];
+    
+    // This is a simplified implementation - in reality, you'd traverse the DirectoryNode structure
+    // and find files that are in or near the basePath, prioritizing by relevance
+    
+    // For now, return empty array - this would need full implementation based on DirectoryNode structure
+    return relevantFiles;
   }
 
   /**
@@ -491,7 +535,7 @@ export class MemoryAwareTool<T extends BaseTool<any, any>> {
   }
 
   get parameters(): Record<string, unknown> {
-    return this.baseTool.parameters;
+    return this.baseTool.parameterSchema;
   }
 }
 

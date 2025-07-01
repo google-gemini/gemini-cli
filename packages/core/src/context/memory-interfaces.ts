@@ -39,6 +39,8 @@ export interface FileContext {
   metadata: FileMetadata;
   /** When this context was last updated */
   lastUpdated: number;
+  /** When this file was last accessed */
+  lastAccessed?: number;
 }
 
 export interface FileDiagnostic {
@@ -229,6 +231,8 @@ export interface ConversationSummary {
   originalTokens: number;
   /** Token count of this summary */
   summaryTokens: number;
+  /** Total tokens (original + summary) */
+  totalTokens: number;
   /** Compression ratio */
   compressionRatio: number;
   /** Quality score of the summary */
@@ -279,6 +283,19 @@ export interface ToolResultCache {
   lastCleanup: number;
   /** Cleanup interval in ms */
   cleanupInterval: number;
+  
+  /** Cache a tool result */
+  set(key: string, result: CachedToolResult): Promise<boolean>;
+  /** Get a cached tool result */
+  get(key: string): Promise<CachedToolResult | undefined>;
+  /** Get cache statistics */
+  getStats(): Promise<CacheStats>;
+  /** Clean up expired entries */
+  cleanup(): Promise<void>;
+  /** Clear all cached entries */
+  clear(): Promise<void>;
+  /** Destroy the cache and cleanup timers */
+  destroy(): void;
 }
 
 export interface CachedToolResult {

@@ -158,6 +158,13 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   }
 
   /**
+   * Get session history
+   */
+  getSessionHistory(): ConversationSummary[] {
+    return [...this.contextMemory.sessionHistory]; // Return a copy
+  }
+
+  /**
    * Cache tool result
    */
   async cacheToolResult(toolName: string, key: string, result: CachedToolResult): Promise<void> {
@@ -269,8 +276,15 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
       const stats = await cache.getStats();
       const results: Record<string, CachedToolResult> = {};
       
-      // Note: We can't directly serialize the Map, so we'll need to extract results
-      // This is a limitation - in a real implementation, we'd need better serialization
+      // Extract cached results from the Map
+      for (const [key, cachedResult] of cache.results.entries()) {
+        // Only serialize non-expired results
+        const age = Date.now() - cachedResult.timestamp;
+        if (age <= cachedResult.ttl) {
+          results[key] = cachedResult;
+        }
+      }
+      
       toolResults[toolName] = {
         toolName,
         results,

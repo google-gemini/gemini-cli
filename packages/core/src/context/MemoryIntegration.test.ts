@@ -267,7 +267,7 @@ describe('MemoryIntegration', () => {
       expect(memoryAwareTool.name).toBe('mock_tool');
       expect(memoryAwareTool.displayName).toBe('Mock Tool');
       expect(memoryAwareTool.description).toBe('A tool for testing');
-      expect(memoryAwareTool.parameters).toEqual(mockTool.parameters);
+      expect(memoryAwareTool.parameters).toEqual(mockTool.parameterSchema);
     });
 
     it('should extract file dependencies from parameters', async () => {
