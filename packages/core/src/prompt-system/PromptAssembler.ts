@@ -250,7 +250,7 @@ export class PromptAssembler {
    */
   private combineModules(
     modules: PromptModule[],
-    context: TaskContext,
+    _context: TaskContext,
   ): string {
     if (modules.length === 0) {
       return 'You are an interactive CLI agent specializing in software engineering tasks.';

@@ -86,7 +86,7 @@ export class PerformanceOptimizer {
    */
   optimizeModuleSelection(
     modules: PromptModule[],
-    context: TaskContext,
+    _context: TaskContext,
   ): PromptModule[] {
     // Sort modules by loading priority (cached modules first)
     return modules.sort((a, b) => {
@@ -137,7 +137,7 @@ export class PerformanceOptimizer {
 
         const result = await assemblyFunction(fullContext);
         this.cacheResult(fullContext, result);
-      } catch (error) {
+      } catch (_error) {
         // Ignore errors during pre-warming
       }
     });

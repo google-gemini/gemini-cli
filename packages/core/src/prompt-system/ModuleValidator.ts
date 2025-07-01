@@ -9,13 +9,16 @@ import type {
   TaskContext,
   AssemblyResult,
 } from './interfaces/prompt-assembly.js';
-import type { ToolManifest } from './interfaces/tool-manifest.js';
+import type { ToolManifest as _ToolManifest } from './interfaces/tool-manifest.js';
 
 /**
  * Interface for assembler objects used in validation
  */
 interface AssemblerLike {
-  assemblePrompt(context?: Partial<TaskContext>, userMemory?: string): Promise<AssemblyResult>;
+  assemblePrompt(
+    context?: Partial<TaskContext>,
+    userMemory?: string,
+  ): Promise<AssemblyResult>;
 }
 
 /**
@@ -414,7 +417,9 @@ export class ModuleValidator {
   /**
    * Run quality assurance tests
    */
-  async runQualityTests(assembler: AssemblerLike): Promise<QualityTestResult[]> {
+  async runQualityTests(
+    assembler: AssemblerLike,
+  ): Promise<QualityTestResult[]> {
     const tests: QualityTestResult[] = [];
 
     // Test 1: Basic assembly functionality
@@ -573,7 +578,9 @@ export class ModuleValidator {
     return 0;
   }
 
-  private async testBasicAssembly(assembler: AssemblerLike): Promise<QualityTestResult> {
+  private async testBasicAssembly(
+    assembler: AssemblerLike,
+  ): Promise<QualityTestResult> {
     try {
       const result = await assembler.assemblePrompt();
       return {

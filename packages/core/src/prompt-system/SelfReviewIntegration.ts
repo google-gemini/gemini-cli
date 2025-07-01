@@ -159,6 +159,10 @@ export class SelfReviewIntegration {
             context.taskType,
           );
           break;
+
+        default:
+          // For unknown gate types, leave them as-is
+          break;
       }
     });
 

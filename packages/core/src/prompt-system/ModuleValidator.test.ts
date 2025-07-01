@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ModuleValidator } from './ModuleValidator.js';
 import type {
   PromptModule,
-  TaskContext,
-  AssemblyResult,
+  TaskContext as _TaskContext,
+  AssemblyResult as _AssemblyResult,
 } from './interfaces/prompt-assembly.js';
 
 describe('ModuleValidator', () => {
@@ -94,9 +94,9 @@ describe('ModuleValidator', () => {
         id: '', // Invalid ID
         version: '', // Invalid version
         content: '', // Invalid content
-        dependencies: 'not-an-array' as any, // Invalid dependencies
+        dependencies: 'not-an-array' as unknown as string[], // Invalid dependencies
         tokenCount: -1, // Invalid token count
-        category: 'invalid' as any, // Invalid category
+        category: 'invalid' as unknown as PromptModule['category'], // Invalid category
       };
 
       const result = validator.validateModule(invalidModule, mockModules);
@@ -293,7 +293,7 @@ describe('ModuleValidator', () => {
           content: '',
           dependencies: [],
           tokenCount: -1,
-          category: 'invalid' as any,
+          category: 'invalid' as unknown as PromptModule['category'],
         }, // 1 invalid module
       ];
 
@@ -433,7 +433,7 @@ describe('ModuleValidator', () => {
     });
 
     it('should test user memory integration', async () => {
-      const userMemory = 'Test user memory content for validation';
+      const _userMemory = 'Test user memory content for validation';
       const mockAssembler = {
         assemblePrompt: vi.fn().mockImplementation((context, memory) =>
           Promise.resolve({

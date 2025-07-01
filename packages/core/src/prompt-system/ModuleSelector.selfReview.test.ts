@@ -224,7 +224,7 @@ describe('ModuleSelector - Self-Review Integration', () => {
         context,
         baseModules,
       );
-      const totalTokens = selectedModules.reduce(
+      const _totalTokens = selectedModules.reduce(
         (sum, m) => sum + m.tokenCount,
         0,
       );

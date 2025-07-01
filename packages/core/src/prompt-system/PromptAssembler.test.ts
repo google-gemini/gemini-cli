@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PromptAssembler } from './PromptAssembler.js';
 import type {
   PromptModule,
-  TaskContext,
+  TaskContext as _TaskContext,
 } from './interfaces/prompt-assembly.js';
 
 // Mock the dependencies
@@ -22,9 +22,20 @@ vi.mock('./ToolReferenceResolver.js', () => ({
 describe('PromptAssembler', () => {
   let promptAssembler: PromptAssembler;
   let mockModules: PromptModule[];
-  let mockModuleLoader: any;
-  let mockModuleSelector: any;
-  let mockContextDetector: any;
+  let mockModuleLoader: {
+    loadAllModules: ReturnType<typeof vi.fn>;
+    getCacheStats: ReturnType<typeof vi.fn>;
+    clearCache: ReturnType<typeof vi.fn>;
+  };
+  let mockModuleSelector: {
+    selectModules: ReturnType<typeof vi.fn>;
+    validateSelection: ReturnType<typeof vi.fn>;
+    optimizeForTokenBudget: ReturnType<typeof vi.fn>;
+  };
+  let mockContextDetector: {
+    detectTaskContext: ReturnType<typeof vi.fn>;
+    clearCache: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockModules = [
@@ -71,15 +82,17 @@ describe('PromptAssembler', () => {
     };
 
     mockContextDetector = {
-      detectTaskContext: vi.fn().mockImplementation((input: any) => ({
-        taskType: 'general',
-        hasGitRepo: false,
-        sandboxMode: false,
-        hasUserMemory: false,
-        contextFlags: {},
-        tokenBudget: input?.tokenBudget,
-        environmentContext: {},
-      })),
+      detectTaskContext: vi
+        .fn()
+        .mockImplementation((input: Partial<_TaskContext> | undefined) => ({
+          taskType: 'general',
+          hasGitRepo: false,
+          sandboxMode: false,
+          hasUserMemory: false,
+          contextFlags: {},
+          tokenBudget: input?.tokenBudget,
+          environmentContext: {},
+        })),
       clearCache: vi.fn(),
     };
 
@@ -92,9 +105,27 @@ describe('PromptAssembler', () => {
     });
 
     // Replace the internal components with mocks
-    (promptAssembler as any).moduleLoader = mockModuleLoader;
-    (promptAssembler as any).moduleSelector = mockModuleSelector;
-    (promptAssembler as any).contextDetector = mockContextDetector;
+    (
+      promptAssembler as unknown as {
+        moduleLoader: typeof mockModuleLoader;
+        moduleSelector: typeof mockModuleSelector;
+        contextDetector: typeof mockContextDetector;
+      }
+    ).moduleLoader = mockModuleLoader;
+    (
+      promptAssembler as unknown as {
+        moduleLoader: typeof mockModuleLoader;
+        moduleSelector: typeof mockModuleSelector;
+        contextDetector: typeof mockContextDetector;
+      }
+    ).moduleSelector = mockModuleSelector;
+    (
+      promptAssembler as unknown as {
+        moduleLoader: typeof mockModuleLoader;
+        moduleSelector: typeof mockModuleSelector;
+        contextDetector: typeof mockContextDetector;
+      }
+    ).contextDetector = mockContextDetector;
 
     vi.clearAllMocks();
   });
@@ -160,12 +191,18 @@ You are an interactive CLI agent.`,
       };
 
       // Mock module loader to return module with comments
-      (promptAssembler as any).moduleLoader.loadAllModules.mockResolvedValue([
-        moduleWithComments,
-      ]);
-      (promptAssembler as any).moduleSelector.selectModules.mockReturnValue([
-        moduleWithComments,
-      ]);
+      (
+        promptAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+        }
+      ).moduleLoader.loadAllModules.mockResolvedValue([moduleWithComments]);
+      (
+        promptAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+        }
+      ).moduleSelector.selectModules.mockReturnValue([moduleWithComments]);
 
       const result = await promptAssembler.assemblePrompt();
 
@@ -193,7 +230,11 @@ You are an interactive CLI agent.`,
     });
 
     it.skip('should handle module loading failure gracefully', async () => {
-      (promptAssembler as any).moduleLoader.loadAllModules.mockRejectedValue(
+      (
+        promptAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+        }
+      ).moduleLoader.loadAllModules.mockRejectedValue(
         new Error('Module loading failed'),
       );
 
@@ -219,9 +260,11 @@ You are an interactive CLI agent.`,
     });
 
     it.skip('should warn when dependency validation fails', async () => {
-      (promptAssembler as any).moduleSelector.validateSelection.mockReturnValue(
-        false,
-      );
+      (
+        promptAssembler as unknown as {
+          moduleSelector: typeof mockModuleSelector;
+        }
+      ).moduleSelector.validateSelection.mockReturnValue(false);
 
       const result = await promptAssembler.assemblePrompt();
 
@@ -237,10 +280,14 @@ You are an interactive CLI agent.`,
         tokenBudget: 2000,
       };
 
-      const result = await promptAssembler.assemblePrompt(contextOverride);
+      const _result = await promptAssembler.assemblePrompt(contextOverride);
 
       expect(
-        (promptAssembler as any).contextDetector.detectTaskContext,
+        (
+          promptAssembler as unknown as {
+            contextDetector: typeof mockContextDetector;
+          }
+        ).contextDetector.detectTaskContext,
       ).toHaveBeenCalledWith(contextOverride);
     });
   });
@@ -252,9 +299,27 @@ You are an interactive CLI agent.`,
       });
 
       // Set up mocks for the new assembler
-      (minimalAssembler as any).moduleLoader = mockModuleLoader;
-      (minimalAssembler as any).moduleSelector = mockModuleSelector;
-      (minimalAssembler as any).contextDetector = mockContextDetector;
+      (
+        minimalAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleLoader = mockModuleLoader;
+      (
+        minimalAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleSelector = mockModuleSelector;
+      (
+        minimalAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).contextDetector = mockContextDetector;
 
       const result = await minimalAssembler.assemblePrompt();
 
@@ -268,9 +333,27 @@ You are an interactive CLI agent.`,
       });
 
       // Set up mocks for the new assembler
-      (comprehensiveAssembler as any).moduleLoader = mockModuleLoader;
-      (comprehensiveAssembler as any).moduleSelector = mockModuleSelector;
-      (comprehensiveAssembler as any).contextDetector = mockContextDetector;
+      (
+        comprehensiveAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleLoader = mockModuleLoader;
+      (
+        comprehensiveAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleSelector = mockModuleSelector;
+      (
+        comprehensiveAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).contextDetector = mockContextDetector;
 
       const result = await comprehensiveAssembler.assemblePrompt();
 
@@ -285,9 +368,27 @@ You are an interactive CLI agent.`,
       });
 
       // Set up mocks for the new assembler
-      (customAssembler as any).moduleLoader = mockModuleLoader;
-      (customAssembler as any).moduleSelector = mockModuleSelector;
-      (customAssembler as any).contextDetector = mockContextDetector;
+      (
+        customAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleLoader = mockModuleLoader;
+      (
+        customAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).moduleSelector = mockModuleSelector;
+      (
+        customAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+          moduleSelector: typeof mockModuleSelector;
+          contextDetector: typeof mockContextDetector;
+        }
+      ).contextDetector = mockContextDetector;
 
       const result = await customAssembler.assemblePrompt();
 
@@ -303,7 +404,11 @@ You are an interactive CLI agent.`,
       await promptAssembler.assemblePrompt(budgetContext);
 
       expect(
-        (promptAssembler as any).moduleSelector.optimizeForTokenBudget,
+        (
+          promptAssembler as unknown as {
+            moduleSelector: typeof mockModuleSelector;
+          }
+        ).moduleSelector.optimizeForTokenBudget,
       ).toHaveBeenCalledWith(expect.any(Array), 500);
     });
 
@@ -311,7 +416,11 @@ You are an interactive CLI agent.`,
       await promptAssembler.assemblePrompt();
 
       expect(
-        (promptAssembler as any).moduleSelector.optimizeForTokenBudget,
+        (
+          promptAssembler as unknown as {
+            moduleSelector: typeof mockModuleSelector;
+          }
+        ).moduleSelector.optimizeForTokenBudget,
       ).not.toHaveBeenCalled();
     });
   });
@@ -330,19 +439,29 @@ You are an interactive CLI agent.`,
       promptAssembler.clearCache();
 
       expect(
-        (promptAssembler as any).moduleLoader.clearCache,
+        (
+          promptAssembler as unknown as {
+            moduleLoader: typeof mockModuleLoader;
+          }
+        ).moduleLoader.clearCache,
       ).toHaveBeenCalled();
       expect(
-        (promptAssembler as any).contextDetector.clearCache,
+        (
+          promptAssembler as unknown as {
+            contextDetector: typeof mockContextDetector;
+          }
+        ).contextDetector.clearCache,
       ).toHaveBeenCalled();
     });
   });
 
   describe('error handling', () => {
     it('should handle empty module list', async () => {
-      (promptAssembler as any).moduleLoader.loadAllModules.mockResolvedValue(
-        [],
-      );
+      (
+        promptAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+        }
+      ).moduleLoader.loadAllModules.mockResolvedValue([]);
 
       const result = await promptAssembler.assemblePrompt();
 
@@ -353,7 +472,11 @@ You are an interactive CLI agent.`,
     });
 
     it('should create fallback result on error', async () => {
-      (promptAssembler as any).moduleLoader.loadAllModules.mockRejectedValue(
+      (
+        promptAssembler as unknown as {
+          moduleLoader: typeof mockModuleLoader;
+        }
+      ).moduleLoader.loadAllModules.mockRejectedValue(
         new Error('Critical failure'),
       );
 
@@ -374,19 +497,65 @@ You are an interactive CLI agent.`,
       await noValidationAssembler.assemblePrompt();
 
       expect(
-        (noValidationAssembler as any).moduleSelector.validateSelection,
+        (
+          noValidationAssembler as unknown as {
+            moduleSelector: typeof mockModuleSelector;
+          }
+        ).moduleSelector.validateSelection,
       ).not.toHaveBeenCalled();
     });
 
     it('should use default options when none provided', () => {
       const defaultAssembler = new PromptAssembler();
 
-      expect((defaultAssembler as any).options.enableCaching).toBe(true);
-      expect((defaultAssembler as any).options.maxTokenBudget).toBe(1500);
-      expect((defaultAssembler as any).options.validateDependencies).toBe(true);
-      expect((defaultAssembler as any).options.selectionStrategy).toBe(
-        'default',
-      );
+      expect(
+        (
+          defaultAssembler as unknown as {
+            options: {
+              enableCaching: boolean;
+              maxTokenBudget: number;
+              validateDependencies: boolean;
+              selectionStrategy: string;
+            };
+          }
+        ).options.enableCaching,
+      ).toBe(true);
+      expect(
+        (
+          defaultAssembler as unknown as {
+            options: {
+              enableCaching: boolean;
+              maxTokenBudget: number;
+              validateDependencies: boolean;
+              selectionStrategy: string;
+            };
+          }
+        ).options.maxTokenBudget,
+      ).toBe(1500);
+      expect(
+        (
+          defaultAssembler as unknown as {
+            options: {
+              enableCaching: boolean;
+              maxTokenBudget: number;
+              validateDependencies: boolean;
+              selectionStrategy: string;
+            };
+          }
+        ).options.validateDependencies,
+      ).toBe(true);
+      expect(
+        (
+          defaultAssembler as unknown as {
+            options: {
+              enableCaching: boolean;
+              maxTokenBudget: number;
+              validateDependencies: boolean;
+              selectionStrategy: string;
+            };
+          }
+        ).options.selectionStrategy,
+      ).toBe('default');
     });
   });
 });
