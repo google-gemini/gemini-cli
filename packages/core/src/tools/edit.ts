@@ -343,7 +343,11 @@ Expectation for required parameters:
       } else if (occurrences === 0) {
         error = {
           display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.${
+            params.old_string.startsWith('@') && !params.use_regex
+              ? ' Consider using `use_regex: true` and a regular expression (e.g., `@\s*EQ` for `@EQ`) to account for whitespace variations.'
+              : ''
+          }`,
         };
         logger.error(`String to replace not found in ${params.file_path}.`);
       } else if (occurrences !== expectedReplacements) {
@@ -516,6 +520,12 @@ Expectation for required parameters:
 
     if (editData.error) {
       logger.error(`Edit execution failed: ${editData.error.display}`, editData.error);
+      const logFilePath = path.join(this.rootDirectory, 'logs', 'edit_errors.log');
+      const errorMessage = `[${new Date().toISOString()}] Failed edit for ${params.file_path}: ${editData.error.raw}\n`;
+      fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+      // Use shellTool to run termux-toast, as direct import is not feasible here
+      // This assumes termux-api is installed and accessible via shell
+      shellTool.run({ command: `termux-toast "Gemini CLI: Edit failed for ${path.basename(params.file_path)}. Check logs/edit_errors.log"` });
       return {
         llmContent: editData.error.raw,
         returnDisplay: `Error: ${editData.error.display}`,

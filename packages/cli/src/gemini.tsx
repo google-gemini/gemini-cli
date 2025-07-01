@@ -8,7 +8,6 @@
 import React from 'react';
 import { render } from 'ink';
 import { basename } from 'node:path';
-
 import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
@@ -42,16 +41,14 @@ import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 
 // --- Arcane Constants & Colors ---
-// Improvement 1: Centralized color constants for mystical terminal outputs.
-import { logger } from '../../core/src/core/logger.js';
+import { logger, logError } from '../../core/src/core/logger.js';
 
-// Improvement 4: A constant for the memory allocation target.
 const TARGET_MEMORY_MULTIPLIER = 0.5; // 50% of total memory.
 
 // --- Helper Spells: Memory and Process Management ---
 
 /**
- * Improvement 5: A spell to determine if more memory should be allocated to Node.js.
+ * A spell to determine if more memory should be allocated to Node.js.
  * This incantation compares current memory limits to a target based on total system memory.
  */
 function getNodeMemoryArgs(config: Config): string[] {
@@ -89,7 +86,7 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 /**
- * Improvement 6: A spell to relaunch the CLI with new arguments.
+ * A spell to relaunch the CLI with new arguments.
  * This is used to increase memory allocation without user intervention.
  */
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
@@ -107,7 +104,7 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 /**
- * Improvement 18: A spell to set the terminal window's title.
+ * A spell to set the terminal window's title.
  * The incantation `\x1b]2;...\x07` is an ANSI escape sequence for this purpose.
  */
 function setWindowTitle(title: string, settings: LoadedSettings) {
@@ -133,12 +130,10 @@ function validateInput(input: string): boolean {
   return true;
 }
 
-
-
 // --- Core Logic Spells ---
 
 /**
- * Improvement 8: A spell to initialize settings and handle any errors found in the scrolls.
+ * A spell to initialize settings and handle any errors found in the scrolls.
  */
 async function handleSettingsInitialization(
   workspaceRoot: string,
@@ -148,7 +143,6 @@ async function handleSettingsInitialization(
     const settings = loadSettings(workspaceRoot);
 
     if (settings.errors.length > 0) {
-      // Improvement 19: More descriptive error logging for settings issues.
       logger.error(
         'Errors were found in your configuration scrolls. The ritual cannot proceed.',
       );
@@ -168,7 +162,7 @@ async function handleSettingsInitialization(
 }
 
 /**
- * Improvement 9: A spell to conjure the core configuration and initialize essential services.
+ * A spell to conjure the core configuration and initialize essential services.
  */
 async function initializeCoreServices(
   settings: LoadedSettings,
@@ -178,7 +172,7 @@ async function initializeCoreServices(
     const extensions = loadExtensions(workspaceRoot);
     const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-    // Improvement 20: A fallback enchantment to use GEMINI_API_KEY if no other auth method is chosen.
+    // A fallback enchantment to use GEMINI_API_KEY if no other auth method is chosen.
     // This must be cast after loadCliConfig, which summons the environment variables.
     if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
       settings.setValue(
@@ -196,14 +190,13 @@ async function initializeCoreServices(
       try {
         await config.getGitService();
       } catch {
-        // Improvement 13: Log a warning instead of silently swallowing the Git service error.
         logger.warn(
           'Could not initialize Git service. Checkpointing may be affected.',
         );
       }
     }
 
-    // Improvement 21: An enchantment to load the user's chosen theme.
+    // An enchantment to load the user's chosen theme.
     if (settings.merged.theme) {
       if (!themeManager.setActiveTheme(settings.merged.theme)) {
         logger.warn(
@@ -220,7 +213,7 @@ async function initializeCoreServices(
 }
 
 /**
- * Improvement 10: A powerful spell to prepare the execution environment, handling sandboxing and memory.
+ * A powerful spell to prepare the execution environment, handling sandboxing and memory.
  */
 async function prepareExecutionEnvironment(
   config: Config,
@@ -263,7 +256,7 @@ async function prepareExecutionEnvironment(
 }
 
 /**
- * Improvement 11: The spell to invoke the interactive TTY-based user interface.
+ * The spell to invoke the interactive TTY-based user interface.
  */
 async function runInteractiveMode(
   config: Config,
@@ -272,11 +265,10 @@ async function runInteractiveMode(
 ) {
   try {
     const startupWarnings = await getStartupWarnings();
-    // Improvement 14: Set the window title to orient the user in their terminal.
     setWindowTitle(basename(workspaceRoot), settings);
 
-    // Improvement 24: React.StrictMode is a ward that detects potential problems in the component tree.
-    // Improvement 25: exitOnCtrlC is false because we have our own graceful shutdown handler in index.ts.
+    // React.StrictMode is a ward that detects potential problems in the component tree.
+    // exitOnCtrlC is false because we have our own graceful shutdown handler in index.ts.
     render(
       <React.StrictMode>
         <AppWrapper
@@ -295,7 +287,7 @@ async function runInteractiveMode(
 }
 
 /**
- * Improvement 12: The spell to run the CLI in non-interactive mode (for pipes and scripts).
+ * The spell to run the CLI in non-interactive mode (for pipes and scripts).
  */
 async function runNonInteractiveMode(
   config: Config,
@@ -305,6 +297,101 @@ async function runNonInteractiveMode(
 ) {
   try {
     let input = initialInput;
+    if (input.trim() === '/test-indicators') {
+      logger.info('Running indicators.py tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/indicators.test.ts' });
+      process.exit(0);
+    } else if (input.startsWith('/replace-decorator ')) {
+      const parts = input.split(' ');
+      if (parts.length < 4) {
+        logger.error('Usage: /replace-decorator <file_path> <old_decorator> <new_decorator>');
+        process.exit(1);
+      }
+      const filePath = parts[1];
+      const oldDecorator = parts[2];
+      const newDecorator = parts[3];
+      logger.info(`Replacing decorator in ${filePath}: ${oldDecorator} with ${newDecorator}...`);
+      await EditTool.run({
+        file_path: filePath,
+        old_string: `@${oldDecorator}`,
+        new_string: `@${newDecorator}`,
+        use_regex: true,
+        expected_replacements: 1, // Assuming one replacement for now
+      });
+      process.exit(0);
+    } else if (input.trim() === '/test-edit-decorator') {
+      logger.info('Running EditTool decorator tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/edit.test.ts' });
+      process.exit(0);
+    } else if (input.startsWith('/check-imports ')) {
+      const filePath = input.substring('/check-imports '.length).trim();
+      if (!filePath.endsWith('.py')) {
+        logger.error('Please provide a Python file path (e.g., /path/to/your_file.py).');
+        process.exit(1);
+      }
+      logger.info(`Checking imports for ${filePath}...`);
+      try {
+        await shellTool.run({ command: `python -m py_compile ${filePath}` });
+        logger.info('Basic syntax check passed. For more comprehensive import checks, consider running: pip install pylint && pylint ' + filePath);
+      } catch (error) {
+        logger.error(`Error checking imports for ${filePath}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.trim() === '/test-read-imports') {
+      logger.info('Running ReadFileTool import detection tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/readFile.test.ts' });
+      process.exit(0);
+    } else if (input.startsWith('/write-python ')) {
+      const parts = input.substring('/write-python '.length).trim().split(':');
+      if (parts.length < 2) {
+        logger.error('Usage: /write-python <file_path>:<content>');
+        process.exit(1);
+      }
+      const filePath = parts[0].trim();
+      const content = parts.slice(1).join(':').trim();
+      if (!filePath.endsWith('.py')) {
+        logger.error('Please provide a Python file path (e.g., /path/to/your_file.py).');
+        process.exit(1);
+      }
+      logger.info(`Writing Python file ${filePath}...`);
+      const fullContent = `from os import path\n\n${content}`;
+      await WriteFileTool.run({ file_path: filePath, content: fullContent });
+      process.exit(0);
+    } else if (input.trim() === '/test-write-imports') {
+      logger.info('Running WriteFileTool import addition tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/writeFile.test.ts' });
+      process.exit(0);
+    } else if (input.trim() === '/edit-error') {
+      logger.info('Displaying edit error logs...');
+      await shellTool.run({ command: 'cat logs/edit_errors.log || echo "No edit errors logged yet."', directory: '/data/data/com.termux/files/home/pyrm-cli' });
+      process.exit(0);
+    } else if (input.trim() === '/test-edit-log') {
+      logger.info('Running EditTool error logging tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/edit.test.ts' });
+      process.exit(0);
+    } else if (input.trim() === '/test-all') {
+      logger.info('Running all Jest tests...');
+      await shellTool.run({ command: './run-tests.sh', directory: '/data/data/com.termux/files/home/pyrm-cli' });
+      process.exit(0);
+    } else if (input.startsWith('/validate-python ')) {
+      const filePath = input.substring('/validate-python '.length).trim();
+      if (!filePath.endsWith('.py')) {
+        logger.error('Please provide a Python file path (e.g., /path/to/your_file.py).');
+        process.exit(1);
+      }
+      logger.info(`Validating Python syntax for ${filePath}...`);
+      try {
+        await shellTool.run({ command: `python -m py_compile ${filePath}` });
+        logger.info(`Python syntax for ${filePath} is valid.`);
+      } catch (error) {
+        logger.error(`Python syntax validation failed for ${filePath}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.trim() === '/test-validate') {
+      logger.info('Running ReadFileTool Python syntax validation tests...');
+      await shellTool.run({ command: 'npm test packages/core/tests/readFile.test.ts' });
+      process.exit(0);
+    }
     // If not a TTY, we must read the sacred input from stdin.
     if (!process.stdin.isTTY) {
       input += await readStdin();
@@ -338,7 +425,7 @@ async function runNonInteractiveMode(
 // --- Main Orchestration Spell ---
 
 /**
- * Improvement 7: The main function, refactored into a grand orchestrator of spells.
+ * The main function, refactored into a grand orchestrator of spells.
  */
 export async function main() {
   try {
@@ -379,7 +466,7 @@ async function loadNonInteractiveConfig(
   settings: LoadedSettings,
 ) {
   let finalConfig = config;
-  // Improvement 15: If not in YOLO mode, we must disable interactive tools that require user approval.
+  // If not in YOLO mode, we must disable interactive tools that require user approval.
   // This is a critical ward to prevent scripts from hanging indefinitely.
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
     const existingExcludeTools = settings.merged.excludeTools || [];
@@ -415,7 +502,6 @@ async function validateNonInterActiveAuth(
 ) {
   // A special case for headless environments: if GEMINI_API_KEY is set, we use it.
   if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    // Improvement 16: Using the styled logger for auth errors.
     logError(
       'An authentication method must be set in your .gemini/settings.json scroll,',
       'or the GEMINI_API_KEY environment variable must be declared before running non-interactively.',
@@ -435,7 +521,7 @@ async function validateNonInterActiveAuth(
 }
 
 // --- The Final Ward: Global Unhandled Rejection Catcher ---
-// Improvement 17: A fortified global ward to catch any promise spirits that escape our grasp.
+// A fortified global ward to catch any promise spirits that escape our grasp.
 process.on('unhandledRejection', (reason, _promise) => {
   logger.error('=========================================');
   logger.error('CRITICAL: A Promise Spirit Was Left Unhandled!');

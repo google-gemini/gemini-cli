@@ -312,6 +312,12 @@ export class WriteFileTool
         logger.debug(`Content prepended and temporary file renamed for: ${file_path}`);
       } else {
         logger.info(`Overwriting file: ${file_path}`);
+        // Create a backup for Python files before overwriting
+        if (path.extname(file_path) === '.py' && fs.existsSync(file_path)) {
+          const backupPath = `${file_path}.bak`;
+          fs.copyFileSync(file_path, backupPath);
+          logger.info(`Created backup: ${backupPath}`);
+        }
         // Atomic write for overwrite mode
         const tempFilePath = `${file_path}.tmp.${Date.now()}`;
         fs.writeFileSync(tempFilePath, content, 'utf8');
