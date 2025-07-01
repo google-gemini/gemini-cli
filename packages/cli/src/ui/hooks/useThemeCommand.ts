@@ -65,55 +65,29 @@ export const useThemeCommand = (
   const handleThemeSelect = useCallback(
     (themeName: string | undefined, scope: SettingScope) => {
       try {
-        // If applying to user settings and the theme is a custom theme from workspace, copy its definition
-        if (
-          scope === SettingScope.User &&
-          themeName &&
-          loadedSettings.workspace.settings.customThemes?.[themeName] &&
-          !loadedSettings.user.settings.customThemes?.[themeName]
-        ) {
-          const userCustomThemes = {
-            ...(loadedSettings.user.settings.customThemes || {}),
-          };
-          userCustomThemes[themeName] =
-            loadedSettings.workspace.settings.customThemes[themeName];
-          loadedSettings.setValue(
-            SettingScope.User,
-            'customThemes',
-            userCustomThemes,
-          );
+        // Only allow selecting themes available in the chosen scope or built-in themes
+        const customThemes =
+          scope === SettingScope.User
+            ? loadedSettings.user.settings.customThemes || {}
+            : loadedSettings.workspace.settings.customThemes || {};
+        const isBuiltIn = themeManager.findThemeByName(themeName);
+        const isCustom = themeName && customThemes[themeName];
+        if (!isBuiltIn && !isCustom) {
+          setThemeError(`Theme "${themeName}" not found in selected scope.`);
+          setIsThemeDialogOpen(true);
+          return;
         }
-
-        // If applying to workspace settings and the theme is a custom theme from user, copy its definition
-        if (
-          scope === SettingScope.Workspace &&
-          themeName &&
-          loadedSettings.user.settings.customThemes?.[themeName] &&
-          !loadedSettings.workspace.settings.customThemes?.[themeName]
-        ) {
-          const workspaceCustomThemes = {
-            ...(loadedSettings.workspace.settings.customThemes || {}),
-          };
-          workspaceCustomThemes[themeName] =
-            loadedSettings.user.settings.customThemes[themeName];
-          loadedSettings.setValue(
-            SettingScope.Workspace,
-            'customThemes',
-            workspaceCustomThemes,
-          );
-        }
-
         loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
-        // If customThemes were updated, reload them
         if (loadedSettings.merged.customThemes) {
           themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
         }
         applyTheme(loadedSettings.merged.theme); // Apply the current theme
+        setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings],
+    [applyTheme, loadedSettings, setThemeError],
   );
 
   return {

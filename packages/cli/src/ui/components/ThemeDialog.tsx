@@ -41,16 +41,30 @@ export function ThemeDialog({
     string | undefined
   >(settings.merged.theme || DEFAULT_THEME.name);
 
-  // Generate theme items
-  const themeItems = themeManager.getAvailableThemes().map((theme) => {
-    const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
-    return {
+  // Generate theme items filtered by selected scope
+  const customThemes =
+    selectedScope === SettingScope.User
+      ? settings.user.settings.customThemes || {}
+      : settings.workspace.settings.customThemes || {};
+  const builtInThemes = themeManager
+    .getAvailableThemes()
+    .filter((theme) => theme.type !== 'custom');
+  const customThemeNames = Object.keys(customThemes);
+  const themeItems = [
+    ...builtInThemes.map((theme) => ({
       label: theme.name,
       value: theme.name,
       themeNameDisplay: theme.name,
-      themeTypeDisplay: typeString,
-    };
-  });
+      themeTypeDisplay:
+        theme.type.charAt(0).toUpperCase() + theme.type.slice(1),
+    })),
+    ...customThemeNames.map((name) => ({
+      label: name,
+      value: name,
+      themeNameDisplay: name,
+      themeTypeDisplay: 'Custom',
+    })),
+  ];
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Determine which radio button should be initially selected in the theme list
