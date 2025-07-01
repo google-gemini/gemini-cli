@@ -216,7 +216,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         throw new Error('The AI failed to generate a valid commit message.');
       }
       
-      const finalCommitMessage = this.addGeminiSignature(commitMessage);
+      const finalCommitMessage = commitMessage;
       const indexHash = await this.getReliableIndexHash(commitMode, signal);
       
       this.cachedCommitData = {
@@ -310,7 +310,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           signal
         );
 
-        finalCommitMessage = this.addGeminiSignature(commitMessage);
+        finalCommitMessage = commitMessage;
       }
 
       // Determine commit mode for execution
@@ -1265,10 +1265,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     return message;
   }
 
-  private addGeminiSignature(commitMessage: string): string {
-    // Return the commit message without any signature
-    return commitMessage;
-  }
 
   // ============================================================================
   // Git Index Management
