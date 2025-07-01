@@ -907,7 +907,7 @@ describe('GenerateCommitMessageTool', () => {
       const result = await tool.execute(undefined, new AbortController().signal);
 
       expect(result.llmContent).toContain('Error during commit workflow');
-      expect(result.llmContent).toContain('Git process closed before commit message could be written');
+      expect(result.llmContent).toContain('Git process closed unexpectedly before commit message could be written');
     });
 
     it('should handle AI API errors with specific messages', async () => {
@@ -1079,7 +1079,198 @@ describe('GenerateCommitMessageTool', () => {
       const result = await tool.execute(undefined, new AbortController().signal);
 
       expect(result.llmContent).toContain('Error during commit workflow');
-      expect(result.llmContent).toContain('must be one of');
+      expect(result.llmContent).toContain('Must be one of');
+    });
+  });
+
+  describe('Complex JSON and Network Error Scenarios', () => {
+    it('should handle nested JSON with complex structures', async () => {
+      const diff = 'diff --git a/complex.json b/complex.json\n--- a/complex.json\n+++ b/complex.json\n@@ -1 +1 @@\n-{}\n+{"nested": {"array": [1, 2, 3]}}';
+      const statusOutput = 'M  complex.json';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    analysis: {
+                      changedFiles: ['complex.json'],
+                      changeType: 'feat',
+                      purpose: 'Add complex nested JSON structure with arrays and objects',
+                      impact: 'Enables more sophisticated data handling capabilities',
+                      hasSensitiveInfo: false,
+                    },
+                    commitMessage: {
+                      header: 'feat: add complex nested JSON structure',
+                      body: 'This change introduces a sophisticated nested JSON structure that includes:\n- Nested objects with multiple levels\n- Arrays containing numeric data\n- Enhanced data representation capabilities',
+                      footer: 'Closes #123',
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('sophisticated nested JSON structure');
+      expect(result.returnDisplay).toContain('Commit created');
+    });
+
+    it('should handle network timeout errors gracefully', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      const timeoutError = new Error('Request timeout');
+      timeoutError.name = 'TimeoutError';
+      (mockClient.generateContent as Mock).mockRejectedValue(timeoutError);
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('timeout');
+    });
+
+    it('should handle authentication errors with detailed guidance', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      const authError = new Error('Authentication failed: Invalid API key');
+      authError.name = 'AuthenticationError';
+      (mockClient.generateContent as Mock).mockRejectedValue(authError);
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('Authentication');
+    });
+
+    it('should handle JSON with escaped characters and quotes', async () => {
+      const diff = 'diff --git a/quotes.txt b/quotes.txt\n--- a/quotes.txt\n+++ b/quotes.txt\n@@ -1 +1 @@\n-simple\n+"complex {\\"quoted\\"} string"';
+      const statusOutput = 'M  quotes.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      const complexJson = {
+        analysis: {
+          changedFiles: ['quotes.txt'],
+          changeType: 'fix',
+          purpose: 'Handle escaped quotes and special characters in strings',
+          impact: 'Improves string handling reliability',
+          hasSensitiveInfo: false,
+        },
+        commitMessage: {
+          header: 'fix: handle escaped quotes in string processing',
+          body: 'This change addresses issues with:\n- Escaped quote characters (\\")\n- Special character sequences\n- JSON-like structures in strings',
+        },
+      };
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: `Here's the analysis:\n\`\`\`json\n${JSON.stringify(complexJson)}\n\`\`\`\nThis handles complex strings.`,
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('escaped quotes');
+      expect(result.returnDisplay).toContain('Commit created');
+    });
+
+    it('should handle rate limiting errors with retry guidance', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      const rateLimitError = new Error('Rate limit exceeded. Try again later.');
+      rateLimitError.name = 'RateLimitError';
+      (mockClient.generateContent as Mock).mockRejectedValue(rateLimitError);
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('Rate limit');
+    });
+
+    it('should handle corrupted JSON responses from AI', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: '{"analysis": {"changedFiles": ["file.txt"], "changeType": "feat", "purpose": "incomplete json...', // Corrupted JSON
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('Failed to parse');
     });
   });
 });
