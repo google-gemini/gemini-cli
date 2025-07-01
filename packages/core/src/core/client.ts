@@ -284,13 +284,9 @@ ${result.llmContent}`,
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
-      if (
-        !result ||
-        !result.candidates ||
-        result.candidates.length === 0
-      ) {
+      if (!result) {
         throw new Error(
-          'API returned an empty or invalid response. This may be due to safety filters or a temporary issue.'
+          'API returned a null or invalid response. This may be due to safety filters or a temporary issue.'
         );
       }
 
