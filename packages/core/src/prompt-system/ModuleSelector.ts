@@ -9,6 +9,7 @@ import type {
   PromptModule,
   TaskContext,
 } from './interfaces/prompt-assembly.js';
+import { getSelfReviewModule } from './SelfReviewIntegration.js';
 
 /**
  * Implementation of intelligent module selection for prompt assembly
@@ -42,6 +43,9 @@ export class ModuleSelectorImpl implements ModuleSelector {
 
     // Step 3: Add context-aware modules
     this.addContextAwareModules(context, selected, moduleMap);
+
+    // Step 3.5: Add self-review module if appropriate
+    this.addSelfReviewModule(context, selected, moduleMap);
 
     // Step 4: Resolve dependencies
     this.resolveDependencies(selected, moduleMap);
@@ -136,6 +140,32 @@ export class ModuleSelectorImpl implements ModuleSelector {
     if (context.taskType !== 'general' && moduleMap.has('style-guide')) {
       selected.add('style-guide');
     }
+
+    // ReAct reasoning patterns for complex tasks requiring structured reasoning
+    if (this.shouldIncludeReActPattern(context) && moduleMap.has('reasoning-patterns')) {
+      selected.add('reasoning-patterns');
+    }
+  }
+
+  /**
+   * Add self-review module if appropriate for the task context
+   */
+  private addSelfReviewModule(
+    context: TaskContext,
+    selected: Set<string>,
+    moduleMap: Map<string, PromptModule>,
+  ): void {
+    const selfReviewModule = getSelfReviewModule(context);
+    
+    if (selfReviewModule) {
+      // Add the self-review module to the module map if it's not already there
+      if (!moduleMap.has(selfReviewModule.id)) {
+        moduleMap.set(selfReviewModule.id, selfReviewModule);
+      }
+      
+      // Select the module
+      selected.add(selfReviewModule.id);
+    }
   }
 
   /**
@@ -209,7 +239,7 @@ export class ModuleSelectorImpl implements ModuleSelector {
     // Calculate current token count
     let currentTokens = 0;
     const optimized: PromptModule[] = [];
-    const required = new Set(['identity', 'mandates', 'security']); // Always keep base modules
+    const required = new Set(['identity', 'mandates', 'security', 'quality-gates']); // Always keep base modules and quality gates
 
     for (const module of prioritized) {
       const newTotal = currentTokens + module.tokenCount;
@@ -288,5 +318,35 @@ export class ModuleSelectorImpl implements ModuleSelector {
       moduleCount: selectedModules.length,
       categoryBreakdown,
     };
+  }
+
+  /**
+   * Determine if ReAct reasoning pattern should be included based on task context
+   * ReAct is valuable for complex, multi-step problems requiring structured reasoning
+   */
+  private shouldIncludeReActPattern(context: TaskContext): boolean {
+    // Include for complex task types that benefit from structured reasoning
+    const complexTaskTypes: Array<TaskContext['taskType']> = [
+      'debug',
+      'software-engineering',
+      'refactor'
+    ];
+
+    if (complexTaskTypes.includes(context.taskType)) {
+      return true;
+    }
+
+    // Include if specific guidance flags are set (indicates complexity)
+    const { contextFlags } = context;
+    if (
+      contextFlags.requiresDebuggingGuidance ||
+      contextFlags.requiresRefactoringGuidance ||
+      contextFlags.requiresApplicationGuidance
+    ) {
+      return true;
+    }
+
+    // Don't include for simple general tasks to maintain efficiency
+    return false;
   }
 }
