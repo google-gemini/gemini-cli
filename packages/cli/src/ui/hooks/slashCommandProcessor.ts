@@ -31,6 +31,7 @@ import path from 'path';
 import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
+import { canOpenBrowser } from '../../utils/platform.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
 
@@ -207,7 +208,10 @@ export const useSlashCommandProcessor = (
         description: 'open full Gemini CLI documentation in your browser',
         action: async (_mainCommand, _subCommand, _args) => {
           const docsUrl = 'https://goo.gle/gemini-cli-docs';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+          if (
+            (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') ||
+            !canOpenBrowser()
+          ) {
             addMessage({
               type: MessageType.INFO,
               content: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,

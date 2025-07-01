@@ -53,6 +53,11 @@ vi.mock('../../utils/version.js', () => ({
   getCliVersion: (...args: []) => mockGetCliVersionFn(...args),
 }));
 
+const mockCanOpenBrowserFn = vi.fn(() => true);
+vi.mock('../../utils/platform.js', () => ({
+  canOpenBrowser: (...args: []) => mockCanOpenBrowserFn(...args),
+}));
+
 import { act, renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import open from 'open';
@@ -1274,6 +1279,46 @@ describe('useSlashCommandProcessor', () => {
             originalTokenCount: 100,
             newTokenCount: 50,
           },
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('/docs command', () => {
+    it('should print URL when browser cannot be opened', async () => {
+      mockCanOpenBrowserFn.mockReturnValue(false);
+      const openMock = open as vi.Mock;
+
+      const { handleSlashCommand } = getProcessor();
+      await act(async () => {
+        await handleSlashCommand('/docs');
+      });
+
+      expect(openMock).not.toHaveBeenCalled();
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: `Please open the following URL in your browser to view the documentation:\nhttps://goo.gle/gemini-cli-docs`,
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should open browser when it can be opened', async () => {
+      mockCanOpenBrowserFn.mockReturnValue(true);
+      const openMock = open as vi.Mock;
+
+      const { handleSlashCommand } = getProcessor();
+      await act(async () => {
+        await handleSlashCommand('/docs');
+      });
+
+      expect(openMock).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs');
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: 'Opening documentation in your browser: https://goo.gle/gemini-cli-docs',
         }),
         expect.any(Number),
       );
