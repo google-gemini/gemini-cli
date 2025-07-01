@@ -350,6 +350,12 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const commandString = `git ${args.join(' ')}`;
       console.debug(`[GenerateCommitMessage] Executing: ${commandString}`);
       
+      // Check if the signal is already aborted before spawning the process
+      if (signal.aborted) {
+        reject(new Error(`Git command '${commandString}' was aborted before starting`));
+        return;
+      }
+      
       try {
         const child = spawn('git', args, { signal, stdio: 'pipe' });
         let stdout = '';
@@ -365,11 +371,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
         this.handleStdinWrite(child, stdin, reject);
         this.handleProcessEvents(child, commandString, stdout, stderr, resolve, reject);
-        
-        if (signal.aborted) {
-          reject(new Error(`Git command '${commandString}' was aborted before starting`));
-          return;
-        }
         
       } catch (error) {
         const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
