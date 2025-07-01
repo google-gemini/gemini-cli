@@ -9,7 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import tar from 'tar';
-import unzipper from 'unzipper';
+import yauzl from 'yauzl';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,22 +97,63 @@ async function downloadAndExtract() {
 
 function handleResponse(response, platformInfo) {
   if (platformInfo.isZip) {
-    response.pipe(unzipper.Parse()).on('entry', (entry) => {
-      if (entry.path === platformInfo.binaryPathInArchive) {
-        const finalPath = path.join(BIN_DIR, platformInfo.finalBinaryName);
-        entry.pipe(fs.createWriteStream(finalPath));
-      } else {
-        entry.autodrain();
-      }
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    response.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
+        if (err) {
+          console.error('Failed to open zip file:', err);
+          process.exit(1);
+        }
+        zipfile.on('error', (err) => {
+          console.error('Error reading zip file:', err);
+          process.exit(1);
+        });
+        zipfile.readEntry();
+        zipfile.on('entry', (entry) => {
+          if (entry.fileName === platformInfo.binaryPathInArchive) {
+            zipfile.openReadStream(entry, (err, readStream) => {
+              if (err) {
+                console.error('Failed to read zip entry:', err);
+                process.exit(1);
+              }
+              const finalPath = path.join(
+                BIN_DIR,
+                platformInfo.finalBinaryName,
+              );
+              const writeStream = fs.createWriteStream(finalPath);
+              writeStream.on('error', (err) => {
+                console.error('Failed to write binary to file:', err);
+                process.exit(1);
+              });
+              readStream.on('error', (err) => {
+                console.error('Error reading from zip entry stream:', err);
+                process.exit(1);
+              });
+              readStream.pipe(writeStream);
+              readStream.on('end', () => {
+                zipfile.readEntry();
+              });
+            });
+          } else {
+            zipfile.readEntry();
+          }
+        });
+      });
     });
   } else {
-    response.pipe(
+    const tarStream = response.pipe(
       tar.x({
         strip: 1,
         C: BIN_DIR,
         filter: (p) => p === platformInfo.binaryPathInArchive,
       }),
     );
+    tarStream.on('error', (err) => {
+      console.error('Failed to extract from tarball:', err);
+      process.exit(1);
+    });
   }
 }
 

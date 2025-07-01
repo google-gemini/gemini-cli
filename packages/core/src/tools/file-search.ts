@@ -58,59 +58,75 @@ export async function performFileSearch(
   } = options;
   const searchDirAbsolute = path.resolve(rootDirectory, searchPath);
 
-  const doSearch = async (searchPattern: string) => {
-    const args = ['--type', search_type, '--absolute-path'];
+  const doSearch = (searchPattern: string): Promise<string[]> =>
+    new Promise((resolve, reject) => {
+      const args = ['--type', search_type, '--absolute-path'];
 
-    if (changed_within) {
-      args.push(
-        '--changed-within',
-        `${changed_within.value}${changed_within.unit}`,
-      );
-    }
-
-    if (max_results) {
-      args.push('--max-results', max_results.toString());
-    }
-
-    if (searchPattern.includes(path.sep)) {
-      args.push('--full-path');
-    }
-
-    if (!respect_git_ignore) {
-      args.push('--no-ignore');
-    }
-
-    if (case_sensitive) {
-      args.push('--case-sensitive');
-    } else {
-      args.push('--ignore-case');
-    }
-
-    args.push(searchPattern);
-
-    const child = spawn(fdPath, args, {
-      cwd: searchDirAbsolute,
-      signal: abortSignal,
-    });
-
-    child.on('error', (err) => {
-      // Ignore abort errors.
-      if ((err as NodeJS.ErrnoException).code === 'ABORT_ERR') {
-        return;
+      if (changed_within) {
+        args.push(
+          '--changed-within',
+          `${changed_within.value}${changed_within.unit}`,
+        );
       }
+
+      if (max_results) {
+        args.push('--max-results', max_results.toString());
+      }
+
+      if (searchPattern.includes(path.sep)) {
+        args.push('--full-path');
+      }
+
+      if (!respect_git_ignore) {
+        args.push('--no-ignore');
+      }
+
+      if (case_sensitive) {
+        args.push('--case-sensitive');
+      } else {
+        args.push('--ignore-case');
+      }
+
+      args.push(searchPattern);
+
+      const child = spawn(fdPath, args, {
+        cwd: searchDirAbsolute,
+        signal: abortSignal,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data;
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data;
+      });
+
+      child.on('error', (err) => {
+        // Errors from spawn (e.g., ENOENT) are caught here.
+        reject(err);
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          if (!stdout.trim()) {
+            resolve([]);
+          } else {
+            resolve(stdout.trim().split('\n'));
+          }
+        } else {
+          // Non-zero exit code indicates an error from the fd command.
+          reject(
+            new Error(
+              `fd command failed with exit code ${code}: ${stderr.trim()}`,
+            ),
+          );
+        }
+      });
     });
-
-    let stdout = '';
-    for await (const chunk of child.stdout) {
-      stdout += chunk;
-    }
-
-    if (!stdout.trim()) {
-      return [];
-    }
-
-    return stdout.trim().split('\n');
-  };
 
   let entries = await doSearch(pattern);
   if (entries.length > 0) {
