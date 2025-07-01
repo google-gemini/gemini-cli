@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Gemini CLI Server",
   "repository": "google-gemini/gemini-cli",
   "type": "module",
@@ -8,7 +8,6 @@
   "scripts": {
     "start": "node dist/src/index.js",
     "build": "node ../../scripts/build_package.js",
-    "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
