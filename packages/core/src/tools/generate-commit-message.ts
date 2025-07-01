@@ -604,10 +604,19 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   private async truncateDiffIfNeeded(diff: string, signal: AbortSignal): Promise<string> {
     try {
-      const tokenCount = await this.countTokensForDiff(diff, signal);
+      // Quick size check first - avoid token counting for small diffs
       const model = this.config.getModel();
       const limit = tokenLimit(model);
       const threshold = Math.floor(limit * 0.01); // 1% threshold for maximum safety
+      
+      // Rough estimate: if diff is small enough, skip token counting
+      const estimatedTokens = Math.ceil(diff.length / 4); // Conservative estimate
+      if (estimatedTokens <= threshold * 0.5) {
+        console.debug(`[GenerateCommitMessage] Diff size (${estimatedTokens} estimated tokens) is small enough, skipping token counting`);
+        return diff;
+      }
+
+      const tokenCount = await this.countTokensForDiff(diff, signal);
 
       if (tokenCount > threshold) {
         console.debug(`[GenerateCommitMessage] Diff token count (${tokenCount}) exceeds threshold (${threshold}), truncating...`);
@@ -662,85 +671,49 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     const errors: string[] = [];
     
     try {
-      // First, try to extract JSON from markdown code blocks
-      const codeBlockMatch = generatedText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (codeBlockMatch) {
+      // First, try to extract JSON from markdown code blocks - check all code blocks
+      const codeBlockMatches = Array.from(generatedText.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/g));
+      for (const [index, match] of codeBlockMatches.entries()) {
         try {
-          const jsonResponse = JSON.parse(codeBlockMatch[1]) as AICommitResponse;
+          const jsonResponse = JSON.parse(match[1]) as AICommitResponse;
           const validationError = this.validateAIResponse(jsonResponse);
           if (validationError) {
-            errors.push(`Code block JSON validation failed: ${validationError}`);
+            errors.push(`Code block ${index + 1} JSON validation failed: ${validationError}`);
           } else {
+            console.debug(`[GenerateCommitMessage] Successfully parsed JSON from code block ${index + 1}`);
             return jsonResponse;
           }
         } catch (parseError) {
-          errors.push(`Code block JSON parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          errors.push(`Code block ${index + 1} JSON parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
       }
 
-      // If no code block or code block parsing failed, try to find the first complete JSON object
-      let braceCount = 0;
-      let startIndex = -1;
-      let endIndex = -1;
-      let inString = false;
-      let escapeNext = false;
-
-      for (let i = 0; i < generatedText.length; i++) {
-        const char = generatedText[i];
-        
-        if (escapeNext) {
-          escapeNext = false;
-          continue;
-        }
-        
-        if (char === '\\') {
-          escapeNext = true;
-          continue;
-        }
-        
-        if (char === '"' && !escapeNext) {
-          inString = !inString;
-          continue;
-        }
-        
-        if (!inString) {
-          if (char === '{') {
-            if (braceCount === 0) {
-              startIndex = i;
-            }
-            braceCount++;
-          } else if (char === '}') {
-            braceCount--;
-            if (braceCount === 0 && startIndex !== -1) {
-              endIndex = i;
-              break;
-            }
-          }
-        }
-      }
-
-      if (startIndex !== -1 && endIndex !== -1) {
+      // If no valid code blocks found, extract all potential JSON objects and try each one
+      const jsonObjects = this.extractAllJsonObjects(generatedText);
+      for (const [index, jsonString] of jsonObjects.entries()) {
         try {
-          const jsonString = generatedText.substring(startIndex, endIndex + 1);
           const jsonResponse = JSON.parse(jsonString) as AICommitResponse;
           const validationError = this.validateAIResponse(jsonResponse);
           if (validationError) {
-            errors.push(`Inline JSON validation failed: ${validationError}`);
+            errors.push(`Inline JSON object ${index + 1} validation failed: ${validationError}`);
           } else {
+            console.debug(`[GenerateCommitMessage] Successfully parsed JSON from inline object ${index + 1}`);
             return jsonResponse;
           }
         } catch (parseError) {
-          errors.push(`Inline JSON parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          errors.push(`Inline JSON object ${index + 1} parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
-      } else {
+      }
+
+      if (jsonObjects.length === 0) {
         errors.push('No JSON object structure found in response');
       }
       
-      const errorSummary = errors.length > 0 ? errors.join('; ') : 'Unknown parsing error';
+      const errorSummary = errors.length > 0 ? errors.join('. ') : 'Unknown parsing error';
       console.debug('[GenerateCommitMessage] All JSON parsing attempts failed:', errors);
       console.debug('[GenerateCommitMessage] AI Response text (first 500 chars):', generatedText.substring(0, 500));
       
-      throw new Error(`Failed to parse AI response as valid JSON. Attempted methods: ${errorSummary}. Please check AI model configuration and try again.`);
+      throw new Error(`Failed to parse AI response as valid JSON. Attempted methods: ${errorSummary}. The AI may have returned an unexpected format.`);
     } catch (jsonError) {
       if (jsonError instanceof Error && jsonError.message.includes('Failed to parse AI response')) {
         throw jsonError;
@@ -750,6 +723,51 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const errorMessage = jsonError instanceof Error ? jsonError.message : String(jsonError);
       throw new Error(`Unexpected error during AI response parsing: ${errorMessage}`);
     }
+  }
+
+  private extractAllJsonObjects(text: string): string[] {
+    const jsonObjects: string[] = [];
+    let braceCount = 0;
+    let startIndex = -1;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '{') {
+          if (braceCount === 0) {
+            startIndex = i;
+          }
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0 && startIndex !== -1) {
+            const jsonString = text.substring(startIndex, i + 1);
+            jsonObjects.push(jsonString);
+            startIndex = -1;
+          }
+        }
+      }
+    }
+
+    return jsonObjects;
   }
 
   private validateAIResponse(response: unknown): string | null {

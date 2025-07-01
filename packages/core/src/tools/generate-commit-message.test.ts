@@ -787,6 +787,133 @@ describe('GenerateCommitMessageTool', () => {
       expect(result.llmContent).toContain('Error during commit workflow');
       expect(result.llmContent).toContain('must contain at least one file');
     });
+
+    it('should handle enhanced multiple JSON objects parsing - iterate through invalid ones to find valid', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';  
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+        'commit': ''
+      }));
+
+      // Create a response with multiple JSON objects - some invalid, one valid
+      const invalidJson1 = '{"incomplete": "json"'; // Malformed - will be ignored by extractAllJsonObjects
+      const invalidJson2 = JSON.stringify({
+        analysis: { changedFiles: [] }, // Invalid - empty changedFiles
+        commitMessage: { header: 'invalid' }
+      });
+      const validJson = JSON.stringify({
+        analysis: {
+          changedFiles: ['file.txt'],
+          changeType: 'feat',
+          purpose: 'Add new feature',
+          impact: 'Improves functionality',
+          hasSensitiveInfo: false,
+        },
+        commitMessage: {
+          header: 'feat: add new feature',
+          body: '',
+          footer: '',
+        },
+      });
+
+      // Need to create proper JSON objects that will be detected by the parser
+      // Use complete JSON objects so they can be properly extracted
+      const malformedButCompleteJson = '{"malformed": "structure", "missing": "required fields"}';
+      
+      // AI response with multiple JSON objects where the third one is valid
+      const aiResponse = `Let me analyze this commit. Here are some possibilities:
+
+First attempt: ${malformedButCompleteJson}
+
+Actually, let me try again: ${invalidJson2}
+
+Here's the correct analysis: ${validJson}
+
+That should work better!`;
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: aiResponse }],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: add new feature');
+    });
+
+    it('should handle enhanced multiple JSON objects in code blocks - iterate through invalid ones to find valid', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';  
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+        'commit': ''
+      }));
+
+      // Create multiple code blocks with JSON - some invalid, one valid
+      const invalidJson = JSON.stringify({
+        analysis: { changedFiles: [] }, // Invalid - empty changedFiles
+        commitMessage: { header: 'invalid' }
+      });
+      const validJson = JSON.stringify({
+        analysis: {
+          changedFiles: ['file.txt'],
+          changeType: 'fix',
+          purpose: 'Fix issue',
+          impact: 'Resolves problem',
+          hasSensitiveInfo: false,
+        },
+        commitMessage: {
+          header: 'fix: resolve issue',
+          body: '',
+          footer: '',
+        },
+      });
+
+      // AI response with multiple code blocks where the second one is valid
+      const aiResponse = `Let me analyze this commit.
+
+First attempt:
+\`\`\`json
+${invalidJson}
+\`\`\`
+
+That's not quite right. Let me try again:
+\`\`\`json
+${validJson}
+\`\`\`
+
+That should work better!`;
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: aiResponse }],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfix: resolve issue');
+    });
   });
 
   describe('Git index hash and race condition protection', () => {
@@ -1284,7 +1411,7 @@ describe('GenerateCommitMessageTool', () => {
 
     it('should truncate large diffs when token count exceeds threshold', async () => {
       const statusOutput = 'M  large-file.txt';
-      const largeDiff = 'diff --git a/large-file.txt b/large-file.txt\n' + 'A'.repeat(10000); // Large diff
+      const largeDiff = 'diff --git a/large-file.txt b/large-file.txt\n' + 'A'.repeat(50000); // Very large diff to exceed threshold
       const logOutput = 'abc1234 Previous commit message';
 
       // Create a new tool with fresh mocks for this test  
