@@ -36,6 +36,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { CommandConfirmDialog } from './components/CommandConfirmDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -72,6 +73,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { CustomSlashCommand } from './hooks/useCustomSlashCommand.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -132,6 +134,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [pendingShellCommand, setPendingShellCommand] = useState<{
+    lines: string[];
+    shellCommands: { index: number; cmd: string }[];
+    cmd: CustomSlashCommand;
+    args: string;
+  } | null>(null);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -283,6 +291,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
+    setPendingShellCommand
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -578,6 +587,39 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
          * content is set it'll flush content to the terminal and move the area which it's "clearing"
          * down a notch. Without Static the area which gets erased and redrawn continuously grows.
          */}
+        {pendingShellCommand && (
+          <CommandConfirmDialog
+            command={pendingShellCommand.shellCommands[0].cmd}
+            onSelect={async (confirmed) => {
+              const { lines, shellCommands, cmd, args } = pendingShellCommand;
+              const current = shellCommands[0];
+              if (confirmed) {
+                try {
+                  const { execSync } = await import('child_process');
+                  const output = execSync(current.cmd, { encoding: 'utf-8' });
+                  lines[current.index] = `!${current.cmd}\n${output.trim()}`;
+                } catch (e) {
+                  lines[current.index] = `!${current.cmd}\n[Failed to execute shell command: ${current.cmd}]\n${String(e)}`;
+                }
+              } else {
+                lines[current.index] = '[Command execution was cancelled by the user]';
+              }
+              const rest = shellCommands.slice(1);
+              if (rest.length > 0) {
+                setPendingShellCommand({
+                  lines,
+                  shellCommands: rest,
+                  cmd,
+                  args: args || '',
+                });
+              } else {
+                setPendingShellCommand(null);
+                const finalPrompt = lines.join('\n');
+                submitQuery(finalPrompt);
+              }
+            }}
+          />
+        )}
         <Static
           key={staticKey}
           items={[
@@ -698,7 +740,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                    config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : thought
                 }

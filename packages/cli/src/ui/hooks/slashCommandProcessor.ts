@@ -79,6 +79,12 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  setPendingShellCommand: (queue: {
+    lines: string[];
+    shellCommands: { index: number; cmd: string }[];
+    cmd: CustomSlashCommand;
+    args: string;
+  }) => void
 ) => {
   const [customCommands, setCustomCommands] = useState<CustomSlashCommand[]>([]);
   useEffect(() => {
@@ -1056,7 +1062,16 @@ export const useSlashCommandProcessor = (
           let prompt = cmd.template.replace(/\$ARGUMENTS/g, args || '');
 
           const lines = prompt.split('\n');
+          const shellCommands: { index: number; cmd: string }[] = [];
+
           for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('!')) {
+              shellCommands.push({ index: i, cmd: lines[i].slice(1).trim() });
+            }
+            if (shellCommands.length > 0) {
+              setPendingShellCommand({ lines, shellCommands, cmd, args: args || '' });
+              return;
+            }
             if (lines[i].startsWith('@')) {
               const filePath = lines[i].slice(1).trim();
               try {
