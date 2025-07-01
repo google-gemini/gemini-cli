@@ -1231,30 +1231,23 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       return null; // Empty footer is valid
     }
 
-    // Footer should contain references or breaking changes
+    // Basic validation for footer content - be permissive to allow AI flexibility
     const footerLines = footer.split('\n');
     for (const line of footerLines) {
       if (line.trim().length === 0) continue;
       
-      // Check for breaking change format
-      if (line.startsWith('BREAKING CHANGE:')) {
-        const breakingDescription = line.substring('BREAKING CHANGE:'.length).trim();
-        if (!breakingDescription) {
-          return 'AI response validation failed: BREAKING CHANGE footer must include a description';
-        }
+      // Only reject extremely long lines that might indicate parsing errors
+      if (line.length > 200) {
+        return 'AI response validation failed: footer line is exceptionally long (>200 chars), which may indicate malformed content';
       }
       
-      // Check for issue reference format (simplified validation)
-      if (line.match(/^(Closes?|Fixes?|Resolves?)\s+#\d+/i)) {
-        continue; // Valid issue reference
-      }
-      
-      // Check for co-authored-by format
-      if (line.match(/^Co-authored-by:\s+.+\s+<.+@.+>/)) {
-        continue; // Valid co-author
+      // Check for empty BREAKING CHANGE declaration (common error)
+      if (line.match(/^BREAKING CHANGE:\s*$/)) {
+        return 'AI response validation failed: BREAKING CHANGE footer must include a description';
       }
     }
 
+    // Footer is valid - don't enforce specific formats as AI might use semantically correct alternatives
     return null;
   }
 

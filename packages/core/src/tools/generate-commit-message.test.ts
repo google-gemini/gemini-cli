@@ -1412,6 +1412,52 @@ That should work better!`;
       expect(result.llmContent).toContain('malformed AI response');
     });
 
+    it('should accept flexible footer formats from AI', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+        'commit': ''
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    analysis: {
+                      changedFiles: ['file.txt'],
+                      changeType: 'feat',
+                      purpose: 'Add new feature with flexible footer',
+                      impact: 'Improves user experience',
+                      hasSensitiveInfo: false,
+                    },
+                    commitMessage: {
+                      header: 'feat: add flexible footer support',
+                      body: 'This allows various footer formats to be accepted',
+                      footer: 'Fixes issue #123\nBreaking change: removes deprecated API\nReviewed-by: John Doe',
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      // Should accept flexible footer formats that are semantically correct
+      expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: add flexible footer support\n\nThis allows various footer formats to be accepted\n\nFixes issue #123\nBreaking change: removes deprecated API\nReviewed-by: John Doe');
+    });
+
     it('should handle network timeout errors gracefully', async () => {
       const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
       const statusOutput = 'M  file.txt';
