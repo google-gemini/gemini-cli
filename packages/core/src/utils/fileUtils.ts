@@ -100,8 +100,14 @@ export function detectFileType(
   filePath: string,
 ): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
   const ext = path.extname(filePath).toLowerCase();
-  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
 
+  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
+  // to assume these are typescript files instead.
+  if (ext === '.ts') {
+    return 'text';
+  }
+
+  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
   if (lookedUpMimeType) {
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
