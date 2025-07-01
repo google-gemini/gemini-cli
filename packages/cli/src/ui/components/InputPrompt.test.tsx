@@ -189,7 +189,6 @@ describe('InputPrompt', () => {
     props.buffer.setText('some text');
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
-
     stdin.write('\u001b[H'); // Home key
     await wait();
     
@@ -202,7 +201,6 @@ describe('InputPrompt', () => {
     props.buffer.setText(bufferText);
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
-
     stdin.write('\u001b[F'); // End key
     await wait();
 
