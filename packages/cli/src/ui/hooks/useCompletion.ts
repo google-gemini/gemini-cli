@@ -209,6 +209,8 @@ export function useCompletion(
       } catch (error: unknown) {
         if (isNodeError(error) && error.name === 'AbortError') {
           // Ignore abort errors, this is expected.
+          setSuggestions([]);
+          setShowSuggestions(false);
           return;
         }
 
