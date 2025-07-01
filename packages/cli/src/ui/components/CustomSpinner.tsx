@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useEffect } from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
 
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const interval = 80;
 
-export const CustomSpinner: React.FC = () => {
+export function CustomSpinner() {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -20,6 +26,4 @@ export const CustomSpinner: React.FC = () => {
       {String(frames[frame])}
     </Text>
   );
-};
-
-export default CustomSpinner;
+}

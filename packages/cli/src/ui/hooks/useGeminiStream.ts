@@ -19,7 +19,6 @@ import {
   MessageSenderType,
   ToolCallRequestInfo,
   logUserPrompt,
-  GitService,
   EditorType,
   ThoughtSummary,
   UnauthorizedError,
@@ -48,7 +47,6 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
 import { handleEnhancedAtCommand } from './enhancedAtCommandProcessor.js';
 import { useFileContext } from '../contexts/FileContextContext.js';
 
@@ -173,12 +171,6 @@ export const useGeminiStream = (
   const pendingFilesRef = useRef<Set<string>>(new Set()); // Track files pending Gemini processing
   const geminiContextFilesRef = useRef<Set<string>>(new Set()); // Track files actually in Gemini's context
   const logger = useLogger();
-  const gitService = useMemo(() => {
-    if (!config.getProjectRoot()) {
-      return;
-    }
-    return new GitService(config.getProjectRoot());
-  }, [config]);
 
   const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
     useReactToolScheduler(

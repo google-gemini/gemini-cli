@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import CustomSpinner from './CustomSpinner.js';
+import { CustomSpinner } from './CustomSpinner.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 

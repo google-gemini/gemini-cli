@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import CustomSpinner from './CustomSpinner.js';
+import { CustomSpinner } from './CustomSpinner.js';
 import { Colors } from '../colors.js';
 
 interface AuthInProgressProps {
