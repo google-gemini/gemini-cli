@@ -48,6 +48,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly client: OAuth2Client,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
+    readonly sessionId?: string,
   ) {}
 
   async generateContentStream(
@@ -55,7 +56,7 @@ export class CodeAssistServer implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.projectId, this.sessionId),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -70,7 +71,7 @@ export class CodeAssistServer implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(req, this.projectId, this.sessionId),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);
