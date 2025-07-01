@@ -4,27 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Part, PartListUnion } from '@google/genai';
 import {
+  ApprovalMode,
+  Config,
+  EditorType,
+  logToolCall,
+  Tool,
+  ToolCallConfirmationDetails,
+  ToolCallEvent,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolConfirmationOutcome,
-  Tool,
-  ToolCallConfirmationDetails,
-  ToolResult,
   ToolRegistry,
-  ApprovalMode,
-  EditorType,
-  Config,
-  logToolCall,
-  ToolCallEvent,
+  ToolResult,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import {
   isModifiableTool,
   ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
+import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -527,14 +527,26 @@ export class CoreToolScheduler {
         'cancelled',
         'User cancelled all tool calls',
       );
+
+      for (const otherToolCall of this.toolCalls.values()) {
+        if (
+          otherToolCall.request.callId !== callId &&
+          (otherToolCall.status === 'scheduled' ||
+            otherToolCall.status === 'awaiting_approval')
+        ) {
+          this.setStatusInternal(
+            otherToolCall.request.callId,
+            'cancelled',
+            'User cancelled all tool calls',
+          );
+        }
+      }
     } else if (outcome === ToolConfirmationOutcome.Skip) {
-      // Skip this tool call but continue with others
       this.setStatusInternal(
         callId,
         'cancelled',
         'User skipped this tool call',
       );
-      // Important: Don't cancel other pending tool calls
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableTool(waitingToolCall.tool)) {
