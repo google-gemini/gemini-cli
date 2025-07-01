@@ -60,10 +60,7 @@ import {
   type SlashCommandActionReturn,
 } from './slashCommandProcessor.js';
 import { MessageType } from '../types.js';
-import {
-  Config,
-  GeminiClient,
-} from '@google/gemini-cli-core';
+import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
@@ -655,7 +652,8 @@ describe('useSlashCommandProcessor', () => {
         expect.objectContaining({
           type: MessageType.ERROR,
           text: 'Could not retrieve tools.',
-        }),         expect.any(Number),
+        }),
+        expect.any(Number),
       );
       expect(commandResult).toBe(true);
     });
@@ -716,7 +714,9 @@ describe('useSlashCommandProcessor', () => {
           commandResult = await handleSlashCommand(command);
         });
 
-        expect(typeof commandResult === 'boolean' ? commandResult : true).toBe(true);
+        expect(typeof commandResult === 'boolean' ? commandResult : true).toBe(
+          true,
+        );
       }
     });
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { 
+import {
   CoreTextState,
   TextEditor,
   CursorNavigation,
@@ -214,12 +214,18 @@ export class VisualLayoutImpl implements VisualLayout {
   }
 
   getVisualPosition(logicalPosition: CursorPosition): CursorPosition {
-    const result = this.visualState.logicalToVisual(logicalPosition[0], logicalPosition[1]);
+    const result = this.visualState.logicalToVisual(
+      logicalPosition[0],
+      logicalPosition[1],
+    );
     return result ?? [0, 0];
   }
 
   getLogicalPosition(visualPosition: CursorPosition): CursorPosition {
-    const result = this.visualState.visualToLogical(visualPosition[0], visualPosition[1]);
+    const result = this.visualState.visualToLogical(
+      visualPosition[0],
+      visualPosition[1],
+    );
     return result ?? [0, 0];
   }
 }
@@ -242,7 +248,10 @@ export class SelectionOperationsImpl implements SelectionOperations {
   }
 
   startSelection(): void {
-    const currentCursor: CursorPosition = [this.textState.cursorRow, this.textState.cursorCol];
+    const currentCursor: CursorPosition = [
+      this.textState.cursorRow,
+      this.textState.cursorCol,
+    ];
     this.selectionState.setSelectionAnchor(currentCursor);
     this.selectionState.setSelectionExtent(currentCursor);
   }
@@ -259,7 +268,7 @@ export class SelectionOperationsImpl implements SelectionOperations {
   getSelectionRange(): SelectionRange | null {
     const bounds = this.selectionState.getSelectionBounds();
     if (!bounds) return null;
-    
+
     const text = this.selectionState.getSelectedText(this.textState.lines);
     return {
       start: bounds.start,
@@ -393,8 +402,15 @@ export class RangeOperationsImpl implements RangeOperations {
   }
 
   modifyRange(modification: RangeModification): boolean {
-    const { startRow, startCol, endRow, endCol, operation, text = '' } = modification;
-    
+    const {
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+      operation,
+      text = '',
+    } = modification;
+
     switch (operation) {
       case 'replace':
         return this.replaceRange(startRow, startCol, endRow, endCol, text);
@@ -410,18 +426,18 @@ export class RangeOperationsImpl implements RangeOperations {
   offsetToPosition(offset: number): CursorPosition {
     const text = this.textState.lines.join('\n');
     let currentOffset = 0;
-    
+
     for (let row = 0; row < this.textState.lines.length; row++) {
       const line = this.textState.lines[row] ?? '';
       const lineLength = line.length;
-      
+
       if (currentOffset + lineLength >= offset) {
         return [row, offset - currentOffset];
       }
-      
+
       currentOffset += lineLength + 1; // +1 for newline
     }
-    
+
     // If offset is beyond text, return end position
     const lastRow = this.textState.lines.length - 1;
     const lastLine = this.textState.lines[lastRow] ?? '';
@@ -431,12 +447,12 @@ export class RangeOperationsImpl implements RangeOperations {
   positionToOffset(position: CursorPosition): number {
     const [row, col] = position;
     let offset = 0;
-    
+
     for (let r = 0; r < row && r < this.textState.lines.length; r++) {
       const line = this.textState.lines[r] ?? '';
       offset += line.length + 1; // +1 for newline
     }
-    
+
     return offset + col;
   }
 }

@@ -19,6 +19,27 @@ import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { Tips } from './components/Tips.js';
 
+// Global test variables
+let mockConfig: MockServerConfig;
+let mockSettings: LoadedSettings;
+let currentUnmount: (() => void) | undefined;
+
+const createMockSettings = (
+  settings: Partial<Settings> = {},
+): LoadedSettings => {
+  const userSettingsFile: SettingsFile = {
+    path: '/user/settings.json',
+    settings: {},
+  };
+  const workspaceSettingsFile: SettingsFile = {
+    path: '/workspace/.gemini/settings.json',
+    settings: {
+      ...settings,
+    },
+  };
+  return new LoadedSettings(userSettingsFile, workspaceSettingsFile, []);
+};
+
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
   apiKey: string;
@@ -179,26 +200,6 @@ vi.mock('./components/Tips.js', () => ({
 }));
 
 describe('App UI', () => {
-  let mockConfig: MockServerConfig;
-  let mockSettings: LoadedSettings;
-  let currentUnmount: (() => void) | undefined;
-
-  const createMockSettings = (
-    settings: Partial<Settings> = {},
-  ): LoadedSettings => {
-    const userSettingsFile: SettingsFile = {
-      path: '/user/settings.json',
-      settings: {},
-    };
-    const workspaceSettingsFile: SettingsFile = {
-      path: '/workspace/.gemini/settings.json',
-      settings: {
-        ...settings,
-      },
-    };
-    return new LoadedSettings(userSettingsFile, workspaceSettingsFile, []);
-  };
-
   beforeEach(() => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
@@ -238,7 +239,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -246,7 +247,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve(); // Wait for any async updates
-    expect(lastFrame()).toContain('Using 1 GEMINI.md file');
+    expect(_lastFrame()).toContain('Using 1 GEMINI.md file');
   });
 
   it('should display default "GEMINI.md" with plural when contextFileName is not set and count is > 1', async () => {
@@ -254,7 +255,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -262,7 +263,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 2 GEMINI.md files');
+    expect(_lastFrame()).toContain('Using 2 GEMINI.md files');
   });
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
@@ -274,7 +275,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -282,7 +283,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 1 AGENTS.md file');
+    expect(_lastFrame()).toContain('Using 1 AGENTS.md file');
   });
 
   it('should display a generic message when multiple context files with different names are provided', async () => {
@@ -294,7 +295,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -302,7 +303,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 2 context files');
+    expect(_lastFrame()).toContain('Using 2 context files');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
@@ -314,7 +315,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -322,7 +323,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 3 MY_NOTES.TXT files');
+    expect(_lastFrame()).toContain('Using 3 MY_NOTES.TXT files');
   });
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
@@ -334,7 +335,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -342,7 +343,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).not.toContain('ANY_FILE.MD');
+    expect(_lastFrame()).not.toContain('ANY_FILE.MD');
   });
 
   it('should display GEMINI.md and MCP server count when both are present', async () => {
@@ -353,7 +354,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -361,7 +362,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('server');
+    expect(_lastFrame()).toContain('server');
   });
 
   it('should display only MCP server count when GEMINI.md count is 0', async () => {
@@ -373,7 +374,7 @@ describe('App UI', () => {
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
@@ -381,7 +382,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using 2 MCP servers');
+    expect(_lastFrame()).toContain('Using 2 MCP servers');
   });
 
   it('should display Tips component by default', async () => {
@@ -430,7 +431,7 @@ describe('App UI', () => {
     it('should display theme dialog if NO_COLOR is not set', async () => {
       delete process.env.NO_COLOR;
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame: _lastFrame, unmount } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -438,13 +439,13 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain('Select Theme');
+      expect(_lastFrame()).toContain('Select Theme');
     });
 
     it('should display a message if NO_COLOR is set', async () => {
       process.env.NO_COLOR = 'true';
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame: _lastFrame, unmount } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -452,778 +453,783 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain(
+      expect(_lastFrame()).toContain(
         'Theme configuration unavailable due to NO_COLOR env variable.',
       );
-      expect(lastFrame()).not.toContain('Select Theme');
+      expect(_lastFrame()).not.toContain('Select Theme');
     });
   });
 });
 
-  describe('Error Handling Scenarios', () => {
-    it('should handle config with missing required properties gracefully', async () => {
-      const invalidConfig = {
-        ...mockConfig,
-        getApiKey: vi.fn(() => ''),
-        getModel: vi.fn(() => ''),
-        getTargetDir: vi.fn(() => ''),
-      } as unknown as MockServerConfig;
+describe('Error Handling Scenarios', () => {
+  it('should handle config with missing required properties gracefully', async () => {
+    const invalidConfig = {
+      ...mockConfig,
+      getApiKey: vi.fn(() => ''),
+      getModel: vi.fn(() => ''),
+      getTargetDir: vi.fn(() => ''),
+    } as unknown as MockServerConfig;
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={invalidConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-      
-      // Should still render without crashing
-      expect(lastFrame()).toBeDefined();
-    });
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={invalidConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-    it('should handle settings with null/undefined values gracefully', async () => {
-      const invalidSettings = createMockSettings({
-        theme: undefined as any,
-        contextFileName: null as any,
-      });
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={invalidSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(lastFrame()).toBeDefined();
-    });
-
-    it('should handle config method errors gracefully', async () => {
-      mockConfig.getGeminiMdFileCount.mockImplementation(() => {
-        throw new Error('Config error');
-      });
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      // Should still render without crashing
-      expect(lastFrame()).toBeDefined();
-    });
+    // Should still render without crashing
+    expect(_lastFrame()).toBeDefined();
   });
 
-  describe('Memory Usage Display', () => {
-    it('should display memory usage when showMemoryUsage is enabled', async () => {
-      mockConfig.getShowMemoryUsage.mockReturnValue(true);
-      mockConfig.getUserMemory.mockReturnValue('Some user memory content');
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-
-      // Should show memory-related content when enabled
-      expect(mockConfig.getShowMemoryUsage).toHaveBeenCalled();
+  it('should handle settings with null/undefined values gracefully', async () => {
+    const invalidSettings = createMockSettings({
+      theme: undefined,
+      contextFileName: undefined,
     });
 
-    it('should not display memory usage when showMemoryUsage is disabled', async () => {
-      mockConfig.getShowMemoryUsage.mockReturnValue(false);
-      mockConfig.getUserMemory.mockReturnValue('Some user memory content');
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={invalidSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-
-      expect(mockConfig.getShowMemoryUsage).toHaveBeenCalled();
-    });
+    expect(_lastFrame()).toBeDefined();
   });
 
-  describe('Debug Mode Scenarios', () => {
-    it('should handle debug mode enabled', async () => {
-      mockConfig.getDebugMode.mockReturnValue(true);
-      mockConfig.getShowMemoryUsage.mockReturnValue(false);
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-
-      expect(mockConfig.getDebugMode).toHaveBeenCalled();
-      expect(lastFrame()).toBeDefined();
+  it('should handle config method errors gracefully', async () => {
+    mockConfig.getGeminiMdFileCount.mockImplementation(() => {
+      throw new Error('Config error');
     });
 
-    it('should handle debug mode disabled', async () => {
-      mockConfig.getDebugMode.mockReturnValue(false);
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    // Should still render without crashing
+    expect(_lastFrame()).toBeDefined();
+  });
+});
 
-      expect(mockConfig.getDebugMode).toHaveBeenCalled();
-    });
+describe('Memory Usage Display', () => {
+  it('should display memory usage when showMemoryUsage is enabled', async () => {
+    mockConfig.getShowMemoryUsage.mockReturnValue(true);
+    mockConfig.getUserMemory.mockReturnValue('Some user memory content');
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+
+    // Should show memory-related content when enabled
+    expect(mockConfig.getShowMemoryUsage).toHaveBeenCalled();
   });
 
-  describe('API Configuration Scenarios', () => {
-    it('should handle different API keys', async () => {
-      mockConfig.getApiKey.mockReturnValue('custom-api-key-12345');
+  it('should not display memory usage when showMemoryUsage is disabled', async () => {
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
+    mockConfig.getUserMemory.mockReturnValue('Some user memory content');
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      expect(mockConfig.getApiKey).toHaveBeenCalled();
-    });
+    expect(mockConfig.getShowMemoryUsage).toHaveBeenCalled();
+  });
+});
 
-    it('should handle different models', async () => {
-      mockConfig.getModel.mockReturnValue('gemini-pro-advanced');
+describe('Debug Mode Scenarios', () => {
+  it('should handle debug mode enabled', async () => {
+    mockConfig.getDebugMode.mockReturnValue(true);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      expect(mockConfig.getModel).toHaveBeenCalled();
-    });
-
-    it('should handle Vertex AI configuration', async () => {
-      mockConfig.getVertexAI.mockReturnValue(true);
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getVertexAI).toHaveBeenCalled();
-    });
+    expect(mockConfig.getDebugMode).toHaveBeenCalled();
+    expect(_lastFrame()).toBeDefined();
   });
 
-  describe('Approval Mode Scenarios', () => {
-    it('should handle different approval modes', async () => {
-      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.ALWAYS);
+  it('should handle debug mode disabled', async () => {
+    mockConfig.getDebugMode.mockReturnValue(false);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      expect(mockConfig.getApprovalMode).toHaveBeenCalled();
-    });
+    expect(mockConfig.getDebugMode).toHaveBeenCalled();
+  });
+});
 
-    it('should handle approval mode changes', async () => {
-      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.NEVER);
-      const setApprovalModeSpy = mockConfig.setApprovalMode;
+describe('API Configuration Scenarios', () => {
+  it('should handle different API keys', async () => {
+    mockConfig.getApiKey.mockReturnValue('custom-api-key-12345');
 
-      const { unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getApprovalMode).toHaveBeenCalled();
-      expect(typeof setApprovalModeSpy).toBe('function');
-    });
+    expect(mockConfig.getApiKey).toHaveBeenCalled();
   });
 
-  describe('Tool Configuration Scenarios', () => {
-    it('should handle core tools configuration', async () => {
-      mockConfig.getCoreTools.mockReturnValue(['tool1', 'tool2', 'tool3']);
+  it('should handle different models', async () => {
+    mockConfig.getModel.mockReturnValue('gemini-pro-advanced');
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getCoreTools).toHaveBeenCalled();
-    });
-
-    it('should handle tool discovery command', async () => {
-      mockConfig.getToolDiscoveryCommand.mockReturnValue('npm run discover-tools');
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getToolDiscoveryCommand).toHaveBeenCalled();
-    });
-
-    it('should handle tool call command', async () => {
-      mockConfig.getToolCallCommand.mockReturnValue('npm run call-tool');
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getToolCallCommand).toHaveBeenCalled();
-    });
+    expect(mockConfig.getModel).toHaveBeenCalled();
   });
 
-  describe('MCP Server Configuration Edge Cases', () => {
-    it('should handle empty MCP servers object', async () => {
-      mockConfig.getMcpServers.mockReturnValue({});
-      mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+  it('should handle Vertex AI configuration', async () => {
+    mockConfig.getVertexAI.mockReturnValue(true);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(lastFrame()).toContain('Using 1 GEMINI.md file');
-      expect(lastFrame()).not.toContain('MCP server');
-    });
+    expect(mockConfig.getVertexAI).toHaveBeenCalled();
+  });
+});
 
-    it('should handle large number of MCP servers', async () => {
-      const servers: Record<string, MCPServerConfig> = {};
-      for (let i = 1; i <= 10; i++) {
-        servers[`server${i}`] = {} as MCPServerConfig;
-      }
-      mockConfig.getMcpServers.mockReturnValue(servers);
-      mockConfig.getGeminiMdFileCount.mockReturnValue(0);
+describe('Approval Mode Scenarios', () => {
+  it('should handle different approval modes', async () => {
+    mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(lastFrame()).toContain('Using 10 MCP servers');
-    });
-
-    it('should handle MCP server command configuration', async () => {
-      mockConfig.getMcpServerCommand.mockReturnValue('custom-mcp-command');
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getMcpServerCommand).toHaveBeenCalled();
-    });
+    expect(mockConfig.getApprovalMode).toHaveBeenCalled();
   });
 
-  describe('Accessibility Configuration', () => {
-    it('should handle accessibility settings', async () => {
-      const accessibilitySettings: AccessibilitySettings = {
-        highContrast: true,
-        reducedMotion: true,
-      };
-      mockConfig.getAccessibility.mockReturnValue(accessibilitySettings);
+  it('should handle approval mode changes', async () => {
+    mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.YOLO);
+    const setApprovalModeSpy = mockConfig.setApprovalMode;
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getAccessibility).toHaveBeenCalled();
-    });
+    expect(mockConfig.getApprovalMode).toHaveBeenCalled();
+    expect(typeof setApprovalModeSpy).toBe('function');
+  });
+});
 
-    it('should handle empty accessibility settings', async () => {
-      mockConfig.getAccessibility.mockReturnValue({});
+describe('Tool Configuration Scenarios', () => {
+  it('should handle core tools configuration', async () => {
+    mockConfig.getCoreTools.mockReturnValue(['tool1', 'tool2', 'tool3']);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getAccessibility).toHaveBeenCalled();
-    });
+    expect(mockConfig.getCoreTools).toHaveBeenCalled();
   });
 
-  describe('User Memory Management', () => {
-    it('should handle non-empty user memory', async () => {
-      mockConfig.getUserMemory.mockReturnValue('Previous conversation context and user preferences');
+  it('should handle tool discovery command', async () => {
+    mockConfig.getToolDiscoveryCommand.mockReturnValue(
+      'npm run discover-tools',
+    );
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getUserMemory).toHaveBeenCalled();
-    });
-
-    it('should handle user memory updates', async () => {
-      const setUserMemorySpy = mockConfig.setUserMemory;
-      mockConfig.getUserMemory.mockReturnValue('Updated memory content');
-
-      const { unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(typeof setUserMemorySpy).toBe('function');
-    });
+    expect(mockConfig.getToolDiscoveryCommand).toHaveBeenCalled();
   });
 
-  describe('Context File Edge Cases', () => {
-    it('should handle contextFileName as empty string', async () => {
-      mockSettings = createMockSettings({
-        contextFileName: '',
-        theme: 'Default',
-      });
-      mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+  it('should handle tool call command', async () => {
+    mockConfig.getToolCallCommand.mockReturnValue('npm run call-tool');
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      // Should fall back to default behavior
-      expect(lastFrame()).toContain('Using 1 GEMINI.md file');
-    });
+    expect(mockConfig.getToolCallCommand).toHaveBeenCalled();
+  });
+});
 
-    it('should handle contextFileName as empty array', async () => {
-      mockSettings = createMockSettings({
-        contextFileName: [],
-        theme: 'Default',
-      });
-      mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+describe('MCP Server Configuration Edge Cases', () => {
+  it('should handle empty MCP servers object', async () => {
+    mockConfig.getMcpServers.mockReturnValue({});
+    mockConfig.getGeminiMdFileCount.mockReturnValue(1);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      // Should fall back to default behavior
-      expect(lastFrame()).toContain('Using 2 GEMINI.md files');
-    });
-
-    it('should handle very large file counts', async () => {
-      mockConfig.getGeminiMdFileCount.mockReturnValue(999);
-      mockConfig.getDebugMode.mockReturnValue(false);
-      mockConfig.getShowMemoryUsage.mockReturnValue(false);
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-
-      expect(lastFrame()).toContain('Using 999 GEMINI.md files');
-    });
+    expect(_lastFrame()).toContain('Using 1 GEMINI.md file');
+    expect(_lastFrame()).not.toContain('MCP server');
   });
 
-  describe('Sandbox Configuration', () => {
-    it('should handle sandbox configuration when provided', async () => {
-      const sandboxConfig: SandboxConfig = {
-        enabled: true,
-        containerImage: 'test-image',
-      };
-      mockConfig.getSandbox.mockReturnValue(sandboxConfig);
+  it('should handle large number of MCP servers', async () => {
+    const servers: Record<string, MCPServerConfig> = {};
+    for (let i = 1; i <= 10; i++) {
+      servers[`server${i}`] = {} as MCPServerConfig;
+    }
+    mockConfig.getMcpServers.mockReturnValue(servers);
+    mockConfig.getGeminiMdFileCount.mockReturnValue(0);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      expect(mockConfig.getSandbox).toHaveBeenCalled();
-    });
-
-    it('should handle undefined sandbox configuration', async () => {
-      mockConfig.getSandbox.mockReturnValue(undefined);
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getSandbox).toHaveBeenCalled();
-    });
+    expect(_lastFrame()).toContain('Using 10 MCP servers');
   });
 
-  describe('User Agent and Target Directory', () => {
-    it('should handle custom user agent', async () => {
-      mockConfig.getUserAgent.mockReturnValue('CustomAgent/1.0');
+  it('should handle MCP server command configuration', async () => {
+    mockConfig.getMcpServerCommand.mockReturnValue('custom-mcp-command');
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getUserAgent).toHaveBeenCalled();
-    });
+    expect(mockConfig.getMcpServerCommand).toHaveBeenCalled();
+  });
+});
 
-    it('should handle different target directories', async () => {
-      mockConfig.getTargetDir.mockReturnValue('/custom/project/path');
+describe('Accessibility Configuration', () => {
+  it('should handle accessibility settings', async () => {
+    const accessibilitySettings: AccessibilitySettings = {
+      disableLoadingPhrases: true,
+    };
+    mockConfig.getAccessibility.mockReturnValue(accessibilitySettings);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getTargetDir).toHaveBeenCalled();
-    });
-
-    it('should handle project root configuration', async () => {
-      mockConfig.getProjectRoot.mockReturnValue('/project/root');
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getProjectRoot).toHaveBeenCalled();
-    });
+    expect(mockConfig.getAccessibility).toHaveBeenCalled();
   });
 
-  describe('Full Context and Question Handling', () => {
-    it('should handle full context enabled', async () => {
-      mockConfig.getFullContext.mockReturnValue(true);
+  it('should handle empty accessibility settings', async () => {
+    mockConfig.getAccessibility.mockReturnValue({});
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getFullContext).toHaveBeenCalled();
-    });
+    expect(mockConfig.getAccessibility).toHaveBeenCalled();
+  });
+});
 
-    it('should handle predefined questions', async () => {
-      mockConfig.getQuestion.mockReturnValue('What should I implement next?');
+describe('User Memory Management', () => {
+  it('should handle non-empty user memory', async () => {
+    mockConfig.getUserMemory.mockReturnValue(
+      'Previous conversation context and user preferences',
+    );
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      expect(mockConfig.getQuestion).toHaveBeenCalled();
-    });
-
-    it('should handle undefined questions', async () => {
-      mockConfig.getQuestion.mockReturnValue(undefined);
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(mockConfig.getQuestion).toHaveBeenCalled();
-    });
+    expect(mockConfig.getUserMemory).toHaveBeenCalled();
   });
 
-  describe('Theme Configuration Edge Cases', () => {
-    it('should handle various theme names', async () => {
-      const themes = ['Dark', 'Light', 'HighContrast', 'Custom'];
-      
-      for (const theme of themes) {
-        const themeSettings = createMockSettings({ theme });
-        
-        const { lastFrame, unmount } = render(
-          <App
-            config={mockConfig as unknown as ServerConfig}
-            settings={themeSettings}
-          />,
-        );
-        
-        expect(lastFrame()).not.toContain('Select Theme');
-        unmount();
-      }
+  it('should handle user memory updates', async () => {
+    const setUserMemorySpy = mockConfig.setUserMemory;
+    mockConfig.getUserMemory.mockReturnValue('Updated memory content');
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(typeof setUserMemorySpy).toBe('function');
+  });
+});
+
+describe('Context File Edge Cases', () => {
+  it('should handle contextFileName as empty string', async () => {
+    mockSettings = createMockSettings({
+      contextFileName: '',
+      theme: 'Default',
     });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(1);
 
-    it('should handle invalid theme names', async () => {
-      mockSettings = createMockSettings({
-        theme: 'NonExistentTheme',
-      });
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      // Should still render without theme dialog
-      expect(lastFrame()).not.toContain('Select Theme');
-    });
+    // Should fall back to default behavior
+    expect(_lastFrame()).toContain('Using 1 GEMINI.md file');
   });
 
-  describe('Settings Validation', () => {
-    it('should handle settings with unexpected properties', async () => {
-      mockSettings = createMockSettings({
-        theme: 'Default',
-        // @ts-expect-error - testing unexpected properties
-        unexpectedProperty: 'should not crash',
-        // @ts-expect-error - testing unexpected properties  
-        numericProperty: 12345,
-      });
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(lastFrame()).toBeDefined();
+  it('should handle contextFileName as empty array', async () => {
+    mockSettings = createMockSettings({
+      contextFileName: [],
+      theme: 'Default',
     });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(2);
 
-    it('should handle complex contextFileName arrays with mixed types', async () => {
-      mockSettings = createMockSettings({
-        contextFileName: ['FILE1.md', 'FILE2.txt', 'FILE3.json'] as any,
-        theme: 'Default',
-      });
-      mockConfig.getGeminiMdFileCount.mockReturnValue(3);
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
-
-      expect(lastFrame()).toContain('Using 3 context files');
-    });
+    // Should fall back to default behavior
+    expect(_lastFrame()).toContain('Using 2 GEMINI.md files');
   });
 
-  describe('Startup Warnings Handling', () => {
-    it('should display startup warnings when provided', async () => {
-      const warnings = ['Warning 1: API key deprecated', 'Warning 2: Update available'];
+  it('should handle very large file counts', async () => {
+    mockConfig.getGeminiMdFileCount.mockReturnValue(999);
+    mockConfig.getDebugMode.mockReturnValue(false);
+    mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          startupWarnings={warnings}
-        />,
-      );
-      currentUnmount = unmount;
-      await Promise.resolve();
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
 
-      expect(lastFrame()).toContain('Warning 1: API key deprecated');
-      expect(lastFrame()).toContain('Warning 2: Update available');
-    });
+    expect(_lastFrame()).toContain('Using 999 GEMINI.md files');
+  });
+});
 
-    it('should handle empty startup warnings array', async () => {
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          startupWarnings={[]}
-        />,
-      );
-      currentUnmount = unmount;
+describe('Sandbox Configuration', () => {
+  it('should handle sandbox configuration when provided', async () => {
+    const sandboxConfig: SandboxConfig = {
+      command: 'docker',
+      image: 'test-image',
+    };
+    mockConfig.getSandbox.mockReturnValue(sandboxConfig);
 
-      expect(lastFrame()).toBeDefined();
-    });
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-    it('should handle undefined startup warnings', async () => {
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(lastFrame()).toBeDefined();
-    });
-
-    it('should handle very long startup warning messages', async () => {
-      const longWarning = 'This is a very long warning message that might wrap across multiple lines and should be handled gracefully by the UI without causing layout issues or crashes in the terminal application.';
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          startupWarnings={[longWarning]}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(lastFrame()).toContain('This is a very long warning message');
-    });
+    expect(mockConfig.getSandbox).toHaveBeenCalled();
   });
 
-  describe('Integration Test Scenarios', () => {
-    it('should handle multiple configuration options simultaneously', async () => {
-      mockConfig.getDebugMode.mockReturnValue(true);
-      mockConfig.getShowMemoryUsage.mockReturnValue(true);
-      mockConfig.getVertexAI.mockReturnValue(true);
-      mockConfig.getGeminiMdFileCount.mockReturnValue(5);
-      mockConfig.getMcpServers.mockReturnValue({
-        server1: {} as MCPServerConfig,
-        server2: {} as MCPServerConfig,
-      });
+  it('should handle undefined sandbox configuration', async () => {
+    mockConfig.getSandbox.mockReturnValue(undefined);
 
-      mockSettings = createMockSettings({
-        theme: 'Dark',
-        contextFileName: 'CUSTOM.md',
-        hideTips: false,
-      });
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
 
-      const { lastFrame, unmount } = render(
+    expect(mockConfig.getSandbox).toHaveBeenCalled();
+  });
+});
+
+describe('User Agent and Target Directory', () => {
+  it('should handle custom user agent', async () => {
+    mockConfig.getUserAgent.mockReturnValue('CustomAgent/1.0');
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getUserAgent).toHaveBeenCalled();
+  });
+
+  it('should handle different target directories', async () => {
+    mockConfig.getTargetDir.mockReturnValue('/custom/project/path');
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getTargetDir).toHaveBeenCalled();
+  });
+
+  it('should handle project root configuration', async () => {
+    mockConfig.getProjectRoot.mockReturnValue('/project/root');
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getProjectRoot).toHaveBeenCalled();
+  });
+});
+
+describe('Full Context and Question Handling', () => {
+  it('should handle full context enabled', async () => {
+    mockConfig.getFullContext.mockReturnValue(true);
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getFullContext).toHaveBeenCalled();
+  });
+
+  it('should handle predefined questions', async () => {
+    mockConfig.getQuestion.mockReturnValue('What should I implement next?');
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getQuestion).toHaveBeenCalled();
+  });
+
+  it('should handle undefined questions', async () => {
+    mockConfig.getQuestion.mockReturnValue(undefined);
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(mockConfig.getQuestion).toHaveBeenCalled();
+  });
+});
+
+describe('Theme Configuration Edge Cases', () => {
+  it('should handle various theme names', async () => {
+    const themes = ['Dark', 'Light', 'HighContrast', 'Custom'];
+
+    for (const theme of themes) {
+      const themeSettings = createMockSettings({ theme });
+
+      const { lastFrame: _lastFrame, unmount } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          startupWarnings={['Integration test warning']}
+          settings={themeSettings}
         />,
       );
-      currentUnmount = unmount;
-      await Promise.resolve();
 
-      expect(lastFrame()).toContain('Using 5 CUSTOM.md files');
-      expect(lastFrame()).toContain('Integration test warning');
-      expect(vi.mocked(Tips)).toHaveBeenCalled();
+      expect(_lastFrame()).not.toContain('Select Theme');
+      unmount();
+    }
+  });
+
+  it('should handle invalid theme names', async () => {
+    mockSettings = createMockSettings({
+      theme: 'NonExistentTheme',
     });
 
-    it('should handle minimal configuration gracefully', async () => {
-      // Reset all config methods to return minimal/default values
-      Object.keys(mockConfig).forEach(key => {
-        if (typeof mockConfig[key as keyof MockServerConfig] === 'function') {
-          const fn = mockConfig[key as keyof MockServerConfig] as any;
-          if (fn.mockReturnValue) {
-            if (key.includes('get')) {
-              // Set reasonable defaults for getter methods
-              switch (key) {
-                case 'getGeminiMdFileCount':
-                  fn.mockReturnValue(0);
-                  break;
-                case 'getDebugMode':
-                case 'getShowMemoryUsage':
-                case 'getFullContext':
-                case 'getVertexAI':
-                  fn.mockReturnValue(false);
-                  break;
-                case 'getMcpServers':
-                  fn.mockReturnValue({});
-                  break;
-                case 'getAccessibility':
-                  fn.mockReturnValue({});
-                  break;
-                case 'getUserMemory':
-                case 'getModel':
-                case 'getApiKey':
-                case 'getUserAgent':
-                case 'getTargetDir':
-                  fn.mockReturnValue('');
-                  break;
-                default:
-                  fn.mockReturnValue(undefined);
-              }
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    // Should still render without theme dialog
+    expect(_lastFrame()).not.toContain('Select Theme');
+  });
+});
+
+describe('Settings Validation', () => {
+  it('should handle settings with unexpected properties', async () => {
+    mockSettings = createMockSettings({
+      theme: 'Default',
+      // @ts-expect-error - testing unexpected properties
+      unexpectedProperty: 'should not crash',
+      numericProperty: 12345,
+    });
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(_lastFrame()).toBeDefined();
+  });
+
+  it('should handle complex contextFileName arrays with mixed types', async () => {
+    mockSettings = createMockSettings({
+      contextFileName: ['FILE1.md', 'FILE2.txt', 'FILE3.json'],
+      theme: 'Default',
+    });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(3);
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+
+    expect(_lastFrame()).toContain('Using 3 context files');
+  });
+});
+
+describe('Startup Warnings Handling', () => {
+  it('should display startup warnings when provided', async () => {
+    const warnings = [
+      'Warning 1: API key deprecated',
+      'Warning 2: Update available',
+    ];
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        startupWarnings={warnings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+
+    expect(_lastFrame()).toContain('Warning 1: API key deprecated');
+    expect(_lastFrame()).toContain('Warning 2: Update available');
+  });
+
+  it('should handle empty startup warnings array', async () => {
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        startupWarnings={[]}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(_lastFrame()).toBeDefined();
+  });
+
+  it('should handle undefined startup warnings', async () => {
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(_lastFrame()).toBeDefined();
+  });
+
+  it('should handle very long startup warning messages', async () => {
+    const longWarning =
+      'This is a very long warning message that might wrap across multiple lines and should be handled gracefully by the UI without causing layout issues or crashes in the terminal application.';
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        startupWarnings={[longWarning]}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(_lastFrame()).toContain('This is a very long warning message');
+  });
+});
+
+describe('Integration Test Scenarios', () => {
+  it('should handle multiple configuration options simultaneously', async () => {
+    mockConfig.getDebugMode.mockReturnValue(true);
+    mockConfig.getShowMemoryUsage.mockReturnValue(true);
+    mockConfig.getVertexAI.mockReturnValue(true);
+    mockConfig.getGeminiMdFileCount.mockReturnValue(5);
+    mockConfig.getMcpServers.mockReturnValue({
+      server1: {} as MCPServerConfig,
+      server2: {} as MCPServerConfig,
+    });
+
+    mockSettings = createMockSettings({
+      theme: 'Dark',
+      contextFileName: 'CUSTOM.md',
+      hideTips: false,
+    });
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        startupWarnings={['Integration test warning']}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+
+    expect(_lastFrame()).toContain('Using 5 CUSTOM.md files');
+    expect(_lastFrame()).toContain('Integration test warning');
+    expect(vi.mocked(Tips)).toHaveBeenCalled();
+  });
+
+  it('should handle minimal configuration gracefully', async () => {
+    // Reset all config methods to return minimal/default values
+    Object.keys(mockConfig).forEach((key) => {
+      if (typeof mockConfig[key as keyof MockServerConfig] === 'function') {
+        const fn = mockConfig[key as keyof MockServerConfig] as Mock;
+        if (fn.mockReturnValue) {
+          if (key.includes('get')) {
+            // Set reasonable defaults for getter methods
+            switch (key) {
+              case 'getGeminiMdFileCount':
+                fn.mockReturnValue(0);
+                break;
+              case 'getDebugMode':
+              case 'getShowMemoryUsage':
+              case 'getFullContext':
+              case 'getVertexAI':
+                fn.mockReturnValue(false);
+                break;
+              case 'getMcpServers':
+                fn.mockReturnValue({});
+                break;
+              case 'getAccessibility':
+                fn.mockReturnValue({});
+                break;
+              case 'getUserMemory':
+              case 'getModel':
+              case 'getApiKey':
+              case 'getUserAgent':
+              case 'getTargetDir':
+                fn.mockReturnValue('');
+                break;
+              default:
+                fn.mockReturnValue(undefined);
             }
           }
         }
-      });
-
-      mockSettings = createMockSettings({ theme: 'Default' });
-
-      const { lastFrame, unmount } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(lastFrame()).toBeDefined();
+      }
     });
+
+    mockSettings = createMockSettings({ theme: 'Default' });
+
+    const { lastFrame: _lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+
+    expect(_lastFrame()).toBeDefined();
   });
 });
