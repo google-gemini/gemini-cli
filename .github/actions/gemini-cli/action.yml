@@ -1,0 +1,10 @@
+name: 'Gemini CLI Action'
+description: 'Run Gemini CLI in GitHub Actions'
+author: 'Gosling-dude'
+runs:
+  using: 'node16'
+  main: 'entrypoint.js'
+inputs:
+  args:
+    description: 'Arguments to pass to Gemini CLI'
+    required: true
