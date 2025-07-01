@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Editor
+.vscode
+.idea
+.editorconfig
+
+# Project Config
+.npmrc
+.prettierrc.json
+esbuild.config.js
+eslint.config.js
+tsconfig.json
+vitest.config.ts
+package-lock.json
+
+# Source & Test files (we only need the packaged dist)
+packages/cli/src
+packages/core/src
+integration-tests
+*.test.ts
+*.test.tsx
+
+# Build artifacts not needed in context
+build
+coverage
+
+# Docs & Misc
+docs
+.gcp
+.github
+scripts
+eslint-rules
+.gemini
+*.md
+LICENSE
+Makefile
+Dockerfile
+.dockerignore
