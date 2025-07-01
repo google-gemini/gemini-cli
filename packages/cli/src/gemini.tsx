@@ -142,7 +142,10 @@ export async function main() {
       if (settings.merged.selectedAuthType) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
+          const err = validateAuthMethod(
+            settings.merged,
+            settings.merged.selectedAuthType,
+          );
           if (err) {
             throw new Error(err);
           }
@@ -285,7 +288,7 @@ async function validateNonInterActiveAuth(
   }
 
   selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
+  const err = validateAuthMethod(nonInteractiveConfig, selectedAuthType);
   if (err != null) {
     console.error(err);
     process.exit(1);

@@ -12,7 +12,7 @@ import {
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
-  VertexSettings,
+  AuthSettings,
   AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
@@ -55,6 +55,7 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  model?: string;
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -66,8 +67,8 @@ export interface Settings {
   hideWindowTitle?: boolean;
   hideTips?: boolean;
 
-  // Vertex AI related settings.
-  vertex?: VertexSettings;
+  // Auth settings
+  auth?: AuthSettings;
 
   // Add other settings here.
 }
@@ -81,6 +82,7 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+
 export class LoadedSettings {
   constructor(
     user: SettingsFile,

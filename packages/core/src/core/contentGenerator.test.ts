@@ -33,8 +33,8 @@ describe('contentGenerator', () => {
     vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
     const generator = await createContentGenerator({
       model: 'test-model',
-      apiKey: 'test-api-key',
       authType: AuthType.USE_GEMINI,
+      auth: { gemini: { apiKey: 'test-api-key' } },
     });
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',

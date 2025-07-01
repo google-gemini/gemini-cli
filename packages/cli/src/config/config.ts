@@ -61,7 +61,6 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'm',
       type: 'string',
       description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     })
     .option('prompt', {
       alias: 'p',
@@ -243,9 +242,9 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model!,
+    model: argv.model || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     extensionContextFilePaths,
-    vertex: settings.vertex,
+    auth: settings.auth,
   });
 }
 
@@ -266,6 +265,7 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
   }
   return mcpServers;
 }
+
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {

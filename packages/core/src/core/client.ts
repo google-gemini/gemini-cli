@@ -53,6 +53,7 @@ export class GeminiClient {
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
+    labels: {},
   };
   private readonly MAX_TURNS = 100;
 
@@ -64,10 +65,13 @@ export class GeminiClient {
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
 
-    const vertex = config.getVertex();
-    if (vertex?.labels) {
-      this.generateContentConfig.labels = vertex.labels;
-    }
+    const auth = config.getAuth();
+    const labels = auth?.vertex?.labels || {};
+    const version = process.env.CLI_VERSION || process.version;
+    this.generateContentConfig.labels = {
+      'gemini-cli': version,
+      ...labels,
+    };
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {

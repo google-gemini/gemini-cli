@@ -160,13 +160,21 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
-      const error = validateAuthMethod(settings.merged.selectedAuthType);
+      const error = validateAuthMethod(
+        settings.merged,
+        settings.merged.selectedAuthType,
+      );
       if (error) {
         setAuthError(error);
         openAuthDialog();
       }
     }
-  }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+  }, [
+    settings.merged,
+    settings.merged.selectedAuthType,
+    openAuthDialog,
+    setAuthError,
+  ]);
 
   const {
     isEditorDialogOpen,

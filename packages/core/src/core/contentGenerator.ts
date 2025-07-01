@@ -12,11 +12,12 @@ import {
   EmbedContentResponse,
   EmbedContentParameters,
   GoogleGenAI,
+  GoogleGenAIOptions,
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
-import { VertexSettings } from '../config/config.js';
+import { AuthSettings } from '../config/config.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -43,11 +44,8 @@ export enum AuthType {
 
 export type ContentGeneratorConfig = {
   model: string;
-  apiKey?: string;
-  vertexai?: boolean;
-  authType?: AuthType | undefined;
-  project?: string;
-  location?: string;
+  authType?: AuthType;
+  auth?: AuthSettings;
 };
 
 export async function createContentGeneratorConfig(
@@ -55,25 +53,15 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
   config?: {
     getModel?: () => string;
-    getVertex?: () => VertexSettings | undefined;
+    getAuth?: () => AuthSettings | undefined;
   },
 ): Promise<ContentGeneratorConfig> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  const vertex = config?.getVertex?.();
-  const googleCloudProject =
-    vertex?.project || process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation =
-    vertex?.location || process.env.GOOGLE_CLOUD_LOCATION;
-
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
     authType,
-    project: googleCloudProject,
-    location: googleCloudLocation,
   };
 
   // if we are using google auth nothing else to validate for now
@@ -81,28 +69,42 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  if (authType === AuthType.USE_GEMINI && geminiApiKey) {
-    contentGeneratorConfig.apiKey = geminiApiKey;
+  const auth = config?.getAuth?.();
+  const geminiApiKey = auth?.gemini?.apiKey || process.env.GEMINI_API_KEY;
+  if (authType === AuthType.USE_GEMINI && !!geminiApiKey) {
+    contentGeneratorConfig.auth = { gemini: { apiKey: geminiApiKey } };
     contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
+      geminiApiKey,
       contentGeneratorConfig.model,
     );
-
     return contentGeneratorConfig;
   }
 
-  if (
-    authType === AuthType.USE_VERTEX_AI &&
-    !!googleApiKey &&
-    googleCloudProject &&
-    googleCloudLocation
-  ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
-    contentGeneratorConfig.vertexai = true;
+  const googleApiKey = auth?.vertex?.apiKey || process.env.GOOGLE_API_KEY;
+  if (authType === AuthType.USE_VERTEX_AI && !!googleApiKey) {
+    contentGeneratorConfig.auth = { vertex: { apiKey: googleApiKey } };
     contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
+      googleApiKey,
       contentGeneratorConfig.model,
     );
+    return contentGeneratorConfig;
+  }
+
+  const googleCloudProject =
+    auth?.vertex?.project || process.env.GOOGLE_CLOUD_PROJECT;
+  const googleCloudLocation =
+    auth?.vertex?.location || process.env.GOOGLE_CLOUD_LOCATION;
+  if (
+    authType === AuthType.USE_VERTEX_AI &&
+    !!googleCloudProject &&
+    !!googleCloudLocation
+  ) {
+    contentGeneratorConfig.auth = {
+      vertex: {
+        project: googleCloudProject,
+        location: googleCloudLocation,
+      },
+    };
 
     return contentGeneratorConfig;
   }
@@ -119,22 +121,24 @@ export async function createContentGenerator(
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
+
   if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
     return createCodeAssistContentGenerator(httpOptions, config.authType);
   }
 
-  if (
-    config.authType === AuthType.USE_GEMINI ||
-    config.authType === AuthType.USE_VERTEX_AI
-  ) {
-    const googleGenAI = new GoogleGenAI({
-      apiKey: config.apiKey === '' ? undefined : config.apiKey,
-      vertexai: config.vertexai,
-      project: config.project,
-      location: config.location,
-      httpOptions,
-    });
+  const options: GoogleGenAIOptions = { httpOptions };
+  if (config.authType === AuthType.USE_GEMINI) {
+    options.apiKey = config.auth?.gemini?.apiKey;
+    const googleGenAI = new GoogleGenAI(options);
+    return googleGenAI.models;
+  }
 
+  if (config.authType === AuthType.USE_VERTEX_AI) {
+    options.vertexai = true;
+    options.apiKey = config.auth?.vertex?.apiKey;
+    options.project = config.auth?.vertex?.project;
+    options.location = config.auth?.vertex?.location;
+    const googleGenAI = new GoogleGenAI(options);
     return googleGenAI.models;
   }
 
