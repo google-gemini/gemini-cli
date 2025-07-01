@@ -161,7 +161,12 @@ export class ToolManifestLoader {
       // First, check if this is a direct reference key
       const referencePath = manifest.tool_references[reference];
       if (referencePath) {
-        const resolvedName = this.resolveReferencePath(referencePath, manifest);
+        // Handle both string and ToolReference object formats
+        const pathString =
+          typeof referencePath === 'string'
+            ? referencePath
+            : `${referencePath.category}.${referencePath.targetTool}.name`;
+        const resolvedName = this.resolveReferencePath(pathString, manifest);
         if (resolvedName) {
           // Try to find the tool definition
           const definition = this.findToolDefinition(resolvedName, manifest);

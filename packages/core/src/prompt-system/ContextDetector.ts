@@ -164,7 +164,7 @@ export class ContextDetectorImpl implements ContextDetector {
       case 'software-engineering':
         // General software engineering might need multiple guidances
         break;
-      
+
       default:
         // No specific flags for other task types
         break;

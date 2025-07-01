@@ -187,7 +187,13 @@ describe('Token Reduction Verification', () => {
       });
 
       // Mock module loading
-      vi.spyOn(assembler as unknown as { moduleLoader: { loadAllModules: () => Promise<PromptModule[]> } }, 'moduleLoader', 'get').mockReturnValue({
+      vi.spyOn(
+        assembler as unknown as {
+          moduleLoader: { loadAllModules: () => Promise<PromptModule[]> };
+        },
+        'moduleLoader',
+        'get',
+      ).mockReturnValue({
         loadAllModules: vi.fn().mockResolvedValue(mockModules),
       });
 
@@ -223,7 +229,13 @@ describe('Token Reduction Verification', () => {
       });
 
       // Mock module loading
-      vi.spyOn(assembler as unknown as { moduleLoader: { loadAllModules: () => Promise<PromptModule[]> } }, 'moduleLoader', 'get').mockReturnValue({
+      vi.spyOn(
+        assembler as unknown as {
+          moduleLoader: { loadAllModules: () => Promise<PromptModule[]> };
+        },
+        'moduleLoader',
+        'get',
+      ).mockReturnValue({
         loadAllModules: vi.fn().mockResolvedValue(mockModules),
       });
 

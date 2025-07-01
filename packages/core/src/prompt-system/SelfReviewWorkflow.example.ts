@@ -17,7 +17,10 @@ import type {
   TaskContext,
   AssemblyResult as _AssemblyResult,
 } from './interfaces/prompt-assembly.js';
-import type { ReviewResult as _ReviewResult, ReviewContext } from './interfaces/self-review.js';
+import type {
+  ReviewResult as _ReviewResult,
+  ReviewContext,
+} from './interfaces/self-review.js';
 
 /**
  * Example 1: Software Engineering Task with Full Quality Review

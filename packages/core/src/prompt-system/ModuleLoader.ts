@@ -289,4 +289,20 @@ export class ModuleLoaderImpl implements ModuleLoader {
       metadata: this.metadataCache.size,
     };
   }
+
+  /**
+   * Get module cache for testing purposes
+   * @internal
+   */
+  getModuleCache(): Map<string, PromptModule> {
+    return this.moduleCache;
+  }
+
+  /**
+   * Get metadata cache for testing purposes
+   * @internal
+   */
+  getMetadataCache(): Map<string, Omit<PromptModule, 'content'>> {
+    return this.metadataCache;
+  }
 }

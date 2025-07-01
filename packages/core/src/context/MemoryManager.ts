@@ -291,11 +291,14 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
       fileStates[path] = context;
     }
 
-    const toolResults: Record<string, {
-      toolName: string;
-      results: Record<string, CachedToolResult>;
-      stats: CacheStats;
-    }> = {};
+    const toolResults: Record<
+      string,
+      {
+        toolName: string;
+        results: Record<string, CachedToolResult>;
+        stats: CacheStats;
+      }
+    > = {};
     for (const [toolName, cache] of this.contextMemory.toolResults.entries()) {
       const stats = await cache.getStats();
       const results: Record<string, CachedToolResult> = {};
@@ -361,6 +364,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Event emitter methods
    */
+  on(event: 'initialized', listener: (config: MemoryConfig) => void): void;
   on(
     event: 'fileContextUpdated',
     listener: (filePath: string, context: FileContext) => void,

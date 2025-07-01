@@ -108,7 +108,9 @@ describe('ValidationSuite', () => {
       }));
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
-      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as unknown as typeof ModuleValidator);
+      vi.mocked(ModuleValidator).mockImplementation(
+        MockModuleValidator as unknown as typeof ModuleValidator,
+      );
 
       const report = await validationSuite.runCompleteValidation();
 
@@ -428,7 +430,9 @@ describe('ValidationSuite', () => {
       }));
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
-      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as unknown as typeof ModuleValidator);
+      vi.mocked(ModuleValidator).mockImplementation(
+        MockModuleValidator as unknown as typeof ModuleValidator,
+      );
 
       const report = await strictSuite.runCompleteValidation();
 

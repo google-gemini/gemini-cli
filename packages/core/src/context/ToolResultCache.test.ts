@@ -6,7 +6,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolResultCache } from './ToolResultCache.js';
-import { CachedToolResult, CacheStats as _CacheStats } from './memory-interfaces.js';
+import {
+  CachedToolResult,
+  CacheStats as _CacheStats,
+} from './memory-interfaces.js';
 
 describe('ToolResultCache', () => {
   let cache: ToolResultCache;

@@ -116,7 +116,9 @@ describe('Dynamic Assembly Engine Demonstration', () => {
     });
 
     // Mock the module loader
-    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
+    (
+      assembler as unknown as { moduleLoader: typeof mockModuleLoader }
+    ).moduleLoader = mockModuleLoader;
 
     const minimalContext: TaskContext = {
       taskType: 'general',
@@ -164,7 +166,9 @@ describe('Dynamic Assembly Engine Demonstration', () => {
       maxTokenBudget: 1500,
     });
 
-    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
+    (
+      assembler as unknown as { moduleLoader: typeof mockModuleLoader }
+    ).moduleLoader = mockModuleLoader;
 
     // Test different contexts
     const contexts = [
@@ -229,7 +233,9 @@ describe('Dynamic Assembly Engine Demonstration', () => {
       maxTokenBudget: 1000,
     });
 
-    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
+    (
+      assembler as unknown as { moduleLoader: typeof mockModuleLoader }
+    ).moduleLoader = mockModuleLoader;
 
     const context: TaskContext = {
       taskType: 'general',

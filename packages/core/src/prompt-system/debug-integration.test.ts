@@ -48,7 +48,9 @@ describe('Debug Integration', () => {
               console.log(`${item}/: ${subContents.join(', ')}`);
             }
           } catch (e) {
-            console.log(`Cannot read ${item}: ${e instanceof Error ? e.message : String(e)}`);
+            console.log(
+              `Cannot read ${item}: ${e instanceof Error ? e.message : String(e)}`,
+            );
           }
         }
       } catch (e) {

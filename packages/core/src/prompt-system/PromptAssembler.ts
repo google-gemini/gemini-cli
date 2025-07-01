@@ -33,7 +33,9 @@ export class PromptAssembler {
   private moduleSelector: ModuleSelector;
   private contextDetector: ContextDetector;
   private performanceOptimizer: PerformanceOptimizer;
-  private options: Required<PromptAssemblerOptions>;
+  private options: Required<Omit<PromptAssemblerOptions, 'customSelector'>> & {
+    customSelector?: PromptAssemblerOptions['customSelector'];
+  };
   private assemblyVersion = '1.0.0';
 
   constructor(options: PromptAssemblerOptions = {}) {
@@ -45,7 +47,7 @@ export class PromptAssembler {
       maxTokenBudget: options.maxTokenBudget || 1500, // Target from PLAN.md
       validateDependencies: options.validateDependencies ?? true,
       selectionStrategy: options.selectionStrategy || 'default',
-      customSelector: options.customSelector,
+      customSelector: options.customSelector || undefined,
     };
 
     // Initialize components
@@ -399,10 +401,8 @@ export class PromptAssembler {
    * Get comprehensive performance statistics
    */
   getPerformanceStats(): {
-    cacheStats: ReturnType<typeof this.performanceOptimizer.getCacheStats>;
-    moduleLoaderStats: ReturnType<
-      (typeof this.moduleLoader & ModuleLoaderImpl)['getCacheStats']
-    >;
+    cacheStats: ReturnType<PerformanceOptimizer['getCacheStats']>;
+    moduleLoaderStats: ReturnType<ModuleLoaderImpl['getCacheStats']>;
   } {
     return {
       cacheStats: this.performanceOptimizer.getCacheStats(),

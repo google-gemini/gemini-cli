@@ -14,9 +14,7 @@ import {
 import { MemoryManager } from './MemoryManager.js';
 import { PromptAssembler } from '../prompt-system/PromptAssembler.js';
 import { BaseTool, ToolResult } from '../tools/tools.js';
-import {
-  TaskContext,
-} from '../prompt-system/interfaces/prompt-assembly.js';
+import { TaskContext } from '../prompt-system/interfaces/prompt-assembly.js';
 import { ProjectContext, MemoryConfig } from './memory-interfaces.js';
 
 // Mock dependencies
@@ -103,12 +101,6 @@ describe('MemoryIntegration', () => {
           assemblyTime: new Date(),
           assemblyVersion: '1.0.0',
           moduleSelectionStrategy: 'default',
-          memoryContext: {
-            fileContextsIncluded: 0,
-            sessionHistoryIncluded: 0,
-            projectPatternsIncluded: 1,
-            memoryTokens: 50,
-          },
         },
       });
 
@@ -183,7 +175,11 @@ describe('MemoryIntegration', () => {
       expect(result.prompt).toContain('React Components');
       expect(result.metadata).toBeDefined();
       if (result.metadata && 'memoryContext' in result.metadata) {
-        const memoryContext = (result.metadata as { memoryContext: { projectPatternsIncluded: number } }).memoryContext;
+        const memoryContext = (
+          result.metadata as {
+            memoryContext: { projectPatternsIncluded: number };
+          }
+        ).memoryContext;
         expect(memoryContext).toBeDefined();
         expect(memoryContext.projectPatternsIncluded).toBe(1);
       }
@@ -388,12 +384,6 @@ describe('MemoryIntegration', () => {
           assemblyTime: new Date(),
           assemblyVersion: '1.0.0',
           moduleSelectionStrategy: 'default',
-          memoryContext: {
-            fileContextsIncluded: 0,
-            sessionHistoryIncluded: 0,
-            projectPatternsIncluded: 1,
-            memoryTokens: 50,
-          },
         },
       });
     });
@@ -425,7 +415,9 @@ describe('MemoryIntegration', () => {
       expect(result.prompt).toContain('Base system prompt');
       expect(result.metadata).toBeDefined();
       if (result.metadata && 'memoryContext' in result.metadata) {
-        expect((result.metadata as { memoryContext: unknown }).memoryContext).toBeDefined();
+        expect(
+          (result.metadata as { memoryContext: unknown }).memoryContext,
+        ).toBeDefined();
       }
     });
 

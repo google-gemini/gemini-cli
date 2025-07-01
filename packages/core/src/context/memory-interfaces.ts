@@ -480,6 +480,8 @@ export interface SerializedMemory {
  * Memory events for integration with the prompt system
  */
 export interface MemoryEventEmitter {
+  /** Emitted when memory system is initialized */
+  on(event: 'initialized', listener: (config: MemoryConfig) => void): void;
   /** Emitted when a file context is updated */
   on(
     event: 'fileContextUpdated',
@@ -507,4 +509,12 @@ export interface MemoryEventEmitter {
     event: 'memoryPressureChanged',
     listener: (level: 'low' | 'medium' | 'high') => void,
   ): void;
+  /** Generic event listener for any event */
+  on(event: string, listener: (...args: unknown[]) => void): void;
+
+  /** Remove event listener */
+  off(event: string, listener: (...args: unknown[]) => void): void;
+
+  /** Emit event */
+  emit(event: string, ...args: unknown[]): boolean;
 }

@@ -116,7 +116,7 @@ export class ValidationSuite {
   };
 
   private criteria: ProductionCriteria;
-  
+
   constructor(criteriaOverrides: Partial<ProductionCriteria> = {}) {
     this.criteria = { ...this.defaultCriteria, ...criteriaOverrides };
     this.validator = new ModuleValidator();

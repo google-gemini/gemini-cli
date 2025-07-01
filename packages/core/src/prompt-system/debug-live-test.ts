@@ -29,14 +29,20 @@ async function debugLiveTest() {
     // Test basic context
     const basicContext: TaskContext = {
       taskType: 'general',
-      environment: {},
+      environmentContext: {},
       hasGitRepo: false,
-      sandboxMode: 'none',
-      userMemory: 'Test user memory content',
+      sandboxMode: false,
+      sandboxType: 'none',
+      hasUserMemory: true,
+      contextFlags: {},
+      tokenBudget: 1500,
     };
 
     console.log('🧪 Testing basic prompt assembly...');
-    const result = await assembler.assemblePrompt(basicContext);
+    const result = await assembler.assemblePrompt(
+      basicContext,
+      'Test user memory content',
+    );
 
     console.log('📊 Assembly Results:');
     console.log(`  - Success: ${result.prompt.length > 0}`);
@@ -61,7 +67,9 @@ async function debugLiveTest() {
 
     return result.prompt.length > 0 && result.warnings.length === 0;
   } catch (error) {
-    console.error(`❌ Test failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `❌ Test failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
     if (error instanceof Error) {
       console.error(error.stack);
     }

@@ -165,7 +165,9 @@ export class ProjectContextManager {
   /**
    * Detect test framework from package.json
    */
-  private detectTestFramework(packageJson: Record<string, unknown>): string | undefined {
+  private detectTestFramework(
+    packageJson: Record<string, unknown>,
+  ): string | undefined {
     const testFrameworks = [
       'vitest',
       'jest',
@@ -265,7 +267,7 @@ export class ProjectContextManager {
           case '.php':
             languages.add('php');
             break;
-          
+
           default:
             // Unknown file extension, no language detected
             break;
@@ -345,12 +347,19 @@ export class ProjectContextManager {
   /**
    * Analyze package.json dependencies
    */
-  async analyzeDependencies(packageJson: Record<string, unknown>): Promise<ProjectDependency[]> {
+  async analyzeDependencies(
+    packageJson: Record<string, unknown>,
+  ): Promise<ProjectDependency[]> {
     const dependencies: ProjectDependency[] = [];
 
     // Production dependencies
-    if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
-      for (const [name, version] of Object.entries(packageJson.dependencies as Record<string, string>)) {
+    if (
+      packageJson.dependencies &&
+      typeof packageJson.dependencies === 'object'
+    ) {
+      for (const [name, version] of Object.entries(
+        packageJson.dependencies as Record<string, string>,
+      )) {
         dependencies.push({
           name,
           version,
@@ -361,7 +370,10 @@ export class ProjectContextManager {
     }
 
     // Development dependencies
-    if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
+    if (
+      packageJson.devDependencies &&
+      typeof packageJson.devDependencies === 'object'
+    ) {
       for (const [name, version] of Object.entries(
         packageJson.devDependencies as Record<string, string>,
       )) {
@@ -375,7 +387,10 @@ export class ProjectContextManager {
     }
 
     // Peer dependencies
-    if (packageJson.peerDependencies && typeof packageJson.peerDependencies === 'object') {
+    if (
+      packageJson.peerDependencies &&
+      typeof packageJson.peerDependencies === 'object'
+    ) {
       for (const [name, version] of Object.entries(
         packageJson.peerDependencies as Record<string, string>,
       )) {

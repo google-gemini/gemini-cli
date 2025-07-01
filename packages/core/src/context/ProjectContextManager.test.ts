@@ -13,24 +13,26 @@ import {
 } from './memory-interfaces.js';
 import * as fs from 'fs/promises';
 import * as _path from 'path';
-import { PathLike, Stats } from 'fs';
+import { PathLike, Stats, Dirent } from 'fs';
 import { FileHandle } from 'fs/promises';
 
-// Mock directory entry interface
-interface MockDirEntry {
+// Mock directory entry interface that implements Dirent
+interface MockDirEntry extends Omit<Dirent, 'name' | 'parentPath' | 'path'> {
   name: string;
-  isDirectory(): boolean;
-  isFile(): boolean;
-  isBlockDevice(): boolean;
-  isCharacterDevice(): boolean;
-  isSymbolicLink(): boolean;
-  isFIFO(): boolean;
-  isSocket(): boolean;
+  parentPath: string;
+  path: string;
 }
 
 // Helper function to create mock directory entries
-const createMockDirEntry = (name: string, isDirectory: boolean): MockDirEntry => ({
+const createMockDirEntry = (
+  name: string,
+  isDirectory: boolean,
+  parentPath = '',
+  fullPath = name,
+): MockDirEntry => ({
   name,
+  parentPath,
+  path: fullPath,
   isDirectory: () => isDirectory,
   isFile: () => !isDirectory,
   isBlockDevice: () => false,
@@ -78,19 +80,23 @@ describe('ProjectContextManager', () => {
         },
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('package.json')) {
-          return JSON.stringify(packageJson);
-        }
-        throw new Error('File not found');
-      });
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return JSON.stringify(packageJson);
+          }
+          throw new Error('File not found');
+        },
+      );
 
-      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('package.json')) {
-          return;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
 
       const context =
         await projectContextManager.analyzeProject(mockProjectRoot);
@@ -120,25 +126,29 @@ describe('ProjectContextManager', () => {
         exclude: ['node_modules', 'dist'],
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('tsconfig.json')) {
-          return JSON.stringify(tsConfig);
-        }
-        if (filePath.toString().includes('package.json')) {
-          return JSON.stringify({ name: 'ts-project' });
-        }
-        throw new Error('File not found');
-      });
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('tsconfig.json')) {
+            return JSON.stringify(tsConfig);
+          }
+          if (filePath.toString().includes('package.json')) {
+            return JSON.stringify({ name: 'ts-project' });
+          }
+          throw new Error('File not found');
+        },
+      );
 
-      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (
-          filePath.toString().includes('tsconfig.json') ||
-          filePath.toString().includes('package.json')
-        ) {
-          return;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (
+            filePath.toString().includes('tsconfig.json') ||
+            filePath.toString().includes('package.json')
+          ) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
 
       const context =
         await projectContextManager.analyzeProject(mockProjectRoot);
@@ -175,25 +185,29 @@ const nextConfig = {
 module.exports = nextConfig
       `;
 
-      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('package.json')) {
-          return JSON.stringify(packageJson);
-        }
-        if (filePath.toString().includes('next.config.js')) {
-          return nextConfig;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('package.json')) {
+            return JSON.stringify(packageJson);
+          }
+          if (filePath.toString().includes('next.config.js')) {
+            return nextConfig;
+          }
+          throw new Error('File not found');
+        },
+      );
 
-      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (
-          filePath.toString().includes('package.json') ||
-          filePath.toString().includes('next.config.js')
-        ) {
-          return;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (
+            filePath.toString().includes('package.json') ||
+            filePath.toString().includes('next.config.js')
+          ) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
 
       const context =
         await projectContextManager.analyzeProject(mockProjectRoot);
@@ -212,19 +226,23 @@ pytest>=7.0.0
 black>=22.0.0
       `.trim();
 
-      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('requirements.txt')) {
-          return requirements;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('requirements.txt')) {
+            return requirements;
+          }
+          throw new Error('File not found');
+        },
+      );
 
-      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('requirements.txt')) {
-          return;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('requirements.txt')) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
 
       const context =
         await projectContextManager.analyzeProject(mockProjectRoot);
@@ -252,31 +270,95 @@ black>=22.0.0
         'package.json',
       ];
 
-      mockFs.readdir.mockImplementation(async (dirPath: PathLike | FileHandle) => {
-        if (dirPath.toString() === mockProjectRoot) {
-          return [
-            createMockDirEntry('src', true),
-            createMockDirEntry('tests', true),
-            createMockDirEntry('public', true),
-            createMockDirEntry('README.md', false),
-            createMockDirEntry('package.json', false),
-          ] as MockDirEntry[];
-        }
-        if (dirPath.toString().includes('src')) {
-          return [
-            createMockDirEntry('components', true),
-            createMockDirEntry('hooks', true),
-            createMockDirEntry('utils', true),
-          ] as MockDirEntry[];
-        }
-        if (dirPath.toString().includes('components')) {
-          return [
-            createMockDirEntry('Button.tsx', false),
-            createMockDirEntry('Input.tsx', false),
-          ] as MockDirEntry[];
-        }
-        return [];
-      });
+      mockFs.readdir.mockImplementation(
+        async (
+          dirPath: PathLike | FileHandle,
+          options?: { withFileTypes?: boolean },
+        ): Promise<string[] | Dirent[]> => {
+          const pathStr = dirPath.toString();
+
+          // Handle withFileTypes: true case
+          if (options && options.withFileTypes) {
+            if (pathStr === mockProjectRoot) {
+              return [
+                createMockDirEntry(
+                  'src',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/src`,
+                ),
+                createMockDirEntry(
+                  'tests',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/tests`,
+                ),
+                createMockDirEntry(
+                  'public',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/public`,
+                ),
+                createMockDirEntry(
+                  'README.md',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/README.md`,
+                ),
+                createMockDirEntry(
+                  'package.json',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/package.json`,
+                ),
+              ] as Dirent[];
+            }
+            if (pathStr.includes('src')) {
+              const srcPath = `${mockProjectRoot}/src`;
+              return [
+                createMockDirEntry(
+                  'components',
+                  true,
+                  srcPath,
+                  `${srcPath}/components`,
+                ),
+                createMockDirEntry('hooks', true, srcPath, `${srcPath}/hooks`),
+                createMockDirEntry('utils', true, srcPath, `${srcPath}/utils`),
+              ] as Dirent[];
+            }
+            if (pathStr.includes('components')) {
+              const componentsPath = `${mockProjectRoot}/src/components`;
+              return [
+                createMockDirEntry(
+                  'Button.tsx',
+                  false,
+                  componentsPath,
+                  `${componentsPath}/Button.tsx`,
+                ),
+                createMockDirEntry(
+                  'Input.tsx',
+                  false,
+                  componentsPath,
+                  `${componentsPath}/Input.tsx`,
+                ),
+              ] as Dirent[];
+            }
+            return [];
+          }
+
+          // Default case - return string array
+          if (pathStr === mockProjectRoot) {
+            return ['src', 'tests', 'public', 'README.md', 'package.json'];
+          }
+          if (pathStr.includes('src')) {
+            return ['components', 'hooks', 'utils'];
+          }
+          if (pathStr.includes('components')) {
+            return ['Button.tsx', 'Input.tsx'];
+          }
+          return [];
+        },
+      );
 
       mockFs.stat.mockResolvedValue({
         isDirectory: () => true,
@@ -302,22 +384,67 @@ black>=22.0.0
     });
 
     it('should calculate file counts correctly', async () => {
-      mockFs.readdir.mockImplementation(async (dirPath: PathLike | FileHandle) => {
-        if (dirPath.toString() === mockProjectRoot) {
-          return [
-            createMockDirEntry('src', true),
-            createMockDirEntry('file1.ts', false),
-            createMockDirEntry('file2.ts', false),
-          ] as MockDirEntry[];
-        }
-        if (dirPath.toString().includes('src')) {
-          return [
-            createMockDirEntry('nested.ts', false),
-            createMockDirEntry('another.ts', false),
-          ] as MockDirEntry[];
-        }
-        return [];
-      });
+      mockFs.readdir.mockImplementation(
+        async (
+          dirPath: PathLike | FileHandle,
+          options?: { withFileTypes?: boolean },
+        ): Promise<string[] | Dirent[]> => {
+          const pathStr = dirPath.toString();
+
+          // Handle withFileTypes: true case
+          if (options && options.withFileTypes) {
+            if (pathStr === mockProjectRoot) {
+              return [
+                createMockDirEntry(
+                  'src',
+                  true,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/src`,
+                ),
+                createMockDirEntry(
+                  'file1.ts',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/file1.ts`,
+                ),
+                createMockDirEntry(
+                  'file2.ts',
+                  false,
+                  mockProjectRoot,
+                  `${mockProjectRoot}/file2.ts`,
+                ),
+              ] as Dirent[];
+            }
+            if (pathStr.includes('src')) {
+              const srcPath = `${mockProjectRoot}/src`;
+              return [
+                createMockDirEntry(
+                  'nested.ts',
+                  false,
+                  srcPath,
+                  `${srcPath}/nested.ts`,
+                ),
+                createMockDirEntry(
+                  'another.ts',
+                  false,
+                  srcPath,
+                  `${srcPath}/another.ts`,
+                ),
+              ] as Dirent[];
+            }
+            return [];
+          }
+
+          // Default case - return string array
+          if (pathStr === mockProjectRoot) {
+            return ['src', 'file1.ts', 'file2.ts'];
+          }
+          if (pathStr.includes('src')) {
+            return ['nested.ts', 'another.ts'];
+          }
+          return [];
+        },
+      );
 
       mockFs.stat.mockResolvedValue({
         isDirectory: () => true,
@@ -594,25 +721,29 @@ export const slugify = (text: string) => {
         printWidth: 100,
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (filePath.toString().includes('.eslintrc.json')) {
-          return JSON.stringify(eslintConfig);
-        }
-        if (filePath.toString().includes('.prettierrc')) {
-          return JSON.stringify(prettierConfig);
-        }
-        throw new Error('File not found');
-      });
+      mockFs.readFile.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (filePath.toString().includes('.eslintrc.json')) {
+            return JSON.stringify(eslintConfig);
+          }
+          if (filePath.toString().includes('.prettierrc')) {
+            return JSON.stringify(prettierConfig);
+          }
+          throw new Error('File not found');
+        },
+      );
 
-      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
-        if (
-          filePath.toString().includes('.eslintrc.json') ||
-          filePath.toString().includes('.prettierrc')
-        ) {
-          return;
-        }
-        throw new Error('File not found');
-      });
+      mockFs.access.mockImplementation(
+        async (filePath: PathLike | FileHandle) => {
+          if (
+            filePath.toString().includes('.eslintrc.json') ||
+            filePath.toString().includes('.prettierrc')
+          ) {
+            return;
+          }
+          throw new Error('File not found');
+        },
+      );
 
       const preferences =
         await projectContextManager.detectPreferences(mockProjectRoot);

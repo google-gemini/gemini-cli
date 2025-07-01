@@ -42,9 +42,11 @@ export class MemoryIntegration {
   /**
    * Create memory-aware tool wrapper
    */
-  createMemoryAwareTool<TParams, TResult extends ToolResult, T extends BaseTool<TParams, TResult>>(
-    tool: T,
-  ): MemoryAwareTool<T> {
+  createMemoryAwareTool<
+    TParams,
+    TResult extends ToolResult,
+    T extends BaseTool<TParams, TResult>,
+  >(tool: T): MemoryAwareTool<T> {
     return new MemoryAwareTool(tool, this.memoryManager);
   }
 
@@ -422,7 +424,10 @@ export class MemoryAwareTool<T extends BaseTool<unknown, ToolResult>> {
   /**
    * Execute tool with memory caching
    */
-  async execute(params: Parameters<T['execute']>[0], signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: Parameters<T['execute']>[0],
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const cacheKey = this.generateCacheKey(params);
 
     // Check cache first
@@ -445,7 +450,10 @@ export class MemoryAwareTool<T extends BaseTool<unknown, ToolResult>> {
     await this.cacheResult(cacheKey, params, result, executionTime);
 
     // Update file contexts if this tool modifies files
-    await this.updateFileContextsIfNeeded(params as Record<string, unknown>, result);
+    await this.updateFileContextsIfNeeded(
+      params as Record<string, unknown>,
+      result,
+    );
 
     return result;
   }
@@ -467,7 +475,9 @@ export class MemoryAwareTool<T extends BaseTool<unknown, ToolResult>> {
     result: ToolResult,
     executionTime: number,
   ): Promise<void> {
-    const dependencies = this.extractDependencies(params as Record<string, unknown>);
+    const dependencies = this.extractDependencies(
+      params as Record<string, unknown>,
+    );
     const size = this.estimateResultSize(result);
     const ttl = this.calculateTtl(executionTime, size);
 
@@ -519,7 +529,9 @@ export class MemoryAwareTool<T extends BaseTool<unknown, ToolResult>> {
     const fileModifyingTools = ['write_file', 'edit', 'shell'];
 
     if (fileModifyingTools.includes(this.baseTool.name)) {
-      const dependencies = this.extractDependencies(params as Record<string, unknown>);
+      const dependencies = this.extractDependencies(
+        params as Record<string, unknown>,
+      );
 
       for (const filePath of dependencies) {
         try {
@@ -661,7 +673,9 @@ export class MemoryIntegrationFactory {
   /**
    * Create memory-aware tool
    */
-  createTool<T extends BaseTool<unknown, ToolResult>>(tool: T): MemoryAwareTool<T> {
+  createTool<T extends BaseTool<unknown, ToolResult>>(
+    tool: T,
+  ): MemoryAwareTool<T> {
     return this.integration.createMemoryAwareTool(tool);
   }
 

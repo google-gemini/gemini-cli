@@ -57,9 +57,7 @@ export type {
   QualityTestResult,
 } from './ModuleValidator.js';
 
-export type {
-  ValidationReport,
-} from './ValidationSuite.js';
+export type { ValidationReport } from './ValidationSuite.js';
 
 export type {
   QualityGate,

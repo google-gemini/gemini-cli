@@ -13,9 +13,9 @@ describe('PromptAssembler Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear environment variables
-    vi.stubEnv('DEBUG', undefined);
-    vi.stubEnv('DEV', undefined);
-    vi.stubEnv('SANDBOX', undefined);
+    delete process.env.DEBUG;
+    delete process.env.DEV;
+    delete process.env.SANDBOX;
   });
 
   afterEach(() => {

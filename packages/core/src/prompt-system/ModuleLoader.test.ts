@@ -129,7 +129,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['identity.md', 'mandates.md', 'other.txt'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
+      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -144,7 +144,9 @@ This is a test module with some content that should have tokens estimated.`;
       vi.mocked(fs.readdir).mockRejectedValue(new Error('Directory not found'));
 
       const modules = await moduleLoader.loadModulesByCategory(
-        'nonexistent' as Parameters<typeof moduleLoader.loadModulesByCategory>[0],
+        'nonexistent' as Parameters<
+          typeof moduleLoader.loadModulesByCategory
+        >[0],
       );
 
       expect(modules).toEqual([]);
@@ -154,7 +156,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
+      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -168,7 +170,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
+      (vi.mocked(fs.readdir) as typeof fs.readdir).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadAllModules();
@@ -191,7 +193,7 @@ This is a test module with some content that should have tokens estimated.`;
       };
 
       // Manually set cache
-      (moduleLoader as { moduleCache: Map<string, PromptModule> }).moduleCache.set('test', mockModule);
+      moduleLoader.getModuleCache().set('test', mockModule);
 
       const exists = moduleLoader.moduleExists('test');
 
@@ -263,13 +265,19 @@ This is a test module with some content that should have tokens estimated.`;
         category: 'core',
       };
 
-      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).moduleCache.set('test', mockModule);
-      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).metadataCache.set('test', { id: 'test' });
+      moduleLoader.getModuleCache().set('test', mockModule);
+      moduleLoader.getMetadataCache().set('test', {
+        id: 'test',
+        version: '1.0.0',
+        dependencies: [],
+        tokenCount: 10,
+        category: 'core',
+      });
 
       moduleLoader.clearCache();
 
-      expect((moduleLoader as { moduleCache: Map<string, PromptModule> }).moduleCache.size).toBe(0);
-      expect((moduleLoader as { metadataCache: Map<string, unknown> }).metadataCache.size).toBe(0);
+      expect(moduleLoader.getModuleCache().size).toBe(0);
+      expect(moduleLoader.getMetadataCache().size).toBe(0);
     });
 
     it('should return cache statistics', () => {
@@ -282,8 +290,14 @@ This is a test module with some content that should have tokens estimated.`;
         category: 'core',
       };
 
-      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).moduleCache.set('test', mockModule);
-      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).metadataCache.set('meta', { id: 'meta' });
+      moduleLoader.getModuleCache().set('test', mockModule);
+      moduleLoader.getMetadataCache().set('meta', {
+        id: 'meta',
+        version: '1.0.0',
+        dependencies: [],
+        tokenCount: 10,
+        category: 'core',
+      });
 
       const stats = moduleLoader.getCacheStats();
 

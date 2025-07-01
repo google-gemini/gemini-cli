@@ -21,8 +21,8 @@ describe('ContextDetector', () => {
     vi.clearAllMocks();
     contextDetector.clearCache();
     // Clear environment variables that might affect detection
-    vi.stubEnv('DEBUG', undefined);
-    vi.stubEnv('DEV', undefined);
+    delete process.env.DEBUG;
+    delete process.env.DEV;
   });
 
   afterEach(() => {
@@ -31,7 +31,7 @@ describe('ContextDetector', () => {
 
   describe('detectTaskContext', () => {
     it('should detect basic context with defaults', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(false);
 
       const context = contextDetector.detectTaskContext();
@@ -51,7 +51,7 @@ describe('ContextDetector', () => {
     });
 
     it('should detect git repository context', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(true);
 
       const context = contextDetector.detectTaskContext();
@@ -93,7 +93,7 @@ describe('ContextDetector', () => {
     });
 
     it('should accept and apply overrides', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(false);
 
       const context = contextDetector.detectTaskContext({
@@ -107,7 +107,7 @@ describe('ContextDetector', () => {
     });
 
     it('should cache context when no overrides provided', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(false);
 
       const context1 = contextDetector.detectTaskContext();
@@ -118,7 +118,7 @@ describe('ContextDetector', () => {
     });
 
     it('should not cache when overrides are provided', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(false);
 
       const context1 = contextDetector.detectTaskContext();
@@ -161,7 +161,7 @@ describe('ContextDetector', () => {
 
   describe('detectSandboxMode', () => {
     it('should detect no sandbox when SANDBOX is not set', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
 
       const result = contextDetector.detectSandboxMode();
 
@@ -215,7 +215,7 @@ describe('ContextDetector', () => {
 
   describe('clearCache', () => {
     it('should clear the cached context', () => {
-      vi.stubEnv('SANDBOX', undefined);
+      delete process.env.SANDBOX;
       vi.mocked(isGitRepository).mockReturnValue(false);
 
       // First call creates cache

@@ -93,7 +93,7 @@ export class ModuleSelectorImpl implements ModuleSelector {
         if (moduleMap.has('software-engineering'))
           selected.add('software-engineering');
         break;
-      
+
       default:
         // No specific modules for other task types
         break;

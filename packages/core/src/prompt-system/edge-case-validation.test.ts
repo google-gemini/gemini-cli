@@ -76,8 +76,20 @@ describe('Edge Case Validation', () => {
         { sandboxMode: undefined as unknown as boolean },
         { tokenBudget: -100 },
         { tokenBudget: 0 },
-        { environmentContext: null as unknown as Record<string, string | undefined> },
-        { taskType: 'invalid-type' as unknown as 'general' | 'debug' | 'new-application' | 'refactor' | 'software-engineering' },
+        {
+          environmentContext: null as unknown as Record<
+            string,
+            string | undefined
+          >,
+        },
+        {
+          taskType: 'invalid-type' as unknown as
+            | 'general'
+            | 'debug'
+            | 'new-application'
+            | 'refactor'
+            | 'software-engineering',
+        },
       ];
 
       for (const context of edgeCases) {
@@ -129,12 +141,15 @@ describe('Edge Case Validation', () => {
 
       for (let i = 0; i < totalRuns; i++) {
         try {
-          const result = await assembler.assemblePrompt({
-            hasGitRepo: i % 2 === 0,
-            sandboxMode: i % 3 === 0,
-            tokenBudget: 500 + i * 100,
-            userMemory: i % 5 === 0 ? `Test memory ${i}` : undefined,
-          });
+          const userMemory = i % 5 === 0 ? `Test memory ${i}` : undefined;
+          const result = await assembler.assemblePrompt(
+            {
+              hasGitRepo: i % 2 === 0,
+              sandboxMode: i % 3 === 0,
+              tokenBudget: 500 + i * 100,
+            },
+            userMemory,
+          );
 
           if (result.prompt.length > 0) {
             successCount++;
@@ -164,9 +179,10 @@ describe('Edge Case Validation', () => {
 
       // Perform many operations
       for (let i = 0; i < 50; i++) {
-        await assembler.assemblePrompt({
-          userMemory: `Large memory block ${'x'.repeat(1000)} iteration ${i}`,
-        });
+        await assembler.assemblePrompt(
+          {},
+          `Large memory block ${'x'.repeat(1000)} iteration ${i}`,
+        );
 
         // Force garbage collection periodically to prevent legitimate caching from affecting test
         if (i % 10 === 0 && global.gc) {

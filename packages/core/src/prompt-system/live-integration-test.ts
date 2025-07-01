@@ -68,7 +68,9 @@ export class LiveIntegrationTest {
       testResults.push({
         name: 'Basic prompt assembly',
         passed: false,
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
@@ -103,7 +105,9 @@ export class LiveIntegrationTest {
       testResults.push({
         name: 'Debug context assembly',
         passed: false,
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
@@ -135,7 +139,9 @@ export class LiveIntegrationTest {
       testResults.push({
         name: 'Token reduction target',
         passed: false,
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
@@ -193,7 +199,9 @@ export class LiveIntegrationTest {
       testResults.push({
         name: 'Performance benchmarking',
         passed: false,
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
@@ -216,7 +224,9 @@ export class LiveIntegrationTest {
       testResults.push({
         name: 'System validation',
         passed: false,
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
@@ -287,7 +297,9 @@ export class LiveIntegrationTest {
       console.log('\n✅ ALL CROSS-COMPONENT INTEGRATIONS WORKING\n');
       return true;
     } catch (error) {
-      console.error(`❌ Cross-component integration failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `❌ Cross-component integration failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return false;
     }
   }

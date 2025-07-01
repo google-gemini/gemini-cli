@@ -403,10 +403,9 @@ export class MemoryPerformanceOptimizer {
     stats: MemoryStats,
   ): 'low' | 'medium' | 'high' {
     const totalCacheOperations = Object.values(stats.cacheHitRatios).reduce(
-      (sum, ratio) => 
+      (sum, ratio) =>
         // Estimate operations based on hit ratio (higher ratio = more operations)
-         sum + ratio * 1000 // Simplified calculation
-      ,
+        sum + ratio * 1000, // Simplified calculation
       0,
     );
 

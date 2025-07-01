@@ -75,7 +75,9 @@ export class PerformanceOptimizer {
     // Implement LRU eviction if cache is full
     if (this.assemblyCache.size >= this.MAX_CACHE_SIZE) {
       const firstKey = this.assemblyCache.keys().next().value;
-      this.assemblyCache.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.assemblyCache.delete(firstKey);
+      }
     }
 
     this.assemblyCache.set(key, result);
@@ -157,13 +159,13 @@ export class PerformanceOptimizer {
     const totalHits = 0;
     const totalRequests = 0;
 
-    for (const result of this.assemblyCache.values()) {
+    this.assemblyCache.forEach((result) => {
       totalSize += result.prompt.length;
       totalSize += result.includedModules.reduce(
         (sum, mod) => sum + mod.content.length,
         0,
       );
-    }
+    });
 
     return {
       cacheSize: this.assemblyCache.size,
@@ -179,13 +181,18 @@ export class PerformanceOptimizer {
     const now = Date.now();
     let cleared = 0;
 
-    for (const [key, result] of this.assemblyCache.entries()) {
+    const keysToDelete: string[] = [];
+    this.assemblyCache.forEach((result, key) => {
       const ageMs = now - result.metadata.assemblyTime.getTime();
       if (ageMs > this.CACHE_TTL_MS) {
-        this.assemblyCache.delete(key);
-        cleared++;
+        keysToDelete.push(key);
       }
-    }
+    });
+
+    keysToDelete.forEach((key) => {
+      this.assemblyCache.delete(key);
+      cleared++;
+    });
 
     return cleared;
   }
@@ -204,7 +211,11 @@ export class PerformanceOptimizer {
     size: number;
     maxSize: number;
     ttlMs: number;
-    memoryUsage: ReturnType<typeof this.getMemoryUsage>;
+    memoryUsage: {
+      cacheSize: number;
+      estimatedMemoryKB: number;
+      hitRate: number;
+    };
   } {
     return {
       size: this.assemblyCache.size,
