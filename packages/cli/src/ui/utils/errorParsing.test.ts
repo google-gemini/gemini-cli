@@ -34,7 +34,7 @@ describe('parseAndFormatApiError', () => {
       'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
     const result = parseAndFormatApiError(
       errorMessage,
-      AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
     expect(result).toContain(enterpriseMessage);
