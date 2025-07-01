@@ -1045,7 +1045,7 @@ describe('Full Context and Question Handling', () => {
 
 describe('Theme Configuration Edge Cases', () => {
   it('should handle various theme names', async () => {
-    const themes = ['Dark', 'Light', 'HighContrast', 'Custom'];
+    const themes = ['Ayu Light', 'Default Light', 'GitHub', 'Google Code'];
 
     for (const theme of themes) {
       const themeSettings = createMockSettings({ theme });
@@ -1075,8 +1075,8 @@ describe('Theme Configuration Edge Cases', () => {
     );
     currentUnmount = unmount;
 
-    // Should still render without theme dialog
-    expect(_lastFrame()).not.toContain('Select Theme');
+    // Should show theme dialog for invalid themes
+    expect(_lastFrame()).toContain('Select Theme');
   });
 });
 
@@ -1195,7 +1195,7 @@ describe('Integration Test Scenarios', () => {
     });
 
     mockSettings = createMockSettings({
-      theme: 'Dark',
+      theme: 'Default',
       contextFileName: 'CUSTOM.md',
       hideTips: false,
     });

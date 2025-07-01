@@ -33,7 +33,17 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       return '';
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
-    const name = allNamesTheSame ? contextFileNames[0] : 'context';
+    let name: string;
+    if (allNamesTheSame && contextFileNames.length > 0 && contextFileNames[0]) {
+      // All names are the same and we have a valid first name
+      name = contextFileNames[0];
+    } else if (allNamesTheSame) {
+      // Empty array case - fallback to default
+      name = 'GEMINI.md';
+    } else {
+      // Multiple different names
+      name = 'context';
+    }
     return `${geminiMdFileCount} ${name} file${
       geminiMdFileCount > 1 ? 's' : ''
     }`;

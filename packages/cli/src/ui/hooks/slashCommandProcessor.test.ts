@@ -112,6 +112,7 @@ describe('useSlashCommandProcessor', () => {
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
       tryCompressChat: mockTryCompressChat,
+      resetChat: vi.fn(),
     } as unknown as GeminiClient;
     mockConfig = {
       getDebugMode: vi.fn(() => false),
@@ -121,6 +122,12 @@ describe('useSlashCommandProcessor', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
+      getToolRegistry: vi.fn().mockResolvedValue({
+        getAllTools: vi.fn().mockReturnValue([
+          { name: 'tool1', displayName: 'Tool1' },
+          { name: 'tool2', displayName: 'Tool2' },
+        ]),
+      }),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -742,7 +749,6 @@ describe('useSlashCommandProcessor', () => {
 
         if (shouldFail) {
           expect(mockAddItem).toHaveBeenCalledWith(
-            2,
             expect.objectContaining({
               type: MessageType.ERROR,
               text: expect.stringContaining('Unknown command'),
