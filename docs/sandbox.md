@@ -4,13 +4,22 @@ This document provides a guide to sandboxing in the Gemini CLI, including prereq
 
 ## Prerequisites
 
-Before using sandboxing, you need to install and set up the Gemini CLI:
+Before using sandboxing, you need to install and set up the Gemini CLI.
+
+You can install it globally using one of the following commands:
 
 ```bash
-# install gemini-cli with npm
+# Install Gemini CLI globally with npm
 npm install -g @google/gemini-cli
+```
 
-# Verify installation
+```bash
+# Or install Gemini CLI globally with pnpm
+pnpm add -g @google/gemini-cli
+```
+
+```bash
+# Verify the installation
 gemini --version
 ```
 
