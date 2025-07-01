@@ -29,7 +29,7 @@ const PrivacyNoticeText = ({
       return <GeminiPrivacyNotice onExit={onExit} />;
     case AuthType.USE_VERTEX_AI:
       return <CloudPaidPrivacyNotice onExit={onExit} />;
-    case AuthType.LOGIN_WITH_GOOGLE_PERSONAL:
+    case AuthType.LOGIN_WITH_GOOGLE:
     default:
       return <CloudFreePrivacyNotice config={config} onExit={onExit} />;
   }
