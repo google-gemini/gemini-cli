@@ -447,7 +447,11 @@ export class GeminiClient {
     }
 
     // Don't compress if not forced and we are under the limit.
-    if (!force && originalTokenCount < this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.model)) {
+    if (
+      !force &&
+      originalTokenCount <
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.model)
+    ) {
       return null;
     }
 
