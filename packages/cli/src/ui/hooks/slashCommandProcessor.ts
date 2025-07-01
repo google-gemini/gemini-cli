@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
@@ -40,6 +40,7 @@ import {
   type SlashCommandActionReturn,
 } from '../commands/types.js';
 import { registeredCommands } from '../commands/index.js';
+import { CommandService } from '../../services/CommandService.js';
 
 // LEGACY TYPE: This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -81,6 +82,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
+  const [customCommands, setCustomCommands] = useState<Command[]>([]);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -219,6 +221,26 @@ export const useSlashCommandProcessor = (
       addMessage,
     ],
   );
+
+  const commandService = useMemo(() => {
+    if (!config) {
+      return null;
+    }
+    return new CommandService(config, commandContext);
+  }, [config, commandContext]);
+
+  useEffect(() => {
+    if (!commandService) {
+      return;
+    }
+
+    const load = async () => {
+      await commandService.loadCommands();
+      setCustomCommands(commandService.getCommands());
+    };
+
+    load();
+  }, [commandService]);
 
   const showMemoryAction = useCallback(async () => {
     const actionFn = createShowMemoryAction(config, settings, addMessage);
@@ -1125,14 +1147,17 @@ export const useSlashCommandProcessor = (
   // underlying source.
   const slashCommands = useMemo(() => {
     // Adapt the new commands to the old interface.
-    const newCommandsAsLegacy = registeredCommands.map(
+    const newCommandsAsLegacy = [
+      ...registeredCommands,
+      ...customCommands,
+    ].map(
       (cmd: Command): SlashCommand => ({
         name: cmd.name,
         altName: cmd.altName,
         description: cmd.description,
         completion: cmd.completion
           ? () => cmd.completion!(commandContext)
-          : undefined,
+                    : undefined,
         action: (mainCommand, subCommand, args) => {
           const commandArgs: CommandArgs = {
             mainCommand,
@@ -1146,7 +1171,7 @@ export const useSlashCommandProcessor = (
     );
 
     return [...newCommandsAsLegacy, ...legacyCommands];
-  }, [legacyCommands, commandContext]);
+  }, [legacyCommands, commandContext, customCommands]);
 
   const handleSlashCommand = useCallback(
     async (
