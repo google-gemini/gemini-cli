@@ -39,8 +39,7 @@ const SIGN_IN_SUCCESS_URL =
 const SIGN_IN_FAILURE_URL =
   'https://developers.google.com/gemini-code-assist/auth_failure_gemini';
 
-const GEMINI_CONFIG_DIR_ENV_VAR = 'GEMINI_CONFIG_DIR';
-const GEMINI_DIR = process.env[GEMINI_CONFIG_DIR_ENV_VAR] || '.gemini';
+import { GEMINI_DIR } from '../utils/paths.js';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
 const GOOGLE_ACCOUNT_ID_FILENAME = 'google_account_id';
 

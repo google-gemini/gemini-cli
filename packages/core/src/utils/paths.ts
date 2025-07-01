@@ -8,7 +8,7 @@ import path from 'node:path';
 import os from 'os';
 import * as crypto from 'crypto';
 
-export const GEMINI_CONFIG_DIR_ENV_VAR = 'GEMINI_CONFIG_DIR';
+const GEMINI_CONFIG_DIR_ENV_VAR = 'GEMINI_CONFIG_DIR';
 export const GEMINI_DIR = process.env[GEMINI_CONFIG_DIR_ENV_VAR] || '.gemini';
 const TMP_DIR_NAME = 'tmp';
 
