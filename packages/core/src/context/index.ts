@@ -9,7 +9,7 @@ export { ChunkRegistry } from './ChunkRegistry.js';
 export { ContextLogger } from './ContextLogger.js';
 export { ContextManager } from './ContextManager.js';
 export { ContextPruner } from './ContextPruner.js';
-export { FallbackStrategies } from './FallbackStrategies.js';
+export { FallbackStrategy } from './FallbackStrategies.js';
 
 // Export memory system interfaces
 export type {

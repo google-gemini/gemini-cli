@@ -28,7 +28,13 @@ export interface FileContext {
   /** Whether file exists */
   exists: boolean;
   /** Git status if in repository */
-  gitStatus?: 'untracked' | 'modified' | 'added' | 'deleted' | 'renamed' | 'clean';
+  gitStatus?:
+    | 'untracked'
+    | 'modified'
+    | 'added'
+    | 'deleted'
+    | 'renamed'
+    | 'clean';
   /** Files this file depends on (imports, includes, etc.) */
   dependencies: string[];
   /** Files that depend on this file */
@@ -95,7 +101,14 @@ export interface ProjectContext {
   /** Project name */
   name: string;
   /** Project type/framework */
-  type: 'nodejs' | 'python' | 'java' | 'typescript' | 'react' | 'nextjs' | 'generic';
+  type:
+    | 'nodejs'
+    | 'python'
+    | 'java'
+    | 'typescript'
+    | 'react'
+    | 'nextjs'
+    | 'generic';
   /** Programming languages used */
   languages: string[];
   /** Frameworks and libraries detected */
@@ -283,7 +296,7 @@ export interface ToolResultCache {
   lastCleanup: number;
   /** Cleanup interval in ms */
   cleanupInterval: number;
-  
+
   /** Cache a tool result */
   set(key: string, result: CachedToolResult): Promise<boolean>;
   /** Get a cached tool result */
@@ -391,7 +404,10 @@ export interface MemoryOperations {
   /** Initialize memory system */
   initialize(config: MemoryConfig): Promise<void>;
   /** Update file context */
-  updateFileContext(filePath: string, context: Partial<FileContext>): Promise<void>;
+  updateFileContext(
+    filePath: string,
+    context: Partial<FileContext>,
+  ): Promise<void>;
   /** Get file context */
   getFileContext(filePath: string): Promise<FileContext | undefined>;
   /** Update project context */
@@ -399,9 +415,16 @@ export interface MemoryOperations {
   /** Add conversation summary */
   addConversationSummary(summary: ConversationSummary): Promise<void>;
   /** Cache tool result */
-  cacheToolResult(toolName: string, key: string, result: CachedToolResult): Promise<void>;
+  cacheToolResult(
+    toolName: string,
+    key: string,
+    result: CachedToolResult,
+  ): Promise<void>;
   /** Get cached tool result */
-  getCachedToolResult(toolName: string, key: string): Promise<CachedToolResult | undefined>;
+  getCachedToolResult(
+    toolName: string,
+    key: string,
+  ): Promise<CachedToolResult | undefined>;
   /** Cleanup expired entries */
   cleanup(): Promise<void>;
   /** Get memory usage statistics */
@@ -437,11 +460,14 @@ export interface SerializedMemory {
   /** Serialized session history */
   sessionHistory: ConversationSummary[];
   /** Serialized tool results */
-  toolResults: Record<string, {
-    toolName: string;
-    results: Record<string, CachedToolResult>;
-    stats: CacheStats;
-  }>;
+  toolResults: Record<
+    string,
+    {
+      toolName: string;
+      results: Record<string, CachedToolResult>;
+      stats: CacheStats;
+    }
+  >;
   /** Metadata about the serialization */
   metadata: {
     version: string;
@@ -455,15 +481,30 @@ export interface SerializedMemory {
  */
 export interface MemoryEventEmitter {
   /** Emitted when a file context is updated */
-  on(event: 'fileContextUpdated', listener: (filePath: string, context: FileContext) => void): void;
+  on(
+    event: 'fileContextUpdated',
+    listener: (filePath: string, context: FileContext) => void,
+  ): void;
   /** Emitted when project context is updated */
-  on(event: 'projectContextUpdated', listener: (context: ProjectContext) => void): void;
+  on(
+    event: 'projectContextUpdated',
+    listener: (context: ProjectContext) => void,
+  ): void;
   /** Emitted when a conversation summary is added */
-  on(event: 'conversationSummaryAdded', listener: (summary: ConversationSummary) => void): void;
+  on(
+    event: 'conversationSummaryAdded',
+    listener: (summary: ConversationSummary) => void,
+  ): void;
   /** Emitted when a tool result is cached */
-  on(event: 'toolResultCached', listener: (toolName: string, key: string, result: CachedToolResult) => void): void;
+  on(
+    event: 'toolResultCached',
+    listener: (toolName: string, key: string, result: CachedToolResult) => void,
+  ): void;
   /** Emitted when memory cleanup occurs */
   on(event: 'memoryCleanup', listener: (stats: MemoryStats) => void): void;
   /** Emitted when memory pressure changes */
-  on(event: 'memoryPressureChanged', listener: (level: 'low' | 'medium' | 'high') => void): void;
+  on(
+    event: 'memoryPressureChanged',
+    listener: (level: 'low' | 'medium' | 'high') => void,
+  ): void;
 }

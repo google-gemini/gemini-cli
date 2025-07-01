@@ -93,6 +93,10 @@ export class ModuleSelectorImpl implements ModuleSelector {
         if (moduleMap.has('software-engineering'))
           selected.add('software-engineering');
         break;
+      
+      default:
+        // No specific modules for other task types
+        break;
     }
   }
 
@@ -142,7 +146,10 @@ export class ModuleSelectorImpl implements ModuleSelector {
     }
 
     // ReAct reasoning patterns for complex tasks requiring structured reasoning
-    if (this.shouldIncludeReActPattern(context) && moduleMap.has('reasoning-patterns')) {
+    if (
+      this.shouldIncludeReActPattern(context) &&
+      moduleMap.has('reasoning-patterns')
+    ) {
       selected.add('reasoning-patterns');
     }
   }
@@ -156,13 +163,13 @@ export class ModuleSelectorImpl implements ModuleSelector {
     moduleMap: Map<string, PromptModule>,
   ): void {
     const selfReviewModule = getSelfReviewModule(context);
-    
+
     if (selfReviewModule) {
       // Add the self-review module to the module map if it's not already there
       if (!moduleMap.has(selfReviewModule.id)) {
         moduleMap.set(selfReviewModule.id, selfReviewModule);
       }
-      
+
       // Select the module
       selected.add(selfReviewModule.id);
     }
@@ -239,7 +246,12 @@ export class ModuleSelectorImpl implements ModuleSelector {
     // Calculate current token count
     let currentTokens = 0;
     const optimized: PromptModule[] = [];
-    const required = new Set(['identity', 'mandates', 'security', 'quality-gates']); // Always keep base modules and quality gates
+    const required = new Set([
+      'identity',
+      'mandates',
+      'security',
+      'quality-gates',
+    ]); // Always keep base modules and quality gates
 
     for (const module of prioritized) {
       const newTotal = currentTokens + module.tokenCount;
@@ -329,7 +341,7 @@ export class ModuleSelectorImpl implements ModuleSelector {
     const complexTaskTypes: Array<TaskContext['taskType']> = [
       'debug',
       'software-engineering',
-      'refactor'
+      'refactor',
     ];
 
     if (complexTaskTypes.includes(context.taskType)) {

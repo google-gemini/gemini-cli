@@ -25,7 +25,7 @@ For complex problems, use structured reasoning:
 ### Flow
 
 1. **ANALYSIS**: Break down problem, identify key factors
-2. **PLAN**: Outline steps and tools needed  
+2. **PLAN**: Outline steps and tools needed
 3. **ACTION**: Execute planned step
 4. **OBSERVATION**: Evaluate results, identify new information
 5. **NEXT**: Determine next step or conclude

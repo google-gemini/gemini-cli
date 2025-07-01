@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PromptAssembler } from './PromptAssembler';
-import * as path from 'node:path';
+import { PromptAssembler } from './PromptAssembler.js';
 
 describe('Real-world Integration Testing', () => {
   let promptAssembler: PromptAssembler;
@@ -114,7 +113,7 @@ describe('Real-world Integration Testing', () => {
       });
       expect(lowBudgetResult.prompt.length).toBeGreaterThan(0);
 
-      // Complex context  
+      // Complex context
       const complexResult = await promptAssembler.assemblePrompt({
         taskType: 'general',
         hasGitRepo: true,

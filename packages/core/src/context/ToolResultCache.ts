@@ -25,10 +25,10 @@ export interface ToolResultCacheConfig {
  * Implementation of tool result caching with LRU eviction and TTL support
  */
 export class ToolResultCache implements IToolResultCache {
-  public readonly toolName: string;
-  public readonly results = new Map<string, CachedToolResult>();
-  public readonly maxSize: number;
-  public readonly stats: CacheStats = {
+  readonly toolName: string;
+  readonly results = new Map<string, CachedToolResult>();
+  readonly maxSize: number;
+  readonly stats: CacheStats = {
     hits: 0,
     misses: 0,
     hitRatio: 0,
@@ -37,8 +37,8 @@ export class ToolResultCache implements IToolResultCache {
     evictions: 0,
     expirations: 0,
   };
-  public lastCleanup: number = Date.now();
-  public readonly cleanupInterval: number;
+  lastCleanup: number = Date.now();
+  readonly cleanupInterval: number;
 
   private readonly defaultTtl: number;
   private readonly maxResultSize: number;
@@ -72,7 +72,10 @@ export class ToolResultCache implements IToolResultCache {
     }
 
     // Check if we need to evict entries to make space
-    while (this.stats.totalSize + result.size > this.maxSize && this.results.size > 0) {
+    while (
+      this.stats.totalSize + result.size > this.maxSize &&
+      this.results.size > 0
+    ) {
       this.evictLeastRecentlyUsed();
     }
 
@@ -90,7 +93,7 @@ export class ToolResultCache implements IToolResultCache {
    */
   async get(key: string): Promise<CachedToolResult | undefined> {
     const result = this.results.get(key);
-    
+
     if (!result) {
       this.stats.misses++;
       this.updateHitRatio();
@@ -111,7 +114,7 @@ export class ToolResultCache implements IToolResultCache {
     // Update access information
     result.accessCount++;
     result.lastAccessed = Date.now();
-    
+
     // Move to end to mark as recently used (LRU)
     this.results.delete(key);
     this.results.set(key, result);
@@ -139,7 +142,7 @@ export class ToolResultCache implements IToolResultCache {
    */
   async invalidateByDependency(dependency: string): Promise<void> {
     const keysToDelete: string[] = [];
-    
+
     for (const [key, result] of this.results.entries()) {
       if (result.dependencies.includes(dependency)) {
         keysToDelete.push(key);
@@ -165,7 +168,7 @@ export class ToolResultCache implements IToolResultCache {
    */
   async cleanup(): Promise<void> {
     const keysToDelete: string[] = [];
-    
+
     for (const [key, result] of this.results.entries()) {
       if (this.isExpired(result)) {
         keysToDelete.push(key);
@@ -231,20 +234,20 @@ export class ToolResultCache implements IToolResultCache {
   /**
    * Sort object properties for consistent key generation
    */
-  private sortObject(obj: any): any {
+  private sortObject(obj: unknown): unknown {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.sortObject(item));
+      return obj.map((item) => this.sortObject(item));
     }
 
-    const sorted: any = {};
-    const keys = Object.keys(obj).sort();
-    
+    const sorted: Record<string, unknown> = {};
+    const keys = Object.keys(obj as Record<string, unknown>).sort();
+
     for (const key of keys) {
-      sorted[key] = this.sortObject(obj[key]);
+      sorted[key] = this.sortObject((obj as Record<string, unknown>)[key]);
     }
 
     return sorted;

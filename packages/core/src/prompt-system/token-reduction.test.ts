@@ -137,9 +137,9 @@ describe('Token Reduction Verification', () => {
         // Verify we achieve at least 60% reduction
         expect(reductionPercent).toBeGreaterThanOrEqual(60);
         expect(dynamicTokens).toBeLessThanOrEqual(1500); // Target from PLAN.md
-      } catch (error) {
+      } catch (_error) {
         // If dynamic assembly fails, at least verify the basic structure works
-        expect(error).toBeUndefined();
+        expect(_error).toBeUndefined();
       }
     });
 
@@ -147,9 +147,9 @@ describe('Token Reduction Verification', () => {
       // Test the specific token budget targets from PLAN.md
       const baseAssemblyTarget = 1500; // Base assembly target
       const debugTaskExtra = 250; // Debug tasks additional
-      const gitRepoExtra = 280; // Git repos additional
-      const sandboxExtra = 290; // Sandbox mode additional
-      const newAppExtra = 395; // New applications additional
+      const _gitRepoExtra = 280; // Git repos additional
+      const _sandboxExtra = 290; // Sandbox mode additional
+      const _newAppExtra = 395; // New applications additional
 
       // Verify base modules fit within base budget
       const baseModules = mockModules.filter((m) =>
@@ -187,7 +187,7 @@ describe('Token Reduction Verification', () => {
       });
 
       // Mock module loading
-      vi.spyOn(assembler as any, 'moduleLoader', 'get').mockReturnValue({
+      vi.spyOn(assembler as unknown as { moduleLoader: { loadAllModules: () => Promise<PromptModule[]> } }, 'moduleLoader', 'get').mockReturnValue({
         loadAllModules: vi.fn().mockResolvedValue(mockModules),
       });
 
@@ -223,7 +223,7 @@ describe('Token Reduction Verification', () => {
       });
 
       // Mock module loading
-      vi.spyOn(assembler as any, 'moduleLoader', 'get').mockReturnValue({
+      vi.spyOn(assembler as unknown as { moduleLoader: { loadAllModules: () => Promise<PromptModule[]> } }, 'moduleLoader', 'get').mockReturnValue({
         loadAllModules: vi.fn().mockResolvedValue(mockModules),
       });
 
@@ -247,9 +247,9 @@ describe('Token Reduction Verification', () => {
         // Should include more modules for complex context but stay within budget
         expect(result.totalTokens).toBeLessThanOrEqual(1500);
         expect(result.includedModules.length).toBeGreaterThan(3); // More than just base modules
-      } catch (error) {
+      } catch (_error) {
         // Expected if modules don't exist in test environment
-        expect(error).toBeDefined();
+        expect(_error).toBeDefined();
       }
     });
   });

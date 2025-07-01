@@ -6,17 +6,10 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { LSTool } from '../tools/ls.js';
-import { EditTool } from '../tools/edit.js';
-import { GlobTool } from '../tools/glob.js';
-import { GrepTool } from '../tools/grep.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
+// Tool imports removed - not currently used in this file
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
-import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 import { resolveToolReferences } from '../prompt-system/ToolReferenceResolver.js';
 import { PromptAssembler } from '../prompt-system/PromptAssembler.js';
 
@@ -292,12 +285,12 @@ export async function getCoreSystemPromptDynamic(
   >,
 ): Promise<string> {
   // Check for system prompt override (maintain compatibility)
-  let systemMdEnabled = false;
+  let _systemMdEnabled = false;
   let systemMdPath = path.join(GEMINI_CONFIG_DIR, 'system.md');
   const systemMdVar = process.env.GEMINI_SYSTEM_MD?.toLowerCase();
 
   if (systemMdVar && !['0', 'false'].includes(systemMdVar)) {
-    systemMdEnabled = true;
+    _systemMdEnabled = true;
     if (!['1', 'true'].includes(systemMdVar)) {
       systemMdPath = systemMdVar;
     }

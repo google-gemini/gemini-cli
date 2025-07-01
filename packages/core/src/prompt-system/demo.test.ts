@@ -72,7 +72,11 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 ];
 
 describe('Dynamic Assembly Engine Demonstration', () => {
-  let mockModuleLoader: any;
+  let mockModuleLoader: {
+    loadAllModules: ReturnType<typeof vi.fn>;
+    moduleExists: ReturnType<typeof vi.fn>;
+    loadModule: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,7 +116,7 @@ describe('Dynamic Assembly Engine Demonstration', () => {
     });
 
     // Mock the module loader
-    (assembler as any).moduleLoader = mockModuleLoader;
+    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
 
     const minimalContext: TaskContext = {
       taskType: 'general',
@@ -160,7 +164,7 @@ describe('Dynamic Assembly Engine Demonstration', () => {
       maxTokenBudget: 1500,
     });
 
-    (assembler as any).moduleLoader = mockModuleLoader;
+    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
 
     // Test different contexts
     const contexts = [
@@ -225,7 +229,7 @@ describe('Dynamic Assembly Engine Demonstration', () => {
       maxTokenBudget: 1000,
     });
 
-    (assembler as any).moduleLoader = mockModuleLoader;
+    (assembler as unknown as { moduleLoader: typeof mockModuleLoader }).moduleLoader = mockModuleLoader;
 
     const context: TaskContext = {
       taskType: 'general',
@@ -258,7 +262,7 @@ describe('Dynamic Assembly Engine Demonstration', () => {
 
       const perfStats = assembler.getPerformanceStats();
       console.log(`Assembly cache stats:`, perfStats.cacheStats);
-    } catch (error) {
+    } catch (_error) {
       console.log('Cache stats not available with mock loader');
     }
 

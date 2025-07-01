@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Basic commit message validation
+commit_msg=$(cat "$1")
+
+# Check for minimum length
+if [ ${#commit_msg} -lt 10 ]; then
+    echo "❌ Commit message too short (minimum 10 characters)"
+    exit 1
+fi
+
+# Check for conventional commit format (optional but recommended)
+if ! echo "$commit_msg" | grep -qE "^(feat|fix|docs|style|refactor|test|chore|perf|build|ci|revert)(\(.+\))?: .+"; then
+    echo "⚠️  Consider using conventional commit format: type(scope): description"
+    echo "   Examples: feat: add new feature, fix: resolve bug, docs: update README"
+    echo "   Types: feat, fix, docs, style, refactor, test, chore, perf, build, ci, revert"
+fi
+
+echo "✅ Commit message validated"

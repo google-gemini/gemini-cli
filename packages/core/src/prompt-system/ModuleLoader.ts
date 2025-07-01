@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { accessSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'url';
 import type {
@@ -22,7 +23,9 @@ export class ModuleLoaderImpl implements ModuleLoader {
   private enableCaching: boolean;
 
   constructor(
-    moduleDirectory: string = path.join(path.dirname(fileURLToPath(import.meta.url))),
+    moduleDirectory: string = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+    ),
     enableCaching: boolean = true,
   ) {
     this.moduleDirectory = moduleDirectory;
@@ -68,7 +71,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
       );
 
       return modules.filter((module) => module.category === category);
-    } catch (error) {
+    } catch (_error) {
       // If category directory doesn't exist, return empty array
       return [];
     }
@@ -116,7 +119,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
       const filePath = path.join(this.moduleDirectory, category, `${id}.md`);
       try {
         // Use synchronous check for existence
-        require('node:fs').accessSync(filePath);
+        accessSync(filePath);
         return true;
       } catch {
         // Continue checking other categories
@@ -172,7 +175,7 @@ export class ModuleLoaderImpl implements ModuleLoader {
       try {
         const content = await fs.readFile(filePath, 'utf-8');
         return this.parseModuleContent(id, content, category);
-      } catch (error) {
+      } catch (_error) {
         // Continue trying other categories
       }
     }
@@ -214,7 +217,12 @@ export class ModuleLoaderImpl implements ModuleLoader {
     tokenCount?: number;
     priority?: number;
   } {
-    const metadata: any = {};
+    const metadata: {
+      version?: string;
+      dependencies?: string[];
+      tokenCount?: number;
+      priority?: number;
+    } = {};
 
     // Look for HTML comment blocks like:
     // <!--

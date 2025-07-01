@@ -75,7 +75,7 @@ export class ContextDetectorImpl implements ContextDetector {
   detectGitRepository(): boolean {
     try {
       return isGitRepository(process.cwd());
-    } catch (error) {
+    } catch (_error) {
       // If git utils fail, assume not a git repo
       return false;
     }
@@ -84,7 +84,10 @@ export class ContextDetectorImpl implements ContextDetector {
   /**
    * Detect sandbox mode and type from environment variables
    */
-  detectSandboxMode(): { sandboxMode: boolean; sandboxType?: 'sandbox-exec' | 'generic' | 'none' } {
+  detectSandboxMode(): {
+    sandboxMode: boolean;
+    sandboxType?: 'sandbox-exec' | 'generic' | 'none';
+  } {
     const sandboxEnv = process.env.SANDBOX;
 
     if (!sandboxEnv) {
@@ -143,7 +146,7 @@ export class ContextDetectorImpl implements ContextDetector {
     taskType: TaskContext['taskType'],
     hasGitRepo: boolean,
     sandboxMode: boolean,
-    environmentContext: Record<string, string | undefined>,
+    _environmentContext: Record<string, string | undefined>,
   ): TaskContext['contextFlags'] {
     const flags: TaskContext['contextFlags'] = {};
 
@@ -160,6 +163,10 @@ export class ContextDetectorImpl implements ContextDetector {
         break;
       case 'software-engineering':
         // General software engineering might need multiple guidances
+        break;
+      
+      default:
+        // No specific flags for other task types
         break;
     }
 

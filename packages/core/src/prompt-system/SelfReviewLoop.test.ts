@@ -135,22 +135,41 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute quality checks in priority order', async () => {
-      const mockExecuteCheck = vi.spyOn(selfReviewLoop as any, 'executeQualityCheck');
-      mockExecuteCheck.mockResolvedValue({ success: true, message: 'Check passed' });
+      const mockExecuteCheck = vi.spyOn(
+        selfReviewLoop as any,
+        'executeQualityCheck',
+      );
+      mockExecuteCheck.mockResolvedValue({
+        success: true,
+        message: 'Check passed',
+      });
 
       const result = await selfReviewLoop.executeReview(mockReviewContext);
 
       expect(result.success).toBe(true);
       expect(result.action).toBe('approve');
       // Security check should be first (priority 0)
-      expect(mockExecuteCheck).toHaveBeenNthCalledWith(1, mockQualityGates[3], mockReviewContext);
+      expect(mockExecuteCheck).toHaveBeenNthCalledWith(
+        1,
+        mockQualityGates[3],
+        mockReviewContext,
+      );
     });
 
     it('should return revise action when syntax validation fails', async () => {
-      const mockExecuteCheck = vi.spyOn(selfReviewLoop as any, 'executeQualityCheck');
+      const mockExecuteCheck = vi.spyOn(
+        selfReviewLoop as any,
+        'executeQualityCheck',
+      );
       mockExecuteCheck
-        .mockResolvedValueOnce({ success: true, message: 'Security check passed' }) // security_check
-        .mockResolvedValueOnce({ success: false, message: 'Syntax error found' }) // syntax_valid
+        .mockResolvedValueOnce({
+          success: true,
+          message: 'Security check passed',
+        }) // security_check
+        .mockResolvedValueOnce({
+          success: false,
+          message: 'Syntax error found',
+        }) // syntax_valid
         .mockResolvedValue({ success: true, message: 'Check passed' }); // others
 
       const result = await selfReviewLoop.executeReview(mockReviewContext);
@@ -161,9 +180,15 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should return escalate action when security check fails', async () => {
-      const mockExecuteCheck = vi.spyOn(selfReviewLoop as any, 'executeQualityCheck');
+      const mockExecuteCheck = vi.spyOn(
+        selfReviewLoop as any,
+        'executeQualityCheck',
+      );
       mockExecuteCheck
-        .mockResolvedValueOnce({ success: false, message: 'Security vulnerability found' }) // security_check
+        .mockResolvedValueOnce({
+          success: false,
+          message: 'Security vulnerability found',
+        }) // security_check
         .mockResolvedValue({ success: true, message: 'Check passed' }); // others
 
       const result = await selfReviewLoop.executeReview(mockReviewContext);
@@ -174,17 +199,20 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should handle timeout correctly', async () => {
-      const shortTimeoutConfig = { 
+      const shortTimeoutConfig = {
         reviewTimeout: 50, // Very short timeout
-        qualityGates: mockQualityGates 
+        qualityGates: mockQualityGates,
       };
       selfReviewLoop = new SelfReviewLoop(shortTimeoutConfig);
 
       // Mock the executeQualityChecks to take longer than timeout
-      const mockExecuteQualityChecks = vi.spyOn(selfReviewLoop as any, 'executeQualityChecks');
-      mockExecuteQualityChecks.mockImplementation(() => {
-        return new Promise(resolve => setTimeout(resolve, 1000)); // Takes 1 second, timeout is 50ms
-      });
+      const mockExecuteQualityChecks = vi.spyOn(
+        selfReviewLoop as any,
+        'executeQualityChecks',
+      );
+      mockExecuteQualityChecks.mockImplementation(() => 
+         new Promise((resolve) => setTimeout(resolve, 1000)) // Takes 1 second, timeout is 50ms
+      );
 
       const result = await selfReviewLoop.executeReview(mockReviewContext);
 
@@ -200,8 +228,14 @@ describe('SelfReviewLoop', () => {
       }));
       selfReviewLoop = new SelfReviewLoop({ qualityGates: gatesWithDisabled });
 
-      const mockExecuteCheck = vi.spyOn(selfReviewLoop as any, 'executeQualityCheck');
-      mockExecuteCheck.mockResolvedValue({ success: true, message: 'Check passed' });
+      const mockExecuteCheck = vi.spyOn(
+        selfReviewLoop as any,
+        'executeQualityCheck',
+      );
+      mockExecuteCheck.mockResolvedValue({
+        success: true,
+        message: 'Check passed',
+      });
 
       const result = await selfReviewLoop.executeReview(mockReviewContext);
 
@@ -216,11 +250,20 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute syntax validation check', async () => {
-      const syntaxGate = mockQualityGates.find(g => g.id === 'syntax_valid')!;
-      const mockValidateSyntax = vi.spyOn(selfReviewLoop as any, 'validateSyntax');
-      mockValidateSyntax.mockResolvedValue({ success: true, message: 'Syntax is valid' });
+      const syntaxGate = mockQualityGates.find((g) => g.id === 'syntax_valid')!;
+      const mockValidateSyntax = vi.spyOn(
+        selfReviewLoop as any,
+        'validateSyntax',
+      );
+      mockValidateSyntax.mockResolvedValue({
+        success: true,
+        message: 'Syntax is valid',
+      });
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(syntaxGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        syntaxGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('Syntax is valid');
@@ -228,11 +271,20 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute test validation check', async () => {
-      const testGate = mockQualityGates.find(g => g.id === 'tests_pass')!;
-      const mockValidateTests = vi.spyOn(selfReviewLoop as any, 'validateTests');
-      mockValidateTests.mockResolvedValue({ success: true, message: 'All tests pass' });
+      const testGate = mockQualityGates.find((g) => g.id === 'tests_pass')!;
+      const mockValidateTests = vi.spyOn(
+        selfReviewLoop as any,
+        'validateTests',
+      );
+      mockValidateTests.mockResolvedValue({
+        success: true,
+        message: 'All tests pass',
+      });
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(testGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        testGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('All tests pass');
@@ -240,11 +292,22 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute style validation check', async () => {
-      const styleGate = mockQualityGates.find(g => g.id === 'style_compliant')!;
-      const mockValidateStyle = vi.spyOn(selfReviewLoop as any, 'validateStyle');
-      mockValidateStyle.mockResolvedValue({ success: true, message: 'Style is compliant' });
+      const styleGate = mockQualityGates.find(
+        (g) => g.id === 'style_compliant',
+      )!;
+      const mockValidateStyle = vi.spyOn(
+        selfReviewLoop as any,
+        'validateStyle',
+      );
+      mockValidateStyle.mockResolvedValue({
+        success: true,
+        message: 'Style is compliant',
+      });
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(styleGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        styleGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('Style is compliant');
@@ -252,11 +315,22 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute security validation check', async () => {
-      const securityGate = mockQualityGates.find(g => g.id === 'security_check')!;
-      const mockValidateSecurity = vi.spyOn(selfReviewLoop as any, 'validateSecurity');
-      mockValidateSecurity.mockResolvedValue({ success: true, message: 'No security issues found' });
+      const securityGate = mockQualityGates.find(
+        (g) => g.id === 'security_check',
+      )!;
+      const mockValidateSecurity = vi.spyOn(
+        selfReviewLoop as any,
+        'validateSecurity',
+      );
+      mockValidateSecurity.mockResolvedValue({
+        success: true,
+        message: 'No security issues found',
+      });
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(securityGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        securityGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('No security issues found');
@@ -264,11 +338,22 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should execute dependency validation check', async () => {
-      const dependencyGate = mockQualityGates.find(g => g.id === 'dependency_valid')!;
-      const mockValidateDependencies = vi.spyOn(selfReviewLoop as any, 'validateDependencies');
-      mockValidateDependencies.mockResolvedValue({ success: true, message: 'Dependencies are valid' });
+      const dependencyGate = mockQualityGates.find(
+        (g) => g.id === 'dependency_valid',
+      )!;
+      const mockValidateDependencies = vi.spyOn(
+        selfReviewLoop as any,
+        'validateDependencies',
+      );
+      mockValidateDependencies.mockResolvedValue({
+        success: true,
+        message: 'Dependencies are valid',
+      });
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(dependencyGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        dependencyGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('Dependencies are valid');
@@ -287,7 +372,10 @@ describe('SelfReviewLoop', () => {
         timeout: 5000,
       };
 
-      const result = await (selfReviewLoop as any).executeQualityCheck(unknownGate, mockReviewContext);
+      const result = await (selfReviewLoop as any).executeQualityCheck(
+        unknownGate,
+        mockReviewContext,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Unknown quality gate type');
@@ -306,7 +394,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const valid: string = "hello";',
       };
 
-      const result = await (selfReviewLoop as any).validateSyntax(contextWithValidTS);
+      const result = await (selfReviewLoop as any).validateSyntax(
+        contextWithValidTS,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Syntax validation passed');
@@ -319,7 +409,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const invalid: string = 123;', // Type error
       };
 
-      const result = await (selfReviewLoop as any).validateSyntax(contextWithInvalidTS);
+      const result = await (selfReviewLoop as any).validateSyntax(
+        contextWithInvalidTS,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Syntax validation failed');
@@ -332,7 +424,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const valid = "hello";',
       };
 
-      const result = await (selfReviewLoop as any).validateSyntax(contextWithValidJS);
+      const result = await (selfReviewLoop as any).validateSyntax(
+        contextWithValidJS,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Syntax validation passed');
@@ -345,7 +439,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'fn main() { println!("Hello"); }',
       };
 
-      const result = await (selfReviewLoop as any).validateSyntax(contextWithUnsupportedLang);
+      const result = await (selfReviewLoop as any).validateSyntax(
+        contextWithUnsupportedLang,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Syntax validation skipped');
@@ -364,7 +460,9 @@ describe('SelfReviewLoop', () => {
         framework: 'vitest',
       };
 
-      const result = await (selfReviewLoop as any).validateTests(contextWithTests);
+      const result = await (selfReviewLoop as any).validateTests(
+        contextWithTests,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Test validation passed');
@@ -376,7 +474,9 @@ describe('SelfReviewLoop', () => {
         hasTests: false,
       };
 
-      const result = await (selfReviewLoop as any).validateTests(contextWithoutTests);
+      const result = await (selfReviewLoop as any).validateTests(
+        contextWithoutTests,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('No tests found');
@@ -389,7 +489,9 @@ describe('SelfReviewLoop', () => {
         taskType: 'general' as const,
       };
 
-      const result = await (selfReviewLoop as any).validateTests(contextWithoutTestRequirement);
+      const result = await (selfReviewLoop as any).validateTests(
+        contextWithoutTestRequirement,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Test validation skipped');
@@ -407,7 +509,9 @@ describe('SelfReviewLoop', () => {
         hasLinting: true,
       };
 
-      const result = await (selfReviewLoop as any).validateStyle(contextWithLinting);
+      const result = await (selfReviewLoop as any).validateStyle(
+        contextWithLinting,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Style validation passed');
@@ -420,7 +524,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const   bad_style="no-spaces";', // Style issues
       };
 
-      const result = await (selfReviewLoop as any).validateStyle(contextWithStyleIssues);
+      const result = await (selfReviewLoop as any).validateStyle(
+        contextWithStyleIssues,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Style validation failed');
@@ -432,7 +538,9 @@ describe('SelfReviewLoop', () => {
         hasLinting: false,
       };
 
-      const result = await (selfReviewLoop as any).validateStyle(contextWithoutLinting);
+      const result = await (selfReviewLoop as any).validateStyle(
+        contextWithoutLinting,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Style validation skipped');
@@ -451,7 +559,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const safeCode = "no secrets here";',
       };
 
-      const result = await (selfReviewLoop as any).validateSecurity(contextWithCleanCode);
+      const result = await (selfReviewLoop as any).validateSecurity(
+        contextWithCleanCode,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Security validation passed');
@@ -464,7 +574,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const apiKey = "sk-1234567890abcdef";', // Exposed API key
       };
 
-      const result = await (selfReviewLoop as any).validateSecurity(contextWithSecrets);
+      const result = await (selfReviewLoop as any).validateSecurity(
+        contextWithSecrets,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Potential security issue detected');
@@ -477,7 +589,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const password = "admin123";',
       };
 
-      const result = await (selfReviewLoop as any).validateSecurity(contextWithPassword);
+      const result = await (selfReviewLoop as any).validateSecurity(
+        contextWithPassword,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Potential security issue detected');
@@ -489,7 +603,9 @@ describe('SelfReviewLoop', () => {
         hasSecurityChecks: false,
       };
 
-      const result = await (selfReviewLoop as any).validateSecurity(contextWithoutSecurity);
+      const result = await (selfReviewLoop as any).validateSecurity(
+        contextWithoutSecurity,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Security validation skipped');
@@ -507,7 +623,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'import { describe } from "vitest";',
       };
 
-      const result = await (selfReviewLoop as any).validateDependencies(contextWithValidDeps);
+      const result = await (selfReviewLoop as any).validateDependencies(
+        contextWithValidDeps,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Dependency validation passed');
@@ -519,7 +637,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'import { nonExistentPackage } from "does-not-exist";',
       };
 
-      const result = await (selfReviewLoop as any).validateDependencies(contextWithMissingDeps);
+      const result = await (selfReviewLoop as any).validateDependencies(
+        contextWithMissingDeps,
+      );
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Missing dependencies detected');
@@ -531,7 +651,9 @@ describe('SelfReviewLoop', () => {
         codeContent: 'const localVar = "no imports";',
       };
 
-      const result = await (selfReviewLoop as any).validateDependencies(contextWithoutImports);
+      const result = await (selfReviewLoop as any).validateDependencies(
+        contextWithoutImports,
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Dependency validation skipped');
@@ -591,7 +713,10 @@ describe('SelfReviewLoop', () => {
     });
 
     it('should respect token budget configuration', () => {
-      const budgetConfig = { tokenBudget: 150, qualityGates: mockQualityGates.slice(0, 2) };
+      const budgetConfig = {
+        tokenBudget: 150,
+        qualityGates: mockQualityGates.slice(0, 2),
+      };
       selfReviewLoop = new SelfReviewLoop(budgetConfig);
 
       const tokenCount = selfReviewLoop.getTokenCount();
@@ -619,7 +744,10 @@ describe('SelfReviewLoop', () => {
         },
       };
 
-      const reviewContext = selfReviewLoop.createReviewContext(taskContext, 'const code = "test";');
+      const reviewContext = selfReviewLoop.createReviewContext(
+        taskContext,
+        'const code = "test";',
+      );
 
       expect(reviewContext.taskType).toBe('software-engineering');
       expect(reviewContext.hasSecurityChecks).toBe(true);

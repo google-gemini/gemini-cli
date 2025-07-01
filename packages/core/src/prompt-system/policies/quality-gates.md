@@ -14,7 +14,7 @@ Before presenting results, automatically validate through these quality gates:
 ## Active Quality Gates
 
 - **syntax_valid**: code compiles → revise
-- **tests_pass**: tests execute successfully → revise  
+- **tests_pass**: tests execute successfully → revise
 - **style_compliant**: follows project style → approve
 - **security_check**: no exposed secrets/vulnerabilities → escalate
 - **dependency_valid**: dependencies are available and secure → revise
@@ -35,6 +35,7 @@ Before presenting results, automatically validate through these quality gates:
 ## Context Sensitivity
 
 Quality gates adapt based on:
+
 - Task type (debugging vs new development)
 - Language and framework detected
 - Project configuration (linting, testing setup)

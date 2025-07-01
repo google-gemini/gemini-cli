@@ -12,11 +12,9 @@ import {
   ProjectContext,
   ConversationSummary,
   CachedToolResult,
-  MemoryStats,
   SerializedMemory,
 } from './memory-interfaces.js';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 // Mock fs module
 vi.mock('fs/promises');
@@ -28,7 +26,7 @@ describe('MemoryManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockConfig = {
       maxMemorySize: 50 * 1024 * 1024, // 50MB
       fileStatesConfig: {
@@ -62,7 +60,7 @@ describe('MemoryManager', () => {
     it('should initialize with valid config', async () => {
       memoryManager = new MemoryManager();
       await expect(memoryManager.initialize(mockConfig)).resolves.not.toThrow();
-      
+
       const stats = await memoryManager.getStats();
       expect(stats.fileCount).toBe(0);
       expect(stats.summaryCount).toBe(0);
@@ -72,9 +70,9 @@ describe('MemoryManager', () => {
     it('should throw error with invalid config', async () => {
       memoryManager = new MemoryManager();
       const invalidConfig = { ...mockConfig, maxMemorySize: -1 };
-      
+
       await expect(memoryManager.initialize(invalidConfig)).rejects.toThrow(
-        'Invalid memory configuration'
+        'Invalid memory configuration',
       );
     });
 
@@ -184,7 +182,7 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.updateFileContext(filePath, fileContext);
-      
+
       const retrievedContext = await memoryManager.getFileContext(filePath);
       expect(retrievedContext).toBeDefined();
       expect(retrievedContext?.filePath).toBe(filePath);
@@ -238,7 +236,7 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.updateFileContext(filePath, fileContext);
-      
+
       const retrievedContext = await memoryManager.getFileContext(filePath);
       expect(retrievedContext?.diagnostics).toHaveLength(2);
       expect(retrievedContext?.diagnostics[0].severity).toBe('error');
@@ -246,7 +244,9 @@ describe('MemoryManager', () => {
     });
 
     it('should return undefined for non-existent file context', async () => {
-      const context = await memoryManager.getFileContext('/non/existent/file.ts');
+      const context = await memoryManager.getFileContext(
+        '/non/existent/file.ts',
+      );
       expect(context).toBeUndefined();
     });
   });
@@ -286,10 +286,10 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.updateProjectContext(projectContext);
-      
+
       const stats = await memoryManager.getStats();
       expect(stats.fileCount).toBe(0); // No files tracked yet
-      
+
       // Verify project context is updated by checking if patterns are saved
       const retrievedContext = memoryManager.getProjectContext();
       expect(retrievedContext.patterns).toHaveLength(1);
@@ -317,11 +317,13 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.updateProjectContext(projectContext);
-      
+
       const retrievedContext = memoryManager.getProjectContext();
       expect(retrievedContext.patterns).toHaveLength(2);
       expect(retrievedContext.patterns[0].confidence).toBe(0.95);
-      expect(retrievedContext.patterns[1].files).toContain('/src/hooks/useAuth.ts');
+      expect(retrievedContext.patterns[1].files).toContain(
+        '/src/hooks/useAuth.ts',
+      );
     });
   });
 
@@ -364,12 +366,13 @@ describe('MemoryManager', () => {
         insights: ['User prefers functional components over class components'],
         originalTokens: 2000,
         summaryTokens: 500,
+        totalTokens: 2500,
         compressionRatio: 0.25,
         qualityScore: 0.85,
       };
 
       await memoryManager.addConversationSummary(summary);
-      
+
       const stats = await memoryManager.getStats();
       expect(stats.summaryCount).toBe(1);
     });
@@ -393,6 +396,7 @@ describe('MemoryManager', () => {
           insights: [],
           originalTokens: 1000,
           summaryTokens: 200,
+          totalTokens: 1200,
           compressionRatio: 0.2,
           qualityScore: 0.8,
         });
@@ -430,8 +434,11 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.cacheToolResult(toolName, key, result);
-      
-      const cachedResult = await memoryManager.getCachedToolResult(toolName, key);
+
+      const cachedResult = await memoryManager.getCachedToolResult(
+        toolName,
+        key,
+      );
       expect(cachedResult).toBeDefined();
       expect(cachedResult?.key).toBe(key);
       expect(cachedResult?.accessCount).toBe(1); // Should increment on access
@@ -487,11 +494,14 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.cacheToolResult(toolName, key, result);
-      
+
       // Trigger cleanup to remove expired entries
       await memoryManager.cleanup();
-      
-      const cachedResult = await memoryManager.getCachedToolResult(toolName, key);
+
+      const cachedResult = await memoryManager.getCachedToolResult(
+        toolName,
+        key,
+      );
       expect(cachedResult).toBeUndefined();
     });
   });
@@ -517,8 +527,12 @@ describe('MemoryManager', () => {
         dependencies: [],
       };
 
-      await memoryManager.cacheToolResult('test_tool', 'expired-key', expiredResult);
-      
+      await memoryManager.cacheToolResult(
+        'test_tool',
+        'expired-key',
+        expiredResult,
+      );
+
       // Add a fresh entry
       const freshResult: CachedToolResult = {
         key: 'fresh-key',
@@ -533,13 +547,23 @@ describe('MemoryManager', () => {
         dependencies: [],
       };
 
-      await memoryManager.cacheToolResult('test_tool', 'fresh-key', freshResult);
+      await memoryManager.cacheToolResult(
+        'test_tool',
+        'fresh-key',
+        freshResult,
+      );
 
       // Cleanup should remove expired entry
       await memoryManager.cleanup();
 
-      const expiredCached = await memoryManager.getCachedToolResult('test_tool', 'expired-key');
-      const freshCached = await memoryManager.getCachedToolResult('test_tool', 'fresh-key');
+      const expiredCached = await memoryManager.getCachedToolResult(
+        'test_tool',
+        'expired-key',
+      );
+      const freshCached = await memoryManager.getCachedToolResult(
+        'test_tool',
+        'fresh-key',
+      );
 
       expect(expiredCached).toBeUndefined();
       expect(freshCached).toBeDefined();
@@ -573,11 +597,15 @@ describe('MemoryManager', () => {
         dependencies: [],
       };
 
-      await memoryManager.cacheToolResult('large_tool', 'large-key', largeResult);
-      
+      await memoryManager.cacheToolResult(
+        'large_tool',
+        'large-key',
+        largeResult,
+      );
+
       const stats = await memoryManager.getStats();
       expect(stats.memoryPressure).toBe('high');
-      
+
       // Cleanup should handle memory pressure
       await memoryManager.cleanup();
     });
@@ -616,6 +644,7 @@ describe('MemoryManager', () => {
         insights: [],
         originalTokens: 1000,
         summaryTokens: 200,
+        totalTokens: 1200,
         compressionRatio: 0.2,
         qualityScore: 0.8,
       };
@@ -645,11 +674,11 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.cacheToolResult(toolName, 'test-key', result);
-      
+
       // Simulate cache hits
       await memoryManager.getCachedToolResult(toolName, 'test-key');
       await memoryManager.getCachedToolResult(toolName, 'test-key');
-      
+
       // Simulate cache miss
       await memoryManager.getCachedToolResult(toolName, 'non-existent-key');
 
@@ -673,7 +702,7 @@ describe('MemoryManager', () => {
       });
 
       const serialized = await memoryManager.serialize();
-      
+
       expect(serialized.fileStates).toBeDefined();
       expect(serialized.fileStates['/test/file.ts']).toBeDefined();
       expect(serialized.fileStates['/test/file.ts']?.size).toBe(1024);
@@ -754,8 +783,9 @@ describe('MemoryManager', () => {
       };
 
       await memoryManager.deserialize(serializedData);
-      
-      const restoredContext = await memoryManager.getFileContext('/test/restored.ts');
+
+      const restoredContext =
+        await memoryManager.getFileContext('/test/restored.ts');
       expect(restoredContext).toBeDefined();
       expect(restoredContext?.size).toBe(2048);
       expect(restoredContext?.contentHash).toBe('restored-hash');

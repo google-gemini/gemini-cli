@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileContextManager } from './FileContextManager.js';
 import { FileContext, FileDiagnostic } from './memory-interfaces.js';
 import * as fs from 'fs/promises';
-import * as path from 'path';
+import { Stats } from 'fs';
 import * as crypto from 'crypto';
 
 // Mock fs module
@@ -38,16 +38,16 @@ describe('FileContextManager', () => {
         isFile: () => true,
         isDirectory: () => false,
       };
-      
-      mockFs.stat.mockResolvedValue(mockStats as any);
+
+      mockFs.stat.mockResolvedValue(mockStats as Stats);
       mockFs.readFile.mockResolvedValue('console.log("hello");');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('hash123'),
-      } as any);
+      } as unknown as crypto.Hash);
 
       const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+
       expect(context.filePath).toBe(filePath);
       expect(context.size).toBe(1024);
       expect(context.exists).toBe(true);
@@ -57,11 +57,11 @@ describe('FileContextManager', () => {
 
     it('should handle non-existent files', async () => {
       const filePath = '/test/nonexistent.ts';
-      
+
       mockFs.stat.mockRejectedValue(new Error('File not found'));
 
       const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+
       expect(context.filePath).toBe(filePath);
       expect(context.exists).toBe(false);
       expect(context.size).toBe(0);
@@ -85,15 +85,17 @@ describe('FileContextManager', () => {
           isFile: () => true,
           isDirectory: () => false,
         };
-        
-        mockFs.stat.mockResolvedValue(mockStats as any);
+
+        mockFs.stat.mockResolvedValue(mockStats as Stats);
         mockFs.readFile.mockResolvedValue('content');
         mockCrypto.createHash.mockReturnValue({
           update: vi.fn().mockReturnThis(),
           digest: vi.fn().mockReturnValue('hash'),
-        } as any);
+        } as unknown as crypto.Hash);
 
-        const context = await fileContextManager.getOrCreateFileContext(testCase.path);
+        const context = await fileContextManager.getOrCreateFileContext(
+          testCase.path,
+        );
         expect(context.fileType).toBe(testCase.expected);
       }
     });
@@ -133,16 +135,16 @@ export default Component;
         isFile: () => true,
         isDirectory: () => false,
       };
-      
-      mockFs.stat.mockResolvedValue(mockStats as any);
+
+      mockFs.stat.mockResolvedValue(mockStats as Stats);
       mockFs.readFile.mockResolvedValue(content);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('content-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
       const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+
       expect(context.metadata.language).toBe('typescript');
       expect(context.metadata.frameworks).toContain('react');
       expect(context.metadata.imports).toContain('react');
@@ -174,16 +176,16 @@ export const processFile = (filePath: string) => {
         isFile: () => true,
         isDirectory: () => false,
       };
-      
-      mockFs.stat.mockResolvedValue(mockStats as any);
+
+      mockFs.stat.mockResolvedValue(mockStats as Stats);
       mockFs.readFile.mockResolvedValue(content);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('deps-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
       const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+
       expect(context.dependencies).toContain('/test/logger.ts');
       expect(context.dependencies).toContain('/config/config.ts');
       expect(context.dependencies).toContain('/helpers/index.ts');
@@ -232,29 +234,31 @@ const generateId = (): string => {
         isFile: () => true,
         isDirectory: () => false,
       };
-      
-      mockFs.stat.mockResolvedValue(mockStats as any);
+
+      mockFs.stat.mockResolvedValue(mockStats as Stats);
       mockFs.readFile.mockResolvedValue(content);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('class-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
       const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+
       const definitions = context.metadata.definitions;
-      const classDefinition = definitions.find(d => d.name === 'UserService');
-      const functionDefinition = definitions.find(d => d.name === 'createUser');
-      const interfaceDefinition = definitions.find(d => d.name === 'User');
-      
+      const classDefinition = definitions.find((d) => d.name === 'UserService');
+      const functionDefinition = definitions.find(
+        (d) => d.name === 'createUser',
+      );
+      const interfaceDefinition = definitions.find((d) => d.name === 'User');
+
       expect(classDefinition).toBeDefined();
       expect(classDefinition?.type).toBe('class');
       expect(classDefinition?.access).toBe('public');
-      
+
       expect(functionDefinition).toBeDefined();
       expect(functionDefinition?.type).toBe('function');
       expect(functionDefinition?.access).toBe('public');
-      
+
       expect(interfaceDefinition).toBeDefined();
       expect(interfaceDefinition?.type).toBe('interface');
     });
@@ -278,27 +282,35 @@ import { config } from './config';
         size: mainContent.length,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue(mainContent);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('main-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const mainContext = await fileContextManager.getOrCreateFileContext(mainFile);
-      
+      await fileContextManager.getOrCreateFileContext(mainFile);
+
       // Update dependencies manually for test
-      await fileContextManager.updateDependencies(mainFile, [utilsFile + '.ts', configFile + '.ts']);
-      
+      await fileContextManager.updateDependencies(mainFile, [
+        utilsFile + '.ts',
+        configFile + '.ts',
+      ]);
+
       // Check that dependencies are tracked
-      const updatedMainContext = await fileContextManager.getFileContext(mainFile);
+      const updatedMainContext =
+        await fileContextManager.getFileContext(mainFile);
       expect(updatedMainContext?.dependencies).toContain(utilsFile + '.ts');
       expect(updatedMainContext?.dependencies).toContain(configFile + '.ts');
-      
+
       // Check that dependents are updated
-      const utilsContext = await fileContextManager.getFileContext(utilsFile + '.ts');
-      const configContext = await fileContextManager.getFileContext(configFile + '.ts');
-      
+      const utilsContext = await fileContextManager.getFileContext(
+        utilsFile + '.ts',
+      );
+      const configContext = await fileContextManager.getFileContext(
+        configFile + '.ts',
+      );
+
       if (utilsContext) {
         expect(utilsContext.dependents).toContain(mainFile);
       }
@@ -317,23 +329,23 @@ import { config } from './config';
         size: 100,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue('export const value = 1;');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
       await fileContextManager.getOrCreateFileContext(fileA);
       await fileContextManager.getOrCreateFileContext(fileB);
-      
+
       // Set up circular dependency
       await fileContextManager.updateDependencies(fileA, [fileB]);
       await fileContextManager.updateDependencies(fileB, [fileA]);
-      
+
       const contextA = await fileContextManager.getFileContext(fileA);
       const contextB = await fileContextManager.getFileContext(fileB);
-      
+
       expect(contextA?.dependencies).toContain(fileB);
       expect(contextA?.dependents).toContain(fileB);
       expect(contextB?.dependencies).toContain(fileA);
@@ -373,16 +385,16 @@ import { config } from './config';
         size: 500,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue('const x: number = "string";');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('diag-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const context = await fileContextManager.getOrCreateFileContext(filePath);
+      await fileContextManager.getOrCreateFileContext(filePath);
       await fileContextManager.updateDiagnostics(filePath, diagnostics);
-      
+
       const updatedContext = await fileContextManager.getFileContext(filePath);
       expect(updatedContext?.diagnostics).toHaveLength(3);
       expect(updatedContext?.diagnostics[0].severity).toBe('error');
@@ -392,21 +404,21 @@ import { config } from './config';
 
     it('should clear diagnostics when file is fixed', async () => {
       const filePath = '/test/fixed-file.ts';
-      
+
       mockFs.stat.mockResolvedValue({
         mtime: new Date(),
         size: 200,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue('const x = 42;');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('fixed-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const context = await fileContextManager.getOrCreateFileContext(filePath);
-      
+      await fileContextManager.getOrCreateFileContext(filePath);
+
       // Add diagnostics
       await fileContextManager.updateDiagnostics(filePath, [
         {
@@ -417,13 +429,13 @@ import { config } from './config';
           source: 'typescript',
         },
       ]);
-      
+
       let updatedContext = await fileContextManager.getFileContext(filePath);
       expect(updatedContext?.diagnostics).toHaveLength(1);
-      
+
       // Clear diagnostics
       await fileContextManager.updateDiagnostics(filePath, []);
-      
+
       updatedContext = await fileContextManager.getFileContext(filePath);
       expect(updatedContext?.diagnostics).toHaveLength(0);
     });
@@ -432,22 +444,22 @@ import { config } from './config';
   describe('git integration', () => {
     it('should track git status for files', async () => {
       const filePath = '/test/git-file.ts';
-      
+
       mockFs.stat.mockResolvedValue({
         mtime: new Date(),
         size: 300,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue('export const gitFile = true;');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('git-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const context = await fileContextManager.getOrCreateFileContext(filePath);
+      await fileContextManager.getOrCreateFileContext(filePath);
       await fileContextManager.updateGitStatus(filePath, 'modified');
-      
+
       const updatedContext = await fileContextManager.getFileContext(filePath);
       expect(updatedContext?.gitStatus).toBe('modified');
     });
@@ -464,23 +476,24 @@ import { config } from './config';
 
       for (const status of testStatuses) {
         const filePath = `/test/git-${status}.ts`;
-        
+
         mockFs.stat.mockResolvedValue({
           mtime: new Date(),
           size: 100,
           isFile: () => true,
           isDirectory: () => false,
-        } as any);
+        } as Stats);
         mockFs.readFile.mockResolvedValue(`// ${status} file`);
         mockCrypto.createHash.mockReturnValue({
           update: vi.fn().mockReturnThis(),
           digest: vi.fn().mockReturnValue(`${status}-hash`),
-        } as any);
+        } as unknown as crypto.Hash);
 
-        const context = await fileContextManager.getOrCreateFileContext(filePath);
+        await fileContextManager.getOrCreateFileContext(filePath);
         await fileContextManager.updateGitStatus(filePath, status);
-        
-        const updatedContext = await fileContextManager.getFileContext(filePath);
+
+        const updatedContext =
+          await fileContextManager.getFileContext(filePath);
         expect(updatedContext?.gitStatus).toBe(status);
       }
     });
@@ -498,14 +511,15 @@ import { config } from './config';
         size: originalContent.length,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue(originalContent);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('original-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const originalContext = await fileContextManager.getOrCreateFileContext(filePath);
+      const originalContext =
+        await fileContextManager.getOrCreateFileContext(filePath);
       expect(originalContext.contentHash).toBe('original-hash');
 
       // File modified
@@ -514,14 +528,15 @@ import { config } from './config';
         size: modifiedContent.length,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue(modifiedContent);
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('modified-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const modifiedContext = await fileContextManager.getOrCreateFileContext(filePath);
+      const modifiedContext =
+        await fileContextManager.getOrCreateFileContext(filePath);
       expect(modifiedContext.contentHash).toBe('modified-hash');
       expect(modifiedContext.contentHash).not.toBe(originalContext.contentHash);
     });
@@ -537,14 +552,15 @@ import { config } from './config';
         size: 100,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
       mockFs.readFile.mockResolvedValue('const x = 1;');
       mockCrypto.createHash.mockReturnValue({
         update: vi.fn().mockReturnThis(),
         digest: vi.fn().mockReturnValue('time-hash'),
-      } as any);
+      } as unknown as crypto.Hash);
 
-      const earlierContext = await fileContextManager.getOrCreateFileContext(filePath);
+      const earlierContext =
+        await fileContextManager.getOrCreateFileContext(filePath);
       expect(earlierContext.lastModified).toBe(earlierTime.getTime());
 
       // Later modification
@@ -553,9 +569,10 @@ import { config } from './config';
         size: 100,
         isFile: () => true,
         isDirectory: () => false,
-      } as any);
+      } as Stats);
 
-      const laterContext = await fileContextManager.getOrCreateFileContext(filePath);
+      const laterContext =
+        await fileContextManager.getOrCreateFileContext(filePath);
       expect(laterContext.lastModified).toBe(laterTime.getTime());
     });
   });

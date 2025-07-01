@@ -6,9 +6,41 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ProjectContextManager } from './ProjectContextManager.js';
-import { ProjectContext, CodingPattern, ProjectDependency } from './memory-interfaces.js';
+import {
+  ProjectContext as _ProjectContext,
+  CodingPattern,
+  ProjectDependency,
+} from './memory-interfaces.js';
 import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as _path from 'path';
+import { PathLike, Stats } from 'fs';
+import { FileHandle } from 'fs/promises';
+
+// Mock directory entry interface
+interface MockDirEntry {
+  name: string;
+  isDirectory(): boolean;
+  isFile(): boolean;
+  isBlockDevice(): boolean;
+  isCharacterDevice(): boolean;
+  isSymbolicLink(): boolean;
+  isFIFO(): boolean;
+  isSocket(): boolean;
+}
+
+// Helper function to create mock directory entries
+const createMockDirEntry = (name: string, isDirectory: boolean): MockDirEntry => ({
+  name,
+  isDirectory: () => isDirectory,
+  isFile: () => !isDirectory,
+  isBlockDevice: () => false,
+  isCharacterDevice: () => false,
+  isSymbolicLink: () => false,
+  isFIFO: () => false,
+  isSocket: () => false,
+});
+
+// Mock stats interface  - using Node.js Stats type
 
 // Mock fs module
 vi.mock('fs/promises');
@@ -46,29 +78,34 @@ describe('ProjectContextManager', () => {
         },
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('package.json')) {
+      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('package.json')) {
           return JSON.stringify(packageJson);
         }
         throw new Error('File not found');
       });
 
-      mockFs.access.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('package.json')) {
+      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('package.json')) {
           return;
         }
         throw new Error('File not found');
       });
 
-      const context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+      const context =
+        await projectContextManager.analyzeProject(mockProjectRoot);
+
       expect(context.name).toBe('test-project');
       expect(context.type).toBe('nodejs');
       expect(context.buildSystem).toBe('npm');
       expect(context.testFramework).toBe('vitest');
       expect(context.dependencies).toHaveLength(4);
-      expect(context.dependencies.find(d => d.name === 'react')).toBeDefined();
-      expect(context.dependencies.find(d => d.name === 'typescript')).toBeDefined();
+      expect(
+        context.dependencies.find((d) => d.name === 'react'),
+      ).toBeDefined();
+      expect(
+        context.dependencies.find((d) => d.name === 'typescript'),
+      ).toBeDefined();
     });
 
     it('should detect TypeScript project from tsconfig.json', async () => {
@@ -83,25 +120,29 @@ describe('ProjectContextManager', () => {
         exclude: ['node_modules', 'dist'],
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('tsconfig.json')) {
+      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('tsconfig.json')) {
           return JSON.stringify(tsConfig);
         }
-        if (filePath.includes('package.json')) {
+        if (filePath.toString().includes('package.json')) {
           return JSON.stringify({ name: 'ts-project' });
         }
         throw new Error('File not found');
       });
 
-      mockFs.access.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('tsconfig.json') || filePath.includes('package.json')) {
+      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (
+          filePath.toString().includes('tsconfig.json') ||
+          filePath.toString().includes('package.json')
+        ) {
           return;
         }
         throw new Error('File not found');
       });
 
-      const context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+      const context =
+        await projectContextManager.analyzeProject(mockProjectRoot);
+
       expect(context.type).toBe('typescript');
       expect(context.languages).toContain('typescript');
       expect(context.frameworks).toContain('react');
@@ -134,25 +175,29 @@ const nextConfig = {
 module.exports = nextConfig
       `;
 
-      mockFs.readFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('package.json')) {
+      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('package.json')) {
           return JSON.stringify(packageJson);
         }
-        if (filePath.includes('next.config.js')) {
+        if (filePath.toString().includes('next.config.js')) {
           return nextConfig;
         }
         throw new Error('File not found');
       });
 
-      mockFs.access.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('package.json') || filePath.includes('next.config.js')) {
+      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (
+          filePath.toString().includes('package.json') ||
+          filePath.toString().includes('next.config.js')
+        ) {
           return;
         }
         throw new Error('File not found');
       });
 
-      const context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+      const context =
+        await projectContextManager.analyzeProject(mockProjectRoot);
+
       expect(context.type).toBe('nextjs');
       expect(context.frameworks).toContain('nextjs');
       expect(context.frameworks).toContain('react');
@@ -167,33 +212,36 @@ pytest>=7.0.0
 black>=22.0.0
       `.trim();
 
-      mockFs.readFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('requirements.txt')) {
+      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('requirements.txt')) {
           return requirements;
         }
         throw new Error('File not found');
       });
 
-      mockFs.access.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('requirements.txt')) {
+      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('requirements.txt')) {
           return;
         }
         throw new Error('File not found');
       });
 
-      const context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+      const context =
+        await projectContextManager.analyzeProject(mockProjectRoot);
+
       expect(context.type).toBe('python');
       expect(context.languages).toContain('python');
       expect(context.frameworks).toContain('django');
       expect(context.testFramework).toBe('pytest');
-      expect(context.dependencies.find(d => d.name === 'django')).toBeDefined();
+      expect(
+        context.dependencies.find((d) => d.name === 'django'),
+      ).toBeDefined();
     });
   });
 
   describe('directory structure analysis', () => {
     it('should analyze project directory structure', async () => {
-      const mockDirStructure = [
+      const _mockDirStructure = [
         'src/components/Button.tsx',
         'src/components/Input.tsx',
         'src/hooks/useAuth.ts',
@@ -204,28 +252,28 @@ black>=22.0.0
         'package.json',
       ];
 
-      mockFs.readdir.mockImplementation(async (dirPath: string) => {
-        if (dirPath === mockProjectRoot) {
+      mockFs.readdir.mockImplementation(async (dirPath: PathLike | FileHandle) => {
+        if (dirPath.toString() === mockProjectRoot) {
           return [
-            { name: 'src', isDirectory: () => true, isFile: () => false },
-            { name: 'tests', isDirectory: () => true, isFile: () => false },
-            { name: 'public', isDirectory: () => true, isFile: () => false },
-            { name: 'README.md', isDirectory: () => false, isFile: () => true },
-            { name: 'package.json', isDirectory: () => false, isFile: () => true },
-          ] as any;
+            createMockDirEntry('src', true),
+            createMockDirEntry('tests', true),
+            createMockDirEntry('public', true),
+            createMockDirEntry('README.md', false),
+            createMockDirEntry('package.json', false),
+          ] as MockDirEntry[];
         }
-        if (dirPath.includes('src')) {
+        if (dirPath.toString().includes('src')) {
           return [
-            { name: 'components', isDirectory: () => true, isFile: () => false },
-            { name: 'hooks', isDirectory: () => true, isFile: () => false },
-            { name: 'utils', isDirectory: () => true, isFile: () => false },
-          ] as any;
+            createMockDirEntry('components', true),
+            createMockDirEntry('hooks', true),
+            createMockDirEntry('utils', true),
+          ] as MockDirEntry[];
         }
-        if (dirPath.includes('components')) {
+        if (dirPath.toString().includes('components')) {
           return [
-            { name: 'Button.tsx', isDirectory: () => false, isFile: () => true },
-            { name: 'Input.tsx', isDirectory: () => false, isFile: () => true },
-          ] as any;
+            createMockDirEntry('Button.tsx', false),
+            createMockDirEntry('Input.tsx', false),
+          ] as MockDirEntry[];
         }
         return [];
       });
@@ -233,37 +281,40 @@ black>=22.0.0
       mockFs.stat.mockResolvedValue({
         isDirectory: () => true,
         isFile: () => false,
-      } as any);
+      } as Stats);
 
-      const structure = await projectContextManager.analyzeDirectoryStructure(mockProjectRoot);
-      
+      const structure =
+        await projectContextManager.analyzeDirectoryStructure(mockProjectRoot);
+
       expect(structure.name).toBe('project');
       expect(structure.isDirectory).toBe(true);
       expect(structure.children).toHaveLength(5);
-      
-      const srcDir = structure.children.find(child => child.name === 'src');
+
+      const srcDir = structure.children.find((child) => child.name === 'src');
       expect(srcDir).toBeDefined();
       expect(srcDir?.children).toHaveLength(3);
-      
-      const componentsDir = srcDir?.children.find(child => child.name === 'components');
+
+      const componentsDir = srcDir?.children.find(
+        (child) => child.name === 'components',
+      );
       expect(componentsDir).toBeDefined();
       expect(componentsDir?.children).toHaveLength(2);
     });
 
     it('should calculate file counts correctly', async () => {
-      mockFs.readdir.mockImplementation(async (dirPath: string) => {
-        if (dirPath === mockProjectRoot) {
+      mockFs.readdir.mockImplementation(async (dirPath: PathLike | FileHandle) => {
+        if (dirPath.toString() === mockProjectRoot) {
           return [
-            { name: 'src', isDirectory: () => true, isFile: () => false },
-            { name: 'file1.ts', isDirectory: () => false, isFile: () => true },
-            { name: 'file2.ts', isDirectory: () => false, isFile: () => true },
-          ] as any;
+            createMockDirEntry('src', true),
+            createMockDirEntry('file1.ts', false),
+            createMockDirEntry('file2.ts', false),
+          ] as MockDirEntry[];
         }
-        if (dirPath.includes('src')) {
+        if (dirPath.toString().includes('src')) {
           return [
-            { name: 'nested.ts', isDirectory: () => false, isFile: () => true },
-            { name: 'another.ts', isDirectory: () => false, isFile: () => true },
-          ] as any;
+            createMockDirEntry('nested.ts', false),
+            createMockDirEntry('another.ts', false),
+          ] as MockDirEntry[];
         }
         return [];
       });
@@ -271,13 +322,14 @@ black>=22.0.0
       mockFs.stat.mockResolvedValue({
         isDirectory: () => true,
         isFile: () => false,
-      } as any);
+      } as Stats);
 
-      const structure = await projectContextManager.analyzeDirectoryStructure(mockProjectRoot);
-      
+      const structure =
+        await projectContextManager.analyzeDirectoryStructure(mockProjectRoot);
+
       expect(structure.fileCount).toBe(4); // 2 in root + 2 in src
-      
-      const srcDir = structure.children.find(child => child.name === 'src');
+
+      const srcDir = structure.children.find((child) => child.name === 'src');
       expect(srcDir?.fileCount).toBe(2);
     });
   });
@@ -339,16 +391,21 @@ export default Input;
         },
       ];
 
-      const patterns = await projectContextManager.detectCodingPatterns(sourceFiles);
-      
-      const reactComponentPattern = patterns.find(p => p.name.includes('React Component'));
-      const propsInterfacePattern = patterns.find(p => p.name.includes('Props Interface'));
-      const hooksPattern = patterns.find(p => p.name.includes('Hooks'));
-      
+      const patterns =
+        await projectContextManager.detectCodingPatterns(sourceFiles);
+
+      const reactComponentPattern = patterns.find((p) =>
+        p.name.includes('React Component'),
+      );
+      const propsInterfacePattern = patterns.find((p) =>
+        p.name.includes('Props Interface'),
+      );
+      const hooksPattern = patterns.find((p) => p.name.includes('Hooks'));
+
       expect(reactComponentPattern).toBeDefined();
       expect(reactComponentPattern?.confidence).toBeGreaterThan(0.8);
       expect(reactComponentPattern?.files).toHaveLength(2);
-      
+
       expect(propsInterfacePattern).toBeDefined();
       expect(hooksPattern).toBeDefined();
     });
@@ -412,13 +469,20 @@ export const useLocalStorage = <T>(key: string, initialValue: T) => {
         },
       ];
 
-      const patterns = await projectContextManager.detectCodingPatterns(sourceFiles);
-      
-      const customHookPattern = patterns.find(p => p.name.includes('Custom Hook'));
+      const patterns =
+        await projectContextManager.detectCodingPatterns(sourceFiles);
+
+      const customHookPattern = patterns.find((p) =>
+        p.name.includes('Custom Hook'),
+      );
       expect(customHookPattern).toBeDefined();
       expect(customHookPattern?.confidence).toBeGreaterThan(0.9);
-      expect(customHookPattern?.files).toContain('/test/project/src/hooks/useAuth.ts');
-      expect(customHookPattern?.files).toContain('/test/project/src/hooks/useLocalStorage.ts');
+      expect(customHookPattern?.files).toContain(
+        '/test/project/src/hooks/useAuth.ts',
+      );
+      expect(customHookPattern?.files).toContain(
+        '/test/project/src/hooks/useLocalStorage.ts',
+      );
     });
 
     it('should detect utility function patterns', async () => {
@@ -435,7 +499,7 @@ export const formatCurrency = (amount: number, currency = 'USD') => {
 
 export const formatDate = (date: Date, format = 'short') => {
   return new Intl.DateTimeFormat('en-US', {
-    dateStyle: format as any,
+    dateStyle: format as 'full' | 'long' | 'medium' | 'short',
   }).format(date);
 };
 
@@ -449,9 +513,10 @@ export const slugify = (text: string) => {
         },
       ];
 
-      const patterns = await projectContextManager.detectCodingPatterns(sourceFiles);
-      
-      const utilityPattern = patterns.find(p => p.name.includes('Utility'));
+      const patterns =
+        await projectContextManager.detectCodingPatterns(sourceFiles);
+
+      const utilityPattern = patterns.find((p) => p.name.includes('Utility'));
       expect(utilityPattern).toBeDefined();
       expect(utilityPattern?.examples).toContain('formatCurrency');
       expect(utilityPattern?.examples).toContain('formatDate');
@@ -476,15 +541,16 @@ export const slugify = (text: string) => {
         },
       };
 
-      const dependencies = await projectContextManager.analyzeDependencies(packageJson);
-      
-      const prodDeps = dependencies.filter(d => d.type === 'production');
-      const devDeps = dependencies.filter(d => d.type === 'development');
-      
+      const dependencies =
+        await projectContextManager.analyzeDependencies(packageJson);
+
+      const prodDeps = dependencies.filter((d) => d.type === 'production');
+      const devDeps = dependencies.filter((d) => d.type === 'development');
+
       expect(prodDeps).toHaveLength(4);
       expect(devDeps).toHaveLength(3);
-      
-      const reactDep = prodDeps.find(d => d.name === 'react');
+
+      const reactDep = prodDeps.find((d) => d.name === 'react');
       expect(reactDep?.version).toBe('^18.2.0');
       expect(reactDep?.manager).toBe('npm');
     });
@@ -499,9 +565,11 @@ export const slugify = (text: string) => {
         },
       };
 
-      const dependencies = await projectContextManager.analyzeDependencies(packageJson);
-      const frameworks = await projectContextManager.detectFrameworks(dependencies);
-      
+      const dependencies =
+        await projectContextManager.analyzeDependencies(packageJson);
+      const frameworks =
+        await projectContextManager.detectFrameworks(dependencies);
+
       expect(frameworks).toContain('nextjs');
       expect(frameworks).toContain('react');
     });
@@ -526,25 +594,29 @@ export const slugify = (text: string) => {
         printWidth: 100,
       };
 
-      mockFs.readFile.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('.eslintrc.json')) {
+      mockFs.readFile.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (filePath.toString().includes('.eslintrc.json')) {
           return JSON.stringify(eslintConfig);
         }
-        if (filePath.includes('.prettierrc')) {
+        if (filePath.toString().includes('.prettierrc')) {
           return JSON.stringify(prettierConfig);
         }
         throw new Error('File not found');
       });
 
-      mockFs.access.mockImplementation(async (filePath: string) => {
-        if (filePath.includes('.eslintrc.json') || filePath.includes('.prettierrc')) {
+      mockFs.access.mockImplementation(async (filePath: PathLike | FileHandle) => {
+        if (
+          filePath.toString().includes('.eslintrc.json') ||
+          filePath.toString().includes('.prettierrc')
+        ) {
           return;
         }
         throw new Error('File not found');
       });
 
-      const preferences = await projectContextManager.detectPreferences(mockProjectRoot);
-      
+      const preferences =
+        await projectContextManager.detectPreferences(mockProjectRoot);
+
       expect(preferences.codeStyle.indentation).toBe('spaces');
       expect(preferences.codeStyle.indentSize).toBe(2);
       expect(preferences.codeStyle.maxLineLength).toBe(100);
@@ -566,8 +638,9 @@ export const slugify = (text: string) => {
         },
       ];
 
-      const preferences = await projectContextManager.detectNamingConventions(sourceFiles);
-      
+      const preferences =
+        await projectContextManager.detectNamingConventions(sourceFiles);
+
       expect(preferences.functions).toBe('camelCase');
       expect(preferences.files).toBe('kebab-case'); // Most common
       expect(preferences.classes).toBe('PascalCase');
@@ -577,8 +650,9 @@ export const slugify = (text: string) => {
   describe('git integration', () => {
     it('should analyze git context', async () => {
       // Mock git commands (these would typically use child_process)
-      const gitContext = await projectContextManager.analyzeGitContext(mockProjectRoot);
-      
+      const gitContext =
+        await projectContextManager.analyzeGitContext(mockProjectRoot);
+
       // This would require actual git command mocking
       // For now, we'll test the interface
       expect(gitContext).toBeDefined();
@@ -595,7 +669,7 @@ export const slugify = (text: string) => {
     it('should update project context incrementally', async () => {
       // Start with basic context
       let context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+
       // Update with new pattern
       const newPattern: CodingPattern = {
         name: 'State Management',
@@ -605,14 +679,16 @@ export const slugify = (text: string) => {
         files: ['/src/store/index.ts'],
       };
 
-      context = await projectContextManager.updatePatterns(context, [newPattern]);
-      
+      context = await projectContextManager.updatePatterns(context, [
+        newPattern,
+      ]);
+
       expect(context.patterns).toContain(newPattern);
     });
 
     it('should merge dependencies without duplicates', async () => {
       let context = await projectContextManager.analyzeProject(mockProjectRoot);
-      
+
       const newDependency: ProjectDependency = {
         name: 'new-package',
         version: '^1.0.0',
@@ -620,8 +696,10 @@ export const slugify = (text: string) => {
         manager: 'npm',
       };
 
-      context = await projectContextManager.updateDependencies(context, [newDependency]);
-      
+      context = await projectContextManager.updateDependencies(context, [
+        newDependency,
+      ]);
+
       const duplicateDependency: ProjectDependency = {
         name: 'new-package', // Same name
         version: '^1.1.0', // Different version
@@ -629,9 +707,13 @@ export const slugify = (text: string) => {
         manager: 'npm',
       };
 
-      context = await projectContextManager.updateDependencies(context, [duplicateDependency]);
-      
-      const packageDeps = context.dependencies.filter(d => d.name === 'new-package');
+      context = await projectContextManager.updateDependencies(context, [
+        duplicateDependency,
+      ]);
+
+      const packageDeps = context.dependencies.filter(
+        (d) => d.name === 'new-package',
+      );
       expect(packageDeps).toHaveLength(1);
       expect(packageDeps[0].version).toBe('^1.1.0'); // Should be updated
     });

@@ -52,12 +52,12 @@ describe('Validation Integration Tests', () => {
         console.log(`Validation completed with status: ${report.status}`);
         console.log(`Production ready: ${report.productionReady}`);
         console.log(`Overall score: ${report.overallScore.toFixed(1)}`);
-      } catch (error) {
+      } catch (_error) {
         // Even if validation fails, check that error handling works
-        expect(error).toBeDefined();
+        expect(_error).toBeDefined();
         console.log(
           'Validation failed as expected in test environment:',
-          error instanceof Error ? error.message : error,
+          _error instanceof Error ? _error.message : _error,
         );
       }
     });
@@ -78,7 +78,7 @@ describe('Validation Integration Tests', () => {
 
         // Report should be substantial
         expect(reportText.length).toBeGreaterThan(1000);
-      } catch (error) {
+      } catch (_error) {
         console.log(
           'Report generation test failed as expected in test environment',
         );
@@ -114,7 +114,7 @@ describe('Validation Integration Tests', () => {
 
       try {
         await assembler.assemblePrompt();
-      } catch (error) {
+      } catch (_error) {
         // Expected in test environment
       }
 

@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { PromptAssembler } from './PromptAssembler';
-import { ValidationSuite } from './ValidationSuite';
+import { PromptAssembler } from './PromptAssembler.js';
+import { ValidationSuite } from './ValidationSuite.js';
 
 describe('Edge Case Validation', () => {
   describe('Stress Testing', () => {
@@ -72,12 +72,12 @@ describe('Edge Case Validation', () => {
       // Test various invalid/edge case contexts
       const edgeCases = [
         {},
-        { hasGitRepo: null as any },
-        { sandboxMode: undefined as any },
+        { hasGitRepo: null as unknown as boolean },
+        { sandboxMode: undefined as unknown as boolean },
         { tokenBudget: -100 },
         { tokenBudget: 0 },
-        { environmentContext: null as any },
-        { taskType: 'invalid-type' as any },
+        { environmentContext: null as unknown as Record<string, string | undefined> },
+        { taskType: 'invalid-type' as unknown as 'general' | 'debug' | 'new-application' | 'refactor' | 'software-engineering' },
       ];
 
       for (const context of edgeCases) {
@@ -108,12 +108,12 @@ describe('Edge Case Validation', () => {
         console.log(
           `✅ Validation recovery test - Status: ${report.status}, Score: ${report.overallScore}`,
         );
-      } catch (error) {
+      } catch (_error) {
         // If it throws, that's fine too - this tests error handling
         console.log(
-          `✅ Validation error handling - Error caught and handled: ${error.message}`,
+          `✅ Validation error handling - Error caught and handled: ${(_error as Error).message}`,
         );
-        expect(error).toBeInstanceOf(Error);
+        expect(_error).toBeInstanceOf(Error);
       }
     });
 
@@ -124,7 +124,7 @@ describe('Edge Case Validation', () => {
       });
 
       let successCount = 0;
-      let errorCount = 0;
+      let _errorCount = 0;
       const totalRuns = 20;
 
       for (let i = 0; i < totalRuns; i++) {
@@ -139,8 +139,8 @@ describe('Edge Case Validation', () => {
           if (result.prompt.length > 0) {
             successCount++;
           }
-        } catch (error) {
-          errorCount++;
+        } catch (_error) {
+          _errorCount++;
         }
       }
 

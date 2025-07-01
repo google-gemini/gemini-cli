@@ -19,10 +19,10 @@ import type { TaskContext } from './interfaces/prompt-assembly.js';
 
 /**
  * Self-review loop system for automated code quality validation
- * 
+ *
  * Implements Phase 2.2 of the PLAN.md specification with configurable quality gates:
  * - syntax_valid: Code compiles without errors → action: 'revise'
- * - tests_pass: Tests execute successfully → action: 'revise' 
+ * - tests_pass: Tests execute successfully → action: 'revise'
  * - style_compliant: Follows project style guide → action: 'approve'
  * - security_check: No exposed secrets/vulnerabilities → action: 'escalate'
  * - dependency_valid: Dependencies are available and secure → action: 'revise'
@@ -46,7 +46,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
     // Initialize quality gates map
     this.qualityGates = new Map(
-      this.config.qualityGates.map(gate => [gate.id, gate])
+      this.config.qualityGates.map((gate) => [gate.id, gate]),
     );
 
     // Initialize metrics
@@ -80,7 +80,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
     try {
       // Get enabled gates sorted by priority
       const enabledGates = this.getEnabledGatesSorted();
-      
+
       if (enabledGates.length === 0) {
         result.errors.push('No quality gates enabled');
         result.success = false;
@@ -89,15 +89,25 @@ export class SelfReviewLoop implements SelfReviewSystem {
       }
 
       // Execute quality checks with timeout
-      const reviewPromise = this.executeQualityChecks(enabledGates, context, result);
+      const reviewPromise = this.executeQualityChecks(
+        enabledGates,
+        context,
+        result,
+      );
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Review timeout exceeded')), this.config.reviewTimeout);
+        setTimeout(
+          () => reject(new Error('Review timeout exceeded')),
+          this.config.reviewTimeout,
+        );
       });
 
       try {
         await Promise.race([reviewPromise, timeoutPromise]);
       } catch (error) {
-        if (error instanceof Error && error.message === 'Review timeout exceeded') {
+        if (
+          error instanceof Error &&
+          error.message === 'Review timeout exceeded'
+        ) {
           result.errors.push('Review timeout exceeded');
           result.success = false;
           result.action = 'revise';
@@ -107,13 +117,17 @@ export class SelfReviewLoop implements SelfReviewSystem {
       }
 
       // Determine final action based on results
-      result.action = this.determineReviewAction(result.failedChecks, result.checkResults);
+      result.action = this.determineReviewAction(
+        result.failedChecks,
+        result.checkResults,
+      );
       result.success = result.failedChecks.length === 0;
-
     } catch (error) {
       result.success = false;
       result.action = 'revise';
-      result.errors.push(error instanceof Error ? error.message : String(error));
+      result.errors.push(
+        error instanceof Error ? error.message : String(error),
+      );
     } finally {
       result.totalTime = Date.now() - startTime;
       this.updateMetrics(result);
@@ -128,7 +142,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
   private async executeQualityChecks(
     gates: QualityGate[],
     context: ReviewContext,
-    result: ReviewResult
+    result: ReviewResult,
   ): Promise<void> {
     for (const gate of gates) {
       try {
@@ -139,17 +153,22 @@ export class SelfReviewLoop implements SelfReviewSystem {
           result.passedChecks.push(gate.id);
         } else {
           result.failedChecks.push(gate.id);
-          
+
           // Record failure metrics
           this.recordFailure(gate.id, checkResult.message);
 
           // Stop on first failure if progressive review is enabled
-          if (this.config.enableProgressiveReview && gate.action === 'escalate') {
+          if (
+            this.config.enableProgressiveReview &&
+            gate.action === 'escalate'
+          ) {
             break;
           }
         }
       } catch (error) {
-        result.errors.push(`Error executing ${gate.id}: ${error instanceof Error ? error.message : String(error)}`);
+        result.errors.push(
+          `Error executing ${gate.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
         result.failedChecks.push(gate.id);
       }
     }
@@ -158,7 +177,10 @@ export class SelfReviewLoop implements SelfReviewSystem {
   /**
    * Execute a single quality check
    */
-  private async executeQualityCheck(gate: QualityGate, context: ReviewContext): Promise<QualityCheck> {
+  private async executeQualityCheck(
+    gate: QualityGate,
+    context: ReviewContext,
+  ): Promise<QualityCheck> {
     const startTime = Date.now();
 
     try {
@@ -195,7 +217,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
       checkResult.executionTime = Date.now() - startTime;
       this.updateGateMetrics(gate.id, checkResult);
-      
+
       return checkResult;
     } catch (error) {
       return {
@@ -243,7 +265,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
   private async validateTypeScriptSyntax(code: string): Promise<QualityCheck> {
     // Basic TypeScript syntax validation
     const syntaxErrors = this.findTypeScriptSyntaxErrors(code);
-    
+
     if (syntaxErrors.length > 0) {
       return {
         success: false,
@@ -254,7 +276,8 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
     return {
       success: true,
-      message: 'Syntax validation passed - TypeScript code is syntactically valid',
+      message:
+        'Syntax validation passed - TypeScript code is syntactically valid',
     };
   }
 
@@ -267,7 +290,8 @@ export class SelfReviewLoop implements SelfReviewSystem {
       new Function(code);
       return {
         success: true,
-        message: 'Syntax validation passed - JavaScript code is syntactically valid',
+        message:
+          'Syntax validation passed - JavaScript code is syntactically valid',
       };
     } catch (error) {
       return {
@@ -285,7 +309,8 @@ export class SelfReviewLoop implements SelfReviewSystem {
     if (context.taskType === 'general' && !context.hasTests) {
       return {
         success: true,
-        message: 'Test validation skipped - no tests expected for this task type',
+        message:
+          'Test validation skipped - no tests expected for this task type',
       };
     }
 
@@ -298,7 +323,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
     // Mock test execution - in real implementation this would run actual tests
     const testResults = await this.simulateTestExecution(context);
-    
+
     if (testResults.passed) {
       return {
         success: true,
@@ -326,7 +351,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
     // Basic style validation
     const styleIssues = this.findStyleIssues(context.codeContent);
-    
+
     if (styleIssues.length > 0) {
       return {
         success: false,
@@ -337,14 +362,17 @@ export class SelfReviewLoop implements SelfReviewSystem {
 
     return {
       success: true,
-      message: 'Style validation passed - code follows project style guidelines',
+      message:
+        'Style validation passed - code follows project style guidelines',
     };
   }
 
   /**
    * Validate security compliance
    */
-  private async validateSecurity(context: ReviewContext): Promise<QualityCheck> {
+  private async validateSecurity(
+    context: ReviewContext,
+  ): Promise<QualityCheck> {
     if (!context.hasSecurityChecks) {
       return {
         success: true,
@@ -353,7 +381,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
     }
 
     const securityIssues = this.findSecurityIssues(context.codeContent);
-    
+
     if (securityIssues.length > 0) {
       return {
         success: false,
@@ -371,9 +399,11 @@ export class SelfReviewLoop implements SelfReviewSystem {
   /**
    * Validate dependencies
    */
-  private async validateDependencies(context: ReviewContext): Promise<QualityCheck> {
+  private async validateDependencies(
+    context: ReviewContext,
+  ): Promise<QualityCheck> {
     const imports = this.extractImports(context.codeContent);
-    
+
     if (imports.length === 0) {
       return {
         success: true,
@@ -382,7 +412,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
     }
 
     const missingDeps = this.findMissingDependencies(imports);
-    
+
     if (missingDeps.length > 0) {
       return {
         success: false,
@@ -404,7 +434,7 @@ export class SelfReviewLoop implements SelfReviewSystem {
     const gates = this.getEnabledGates();
     const isContextual = Boolean(context);
     const maxGates = this.getMaxGatesForBudget();
-    
+
     // Generate compact prompt respecting token budget
     let prompt = `## QUALITY REVIEW SYSTEM
 
@@ -441,7 +471,9 @@ Before presenting results, automatically validate through these quality gates:
    * Get currently enabled quality gates
    */
   getEnabledGates(): QualityGate[] {
-    return Array.from(this.qualityGates.values()).filter(gate => gate.enabled);
+    return Array.from(this.qualityGates.values()).filter(
+      (gate) => gate.enabled,
+    );
   }
 
   /**
@@ -449,21 +481,26 @@ Before presenting results, automatically validate through these quality gates:
    */
   configureGates(gates: QualityGate[]): void {
     this.qualityGates.clear();
-    gates.forEach(gate => this.qualityGates.set(gate.id, gate));
+    gates.forEach((gate) => this.qualityGates.set(gate.id, gate));
     this.config.qualityGates = gates;
   }
 
   /**
    * Create review context from task context
    */
-  createReviewContext(taskContext: TaskContext, codeContent: string): ReviewContext {
+  createReviewContext(
+    taskContext: TaskContext,
+    codeContent: string,
+  ): ReviewContext {
     return {
       taskType: taskContext.taskType,
       language: this.detectLanguage(codeContent),
       framework: this.detectFramework(taskContext.environmentContext),
       hasTests: this.hasTestFiles(codeContent),
       hasLinting: this.hasLintingConfig(taskContext.environmentContext),
-      hasSecurityChecks: Boolean(taskContext.contextFlags.requiresSecurityGuidance),
+      hasSecurityChecks: Boolean(
+        taskContext.contextFlags.requiresSecurityGuidance,
+      ),
       codeContent,
       filePaths: [], // Would be populated from actual file operations
       environmentContext: taskContext.environmentContext,
@@ -560,7 +597,10 @@ Before presenting results, automatically validate through these quality gates:
     return this.getEnabledGates().sort((a, b) => a.priority - b.priority);
   }
 
-  private determineReviewAction(failedChecks: string[], checkResults: Record<string, QualityCheck>): ReviewAction {
+  private determineReviewAction(
+    failedChecks: string[],
+    _checkResults: Record<string, QualityCheck>,
+  ): ReviewAction {
     if (failedChecks.length === 0) {
       return 'approve';
     }
@@ -586,17 +626,23 @@ Before presenting results, automatically validate through these quality gates:
 
   private updateMetrics(result: ReviewResult): void {
     // Update success rate
-    const successCount = this.reviewMetrics.totalReviews * this.reviewMetrics.successRate / 100;
+    const successCount =
+      (this.reviewMetrics.totalReviews * this.reviewMetrics.successRate) / 100;
     const newSuccessCount = successCount + (result.success ? 1 : 0);
-    this.reviewMetrics.successRate = (newSuccessCount / this.reviewMetrics.totalReviews) * 100;
+    this.reviewMetrics.successRate =
+      (newSuccessCount / this.reviewMetrics.totalReviews) * 100;
 
     // Update average review time
-    const totalTime = this.reviewMetrics.averageReviewTime * (this.reviewMetrics.totalReviews - 1);
-    this.reviewMetrics.averageReviewTime = (totalTime + result.totalTime) / this.reviewMetrics.totalReviews;
+    const totalTime =
+      this.reviewMetrics.averageReviewTime *
+      (this.reviewMetrics.totalReviews - 1);
+    this.reviewMetrics.averageReviewTime =
+      (totalTime + result.totalTime) / this.reviewMetrics.totalReviews;
   }
 
-  private recordFailure(gateId: string, message: string): void {
-    this.reviewMetrics.commonFailures[gateId] = (this.reviewMetrics.commonFailures[gateId] || 0) + 1;
+  private recordFailure(gateId: string, _message: string): void {
+    this.reviewMetrics.commonFailures[gateId] =
+      (this.reviewMetrics.commonFailures[gateId] || 0) + 1;
   }
 
   private updateGateMetrics(gateId: string, checkResult: QualityCheck): void {
@@ -610,14 +656,18 @@ Before presenting results, automatically validate through these quality gates:
 
     const gateMetrics = this.reviewMetrics.gatePerformance[gateId];
     gateMetrics.totalExecutions++;
-    
-    const successCount = gateMetrics.successRate * (gateMetrics.totalExecutions - 1) / 100;
+
+    const successCount =
+      (gateMetrics.successRate * (gateMetrics.totalExecutions - 1)) / 100;
     const newSuccessCount = successCount + (checkResult.success ? 1 : 0);
-    gateMetrics.successRate = (newSuccessCount / gateMetrics.totalExecutions) * 100;
+    gateMetrics.successRate =
+      (newSuccessCount / gateMetrics.totalExecutions) * 100;
 
     if (checkResult.executionTime) {
-      const totalTime = gateMetrics.averageTime * (gateMetrics.totalExecutions - 1);
-      gateMetrics.averageTime = (totalTime + checkResult.executionTime) / gateMetrics.totalExecutions;
+      const totalTime =
+        gateMetrics.averageTime * (gateMetrics.totalExecutions - 1);
+      gateMetrics.averageTime =
+        (totalTime + checkResult.executionTime) / gateMetrics.totalExecutions;
     }
   }
 
@@ -625,12 +675,12 @@ Before presenting results, automatically validate through these quality gates:
 
   private findTypeScriptSyntaxErrors(code: string): string[] {
     const errors: string[] = [];
-    
+
     // Basic TypeScript syntax checks
     if (code.includes(': string = 123')) {
       errors.push('Type mismatch: string assigned number value');
     }
-    
+
     if (code.match(/\w+\s*:\s*\w+\s*=\s*\d+/) && code.includes(': string')) {
       errors.push('Type annotation mismatch');
     }
@@ -654,12 +704,12 @@ Before presenting results, automatically validate through these quality gates:
 
   private findStyleIssues(code: string): string[] {
     const issues: string[] = [];
-    
+
     // Basic style checks
     if (code.includes('  ')) {
       issues.push('Inconsistent spacing detected');
     }
-    
+
     if (code.includes('_') && !code.includes('const ')) {
       issues.push('Prefer camelCase over snake_case');
     }
@@ -669,12 +719,12 @@ Before presenting results, automatically validate through these quality gates:
 
   private findSecurityIssues(code: string): string[] {
     const issues: string[] = [];
-    
+
     // Basic security checks
     if (code.match(/["']sk-[a-zA-Z0-9]{10,}["']/)) {
       issues.push('Potential API key detected');
     }
-    
+
     if (code.match(/password\s*=\s*["'][^"']+["']/i)) {
       issues.push('Hardcoded password detected');
     }
@@ -686,22 +736,28 @@ Before presenting results, automatically validate through these quality gates:
     const imports: string[] = [];
     const importRegex = /import\s+.*?\s+from\s+["']([^"']+)["']/g;
     let match;
-    
+
     while ((match = importRegex.exec(code)) !== null) {
       imports.push(match[1]);
     }
-    
+
     return imports;
   }
 
   private findMissingDependencies(imports: string[]): string[] {
     // Mock dependency check - in real implementation would check node_modules or package.json
     const knownPackages = ['vitest', 'typescript', 'node'];
-    return imports.filter(imp => !knownPackages.includes(imp) && imp.startsWith('does-not-exist'));
+    return imports.filter(
+      (imp) => !knownPackages.includes(imp) && imp.startsWith('does-not-exist'),
+    );
   }
 
   private detectLanguage(code: string): string {
-    if (code.includes('interface ') || code.includes(': string') || code.includes(': number')) {
+    if (
+      code.includes('interface ') ||
+      code.includes(': string') ||
+      code.includes(': number')
+    ) {
       return 'typescript';
     }
     return 'javascript';
@@ -714,7 +770,11 @@ Before presenting results, automatically validate through these quality gates:
   }
 
   private hasTestFiles(code: string): boolean {
-    return code.includes('describe(') || code.includes('it(') || code.includes('test(');
+    return (
+      code.includes('describe(') ||
+      code.includes('it(') ||
+      code.includes('test(')
+    );
   }
 
   private hasLintingConfig(env: Record<string, string | undefined>): boolean {

@@ -18,7 +18,7 @@
     "build:sandbox": "node scripts/build_sandbox.js",
     "build:all": "npm run build && npm run build:sandbox",
     "clean": "node scripts/clean.js",
-    "prepare": "npm run bundle",
+    "prepare": "husky",
     "test": "npm run test --workspaces",
     "test:ci": "npm run test:ci --workspaces --if-present",
     "test:e2e": "npm run test:integration:sandbox:none -- --verbose --keep-output",
@@ -33,6 +33,9 @@
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "pre-commit": "lint-staged",
+    "validate": "npm run format:check && npm run lint:ci && npm run typecheck",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
@@ -60,6 +63,23 @@
     "README.md",
     "LICENSE"
   ],
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0",
+      "bash -c 'npm run typecheck --workspaces --if-present || true'"
+    ],
+    "*.{js,jsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0"
+    ],
+    "*.{md,json,yaml,yml}": [
+      "prettier --write"
+    ],
+    "package*.json": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@types/micromatch": "^4.0.9",
     "@types/mime-types": "^2.1.4",
@@ -76,13 +96,14 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "glob": "^10.4.5",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "json": "^11.0.0",
+    "lint-staged": "^16.1.2",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
-  },
-  "dependencies": {}
+  }
 }

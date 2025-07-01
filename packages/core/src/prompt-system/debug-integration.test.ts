@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ModuleLoaderImpl } from './ModuleLoader';
+import { ModuleLoaderImpl } from './ModuleLoader.js';
 import * as path from 'node:path';
 
 describe('Debug Integration', () => {
@@ -48,7 +48,7 @@ describe('Debug Integration', () => {
               console.log(`${item}/: ${subContents.join(', ')}`);
             }
           } catch (e) {
-            console.log(`Cannot read ${item}: ${e.message}`);
+            console.log(`Cannot read ${item}: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
       } catch (e) {

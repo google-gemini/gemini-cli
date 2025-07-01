@@ -24,7 +24,12 @@ export { runValidation } from './runValidation.js';
 
 // Self-Review System exports
 export { SelfReviewLoop } from './SelfReviewLoop.js';
-export { SelfReviewIntegration, createSelfReviewIntegration, shouldIncludeSelfReview, getSelfReviewModule } from './SelfReviewIntegration.js';
+export {
+  SelfReviewIntegration,
+  createSelfReviewIntegration,
+  shouldIncludeSelfReview,
+  getSelfReviewModule,
+} from './SelfReviewIntegration.js';
 
 export type {
   ToolManifest,
@@ -50,8 +55,11 @@ export type {
   ValidationOptions,
   PerformanceBenchmark,
   QualityTestResult,
-  ValidationReport,
 } from './ModuleValidator.js';
+
+export type {
+  ValidationReport,
+} from './ValidationSuite.js';
 
 export type {
   QualityGate,

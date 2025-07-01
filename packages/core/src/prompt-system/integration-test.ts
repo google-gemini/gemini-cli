@@ -6,19 +6,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PromptAssembler } from './PromptAssembler';
-import { ContextDetector } from './ContextDetector';
-import { ModuleLoader } from './ModuleLoader';
-import { ModuleSelector } from './ModuleSelector';
-import { ToolReferenceResolver } from './ToolReferenceResolver';
+import { PromptAssembler } from './PromptAssembler.js';
+import { ContextDetectorImpl } from './ContextDetector.js';
+import { ModuleLoaderImpl } from './ModuleLoader.js';
+import { ModuleSelectorImpl } from './ModuleSelector.js';
+import { ToolReferenceResolver } from './ToolReferenceResolver.js';
 
 async function testIntegration() {
   try {
     console.log('🔄 Testing Real-world Integration...');
 
-    const moduleLoader = new ModuleLoader();
-    const moduleSelector = new ModuleSelector();
-    const contextDetector = new ContextDetector();
+    const moduleLoader = new ModuleLoaderImpl();
+    const moduleSelector = new ModuleSelectorImpl();
+    const contextDetector = new ContextDetectorImpl();
     const toolReferenceResolver = new ToolReferenceResolver();
 
     const assembler = new PromptAssembler(
@@ -125,11 +125,14 @@ async function testIntegration() {
       warnings: result.warnings.length,
     };
   } catch (error) {
-    console.error('❌ Integration test failed:', error.message);
-    console.error(error.stack);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Integration test failed:', errorMessage);
+    if (error instanceof Error) {
+      console.error(error.stack);
+    }
     return {
       success: false,
-      error: error.message,
+      error: errorMessage,
     };
   }
 }

@@ -12,6 +12,7 @@ import {
   ProjectContext,
   ConversationSummary,
   CachedToolResult,
+  CacheStats,
   MemoryStats,
   SerializedMemory,
   MemoryEventEmitter,
@@ -48,21 +49,22 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   async initialize(config: MemoryConfig): Promise<void> {
     this.validateConfig(config);
     this.config = config;
-    
+
     // Set up memory file path
     this.memoryFilePath = path.join(homedir(), '.gemini', 'memory.json');
-    
+
     // Load existing memory state
     await this.loadMemoryState();
-    
+
     // Initialize project context if not exists
     if (!this.contextMemory.projectKnowledge.rootPath) {
-      this.contextMemory.projectKnowledge = await this.detectAndAnalyzeProject();
+      this.contextMemory.projectKnowledge =
+        await this.detectAndAnalyzeProject();
     }
-    
+
     // Start cleanup timer
     this.scheduleCleanup();
-    
+
     // Emit initialization complete
     this.eventEmitter.emit('initialized', this.config);
   }
@@ -70,28 +72,36 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Update file context
    */
-  async updateFileContext(filePath: string, context: Partial<FileContext>): Promise<void> {
+  async updateFileContext(
+    filePath: string,
+    context: Partial<FileContext>,
+  ): Promise<void> {
     const normalizedPath = path.resolve(filePath);
     let existingContext = this.contextMemory.fileStates.get(normalizedPath);
-    
+
     if (!existingContext) {
-      existingContext = await this.fileContextManager.getOrCreateFileContext(normalizedPath);
+      existingContext =
+        await this.fileContextManager.getOrCreateFileContext(normalizedPath);
     }
-    
+
     // Merge the updates
     const updatedContext: FileContext = {
       ...existingContext,
       ...context,
       lastUpdated: Date.now(),
     };
-    
+
     this.contextMemory.fileStates.set(normalizedPath, updatedContext);
-    
+
     // Check memory limits
     await this.enforceMemoryLimits();
-    
+
     // Emit event
-    this.eventEmitter.emit('fileContextUpdated', normalizedPath, updatedContext);
+    this.eventEmitter.emit(
+      'fileContextUpdated',
+      normalizedPath,
+      updatedContext,
+    );
   }
 
   /**
@@ -100,7 +110,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   async getFileContext(filePath: string): Promise<FileContext | undefined> {
     const normalizedPath = path.resolve(filePath);
     let context = this.contextMemory.fileStates.get(normalizedPath);
-    
+
     if (!context) {
       // Try to load from file context manager
       context = await this.fileContextManager.getFileContext(normalizedPath);
@@ -108,7 +118,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
         this.contextMemory.fileStates.set(normalizedPath, context);
       }
     }
-    
+
     return context;
   }
 
@@ -121,9 +131,12 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
       ...context,
       lastAnalyzed: Date.now(),
     };
-    
+
     // Emit event
-    this.eventEmitter.emit('projectContextUpdated', this.contextMemory.projectKnowledge);
+    this.eventEmitter.emit(
+      'projectContextUpdated',
+      this.contextMemory.projectKnowledge,
+    );
   }
 
   /**
@@ -138,21 +151,21 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   async addConversationSummary(summary: ConversationSummary): Promise<void> {
     this.contextMemory.sessionHistory.push(summary);
-    
+
     // Enforce session history limits
     const maxSessions = this.config.sessionHistoryConfig.maxSessions;
     if (this.contextMemory.sessionHistory.length > maxSessions) {
       // Remove oldest summaries
-      this.contextMemory.sessionHistory = this.contextMemory.sessionHistory
-        .slice(-maxSessions);
+      this.contextMemory.sessionHistory =
+        this.contextMemory.sessionHistory.slice(-maxSessions);
     }
-    
+
     // Remove summaries older than maxAge
     const maxAge = this.config.sessionHistoryConfig.maxAge;
     const cutoffTime = Date.now() - maxAge;
-    this.contextMemory.sessionHistory = this.contextMemory.sessionHistory
-      .filter(s => s.endTime > cutoffTime);
-    
+    this.contextMemory.sessionHistory =
+      this.contextMemory.sessionHistory.filter((s) => s.endTime > cutoffTime);
+
     // Emit event
     this.eventEmitter.emit('conversationSummaryAdded', summary);
   }
@@ -167,9 +180,13 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Cache tool result
    */
-  async cacheToolResult(toolName: string, key: string, result: CachedToolResult): Promise<void> {
+  async cacheToolResult(
+    toolName: string,
+    key: string,
+    result: CachedToolResult,
+  ): Promise<void> {
     let cache = this.contextMemory.toolResults.get(toolName);
-    
+
     if (!cache) {
       cache = new ToolResultCache(toolName, {
         maxSize: this.config.toolResultsConfig.maxCacheSize,
@@ -179,9 +196,9 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
       });
       this.contextMemory.toolResults.set(toolName, cache);
     }
-    
+
     const success = await cache.set(key, result);
-    
+
     if (success) {
       // Emit event
       this.eventEmitter.emit('toolResultCached', toolName, key, result);
@@ -191,12 +208,15 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Get cached tool result
    */
-  async getCachedToolResult(toolName: string, key: string): Promise<CachedToolResult | undefined> {
+  async getCachedToolResult(
+    toolName: string,
+    key: string,
+  ): Promise<CachedToolResult | undefined> {
     const cache = this.contextMemory.toolResults.get(toolName);
     if (!cache) {
       return undefined;
     }
-    
+
     return await cache.get(key);
   }
 
@@ -205,30 +225,30 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   async cleanup(): Promise<void> {
     const startTime = Date.now();
-    
+
     // Cleanup tool result caches
-    for (const [toolName, cache] of this.contextMemory.toolResults.entries()) {
+    for (const [_toolName, cache] of this.contextMemory.toolResults.entries()) {
       await cache.cleanup();
     }
-    
+
     // Cleanup file contexts based on LRU and TTL
     await this.cleanupFileContexts();
-    
+
     // Cleanup session history
     await this.cleanupSessionHistory();
-    
+
     // Check memory pressure and emit event if needed
     const stats = await this.getStats();
     if (stats.memoryPressure !== 'low') {
       this.eventEmitter.emit('memoryPressureChanged', stats.memoryPressure);
     }
-    
+
     // Save memory state to disk
     await this.saveMemoryState();
-    
+
     // Emit cleanup event
     this.eventEmitter.emit('memoryCleanup', stats);
-    
+
     console.log(`Memory cleanup completed in ${Date.now() - startTime}ms`);
   }
 
@@ -239,18 +259,18 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
     const totalMemoryUsage = await this.calculateMemoryUsage();
     const fileCount = this.contextMemory.fileStates.size;
     const summaryCount = this.contextMemory.sessionHistory.length;
-    
+
     let cachedResultCount = 0;
     const cacheHitRatios: Record<string, number> = {};
-    
+
     for (const [toolName, cache] of this.contextMemory.toolResults.entries()) {
       const cacheStats = await cache.getStats();
       cachedResultCount += cacheStats.itemCount;
       cacheHitRatios[toolName] = cacheStats.hitRatio;
     }
-    
+
     const memoryPressure = this.calculateMemoryPressure(totalMemoryUsage);
-    
+
     return {
       totalMemoryUsage,
       fileCount,
@@ -270,12 +290,16 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
     for (const [path, context] of this.contextMemory.fileStates.entries()) {
       fileStates[path] = context;
     }
-    
-    const toolResults: Record<string, any> = {};
+
+    const toolResults: Record<string, {
+      toolName: string;
+      results: Record<string, CachedToolResult>;
+      stats: CacheStats;
+    }> = {};
     for (const [toolName, cache] of this.contextMemory.toolResults.entries()) {
       const stats = await cache.getStats();
       const results: Record<string, CachedToolResult> = {};
-      
+
       // Extract cached results from the Map
       for (const [key, cachedResult] of cache.results.entries()) {
         // Only serialize non-expired results
@@ -284,14 +308,14 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
           results[key] = cachedResult;
         }
       }
-      
+
       toolResults[toolName] = {
         toolName,
         results,
         stats,
       };
     }
-    
+
     return {
       fileStates,
       projectKnowledge: this.contextMemory.projectKnowledge,
@@ -314,16 +338,16 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
     for (const [path, context] of Object.entries(data.fileStates)) {
       this.contextMemory.fileStates.set(path, context);
     }
-    
+
     // Restore project knowledge
     this.contextMemory.projectKnowledge = data.projectKnowledge;
-    
+
     // Restore session history
     this.contextMemory.sessionHistory = data.sessionHistory;
-    
+
     // Restore tool results (simplified - would need better implementation)
     this.contextMemory.toolResults.clear();
-    for (const [toolName, cacheData] of Object.entries(data.toolResults)) {
+    for (const [toolName, _cacheData] of Object.entries(data.toolResults)) {
       const cache = new ToolResultCache(toolName, {
         maxSize: this.config.toolResultsConfig.maxCacheSize,
         defaultTtl: this.config.toolResultsConfig.defaultTtl,
@@ -337,15 +361,36 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Event emitter methods
    */
-  on(event: string, listener: (...args: any[]) => void): void {
+  on(
+    event: 'fileContextUpdated',
+    listener: (filePath: string, context: FileContext) => void,
+  ): void;
+  on(
+    event: 'projectContextUpdated',
+    listener: (context: ProjectContext) => void,
+  ): void;
+  on(
+    event: 'conversationSummaryAdded',
+    listener: (summary: ConversationSummary) => void,
+  ): void;
+  on(
+    event: 'toolResultCached',
+    listener: (toolName: string, key: string, result: CachedToolResult) => void,
+  ): void;
+  on(event: 'memoryCleanup', listener: (stats: MemoryStats) => void): void;
+  on(
+    event: 'memoryPressureChanged',
+    listener: (level: 'low' | 'medium' | 'high') => void,
+  ): void;
+  on(event: string, listener: (...args: unknown[]) => void): void {
     this.eventEmitter.on(event, listener);
   }
 
-  off(event: string, listener: (...args: any[]) => void): void {
+  off(event: string, listener: (...args: unknown[]) => void): void {
     this.eventEmitter.off(event, listener);
   }
 
-  emit(event: string, ...args: any[]): boolean {
+  emit(event: string, ...args: unknown[]): boolean {
     return this.eventEmitter.emit(event, ...args);
   }
 
@@ -358,15 +403,15 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
     }
-    
+
     // Destroy tool result caches
     for (const cache of this.contextMemory.toolResults.values()) {
       cache.destroy();
     }
-    
+
     // Save final state
     await this.saveMemoryState();
-    
+
     // Remove all event listeners
     this.eventEmitter.removeAllListeners();
   }
@@ -376,19 +421,27 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private validateConfig(config: MemoryConfig): void {
     if (config.maxMemorySize <= 0) {
-      throw new Error('Invalid memory configuration: maxMemorySize must be positive');
+      throw new Error(
+        'Invalid memory configuration: maxMemorySize must be positive',
+      );
     }
-    
+
     if (config.fileStatesConfig.maxFiles <= 0) {
-      throw new Error('Invalid memory configuration: fileStatesConfig.maxFiles must be positive');
+      throw new Error(
+        'Invalid memory configuration: fileStatesConfig.maxFiles must be positive',
+      );
     }
-    
+
     if (config.sessionHistoryConfig.maxSessions <= 0) {
-      throw new Error('Invalid memory configuration: sessionHistoryConfig.maxSessions must be positive');
+      throw new Error(
+        'Invalid memory configuration: sessionHistoryConfig.maxSessions must be positive',
+      );
     }
-    
+
     if (config.toolResultsConfig.maxCacheSize <= 0) {
-      throw new Error('Invalid memory configuration: toolResultsConfig.maxCacheSize must be positive');
+      throw new Error(
+        'Invalid memory configuration: toolResultsConfig.maxCacheSize must be positive',
+      );
     }
   }
 
@@ -397,7 +450,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async loadMemoryState(): Promise<void> {
     if (!this.memoryFilePath) return;
-    
+
     try {
       await fs.access(this.memoryFilePath);
       const data = await fs.readFile(this.memoryFilePath, 'utf-8');
@@ -414,12 +467,16 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async saveMemoryState(): Promise<void> {
     if (!this.memoryFilePath) return;
-    
+
     try {
       const serialized = await this.serialize();
       const dir = path.dirname(this.memoryFilePath);
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(this.memoryFilePath, JSON.stringify(serialized, null, 2), 'utf-8');
+      await fs.writeFile(
+        this.memoryFilePath,
+        JSON.stringify(serialized, null, 2),
+        'utf-8',
+      );
     } catch (error) {
       console.error('Failed to save memory state:', error);
     }
@@ -430,12 +487,12 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async detectAndAnalyzeProject(): Promise<ProjectContext> {
     const cwd = process.cwd();
-    
+
     try {
       return await this.projectContextManager.analyzeProject(cwd);
     } catch (error) {
       console.warn('Failed to analyze project context:', error);
-      
+
       // Return minimal project context
       return {
         rootPath: cwd,
@@ -485,7 +542,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
     const maxFiles = this.config.fileStatesConfig.maxFiles;
     const ttl = this.config.fileStatesConfig.ttl;
     const cutoffTime = Date.now() - ttl;
-    
+
     // Remove expired contexts
     const expiredKeys: string[] = [];
     for (const [path, context] of this.contextMemory.fileStates.entries()) {
@@ -493,20 +550,21 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
         expiredKeys.push(path);
       }
     }
-    
+
     for (const key of expiredKeys) {
       this.contextMemory.fileStates.delete(key);
     }
-    
+
     // Enforce max files limit using LRU
     if (this.contextMemory.fileStates.size > maxFiles) {
-      const sortedContexts = Array.from(this.contextMemory.fileStates.entries())
-        .sort(([, a], [, b]) => a.lastUpdated - b.lastUpdated);
-      
+      const sortedContexts = Array.from(
+        this.contextMemory.fileStates.entries(),
+      ).sort(([, a], [, b]) => a.lastUpdated - b.lastUpdated);
+
       const keysToRemove = sortedContexts
         .slice(0, this.contextMemory.fileStates.size - maxFiles)
         .map(([path]) => path);
-      
+
       for (const key of keysToRemove) {
         this.contextMemory.fileStates.delete(key);
       }
@@ -519,9 +577,11 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   private async cleanupSessionHistory(): Promise<void> {
     const maxAge = this.config.sessionHistoryConfig.maxAge;
     const cutoffTime = Date.now() - maxAge;
-    
-    this.contextMemory.sessionHistory = this.contextMemory.sessionHistory
-      .filter(summary => summary.endTime > cutoffTime);
+
+    this.contextMemory.sessionHistory =
+      this.contextMemory.sessionHistory.filter(
+        (summary) => summary.endTime > cutoffTime,
+      );
   }
 
   /**
@@ -529,7 +589,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async enforceMemoryLimits(): Promise<void> {
     const currentUsage = await this.calculateMemoryUsage();
-    
+
     if (currentUsage > this.config.maxMemorySize) {
       // Implement aggressive cleanup
       await this.aggressiveCleanup();
@@ -541,19 +601,22 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async aggressiveCleanup(): Promise<void> {
     // Remove half of the file contexts (LRU)
-    const fileContexts = Array.from(this.contextMemory.fileStates.entries())
-      .sort(([, a], [, b]) => a.lastUpdated - b.lastUpdated);
-    
+    const fileContexts = Array.from(
+      this.contextMemory.fileStates.entries(),
+    ).sort(([, a], [, b]) => a.lastUpdated - b.lastUpdated);
+
     const toRemove = Math.floor(fileContexts.length / 2);
     for (let i = 0; i < toRemove; i++) {
       this.contextMemory.fileStates.delete(fileContexts[i][0]);
     }
-    
+
     // Remove half of the session history
-    const historyToRemove = Math.floor(this.contextMemory.sessionHistory.length / 2);
-    this.contextMemory.sessionHistory = this.contextMemory.sessionHistory
-      .slice(historyToRemove);
-    
+    const historyToRemove = Math.floor(
+      this.contextMemory.sessionHistory.length / 2,
+    );
+    this.contextMemory.sessionHistory =
+      this.contextMemory.sessionHistory.slice(historyToRemove);
+
     // Clear tool result caches
     for (const cache of this.contextMemory.toolResults.values()) {
       await cache.clear();
@@ -565,33 +628,33 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
    */
   private async calculateMemoryUsage(): Promise<number> {
     let totalSize = 0;
-    
+
     // File contexts size
     for (const context of this.contextMemory.fileStates.values()) {
       totalSize += this.estimateObjectSize(context);
     }
-    
+
     // Project knowledge size
     totalSize += this.estimateObjectSize(this.contextMemory.projectKnowledge);
-    
+
     // Session history size
     for (const summary of this.contextMemory.sessionHistory) {
       totalSize += this.estimateObjectSize(summary);
     }
-    
+
     // Tool results size
     for (const cache of this.contextMemory.toolResults.values()) {
       const stats = await cache.getStats();
       totalSize += stats.totalSize;
     }
-    
+
     return totalSize;
   }
 
   /**
    * Estimate object size in bytes
    */
-  private estimateObjectSize(obj: any): number {
+  private estimateObjectSize(obj: unknown): number {
     const jsonString = JSON.stringify(obj);
     return new Blob([jsonString]).size;
   }
@@ -599,9 +662,11 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   /**
    * Calculate memory pressure level
    */
-  private calculateMemoryPressure(currentUsage: number): 'low' | 'medium' | 'high' {
+  private calculateMemoryPressure(
+    currentUsage: number,
+  ): 'low' | 'medium' | 'high' {
     const ratio = currentUsage / this.config.maxMemorySize;
-    
+
     if (ratio < 0.6) return 'low';
     if (ratio < 0.8) return 'medium';
     return 'high';
@@ -613,7 +678,7 @@ export class MemoryManager implements MemoryOperations, MemoryEventEmitter {
   private scheduleCleanup(): void {
     const interval = this.config.fileStatesConfig.checkInterval;
     this.cleanupTimer = setInterval(() => {
-      this.cleanup().catch(error => {
+      this.cleanup().catch((error) => {
         console.error('Cleanup failed:', error);
       });
     }, interval);

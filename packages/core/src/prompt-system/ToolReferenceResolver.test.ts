@@ -10,8 +10,8 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import {
   ToolReferenceResolver,
-  resolveToolReferences,
-  resolveToolReference,
+  resolveToolReferences as _resolveToolReferences,
+  resolveToolReference as _resolveToolReference,
 } from './ToolReferenceResolver.js';
 import { ToolManifestLoader } from './ToolManifestLoader.js';
 import type { ToolManifest } from './interfaces/tool-manifest.js';

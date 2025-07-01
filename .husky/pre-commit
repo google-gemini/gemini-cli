@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged for formatting and linting
+echo "📝 Formatting and linting staged files..."
+npx lint-staged
+
+# Check if there are any TypeScript files in the commit
+if git diff --cached --name-only | grep -qE '\.(ts|tsx)$'; then
+    echo "🔧 Running TypeScript type checking..."
+    npm run typecheck
+fi
+
+# Run tests only if there are code changes (not just docs/config)
+if git diff --cached --name-only | grep -qvE '\.(md|json|yaml|yml|txt)$'; then
+    echo "🧪 Running tests..."
+    npm test
+fi
+
+echo "✅ Pre-commit checks completed!"

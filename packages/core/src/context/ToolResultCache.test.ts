@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolResultCache } from './ToolResultCache.js';
-import { CachedToolResult, CacheStats } from './memory-interfaces.js';
+import { CachedToolResult, CacheStats as _CacheStats } from './memory-interfaces.js';
 
 describe('ToolResultCache', () => {
   let cache: ToolResultCache;
@@ -43,7 +43,7 @@ describe('ToolResultCache', () => {
 
       await cache.set(key, result);
       const retrieved = await cache.get(key);
-      
+
       expect(retrieved).toBeDefined();
       expect(retrieved?.key).toBe(key);
       expect(retrieved?.result).toEqual({ output: 'test result' });
@@ -71,16 +71,18 @@ describe('ToolResultCache', () => {
       };
 
       await cache.set(key, result);
-      
+
       const firstAccess = await cache.get(key);
       expect(firstAccess?.accessCount).toBe(1);
-      
+
       // Small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 1));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1));
+
       const secondAccess = await cache.get(key);
       expect(secondAccess?.accessCount).toBe(2);
-      expect(secondAccess?.lastAccessed).toBeGreaterThan(firstAccess!.lastAccessed);
+      expect(secondAccess?.lastAccessed).toBeGreaterThan(
+        firstAccess!.lastAccessed,
+      );
     });
   });
 
@@ -102,14 +104,14 @@ describe('ToolResultCache', () => {
       };
 
       await cache.set(key, result);
-      
+
       // Should be available immediately
       let retrieved = await cache.get(key);
       expect(retrieved).toBeDefined();
-      
+
       // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, shortTtl + 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, shortTtl + 50));
+
       // Should be expired now
       retrieved = await cache.get(key);
       expect(retrieved).toBeUndefined();
@@ -118,7 +120,7 @@ describe('ToolResultCache', () => {
     it('should handle custom TTL per result', async () => {
       const shortKey = 'short-ttl';
       const longKey = 'long-ttl';
-      
+
       const shortResult: CachedToolResult = {
         key: shortKey,
         parameters: {},
@@ -147,10 +149,10 @@ describe('ToolResultCache', () => {
 
       await cache.set(shortKey, shortResult);
       await cache.set(longKey, longResult);
-      
+
       // Wait for short TTL to expire
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       expect(await cache.get(shortKey)).toBeUndefined();
       expect(await cache.get(longKey)).toBeDefined();
     });
@@ -160,7 +162,7 @@ describe('ToolResultCache', () => {
     it('should enforce maximum result size', async () => {
       const key = 'large-result';
       const largeData = 'x'.repeat(600 * 1024); // 600KB, exceeds 512KB limit
-      
+
       const result: CachedToolResult = {
         key,
         parameters: {},
@@ -176,7 +178,7 @@ describe('ToolResultCache', () => {
 
       const success = await cache.set(key, result);
       expect(success).toBe(false);
-      
+
       const retrieved = await cache.get(key);
       expect(retrieved).toBeUndefined();
     });
@@ -413,7 +415,7 @@ describe('ToolResultCache', () => {
 
       expect(await cache.get('key1')).toBeUndefined();
       expect(await cache.get('key2')).toBeUndefined();
-      
+
       const stats = await cache.getStats();
       expect(stats.itemCount).toBe(0);
       expect(stats.totalSize).toBe(0);
@@ -459,7 +461,7 @@ describe('ToolResultCache', () => {
       const statsAfterCleanup = await cache.getStats();
       expect(statsAfterCleanup.itemCount).toBe(1);
       expect(statsAfterCleanup.expirations).toBeGreaterThan(0);
-      
+
       expect(await cache.get(expiredKey)).toBeUndefined();
       expect(await cache.get(validKey)).toBeDefined();
     });
@@ -486,7 +488,7 @@ describe('ToolResultCache', () => {
       });
 
       // Wait for automatic cleanup
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise((resolve) => setTimeout(resolve, 350));
 
       expect(await autoCleanupCache.get('expiring')).toBeUndefined();
     });
@@ -530,7 +532,7 @@ describe('ToolResultCache', () => {
       await cache.get('nonexistent');
 
       const stats = await cache.getStats();
-      
+
       expect(stats.itemCount).toBe(2);
       expect(stats.totalSize).toBe(250);
       expect(stats.hits).toBe(3);

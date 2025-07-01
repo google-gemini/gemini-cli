@@ -6,8 +6,16 @@
 
 import { MemoryManager } from './MemoryManager.js';
 import { PromptAssembler } from '../prompt-system/PromptAssembler.js';
-import { TaskContext, AssemblyResult } from '../prompt-system/interfaces/prompt-assembly.js';
-import { MemoryConfig, ConversationSummary, FileContext } from './memory-interfaces.js';
+import {
+  TaskContext,
+  AssemblyResult,
+} from '../prompt-system/interfaces/prompt-assembly.js';
+import {
+  MemoryConfig,
+  ConversationSummary,
+  FileContext,
+  DirectoryNode,
+} from './memory-interfaces.js';
 import { BaseTool, ToolResult } from '../tools/tools.js';
 
 /**
@@ -24,7 +32,9 @@ export class MemoryIntegration {
   /**
    * Enhance PromptAssembler with memory-aware context
    */
-  enhancePromptAssembler(promptAssembler: PromptAssembler): MemoryAwarePromptAssembler {
+  enhancePromptAssembler(
+    promptAssembler: PromptAssembler,
+  ): MemoryAwarePromptAssembler {
     this.originalPromptAssembler = promptAssembler;
     return new MemoryAwarePromptAssembler(promptAssembler, this.memoryManager);
   }
@@ -32,7 +42,9 @@ export class MemoryIntegration {
   /**
    * Create memory-aware tool wrapper
    */
-  createMemoryAwareTool<T extends BaseTool<any, any>>(tool: T): MemoryAwareTool<T> {
+  createMemoryAwareTool<TParams, TResult extends ToolResult, T extends BaseTool<TParams, TResult>>(
+    tool: T,
+  ): MemoryAwareTool<T> {
     return new MemoryAwareTool(tool, this.memoryManager);
   }
 
@@ -72,7 +84,7 @@ export class MemoryIntegration {
 export class MemoryAwarePromptAssembler {
   constructor(
     private baseAssembler: PromptAssembler,
-    private memoryManager: MemoryManager
+    private memoryManager: MemoryManager,
   ) {}
 
   /**
@@ -81,20 +93,20 @@ export class MemoryAwarePromptAssembler {
   async assemblePrompt(context: TaskContext): Promise<AssemblyResult> {
     // Get base assembly result
     const baseResult = await this.baseAssembler.assemblePrompt(context);
-    
+
     // Enhance with memory context
     const memoryContext = await this.buildMemoryContext(context);
-    
+
     // Combine base prompt with memory context
-    const enhancedPrompt = this.combinePromptWithMemory(baseResult.prompt, memoryContext);
-    
+    const enhancedPrompt = this.combinePromptWithMemory(
+      baseResult.prompt,
+      memoryContext,
+    );
+
     return {
       ...baseResult,
       prompt: enhancedPrompt,
-      warnings: [
-        ...baseResult.warnings,
-        ...memoryContext.warnings,
-      ],
+      warnings: [...baseResult.warnings, ...memoryContext.warnings],
       metadata: {
         ...baseResult.metadata,
         memoryContext: {
@@ -103,14 +115,23 @@ export class MemoryAwarePromptAssembler {
           projectPatternsIncluded: memoryContext.projectPatterns.length,
           memoryTokens: memoryContext.estimatedTokens,
         },
-      } as any,
+      } as typeof baseResult.metadata & {
+        memoryContext: {
+          fileContextsIncluded: number;
+          sessionHistoryIncluded: number;
+          projectPatternsIncluded: number;
+          memoryTokens: number;
+        };
+      },
     };
   }
 
   /**
    * Build memory context for prompt assembly
    */
-  private async buildMemoryContext(context: TaskContext): Promise<MemoryContextData> {
+  private async buildMemoryContext(
+    context: TaskContext,
+  ): Promise<MemoryContextData> {
     const memoryContext: MemoryContextData = {
       fileContexts: [],
       sessionHistory: [],
@@ -122,11 +143,11 @@ export class MemoryAwarePromptAssembler {
     try {
       // Get project context
       const projectContext = this.memoryManager.getProjectContext();
-      
+
       // Include relevant coding patterns
       if (projectContext.patterns) {
         memoryContext.projectPatterns = projectContext.patterns
-          .filter(pattern => pattern.confidence > 0.7)
+          .filter((pattern) => pattern.confidence > 0.7)
           .slice(0, 5); // Limit to top 5 patterns
       }
 
@@ -143,12 +164,16 @@ export class MemoryAwarePromptAssembler {
       memoryContext.estimatedTokens = this.estimateMemoryTokens(memoryContext);
 
       // Check if we're within token budget
-      if (context.tokenBudget && memoryContext.estimatedTokens > context.tokenBudget * 0.3) {
+      if (
+        context.tokenBudget &&
+        memoryContext.estimatedTokens > context.tokenBudget * 0.3
+      ) {
         // Reduce memory context if it's too large
-        memoryContext.warnings.push('Memory context reduced due to token budget constraints');
+        memoryContext.warnings.push(
+          'Memory context reduced due to token budget constraints',
+        );
         this.reduceMemoryContext(memoryContext, context.tokenBudget * 0.3);
       }
-
     } catch (error) {
       memoryContext.warnings.push(`Failed to load memory context: ${error}`);
     }
@@ -159,17 +184,23 @@ export class MemoryAwarePromptAssembler {
   /**
    * Get recent file contexts from current directory
    */
-  private async getRecentFileContexts(basePath: string, limit: number): Promise<FileContext[]> {
+  private async getRecentFileContexts(
+    basePath: string,
+    limit: number,
+  ): Promise<FileContext[]> {
     try {
       const fileContexts: FileContext[] = [];
-      
+
       // Get all file contexts from memory manager
       const projectContext = this.memoryManager.getProjectContext();
-      
+
       // If we have a project structure, use it to find relevant files
       if (projectContext.structure) {
-        const relevantFiles = this.findRelevantFilesInStructure(projectContext.structure, basePath);
-        
+        const relevantFiles = this.findRelevantFilesInStructure(
+          projectContext.structure,
+          basePath,
+        );
+
         // Get file contexts for these files, prioritizing recently accessed ones
         for (const filePath of relevantFiles.slice(0, limit)) {
           const fileContext = await this.memoryManager.getFileContext(filePath);
@@ -178,10 +209,12 @@ export class MemoryAwarePromptAssembler {
           }
         }
       }
-      
+
       // Sort by last accessed/updated time
-      fileContexts.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-      
+      fileContexts.sort(
+        (a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0),
+      );
+
       return fileContexts.slice(0, limit);
     } catch (error) {
       console.warn('Failed to get recent file contexts:', error);
@@ -192,11 +225,13 @@ export class MemoryAwarePromptAssembler {
   /**
    * Get recent session history
    */
-  private async getRecentSessionHistory(limit: number): Promise<ConversationSummary[]> {
+  private async getRecentSessionHistory(
+    limit: number,
+  ): Promise<ConversationSummary[]> {
     try {
       // Get session history from memory manager
       const sessionHistory = this.memoryManager.getSessionHistory();
-      
+
       // Sort by end time (most recent first) and limit
       return sessionHistory
         .sort((a, b) => b.endTime - a.endTime)
@@ -210,12 +245,15 @@ export class MemoryAwarePromptAssembler {
   /**
    * Find relevant files in project structure relative to base path
    */
-  private findRelevantFilesInStructure(structure: any, basePath: string): string[] {
+  private findRelevantFilesInStructure(
+    _structure: DirectoryNode,
+    _basePath: string,
+  ): string[] {
     const relevantFiles: string[] = [];
-    
+
     // This is a simplified implementation - in reality, you'd traverse the DirectoryNode structure
     // and find files that are in or near the basePath, prioritizing by relevance
-    
+
     // For now, return empty array - this would need full implementation based on DirectoryNode structure
     return relevantFiles;
   }
@@ -225,32 +263,35 @@ export class MemoryAwarePromptAssembler {
    */
   private estimateMemoryTokens(memoryContext: MemoryContextData): number {
     let tokens = 0;
-    
+
     // File contexts
     for (const fileContext of memoryContext.fileContexts) {
       tokens += 50; // Base tokens for file info
       tokens += fileContext.dependencies.length * 5;
       tokens += fileContext.diagnostics.length * 20;
     }
-    
+
     // Project patterns
     for (const pattern of memoryContext.projectPatterns) {
       tokens += 30; // Base tokens for pattern
       tokens += pattern.examples.length * 10;
     }
-    
+
     // Session history
     for (const session of memoryContext.sessionHistory) {
       tokens += session.summaryTokens;
     }
-    
+
     return tokens;
   }
 
   /**
    * Reduce memory context to fit within token budget
    */
-  private reduceMemoryContext(memoryContext: MemoryContextData, maxTokens: number): void {
+  private reduceMemoryContext(
+    memoryContext: MemoryContextData,
+    maxTokens: number,
+  ): void {
     while (memoryContext.estimatedTokens > maxTokens) {
       // Remove lowest priority items first
       if (memoryContext.fileContexts.length > 0) {
@@ -262,7 +303,7 @@ export class MemoryAwarePromptAssembler {
       } else {
         break;
       }
-      
+
       memoryContext.estimatedTokens = this.estimateMemoryTokens(memoryContext);
     }
   }
@@ -270,19 +311,22 @@ export class MemoryAwarePromptAssembler {
   /**
    * Combine base prompt with memory context
    */
-  private combinePromptWithMemory(basePrompt: string, memoryContext: MemoryContextData): string {
+  private combinePromptWithMemory(
+    basePrompt: string,
+    memoryContext: MemoryContextData,
+  ): string {
     const memorySection = this.buildMemorySection(memoryContext);
-    
+
     if (!memorySection) {
       return basePrompt;
     }
-    
+
     // Insert memory section after the core identity but before task-specific guidance
     const sections = basePrompt.split('\n\n');
     const insertIndex = Math.min(2, sections.length - 1); // After identity and mandates
-    
+
     sections.splice(insertIndex, 0, memorySection);
-    
+
     return sections.join('\n\n');
   }
 
@@ -291,61 +335,77 @@ export class MemoryAwarePromptAssembler {
    */
   private buildMemorySection(memoryContext: MemoryContextData): string {
     const sections: string[] = [];
-    
+
     // Project patterns
     if (memoryContext.projectPatterns.length > 0) {
       sections.push('## Project Context\n');
-      sections.push('Based on analysis of this codebase, the following patterns are commonly used:\n');
-      
+      sections.push(
+        'Based on analysis of this codebase, the following patterns are commonly used:\n',
+      );
+
       for (const pattern of memoryContext.projectPatterns) {
         sections.push(`- **${pattern.name}**: ${pattern.description}`);
         if (pattern.examples.length > 0) {
-          sections.push(`  Examples: ${pattern.examples.slice(0, 3).join(', ')}`);
+          sections.push(
+            `  Examples: ${pattern.examples.slice(0, 3).join(', ')}`,
+          );
         }
       }
       sections.push('');
     }
-    
+
     // File contexts
     if (memoryContext.fileContexts.length > 0) {
       sections.push('## Recent File Activity\n');
-      
+
       for (const fileContext of memoryContext.fileContexts.slice(0, 5)) {
-        sections.push(`- \`${fileContext.filePath}\`: ${fileContext.fileType} file`);
-        
+        sections.push(
+          `- \`${fileContext.filePath}\`: ${fileContext.fileType} file`,
+        );
+
         if (fileContext.diagnostics.length > 0) {
-          const errorCount = fileContext.diagnostics.filter(d => d.severity === 'error').length;
-          const warningCount = fileContext.diagnostics.filter(d => d.severity === 'warning').length;
+          const errorCount = fileContext.diagnostics.filter(
+            (d) => d.severity === 'error',
+          ).length;
+          const warningCount = fileContext.diagnostics.filter(
+            (d) => d.severity === 'warning',
+          ).length;
           if (errorCount > 0 || warningCount > 0) {
-            sections.push(`  Issues: ${errorCount} errors, ${warningCount} warnings`);
+            sections.push(
+              `  Issues: ${errorCount} errors, ${warningCount} warnings`,
+            );
           }
         }
-        
+
         if (fileContext.dependencies.length > 0) {
-          sections.push(`  Dependencies: ${fileContext.dependencies.length} files`);
+          sections.push(
+            `  Dependencies: ${fileContext.dependencies.length} files`,
+          );
         }
       }
       sections.push('');
     }
-    
+
     // Session history
     if (memoryContext.sessionHistory.length > 0) {
       sections.push('## Recent Session Context\n');
-      
+
       for (const session of memoryContext.sessionHistory.slice(0, 2)) {
         sections.push(`- Previous session: ${session.summary}`);
-        
+
         if (session.pendingTasks.length > 0) {
           sections.push(`  Pending tasks: ${session.pendingTasks.length}`);
         }
-        
+
         if (session.insights.length > 0) {
-          sections.push(`  Key insights: ${session.insights.slice(0, 2).join('; ')}`);
+          sections.push(
+            `  Key insights: ${session.insights.slice(0, 2).join('; ')}`,
+          );
         }
       }
       sections.push('');
     }
-    
+
     return sections.length > 0 ? sections.join('\n') : '';
   }
 }
@@ -353,47 +413,47 @@ export class MemoryAwarePromptAssembler {
 /**
  * Memory-aware tool wrapper that caches results
  */
-export class MemoryAwareTool<T extends BaseTool<any, any>> {
+export class MemoryAwareTool<T extends BaseTool<unknown, ToolResult>> {
   constructor(
     private baseTool: T,
-    private memoryManager: MemoryManager
+    private memoryManager: MemoryManager,
   ) {}
 
   /**
    * Execute tool with memory caching
    */
-  async execute(params: any, signal: AbortSignal): Promise<ToolResult> {
+  async execute(params: Parameters<T['execute']>[0], signal: AbortSignal): Promise<ToolResult> {
     const cacheKey = this.generateCacheKey(params);
-    
+
     // Check cache first
     const cachedResult = await this.memoryManager.getCachedToolResult(
       this.baseTool.name,
-      cacheKey
+      cacheKey,
     );
-    
+
     if (cachedResult && cachedResult.valid) {
       // Update access count and return cached result
       return cachedResult.result as ToolResult;
     }
-    
+
     // Execute tool
     const startTime = Date.now();
     const result = await this.baseTool.execute(params, signal);
     const executionTime = Date.now() - startTime;
-    
+
     // Cache the result
     await this.cacheResult(cacheKey, params, result, executionTime);
-    
+
     // Update file contexts if this tool modifies files
-    await this.updateFileContextsIfNeeded(params, result);
-    
+    await this.updateFileContextsIfNeeded(params as Record<string, unknown>, result);
+
     return result;
   }
 
   /**
    * Generate cache key for parameters
    */
-  private generateCacheKey(params: any): string {
+  private generateCacheKey(params: unknown): string {
     const sortedParams = this.sortObject(params);
     return Buffer.from(JSON.stringify(sortedParams)).toString('base64');
   }
@@ -403,17 +463,17 @@ export class MemoryAwareTool<T extends BaseTool<any, any>> {
    */
   private async cacheResult(
     key: string,
-    params: any,
+    params: unknown,
     result: ToolResult,
-    executionTime: number
+    executionTime: number,
   ): Promise<void> {
-    const dependencies = this.extractDependencies(params);
+    const dependencies = this.extractDependencies(params as Record<string, unknown>);
     const size = this.estimateResultSize(result);
     const ttl = this.calculateTtl(executionTime, size);
-    
+
     await this.memoryManager.cacheToolResult(this.baseTool.name, key, {
       key,
-      parameters: params,
+      parameters: params as Record<string, unknown>,
       result,
       timestamp: Date.now(),
       ttl,
@@ -428,36 +488,39 @@ export class MemoryAwareTool<T extends BaseTool<any, any>> {
   /**
    * Extract file dependencies from tool parameters
    */
-  private extractDependencies(params: any): string[] {
+  private extractDependencies(params: Record<string, unknown>): string[] {
     const dependencies: string[] = [];
-    
+
     // Common file path parameters
     const fileParams = ['filePath', 'file', 'path', 'input', 'output'];
-    
+
     for (const param of fileParams) {
       if (params[param] && typeof params[param] === 'string') {
         dependencies.push(params[param]);
       }
     }
-    
+
     // Handle arrays of file paths
     if (Array.isArray(params.files)) {
-      dependencies.push(...params.files.filter(f => typeof f === 'string'));
+      dependencies.push(...params.files.filter((f) => typeof f === 'string'));
     }
-    
+
     return dependencies;
   }
 
   /**
    * Update file contexts after tool execution
    */
-  private async updateFileContextsIfNeeded(params: any, result: ToolResult): Promise<void> {
+  private async updateFileContextsIfNeeded(
+    params: Record<string, unknown>,
+    _result: ToolResult,
+  ): Promise<void> {
     // Update file contexts for tools that modify files
     const fileModifyingTools = ['write_file', 'edit', 'shell'];
-    
+
     if (fileModifyingTools.includes(this.baseTool.name)) {
-      const dependencies = this.extractDependencies(params);
-      
+      const dependencies = this.extractDependencies(params as Record<string, unknown>);
+
       for (const filePath of dependencies) {
         try {
           // Trigger file context update
@@ -485,39 +548,41 @@ export class MemoryAwareTool<T extends BaseTool<any, any>> {
   private calculateTtl(executionTime: number, size: number): number {
     // Base TTL
     let ttl = 60 * 60 * 1000; // 1 hour
-    
+
     // Longer TTL for expensive operations
-    if (executionTime > 5000) { // 5 seconds
+    if (executionTime > 5000) {
+      // 5 seconds
       ttl = 24 * 60 * 60 * 1000; // 24 hours
     }
-    
+
     // Shorter TTL for large results
-    if (size > 1024 * 1024) { // 1MB
+    if (size > 1024 * 1024) {
+      // 1MB
       ttl = 30 * 60 * 1000; // 30 minutes
     }
-    
+
     return ttl;
   }
 
   /**
    * Sort object for consistent serialization
    */
-  private sortObject(obj: any): any {
+  private sortObject(obj: unknown): unknown {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
-    
+
     if (Array.isArray(obj)) {
-      return obj.map(item => this.sortObject(item));
+      return obj.map((item) => this.sortObject(item));
     }
-    
-    const sorted: any = {};
-    const keys = Object.keys(obj).sort();
-    
+
+    const sorted: Record<string, unknown> = {};
+    const keys = Object.keys(obj as Record<string, unknown>).sort();
+
     for (const key of keys) {
-      sorted[key] = this.sortObject(obj[key]);
+      sorted[key] = this.sortObject((obj as Record<string, unknown>)[key]);
     }
-    
+
     return sorted;
   }
 
@@ -563,11 +628,11 @@ export class MemoryIntegrationFactory {
   private integration: MemoryIntegration;
 
   constructor(config?: Partial<MemoryConfig>) {
-    const fullConfig = {
+    const _fullConfig = {
       ...MemoryIntegration.getDefaultConfig(),
       ...config,
     };
-    
+
     this.memoryManager = new MemoryManager();
     this.integration = new MemoryIntegration(this.memoryManager);
   }
@@ -580,21 +645,23 @@ export class MemoryIntegrationFactory {
       ...MemoryIntegration.getDefaultConfig(),
       ...config,
     };
-    
+
     await this.memoryManager.initialize(fullConfig);
   }
 
   /**
    * Create memory-aware prompt assembler
    */
-  createPromptAssembler(baseAssembler: PromptAssembler): MemoryAwarePromptAssembler {
+  createPromptAssembler(
+    baseAssembler: PromptAssembler,
+  ): MemoryAwarePromptAssembler {
     return this.integration.enhancePromptAssembler(baseAssembler);
   }
 
   /**
    * Create memory-aware tool
    */
-  createTool<T extends BaseTool<any, any>>(tool: T): MemoryAwareTool<T> {
+  createTool<T extends BaseTool<unknown, ToolResult>>(tool: T): MemoryAwareTool<T> {
     return this.integration.createMemoryAwareTool(tool);
   }
 

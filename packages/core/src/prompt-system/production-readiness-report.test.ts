@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ValidationSuite } from './ValidationSuite.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 
@@ -147,7 +147,7 @@ describe('Production Readiness Assessment', () => {
     console.log('='.repeat(80));
   }, 30000); // 30 second timeout for comprehensive test
 
-  it('should verify system architecture completeness', () => {
+  it('should verify system architecture completeness', async () => {
     console.log('\n🏗️ SYSTEM ARCHITECTURE VERIFICATION:');
 
     // Verify all required components exist
@@ -162,7 +162,7 @@ describe('Production Readiness Assessment', () => {
 
     for (const component of requiredComponents) {
       try {
-        require(`./${component}.js`);
+        await import(`./${component}.js`);
         console.log(`  ✅ ${component} available`);
       } catch {
         console.log(`  ❌ ${component} missing`);
@@ -196,11 +196,11 @@ describe('Production Readiness Assessment', () => {
       const loader = new ToolManifestLoader();
 
       // Test tool resolution to verify manifest loading works
-      const testResult = loader.resolveToolReference('file-read');
-      const manifest = { 
-        manifest_version: '1.0.0', 
+      const _testResult = loader.resolveToolReference('file-read');
+      const manifest = {
+        manifest_version: '1.0.0',
         tools: { test: {} },
-        tool_references: {}
+        tool_references: {},
       }; // Mock manifest for test
 
       console.log(`  ✅ Manifest loaded successfully`);

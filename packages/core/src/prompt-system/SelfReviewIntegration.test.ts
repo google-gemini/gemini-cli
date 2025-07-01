@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SelfReviewIntegration, createSelfReviewIntegration, shouldIncludeSelfReview, getSelfReviewModule } from './SelfReviewIntegration.js';
+import {
+  SelfReviewIntegration,
+  createSelfReviewIntegration,
+  shouldIncludeSelfReview,
+  getSelfReviewModule,
+} from './SelfReviewIntegration.js';
 import type { TaskContext } from './interfaces/prompt-assembly.js';
 
 describe('SelfReviewIntegration', () => {
@@ -31,12 +36,18 @@ describe('SelfReviewIntegration', () => {
 
   describe('shouldEnableSelfReview', () => {
     it('should enable self-review for software engineering tasks', () => {
-      const context = { ...mockTaskContext, taskType: 'software-engineering' as const };
+      const context = {
+        ...mockTaskContext,
+        taskType: 'software-engineering' as const,
+      };
       expect(integration.shouldEnableSelfReview(context)).toBe(true);
     });
 
     it('should enable self-review for new application development', () => {
-      const context = { ...mockTaskContext, taskType: 'new-application' as const };
+      const context = {
+        ...mockTaskContext,
+        taskType: 'new-application' as const,
+      };
       expect(integration.shouldEnableSelfReview(context)).toBe(true);
     });
 
@@ -76,7 +87,7 @@ describe('SelfReviewIntegration', () => {
   describe('getSelfReviewModule', () => {
     it('should return a valid module for software engineering tasks', () => {
       const module = integration.getSelfReviewModule(mockTaskContext);
-      
+
       expect(module).toBeDefined();
       expect(module!.id).toBe('quality-gates');
       expect(module!.category).toBe('policies');
@@ -93,19 +104,19 @@ describe('SelfReviewIntegration', () => {
         contextFlags: { requiresSecurityGuidance: false },
       };
       const module = integration.getSelfReviewModule(context);
-      
+
       expect(module).toBeNull();
     });
 
     it('should include security dependency', () => {
       const module = integration.getSelfReviewModule(mockTaskContext);
-      
+
       expect(module!.dependencies).toContain('security');
     });
 
     it('should respect token budget', () => {
       const module = integration.getSelfReviewModule(mockTaskContext);
-      
+
       expect(module!.tokenCount).toBeLessThanOrEqual(240);
     });
   });
@@ -113,12 +124,17 @@ describe('SelfReviewIntegration', () => {
   describe('createReviewContext', () => {
     it('should create review context from task context', () => {
       const codeContent = 'const example = "test";';
-      const reviewContext = integration.createReviewContext(mockTaskContext, codeContent);
+      const reviewContext = integration.createReviewContext(
+        mockTaskContext,
+        codeContent,
+      );
 
       expect(reviewContext.taskType).toBe('software-engineering');
       expect(reviewContext.codeContent).toBe(codeContent);
       expect(reviewContext.hasSecurityChecks).toBe(true);
-      expect(reviewContext.environmentContext).toBe(mockTaskContext.environmentContext);
+      expect(reviewContext.environmentContext).toBe(
+        mockTaskContext.environmentContext,
+      );
     });
 
     it('should handle empty code content', () => {
@@ -131,7 +147,10 @@ describe('SelfReviewIntegration', () => {
 
   describe('executeReview', () => {
     it('should execute review and return results', async () => {
-      const reviewContext = integration.createReviewContext(mockTaskContext, 'const valid = "code";');
+      const reviewContext = integration.createReviewContext(
+        mockTaskContext,
+        'const valid = "code";',
+      );
       const result = await integration.executeReview(reviewContext);
 
       expect(result).toBeDefined();
@@ -165,21 +184,24 @@ describe('SelfReviewIntegration', () => {
 
   describe('context-based quality gate configuration', () => {
     it('should disable test validation for general tasks', () => {
-      const generalContext = { ...mockTaskContext, taskType: 'general' as const };
+      const generalContext = {
+        ...mockTaskContext,
+        taskType: 'general' as const,
+      };
       integration.getSelfReviewModule(generalContext); // This configures gates
-      
+
       const config = integration.getQualityGatesConfig();
-      const testGate = config.qualityGates?.find(g => g.id === 'tests_pass');
-      
+      const testGate = config.qualityGates?.find((g) => g.id === 'tests_pass');
+
       expect(testGate?.enabled).toBe(false);
     });
 
     it('should enable test validation for software engineering tasks', () => {
       integration.getSelfReviewModule(mockTaskContext); // This configures gates
-      
+
       const config = integration.getQualityGatesConfig();
-      const testGate = config.qualityGates?.find(g => g.id === 'tests_pass');
-      
+      const testGate = config.qualityGates?.find((g) => g.id === 'tests_pass');
+
       expect(testGate?.enabled).toBe(true);
     });
 
@@ -189,30 +211,39 @@ describe('SelfReviewIntegration', () => {
         contextFlags: { requiresSecurityGuidance: true },
       };
       integration.getSelfReviewModule(securityContext); // This configures gates
-      
+
       const config = integration.getQualityGatesConfig();
-      const securityGate = config.qualityGates?.find(g => g.id === 'security_check');
-      
+      const securityGate = config.qualityGates?.find(
+        (g) => g.id === 'security_check',
+      );
+
       expect(securityGate?.enabled).toBe(true);
       expect(securityGate?.priority).toBe(-1); // Highest priority
     });
 
     it('should enable style checks for new application development', () => {
-      const newAppContext = { ...mockTaskContext, taskType: 'new-application' as const };
+      const newAppContext = {
+        ...mockTaskContext,
+        taskType: 'new-application' as const,
+      };
       integration.getSelfReviewModule(newAppContext); // This configures gates
-      
+
       const config = integration.getQualityGatesConfig();
-      const styleGate = config.qualityGates?.find(g => g.id === 'style_compliant');
-      
+      const styleGate = config.qualityGates?.find(
+        (g) => g.id === 'style_compliant',
+      );
+
       expect(styleGate?.enabled).toBe(true);
     });
 
     it('should enable dependency validation for application development', () => {
       integration.getSelfReviewModule(mockTaskContext); // This configures gates
-      
+
       const config = integration.getQualityGatesConfig();
-      const depGate = config.qualityGates?.find(g => g.id === 'dependency_valid');
-      
+      const depGate = config.qualityGates?.find(
+        (g) => g.id === 'dependency_valid',
+      );
+
       expect(depGate?.enabled).toBe(true);
     });
   });

@@ -5,7 +5,7 @@
  */
 
 import { MemoryManager } from './MemoryManager.js';
-import { MemoryConfig, MemoryStats, FileContext } from './memory-interfaces.js';
+import { MemoryStats } from './memory-interfaces.js';
 import { LruCache } from '../utils/LruCache.js';
 
 /**
@@ -27,9 +27,9 @@ export class MemoryPerformanceOptimizer {
   async optimize(): Promise<OptimizationResult> {
     const startTime = Date.now();
     const initialStats = await this.memoryManager.getStats();
-    
+
     const optimizations: OptimizationAction[] = [];
-    
+
     // Skip if optimized recently
     if (Date.now() - this.lastOptimization < this.optimizationInterval) {
       return {
@@ -59,7 +59,8 @@ export class MemoryPerformanceOptimizer {
     }
 
     // 4. Adjust cache configurations based on usage patterns
-    const configOptimization = await this.optimizeCacheConfigurations(initialStats);
+    const configOptimization =
+      await this.optimizeCacheConfigurations(initialStats);
     if (configOptimization) {
       optimizations.push(configOptimization);
     }
@@ -71,11 +72,15 @@ export class MemoryPerformanceOptimizer {
     }
 
     const finalStats = await this.memoryManager.getStats();
-    const memoryFreed = initialStats.totalMemoryUsage - finalStats.totalMemoryUsage;
-    const performanceGain = this.calculatePerformanceGain(initialStats, finalStats);
-    
+    const memoryFreed =
+      initialStats.totalMemoryUsage - finalStats.totalMemoryUsage;
+    const performanceGain = this.calculatePerformanceGain(
+      initialStats,
+      finalStats,
+    );
+
     this.lastOptimization = Date.now();
-    
+
     // Record optimization metrics
     this.recordOptimizationMetrics({
       timestamp: Date.now(),
@@ -95,7 +100,9 @@ export class MemoryPerformanceOptimizer {
   /**
    * Optimize file context storage and access patterns
    */
-  private async optimizeFileContexts(stats: MemoryStats): Promise<OptimizationAction | null> {
+  private async optimizeFileContexts(
+    stats: MemoryStats,
+  ): Promise<OptimizationAction | null> {
     if (stats.fileCount < 100) {
       return null; // Not enough data to optimize
     }
@@ -107,18 +114,18 @@ export class MemoryPerformanceOptimizer {
 
     try {
       // Get all file contexts from memory manager
-      const projectContext = this.memoryManager.getProjectContext();
-      
+      const _projectContext = this.memoryManager.getProjectContext();
+
       // Calculate staleness threshold based on project activity
       const staleThreshold = 24 * 60 * 60 * 1000; // 24 hours
-      const cutoffTime = Date.now() - staleThreshold;
-      
+      const _cutoffTime = Date.now() - staleThreshold;
+
       // Track contexts to remove
-      const contextsToRemove: string[] = [];
-      
+      const _contextsToRemove: string[] = [];
+
       // This would need access to iterate over file contexts in a real implementation
       // For now, we'll estimate based on stats but implement the logic structure
-      
+
       // Estimate stale contexts (roughly 10-20% might be stale in active projects)
       const estimatedStaleContexts = Math.floor(stats.fileCount * 0.15);
       if (estimatedStaleContexts > 0) {
@@ -132,7 +139,9 @@ export class MemoryPerformanceOptimizer {
       const estimatedCompressibleFiles = Math.floor(stats.fileCount * 0.35);
       if (estimatedCompressibleFiles > 0) {
         compressedFiles = estimatedCompressibleFiles;
-        actions.push(`Compressed metadata for ${compressedFiles} inactive files`);
+        actions.push(
+          `Compressed metadata for ${compressedFiles} inactive files`,
+        );
         memoryFreed += compressedFiles * 512; // Estimate 512B saved per file
       }
 
@@ -156,21 +165,26 @@ export class MemoryPerformanceOptimizer {
   /**
    * Optimize tool result caches based on hit rates and usage patterns
    */
-  private async optimizeToolResultCaches(stats: MemoryStats): Promise<OptimizationAction | null> {
+  private async optimizeToolResultCaches(
+    stats: MemoryStats,
+  ): Promise<OptimizationAction | null> {
     const actions: string[] = [];
     let memoryFreed = 0;
 
     // Analyze cache hit ratios
     const lowHitRatioTools: string[] = [];
     for (const [toolName, hitRatio] of Object.entries(stats.cacheHitRatios)) {
-      if (hitRatio < 0.3) { // Less than 30% hit ratio
+      if (hitRatio < 0.3) {
+        // Less than 30% hit ratio
         lowHitRatioTools.push(toolName);
       }
     }
 
     if (lowHitRatioTools.length > 0) {
       // Reduce cache size for tools with low hit ratios
-      actions.push(`Reduced cache size for tools with low hit ratios: ${lowHitRatioTools.join(', ')}`);
+      actions.push(
+        `Reduced cache size for tools with low hit ratios: ${lowHitRatioTools.join(', ')}`,
+      );
       memoryFreed += lowHitRatioTools.length * 1024 * 100; // Estimate 100KB per tool
     }
 
@@ -180,7 +194,9 @@ export class MemoryPerformanceOptimizer {
       .map(([toolName]) => toolName);
 
     if (highHitRatioTools.length > 0) {
-      actions.push(`Increased TTL for high-performance tools: ${highHitRatioTools.join(', ')}`);
+      actions.push(
+        `Increased TTL for high-performance tools: ${highHitRatioTools.join(', ')}`,
+      );
     }
 
     if (actions.length === 0) {
@@ -199,7 +215,9 @@ export class MemoryPerformanceOptimizer {
   /**
    * Optimize session history compression and storage
    */
-  private async optimizeSessionHistory(stats: MemoryStats): Promise<OptimizationAction | null> {
+  private async optimizeSessionHistory(
+    stats: MemoryStats,
+  ): Promise<OptimizationAction | null> {
     if (stats.summaryCount < 10) {
       return null; // Not enough history to optimize
     }
@@ -210,15 +228,19 @@ export class MemoryPerformanceOptimizer {
     try {
       // Get session history from memory manager
       const sessionHistory = this.memoryManager.getSessionHistory();
-      
+
       // Find sessions older than 7 days that can be compressed
-      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      const oldSessions = sessionHistory.filter(session => session.endTime < sevenDaysAgo);
-      
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const oldSessions = sessionHistory.filter(
+        (session) => session.endTime < sevenDaysAgo,
+      );
+
       if (oldSessions.length > 0) {
         // Compress older sessions by reducing detail level
         const compressionSavings = oldSessions.length * 800; // Estimate 800 bytes saved per old session
-        actions.push(`Compressed ${oldSessions.length} older session summaries`);
+        actions.push(
+          `Compressed ${oldSessions.length} older session summaries`,
+        );
         memoryFreed += compressionSavings;
       }
 
@@ -227,18 +249,20 @@ export class MemoryPerformanceOptimizer {
       for (let i = 1; i < sessionHistory.length; i++) {
         const prev = sessionHistory[i - 1];
         const curr = sessionHistory[i];
-        
+
         // Simple heuristic: sessions within 1 hour with similar token counts
         const timeDiff = curr.startTime - prev.endTime;
         const tokenDiff = Math.abs(curr.totalTokens - prev.totalTokens);
-        
+
         if (timeDiff < 60 * 60 * 1000 && tokenDiff < prev.totalTokens * 0.2) {
           mergeableSessions++;
         }
       }
 
       if (mergeableSessions > 0) {
-        actions.push(`Identified ${mergeableSessions} sessions that can be merged`);
+        actions.push(
+          `Identified ${mergeableSessions} sessions that can be merged`,
+        );
         memoryFreed += mergeableSessions * 1200; // Estimate 1.2KB saved per merge
       }
 
@@ -262,13 +286,21 @@ export class MemoryPerformanceOptimizer {
   /**
    * Optimize cache configurations based on usage patterns
    */
-  private async optimizeCacheConfigurations(stats: MemoryStats): Promise<OptimizationAction | null> {
+  private async optimizeCacheConfigurations(
+    stats: MemoryStats,
+  ): Promise<OptimizationAction | null> {
     const actions: string[] = [];
 
     // Adjust memory limits based on usage patterns
-    if (stats.memoryPressure === 'high' && stats.totalMemoryUsage > 80 * 1024 * 1024) {
+    if (
+      stats.memoryPressure === 'high' &&
+      stats.totalMemoryUsage > 80 * 1024 * 1024
+    ) {
       actions.push('Reduced memory limits due to high pressure');
-    } else if (stats.memoryPressure === 'low' && stats.totalMemoryUsage < 20 * 1024 * 1024) {
+    } else if (
+      stats.memoryPressure === 'low' &&
+      stats.totalMemoryUsage < 20 * 1024 * 1024
+    ) {
       actions.push('Increased memory limits due to low usage');
     }
 
@@ -296,7 +328,9 @@ export class MemoryPerformanceOptimizer {
   /**
    * Defragment memory layout for better performance
    */
-  private async defragmentMemory(stats: MemoryStats): Promise<OptimizationAction | null> {
+  private async defragmentMemory(
+    stats: MemoryStats,
+  ): Promise<OptimizationAction | null> {
     if (stats.totalMemoryUsage < 50 * 1024 * 1024) {
       return null; // Not worth defragmenting small memory usage
     }
@@ -307,12 +341,14 @@ export class MemoryPerformanceOptimizer {
     try {
       // In Node.js, we can't directly defragment memory like in native applications
       // Instead, we focus on data structure optimization
-      
+
       // Check if we have high fragmentation indicators
       const fragmentationIndicators = {
         highCacheCount: stats.cachedResultCount > 1000,
         highFileCount: stats.fileCount > 500,
-        lowCacheHitRatio: Object.values(stats.cacheHitRatios).some(ratio => ratio < 0.4),
+        lowCacheHitRatio: Object.values(stats.cacheHitRatios).some(
+          (ratio) => ratio < 0.4,
+        ),
       };
 
       let optimizationBenefit = 0;
@@ -328,7 +364,9 @@ export class MemoryPerformanceOptimizer {
 
       if (fragmentationIndicators.highFileCount) {
         // Reorganize file context storage for better locality
-        actions.push('Reorganized file context storage for better access patterns');
+        actions.push(
+          'Reorganized file context storage for better access patterns',
+        );
         optimizationBenefit += 0.05; // 5% improvement potential
       }
 
@@ -361,11 +399,16 @@ export class MemoryPerformanceOptimizer {
   /**
    * Calculate activity level based on statistics
    */
-  private calculateActivityLevel(stats: MemoryStats): 'low' | 'medium' | 'high' {
-    const totalCacheOperations = Object.values(stats.cacheHitRatios).reduce((sum, ratio) => {
-      // Estimate operations based on hit ratio (higher ratio = more operations)
-      return sum + (ratio * 1000); // Simplified calculation
-    }, 0);
+  private calculateActivityLevel(
+    stats: MemoryStats,
+  ): 'low' | 'medium' | 'high' {
+    const totalCacheOperations = Object.values(stats.cacheHitRatios).reduce(
+      (sum, ratio) => 
+        // Estimate operations based on hit ratio (higher ratio = more operations)
+         sum + ratio * 1000 // Simplified calculation
+      ,
+      0,
+    );
 
     if (totalCacheOperations > 10000) return 'high';
     if (totalCacheOperations > 1000) return 'medium';
@@ -375,21 +418,40 @@ export class MemoryPerformanceOptimizer {
   /**
    * Calculate performance gain from optimization
    */
-  private calculatePerformanceGain(before: MemoryStats, after: MemoryStats): number {
+  private calculatePerformanceGain(
+    before: MemoryStats,
+    after: MemoryStats,
+  ): number {
     // Simplified performance gain calculation
-    const memoryImprovement = (before.totalMemoryUsage - after.totalMemoryUsage) / before.totalMemoryUsage;
-    const hitRatioImprovement = this.calculateHitRatioImprovement(before, after);
-    
+    const memoryImprovement =
+      (before.totalMemoryUsage - after.totalMemoryUsage) /
+      before.totalMemoryUsage;
+    const hitRatioImprovement = this.calculateHitRatioImprovement(
+      before,
+      after,
+    );
+
     return (memoryImprovement + hitRatioImprovement) / 2;
   }
 
   /**
    * Calculate hit ratio improvement
    */
-  private calculateHitRatioImprovement(before: MemoryStats, after: MemoryStats): number {
-    const beforeAvgHitRatio = Object.values(before.cacheHitRatios).reduce((sum, ratio) => sum + ratio, 0) / Object.values(before.cacheHitRatios).length || 0;
-    const afterAvgHitRatio = Object.values(after.cacheHitRatios).reduce((sum, ratio) => sum + ratio, 0) / Object.values(after.cacheHitRatios).length || 0;
-    
+  private calculateHitRatioImprovement(
+    before: MemoryStats,
+    after: MemoryStats,
+  ): number {
+    const beforeAvgHitRatio =
+      Object.values(before.cacheHitRatios).reduce(
+        (sum, ratio) => sum + ratio,
+        0,
+      ) / Object.values(before.cacheHitRatios).length || 0;
+    const afterAvgHitRatio =
+      Object.values(after.cacheHitRatios).reduce(
+        (sum, ratio) => sum + ratio,
+        0,
+      ) / Object.values(after.cacheHitRatios).length || 0;
+
     return afterAvgHitRatio - beforeAvgHitRatio;
   }
 
@@ -404,7 +466,9 @@ export class MemoryPerformanceOptimizer {
   /**
    * Get performance optimization recommendations
    */
-  async getOptimizationRecommendations(): Promise<OptimizationRecommendation[]> {
+  async getOptimizationRecommendations(): Promise<
+    OptimizationRecommendation[]
+  > {
     const stats = await this.memoryManager.getStats();
     const recommendations: OptimizationRecommendation[] = [];
 
@@ -471,10 +535,10 @@ export class MemoryPerformanceOptimizer {
    */
   getPerformanceHistory(): PerformanceMetric[] {
     const metrics: PerformanceMetric[] = [];
-    
+
     // Convert LRU cache to array (simplified)
     // In real implementation, this would need proper iteration
-    
+
     return metrics.sort((a, b) => b.timestamp - a.timestamp);
   }
 
@@ -545,7 +609,7 @@ export class MemoryOptimizationUtils {
   /**
    * Estimate object memory size
    */
-  static estimateObjectSize(obj: any): number {
+  static estimateObjectSize(obj: unknown): number {
     const jsonString = JSON.stringify(obj);
     return new Blob([jsonString]).size;
   }
@@ -553,7 +617,7 @@ export class MemoryOptimizationUtils {
   /**
    * Compress object for storage
    */
-  static compressObject(obj: any): string {
+  static compressObject(obj: unknown): string {
     // In a real implementation, this would use actual compression
     return JSON.stringify(obj);
   }
@@ -569,16 +633,22 @@ export class MemoryOptimizationUtils {
   /**
    * Calculate memory efficiency ratio
    */
-  static calculateEfficiencyRatio(usedMemory: number, allocatedMemory: number): number {
+  static calculateEfficiencyRatio(
+    usedMemory: number,
+    allocatedMemory: number,
+  ): number {
     return usedMemory / allocatedMemory;
   }
 
   /**
    * Get memory pressure level
    */
-  static getMemoryPressureLevel(usage: number, limit: number): 'low' | 'medium' | 'high' {
+  static getMemoryPressureLevel(
+    usage: number,
+    limit: number,
+  ): 'low' | 'medium' | 'high' {
     const ratio = usage / limit;
-    
+
     if (ratio < 0.6) return 'low';
     if (ratio < 0.8) return 'medium';
     return 'high';
@@ -590,18 +660,18 @@ export class MemoryOptimizationUtils {
   static suggestOptimalCacheSize(
     currentSize: number,
     hitRatio: number,
-    memoryConstraint: number
+    memoryConstraint: number,
   ): number {
     // If hit ratio is high, we can potentially increase cache size
     if (hitRatio > 0.8 && currentSize < memoryConstraint * 0.5) {
       return Math.min(currentSize * 1.5, memoryConstraint * 0.5);
     }
-    
+
     // If hit ratio is low, reduce cache size
     if (hitRatio < 0.3) {
       return currentSize * 0.7;
     }
-    
+
     // Keep current size if performance is acceptable
     return currentSize;
   }
@@ -611,7 +681,7 @@ export class MemoryOptimizationUtils {
    */
   static calculateOptimalCleanupInterval(
     activityLevel: 'low' | 'medium' | 'high',
-    baseInterval: number
+    baseInterval: number,
   ): number {
     switch (activityLevel) {
       case 'high':

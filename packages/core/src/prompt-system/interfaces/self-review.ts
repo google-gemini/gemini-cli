@@ -74,7 +74,12 @@ export interface ReviewResult {
  */
 export interface ReviewContext {
   /** Type of task being reviewed */
-  taskType: 'general' | 'debug' | 'new-application' | 'refactor' | 'software-engineering';
+  taskType:
+    | 'general'
+    | 'debug'
+    | 'new-application'
+    | 'refactor'
+    | 'software-engineering';
   /** Programming language of the code */
   language?: string;
   /** Framework or runtime being used */
@@ -128,7 +133,7 @@ export interface SelfReviewSystem {
   /** Configure quality gates */
   configureGates(gates: QualityGate[]): void;
   /** Create review context from task context */
-  createReviewContext(taskContext: any, codeContent: string): ReviewContext;
+  createReviewContext(taskContext: unknown, codeContent: string): ReviewContext;
 }
 
 /**
@@ -176,9 +181,12 @@ export interface ReviewMetrics {
   /** Most common failure reasons */
   commonFailures: Record<string, number>;
   /** Performance by gate type */
-  gatePerformance: Record<string, {
-    successRate: number;
-    averageTime: number;
-    totalExecutions: number;
-  }>;
+  gatePerformance: Record<
+    string,
+    {
+      successRate: number;
+      averageTime: number;
+      totalExecutions: number;
+    }
+  >;
 }

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import * as _path from 'node:path';
 import { ModuleLoaderImpl } from './ModuleLoader.js';
 import type { PromptModule } from './interfaces/prompt-assembly.js';
 
@@ -129,7 +129,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['identity.md', 'mandates.md', 'other.txt'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as any);
+      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -144,7 +144,7 @@ This is a test module with some content that should have tokens estimated.`;
       vi.mocked(fs.readdir).mockRejectedValue(new Error('Directory not found'));
 
       const modules = await moduleLoader.loadModulesByCategory(
-        'nonexistent' as any,
+        'nonexistent' as Parameters<typeof moduleLoader.loadModulesByCategory>[0],
       );
 
       expect(modules).toEqual([]);
@@ -154,7 +154,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as any);
+      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadModulesByCategory('core');
@@ -168,7 +168,7 @@ This is a test module with some content that should have tokens estimated.`;
       const mockFiles = ['test.md'];
       const mockContent = '# Test Module';
 
-      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as any);
+      vi.mocked(fs.readdir).mockResolvedValue(mockFiles as string[] & fs.Dirent[]);
       vi.mocked(fs.readFile).mockResolvedValue(mockContent);
 
       const modules = await moduleLoader.loadAllModules();
@@ -191,15 +191,16 @@ This is a test module with some content that should have tokens estimated.`;
       };
 
       // Manually set cache
-      (moduleLoader as any).moduleCache.set('test', mockModule);
+      (moduleLoader as { moduleCache: Map<string, PromptModule> }).moduleCache.set('test', mockModule);
 
       const exists = moduleLoader.moduleExists('test');
 
       expect(exists).toBe(true);
     });
 
-    it('should check file system when not in cache', () => {
-      const mockAccessSync = vi.spyOn(require('node:fs'), 'accessSync');
+    it('should check file system when not in cache', async () => {
+      const { accessSync } = await import('node:fs');
+      const mockAccessSync = vi.spyOn({ accessSync }, 'accessSync');
       mockAccessSync.mockImplementation(() => true);
 
       const exists = moduleLoader.moduleExists('test');
@@ -208,8 +209,9 @@ This is a test module with some content that should have tokens estimated.`;
       expect(mockAccessSync).toHaveBeenCalled();
     });
 
-    it('should return false when module does not exist', () => {
-      const mockAccessSync = vi.spyOn(require('node:fs'), 'accessSync');
+    it('should return false when module does not exist', async () => {
+      const { accessSync } = await import('node:fs');
+      const mockAccessSync = vi.spyOn({ accessSync }, 'accessSync');
       mockAccessSync.mockImplementation(() => {
         throw new Error('File not found');
       });
@@ -261,13 +263,13 @@ This is a test module with some content that should have tokens estimated.`;
         category: 'core',
       };
 
-      (moduleLoader as any).moduleCache.set('test', mockModule);
-      (moduleLoader as any).metadataCache.set('test', { id: 'test' });
+      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).moduleCache.set('test', mockModule);
+      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).metadataCache.set('test', { id: 'test' });
 
       moduleLoader.clearCache();
 
-      expect((moduleLoader as any).moduleCache.size).toBe(0);
-      expect((moduleLoader as any).metadataCache.size).toBe(0);
+      expect((moduleLoader as { moduleCache: Map<string, PromptModule> }).moduleCache.size).toBe(0);
+      expect((moduleLoader as { metadataCache: Map<string, unknown> }).metadataCache.size).toBe(0);
     });
 
     it('should return cache statistics', () => {
@@ -280,8 +282,8 @@ This is a test module with some content that should have tokens estimated.`;
         category: 'core',
       };
 
-      (moduleLoader as any).moduleCache.set('test', mockModule);
-      (moduleLoader as any).metadataCache.set('meta', { id: 'meta' });
+      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).moduleCache.set('test', mockModule);
+      (moduleLoader as { moduleCache: Map<string, PromptModule>; metadataCache: Map<string, { id: string }> }).metadataCache.set('meta', { id: 'meta' });
 
       const stats = moduleLoader.getCacheStats();
 

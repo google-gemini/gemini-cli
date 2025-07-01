@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { TaskContext, PromptModule } from './interfaces/prompt-assembly.js';
+import type {
+  TaskContext,
+  PromptModule,
+} from './interfaces/prompt-assembly.js';
 import type { ReviewContext } from './interfaces/self-review.js';
 import { SelfReviewLoop } from './SelfReviewLoop.js';
 
 /**
  * Integration layer between the self-review system and the existing PromptAssembler
- * 
+ *
  * This class provides seamless integration of quality gates with the modular prompt system,
  * ensuring that self-review capabilities are automatically included when appropriate
  * based on task context and project configuration.
@@ -38,7 +41,10 @@ export class SelfReviewIntegration {
     }
 
     // Enable for debugging tasks that modify code
-    if (context.taskType === 'debug' && context.contextFlags.requiresSecurityGuidance) {
+    if (
+      context.taskType === 'debug' &&
+      context.contextFlags.requiresSecurityGuidance
+    ) {
       return true;
     }
 
@@ -88,7 +94,10 @@ export class SelfReviewIntegration {
   /**
    * Create review context from task context and code content
    */
-  createReviewContext(taskContext: TaskContext, codeContent: string = ''): ReviewContext {
+  createReviewContext(
+    taskContext: TaskContext,
+    codeContent: string = '',
+  ): ReviewContext {
     return this.selfReviewLoop.createReviewContext(taskContext, codeContent);
   }
 
@@ -118,29 +127,37 @@ export class SelfReviewIntegration {
    */
   private configureQualityGatesForContext(context: TaskContext): void {
     const gates = this.selfReviewLoop.getEnabledGates();
-    
+
     // Adjust gates based on context
-    gates.forEach(gate => {
+    gates.forEach((gate) => {
       switch (gate.id) {
         case 'tests_pass':
           // Disable test validation for general tasks
           gate.enabled = context.taskType !== 'general';
           break;
-          
+
         case 'security_check':
           // Always enable security checks, but prioritize for security-sensitive contexts
           gate.enabled = true;
-          gate.priority = context.contextFlags.requiresSecurityGuidance ? -1 : 0;
+          gate.priority = context.contextFlags.requiresSecurityGuidance
+            ? -1
+            : 0;
           break;
-          
+
         case 'style_compliant':
           // Enable style checks for new development and refactoring
-          gate.enabled = ['new-application', 'refactor', 'software-engineering'].includes(context.taskType);
+          gate.enabled = [
+            'new-application',
+            'refactor',
+            'software-engineering',
+          ].includes(context.taskType);
           break;
-          
+
         case 'dependency_valid':
           // Enable dependency validation for application development
-          gate.enabled = ['new-application', 'software-engineering'].includes(context.taskType);
+          gate.enabled = ['new-application', 'software-engineering'].includes(
+            context.taskType,
+          );
           break;
       }
     });

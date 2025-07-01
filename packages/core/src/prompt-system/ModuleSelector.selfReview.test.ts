@@ -6,15 +6,18 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ModuleSelectorImpl } from './ModuleSelector.js';
-import type { TaskContext, PromptModule } from './interfaces/prompt-assembly.js';
+import type {
+  TaskContext,
+  PromptModule,
+} from './interfaces/prompt-assembly.js';
 
 describe('ModuleSelector - Self-Review Integration', () => {
   let moduleSelector: ModuleSelectorImpl;
   let baseModules: PromptModule[];
-  
+
   beforeEach(() => {
     moduleSelector = new ModuleSelectorImpl();
-    
+
     // Create base modules for testing
     baseModules = [
       {
@@ -65,9 +68,14 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(qualityGatesModule).toBeDefined();
       expect(qualityGatesModule!.category).toBe('policies');
       expect(qualityGatesModule!.content).toContain('QUALITY REVIEW SYSTEM');
@@ -83,9 +91,14 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(qualityGatesModule).toBeDefined();
     });
 
@@ -99,9 +112,14 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(qualityGatesModule).toBeDefined();
     });
 
@@ -117,9 +135,14 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(qualityGatesModule).toBeUndefined();
     });
 
@@ -135,9 +158,14 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(qualityGatesModule).toBeDefined();
     });
   });
@@ -156,18 +184,28 @@ describe('ModuleSelector - Self-Review Integration', () => {
         tokenBudget: 300, // Limited budget
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      
-      expect(qualityGatesModule).toBeDefined();
-      
-      // Verify total tokens are within budget or quality-gates is preserved
-      const totalTokens = selectedModules.reduce((sum, m) => sum + m.tokenCount, 0);
-      const hasRequiredModules = selectedModules.every(m => 
-        ['identity', 'mandates', 'security', 'quality-gates'].includes(m.id) ||
-        totalTokens <= context.tokenBudget!
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
       );
-      
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+
+      expect(qualityGatesModule).toBeDefined();
+
+      // Verify total tokens are within budget or quality-gates is preserved
+      const totalTokens = selectedModules.reduce(
+        (sum, m) => sum + m.tokenCount,
+        0,
+      );
+      const hasRequiredModules = selectedModules.every(
+        (m) =>
+          ['identity', 'mandates', 'security', 'quality-gates'].includes(
+            m.id,
+          ) || totalTokens <= context.tokenBudget!,
+      );
+
       expect(hasRequiredModules).toBe(true);
     });
 
@@ -182,15 +220,26 @@ describe('ModuleSelector - Self-Review Integration', () => {
         tokenBudget: 400,
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const totalTokens = selectedModules.reduce((sum, m) => sum + m.tokenCount, 0);
-      
-      // Should include required modules even if slightly over budget
-      const requiredModuleIds = ['identity', 'mandates', 'security', 'quality-gates'];
-      const hasAllRequired = requiredModuleIds.every(id => 
-        selectedModules.some(m => m.id === id)
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
       );
-      
+      const totalTokens = selectedModules.reduce(
+        (sum, m) => sum + m.tokenCount,
+        0,
+      );
+
+      // Should include required modules even if slightly over budget
+      const requiredModuleIds = [
+        'identity',
+        'mandates',
+        'security',
+        'quality-gates',
+      ];
+      const hasAllRequired = requiredModuleIds.every((id) =>
+        selectedModules.some((m) => m.id === id),
+      );
+
       expect(hasAllRequired).toBe(true);
     });
   });
@@ -208,14 +257,21 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      
-      const securityIndex = selectedModules.findIndex(m => m.id === 'security');
-      const qualityGatesIndex = selectedModules.findIndex(m => m.id === 'quality-gates');
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+
+      const securityIndex = selectedModules.findIndex(
+        (m) => m.id === 'security',
+      );
+      const qualityGatesIndex = selectedModules.findIndex(
+        (m) => m.id === 'quality-gates',
+      );
+
       expect(securityIndex).toBeGreaterThanOrEqual(0);
       expect(qualityGatesIndex).toBeGreaterThanOrEqual(0);
-      
+
       // Both should be in policies category and properly ordered
       const qualityGatesModule = selectedModules[qualityGatesIndex];
       expect(qualityGatesModule.category).toBe('policies');
@@ -234,15 +290,28 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
-      const isValid = moduleSelector.validateSelection(selectedModules, selectedModules);
-      
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
+      const isValid = moduleSelector.validateSelection(
+        selectedModules,
+        selectedModules,
+      );
+
       expect(isValid).toBe(true);
-      
+
       // Verify quality-gates has security dependency satisfied
-      const qualityGatesModule = selectedModules.find(m => m.id === 'quality-gates');
-      if (qualityGatesModule && qualityGatesModule.dependencies.includes('security')) {
-        const hasSecurityModule = selectedModules.some(m => m.id === 'security');
+      const qualityGatesModule = selectedModules.find(
+        (m) => m.id === 'quality-gates',
+      );
+      if (
+        qualityGatesModule &&
+        qualityGatesModule.dependencies.includes('security')
+      ) {
+        const hasSecurityModule = selectedModules.some(
+          (m) => m.id === 'security',
+        );
         expect(hasSecurityModule).toBe(true);
       }
     });
@@ -259,9 +328,12 @@ describe('ModuleSelector - Self-Review Integration', () => {
         environmentContext: {},
       };
 
-      const selectedModules = moduleSelector.selectModules(context, baseModules);
+      const selectedModules = moduleSelector.selectModules(
+        context,
+        baseModules,
+      );
       const stats = moduleSelector.getSelectionStats(selectedModules);
-      
+
       expect(stats.moduleCount).toBeGreaterThan(4); // Base modules + quality-gates + others
       expect(stats.categoryBreakdown.policies).toBeGreaterThanOrEqual(2); // security + quality-gates
       expect(stats.totalTokens).toBeGreaterThan(0);

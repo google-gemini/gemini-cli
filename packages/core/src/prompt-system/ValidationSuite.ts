@@ -13,7 +13,6 @@ import {
   getCoreSystemPromptDynamic,
 } from '../core/prompts.js';
 import type {
-  ModuleValidationResult,
   SystemValidationResult,
   PerformanceBenchmark,
   QualityTestResult,
@@ -116,8 +115,10 @@ export class ValidationSuite {
     maxCriticalIssues: 0,
   };
 
-  constructor(private criteria: ProductionCriteria = {}) {
-    this.criteria = { ...this.defaultCriteria, ...this.criteria };
+  private criteria: ProductionCriteria;
+  
+  constructor(criteriaOverrides: Partial<ProductionCriteria> = {}) {
+    this.criteria = { ...this.defaultCriteria, ...criteriaOverrides };
     this.validator = new ModuleValidator();
     this.assembler = new PromptAssembler();
     this.moduleLoader = new ModuleLoaderImpl();
@@ -150,7 +151,7 @@ export class ValidationSuite {
       console.log('📋 Validating module system...');
       const modules = await this.loadAllModules();
       report.moduleValidation = this.validator.validateSystem(modules);
-      report.categoryScores.moduleIntegrity =
+      report.categoryScores!.moduleIntegrity =
         report.moduleValidation.healthScore;
 
       // Step 2: Run integration tests
@@ -163,14 +164,14 @@ export class ValidationSuite {
       console.log('⚡ Running performance benchmarks...');
       report.performanceBenchmarks =
         await this.validator.runPerformanceBenchmarks(this.assembler);
-      report.categoryScores.performance = this.calculatePerformanceScore(
+      report.categoryScores!.performance = this.calculatePerformanceScore(
         report.performanceBenchmarks,
       );
 
       // Step 4: Token reduction verification
       console.log('📊 Verifying token reduction...');
       report.tokenReduction = await this.verifyTokenReduction();
-      report.categoryScores.tokenEfficiency =
+      report.categoryScores!.tokenEfficiency =
         this.calculateTokenEfficiencyScore(report.tokenReduction);
 
       // Step 5: Backward compatibility
@@ -181,7 +182,7 @@ export class ValidationSuite {
           originalPrompt,
           this.assembler,
         );
-      report.categoryScores.compatibility = report.backwardCompatibility
+      report.categoryScores!.compatibility = report.backwardCompatibility
         .compatible
         ? 100
         : 50;
@@ -189,12 +190,12 @@ export class ValidationSuite {
       // Step 6: Safety validation
       console.log('🛡️ Validating safety policies...');
       report.safetyValidation = await this.validateSafety(modules);
-      report.categoryScores.safety = this.calculateSafetyScore(
+      report.categoryScores!.safety = this.calculateSafetyScore(
         report.safetyValidation,
       );
 
       // Step 7: Calculate overall assessment
-      report.overallScore = this.calculateOverallScore(report.categoryScores);
+      report.overallScore = this.calculateOverallScore(report.categoryScores!);
       report.productionReady = this.assessProductionReadiness(
         report as ValidationReport,
       );
@@ -214,10 +215,10 @@ export class ValidationSuite {
       };
 
       console.log(`✅ Validation complete with status: ${report.status}`);
-    } catch (error) {
+    } catch (_error) {
       report.status = 'FAIL';
       report.criticalIssues!.push(
-        `Validation suite failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Validation suite failed: ${_error instanceof Error ? _error.message : String(_error)}`,
       );
       report.productionReady = false;
     }
@@ -446,7 +447,7 @@ export class ValidationSuite {
       // Fail loudly if modules cannot be loaded - this indicates a critical issue
       throw new Error(
         `Failed to load modules for validation: ${error instanceof Error ? error.message : String(error)}. ` +
-        `This prevents proper validation and must be resolved before proceeding.`,
+          `This prevents proper validation and must be resolved before proceeding.`,
       );
     }
   }
@@ -469,7 +470,7 @@ export class ValidationSuite {
         reductionPercent,
         targetMet: reductionPercent >= this.criteria.minTokenReduction,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         originalTokens: 4200, // Estimated original
         dynamicTokens: 1500, // Estimated target
@@ -501,9 +502,9 @@ export class ValidationSuite {
     // Check tool references
     let toolReferencesValid = true;
     try {
-      const manifest = await this.toolManifestLoader.loadManifest();
-      toolReferencesValid =
-        !!manifest && Object.keys(manifest.tools).length > 0;
+      const toolNames = this.toolManifestLoader.getAvailableToolNames();
+      const manifestVersion = this.toolManifestLoader.getManifestVersion();
+      toolReferencesValid = toolNames.length > 0 && !!manifestVersion;
     } catch {
       toolReferencesValid = false;
       issues.push('Tool manifest could not be loaded or validated');
@@ -613,8 +614,8 @@ export class ValidationSuite {
 
   private async getManifestVersion(): Promise<string> {
     try {
-      const manifest = await this.toolManifestLoader.loadManifest();
-      return manifest.manifest_version || '1.0.0';
+      const version = this.toolManifestLoader.getManifestVersion();
+      return version || '1.0.0';
     } catch {
       return '1.0.0';
     }

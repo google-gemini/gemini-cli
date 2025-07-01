@@ -12,6 +12,13 @@ import type {
 import type { ToolManifest } from './interfaces/tool-manifest.js';
 
 /**
+ * Interface for assembler objects used in validation
+ */
+interface AssemblerLike {
+  assemblePrompt(context?: Partial<TaskContext>, userMemory?: string): Promise<AssemblyResult>;
+}
+
+/**
  * Validation result for a single module
  */
 export interface ModuleValidationResult {
@@ -337,7 +344,7 @@ export class ModuleValidator {
    * Run performance benchmarks
    */
   async runPerformanceBenchmarks(
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<PerformanceBenchmark[]> {
     const benchmarks: PerformanceBenchmark[] = [];
 
@@ -407,7 +414,7 @@ export class ModuleValidator {
   /**
    * Run quality assurance tests
    */
-  async runQualityTests(assembler: any): Promise<QualityTestResult[]> {
+  async runQualityTests(assembler: AssemblerLike): Promise<QualityTestResult[]> {
     const tests: QualityTestResult[] = [];
 
     // Test 1: Basic assembly functionality
@@ -433,7 +440,7 @@ export class ModuleValidator {
    */
   async validateBackwardCompatibility(
     originalPrompt: string,
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<{
     compatible: boolean;
     issues: string[];
@@ -566,7 +573,7 @@ export class ModuleValidator {
     return 0;
   }
 
-  private async testBasicAssembly(assembler: any): Promise<QualityTestResult> {
+  private async testBasicAssembly(assembler: AssemblerLike): Promise<QualityTestResult> {
     try {
       const result = await assembler.assemblePrompt();
       return {
@@ -589,7 +596,7 @@ export class ModuleValidator {
   }
 
   private async testContextAwareSelection(
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<QualityTestResult> {
     try {
       const generalResult = await assembler.assemblePrompt({
@@ -621,7 +628,7 @@ export class ModuleValidator {
   }
 
   private async testTokenBudgetCompliance(
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<QualityTestResult> {
     try {
       const budget = 1000;
@@ -647,7 +654,7 @@ export class ModuleValidator {
   }
 
   private async testDependencyResolution(
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<QualityTestResult> {
     try {
       const result = await assembler.assemblePrompt();
@@ -687,7 +694,7 @@ export class ModuleValidator {
   }
 
   private async testUserMemoryIntegration(
-    assembler: any,
+    assembler: AssemblerLike,
   ): Promise<QualityTestResult> {
     try {
       const userMemory = 'Test user memory content for validation';

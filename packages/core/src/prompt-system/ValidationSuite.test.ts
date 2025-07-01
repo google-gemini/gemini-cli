@@ -17,12 +17,12 @@ vi.mock('../core/prompts.js');
 
 describe('ValidationSuite', () => {
   let validationSuite: ValidationSuite;
-  let mockModules: PromptModule[];
+  let _mockModules: PromptModule[];
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockModules = [
+    _mockModules = [
       {
         id: 'identity',
         version: '1.0.0',
@@ -108,7 +108,7 @@ describe('ValidationSuite', () => {
       }));
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
-      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as any);
+      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as unknown as typeof ModuleValidator);
 
       const report = await validationSuite.runCompleteValidation();
 
@@ -428,7 +428,7 @@ describe('ValidationSuite', () => {
       }));
 
       const { ModuleValidator } = await import('./ModuleValidator.js');
-      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as any);
+      vi.mocked(ModuleValidator).mockImplementation(MockModuleValidator as unknown as typeof ModuleValidator);
 
       const report = await strictSuite.runCompleteValidation();
 

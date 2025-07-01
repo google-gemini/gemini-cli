@@ -11,7 +11,7 @@ import type { TaskContext } from './interfaces/prompt-assembly.js';
 
 /**
  * Final validation tests for the self-review loop system
- * 
+ *
  * These tests verify the complete integration and validate that
  * all requirements from PLAN.md Phase 2.2 are met.
  */
@@ -53,7 +53,7 @@ describe('Self-Review System Final Validation', () => {
 
     it('should adjust content based on token constraints', () => {
       const integration = new SelfReviewIntegration();
-      
+
       // Test with very limited budget
       const limitedContext: TaskContext = {
         taskType: 'software-engineering',
@@ -66,7 +66,7 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const limitedModule = integration.getSelfReviewModule(limitedContext);
-      
+
       // Test with generous budget
       const generousContext: TaskContext = {
         taskType: 'software-engineering',
@@ -82,7 +82,9 @@ describe('Self-Review System Final Validation', () => {
 
       expect(limitedModule!.tokenCount).toBeLessThanOrEqual(150);
       expect(generousModule!.tokenCount).toBeLessThanOrEqual(300);
-      expect(limitedModule!.content.length).toBeLessThanOrEqual(generousModule!.content.length);
+      expect(limitedModule!.content.length).toBeLessThanOrEqual(
+        generousModule!.content.length,
+      );
     });
   });
 
@@ -90,17 +92,17 @@ describe('Self-Review System Final Validation', () => {
     it('should implement all five required quality gates', () => {
       const integration = new SelfReviewIntegration();
       const config = integration.getQualityGatesConfig();
-      
+
       const requiredGates = [
         'syntax_valid',
         'tests_pass',
         'style_compliant',
         'security_check',
-        'dependency_valid'
+        'dependency_valid',
       ];
 
-      const implementedGates = config.qualityGates?.map(g => g.id) || [];
-      
+      const implementedGates = config.qualityGates?.map((g) => g.id) || [];
+
       for (const requiredGate of requiredGates) {
         expect(implementedGates).toContain(requiredGate);
       }
@@ -112,15 +114,15 @@ describe('Self-Review System Final Validation', () => {
       const gates = config.qualityGates || [];
 
       const actionMap = {
-        'syntax_valid': 'revise',
-        'tests_pass': 'revise',
-        'style_compliant': 'approve',
-        'security_check': 'escalate',
-        'dependency_valid': 'revise'
+        syntax_valid: 'revise',
+        tests_pass: 'revise',
+        style_compliant: 'approve',
+        security_check: 'escalate',
+        dependency_valid: 'revise',
       };
 
       for (const [gateId, expectedAction] of Object.entries(actionMap)) {
-        const gate = gates.find(g => g.id === gateId);
+        const gate = gates.find((g) => g.id === gateId);
         expect(gate).toBeDefined();
         expect(gate!.action).toBe(expectedAction);
       }
@@ -140,9 +142,11 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const result = await assembler.assemblePrompt(context);
-      
+
       expect(result.includedModules.length).toBeGreaterThan(0);
-      expect(result.includedModules.some(m => m.id === 'quality-gates')).toBe(true);
+      expect(result.includedModules.some((m) => m.id === 'quality-gates')).toBe(
+        true,
+      );
       expect(result.prompt).toContain('Quality Review System');
     });
 
@@ -158,22 +162,27 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const result = await assembler.assemblePrompt(generalContext);
-      
+
       // Should work without self-review for general tasks
       expect(result.includedModules.length).toBeGreaterThan(0);
-      expect(result.includedModules.some(m => m.id === 'quality-gates')).toBe(false);
+      expect(result.includedModules.some((m) => m.id === 'quality-gates')).toBe(
+        false,
+      );
     });
   });
 
   describe('Context-Sensitive Behavior', () => {
     it('should enable self-review for appropriate task types', () => {
       const integration = new SelfReviewIntegration();
-      
+
       const appropriateContexts = [
         { taskType: 'software-engineering' as const },
         { taskType: 'new-application' as const },
         { taskType: 'refactor' as const },
-        { taskType: 'debug' as const, contextFlags: { requiresSecurityGuidance: true } },
+        {
+          taskType: 'debug' as const,
+          contextFlags: { requiresSecurityGuidance: true },
+        },
       ];
 
       for (const context of appropriateContexts) {
@@ -192,7 +201,7 @@ describe('Self-Review System Final Validation', () => {
 
     it('should disable self-review for inappropriate contexts', () => {
       const integration = new SelfReviewIntegration();
-      
+
       const inappropriateContext: TaskContext = {
         taskType: 'general',
         hasGitRepo: false,
@@ -202,12 +211,14 @@ describe('Self-Review System Final Validation', () => {
         environmentContext: {},
       };
 
-      expect(integration.shouldEnableSelfReview(inappropriateContext)).toBe(false);
+      expect(integration.shouldEnableSelfReview(inappropriateContext)).toBe(
+        false,
+      );
     });
 
     it('should adapt quality gates based on context', () => {
       const integration = new SelfReviewIntegration();
-      
+
       // Test different contexts
       const contexts = [
         { taskType: 'general' as const, expectTestGate: false },
@@ -227,11 +238,13 @@ describe('Self-Review System Final Validation', () => {
 
         // Get module (which configures gates internally)
         const module = integration.getSelfReviewModule(context);
-        
+
         if (module) {
           const config = integration.getQualityGatesConfig();
-          const testGate = config.qualityGates?.find(g => g.id === 'tests_pass');
-          
+          const testGate = config.qualityGates?.find(
+            (g) => g.id === 'tests_pass',
+          );
+
           if (expectTestGate) {
             expect(testGate?.enabled).toBe(true);
           } else {
@@ -246,8 +259,10 @@ describe('Self-Review System Final Validation', () => {
     it('should prioritize security checks', () => {
       const integration = new SelfReviewIntegration();
       const config = integration.getQualityGatesConfig();
-      const securityGate = config.qualityGates?.find(g => g.id === 'security_check');
-      
+      const securityGate = config.qualityGates?.find(
+        (g) => g.id === 'security_check',
+      );
+
       expect(securityGate).toBeDefined();
       expect(securityGate!.priority).toBe(0); // Highest priority
       expect(securityGate!.action).toBe('escalate');
@@ -271,7 +286,10 @@ describe('Self-Review System Final Validation', () => {
         };
       `;
 
-      const reviewContext = integration.createReviewContext(context, codeWithSecrets);
+      const reviewContext = integration.createReviewContext(
+        context,
+        codeWithSecrets,
+      );
       const result = await integration.executeReview(reviewContext);
 
       expect(result.success).toBe(false);
@@ -292,8 +310,11 @@ describe('Self-Review System Final Validation', () => {
         environmentContext: {},
       };
 
-      const reviewContext = integration.createReviewContext(context, 'const simple = "code";');
-      
+      const reviewContext = integration.createReviewContext(
+        context,
+        'const simple = "code";',
+      );
+
       const startTime = Date.now();
       const result = await integration.executeReview(reviewContext);
       const endTime = Date.now();
@@ -305,7 +326,7 @@ describe('Self-Review System Final Validation', () => {
     it('should handle timeout gracefully', async () => {
       const integration = new SelfReviewIntegration();
       const config = integration.getQualityGatesConfig();
-      
+
       // Verify timeout configuration exists
       expect(config.reviewTimeout).toBeGreaterThan(0);
       expect(config.reviewTimeout).toBeLessThan(60000); // Should be reasonable (< 1 minute)
@@ -316,10 +337,10 @@ describe('Self-Review System Final Validation', () => {
     it('should support custom quality gates', () => {
       const integration = new SelfReviewIntegration();
       const config = integration.getQualityGatesConfig();
-      
+
       // Verify structure supports custom gates
       expect(Array.isArray(config.qualityGates)).toBe(true);
-      
+
       // Check that gate structure supports customization
       const firstGate = config.qualityGates?.[0];
       if (firstGate) {
@@ -346,7 +367,7 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const module = integration.getSelfReviewModule(context);
-      
+
       expect(module).toBeDefined();
       expect(module!.id).toBe('quality-gates');
       expect(module!.version).toBeDefined();
@@ -371,7 +392,10 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const invalidCode = 'const invalid syntax = ;';
-      const reviewContext = integration.createReviewContext(context, invalidCode);
+      const reviewContext = integration.createReviewContext(
+        context,
+        invalidCode,
+      );
       const result = await integration.executeReview(reviewContext);
 
       expect(result).toBeDefined();
@@ -393,7 +417,7 @@ describe('Self-Review System Final Validation', () => {
       };
 
       const module = integration.getSelfReviewModule(context);
-      
+
       expect(module).toBeDefined();
       expect(module!.dependencies).toContain('security');
     });

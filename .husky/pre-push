@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run comprehensive preflight check before pushing
+echo "Running preflight checks before push..."
+npm run preflight

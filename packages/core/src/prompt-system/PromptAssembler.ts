@@ -261,7 +261,7 @@ export class PromptAssembler {
       // Sort by category first (core -> policy -> playbook -> context -> example)
       const categoryOrder = {
         core: 0,
-        policy: 1,
+        policies: 1,
         playbook: 2,
         context: 3,
         example: 4,
