@@ -382,10 +382,21 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   private handleStdinWrite(child: ChildProcess, stdin: string | undefined, reject: (error: Error) => void): void {
     if (stdin && child.stdin) {
+      let isRejected = false;
+      
+      // Helper to ensure we only reject once
+      const safeReject = (error: Error) => {
+        if (!isRejected) {
+          isRejected = true;
+          reject(error);
+        }
+      };
+      
+      // Set up error handler for the stdin stream
       child.stdin.on('error', (err: Error & { code?: string }) => {
         const errorMessage = this.formatStdinError(err);
         console.error(`[GenerateCommitMessage] stdin write error: ${errorMessage}`);
-        reject(new Error(errorMessage));
+        safeReject(new Error(errorMessage));
       });
       
       try {
@@ -395,39 +406,57 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
             return;
           }
           
+          let isResolved = false;
+          
+          // Helper to ensure we only resolve once
+          const safeResolve = () => {
+            if (!isResolved) {
+              isResolved = true;
+              resolve();
+            }
+          };
+          
+          // Helper to ensure we only reject once within the promise
+          const safeWriteReject = (error: Error) => {
+            if (!isResolved) {
+              isResolved = true;
+              writeReject(error);
+            }
+          };
+          
           const writeResult = child.stdin.write(stdin, (writeError) => {
             if (writeError) {
               const errorMessage = this.formatStdinWriteError(writeError as Error & { code?: string });
               console.error(`[GenerateCommitMessage] Stdin write callback error: ${errorMessage}`);
-              writeReject(new Error(errorMessage));
+              safeWriteReject(new Error(errorMessage));
             } else {
-              resolve();
+              safeResolve();
             }
           });
           
+          // Handle backpressure case
           if (!writeResult) {
-            child.stdin.once('drain', () => resolve());
+            child.stdin.once('drain', safeResolve);
           } else {
-            resolve();
+            safeResolve();
           }
         });
         
         writePromise
           .then(() => {
-            if (child.stdin) {
+            if (child.stdin && !child.stdin.destroyed) {
               child.stdin.end();
             }
           })
           .catch((writeError) => {
             const errorMessage = writeError instanceof Error ? writeError.message : String(writeError);
             console.error(`[GenerateCommitMessage] Stdin write promise error: ${errorMessage}`);
-            reject(new Error(errorMessage));
+            safeReject(new Error(errorMessage));
           });
       } catch (stdinError) {
         const errorMessage = this.formatStdinWriteError(stdinError as Error & { code?: string });
         console.error(`[GenerateCommitMessage] Stdin write error: ${errorMessage}`);
-        reject(new Error(errorMessage));
-        return;
+        safeReject(new Error(errorMessage));
       }
     }
   }
