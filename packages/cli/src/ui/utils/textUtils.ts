@@ -34,10 +34,10 @@ export function isBinary(
 
   const sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
 
-  for (let i = 0; i < sample.length; i++) {
+  for (const byte of sample) {
     // The presence of a NULL byte (0x00) is one of the most reliable
     // indicators of a binary file. Text files should not contain them.
-    if (sample[i] === 0) {
+    if (byte === 0) {
       return true;
     }
   }
