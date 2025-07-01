@@ -46,6 +46,7 @@ export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
+  hasSubCommand?: boolean;
   completion?: () => Promise<string[]>;
   action: (
     mainCommand: string,
@@ -211,6 +212,7 @@ export const useSlashCommandProcessor = (
         name: 'help',
         altName: '?',
         description: 'for help on gemini-cli',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Opening help.');
           setShowHelp(true);
@@ -219,6 +221,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'docs',
         description: 'open full Gemini CLI documentation in your browser',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           const docsUrl = 'https://goo.gle/gemini-cli-docs';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
@@ -240,6 +243,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'clear',
         description: 'clear the screen and conversation history',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Clearing terminal and resetting chat.');
           clearItems();
@@ -251,6 +255,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'theme',
         description: 'change the theme',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openThemeDialog();
         },
@@ -258,6 +263,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'auth',
         description: 'change the auth method',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openAuthDialog();
         },
@@ -265,6 +271,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'editor',
         description: 'set external editor preference',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openEditorDialog();
         },
@@ -272,6 +279,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'privacy',
         description: 'display the privacy notice',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openPrivacyNotice();
         },
@@ -280,6 +288,7 @@ export const useSlashCommandProcessor = (
         name: 'stats',
         altName: 'usage',
         description: 'check session stats. Usage: /stats [model|tools]',
+        hasSubCommand: true,
         action: (_mainCommand, subCommand, _args) => {
           if (subCommand === 'model') {
             addMessage({
@@ -309,6 +318,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'mcp',
         description: 'list configured MCP servers and tools',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           // Check if the _subCommand includes a specific flag to control description visibility
           let useShowDescriptions = showToolDescriptions;
@@ -509,6 +519,7 @@ export const useSlashCommandProcessor = (
         name: 'memory',
         description:
           'manage memory. Usage: /memory <show|refresh|add> [text for add]',
+        hasSubCommand: true,
         action: (mainCommand, subCommand, args) => {
           switch (subCommand) {
             case 'show':
@@ -540,6 +551,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'tools',
         description: 'list available Gemini CLI tools',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           // Check if the _subCommand includes a specific flag to control description visibility
           let useShowDescriptions = showToolDescriptions;
@@ -613,6 +625,7 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'corgi',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           toggleCorgiMode();
         },
@@ -620,6 +633,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'about',
         description: 'show version info',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           const osVersion = process.platform;
           let sandboxEnv = 'no sandbox';
@@ -648,6 +662,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'bug',
         description: 'submit a bug report',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, args) => {
           let bugDescription = _subCommand || '';
           if (args) {
@@ -710,6 +725,7 @@ export const useSlashCommandProcessor = (
         name: 'chat',
         description:
           'Manage conversation history. Usage: /chat <list|save|resume> [tag]',
+        hasSubCommand: true,
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
@@ -830,6 +846,7 @@ export const useSlashCommandProcessor = (
         name: 'quit',
         altName: 'exit',
         description: 'exit the cli',
+        hasSubCommand: true,
         action: async (mainCommand, _subCommand, _args) => {
           const now = new Date();
           const { sessionStartTime } = session.stats;
@@ -857,6 +874,7 @@ export const useSlashCommandProcessor = (
         name: 'compress',
         altName: 'summarize',
         description: 'Compresses the context by replacing it with a summary.',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           if (pendingCompressionItemRef.current !== null) {
             addMessage({
@@ -1033,6 +1051,7 @@ export const useSlashCommandProcessor = (
       commands.push({
         name: cmd.name,
         description: cmd.description,
+        hasSubCommand: false,
         action: async (_mainCommand, _subCommand, args) => {
           let prompt = cmd.template.replace(/\$ARGUMENTS/g, args || '');
 
@@ -1128,14 +1147,26 @@ export const useSlashCommandProcessor = (
         );
       }
 
+      let mainCommand: string;
       let subCommand: string | undefined;
       let args: string | undefined;
 
-      const parts = trimmed.startsWith('/') || trimmed.startsWith('?')
-        ? trimmed.slice(1).split(/\s+/)
-        : [];
-      const mainCommand = parts[0];
-      args = parts.slice(1).join(' ');
+      if (trimmed.startsWith('?')) {
+        mainCommand = 'help';
+        args = trimmed.slice(1).trim();
+      } else {
+        const parts = trimmed.slice(1).split(/\s+/);
+        mainCommand = parts[0];
+        const cmdDef = slashCommands.find(
+          cmd => cmd.name === mainCommand || cmd.altName === mainCommand
+        );
+        if (cmdDef?.hasSubCommand) {
+          subCommand = parts[1];
+          args = parts.slice(2).join(' ');
+        } else {
+          args = parts.slice(1).join(' ');
+        }
+      }
 
       for (const cmd of slashCommands) {
         if (mainCommand === cmd.name || mainCommand === cmd.altName) {
