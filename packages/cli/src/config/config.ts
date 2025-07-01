@@ -297,6 +297,15 @@ function findEnvFile(startDir: string): string | null {
 export function loadEnvironment(): void {
   const envFilePath = findEnvFile(process.cwd());
   if (envFilePath) {
-    dotenv.config({ path: envFilePath });
+    // Enable error reporting in development/interactive environments,
+    // but keep quiet in CI/CD and production to avoid disrupting automated scripts
+    const isAutomatedEnvironment = process.env.CI === 'true' || 
+                                   process.env.NODE_ENV === 'production' ||
+                                   !process.stdout.isTTY;
+    
+    dotenv.config({ 
+      path: envFilePath, 
+      quiet: isAutomatedEnvironment 
+    });
   }
 }
