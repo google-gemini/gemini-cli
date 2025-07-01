@@ -20,6 +20,7 @@ import { Config, EditorType, AuthType } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { HistoryItem, MessageType, StreamingState } from '../types.js';
+import { SlashCommandActionReturn } from '../commands/types.js';
 import { Dispatch, SetStateAction } from 'react';
 import { LoadedSettings } from '../../config/settings.js';
 
@@ -360,10 +361,7 @@ describe('useGeminiStream', () => {
         onDebugMessage: (message: string) => void;
         handleSlashCommand: (
           cmd: PartListUnion,
-        ) => Promise<
-          | import('./slashCommandProcessor.js').SlashCommandActionReturn
-          | boolean
-        >;
+        ) => Promise<SlashCommandActionReturn | boolean>;
         shellModeActive: boolean;
         loadedSettings: LoadedSettings;
         toolCalls?: TrackedToolCall[]; // Allow passing updated toolCalls
@@ -396,10 +394,7 @@ describe('useGeminiStream', () => {
           onDebugMessage: mockOnDebugMessage,
           handleSlashCommand: mockHandleSlashCommand as unknown as (
             cmd: PartListUnion,
-          ) => Promise<
-            | import('./slashCommandProcessor.js').SlashCommandActionReturn
-            | boolean
-          >,
+          ) => Promise<SlashCommandActionReturn | boolean>,
           shellModeActive: false,
           loadedSettings: mockLoadedSettings,
           toolCalls: initialToolCalls,

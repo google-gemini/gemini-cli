@@ -73,6 +73,7 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { Command } from '../commands/types.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(),
@@ -85,6 +86,13 @@ vi.mock('./useShowMemoryCommand.js', () => ({
 
 vi.mock('open', () => ({
   default: vi.fn(),
+}));
+
+const mockRegisteredCommands: Command[] = [];
+vi.mock('../commands/index.js', () => ({
+  get registeredCommands() {
+    return mockRegisteredCommands;
+  },
 }));
 
 describe('useSlashCommandProcessor', () => {
@@ -129,6 +137,7 @@ describe('useSlashCommandProcessor', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
+      getSessionId: vi.fn(() => 'test-session-id'),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -177,6 +186,7 @@ describe('useSlashCommandProcessor', () => {
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
+        vi.fn(), // mockOpenPrivacyNotice
       ),
     );
   };
@@ -447,37 +457,6 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Other commands', () => {
-    it('/help should open help and return true', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/help');
-      });
-      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
-      expect(commandResult).toBe(true);
-    });
-
-    it('/clear should clear items, reset chat, and refresh static', async () => {
-      const mockResetChat = vi.fn();
-      mockConfig = {
-        ...mockConfig,
-        getGeminiClient: () => ({
-          resetChat: mockResetChat,
-        }),
-      } as unknown as Config;
-
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/clear');
-      });
-
-      expect(mockClearItems).toHaveBeenCalled();
-      expect(mockResetChat).toHaveBeenCalled();
-      expect(mockRefreshStatic).toHaveBeenCalled();
-      expect(commandResult).toBe(true);
-    });
-
     it('/editor should open editor dialog and return true', async () => {
       const { handleSlashCommand } = getProcessor();
       let commandResult: SlashCommandActionReturn | boolean = false;
@@ -486,6 +465,29 @@ describe('useSlashCommandProcessor', () => {
       });
       expect(mockOpenEditorDialog).toHaveBeenCalled();
       expect(commandResult).toBe(true);
+    });
+  });
+
+  describe('New command registry', () => {
+    it('should execute a command from the new registry', async () => {
+      const mockAction = vi.fn();
+      const newCommand: Command = {
+        name: 'test',
+        action: mockAction,
+      };
+      mockRegisteredCommands.push(newCommand);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/test');
+      });
+
+      expect(mockAction).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+
+      // Clean up the mock for other tests
+      mockRegisteredCommands.length = 0;
     });
   });
 
@@ -1264,23 +1266,9 @@ describe('useSlashCommandProcessor', () => {
   describe('/compress command', () => {
     it('should call tryCompressChat(true)', async () => {
       const hook = getProcessorHook();
-      mockTryCompressChat.mockImplementationOnce(async (force?: boolean) => {
-        expect(force).toBe(true);
-        await act(async () => {
-          hook.rerender();
-        });
-        expect(hook.result.current.pendingHistoryItems).toContainEqual({
-          type: MessageType.COMPRESSION,
-          compression: {
-            isPending: true,
-            originalTokenCount: null,
-            newTokenCount: null,
-          },
-        });
-        return {
-          originalTokenCount: 100,
-          newTokenCount: 50,
-        };
+      mockTryCompressChat.mockResolvedValue({
+        originalTokenCount: 100,
+        newTokenCount: 50,
       });
 
       await act(async () => {

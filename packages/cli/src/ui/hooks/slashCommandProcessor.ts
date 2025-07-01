@@ -33,14 +33,16 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import {
+  type Command,
+  type CommandArgs,
+  type CommandContext,
+  type SlashCommandActionReturn,
+} from '../commands/types.js';
+import { registeredCommands } from '../commands/index.js';
 
-export interface SlashCommandActionReturn {
-  shouldScheduleTool?: boolean;
-  toolName?: string;
-  toolArgs?: Record<string, unknown>;
-  message?: string; // For simple messages or errors
-}
-
+// LEGACY TYPE: This interface is for the old, inline command definitions.
+// It will be removed once all commands are migrated to the new system.
 export interface SlashCommand {
   name: string;
   altName?: string;
@@ -53,7 +55,7 @@ export interface SlashCommand {
   ) =>
     | void
     | SlashCommandActionReturn
-    | Promise<void | SlashCommandActionReturn>; // Action can now return this object
+    | Promise<void | SlashCommandActionReturn>;
 }
 
 /**
@@ -86,12 +88,23 @@ export const useSlashCommandProcessor = (
     return new GitService(config.getProjectRoot());
   }, [config]);
 
-  const pendingHistoryItems: HistoryItemWithoutId[] = [];
+  const logger = useMemo(() => {
+    const l = new Logger(config?.getSessionId() || '');
+    // The logger's initialize is async, but we can create the instance
+    // synchronously. Commands that use it will await its initialization.
+    return l;
+  }, [config]);
+
   const [pendingCompressionItemRef, setPendingCompressionItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
-  if (pendingCompressionItemRef.current != null) {
-    pendingHistoryItems.push(pendingCompressionItemRef.current);
-  }
+
+  const pendingHistoryItems = useMemo(() => {
+    const items: HistoryItemWithoutId[] = [];
+    if (pendingCompressionItemRef.current != null) {
+      items.push(pendingCompressionItemRef.current);
+    }
+    return items;
+  }, [pendingCompressionItemRef]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -139,6 +152,72 @@ export const useSlashCommandProcessor = (
       addItem(historyItemContent, message.timestamp.getTime());
     },
     [addItem],
+  );
+
+  // Construct Command Context
+  // This single, memoized object provides all necessary dependencies to the
+  // new, refactored commands, acting as a dependency injection container.
+  const commandContext = useMemo(
+    (): CommandContext => ({
+      services: {
+        config,
+        settings,
+        git: gitService,
+        logger,
+      },
+      ui: {
+        history,
+        addItem,
+        clearItems,
+        loadHistory,
+        refreshStatic,
+        setQuittingMessages,
+        pendingHistoryItems,
+      },
+      dialogs: {
+        openTheme: openThemeDialog,
+        openAuth: openAuthDialog,
+        openEditor: openEditorDialog,
+        openPrivacy: openPrivacyNotice,
+        setShowHelp: (show) => setShowHelp(show),
+      },
+      actions: {
+        performMemoryRefresh,
+        toggleCorgiMode,
+        setPendingCompression: setPendingCompressionItem,
+      },
+      session: {
+        stats: session.stats,
+      },
+      utils: {
+        onDebugMessage,
+        addMessage,
+      },
+    }),
+    [
+      config,
+      settings,
+      gitService,
+      logger,
+      history,
+      addItem,
+      clearItems,
+      loadHistory,
+      refreshStatic,
+      setQuittingMessages,
+      pendingHistoryItems,
+      openThemeDialog,
+      openAuthDialog,
+      openEditorDialog,
+      openPrivacyNotice,
+      setShowHelp,
+      performMemoryRefresh,
+      toggleCorgiMode,
+      setPendingCompressionItem,
+      session.stats,
+      onDebugMessage,
+      addMessage,
+    ],
   );
 
   const showMemoryAction = useCallback(async () => {
@@ -193,17 +272,12 @@ export const useSlashCommandProcessor = (
     }
   }, [config]);
 
-  const slashCommands: SlashCommand[] = useMemo(() => {
+  // Define legacy commands
+  // This list contains all commands that have NOT YET been migrated to the
+  // new system. As commands are migrated, they are removed from this list.
+  const legacyCommands: SlashCommand[] = useMemo(() => {
     const commands: SlashCommand[] = [
-      {
-        name: 'help',
-        altName: '?',
-        description: 'for help on gemini-cli',
-        action: (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Opening help.');
-          setShowHelp(true);
-        },
-      },
+      // `/help` and `/clear` have been migrated and REMOVED from this list.
       {
         name: 'docs',
         description: 'open full Gemini CLI documentation in your browser',
@@ -226,17 +300,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'clear',
-        description: 'clear the screen and conversation history',
-        action: async (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Clearing terminal and resetting chat.');
-          clearItems();
-          await config?.getGeminiClient()?.resetChat();
-          console.clear();
-          refreshStatic();
-        },
-      },
-      {
         name: 'theme',
         description: 'change the theme',
         action: (_mainCommand, _subCommand, _args) => {
@@ -246,23 +309,17 @@ export const useSlashCommandProcessor = (
       {
         name: 'auth',
         description: 'change the auth method',
-        action: (_mainCommand, _subCommand, _args) => {
-          openAuthDialog();
-        },
+        action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
       },
       {
         name: 'editor',
         description: 'set external editor preference',
-        action: (_mainCommand, _subCommand, _args) => {
-          openEditorDialog();
-        },
+        action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
       },
       {
         name: 'privacy',
         description: 'display the privacy notice',
-        action: (_mainCommand, _subCommand, _args) => {
-          openPrivacyNotice();
-        },
+        action: (_mainCommand, _subCommand, _args) => openPrivacyNotice(),
       },
       {
         name: 'stats',
@@ -1036,17 +1093,14 @@ export const useSlashCommandProcessor = (
     }
     return commands;
   }, [
-    onDebugMessage,
-    setShowHelp,
-    refreshStatic,
+    addMessage,
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    clearItems,
+    openPrivacyNotice,
     performMemoryRefresh,
     showMemoryAction,
     addMemoryAction,
-    addMessage,
     toggleCorgiMode,
     savedChatTags,
     config,
@@ -1059,8 +1113,40 @@ export const useSlashCommandProcessor = (
     setQuittingMessages,
     pendingCompressionItemRef,
     setPendingCompressionItem,
-    openPrivacyNotice,
+    clearItems,
+    refreshStatic,
   ]);
+
+  // Combine Command Sources
+  // This is the coexistence strategy. We map the new, strongly-typed commands
+  // from the registry to the legacy `SlashCommand` interface. Then, we
+  // combine them with the remaining legacy commands. The `handleSlashCommand`
+  // function can then operate on this single, combined list, unaware of the
+  // underlying source.
+  const slashCommands = useMemo(() => {
+    // Adapt the new commands to the old interface.
+    const newCommandsAsLegacy = registeredCommands.map(
+      (cmd: Command): SlashCommand => ({
+        name: cmd.name,
+        altName: cmd.altName,
+        description: cmd.description,
+        completion: cmd.completion
+          ? () => cmd.completion!(commandContext)
+          : undefined,
+        action: (mainCommand, subCommand, args) => {
+          const commandArgs: CommandArgs = {
+            mainCommand,
+            subCommand,
+            rest: args || '',
+          };
+          // Execute the new command's action with the context and parsed args.
+          return cmd.action(commandContext, commandArgs);
+        },
+      }),
+    );
+
+    return [...newCommandsAsLegacy, ...legacyCommands];
+  }, [legacyCommands, commandContext]);
 
   const handleSlashCommand = useCallback(
     async (

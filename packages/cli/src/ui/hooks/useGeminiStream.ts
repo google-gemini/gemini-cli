@@ -34,6 +34,7 @@ import {
   MessageType,
   ToolCallStatus,
 } from '../types.js';
+import { SlashCommandActionReturn } from '../commands/types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
 import { parseAndFormatApiError } from '../utils/errorParsing.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
@@ -83,9 +84,7 @@ export const useGeminiStream = (
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
-  ) => Promise<
-    import('./slashCommandProcessor.js').SlashCommandActionReturn | boolean
-  >,
+  ) => Promise<SlashCommandActionReturn | boolean>,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: () => void,
