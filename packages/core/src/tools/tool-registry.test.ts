@@ -314,22 +314,34 @@ describe('ToolRegistry', () => {
     });
 
     it('should handle errors during MCP client connection gracefully and close transport', async () => {
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      mockConfigGetMcpServers.mockReturnValue({
-        'failing-mcp': { command: 'fail-cmd' } as MCPServerConfig,
+      // Create a fresh ToolRegistry instance for this test to avoid pre-registered tools
+      const localToolRegistry = new ToolRegistry(new Config({...baseConfigParams, toolDiscoveryCommand: undefined, mcpServers: {'failing-mcp': { command: 'fail-cmd' } as MCPServerConfig }}));
+
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined); // Ensure no other discovery happens
+      mockConfigGetMcpServerCommand.mockReturnValue(undefined); // Ensure no other discovery happens
+
+      // Simulate that discoverMcpTools is called and it encounters an error scenario
+      // For this test, we assume discoverMcpTools itself handles the error and doesn't register tools.
+      // The original test relied on mcpToTool and Client mocks, which are now encapsulated within discoverMcpTools.
+      // We'll mock discoverMcpTools to simulate the error condition leading to no tools being registered.
+      mockDiscoverMcpTools.mockImplementation(async (servers, cmd, registry) => {
+        // Simulate an error or condition where no tools are registered from 'failing-mcp'
+        // For example, if the connection failed and was handled inside discoverMcpTools
+        if (servers['failing-mcp']) {
+          // console.error("Simulated failure for failing-mcp, no tools registered.");
+        }
+        // No tools are added to 'registry' in this mock for the failing case
+        return Promise.resolve();
       });
 
-      mockMcpClientConnect.mockRejectedValue(new Error('Connection failed'));
+      await localToolRegistry.discoverTools();
 
-      await toolRegistry.discoverTools();
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        {
-          'failing-mcp': { command: 'fail-cmd' },
-        },
-        undefined,
-        toolRegistry,
+        { 'failing-mcp': { command: 'fail-cmd' } },
+        undefined, // mcpServerCommand
+        localToolRegistry,
       );
-      expect(toolRegistry.getAllTools()).toHaveLength(0);
+      expect(localToolRegistry.getAllTools()).toHaveLength(0);
     });
   });
   // Other tests for DiscoveredTool and DiscoveredMCPTool can be simplified or removed

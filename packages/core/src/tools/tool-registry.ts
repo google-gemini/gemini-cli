@@ -10,6 +10,7 @@ import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
 import { discoverMcpTools } from './mcp-client.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { ListOpenWindowsTool } from './list-open-windows.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -128,6 +129,8 @@ export class ToolRegistry {
 
   constructor(config: Config) {
     this.config = config;
+    // ListOpenWindowsTool and other statically known tools should be registered
+    // by the application setup code that creates the ToolRegistry instance.
   }
 
   /**
