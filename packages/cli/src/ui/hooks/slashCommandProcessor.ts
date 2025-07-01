@@ -32,7 +32,7 @@ import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { LoadedSettings, SettingScope } from '../../config/settings.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -878,6 +878,138 @@ export const useSlashCommandProcessor = (
             });
           }
           setPendingCompressionItem(null);
+        },
+      },
+      {
+        name: 'pushcmdz',
+        description: 'Save currently allowed shell commands to project settings',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const toolRegistry = await config?.getToolRegistry();
+          if (!toolRegistry) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not retrieve tool registry.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Get the shell tool from the registry
+          const shellTool = toolRegistry.getAllTools().find(
+            tool => tool.name === 'run_shell_command'
+          );
+
+          if (!shellTool) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Shell tool not found.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Access the whitelist from the shell tool
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const getWhitelist = (shellTool as any).getWhitelist;
+          if (typeof getWhitelist !== 'function') {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not access shell command whitelist.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          const whitelist = getWhitelist.call(shellTool);
+          const allowedCommands = Array.from(whitelist);
+          
+          if (allowedCommands.length === 0) {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No commands have been approved in this session yet.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Get existing allowCommands from settings
+          const existingAllowCommands = settings.workspace.settings.allowCommands || [];
+          
+          // Merge with existing commands, avoiding duplicates
+          const mergedCommands = Array.from(new Set([...existingAllowCommands, ...allowedCommands]));
+          
+          // Save to workspace settings
+          settings.setValue(SettingScope.Workspace, 'allowCommands', mergedCommands as string[]);
+          
+          addMessage({
+            type: MessageType.INFO,
+            content: `Saved ${allowedCommands.length} command(s) to project settings:\n  - ${allowedCommands.join('\n  - ')}\n\nTotal allowed commands: ${mergedCommands.length}`,
+            timestamp: new Date(),
+          });
+        },
+      },
+      {
+        name: 'pushdeny',
+        description: 'Save currently denied shell commands to project settings',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const toolRegistry = await config?.getToolRegistry();
+          if (!toolRegistry) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not retrieve tool registry.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Get the shell tool from the registry
+          const shellTool = toolRegistry.getAllTools().find(
+            tool => tool.name === 'run_shell_command'
+          );
+
+          if (!shellTool) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Shell tool not found.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // For denyCommands, we can suggest commands based on the current whitelist
+          // These are commands that have been run, which the user might want to deny
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const getWhitelist = (shellTool as any).getWhitelist;
+          if (typeof getWhitelist !== 'function') {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not access shell command whitelist.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          const whitelist = getWhitelist.call(shellTool);
+          const sessionCommands = Array.from(whitelist);
+          
+          if (sessionCommands.length === 0) {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No commands have been run in this session yet to suggest for deny list.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Get existing denyCommands from settings
+          const existingDenyCommands = settings.workspace.settings.denyCommands || [];
+          
+          // Show the user what commands they can add to denyCommands
+          addMessage({
+            type: MessageType.INFO,
+            content: `Commands run this session that could be added to deny list:\n  - ${sessionCommands.join('\n  - ')}\n\nExisting deny list has ${existingDenyCommands.length} command(s).\n\nTo add specific commands to the deny list, edit .gemini/settings.json and add them to the "denyCommands" array.`,
+            timestamp: new Date(),
+          });
         },
       },
     ];

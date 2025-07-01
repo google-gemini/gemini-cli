@@ -1,0 +1,383 @@
+{
+  "basicDevelopment": {
+    "description": "Common development commands for everyday use",
+    "allowCommands": [
+      "ls",
+      "pwd",
+      "cd",
+      "cat",
+      "echo",
+      "mkdir",
+      "touch",
+      "cp",
+      "mv"
+    ]
+  },
+
+  "gitWorkflow": {
+    "description": "Git commands for version control",
+    "allowCommands": [
+      "git status",
+      "git diff",
+      "git log",
+      "git branch",
+      "git checkout",
+      "git add",
+      "git commit",
+      "git pull",
+      "git fetch",
+      "git stash"
+    ]
+  },
+
+  "gitReadOnly": {
+    "description": "Safe read-only git operations",
+    "allowCommands": [
+      "/^git\\s+(status|log|diff|show|branch|remote|tag)/"
+    ]
+  },
+
+  "nodeJsProject": {
+    "description": "Node.js development workflow",
+    "allowCommands": [
+      "node",
+      "npm",
+      "npm test",
+      "npm run",
+      "npm install",
+      "npx",
+      "yarn",
+      "pnpm",
+      "jest",
+      "mocha",
+      "eslint",
+      "prettier"
+    ]
+  },
+
+  "pythonProject": {
+    "description": "Python development workflow",
+    "allowCommands": [
+      "python",
+      "python3",
+      "pip",
+      "pip3",
+      "pytest",
+      "black",
+      "flake8",
+      "mypy",
+      "poetry",
+      "virtualenv",
+      "conda"
+    ]
+  },
+
+  "webDevelopment": {
+    "description": "Web development tools",
+    "allowCommands": [
+      "npm*",
+      "yarn*",
+      "pnpm*",
+      "webpack",
+      "vite",
+      "parcel",
+      "next",
+      "gatsby",
+      "create-react-app",
+      "/^(curl|wget)\\s+--/"
+    ]
+  },
+
+  "dockerWorkflow": {
+    "description": "Docker container management",
+    "allowCommands": [
+      "docker ps",
+      "docker images",
+      "docker logs",
+      "docker exec",
+      "docker-compose up",
+      "docker-compose down",
+      "docker-compose logs",
+      "/^docker\\s+(build|run)\\s+.*--dry-run/"
+    ]
+  },
+
+  "kubernetesReadOnly": {
+    "description": "Safe Kubernetes operations",
+    "allowCommands": [
+      "/^kubectl\\s+get/",
+      "/^kubectl\\s+describe/",
+      "/^kubectl\\s+logs/",
+      "/^kubectl\\s+explain/",
+      "kubectl config",
+      "helm list",
+      "helm status"
+    ]
+  },
+
+  "dataScience": {
+    "description": "Data science and analysis tools",
+    "allowCommands": [
+      "python",
+      "jupyter",
+      "ipython",
+      "R",
+      "julia",
+      "octave",
+      "gnuplot",
+      "/^(head|tail|wc|sort|uniq|cut|awk|sed)\\s+/"
+    ]
+  },
+
+  "systemMonitoring": {
+    "description": "System monitoring and inspection",
+    "allowCommands": [
+      "ps",
+      "top",
+      "htop",
+      "df",
+      "du",
+      "free",
+      "uptime",
+      "whoami",
+      "date",
+      "cal",
+      "which",
+      "whereis",
+      "file",
+      "stat"
+    ]
+  },
+
+  "buildTools": {
+    "description": "Common build and compilation tools",
+    "allowCommands": [
+      "make",
+      "cmake",
+      "gcc",
+      "g++",
+      "clang",
+      "cargo",
+      "go build",
+      "go test",
+      "go run",
+      "gradle",
+      "mvn",
+      "ant"
+    ]
+  },
+
+  "textProcessing": {
+    "description": "Text processing and search tools",
+    "allowCommands": [
+      "grep",
+      "egrep",
+      "fgrep",
+      "ag",
+      "rg",
+      "find",
+      "locate",
+      "sed",
+      "awk",
+      "cut",
+      "sort",
+      "uniq",
+      "tr",
+      "comm",
+      "diff"
+    ]
+  },
+
+  "networkTools": {
+    "description": "Network diagnostic tools",
+    "allowCommands": [
+      "ping",
+      "traceroute",
+      "nslookup",
+      "dig",
+      "host",
+      "netstat",
+      "ss",
+      "ip addr",
+      "ifconfig",
+      "curl",
+      "wget"
+    ]
+  },
+
+  "cicdPipelineBasic": {
+    "description": "CI/CD pipeline commands",
+    "allowCommands": [
+      "/^npm\\s+(test|run build|run lint)$/",
+      "/^yarn\\s+(test|build|lint)$/",
+      "jest",
+      "mocha",
+      "pytest",
+      "/^docker\\s+build/",
+      "/^docker\\s+tag/",
+      "terraform plan",
+      "ansible-playbook --check"
+    ]
+  },
+
+  "securityScanning": {
+    "description": "Security and vulnerability scanning",
+    "allowCommands": [
+      "npm audit",
+      "yarn audit",
+      "pip check",
+      "safety check",
+      "bandit",
+      "semgrep",
+      "trivy",
+      "snyk test",
+      "/^(clamscan|rkhunter|chkrootkit)\\s+/"
+    ]
+  },
+
+  "minimalSafe": {
+    "description": "Minimal set of safe commands",
+    "allowCommands": [
+      "ls",
+      "pwd",
+      "echo",
+      "date",
+      "whoami"
+    ]
+  },
+
+  "globPatternExamples": {
+    "description": "Examples using glob patterns",
+    "allowCommands": [
+      "test*",          
+      "*.sh",           
+      "build-*",        
+      "deploy-?-prod",  
+      "*-test",         
+      "app.*.js"        
+    ]
+  },
+
+  "regexPatternExamples": {
+    "description": "Examples using regex patterns",
+    "allowCommands": [
+      "/^echo\\s+[^$`]+$/",              
+      "/^rm\\s+.*\\.(tmp|log|cache)$/",  
+      "/^git\\s+push\\s+origin\\s+[^-]/", 
+      "/^npm\\s+(start|test|build)$/",   
+      "/^(cat|less|more)\\s+[^>]+$/",    
+      "/^find\\s+\\.\\s+-name/"          
+    ]
+  },
+
+  "enterpriseRestricted": {
+    "description": "Restricted environment with audit requirements",
+    "allowCommands": [
+      "/^ls(\\s+-[la]+)?$/",
+      "/^pwd$/",
+      "/^cd\\s+[^/]/",
+      "/^git\\s+(status|log\\s+--oneline)$/",
+      "/^npm\\s+audit$/",
+      "/^cat\\s+[^/>]+$/",
+      "/^echo\\s+'[^']*'$/"
+    ]
+  },
+
+  "dangerous": {
+    "description": "⚠️ EXAMPLE ONLY - DO NOT USE - Overly permissive patterns",
+    "allowCommands": [
+      "*",              
+      "sudo*",          
+      "rm*",            
+      "chmod*",         
+      "chown*",         
+      "/*"              
+    ]
+  },
+
+  "withDenyCommands": {
+    "description": "Using allowCommands with denyCommands for balanced security",
+    "allowCommands": [
+      "git*",
+      "npm*",
+      "docker*"
+    ],
+    "denyCommands": [
+      "git push --force",
+      "git reset --hard",
+      "npm publish",
+      "docker rm -f",
+      "docker system prune"
+    ]
+  },
+
+  "strictSecurity": {
+    "description": "High security configuration with explicit deny list",
+    "allowCommands": [
+      "ls",
+      "pwd",
+      "cat",
+      "/^git\\s+(status|log|diff)$/",
+      "/^npm\\s+(test|audit)$/"
+    ],
+    "denyCommands": [
+      "sudo*",
+      "su*",
+      "chmod*",
+      "chown*",
+      "rm*",
+      "dd*",
+      "mkfs*",
+      "/*--force*/",
+      "/*-rf*/",
+      "curl*-o*",
+      "wget*-O*",
+      "/>.*/"
+    ]
+  },
+
+  "developmentWithSafety": {
+    "description": "Full development access with dangerous commands blocked",
+    "allowCommands": [
+      "git*",
+      "npm*",
+      "node*",
+      "python*",
+      "make*",
+      "docker*",
+      "kubectl*"
+    ],
+    "denyCommands": [
+      "rm -rf /",
+      "git push --force origin master",
+      "npm publish",
+      "docker system prune -a",
+      "kubectl delete ns",
+      "/*--no-verify*/",
+      "sudo rm -rf",
+      "chmod 777"
+    ]
+  },
+
+  "cicdPipelineStrict": {
+    "description": "CI/CD environment with strict controls",
+    "allowCommands": [
+      "npm ci",
+      "npm test",
+      "npm run build",
+      "npm run lint",
+      "docker build",
+      "docker tag",
+      "/^git\\s+(clone|checkout|pull)/"
+    ],
+    "denyCommands": [
+      "npm install",
+      "npm update",
+      "git push",
+      "git merge",
+      "docker push",
+      "/*--force*/",
+      "/*--no-verify*/"
+    ]
+  }
+}

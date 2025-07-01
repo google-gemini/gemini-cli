@@ -89,6 +89,10 @@ Process Group PGID: Process group started or \`(none)\``,
     return description;
   }
 
+  getWhitelist(): Set<string> {
+    return new Set(this.whitelist);
+  }
+
   getCommandRoot(command: string): string | undefined {
     return command
       .trim() // remove leading and trailing whitespace
@@ -96,6 +100,49 @@ Process Group PGID: Process group started or \`(none)\``,
       .split(/[\s;&|]+/)[0] // split on any whitespace or separator or chaining operators and take first part
       ?.split(/[/\\]/) // split on any path separators (or return undefined if previous line was undefined)
       .pop(); // take last part and return command root (or undefined if previous line was empty)
+  }
+
+  matchesAllowPattern(command: string, pattern: string): boolean {
+    // Check if pattern is a regex (starts with / and ends with /)
+    if (pattern.startsWith('/') && pattern.endsWith('/')) {
+      try {
+        const regex = new RegExp(pattern.slice(1, -1));
+        // Simple ReDoS protection: timeout after 100ms
+        const startTime = Date.now();
+        const result = regex.test(command);
+        const elapsed = Date.now() - startTime;
+        
+        // Warn if regex takes too long (potential ReDoS)
+        if (elapsed > 50) {
+          console.warn(`Slow regex pattern detected (${elapsed}ms): ${pattern}`);
+        }
+        
+        return result;
+      } catch (_e) {
+        // Invalid regex, treat as literal string
+        console.warn(`Invalid regex pattern: ${pattern}`);
+        return false;
+      }
+    }
+    
+    // Check for glob-like patterns (contains * or ?)
+    if (pattern.includes('*') || pattern.includes('?')) {
+      // Convert glob to regex
+      const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except * and ?
+        .replace(/\*/g, '.*') // * matches any characters
+        .replace(/\?/g, '.'); // ? matches single character
+      try {
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(command);
+      } catch (_e) {
+        console.warn(`Invalid glob pattern: ${pattern}`);
+        return false;
+      }
+    }
+    
+    // Exact match
+    return command === pattern;
   }
 
   isCommandAllowed(command: string): boolean {
@@ -196,9 +243,50 @@ Process Group PGID: Process group started or \`(none)\``,
       return false; // skip confirmation, execute call will fail immediately
     }
     const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
-    if (this.whitelist.has(rootCommand)) {
-      return false; // already approved and whitelisted
+    
+    // Check if command is in denyCommands list FIRST
+    const denyCommands = this.config.getDenyCommands();
+    if (denyCommands && denyCommands.length > 0) {
+      // If denyCommands is defined, check if the command matches any pattern
+      const isDenied = denyCommands.some(pattern => 
+        this.matchesAllowPattern(rootCommand, pattern)
+      );
+      
+      if (isDenied) {
+        // Command is denied - always require confirmation
+        const confirmationDetails: ToolExecuteConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm Denied Command',
+          command: params.command,
+          rootCommand,
+          onConfirm: async (outcome: ToolConfirmationOutcome) => {
+            if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+              this.whitelist.add(rootCommand);
+            }
+          },
+        };
+        return confirmationDetails;
+      }
     }
+    
+    // Check if command is in allowCommands list
+    const allowCommands = this.config.getAllowCommands();
+    if (allowCommands && allowCommands.length > 0) {
+      // If allowCommands is defined, check if the command matches any pattern
+      const isAllowed = allowCommands.some(pattern => 
+        this.matchesAllowPattern(rootCommand, pattern)
+      );
+      
+      if (isAllowed) {
+        return false; // Command is in allowlist, no confirmation needed
+      }
+    }
+    
+    // Check session whitelist
+    if (this.whitelist.has(rootCommand)) {
+      return false; // already approved and whitelisted in this session
+    }
+    
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',

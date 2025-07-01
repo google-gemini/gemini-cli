@@ -107,6 +107,8 @@ export interface ConfigParameters {
   fullContext?: boolean;
   coreTools?: string[];
   excludeTools?: string[];
+  allowCommands?: string[];
+  denyCommands?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -144,6 +146,8 @@ export class Config {
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
+  private readonly allowCommands: string[] | undefined;
+  private readonly denyCommands: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
@@ -182,6 +186,8 @@ export class Config {
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
     this.excludeTools = params.excludeTools;
+    this.allowCommands = params.allowCommands;
+    this.denyCommands = params.denyCommands;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
@@ -328,6 +334,14 @@ export class Config {
 
   getExcludeTools(): string[] | undefined {
     return this.excludeTools;
+  }
+
+  getAllowCommands(): string[] | undefined {
+    return this.allowCommands;
+  }
+
+  getDenyCommands(): string[] | undefined {
+    return this.denyCommands;
   }
 
   getToolDiscoveryCommand(): string | undefined {

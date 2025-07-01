@@ -240,4 +240,319 @@ describe('Configuration Integration Tests', () => {
       expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
     });
   });
+
+  describe('allowCommands Configuration', () => {
+    it('should handle undefined allowCommands', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toBeUndefined();
+    });
+
+    it('should load allowCommands from configuration', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: ['ls', 'pwd', 'git*'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual(['ls', 'pwd', 'git*']);
+    });
+
+    it('should handle empty allowCommands array', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: [],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual([]);
+    });
+
+    it('should handle various pattern types in allowCommands', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: [
+          'ls',                    // exact match
+          'git*',                  // glob pattern
+          '*.sh',                  // glob pattern
+          'test?',                 // glob pattern
+          '/^npm\\s+test$/',       // regex pattern
+          'git status',            // exact match with space
+        ],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual([
+        'ls',
+        'git*',
+        '*.sh',
+        'test?',
+        '/^npm\\s+test$/',
+        'git status',
+      ]);
+    });
+
+    it('should work alongside excludeTools', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: ['git*', 'npm*'],
+        excludeTools: ['ShellTool(git push --force)'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual(['git*', 'npm*']);
+      expect(config.getExcludeTools()).toEqual(['ShellTool(git push --force)']);
+    });
+
+    it('should work alongside coreTools', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: ['ls', 'pwd'],
+        coreTools: ['ShellTool', 'ReadFileTool'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual(['ls', 'pwd']);
+      expect(config.getCoreTools()).toEqual(['ShellTool', 'ReadFileTool']);
+    });
+
+    it('should handle special characters in patterns', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: [
+          'git-flow',
+          'npm@latest',
+          'test_command',
+          'docker-compose',
+          './script.sh',
+          '/usr/bin/ls',
+        ],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual([
+        'git-flow',
+        'npm@latest',
+        'test_command',
+        'docker-compose',
+        './script.sh',
+        '/usr/bin/ls',
+      ]);
+    });
+
+    it('should handle complex regex patterns', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: [
+          '/^(ls|pwd|cd)$/',
+          '/^git\\s+(status|log|diff)$/',
+          '/^npm\\s+(test|install|run)$/',
+          '/^make\\s+[a-z]+$/',
+        ],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual([
+        '/^(ls|pwd|cd)$/',
+        '/^git\\s+(status|log|diff)$/',
+        '/^npm\\s+(test|install|run)$/',
+        '/^make\\s+[a-z]+$/',
+      ]);
+    });
+  });
+
+  describe('denyCommands Configuration', () => {
+    it('should handle undefined denyCommands', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getDenyCommands()).toBeUndefined();
+    });
+
+    it('should load denyCommands from configuration', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        denyCommands: ['rm -rf', 'sudo*', 'chmod 777'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getDenyCommands()).toEqual(['rm -rf', 'sudo*', 'chmod 777']);
+    });
+
+    it('should handle empty denyCommands array', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        denyCommands: [],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getDenyCommands()).toEqual([]);
+    });
+
+    it('should work alongside allowCommands', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: ['git*', 'npm*'],
+        denyCommands: ['git push --force', 'npm publish'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toEqual(['git*', 'npm*']);
+      expect(config.getDenyCommands()).toEqual(['git push --force', 'npm publish']);
+    });
+
+    it('should handle various pattern types in denyCommands', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        denyCommands: [
+          'rm -rf',                 // exact match
+          'sudo*',                  // glob pattern
+          '*.sh',                   // glob pattern
+          '/^chmod\\s+777/',        // regex pattern
+          'git push --force',       // exact match with spaces
+        ],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getDenyCommands()).toEqual([
+        'rm -rf',
+        'sudo*',
+        '*.sh',
+        '/^chmod\\s+777/',
+        'git push --force',
+      ]);
+    });
+
+    it('should handle complex security configurations', () => {
+      const configParams: ConfigParameters = {
+        cwd: '/tmp',
+        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        embeddingModel: 'test-embedding-model',
+        sandbox: false,
+        targetDir: tempDir,
+        debugMode: false,
+        sessionId: 'test-session',
+        model: 'test-model',
+        allowCommands: [
+          'ls',
+          'pwd',
+          'git status',
+          'git log',
+          'npm test',
+        ],
+        denyCommands: [
+          'sudo*',
+          'rm -rf',
+          'chmod 777',
+          'chown',
+          '/.*\\s+--force/',
+          'curl*-o*',
+        ],
+        excludeTools: ['ShellTool(rm -rf /)'],
+      };
+      
+      const config = new Config(configParams);
+      expect(config.getAllowCommands()).toBeDefined();
+      expect(config.getDenyCommands()).toBeDefined();
+      expect(config.getExcludeTools()).toBeDefined();
+      expect(config.getAllowCommands()?.length).toBe(5);
+      expect(config.getDenyCommands()?.length).toBe(6);
+    });
+  });
 });

@@ -41,6 +41,8 @@ export interface Settings {
   sandbox?: boolean | string;
   coreTools?: string[];
   excludeTools?: string[];
+  allowCommands?: string[];
+  denyCommands?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -120,10 +122,10 @@ export class LoadedSettings {
   setValue(
     scope: SettingScope,
     key: keyof Settings,
-    value: string | Record<string, MCPServerConfig> | undefined,
+    value: string | string[] | Record<string, MCPServerConfig> | undefined,
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
+    // @ts-expect-error - value can be string | string[] | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
