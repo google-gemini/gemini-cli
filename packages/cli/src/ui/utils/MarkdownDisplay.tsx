@@ -8,6 +8,7 @@ import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
 import { colorizeCode } from './CodeColorizer.js';
+import { TableRenderer } from './TableRenderer.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -43,12 +44,17 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
   const hrRegex = /^ *([-*_] *){3,} *$/;
+  const tableRowRegex = /^\s*\|(.+)\|\s*$/;
+  const tableSeparatorRegex = /^\s*\|?\s*(:?-+:?)\s*(\|\s*(:?-+:?)\s*)+\|?\s*$/;
 
   const contentBlocks: React.ReactNode[] = [];
   let inCodeBlock = false;
   let codeBlockContent: string[] = [];
   let codeBlockLang: string | null = null;
   let codeBlockFence = '';
+  let inTable = false;
+  let tableRows: string[][] = [];
+  let tableHeaders: string[] = [];
 
   lines.forEach((line, index) => {
     const key = `line-${index}`;
@@ -85,11 +91,71 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     const ulMatch = line.match(ulItemRegex);
     const olMatch = line.match(olItemRegex);
     const hrMatch = line.match(hrRegex);
+    const tableRowMatch = line.match(tableRowRegex);
+    const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
     if (codeFenceMatch) {
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
       codeBlockLang = codeFenceMatch[2] || null;
+    } else if (tableRowMatch && !inTable) {
+      // Potential table start - check if next line is separator
+      if (
+        index + 1 < lines.length &&
+        lines[index + 1].match(tableSeparatorRegex)
+      ) {
+        inTable = true;
+        tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        tableRows = [];
+      } else {
+        // Not a table, treat as regular text
+        contentBlocks.push(
+          <Box key={key}>
+            <Text wrap="wrap">
+              <RenderInline text={line} />
+            </Text>
+          </Box>,
+        );
+      }
+    } else if (inTable && tableSeparatorMatch) {
+      // Skip separator line - already handled
+    } else if (inTable && tableRowMatch) {
+      // Add table row
+      const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+      // Ensure row has same column count as headers
+      while (cells.length < tableHeaders.length) {
+        cells.push('');
+      }
+      if (cells.length > tableHeaders.length) {
+        cells.length = tableHeaders.length;
+      }
+      tableRows.push(cells);
+    } else if (inTable && !tableRowMatch) {
+      // End of table
+      if (tableHeaders.length > 0 && tableRows.length > 0) {
+        contentBlocks.push(
+          <RenderTable
+            key={`table-${contentBlocks.length}`}
+            headers={tableHeaders}
+            rows={tableRows}
+            terminalWidth={terminalWidth}
+          />,
+        );
+      }
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+
+      // Process current line as normal
+      if (line.trim().length > 0) {
+        contentBlocks.push(
+          <Box key={key}>
+            <Text wrap="wrap">
+              <RenderInline text={line} />
+            </Text>
+          </Box>,
+        );
+      }
     } else if (hrMatch) {
       contentBlocks.push(
         <Box key={key}>
@@ -189,6 +255,18 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         lang={codeBlockLang}
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
+        terminalWidth={terminalWidth}
+      />,
+    );
+  }
+
+  // Handle table at end of content
+  if (inTable && tableHeaders.length > 0 && tableRows.length > 0) {
+    contentBlocks.push(
+      <RenderTable
+        key={`table-${contentBlocks.length}`}
+        headers={tableHeaders}
+        rows={tableRows}
         terminalWidth={terminalWidth}
       />,
     );
@@ -442,5 +520,21 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
 };
 
 const RenderListItem = React.memo(RenderListItemInternal);
+
+interface RenderTableProps {
+  headers: string[];
+  rows: string[][];
+  terminalWidth: number;
+}
+
+const RenderTableInternal: React.FC<RenderTableProps> = ({
+  headers,
+  rows,
+  terminalWidth,
+}) => (
+  <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
+);
+
+const RenderTable = React.memo(RenderTableInternal);
 
 export const MarkdownDisplay = React.memo(MarkdownDisplayInternal);
