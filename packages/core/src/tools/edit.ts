@@ -284,6 +284,8 @@ Expectation for required parameters:
     let error: { display: string; raw: string } | undefined = undefined;
 
     try {
+      await fs.copyFile(params.file_path, `${params.file_path}.bak`);
+      logger.info(`Created backup of ${params.file_path} at ${params.file_path}.bak`);
       currentContent = fs.readFileSync(params.file_path, 'utf8');
       // Normalize line endings to LF for consistent processing.
       currentContent = currentContent.replace(/\r\n/g, '\n');

@@ -32,6 +32,7 @@ import {
   toGenerateContentRequest,
 } from './converter.js';
 import { PassThrough } from 'node:stream';
+import { logger } from '../core/logger.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -49,7 +50,9 @@ export class CodeAssistServer implements ContentGenerator {
     readonly client: OAuth2Client,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
-  ) {}
+  ) {
+    logger.info('CodeAssistServer initialized.');
+  }
 
   async generateContentStream(
     req: GenerateContentParameters,
@@ -123,18 +126,25 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await this.client.request({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
-      responseType: 'json',
-      body: JSON.stringify(req),
-      signal,
-    });
-    return res.data as T;
+    logger.debug(`Calling endpoint: ${method} with request: ${JSON.stringify(req)}`);
+    try {
+      const res = await this.client.request({
+        url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.httpOptions.headers,
+        },
+        responseType: 'json',
+        body: JSON.stringify(req),
+        signal,
+      });
+      logger.debug(`Received response from ${method}: ${JSON.stringify(res.data)}`);
+      return res.data as T;
+    } catch (error) {
+      logger.error(`Error calling endpoint ${method}: ${error.message}`, { error });
+      throw error;
+    }
   }
 
   async getEndpoint<T>(method: string, signal?: AbortSignal): Promise<T> {

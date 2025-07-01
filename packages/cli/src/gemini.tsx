@@ -20,6 +20,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  readFileTool,
 } from '@google/gemini-cli-core';
 
 // --- Local Module Imports ---
@@ -341,27 +342,84 @@ async function runNonInteractiveMode(
       logger.info('Running ReadFileTool import detection tests...');
       await shellTool.run({ command: 'npm test packages/core/tests/readFile.test.ts' });
       process.exit(0);
-    } else if (input.startsWith('/write-python ')) {
-      const parts = input.substring('/write-python '.length).trim().split(':');
-      if (parts.length < 2) {
-        logger.error('Usage: /write-python <file_path>:<content>');
+    } else if (input.startsWith('/read-url ')) {
+      const [url] = input.substring('/read-url '.length).trim().split(' ');
+      logger.info(`Reading URL: ${url}...`);
+      try {
+        const content = await readFileTool.run({ filePath: url });
+        logger.info(`Content from ${url}:
+${content}`);
+      } catch (error) {
+        logger.error(`Failed to read URL ${url}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.startsWith('/read-sdcard ')) {
+      const [path] = input.substring('/read-sdcard '.length).trim().split(' ');
+      logger.info(`Reading from /sdcard/${path}...`);
+      try {
+        const content = await readFileTool.run({ filePath: `/sdcard/${path}` });
+        logger.info(`Content from /sdcard/${path}:\n${content}`);
+      } catch (error) {
+        logger.error(`Failed to read from /sdcard/${path}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.startsWith('/read-json ')) {
+      const [path] = input.substring('/read-json '.length).trim().split(' ');
+      logger.info(`Reading and parsing JSON from ${path}...`);
+      try {
+        const content = await readFileTool.run({ filePath: path });
+        logger.info(`Content from ${path}:\n${content}`);
+      } catch (error) {
+        logger.error(`Failed to read and parse JSON from ${path}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.trim() === '/read-clipboard') {
+      logger.info('Reading from clipboard...');
+      try {
+        const content = await readFileTool.run({ filePath: 'clipboard' });
+        logger.info(`Content from clipboard:\n${content}`);
+      } catch (error) {
+        logger.error(`Failed to read from clipboard: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.startsWith('/write-sdcard ')) {
+      const [path, ...content] = input.substring('/write-sdcard '.length).trim().split(' ');
+      logger.info(`Writing to /sdcard/${path}...`);
+      try {
+        await WriteFileTool.run({ filePath: `/sdcard/${path}`, content: content.join(' '), overwrite: true });
+        logger.info(`Content written to /sdcard/${path}`);
+      } catch (error) {
+        logger.error(`Failed to write to /sdcard/${path}: ${error}`);
+      }
+      process.exit(0);
+    } else if (input.startsWith('/replace ')) {
+      const parts = input.substring('/replace '.length).trim().split(' ');
+      if (parts.length < 3) {
+        logger.error('Usage: /replace <file_path> <search_string> <replace_string>');
         process.exit(1);
       }
-      const filePath = parts[0].trim();
-      const content = parts.slice(1).join(':').trim();
-      if (!filePath.endsWith('.py')) {
-        logger.error('Please provide a Python file path (e.g., /path/to/your_file.py).');
-        process.exit(1);
+      const filePath = parts[0];
+      const search = parts[1];
+      const replace = parts[2];
+      logger.info(`Replacing in ${filePath}: '${search}' with '${replace}' using regex...`);
+      await EditTool.run({
+        file_path: filePath,
+        old_string: search,
+        new_string: replace,
+        use_regex: true,
+      });
+      process.exit(0);
+      process.exit(0);
+    } else if (input.startsWith('/write-sdcard ')) {
+      const [path, ...content] = input.substring('/write-sdcard '.length).trim().split(' ');
+      logger.info(`Writing to /sdcard/${path}...`);
+      try {
+        await WriteFileTool.run({ filePath: `/sdcard/${path}`, content: content.join(' '), overwrite: true });
+        logger.info(`Content written to /sdcard/${path}`);
+      } catch (error) {
+        logger.error(`Failed to write to /sdcard/${path}: ${error}`);
       }
-      logger.info(`Writing Python file ${filePath}...`);
-      const fullContent = `from os import path\n\n${content}`;
-      await WriteFileTool.run({ file_path: filePath, content: fullContent });
       process.exit(0);
-    } else if (input.trim() === '/test-write-imports') {
-      logger.info('Running WriteFileTool import addition tests...');
-      await shellTool.run({ command: 'npm test packages/core/tests/writeFile.test.ts' });
-      process.exit(0);
-    } else if (input.trim() === '/edit-error') {
       logger.info('Displaying edit error logs...');
       await shellTool.run({ command: 'cat logs/edit_errors.log || echo "No edit errors logged yet."', directory: '/data/data/com.termux/files/home/pyrm-cli' });
       process.exit(0);

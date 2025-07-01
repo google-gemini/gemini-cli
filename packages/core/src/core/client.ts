@@ -60,10 +60,12 @@ export class GeminiClient {
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
+      logger.info(`GeminiClient: Proxy set to ${config.getProxy()}`);
     }
 
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
+    logger.info('GeminiClient initialized.');
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {

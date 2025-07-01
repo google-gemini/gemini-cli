@@ -34,7 +34,8 @@ function loadSettingsValue(filePath) {
       const settings = JSON.parse(jsonContent);
       return settings.telemetry?.target;
     }
-  } catch (e) {
+  }
+ catch (e) {
     console.warn(
       `⚠️ Warning: Could not parse settings file at ${filePath}: ${e.message}`,
     );
@@ -59,7 +60,7 @@ if (targetArg) {
     console.log(`⚙️  Using command-line target: ${target}`);
   } else {
     console.error(
-      `🛑 Error: Invalid target '${potentialTarget}'. Allowed targets are: ${allowedTargets.join(', ')}.`,
+      `🛑 Error: Invalid target '${potentialTarget}'. Allowed targets are: ${allowedTargets.join(', ')}.`, 
     );
     process.exit(1);
   }

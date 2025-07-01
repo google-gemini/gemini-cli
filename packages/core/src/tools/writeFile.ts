@@ -1,6 +1,9 @@
 import fs from 'fs/promises';
 import { Tool } from '../types/toolTypes';
 import { logger } from '../core/logger.js';
+import { exec } from 'child_process';
+import path from 'path';
+import { execSync } from 'child_process';
 
 export interface WriteFileArgs {
   filePath: string;
@@ -24,12 +27,32 @@ export const writeFileTool: Tool<WriteFileArgs, string> = {
     logger.info(`WriteFile: Attempting to ${operation} file: ${filePath}`);
 
     try {
+      let dataToWrite = content;
+      if (path.extname(filePath).toLowerCase() === '.json') {
+        try {
+          dataToWrite = JSON.stringify(JSON.parse(content), null, 2);
+        } catch (jsonError) {
+          logger.error(`WriteFile: Failed to parse JSON content for ${filePath}: ${jsonError.message}`);
+          throw new Error(`Failed to parse JSON content for ${filePath}`);
+        }
+      }
+
       if (overwrite) {
-        await fs.writeFile(filePath, content, 'utf-8');
+        await fs.writeFile(filePath, dataToWrite, 'utf-8');
+        if (filePath.startsWith('/sdcard')) {
+          exec(`termux-toast 'Wrote to ${filePath} successfully'`);
+        } else if (filePath === 'clipboard') {
+          execSync(`echo '${dataToWrite}' | termux-clipboard-set`);
+        }
         logger.info(`WriteFile: Successfully overwrote file: ${filePath}`);
         return `Successfully overwrote file: ${filePath}`;
       } else {
-        await fs.appendFile(filePath, content, 'utf-8');
+        await fs.appendFile(filePath, dataToWrite, 'utf-8');
+        if (filePath.startsWith('/sdcard')) {
+          exec(`termux-toast 'Wrote to ${filePath} successfully'`);
+        } else if (filePath === 'clipboard') {
+          execSync(`echo '${dataToWrite}' | termux-clipboard-set`);
+        }
         logger.info(`WriteFile: Successfully appended to file: ${filePath}`);
         return `Successfully appended to file: ${filePath}`;
       }
