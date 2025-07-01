@@ -27,6 +27,17 @@ export const useThemeCommand = (
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
 
+  // Check for invalid theme configuration on startup
+  useEffect(() => {
+    const effectiveTheme = loadedSettings.merged.theme;
+    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
+      setIsThemeDialogOpen(true);
+      setThemeError(`Theme "${effectiveTheme}" not found.`);
+    } else {
+      setThemeError(null);
+    }
+  }, [loadedSettings.merged.theme, setThemeError]);
+
   const openThemeDialog = useCallback(() => {
     setIsThemeDialogOpen(true);
   }, []);
