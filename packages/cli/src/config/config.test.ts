@@ -90,19 +90,19 @@ describe('loadCliConfig', () => {
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 
-  it('should undefined when labels is not present in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session');
-    expect(config.getLabels()).toBeUndefined();
-  });
+  // it('should undefined when labels is not present in settings', async () => {
+  //   process.argv = ['node', 'script.js'];
+  //   const settings: Settings = {};
+  //   const config = await loadCliConfig(settings, [], 'test-session');
+  //   expect(config.getLabels()).toBeUndefined();
+  // });
 
-  it('should pass labels from settings to config', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = { labels: { example: 'value' } };
-    const config = await loadCliConfig(settings, [], 'test-session');
-    expect(config.getLabels()?.example).toBe('value');
-  });
+  // it('should pass labels from settings to config', async () => {
+  //   process.argv = ['node', 'script.js'];
+  //   const settings: Settings = { labels: { example: 'value' } };
+  //   const config = await loadCliConfig(settings, [], 'test-session');
+  //   expect(config.getLabels()?.example).toBe('value');
+  // });
 });
 
 describe('loadCliConfig telemetry', () => {

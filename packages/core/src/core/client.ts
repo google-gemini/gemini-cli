@@ -63,7 +63,11 @@ export class GeminiClient {
 
     this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
-    this.generateContentConfig.labels = config.getLabels();
+
+    const vertex = config.getVertex();
+    if (vertex?.labels) {
+      this.generateContentConfig.labels = vertex.labels;
+    }
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {

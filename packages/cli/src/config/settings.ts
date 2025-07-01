@@ -12,6 +12,7 @@ import {
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
+  VertexSettings,
   AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
@@ -65,8 +66,10 @@ export interface Settings {
   hideWindowTitle?: boolean;
   hideTips?: boolean;
 
+  // Vertex AI related settings.
+  vertex?: VertexSettings;
+
   // Add other settings here.
-  labels?: Record<string, string>;
 }
 
 export interface SettingsError {

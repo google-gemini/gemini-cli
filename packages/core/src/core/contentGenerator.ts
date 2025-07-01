@@ -16,6 +16,7 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
+import { VertexSettings } from '../config/config.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -45,17 +46,25 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  project?: string;
+  location?: string;
 };
 
 export async function createContentGeneratorConfig(
   model: string | undefined,
   authType: AuthType | undefined,
-  config?: { getModel?: () => string },
+  config?: {
+    getModel?: () => string;
+    getVertex?: () => VertexSettings | undefined;
+  },
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+  const vertex = config?.getVertex?.();
+  const googleCloudProject =
+    vertex?.project || process.env.GOOGLE_CLOUD_PROJECT;
+  const googleCloudLocation =
+    vertex?.location || process.env.GOOGLE_CLOUD_LOCATION;
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
@@ -63,6 +72,8 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
     authType,
+    project: googleCloudProject,
+    location: googleCloudLocation,
   };
 
   // if we are using google auth nothing else to validate for now
@@ -119,6 +130,8 @@ export async function createContentGenerator(
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,
+      project: config.project,
+      location: config.location,
       httpOptions,
     });
 

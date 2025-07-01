@@ -245,7 +245,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
-    labels: settings.labels,
+    vertex: settings.vertex,
   });
 }
 

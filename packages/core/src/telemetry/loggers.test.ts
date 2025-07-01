@@ -360,7 +360,7 @@ describe('loggers', () => {
       getToolRegistry: () => new ToolRegistry(cfg1),
       getFullContext: () => false,
       getUserMemory: () => 'user-memory',
-      getLabels: () => undefined,
+      // getLabels: () => undefined,
     } as unknown as Config;
 
     const mockGeminiClient = new GeminiClient(cfg2);

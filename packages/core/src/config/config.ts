@@ -65,6 +65,12 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
+export interface VertexSettings {
+  project?: string; // GoogleGenAIOptions.project
+  location?: string; // GoogleGenAIOptions.location
+  labels?: Record<string, string>; // GenerateContentConfig.labels
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -130,7 +136,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
-  labels?: Record<string, string>;
+  vertex?: VertexSettings;
 }
 
 export class Config {
@@ -169,7 +175,7 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
-  private readonly labels: Record<string, string> | undefined;
+  private readonly vertex: VertexSettings | undefined;
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
 
@@ -213,7 +219,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
-    this.labels = params.labels;
+    this.vertex = params.vertex;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -448,8 +454,8 @@ export class Config {
     return this.extensionContextFilePaths;
   }
 
-  getLabels(): Record<string, string> | undefined {
-    return this.labels;
+  getVertex(): VertexSettings | undefined {
+    return this.vertex;
   }
 
   async getGitService(): Promise<GitService> {

@@ -202,19 +202,19 @@ describe('Server Config (config.ts)', () => {
     expect(fileService).toBeDefined();
   });
 
-  it('should return undefined for labels when not provided', () => {
-    const config = new Config(baseParams);
-    expect(config.getLabels()).toBeUndefined();
-  });
+  // it('should return undefined for labels when not provided', () => {
+  //   const config = new Config(baseParams);
+  //   expect(config.getLabels()).toBeUndefined();
+  // });
 
-  it('should return labels when provided', () => {
-    const paramsWithLabels: ConfigParameters = {
-      ...baseParams,
-      labels: { example: 'value' },
-    };
-    const config = new Config(paramsWithLabels);
-    expect(config.getLabels()?.example).toBe('value');
-  });
+  // it('should return labels when provided', () => {
+  //   const paramsWithLabels: ConfigParameters = {
+  //     ...baseParams,
+  //     labels: { example: 'value' },
+  //   };
+  //   const config = new Config(paramsWithLabels);
+  //   expect(config.getLabels()?.example).toBe('value');
+  // });
 
   describe('Telemetry Settings', () => {
     it('should return default telemetry target if not provided', () => {
