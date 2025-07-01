@@ -6,6 +6,7 @@ on:
 
 jobs:
   triage-issue:
+    if: github.repository == 'google-gemini/gemini-cli'
     timeout-minutes: 5
     permissions:
       issues: write
