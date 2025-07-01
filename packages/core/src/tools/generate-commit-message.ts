@@ -16,7 +16,16 @@ import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
-const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise and meaningful git commit messages following the Conventional Commits format.
+// Simple logger for consistent logging format
+const logger = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  debug: (...args: any[]) => console.debug('[DEBUG] [GenerateCommitMessage]', ...args),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  error: (...args: any[]) => console.error('[ERROR] [GenerateCommitMessage]', ...args),
+};
+
+const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise ` +
+  `and meaningful git commit messages following the Conventional Commits format.
 
 Your task is to analyze git changes and generate commit messages that follow this specific workflow:
 
@@ -159,11 +168,15 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       };
 
       // Determine which files will be committed for display
-      const filesToCommit = this.parseFilesToBeCommitted(statusOutput || '', commitMode === 'staged-only');
+      const filesToCommit = this.parseFilesToBeCommitted(
+        statusOutput || '', 
+        commitMode === 'staged-only'
+      );
       
       let filesDisplay = '';
       if (filesToCommit.length > 0) {
-        filesDisplay = `\n\nFiles to be committed:\n${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+        filesDisplay = `\n\nFiles to be committed:\n` +
+          `${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
       }
 
       const confirmationDetails: ToolExecuteConfirmationDetails = {
@@ -185,7 +198,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   }
 
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
-    console.debug('[GenerateCommitMessage] Starting git commit workflow...');
+    logger.debug('Starting git commit workflow...');
 
     try {
       let finalCommitMessage: string;
@@ -193,13 +206,13 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
       // Check if we have cached data from shouldConfirmExecute
       if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < 30000)) {
-        console.debug('[GenerateCommitMessage] Using cached commit message from confirmation...');
+        logger.debug('Using cached commit message from confirmation...');
         finalCommitMessage = this.cachedCommitData.finalCommitMessage;
         statusOutput = this.cachedCommitData.statusOutput;
         
         // Keep cache for staging strategy execution - don't clear yet
       } else {
-        console.debug('[GenerateCommitMessage] No valid cache, generating fresh commit message...');
+        logger.debug('No valid cache, generating fresh commit message...');
         
         // Step 1: Gather git information (parallel execution)
         const [statusOut, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
@@ -235,23 +248,25 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const cachedData = this.cachedCommitData;
       if (cachedData && cachedData.commitMode === 'all-changes') {
         // Stage all changes using git add .
-        console.debug('[GenerateCommitMessage] Staging all changes using git add .');
+        logger.debug('Staging all changes using git add .');
         await this.executeGitCommand(['add', '.'], signal);
       } else if (!cachedData) {
         // Fallback for non-cached execution - determine staging strategy
         const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
         const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
-        const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && currentUnstagedDiff?.trim();
+        const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && 
+          currentUnstagedDiff?.trim();
         const hasUntrackedFiles = statusOutput?.includes('??');
         
         if (hasOnlyUnstagedChanges || hasUntrackedFiles) {
-          console.debug('[GenerateCommitMessage] Staging all changes using git add .');
+          logger.debug('Staging all changes using git add .');
           await this.executeGitCommand(['add', '.'], signal);
         }
       }
 
       // Step 4: Create commit
-      console.debug('[GenerateCommitMessage] Creating commit with message:', finalCommitMessage.substring(0, 100) + '...');
+      logger.debug('Creating commit with message:', 
+        finalCommitMessage.substring(0, 100) + '...');
       
       try {
         await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
@@ -272,7 +287,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
             (commitError.message.includes('pre-commit') || 
              commitError.message.includes('index.lock') ||
              commitError.message.includes('hook'))) {
-          console.debug('[GenerateCommitMessage] Pre-commit hook or staging issue detected, implementing comprehensive retry...');
+          logger.debug('Pre-commit hook or staging issue detected, ' +
+            'implementing comprehensive retry...');
           
           // Stage all modified files comprehensively
           await this.executeGitCommand(['add', '.'], signal);
@@ -284,20 +300,24 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
             this.cachedCommitData = null;
             
             return {
-              llmContent: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
-              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\nCommit message:\n${finalCommitMessage}`,
+              llmContent: `Commit created successfully after pre-commit hook modifications!\n\n` +
+                `Commit message:\n${finalCommitMessage}`,
+              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\n` +
+                `Commit message:\n${finalCommitMessage}`,
             };
           } catch (retryError) {
             // If retry fails, provide detailed error information
-            const errorDetails = retryError instanceof Error ? retryError.message : String(retryError);
-            throw new Error(`Commit failed after pre-commit hook retry. Original error: ${commitError.message}. Retry error: ${errorDetails}`);
+            const errorDetails = retryError instanceof Error ? 
+              retryError.message : String(retryError);
+            throw new Error(`Commit failed after pre-commit hook retry. ` +
+              `Original error: ${commitError.message}. Retry error: ${errorDetails}`);
           }
         }
         throw commitError;
       }
 
     } catch (error) {
-      console.error('[GenerateCommitMessage] Error during execution:', error);
+      logger.error('Error during execution:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error during commit workflow: ${errorMessage}`,
@@ -313,7 +333,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const commandString = `git ${args.join(' ')}`;
-      console.debug(`[GenerateCommitMessage] Executing: ${commandString}`);
+      logger.debug(`Executing: ${commandString}`);
       
       try {
         const child = spawn('git', args, { signal, stdio: 'pipe' });
@@ -337,23 +357,25 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         child.on('close', (exitCode) => {
           if (exitCode !== 0) {
             const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
-            console.error(`[GenerateCommitMessage] Command failed: ${commandString}, Error: ${errorMessage}`);
+            logger.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
             reject(new Error(errorMessage));
           } else {
-            console.debug(`[GenerateCommitMessage] Command succeeded: ${commandString}`);
+            logger.debug(`Command succeeded: ${commandString}`);
             resolve(stdout.trim() || null);
           }
         });
 
         child.on('error', (err) => {
           const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-          console.error(`[GenerateCommitMessage] Spawn error: ${errorMessage}`);
+          logger.error(`Spawn error: ${errorMessage}`);
           
           // Provide helpful error context
           if (err.message.includes('ENOENT')) {
-            reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
-          } else if (err.message.includes('EACCES')) {
-            reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
+            reject(new Error(`Git is not installed or not found in PATH. ` +
+              `Please install Git and try again.`));
+                      } else if (err.message.includes('EACCES')) {
+              reject(new Error(`Permission denied when executing git command. ` +
+                `Please check file permissions.`));
           } else {
             reject(new Error(errorMessage));
           }
@@ -372,8 +394,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         }
         
       } catch (error) {
-        const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`[GenerateCommitMessage] Spawn setup error: ${errorMessage}`);
+        const errorMessage = `Failed to spawn git process: ` +
+          `${error instanceof Error ? error.message : String(error)}`;
+        logger.error(`Spawn setup error: ${errorMessage}`);
         reject(new Error(errorMessage));
       }
     });
@@ -389,7 +412,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
     // Provide more specific error messages for common scenarios
     if (stderr.includes('not a git repository')) {
-      return 'This directory is not a Git repository. Please run this command from within a Git repository.';
+      return 'This directory is not a Git repository. ' +
+        'Please run this command from within a Git repository.';
     } else if (stderr.includes('no changes added to commit')) {
       return 'No changes have been staged for commit. Use "git add" to stage changes first.';
     } else if (stderr.includes('nothing to commit')) {
@@ -397,22 +421,17 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     } else if (stderr.includes('index.lock')) {
       return 'Git index is locked. Another git process may be running. Please wait and try again.';
     } else if (stderr.includes('refusing to merge unrelated histories')) {
-      return 'Cannot merge unrelated Git histories. This may require manual intervention.';
+      return 'Cannot merge unrelated Git histories. ' +
+        'This may require manual intervention.';
     } else if (stderr.includes('pathspec') && stderr.includes('did not match any files')) {
-      return 'No files match the specified path. Please check the file paths and try again.';
-    } else if (stderr.includes('fatal: could not read') || stderr.includes('fatal: unable to read')) {
+      return 'No files match the specified path. ' +
+        'Please check the file paths and try again.';
+    } else if (stderr.includes('fatal: could not read') || 
+               stderr.includes('fatal: unable to read')) {
       return 'Unable to read Git repository data. The repository may be corrupted.';
     } else {
       return `${baseError}: ${stderr.trim()}`;
     }
-  }
-
-  private parseUntrackedFiles(statusOutput: string): string[] {
-    return statusOutput
-      .split('\n')
-      .filter(line => line.startsWith('??'))
-      .map(line => line.substring(3).trim())
-      .filter(file => !file.includes('node_modules/') && !file.includes('.git/'));
   }
 
   private parseFilesToBeCommitted(statusOutput: string, hasStagedChanges: boolean): string[] {
@@ -456,7 +475,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       .replace('{{diff}}', diff)
       .replace('{{log}}', log);
 
-    console.debug('[GenerateCommitMessage] Calling Gemini API for commit analysis...');
+    logger.debug('Calling Gemini API for commit analysis...');
 
     try {
       const response = await this.client.generateContent(
@@ -482,8 +501,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
       return generatedText;
     } catch (error) {
-      console.error('[GenerateCommitMessage] Error during Gemini API call:', error);
-      throw new Error(`Failed to generate commit message: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('Error during Gemini API call:', error);
+      throw new Error(`Failed to generate commit message: ` +
+        `${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

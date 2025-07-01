@@ -119,7 +119,11 @@ describe('GenerateCommitMessageTool', () => {
     };
 
     mockSpawn.mockImplementation((command: string, args: string[]) => {
-      const child = new EventEmitter() as any;
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
+      };
       const argString = args.join(' ');
 
       if (command === 'git' && argString === 'commit -F -') {
