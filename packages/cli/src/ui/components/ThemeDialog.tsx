@@ -39,7 +39,9 @@ export function ThemeDialog({
   // Generate theme items
   // Ensure custom themes are loaded before rendering
   useEffect(() => {
-    themeManager.loadCustomThemes(settings.merged.customThemes);
+    if (settings.merged.customThemes) {
+      themeManager.loadCustomThemes(settings.merged.customThemes);
+    }
   }, [settings.merged.customThemes]);
 
   const availableThemes = themeManager.getAvailableThemes();
@@ -48,7 +50,7 @@ export function ThemeDialog({
     const label = theme.isCustom ? `[Custom] ${theme.name}` : theme.name;
     return {
       label,
-      value: theme.name, // Use theme name as value
+      value: theme.name,
       themeNameDisplay: theme.name,
       themeTypeDisplay: typeString,
       isCustom: theme.isCustom,
@@ -57,7 +59,7 @@ export function ThemeDialog({
 
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
-  // Determine which radio button should be initially selected in the themes list
+  // Determine which radio button should be initially selected in the theme list
   // This should reflect the theme *saved* for the selected scope, or the default
   const initialThemeIndex = themeItems.findIndex(
     (item) => item.value === (settings.merged.theme || DEFAULT_THEME.name),
