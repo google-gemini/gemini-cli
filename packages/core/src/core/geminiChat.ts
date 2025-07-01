@@ -16,7 +16,7 @@ import {
   Part,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, CircuitBreaker } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -130,12 +130,14 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
 
   constructor(
     private readonly config: Config,
     private readonly contentGenerator: ContentGenerator,
     private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
+    private readonly getCircuitBreaker?: (authType: string) => CircuitBreaker,
   ) {
     validateHistory(history);
   }
@@ -170,6 +172,30 @@ export class GeminiChat {
         responseText,
       ),
     );
+  }
+
+  private getCircuitBreakerFromConfig(): CircuitBreaker | undefined {
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    if (!authType) return undefined;
+
+    // Use the provided circuit breaker function if available
+    if (this.getCircuitBreaker) {
+      return this.getCircuitBreaker(authType);
+    }
+
+    // Fallback to creating our own (for backwards compatibility)
+    if (!this.circuitBreakers.has(authType)) {
+      const circuitBreakerConfig = this.config.getCircuitBreakerConfig();
+      const circuitBreaker = new CircuitBreaker(authType, circuitBreakerConfig);
+
+      // Set up state change callbacks
+      circuitBreaker.onStateChange((state, auth) => {
+        console.log(`Circuit breaker for ${auth} changed to ${state}`);
+      });
+
+      this.circuitBreakers.set(authType, circuitBreaker);
+    }
+    return this.circuitBreakers.get(authType)!;
   }
 
   private _logApiError(durationMs: number, error: unknown): void {
@@ -244,6 +270,7 @@ export class GeminiChat {
    */
   async sendMessage(
     params: SendMessageParameters,
+    isManualOverride?: boolean,
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -262,6 +289,8 @@ export class GeminiChat {
           config: { ...this.generationConfig, ...params.config },
         });
 
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           if (error && error.message) {
@@ -272,7 +301,9 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getCircuitBreakerFromConfig(),
+        isManualOverride,
       });
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
@@ -338,6 +369,7 @@ export class GeminiChat {
    */
   async sendMessageStream(
     params: SendMessageParameters,
+    isManualOverride?: boolean,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -358,6 +390,8 @@ export class GeminiChat {
       // for transient issues internally before yielding the async generator, this retry will re-initiate
       // the stream. For simple 429/500 errors on initial call, this is fine.
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
+      const authType =
+        this.config.getContentGeneratorConfig()?.authType || 'unknown';
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check error messages for status codes, or specific error names if known
@@ -369,7 +403,9 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType,
+        circuitBreaker: this.getCircuitBreakerFromConfig(),
+        isManualOverride,
       });
 
       // Resolve the internal tracking of send completion promise - `sendPromise`
