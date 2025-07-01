@@ -378,7 +378,8 @@ describe('Gemini Client (client.ts)', () => {
 
       // Mock the chat's sendMessage method
       const mockChat: Partial<GeminiChat> = {
-        getHistory: vi.fn()
+        getHistory: vi
+          .fn()
           .mockReturnValue([
             { role: 'user', parts: [{ text: '...history...' }] },
           ]),
@@ -400,7 +401,7 @@ describe('Gemini Client (client.ts)', () => {
       const result = await client.tryCompressChat();
       const newChat = client.getChat();
 
-      expect(tokenLimit).toHaveBeenCalled(); 
+      expect(tokenLimit).toHaveBeenCalled();
       expect(result).toBeNull();
       expect(newChat).toBe(initialChat);
     });
@@ -411,7 +412,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const originalTokenCount = 1000 * 0.7;
       const newTokenCount = 100;
-      
+
       mockCountTokens
         .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
@@ -446,7 +447,7 @@ describe('Gemini Client (client.ts)', () => {
       mockCountTokens
         .mockResolvedValueOnce({ totalTokens: originalTokenCount })
         .mockResolvedValueOnce({ totalTokens: newTokenCount });
-      
+
       // Mock the summary response from the chat
       mockSendMessage.mockResolvedValue({
         role: 'model',
