@@ -8,7 +8,7 @@ import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { HistoryItem, MessageType } from '../types.js';
-import { CumulativeStats } from '../contexts/SessionContext.js';
+import { SessionStatsProvider } from '../contexts/SessionContext.js';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -36,25 +36,15 @@ describe('<HistoryItemDisplay />', () => {
   });
 
   it('renders StatsDisplay for "stats" type', () => {
-    const stats: CumulativeStats = {
-      turnCount: 1,
-      promptTokenCount: 10,
-      candidatesTokenCount: 20,
-      totalTokenCount: 30,
-      cachedContentTokenCount: 5,
-      toolUsePromptTokenCount: 2,
-      thoughtsTokenCount: 3,
-      apiTimeMs: 123,
-    };
     const item: HistoryItem = {
       ...baseItem,
       type: MessageType.STATS,
-      stats,
-      lastTurnStats: stats,
       duration: '1s',
     };
     const { lastFrame } = render(
-      <HistoryItemDisplay {...baseItem} item={item} />,
+      <SessionStatsProvider>
+        <HistoryItemDisplay {...baseItem} item={item} />
+      </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Stats');
   });
@@ -76,25 +66,46 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('About Gemini CLI');
   });
 
-  it('renders SessionSummaryDisplay for "quit" type', () => {
-    const stats: CumulativeStats = {
-      turnCount: 1,
-      promptTokenCount: 10,
-      candidatesTokenCount: 20,
-      totalTokenCount: 30,
-      cachedContentTokenCount: 5,
-      toolUsePromptTokenCount: 2,
-      thoughtsTokenCount: 3,
-      apiTimeMs: 123,
+  it('renders ModelStatsDisplay for "model_stats" type', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'model_stats',
     };
+    const { lastFrame } = render(
+      <SessionStatsProvider>
+        <HistoryItemDisplay {...baseItem} item={item} />
+      </SessionStatsProvider>,
+    );
+    expect(lastFrame()).toContain(
+      'No API calls have been made in this session.',
+    );
+  });
+
+  it('renders ToolStatsDisplay for "tool_stats" type', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'tool_stats',
+    };
+    const { lastFrame } = render(
+      <SessionStatsProvider>
+        <HistoryItemDisplay {...baseItem} item={item} />
+      </SessionStatsProvider>,
+    );
+    expect(lastFrame()).toContain(
+      'No tool calls have been made in this session.',
+    );
+  });
+
+  it('renders SessionSummaryDisplay for "quit" type', () => {
     const item: HistoryItem = {
       ...baseItem,
       type: 'quit',
-      stats,
       duration: '1s',
     };
     const { lastFrame } = render(
-      <HistoryItemDisplay {...baseItem} item={item} />,
+      <SessionStatsProvider>
+        <HistoryItemDisplay {...baseItem} item={item} />
+      </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');
   });
