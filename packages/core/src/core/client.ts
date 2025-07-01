@@ -142,7 +142,9 @@ export class GeminiClient {
           );
           if (result.llmContent) {
             initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
+              text: `
+--- Full File Context ---
+${result.llmContent}`,
             });
           } else {
             console.warn(
@@ -281,6 +283,16 @@ export class GeminiClient {
           await this.handleFlashFallback(authType),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
+
+      if (
+        !result ||
+        !result.candidates ||
+        result.candidates.length === 0
+      ) {
+        throw new Error(
+          'API returned an empty or invalid response. This may be due to safety filters or a temporary issue.'
+        );
+      }
 
       const text = getResponseText(result);
       if (!text) {
