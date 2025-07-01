@@ -113,7 +113,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
       const query = buffer.text;
-      const selectedSuggestion = completionSuggestions[indexToUse];
+      const suggestion = completionSuggestions[indexToUse].value;
 
       if (query.trimStart().startsWith('/')) {
         const parts = query.trimStart().substring(1).split(' ');
@@ -122,11 +122,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const base = query.substring(0, slashIndex + 1);
 
         const command = slashCommands.find((cmd) => cmd.name === commandName);
-        if (command && command.completion) {
-          const newValue = `${base}${commandName} ${selectedSuggestion.value}`;
-          buffer.setText(newValue);
+        // Make sure completion isn't the original command when command.completigion hasn't happened yet.
+        if (command && command.completion && suggestion !== commandName) {
+          const newValue = `${base}${commandName} ${suggestion}`;
+          if (newValue === query) {
+            handleSubmitAndClear(newValue);
+          } else {
+            buffer.setText(newValue);
+          }
         } else {
-          const newValue = base + selectedSuggestion.value;
+          const newValue = base + suggestion;
           buffer.setText(newValue);
           handleSubmitAndClear(newValue);
         }
@@ -142,7 +147,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.replaceRangeByOffset(
           autoCompleteStartIndex,
           buffer.text.length,
-          selectedSuggestion.value,
+          suggestion,
         );
       }
       resetCompletionState();
