@@ -35,14 +35,14 @@ describe('CodeAssistServer', () => {
         ],
       },
     };
-    vi.spyOn(server, 'callEndpoint').mockResolvedValue(mockResponse);
+    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
     const response = await server.generateContent({
       model: 'test-model',
       contents: [{ role: 'user', parts: [{ text: 'request' }] }],
     });
 
-    expect(server.callEndpoint).toHaveBeenCalledWith(
+    expect(server.requestPost).toHaveBeenCalledWith(
       'generateContent',
       expect.any(Object),
       undefined,
@@ -72,7 +72,7 @@ describe('CodeAssistServer', () => {
         },
       };
     })();
-    vi.spyOn(server, 'streamEndpoint').mockResolvedValue(mockResponse);
+    vi.spyOn(server, 'requestStreamingPost').mockResolvedValue(mockResponse);
 
     const stream = await server.generateContentStream({
       model: 'test-model',
@@ -80,7 +80,7 @@ describe('CodeAssistServer', () => {
     });
 
     for await (const res of stream) {
-      expect(server.streamEndpoint).toHaveBeenCalledWith(
+      expect(server.requestStreamingPost).toHaveBeenCalledWith(
         'streamGenerateContent',
         expect.any(Object),
         undefined,
@@ -96,7 +96,7 @@ describe('CodeAssistServer', () => {
       name: 'operations/123',
       done: true,
     };
-    vi.spyOn(server, 'callEndpoint').mockResolvedValue(mockResponse);
+    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
     const response = await server.onboardUser({
       tierId: 'test-tier',
@@ -104,7 +104,7 @@ describe('CodeAssistServer', () => {
       metadata: {},
     });
 
-    expect(server.callEndpoint).toHaveBeenCalledWith(
+    expect(server.requestPost).toHaveBeenCalledWith(
       'onboardUser',
       expect.any(Object),
     );
@@ -117,13 +117,13 @@ describe('CodeAssistServer', () => {
     const mockResponse = {
       // TODO: Add mock response
     };
-    vi.spyOn(server, 'callEndpoint').mockResolvedValue(mockResponse);
+    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
     const response = await server.loadCodeAssist({
       metadata: {},
     });
 
-    expect(server.callEndpoint).toHaveBeenCalledWith(
+    expect(server.requestPost).toHaveBeenCalledWith(
       'loadCodeAssist',
       expect.any(Object),
     );
@@ -136,7 +136,7 @@ describe('CodeAssistServer', () => {
     const mockResponse = {
       totalTokens: 100,
     };
-    vi.spyOn(server, 'callEndpoint').mockResolvedValue(mockResponse);
+    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
     const response = await server.countTokens({
       model: 'test-model',
