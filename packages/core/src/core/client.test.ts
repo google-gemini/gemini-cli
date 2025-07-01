@@ -502,7 +502,7 @@ describe('Gemini Client (client.ts)', () => {
     it('should respect MAX_TURNS limit even when turns parameter is set to a large value', async () => {
       // This test verifies that the infinite loop protection works even when
       // someone tries to bypass it by calling with a very large turns value
-      
+
       // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
       const { checkNextSpeaker } = await import(
         '../utils/nextSpeakerChecker.js'
@@ -544,7 +544,6 @@ describe('Gemini Client (client.ts)', () => {
 
       // Count how many stream events we get
       let eventCount = 0;
-      let finalResult: Turn | undefined;
       const maxTestIterations = 1000; // Higher limit to show the loop continues
 
       // Consume the stream and count iterations
@@ -552,7 +551,6 @@ describe('Gemini Client (client.ts)', () => {
         while (true) {
           const result = await stream.next();
           if (result.done) {
-            finalResult = result.value;
             break;
           }
           eventCount++;
@@ -571,15 +569,15 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert that the fix works - the loop should stop at MAX_TURNS
       const callCount = mockCheckNextSpeaker.mock.calls.length;
-      
-      // With the fix: even when turns is set to a very high value, 
+
+      // With the fix: even when turns is set to a very high value,
       // the loop should stop at MAX_TURNS (100)
       expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
       expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
-      
+
       console.log(
         `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
-        `${eventCount} events generated (properly bounded by MAX_TURNS)`
+          `${eventCount} events generated (properly bounded by MAX_TURNS)`,
       );
     });
   });
