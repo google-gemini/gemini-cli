@@ -1066,16 +1066,18 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       return 'AI response validation failed: analysis.purpose must be a non-empty string, received: ' + (typeof analysisObj.purpose === 'string' ? 'empty string' : typeof analysisObj.purpose);
     }
 
-    if (analysisObj.purpose && analysisObj.purpose.length > 500) {
-      return 'AI response validation failed: analysis.purpose exceeds maximum length of 500 characters';
+    // Allow reasonable length for analysis fields - these are internal and don't appear in commit message
+    // Only reject extremely long content that might indicate parsing errors or malformed AI responses
+    if (analysisObj.purpose && analysisObj.purpose.length > 2000) {
+      return 'AI response validation failed: analysis.purpose is exceptionally long (>2000 chars), which may indicate malformed AI response';
     }
 
     if (typeof analysisObj.impact !== 'string' || !analysisObj.impact.trim()) {
       return 'AI response validation failed: analysis.impact must be a non-empty string, received: ' + (typeof analysisObj.impact === 'string' ? 'empty string' : typeof analysisObj.impact);
     }
 
-    if (analysisObj.impact && analysisObj.impact.length > 500) {
-      return 'AI response validation failed: analysis.impact exceeds maximum length of 500 characters';
+    if (analysisObj.impact && analysisObj.impact.length > 2000) {
+      return 'AI response validation failed: analysis.impact is exceptionally long (>2000 chars), which may indicate malformed AI response';
     }
 
     if (typeof analysisObj.hasSensitiveInfo !== 'boolean') {

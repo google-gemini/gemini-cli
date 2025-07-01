@@ -1363,6 +1363,55 @@ That should work better!`;
       expect(result.llmContent).toContain('exceeds maximum length of 150 characters');
     });
 
+    it('should reject extremely long analysis fields (>2000 chars)', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+      
+      // Create an analysis purpose that's over 2000 characters
+      const veryLongPurpose = 'This is an extremely long analysis purpose that exceeds 2000 characters. '.repeat(30) + 'Extra content to push it over the limit.';
+      
+      mockSpawn.mockImplementation(createGitCommandMock({
+        'status': statusOutput,
+        'diff --cached': diff,
+        'diff': '',
+        'log': logOutput,
+      }));
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    analysis: {
+                      changedFiles: ['file.txt'],
+                      changeType: 'feat',
+                      purpose: veryLongPurpose,
+                      impact: 'Normal impact description',
+                      hasSensitiveInfo: false,
+                    },
+                    commitMessage: {
+                      header: 'feat: add feature',
+                      body: 'Normal body',
+                      footer: '',
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error during commit workflow');
+      expect(result.llmContent).toContain('exceptionally long');
+      expect(result.llmContent).toContain('malformed AI response');
+    });
+
     it('should handle network timeout errors gracefully', async () => {
       const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
       const statusOutput = 'M  file.txt';
