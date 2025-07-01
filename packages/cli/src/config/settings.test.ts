@@ -590,37 +590,39 @@ describe('Settings Loading and Merging', () => {
       delete process.env.TEST_PORT;
     });
 
-    //   it('should load labels setting from user settings', () => {
-    //     (mockFsExistsSync as Mock).mockImplementation(
-    //       (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-    //     );
-    //     const userSettingsContent = { labels: { example: 'value' } };
-    //     (fs.readFileSync as Mock).mockImplementation(
-    //       (p: fs.PathOrFileDescriptor) => {
-    //         if (p === USER_SETTINGS_PATH)
-    //           return JSON.stringify(userSettingsContent);
-    //         return '{}';
-    //       },
-    //     );
-    //     const settings = loadSettings(MOCK_WORKSPACE_DIR);
-    //     expect(settings.merged.labels?.example).toBe('value');
-    //   });
+    it('should load auth setting from user settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = { auth: { gemini: { apiKey: 'test-key' } } };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.auth?.gemini?.apiKey).toBe('test-key');
+    });
 
-    //   it('should load labels setting from workspace settings', () => {
-    //     (mockFsExistsSync as Mock).mockImplementation(
-    //       (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
-    //     );
-    //     const workspaceSettingsContent = { labels: { example: 'value' } };
-    //     (fs.readFileSync as Mock).mockImplementation(
-    //       (p: fs.PathOrFileDescriptor) => {
-    //         if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-    //           return JSON.stringify(workspaceSettingsContent);
-    //         return '{}';
-    //       },
-    //     );
-    //     const settings = loadSettings(MOCK_WORKSPACE_DIR);
-    //     expect(settings.merged.labels?.example).toBe('value');
-    //   });
+    it('should load auth setting from workspace settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = {
+        auth: { gemini: { apiKey: 'test-key' } },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.auth?.gemini?.apiKey).toBe('test-key');
+    });
   });
 
   describe('LoadedSettings class', () => {

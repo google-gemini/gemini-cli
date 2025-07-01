@@ -49,6 +49,7 @@ export const validateAuthMethod = (
       '• Configure `auth.vertex.apiKey` in your `settings.json` (if using express mode).\n' +
       'If you use the environment variables, update your .env and try again, no reload needed!\n' +
       'Otherwise, reload reload gemini-cli.\n'
+    );
   }
 
   return 'Invalid auth method selected.';
