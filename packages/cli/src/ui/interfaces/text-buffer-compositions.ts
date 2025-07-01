@@ -56,7 +56,7 @@ export interface ReadOnlyTextBufferProps {
 
 /**
  * BasicTextEditor - Composes CoreTextState + TextEditor
- * 
+ *
  * Provides essential text editing capabilities without advanced features.
  * Ideal for simple text input scenarios where full text buffer functionality
  * is not required.
@@ -145,22 +145,22 @@ export class BasicTextEditor implements CoreTextState, TextEditor {
 
 /**
  * AdvancedTextEditor - Composes all interfaces
- * 
+ *
  * Provides full text buffer functionality with all advanced features.
  * This is the complete text editing solution that includes visual layout,
  * selection, history, range operations, and configuration.
  */
-export class AdvancedTextEditor 
-  implements 
-    CoreTextState, 
-    TextEditor, 
-    CursorNavigation, 
-    VisualLayout, 
-    SelectionOperations, 
-    HistoryManagement, 
-    RangeOperations, 
-    BufferConfiguration {
-  
+export class AdvancedTextEditor
+  implements
+    CoreTextState,
+    TextEditor,
+    CursorNavigation,
+    VisualLayout,
+    SelectionOperations,
+    HistoryManagement,
+    RangeOperations,
+    BufferConfiguration
+{
   constructor(private props: AdvancedTextEditorProps) {}
 
   // CoreTextState implementation - delegate to coreState
@@ -393,7 +393,13 @@ export class AdvancedTextEditor
     endCol: number,
     text: string,
   ): boolean {
-    return this.props.rangeOperations.replaceRange(startRow, startCol, endRow, endCol, text);
+    return this.props.rangeOperations.replaceRange(
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+      text,
+    );
   }
 
   replaceRangeByOffset(
@@ -401,7 +407,11 @@ export class AdvancedTextEditor
     endOffset: number,
     text: string,
   ): boolean {
-    return this.props.rangeOperations.replaceRangeByOffset(startOffset, endOffset, text);
+    return this.props.rangeOperations.replaceRangeByOffset(
+      startOffset,
+      endOffset,
+      text,
+    );
   }
 
   deleteRange(
@@ -410,7 +420,12 @@ export class AdvancedTextEditor
     endRow: number,
     endCol: number,
   ): boolean {
-    return this.props.rangeOperations.deleteRange(startRow, startCol, endRow, endCol);
+    return this.props.rangeOperations.deleteRange(
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+    );
   }
 
   getRangeText(
@@ -419,7 +434,12 @@ export class AdvancedTextEditor
     endRow: number,
     endCol: number,
   ): string {
-    return this.props.rangeOperations.getRangeText(startRow, startCol, endRow, endCol);
+    return this.props.rangeOperations.getRangeText(
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+    );
   }
 
   modifyRange(modification: RangeModification): boolean {
@@ -454,7 +474,7 @@ export class AdvancedTextEditor
 
 /**
  * ReadOnlyTextBuffer - Composes CoreTextState + VisualLayout
- * 
+ *
  * Provides read-only access to text content with visual layout capabilities.
  * Ideal for display scenarios where text editing is not required but
  * visual presentation and navigation are needed.

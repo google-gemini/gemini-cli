@@ -37,7 +37,7 @@ export interface TextBufferAdapterDependencies {
 
 /**
  * TextBufferAdapter - Backward compatibility adapter
- * 
+ *
  * Provides 100% backward compatibility with the existing TextBuffer interface
  * while internally using the segregated interfaces. This allows existing code
  * to continue working unchanged while enabling migration to the new interface
@@ -138,7 +138,13 @@ export class TextBufferAdapter implements TextBuffer {
     endCol: number,
     text: string,
   ): boolean {
-    return this.deps.rangeOperations.replaceRange(startRow, startCol, endRow, endCol, text);
+    return this.deps.rangeOperations.replaceRange(
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+      text,
+    );
   }
 
   replaceRangeByOffset(
@@ -146,7 +152,11 @@ export class TextBufferAdapter implements TextBuffer {
     endOffset: number,
     replacementText: string,
   ): boolean {
-    return this.deps.rangeOperations.replaceRangeByOffset(startOffset, endOffset, replacementText);
+    return this.deps.rangeOperations.replaceRangeByOffset(
+      startOffset,
+      endOffset,
+      replacementText,
+    );
   }
 
   // Advanced TextEditor operations
@@ -197,17 +207,23 @@ export class TextBufferAdapter implements TextBuffer {
     // For now, we'll throw an error to indicate this needs specific implementation
     // In a real implementation, this would dispatch to appropriate interface methods
     // based on the key input patterns
-    throw new Error('handleInput coordination not implemented - requires key binding logic');
+    throw new Error(
+      'handleInput coordination not implemented - requires key binding logic',
+    );
   }
 
   openInExternalEditor(opts?: { editor?: string }): Promise<void> {
     // This is a complex operation that would need to coordinate between interfaces
     // It would need to use the text from coreState, launch editor, then use setText
-    throw new Error('openInExternalEditor coordination not implemented - requires file system integration');
+    throw new Error(
+      'openInExternalEditor coordination not implemented - requires file system integration',
+    );
   }
 
   // Batch operations requiring coordination
-  applyOperations(ops: Array<{ type: 'insert'; payload: string } | { type: 'backspace' }>): void {
+  applyOperations(
+    ops: Array<{ type: 'insert'; payload: string } | { type: 'backspace' }>,
+  ): void {
     // This would coordinate with textEditor and historyManagement for batch operations
     for (const op of ops) {
       switch (op.type) {
@@ -220,7 +236,9 @@ export class TextBufferAdapter implements TextBuffer {
         default:
           // Type-safe exhaustive check
           const _exhaustive: never = op;
-          throw new Error(`Unknown operation type: ${JSON.stringify(_exhaustive)}`);
+          throw new Error(
+            `Unknown operation type: ${JSON.stringify(_exhaustive)}`,
+          );
       }
     }
   }

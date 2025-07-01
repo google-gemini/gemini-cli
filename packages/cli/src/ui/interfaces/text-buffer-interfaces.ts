@@ -6,7 +6,15 @@
 
 // Re-export common types for convenience
 export type CursorPosition = [number, number];
-export type Direction = 'left' | 'right' | 'up' | 'down' | 'wordLeft' | 'wordRight' | 'home' | 'end';
+export type Direction =
+  | 'left'
+  | 'right'
+  | 'up'
+  | 'down'
+  | 'wordLeft'
+  | 'wordRight'
+  | 'home'
+  | 'end';
 
 /**
  * Viewport dimensions for rendering calculations
@@ -58,7 +66,7 @@ export interface BufferConfig {
 
 /**
  * CoreTextState Interface - Basic text state (lines, cursor position)
- * 
+ *
  * Responsible for fundamental text storage and cursor positioning.
  * This is the foundation interface that provides access to the raw text
  * content and current cursor location.
@@ -82,7 +90,7 @@ export interface CoreTextState {
 
 /**
  * TextEditor Interface - Text editing operations (insert, delete, etc.)
- * 
+ *
  * Provides all text modification operations. Handles character-level
  * and line-level edits, including advanced editing operations like
  * word deletion and line killing.
@@ -111,7 +119,7 @@ export interface TextEditor {
 
 /**
  * CursorNavigation Interface - Cursor movement and positioning
- * 
+ *
  * Handles all cursor movement operations. Provides both high-level
  * directional movement and precise positioning capabilities.
  */
@@ -133,7 +141,7 @@ export interface CursorNavigation {
 
 /**
  * VisualLayout Interface - Visual rendering and layout
- * 
+ *
  * Manages the visual representation of text, handling line wrapping,
  * scrolling, and the mapping between logical and visual coordinates.
  */
@@ -157,7 +165,7 @@ export interface VisualLayout {
 
 /**
  * SelectionOperations Interface - Text selection and clipboard
- * 
+ *
  * Provides text selection functionality and clipboard operations.
  * Handles both keyboard-driven and programmatic selection operations.
  */
@@ -181,7 +189,7 @@ export interface SelectionOperations {
 
 /**
  * HistoryManagement Interface - Undo/redo functionality
- * 
+ *
  * Manages the undo/redo stack and provides operations for
  * reverting and replaying changes to the text buffer.
  */
@@ -202,7 +210,7 @@ export interface HistoryManagement {
 
 /**
  * RangeOperations Interface - Range-based text manipulation
- * 
+ *
  * Provides operations for manipulating text ranges, including
  * replacement, deletion, and coordinate conversion utilities.
  */
@@ -245,7 +253,7 @@ export interface RangeOperations {
 
 /**
  * BufferConfiguration Interface - Configuration and metadata
- * 
+ *
  * Manages buffer-level configuration options such as history limits,
  * tab settings, and editor behavior preferences.
  */

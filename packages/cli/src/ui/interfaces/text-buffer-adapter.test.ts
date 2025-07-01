@@ -27,8 +27,10 @@ const createMockSegregatedInterfaces = () => {
     text: 'Hello world\nSecond line',
     cursor: [0, 5],
     preferredCol: null,
-    currentLine: vi.fn((row: number) => row === 0 ? 'Hello world' : 'Second line'),
-    currentLineLen: vi.fn((row: number) => row === 0 ? 11 : 11),
+    currentLine: vi.fn((row: number) =>
+      row === 0 ? 'Hello world' : 'Second line',
+    ),
+    currentLineLen: vi.fn((row: number) => (row === 0 ? 11 : 11)),
     updateLines: vi.fn(),
     updateCursor: vi.fn(),
     setPreferredCol: vi.fn(),
@@ -163,7 +165,9 @@ describe('TextBufferAdapter', () => {
   describe('TextEditor compatibility', () => {
     it('should provide setText method', () => {
       adapter.setText('new text');
-      expect(mockInterfaces.textEditor.setText).toHaveBeenCalledWith('new text');
+      expect(mockInterfaces.textEditor.setText).toHaveBeenCalledWith(
+        'new text',
+      );
     });
 
     it('should provide insert method', () => {
@@ -174,7 +178,9 @@ describe('TextBufferAdapter', () => {
     it('should provide insertStr method', () => {
       const result = adapter.insertStr('hello world');
       expect(result).toBe(true);
-      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith('hello world');
+      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith(
+        'hello world',
+      );
     });
 
     it('should provide newline method', () => {
@@ -201,14 +207,19 @@ describe('TextBufferAdapter', () => {
 
     it('should provide moveToOffset method', () => {
       adapter.moveToOffset(10);
-      expect(mockInterfaces.cursorNavigation.moveToOffset).toHaveBeenCalledWith(10);
+      expect(mockInterfaces.cursorNavigation.moveToOffset).toHaveBeenCalledWith(
+        10,
+      );
     });
   });
 
   describe('VisualLayout compatibility', () => {
     it('should expose visual layout properties', () => {
       expect(adapter.allVisualLines).toEqual(['Hello world', 'Second line']);
-      expect(adapter.viewportVisualLines).toEqual(['Hello world', 'Second line']);
+      expect(adapter.viewportVisualLines).toEqual([
+        'Hello world',
+        'Second line',
+      ]);
       expect(adapter.visualCursor).toEqual([0, 5]);
       expect(adapter.visualScrollRow).toBe(0);
     });
@@ -232,7 +243,9 @@ describe('TextBufferAdapter', () => {
 
     it('should provide startSelection method', () => {
       adapter.startSelection();
-      expect(mockInterfaces.selectionOperations.startSelection).toHaveBeenCalled();
+      expect(
+        mockInterfaces.selectionOperations.startSelection,
+      ).toHaveBeenCalled();
     });
   });
 
@@ -254,13 +267,21 @@ describe('TextBufferAdapter', () => {
     it('should provide replaceRange method', () => {
       const result = adapter.replaceRange(0, 0, 0, 5, 'hello');
       expect(result).toBe(true);
-      expect(mockInterfaces.rangeOperations.replaceRange).toHaveBeenCalledWith(0, 0, 0, 5, 'hello');
+      expect(mockInterfaces.rangeOperations.replaceRange).toHaveBeenCalledWith(
+        0,
+        0,
+        0,
+        5,
+        'hello',
+      );
     });
 
     it('should provide replaceRangeByOffset method', () => {
       const result = adapter.replaceRangeByOffset(0, 5, 'hello');
       expect(result).toBe(true);
-      expect(mockInterfaces.rangeOperations.replaceRangeByOffset).toHaveBeenCalledWith(0, 5, 'hello');
+      expect(
+        mockInterfaces.rangeOperations.replaceRangeByOffset,
+      ).toHaveBeenCalledWith(0, 5, 'hello');
     });
   });
 
@@ -290,7 +311,9 @@ describe('TextBufferAdapter', () => {
     it('should provide openInExternalEditor method', () => {
       expect(typeof adapter.openInExternalEditor).toBe('function');
       // Note: This method throws an error indicating coordination logic needed
-      expect(() => adapter.openInExternalEditor()).toThrow('openInExternalEditor coordination not implemented');
+      expect(() => adapter.openInExternalEditor()).toThrow(
+        'openInExternalEditor coordination not implemented',
+      );
     });
   });
 
@@ -306,7 +329,9 @@ describe('TextBufferAdapter', () => {
       };
       expect(typeof adapter.handleInput).toBe('function');
       // Note: This method throws an error indicating coordination logic needed
-      expect(() => adapter.handleInput(key)).toThrow('handleInput coordination not implemented');
+      expect(() => adapter.handleInput(key)).toThrow(
+        'handleInput coordination not implemented',
+      );
     });
   });
 
@@ -314,7 +339,9 @@ describe('TextBufferAdapter', () => {
     it('should provide applyOperations method', () => {
       const ops = [{ type: 'insert' as const, payload: 'hello' }];
       adapter.applyOperations(ops);
-      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith('hello');
+      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith(
+        'hello',
+      );
     });
   });
 
@@ -322,7 +349,7 @@ describe('TextBufferAdapter', () => {
     it('should implement all TextBuffer interface methods', () => {
       // Verify adapter conforms to TextBuffer interface
       const textBuffer: TextBuffer = adapter;
-      
+
       // Should be able to call all TextBuffer methods
       expect(typeof textBuffer.setText).toBe('function');
       expect(typeof textBuffer.insert).toBe('function');
@@ -356,20 +383,30 @@ describe('TextBufferAdapter', () => {
       adapter.copy();
       adapter.undo();
       adapter.replaceRange(0, 0, 0, 5, 'world');
-      
+
       // Properties should be accessible
       expect(Array.isArray(adapter.lines)).toBe(true);
       expect(typeof adapter.text).toBe('string');
       expect(Array.isArray(adapter.cursor)).toBe(true);
       expect(Array.isArray(adapter.allVisualLines)).toBe(true);
-      
+
       // Verify delegation calls were made
-      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith('hello');
+      expect(mockInterfaces.textEditor.insertText).toHaveBeenCalledWith(
+        'hello',
+      );
       expect(mockInterfaces.cursorNavigation.move).toHaveBeenCalledWith('left');
-      expect(mockInterfaces.selectionOperations.startSelection).toHaveBeenCalled();
+      expect(
+        mockInterfaces.selectionOperations.startSelection,
+      ).toHaveBeenCalled();
       expect(mockInterfaces.selectionOperations.copy).toHaveBeenCalled();
       expect(mockInterfaces.historyManagement.undo).toHaveBeenCalled();
-      expect(mockInterfaces.rangeOperations.replaceRange).toHaveBeenCalledWith(0, 0, 0, 5, 'world');
+      expect(mockInterfaces.rangeOperations.replaceRange).toHaveBeenCalledWith(
+        0,
+        0,
+        0,
+        5,
+        'world',
+      );
     });
   });
 });

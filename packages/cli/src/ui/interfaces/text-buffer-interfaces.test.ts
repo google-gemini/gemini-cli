@@ -379,7 +379,9 @@ describe('TextEditor Interface', () => {
 
   it('should provide insertText method', () => {
     let insertedText = '';
-    const editor = new MockTextEditor((text) => { insertedText = text; });
+    const editor = new MockTextEditor((text) => {
+      insertedText = text;
+    });
     editor.insertText('hello');
     expect(insertedText).toBe('hello');
   });
@@ -414,7 +416,9 @@ describe('TextEditor Interface', () => {
 
   it('should provide newline method that calls insertText', () => {
     let insertedText = '';
-    const editor = new MockTextEditor((text) => { insertedText = text; });
+    const editor = new MockTextEditor((text) => {
+      insertedText = text;
+    });
     editor.newline();
     expect(insertedText).toBe('\n');
   });
@@ -480,7 +484,9 @@ describe('VisualLayout Interface', () => {
   });
 
   it('should fail updateViewport method until implemented', () => {
-    expect(() => visualLayout.updateViewport({ width: 100, height: 30 })).toThrow('Not implemented');
+    expect(() =>
+      visualLayout.updateViewport({ width: 100, height: 30 }),
+    ).toThrow('Not implemented');
   });
 
   it('should fail recalculateLayout method until implemented', () => {
@@ -488,15 +494,21 @@ describe('VisualLayout Interface', () => {
   });
 
   it('should fail scrollToRevealCursor method until implemented', () => {
-    expect(() => visualLayout.scrollToRevealCursor()).toThrow('Not implemented');
+    expect(() => visualLayout.scrollToRevealCursor()).toThrow(
+      'Not implemented',
+    );
   });
 
   it('should fail getVisualPosition method until implemented', () => {
-    expect(() => visualLayout.getVisualPosition([0, 0])).toThrow('Not implemented');
+    expect(() => visualLayout.getVisualPosition([0, 0])).toThrow(
+      'Not implemented',
+    );
   });
 
   it('should fail getLogicalPosition method until implemented', () => {
-    expect(() => visualLayout.getLogicalPosition([0, 0])).toThrow('Not implemented');
+    expect(() => visualLayout.getLogicalPosition([0, 0])).toThrow(
+      'Not implemented',
+    );
   });
 });
 
@@ -587,11 +599,15 @@ describe('RangeOperations Interface', () => {
   });
 
   it('should fail replaceRange method until implemented', () => {
-    expect(() => rangeOps.replaceRange(0, 0, 0, 5, 'hello')).toThrow('Not implemented');
+    expect(() => rangeOps.replaceRange(0, 0, 0, 5, 'hello')).toThrow(
+      'Not implemented',
+    );
   });
 
   it('should fail replaceRangeByOffset method until implemented', () => {
-    expect(() => rangeOps.replaceRangeByOffset(0, 5, 'hello')).toThrow('Not implemented');
+    expect(() => rangeOps.replaceRangeByOffset(0, 5, 'hello')).toThrow(
+      'Not implemented',
+    );
   });
 
   it('should fail deleteRange method until implemented', () => {
@@ -636,7 +652,9 @@ describe('BufferConfiguration Interface', () => {
   });
 
   it('should fail updateConfig method until implemented', () => {
-    expect(() => config.updateConfig({ historyLimit: 50 })).toThrow('Not implemented');
+    expect(() => config.updateConfig({ historyLimit: 50 })).toThrow(
+      'Not implemented',
+    );
   });
 
   it('should fail getConfig method until implemented', () => {
@@ -665,10 +683,16 @@ describe('Interface Integration', () => {
 
   it('should have compatible direction types', () => {
     const directions: Direction[] = [
-      'left', 'right', 'up', 'down',
-      'wordLeft', 'wordRight', 'home', 'end'
+      'left',
+      'right',
+      'up',
+      'down',
+      'wordLeft',
+      'wordRight',
+      'home',
+      'end',
     ];
-    directions.forEach(dir => {
+    directions.forEach((dir) => {
       expect(typeof dir).toBe('string');
     });
   });

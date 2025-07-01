@@ -130,7 +130,7 @@ describe('BasicTextEditor Composition', () => {
       coreState: createMockCoreTextState(),
       textEditor: createMockTextEditor(),
     };
-    
+
     basicEditor = new BasicTextEditor(props);
   });
 
@@ -140,12 +140,12 @@ describe('BasicTextEditor Composition', () => {
 
   it('should compose CoreTextState and TextEditor interfaces', () => {
     const editor = new BasicTextEditor(props);
-    
+
     // Should have CoreTextState properties
     expect(editor.lines).toBeDefined();
     expect(editor.text).toBeDefined();
     expect(editor.cursor).toBeDefined();
-    
+
     // Should have TextEditor methods
     expect(typeof editor.insertText).toBe('function');
     expect(typeof editor.deleteCharBefore).toBe('function');
@@ -175,7 +175,7 @@ describe('AdvancedTextEditor Composition', () => {
 
   it('should compose all interfaces', () => {
     const editor = new AdvancedTextEditor(props);
-    
+
     // Should have all interface capabilities
     expect(editor.lines).toBeDefined();
     expect(typeof editor.insertText).toBe('function');
@@ -189,13 +189,13 @@ describe('AdvancedTextEditor Composition', () => {
 
   it('should coordinate between all interfaces', () => {
     const editor = new AdvancedTextEditor(props);
-    
+
     // Should be able to perform complex operations
     editor.insertText('Hello');
     editor.move('left');
     editor.startSelection();
     editor.copy();
-    
+
     // All interface methods should be available
     expect(props.textEditor.insertText).toHaveBeenCalled();
     expect(props.cursorNavigation.move).toHaveBeenCalled();
@@ -220,12 +220,12 @@ describe('ReadOnlyTextBuffer Composition', () => {
 
   it('should provide read-only access', () => {
     const buffer = new ReadOnlyTextBuffer(props);
-    
+
     // Should have read access
     expect(buffer.lines).toBeDefined();
     expect(buffer.text).toBeDefined();
     expect(buffer.allVisualLines).toBeDefined();
-    
+
     // Should NOT have editing methods (these would come from TextEditor interface)
     expect((buffer as any).insertText).toBeUndefined();
     expect((buffer as any).deleteCharBefore).toBeUndefined();
@@ -234,10 +234,10 @@ describe('ReadOnlyTextBuffer Composition', () => {
 
   it('should handle viewport operations', () => {
     const buffer = new ReadOnlyTextBuffer(props);
-    
+
     buffer.updateViewport({ width: 100, height: 30 });
     buffer.recalculateLayout();
-    
+
     expect(props.visualLayout.updateViewport).toHaveBeenCalled();
     expect(props.visualLayout.recalculateLayout).toHaveBeenCalled();
   });
@@ -248,17 +248,20 @@ describe('Composition Integration', () => {
     const coreState = createMockCoreTextState();
     const textEditor = createMockTextEditor();
     const visualLayout = createMockVisualLayout();
-    
+
     // Different compositions for different use cases
     expect(() => {
       // Basic editing - only need core + editor
       const basicProps: BasicTextEditorProps = { coreState, textEditor };
       const basic = new BasicTextEditor(basicProps);
-      
+
       // Read-only viewing - only need core + visual
-      const readOnlyProps: ReadOnlyTextBufferProps = { coreState, visualLayout };
+      const readOnlyProps: ReadOnlyTextBufferProps = {
+        coreState,
+        visualLayout,
+      };
       const readOnly = new ReadOnlyTextBuffer(readOnlyProps);
-      
+
       // Should be able to create different compositions
       expect(basic).toBeDefined();
       expect(readOnly).toBeDefined();
@@ -270,12 +273,12 @@ describe('Composition Integration', () => {
     const coreState = createMockCoreTextState();
     expect(coreState.lines).toEqual(['Hello world']);
     expect(coreState.currentLine(0)).toBe('Hello world');
-    
+
     // Testing text editor in isolation
     const textEditor = createMockTextEditor();
     textEditor.insertText('test');
     expect(textEditor.insertText).toHaveBeenCalledWith('test');
-    
+
     // No need to test full integration for every operation
     // Each interface can be tested independently
   });
@@ -285,25 +288,32 @@ describe('Composition Integration', () => {
     // Segregated interfaces: 8 interfaces × 5-8 methods each = 40-64 focused tests
     // Plus composition tests: ~20 tests
     // Total: 60-84 tests vs 200+ tests = 58-70% reduction
-    
+
     const interfaceCounts = {
-      CoreTextState: 5,      // lines, text, cursor, currentLine, updateLines
-      TextEditor: 10,        // insert, delete, kill operations
-      CursorNavigation: 8,   // move, positioning operations
-      VisualLayout: 5,       // visual properties and operations
+      CoreTextState: 5, // lines, text, cursor, currentLine, updateLines
+      TextEditor: 10, // insert, delete, kill operations
+      CursorNavigation: 8, // move, positioning operations
+      VisualLayout: 5, // visual properties and operations
       SelectionOperations: 8, // selection and clipboard
-      HistoryManagement: 5,  // undo/redo operations
-      RangeOperations: 7,    // range manipulations
+      HistoryManagement: 5, // undo/redo operations
+      RangeOperations: 7, // range manipulations
       BufferConfiguration: 3, // config operations
     };
-    
-    const totalInterfaceMethods = Object.values(interfaceCounts).reduce((sum, count) => sum + count, 0);
+
+    const totalInterfaceMethods = Object.values(interfaceCounts).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
     const estimatedCompositionTests = 20;
-    const totalSegregatedTests = totalInterfaceMethods + estimatedCompositionTests;
+    const totalSegregatedTests =
+      totalInterfaceMethods + estimatedCompositionTests;
     const originalMonolithicTests = 200; // Conservative estimate
-    
-    const reductionPercentage = ((originalMonolithicTests - totalSegregatedTests) / originalMonolithicTests) * 100;
-    
+
+    const reductionPercentage =
+      ((originalMonolithicTests - totalSegregatedTests) /
+        originalMonolithicTests) *
+      100;
+
     expect(totalSegregatedTests).toBeLessThan(originalMonolithicTests);
     expect(reductionPercentage).toBeGreaterThan(50);
     expect(reductionPercentage).toBeLessThan(87);
