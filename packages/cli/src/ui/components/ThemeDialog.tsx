@@ -84,8 +84,6 @@ export function ThemeDialog({
     setFocusedSection('theme'); // Reset focus to theme section
   };
 
-  // Remove state and logic for 'create' focus section
-  // const [focusedSection, setFocusedSection] = useState<'theme' | 'create' | 'scope'>('theme');
   const [focusedSection, setFocusedSection] = useState<'theme' | 'scope'>(
     'theme',
   );
