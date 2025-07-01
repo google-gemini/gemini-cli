@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "command": "Create a test file packages/core/tests/readFile.test.ts with Jest tests for ReadFile tool stream reading"
+  },
+  {
+    "id": 2,
+    "command": "Add a /test-read command in packages/cli/src/gemini.tsx to run ReadFile tests with Jest"
+  },
+  {
+    "id": 3,
+    "command": "Create a test file packages/core/tests/writeFile.test.ts with Jest tests for WriteFile tool stream writing"
+  },
+  {
+    "id": 4,
+    "command": "Add a /test-write command in packages/cli/src/gemini.tsx to run WriteFile tests"
+  },
+  {
+    "id": 5,
+    "command": "Create a test file packages/core/tests/edit.test.ts with Jest tests for Edit tool regex replacements"
+  },
+  {
+    "id": 6,
+    "command": "Add a /test-edit command in packages/cli/src/gemini.tsx to run Edit tests"
+  },
+  {
+    "id": 7,
+    "command": "Write a script in /sdcard/scripts/run-tests.sh to run all Jest tests with termux-toast notifications"
+  },
+  {
+    "id": 8,
+    "command": "Add a /test-all command in packages/cli/src/gemini.tsx to run all Jest tests"
+  },
+  {
+    "id": 9,
+    "command": "Add tests in packages/core/tests/readFile.test.ts for file-not-found error handling"
+  },
+  {
+    "id": 10,
+    "command": "Create a script in /sdcard/scripts/test-read.sh to test ReadFile with sample files in /sdcard"
+  },
+  {
+    "id": 11,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for permission checks on /sdcard"
+  },
+  {
+    "id": 12,
+    "command": "Add a /test-perms command in packages/cli/src/gemini.tsx to test WriteFile permissions"
+  },
+  {
+    "id": 13,
+    "command": "Add tests in packages/core/tests/edit.test.ts for batch edit functionality"
+  },
+  {
+    "id": 14,
+    "command": "Add a /test-batch command in packages/cli/src/gemini.tsx to test batch edits"
+  },
+  {
+    "id": 15,
+    "command": "Create a test file packages/core/tests/read-preview.test.ts for preview tool functionality"
+  },
+  {
+    "id": 16,
+    "command": "Add a /test-preview command in packages/cli/src/gemini.tsx to test file previews"
+  },
+  {
+    "id": 17,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for JSON formatting"
+  },
+  {
+    "id": 18,
+    "command": "Add a /test-json command in packages/cli/src/gemini.tsx to test JSON writing"
+  },
+  {
+    "id": 19,
+    "command": "Add tests in packages/core/tests/edit.test.ts for inline comment addition"
+  },
+  {
+    "id": 20,
+    "command": "Add a /test-comments command in packages/cli/src/gemini.tsx to test comment edits"
+  },
+  {
+    "id": 21,
+    "command": "Write a script in /sdcard/scripts/test-format.sh to test Edit tool with black formatting"
+  },
+  {
+    "id": 22,
+    "command": "Add a /test-format command in packages/cli/src/gemini.tsx to test formatted edits"
+  },
+  {
+    "id": 23,
+    "command": "Add tests in packages/core/tests/readFile.test.ts for reading from /sdcard with notifications"
+  },
+  {
+    "id": 24,
+    "command": "Add a /test-sdcard command in packages/cli/src/gemini.tsx to test /sdcard reading"
+  },
+  {
+    "id": 25,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for backup creation"
+  },
+  {
+    "id": 26,
+    "command": "Add a /test-backup command in packages/cli/src/gemini.tsx to test file backups"
+  },
+  {
+    "id": 27,
+    "command": "Add tests in packages/core/tests/edit.test.ts for undo functionality"
+  },
+  {
+    "id": 28,
+    "command": "Add a /test-undo command in packages/cli/src/gemini.tsx to test edit reversals"
+  },
+  {
+    "id": 29,
+    "command": "Create a test file packages/core/tests/read-meta.test.ts for file metadata reading"
+  },
+  {
+    "id": 30,
+    "command": "Add a /test-meta command in packages/cli/src/gemini.tsx to test metadata functionality"
+  },
+  {
+    "id": 31,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for CSV appending"
+  },
+  {
+    "id": 32,
+    "command": "Add a /test-csv command in packages/cli/src/gemini.tsx to test CSV writing"
+  },
+  {
+    "id": 33,
+    "command": "Add tests in packages/core/tests/edit.test.ts for pylint integration"
+  },
+  {
+    "id": 34,
+    "command": "Add a /test-lint command in packages/cli/src/gemini.tsx to test linting edits"
+  },
+  {
+    "id": 35,
+    "command": "Write a script in /sdcard/scripts/test-search.sh to test file content searching"
+  },
+  {
+    "id": 36,
+    "command": "Add a /test-search command in packages/cli/src/gemini.tsx to test file searches"
+  },
+  {
+    "id": 37,
+    "command": "Add tests in packages/core/tests/readFile.test.ts for compressed file reading"
+  },
+  {
+    "id": 38,
+    "command": "Add a /test-zip command in packages/cli/src/gemini.tsx to test compressed file reading"
+  },
+  {
+    "id": 39,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for writing with termux-toast"
+  },
+  {
+    "id": 40,
+    "command": "Add a /test-write-sdcard command in packages/cli/src/gemini.tsx to test /sdcard writing"
+  },
+  {
+    "id": 41,
+    "command": "Add tests in packages/core/tests/edit.test.ts for type hint addition"
+  },
+  {
+    "id": 42,
+    "command": "Add a /test-type command in packages/cli/src/gemini.tsx to test type hint edits"
+  },
+  {
+    "id": 43,
+    "command": "Write a script in /sdcard/scripts/test-edit-log.sh to test Edit tool logging"
+  },
+  {
+    "id": 44,
+    "command": "Add a /test-edit-log command in packages/cli/src/gemini.tsx to test edit history"
+  },
+  {
+    "id": 45,
+    "command": "Add tests in packages/core/tests/readFile.test.ts for clipboard reading"
+  },
+  {
+    "id": 46,
+    "command": "Add a /test-clipboard-read command in packages/cli/src/gemini.tsx to test clipboard reading"
+  },
+  {
+    "id": 47,
+    "command": "Add tests in packages/core/tests/writeFile.test.ts for clipboard writing"
+  },
+  {
+    "id": 48,
+    "command": "Add a /test-clipboard-write command in packages/cli/src/gemini.tsx to test clipboard writing"
+  },
+  {
+    "id": 49,
+    "command": "Add tests in packages/core/tests/edit.test.ts for code completion integration"
+  },
+  {
+    "id": 50,
+    "command": "Add a /test-complete command in packages/cli/src/gemini.tsx to test code completion edits"
+  }
+]
