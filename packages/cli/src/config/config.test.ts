@@ -10,6 +10,7 @@ import { loadCliConfig } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
+import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -90,19 +91,47 @@ describe('loadCliConfig', () => {
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 
-  // it('should undefined when labels is not present in settings', async () => {
-  //   process.argv = ['node', 'script.js'];
-  //   const settings: Settings = {};
-  //   const config = await loadCliConfig(settings, [], 'test-session');
-  //   expect(config.getLabels()).toBeUndefined();
-  // });
+  it('should be default value when model is not given', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+  });
 
-  // it('should pass labels from settings to config', async () => {
-  //   process.argv = ['node', 'script.js'];
-  //   const settings: Settings = { labels: { example: 'value' } };
-  //   const config = await loadCliConfig(settings, [], 'test-session');
-  //   expect(config.getLabels()?.example).toBe('value');
-  // });
+  it('should pass model from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { model: 'dummy-model' };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getModel()).toBe('dummy-model');
+  });
+
+  it('should pass model from args to config', async () => {
+    process.argv = ['node', 'script.js', '-m', 'dummy-model'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getModel()).toBe('dummy-model');
+  });
+
+  it('should override model from args rather than settings', async () => {
+    process.argv = ['node', 'script.js', '-m', 'dummy-model-cli'];
+    const settings: Settings = { model: 'dummy-model-settings' };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getModel()).toBe('dummy-model-cli');
+  });
+
+  it('should undefined when auth is not present in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getAuth()).toBeUndefined();
+  });
+
+  it('should pass auth from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { auth: { gemini: { apiKey: 'test-key' } } };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getAuth()?.gemini?.apiKey).toBe('test-key');
+  });
 });
 
 describe('loadCliConfig telemetry', () => {

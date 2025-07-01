@@ -135,9 +135,12 @@ export async function createContentGenerator(
 
   if (config.authType === AuthType.USE_VERTEX_AI) {
     options.vertexai = true;
-    options.apiKey = config.auth?.vertex?.apiKey;
-    options.project = config.auth?.vertex?.project;
-    options.location = config.auth?.vertex?.location;
+    if (config.auth?.vertex?.apiKey) {
+      options.apiKey = config.auth?.vertex?.apiKey;
+    } else {
+      options.project = config.auth?.vertex?.project;
+      options.location = config.auth?.vertex?.location;
+    }
     const googleGenAI = new GoogleGenAI(options);
     return googleGenAI.models;
   }
