@@ -100,7 +100,7 @@ export class HybridScorer {
       });
 
       return results;
-    } catch (error) {
+    } catch (_error) {
       // Fallback: return zero scores for all chunks
       return chunks.map((chunk) => ({
         chunkId: chunk.id,
@@ -168,7 +168,7 @@ export class HybridScorer {
       // Handle both sync and async scorers
       const result = scorer.scoreChunks(chunks, query);
       return result instanceof Promise ? await result : result;
-    } catch (error) {
+    } catch (_error) {
       // Return zero scores for all chunks on error
       return chunks.map((chunk) => ({
         chunkId: chunk.id,

@@ -21,7 +21,7 @@ export interface ContextOptimizationEvent {
   data: Record<string, unknown>;
 }
 
-export interface OptimizationLogEntry {
+export interface OptimizationLogEntry extends Record<string, unknown> {
   query: string;
   originalChunks: number;
   finalChunks: number;
@@ -254,16 +254,20 @@ export class ContextLogger {
     }
 
     const avgProcessingTime =
-      optimizations.reduce((sum, e) => sum + e.data.processingTimeMs, 0) /
-      optimizations.length;
+      optimizations.reduce(
+        (sum, e) => sum + (e.data as OptimizationLogEntry).processingTimeMs,
+        0,
+      ) / optimizations.length;
     const avgTokenReduction =
-      optimizations.reduce((sum, e) => sum + e.data.reductionPercentage, 0) /
-      optimizations.length;
+      optimizations.reduce(
+        (sum, e) => sum + (e.data as OptimizationLogEntry).reductionPercentage,
+        0,
+      ) / optimizations.length;
     const avgChunkReduction =
       optimizations.reduce((sum, e) => {
+        const data = e.data as OptimizationLogEntry;
         const reduction =
-          ((e.data.originalChunks - e.data.finalChunks) /
-            e.data.originalChunks) *
+          ((data.originalChunks - data.finalChunks) / data.originalChunks) *
           100;
         return sum + reduction;
       }, 0) / optimizations.length;

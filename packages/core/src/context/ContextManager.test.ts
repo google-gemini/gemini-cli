@@ -10,6 +10,7 @@ import type {
   ConversationChunk,
   ContextOptimizationConfig,
   RelevanceQuery,
+  ScoringWeights,
 } from './types.js';
 
 /**
@@ -87,9 +88,11 @@ describe('ContextManager Unit Tests', () => {
 
     it('should validate configuration parameters', () => {
       const invalidConfig = {
-        enabled: 'yes', // Should be boolean
+        enabled: 'yes' as unknown as boolean, // Should be boolean
         maxChunks: -1, // Should be non-negative
-        scoringWeights: null, // Should be object
+        embeddingEnabled: true,
+        aggressivePruning: false,
+        scoringWeights: null as unknown as ScoringWeights, // Should be object
       };
 
       expect(() => contextManager.updateConfig(invalidConfig)).toThrow();
@@ -268,7 +271,7 @@ describe('ContextManager Unit Tests', () => {
     it('should handle malformed chunks gracefully', async () => {
       const malformedChunk = {
         id: 'malformed',
-        role: 'user',
+        role: 'user' as const,
         content: 'test',
         tokens: 50,
         timestamp: Date.now(),

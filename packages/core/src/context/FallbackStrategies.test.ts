@@ -219,7 +219,7 @@ describe('FallbackStrategies', () => {
       const emptyManager = new FallbackStrategyManager();
 
       // Clear default strategies by creating new instance
-      (emptyManager as { strategies: FallbackStrategy[] }).strategies = [
+      (emptyManager as unknown as { strategies: unknown[] }).strategies = [
         {
           name: 'fail1',
           priority: 1,

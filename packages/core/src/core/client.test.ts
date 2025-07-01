@@ -15,7 +15,7 @@ import {
 import { GeminiClient } from './client.js';
 import { AuthType, ContentGenerator } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
-import { Config } from '../config/config.js';
+import { Config, ConfigParameters } from '../config/config.js';
 import { Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -136,8 +136,12 @@ describe('Gemini Client (client.ts)', () => {
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockConfig = new Config({} as any);
+    const mockConfig = new Config({
+      sessionId: 'test-session',
+      targetDir: '/test/dir',
+      debugMode: false,
+      cwd: '/test/dir',
+    } as ConfigParameters);
     client = new GeminiClient(mockConfig);
     await client.initialize(contentGeneratorConfig);
   });
@@ -322,9 +326,12 @@ describe('Gemini Client (client.ts)', () => {
     it('should call chat.addHistory with the provided content', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const newContent = {
         role: 'user',
@@ -372,11 +379,14 @@ describe('Gemini Client (client.ts)', () => {
       })();
       mockTurnRunFn.mockReturnValue(mockStream);
 
-      const mockChat: Partial<GeminiChat> = {
+      const mockChat = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as GeminiChat;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
@@ -406,16 +416,104 @@ describe('Gemini Client (client.ts)', () => {
 });
 
 describe('GeminiClient - Additional comprehensive tests', () => {
+  let client: GeminiClient;
+
+  beforeEach(async () => {
+    vi.resetAllMocks();
+
+    // Set up the mock for GoogleGenAI constructor and its methods
+    const MockedGoogleGenAI = vi.mocked(GoogleGenAI);
+    MockedGoogleGenAI.mockImplementation(() => {
+      const mock = {
+        chats: { create: mockChatCreateFn },
+        models: {
+          generateContent: mockGenerateContentFn,
+          embedContent: mockEmbedContentFn,
+        },
+      };
+      return mock as unknown as GoogleGenAI;
+    });
+
+    mockChatCreateFn.mockResolvedValue({} as Chat);
+    mockGenerateContentFn.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: '{"key": "value"}' }],
+          },
+        },
+      ],
+    } as unknown as GenerateContentResponse);
+
+    // Mock Config for the second describe block
+    const mockToolRegistry = {
+      getFunctionDeclarations: vi.fn().mockReturnValue([]),
+      getTool: vi.fn().mockReturnValue(null),
+    };
+    const fileService = new FileDiscoveryService('/test/dir');
+    const MockedConfig = vi.mocked(Config, true);
+    const contentGeneratorConfig = {
+      model: 'test-model',
+      apiKey: 'test-key',
+      vertexai: false,
+      authType: AuthType.USE_GEMINI,
+    };
+    MockedConfig.mockImplementation(() => {
+      const mock = {
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue(contentGeneratorConfig),
+        getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+        getModel: vi.fn().mockReturnValue('test-model'),
+        getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+        getApiKey: vi.fn().mockReturnValue('test-key'),
+        getVertexAI: vi.fn().mockReturnValue(false),
+        getUserAgent: vi.fn().mockReturnValue('test-agent'),
+        getUserMemory: vi.fn().mockReturnValue(''),
+        getFullContext: vi.fn().mockReturnValue(false),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
+        getProxy: vi.fn().mockReturnValue(undefined),
+        getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
+        getFileService: vi.fn().mockReturnValue(fileService),
+      };
+      return mock as unknown as Config;
+    });
+
+    // Initialize client for the second describe block
+    const mockConfig = new Config({
+      sessionId: 'test-session',
+      targetDir: '/test/dir',
+      debugMode: false,
+      cwd: '/test/dir',
+    } as ConfigParameters);
+    client = new GeminiClient(mockConfig);
+    await client.initialize(contentGeneratorConfig);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('constructor and initialization', () => {
     it('should initialize with correct configuration', () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const client = new GeminiClient(mockConfig);
 
       expect(client).toBeInstanceOf(GeminiClient);
     });
 
     it('should handle initialization with different auth types', async () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const client = new GeminiClient(mockConfig);
 
       const vertexConfig = {
@@ -456,17 +554,27 @@ describe('GeminiClient - Additional comprehensive tests', () => {
             .fn()
             .mockReturnValue(new FileDiscoveryService('/test/dir')),
         };
-        return mock as any;
+        return mock as unknown as Config;
       });
 
-      const config = new Config({} as any);
+      const config = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       expect(() => new GeminiClient(config)).not.toThrow();
     });
   });
 
   describe('getContentGenerator', () => {
     it('should throw error when content generator not initialized', () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const uninitializedClient = new GeminiClient(mockConfig);
 
       expect(() => uninitializedClient.getContentGenerator()).toThrow(
@@ -484,7 +592,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
 
   describe('getChat', () => {
     it('should throw error when chat not initialized', () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const uninitializedClient = new GeminiClient(mockConfig);
 
       expect(() => uninitializedClient.getChat()).toThrow(
@@ -509,8 +622,10 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         getHistory: vi.fn().mockResolvedValue(mockHistory),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const history = await client.getHistory();
 
@@ -523,8 +638,10 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         getHistory: vi.fn().mockResolvedValue([]),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const history = await client.getHistory();
 
@@ -537,8 +654,10 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         getHistory: vi.fn().mockRejectedValue(new Error('History error')),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       await expect(client.getHistory()).rejects.toThrow('History error');
     });
@@ -554,8 +673,10 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         getHistory: vi.fn(),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       await client.setHistory(newHistory);
 
@@ -567,8 +688,10 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         getHistory: vi.fn(),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       await client.setHistory([]);
 
@@ -887,8 +1010,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     it('should handle adding user message', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const userMessage = {
         role: 'user' as const,
@@ -903,8 +1030,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     it('should handle adding model message', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const modelMessage = {
         role: 'model' as const,
@@ -919,8 +1050,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     it('should handle adding multimodal message', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const multimodalMessage = {
         role: 'user' as const,
@@ -938,8 +1073,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     it('should handle message with function calls', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const functionCallMessage = {
         role: 'model' as const,
@@ -965,8 +1104,11 @@ describe('GeminiClient - Additional comprehensive tests', () => {
             { role: 'user', parts: [{ text: 'old message' }] },
           ])
           .mockReturnValueOnce([]), // After reset
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const initialChat = client.getChat();
 
@@ -998,11 +1140,14 @@ describe('GeminiClient - Additional comprehensive tests', () => {
 
   describe('sendMessageStream - comprehensive edge cases', () => {
     beforeEach(() => {
-      const mockChat: Partial<GeminiChat> = {
+      const mockChat = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as GeminiChat;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
@@ -1019,15 +1164,16 @@ describe('GeminiClient - Additional comprehensive tests', () => {
       const stream = client.sendMessageStream([], new AbortController().signal);
 
       let streamedContent = '';
-      let finalResult: any;
+      let finalResult: Turn;
       while (true) {
         const result = await stream.next();
         if (result.done) {
           finalResult = result.value;
           break;
         }
-        if (result.value.type === 'content') {
-          streamedContent += result.value.value;
+        const event = result.value as { type: string; value: string };
+        if (event.type === 'content') {
+          streamedContent += event.value;
         }
       }
 
@@ -1054,8 +1200,9 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         if (result.done) {
           break;
         }
-        if (result.value.type === 'content') {
-          streamedContent += result.value.value;
+        const event = result.value as { type: string; value: string };
+        if (event.type === 'content') {
+          streamedContent += event.value;
         }
       }
 
@@ -1111,8 +1258,9 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         if (result.done) {
           break;
         }
-        if (result.value.type === 'content') {
-          streamedContent += result.value.value;
+        const event = result.value as { type: string; value: string };
+        if (event.type === 'content') {
+          streamedContent += event.value;
         }
       }
 
@@ -1132,7 +1280,7 @@ describe('GeminiClient - Additional comprehensive tests', () => {
       );
 
       // Should not throw and should handle the custom turns parameter
-      let finalResult: any;
+      let finalResult: Turn;
       while (true) {
         const result = await stream.next();
         if (result.done) {
@@ -1151,7 +1299,7 @@ describe('GeminiClient - Additional comprehensive tests', () => {
         0, // Zero turns
       );
 
-      let finalResult: any;
+      let finalResult: Turn;
       while (true) {
         const result = await stream.next();
         if (result.done) {
@@ -1167,7 +1315,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
 
   describe('error handling and edge cases', () => {
     it('should handle getContentGenerator when not initialized', () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const uninitializedClient = new GeminiClient(mockConfig);
 
       expect(() => uninitializedClient.getContentGenerator()).toThrow(
@@ -1176,7 +1329,12 @@ describe('GeminiClient - Additional comprehensive tests', () => {
     });
 
     it('should handle getChat when not initialized', () => {
-      const mockConfig = new Config({} as any);
+      const mockConfig = new Config({
+        sessionId: 'test-session',
+        targetDir: '/test/dir',
+        debugMode: false,
+        cwd: '/test/dir',
+      } as ConfigParameters);
       const uninitializedClient = new GeminiClient(mockConfig);
 
       expect(() => uninitializedClient.getChat()).toThrow(
@@ -1240,8 +1398,11 @@ describe('GeminiClient - Additional comprehensive tests', () => {
             { role: 'user', parts: [{ text: 'Hello' }] },
             { role: 'model', parts: [{ text: 'Hello there!' }] },
           ]),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 10 }),
@@ -1316,8 +1477,11 @@ describe('GeminiClient - Additional comprehensive tests', () => {
             { role: 'user', parts: [{ text: 'old message' }] },
           ])
           .mockReturnValueOnce([]), // After reset
+        setHistory: vi.fn(),
+        sendMessage: vi.fn(),
+        sendMessageStream: vi.fn(),
       };
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       await client.addHistory({
         role: 'user',

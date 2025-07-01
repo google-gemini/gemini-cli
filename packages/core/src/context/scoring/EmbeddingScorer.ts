@@ -44,7 +44,7 @@ export class EmbeddingScorer {
       if (this.embeddingGenerator && query.text.trim()) {
         try {
           queryEmbedding = await this.embeddingGenerator(query.text);
-        } catch (error) {
+        } catch (_error) {
           // Fall back to zero scores if embedding generation fails
           queryEmbedding = null;
         }
@@ -65,7 +65,7 @@ export class EmbeddingScorer {
       });
 
       return results;
-    } catch (error) {
+    } catch (_error) {
       // Fallback: return zero scores for all chunks
       return chunks.map((chunk) => ({
         chunkId: chunk.id,
@@ -107,7 +107,7 @@ export class EmbeddingScorer {
 
       // Clamp negative similarities to 0 (only positive similarity is useful)
       return Math.max(0, similarity);
-    } catch (error) {
+    } catch (_error) {
       return 0;
     }
   }

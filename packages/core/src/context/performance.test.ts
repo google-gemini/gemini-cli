@@ -15,7 +15,7 @@ import type {
 /**
  * Performance metrics for tracking optimization effectiveness.
  */
-interface PerformanceMetrics {
+interface _PerformanceMetrics {
   processingTimeMs: number;
   memoryUsageMB: number;
   tokenReductionPercentage: number;
@@ -26,7 +26,7 @@ interface PerformanceMetrics {
 /**
  * Relevance preservation metrics.
  */
-interface RelevanceMetrics {
+interface _RelevanceMetrics {
   precisionAtK: number;
   recallAtK: number;
   ndcgAtK: number;
@@ -255,7 +255,7 @@ describe('Context Optimization Performance and Validation', () => {
     });
 
     it('should clean up memory when clearing chunks', async () => {
-      const initialMemory = measureMemoryUsage();
+      const _initialMemory = measureMemoryUsage();
 
       // Add chunks and measure memory
       const chunks = generateLargeConversationDataset(500);
@@ -275,7 +275,7 @@ describe('Context Optimization Performance and Validation', () => {
 
       // Memory should be released (within reasonable bounds due to GC behavior)
       // Note: GC behavior is unpredictable, so we just check that memory usage is reasonable
-      const memoryReclaimed = withChunksMemory - afterClearMemory;
+      const _memoryReclaimed = withChunksMemory - afterClearMemory;
       // Memory might not be immediately reclaimed due to GC timing
       expect(afterClearMemory).toBeLessThan(withChunksMemory + 10); // Within 10MB tolerance
     });
@@ -389,49 +389,50 @@ describe('Context Optimization Performance and Validation', () => {
   describe('Relevance Preservation Accuracy', () => {
     it('should prioritize highly relevant chunks', async () => {
       // Create chunks with known relevance patterns
-      const chunks: (ConversationChunk & { groundTruthRelevance?: number })[] =
-        [
-          createMockChunk(
-            'high-rel-1',
-            'user',
-            'machine learning neural networks deep learning',
-            100,
-            Date.now() - 5000,
-            0.9,
-          ),
-          createMockChunk(
-            'high-rel-2',
-            'assistant',
-            'artificial intelligence and machine learning algorithms',
-            120,
-            Date.now() - 4000,
-            0.85,
-          ),
-          createMockChunk(
-            'med-rel-1',
-            'user',
-            'programming and software development',
-            80,
-            Date.now() - 3000,
-            0.6,
-          ),
-          createMockChunk(
-            'low-rel-1',
-            'user',
-            'weather forecast for tomorrow',
-            60,
-            Date.now() - 2000,
-            0.2,
-          ),
-          createMockChunk(
-            'low-rel-2',
-            'assistant',
-            'cooking recipes and food preparation',
-            90,
-            Date.now() - 1000,
-            0.1,
-          ),
-        ];
+      const chunks: Array<
+        ConversationChunk & { groundTruthRelevance?: number }
+      > = [
+        createMockChunk(
+          'high-rel-1',
+          'user',
+          'machine learning neural networks deep learning',
+          100,
+          Date.now() - 5000,
+          0.9,
+        ),
+        createMockChunk(
+          'high-rel-2',
+          'assistant',
+          'artificial intelligence and machine learning algorithms',
+          120,
+          Date.now() - 4000,
+          0.85,
+        ),
+        createMockChunk(
+          'med-rel-1',
+          'user',
+          'programming and software development',
+          80,
+          Date.now() - 3000,
+          0.6,
+        ),
+        createMockChunk(
+          'low-rel-1',
+          'user',
+          'weather forecast for tomorrow',
+          60,
+          Date.now() - 2000,
+          0.2,
+        ),
+        createMockChunk(
+          'low-rel-2',
+          'assistant',
+          'cooking recipes and food preparation',
+          90,
+          Date.now() - 1000,
+          0.1,
+        ),
+      ];
 
       contextManager.addChunks(chunks);
 
@@ -460,7 +461,7 @@ describe('Context Optimization Performance and Validation', () => {
       const chunks = generateLargeConversationDataset(50);
 
       // Assign ground truth relevance scores
-      chunks.forEach((chunk, index) => {
+      chunks.forEach((chunk, _index) => {
         const chunkWithTruth = chunk as ConversationChunk & {
           groundTruthRelevance?: number;
         };
@@ -516,7 +517,7 @@ describe('Context Optimization Performance and Validation', () => {
           const original = chunks.find(
             (c) => c.id === chunk.id,
           ) as ConversationChunk & { groundTruthRelevance?: number };
-          return original?.groundTruthRelevance! > 0.6;
+          return original && original.groundTruthRelevance! > 0.6;
         })
         .map((chunk) => chunk.id);
 

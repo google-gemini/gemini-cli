@@ -10,7 +10,6 @@ import type {
   ConversationChunk,
   RelevanceQuery,
   ScoringWeights,
-  ScoringResult,
 } from '../types.js';
 
 // Create mock functions that will be used by the scorers

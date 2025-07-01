@@ -40,7 +40,8 @@ describe('user_id', () => {
           }
           return array;
         }),
-      } as Crypto;
+        subtle: {} as SubtleCrypto,
+      } as unknown as Crypto;
     }
   });
 
@@ -49,7 +50,9 @@ describe('user_id', () => {
     vi.clearAllMocks();
     try {
       localStorage.clear();
-    } catch {}
+    } catch {
+      // Ignore localStorage errors in test environment
+    }
   });
 
   describe('getInstallationId', () => {
@@ -330,7 +333,7 @@ describe('user_id', () => {
     });
 
     it('should handle undefined returned from localStorage', () => {
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(undefined as any);
+      vi.spyOn(localStorage, 'getItem').mockReturnValue(null);
 
       const result = getObfuscatedGoogleAccountId();
       expect(result).toBe(getInstallationId());
@@ -343,8 +346,8 @@ describe('user_id', () => {
       const originalLocalStorage = global.localStorage;
       const originalCrypto = global.crypto;
 
-      delete (global as any).localStorage;
-      delete (global as any).crypto;
+      delete (global as { localStorage?: Storage }).localStorage;
+      delete (global as { crypto?: Crypto }).crypto;
 
       const installationId = getInstallationId();
       const googleAccountId = getObfuscatedGoogleAccountId();
@@ -490,7 +493,7 @@ describe('user_id', () => {
 
     it('should be deterministic with same input conditions', () => {
       const testAccountId = 'deterministic-test-account';
-      let expectedResult: string;
+      let expectedResult: string | undefined;
 
       // Run test multiple times with same conditions
       for (let i = 0; i < 5; i++) {
@@ -512,7 +515,9 @@ describe('user_id', () => {
   describe('Input validation and sanitization', () => {
     it('should handle localStorage returning non-string values', () => {
       // Mock localStorage to return non-string values
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(123 as any);
+      vi.spyOn(localStorage, 'getItem').mockReturnValue(
+        123 as unknown as string,
+      );
 
       const result = getInstallationId();
       expect(result).toBeDefined();
@@ -522,7 +527,7 @@ describe('user_id', () => {
     it('should handle localStorage returning objects', () => {
       vi.spyOn(localStorage, 'getItem').mockReturnValue({
         invalid: 'object',
-      } as any);
+      } as unknown as string);
 
       const result = getInstallationId();
       expect(result).toBeDefined();
@@ -530,10 +535,12 @@ describe('user_id', () => {
     });
 
     it('should handle localStorage with circular references', () => {
-      const circular: any = { prop: null };
+      const circular: { prop: unknown } = { prop: null };
       circular.prop = circular;
 
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(circular);
+      vi.spyOn(localStorage, 'getItem').mockReturnValue(
+        circular as unknown as string,
+      );
 
       const result = getInstallationId();
       expect(result).toBeDefined();

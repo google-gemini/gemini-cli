@@ -665,11 +665,118 @@ describe('EditTool', () => {
 });
 
 describe('Additional Edge Cases and Error Handling', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
   const testFile = 'edge_case_test.txt';
   let filePath: string;
 
   beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
     filePath = path.join(rootDir, testFile);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe('File System Error Handling', () => {
@@ -921,7 +1028,7 @@ describe('Additional Edge Cases and Error Handling', () => {
 
     it('should handle normalized vs non-normalized paths correctly', () => {
       const unnormalizedPath = path.join(rootDir, 'folder', '..', 'test.txt');
-      const normalizedPath = path.join(rootDir, 'test.txt');
+      const _normalizedPath = path.join(rootDir, 'test.txt');
 
       const params: EditToolParams = {
         file_path: unnormalizedPath,
@@ -1166,7 +1273,7 @@ updated line 3`;
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       const updatedContent = fs.readFileSync(filePath, 'utf8');
-      expect(updatedContent).toStartWith('beginning of document');
+      expect(updatedContent.startsWith('beginning of document')).toBe(true);
     });
 
     it('should handle old_string at the very end of file', async () => {
@@ -1185,7 +1292,7 @@ updated line 3`;
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       const updatedContent = fs.readFileSync(filePath, 'utf8');
-      expect(updatedContent).toEndWith('final content');
+      expect(updatedContent.endsWith('final content')).toBe(true);
     });
 
     it('should handle old_string that spans entire file content', async () => {
@@ -1210,6 +1317,117 @@ updated line 3`;
 });
 
 describe('Integration with External Dependencies', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
   describe('ensureCorrectEdit Integration', () => {
     it('should pass correct parameters to ensureCorrectEdit', async () => {
       const content = 'test content for correction';
@@ -1285,13 +1503,13 @@ describe('Integration with External Dependencies', () => {
         new_string: 'updated content',
       };
 
-      let capturedContents: Content[] | null = null;
-      let capturedSchema: SchemaUnion | null = null;
+      let _capturedContents: Content[] | null = null;
+      let _capturedSchema: SchemaUnion | null = null;
 
       mockGenerateJson.mockImplementationOnce(
         async (contents: Content[], schema: SchemaUnion) => {
-          capturedContents = contents;
-          capturedSchema = schema;
+          _capturedContents = contents;
+          _capturedSchema = schema;
           return { corrected_target_snippet: 'corrected content' };
         },
       );
@@ -1307,6 +1525,119 @@ describe('Integration with External Dependencies', () => {
 });
 
 describe('Performance and Resource Management', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
+  const testFile = 'performance_test.txt';
+  let filePath: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
+    filePath = path.join(rootDir, testFile);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
   it('should not leak file descriptors', async () => {
     const testFiles = Array.from({ length: 10 }, (_, i) =>
       path.join(rootDir, `test_${i}.txt`),
@@ -1364,6 +1695,116 @@ describe('Performance and Resource Management', () => {
 });
 
 describe('getDescription Additional Edge Cases', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
   it('should handle strings with newlines in description', () => {
     const testFileName = 'multiline.txt';
     const params: EditToolParams = {
@@ -1393,6 +1834,116 @@ describe('getDescription Additional Edge Cases', () => {
 });
 
 describe('validateToolParams Additional Edge Cases', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
   it('should handle params with undefined properties', () => {
     const params = {
       file_path: path.join(rootDir, 'test.txt'),
@@ -1426,6 +1977,119 @@ describe('validateToolParams Additional Edge Cases', () => {
 });
 
 describe('File Content Edge Cases', () => {
+  let tool: EditTool;
+  let tempDir: string;
+  let rootDir: string;
+  let mockConfig: Config;
+  const testFile = 'edge_case_test.txt';
+  let filePath: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    rootDir = path.join(tempDir, 'root');
+    fs.mkdirSync(rootDir);
+
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
+      generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
+    };
+
+    mockConfig = {
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getTargetDir: () => rootDir,
+      getApprovalMode: vi.fn(),
+      setApprovalMode: vi.fn(),
+      // Add other properties/methods of Config if EditTool uses them
+      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
+      getApiKey: () => 'test-api-key',
+      getModel: () => 'test-model',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getQuestion: () => undefined,
+      getFullContext: () => false,
+      getToolDiscoveryCommand: () => undefined,
+      getToolCallCommand: () => undefined,
+      getMcpServerCommand: () => undefined,
+      getMcpServers: () => undefined,
+      getUserAgent: () => 'test-agent',
+      getUserMemory: () => '',
+      setUserMemory: vi.fn(),
+      getGeminiMdFileCount: () => 0,
+      setGeminiMdFileCount: vi.fn(),
+      getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+    } as unknown as Config;
+
+    // Reset mocks before each test
+    (mockConfig.getApprovalMode as Mock).mockClear();
+    // Default to not skipping confirmation
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
+
+    // Reset mocks and set default implementation for ensureCorrectEdit
+    mockEnsureCorrectEdit.mockReset();
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
+        }
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
+
+    // Default mock for generateJson to return the snippet unchanged
+    mockGenerateJson.mockReset();
+    mockGenerateJson.mockImplementation(
+      async (contents: Content[], schema: SchemaUnion) => {
+        // The problematic_snippet is the last part of the user's content
+        const userContent = contents.find((c: Content) => c.role === 'user');
+        let promptText = '';
+        if (userContent && userContent.parts) {
+          promptText = userContent.parts
+            .filter((p: Part) => typeof (p as any).text === 'string')
+            .map((p: Part) => (p as any).text)
+            .join('\n');
+        }
+        const snippetMatch = promptText.match(
+          /Problematic target snippet:\n```\n([\s\S]*?)\n```/,
+        );
+        const problematicSnippet =
+          snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
+
+        if (((schema as any).properties as any)?.corrected_target_snippet) {
+          return Promise.resolve({
+            corrected_target_snippet: problematicSnippet,
+          });
+        }
+        if (((schema as any).properties as any)?.corrected_new_string) {
+          // For new_string correction, we might need more sophisticated logic,
+          // but for now, returning original is a safe default if not specified by a test.
+          const originalNewStringMatch = promptText.match(
+            /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
+          );
+          const originalNewString =
+            originalNewStringMatch && originalNewStringMatch[1]
+              ? originalNewStringMatch[1]
+              : '';
+          return Promise.resolve({ corrected_new_string: originalNewString });
+        }
+        return Promise.resolve({}); // Default empty object if schema doesn't match
+      },
+    );
+
+    tool = new EditTool(mockConfig);
+    filePath = path.join(rootDir, testFile);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
   it('should handle binary-like content', async () => {
     // Content that might be mistaken for binary
     const binaryLikeContent = '\x00\x01\x02hello world\x03\x04';

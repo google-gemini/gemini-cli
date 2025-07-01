@@ -786,8 +786,8 @@ describe('Additional Edge Cases and Error Handling', () => {
   });
 
   it('should handle very large settings objects without performance degradation', () => {
-    const largeSettings: any = {};
-    const arrayData: any[] = [];
+    const largeSettings: Record<string, unknown> = {};
+    const arrayData: Array<{ index: number; value: string }> = [];
 
     // Create a large settings object
     for (let i = 0; i < 1000; i++) {

@@ -6,12 +6,8 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ContextManager } from './ContextManager.js';
-import { ChunkRegistry } from './ChunkRegistry.js';
-import { ContextPruner } from './ContextPruner.js';
-import { HybridScorer } from './scoring/HybridScorer.js';
-import { BM25Scorer } from './scoring/BM25Scorer.js';
-import { EmbeddingScorer } from './scoring/EmbeddingScorer.js';
-import { RecencyScorer } from './scoring/RecencyScorer.js';
+import { EmbeddingScorer as _EmbeddingScorer } from './scoring/EmbeddingScorer.js';
+import { RecencyScorer as _RecencyScorer } from './scoring/RecencyScorer.js';
 import type {
   ConversationChunk,
   ContextOptimizationConfig,
@@ -381,13 +377,13 @@ describe('Context Optimization System - End-to-End Integration', () => {
       expect(keywordChunkIncluded).toBe(true);
 
       // Recent chunk should benefit from recency scoring
-      const recentChunkIncluded = optimizedContext.chunks.some(
+      const _recentChunkIncluded = optimizedContext.chunks.some(
         (chunk) => chunk.id === 'recent',
       );
 
       // Irrelevant chunk may or may not be pruned depending on the token budget and scoring
       // This is expected behavior - the test verifies the system runs correctly
-      const irrelevantChunkIncluded = optimizedContext.chunks.some(
+      const _irrelevantChunkIncluded = optimizedContext.chunks.some(
         (chunk) => chunk.id === 'irrelevant',
       );
       // We just check that the optimization completed successfully
@@ -715,7 +711,7 @@ describe('Context Optimization System - End-to-End Integration', () => {
 
       // Initial optimization with standard config
       const query: RelevanceQuery = { text: 'test content' };
-      const result1 = await contextManager.optimizeContext(query, 250);
+      const _result1 = await contextManager.optimizeContext(query, 250);
 
       // Change to aggressive pruning
       contextManager.updateConfig({
@@ -724,7 +720,7 @@ describe('Context Optimization System - End-to-End Integration', () => {
         maxChunks: 2,
       });
 
-      const result2 = await contextManager.optimizeContext(query, 250);
+      const _result2 = await contextManager.optimizeContext(query, 250);
 
       // Disable optimization
       contextManager.updateConfig({

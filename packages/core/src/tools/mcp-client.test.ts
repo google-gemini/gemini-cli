@@ -89,11 +89,11 @@ vi.mock('./tool-registry.js', () => ({
   ToolRegistry: vi.fn(() => mockToolRegistryInstance),
 }));
 
-describe('discoverMcpTools', () => {
-  let mockConfig: Mocked<Config>;
-  // Use the instance from the module mock
-  let mockToolRegistry: typeof mockToolRegistryInstance;
+// Global variables for use across all test blocks
+let mockConfig: Mocked<Config>;
+let mockToolRegistry: typeof mockToolRegistryInstance;
 
+describe('discoverMcpTools', () => {
   beforeEach(() => {
     // Assign the shared mock instance to the test-scoped variable
     mockToolRegistry = mockToolRegistryInstance;

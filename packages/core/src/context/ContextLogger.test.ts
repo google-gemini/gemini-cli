@@ -103,8 +103,16 @@ describe('ContextLogger', () => {
       const events = logger.exportLogs();
       expect(events[0].type).toBe('scoring_complete');
       expect(events[0].data.processingTimeMs).toBe(50);
-      expect(events[0].data.breakdown.bm25Average).toBe(0.6);
-      expect(events[0].data.breakdown.recencyAverage).toBe(0.8);
+
+      // Type assert the breakdown data for scoring complete events
+      const breakdown = events[0].data.breakdown as {
+        bm25Average: number;
+        recencyAverage: number;
+        embeddingAverage: number;
+        hybridAverage: number;
+      };
+      expect(breakdown.bm25Average).toBe(0.6);
+      expect(breakdown.recencyAverage).toBe(0.8);
     });
   });
 
