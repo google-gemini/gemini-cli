@@ -169,12 +169,14 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
 
   const renderTitle = () => {
     if (title) {
-      return Colors.GradientColors ? (
+      return Colors.GradientColors && Colors.GradientColors.length > 0 ? (
         <Gradient colors={Colors.GradientColors}>
           <Text bold>{title}</Text>
         </Gradient>
       ) : (
-        <Text bold>{title}</Text>
+        <Text bold color={Colors.AccentPurple}>
+          {title}
+        </Text>
       );
     }
     return (
