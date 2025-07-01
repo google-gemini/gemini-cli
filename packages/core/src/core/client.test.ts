@@ -1503,4 +1503,3 @@ describe('GeminiClient - Additional comprehensive tests', () => {
       });
     });
   });
-});
