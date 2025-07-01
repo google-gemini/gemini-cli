@@ -153,7 +153,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
-    handleAuthHighlight,
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
@@ -680,7 +679,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <Box flexDirection="column">
               <AuthDialog
                 onSelect={handleAuthSelect}
-                onHighlight={handleAuthHighlight}
                 settings={settings}
                 initialErrorMessage={authError}
               />

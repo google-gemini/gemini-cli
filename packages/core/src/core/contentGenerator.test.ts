@@ -20,7 +20,7 @@ describe('contentGenerator', () => {
     );
     const generator = await createContentGenerator({
       model: 'test-model',
-      authType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
     });
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toBe(mockGenerator);
