@@ -1264,7 +1264,7 @@ describe('useSlashCommandProcessor', () => {
   describe('/compress command', () => {
     it('should call tryCompressChat(true)', async () => {
       const hook = getProcessorHook();
-      mockTryCompressChat.mockImplementationOnce(async (force?: boolean) => {
+      mockTryCompressChat.mockImplementationOnce(async (turn_id?: string, force?: boolean) => {
         expect(force).toBe(true);
         await act(async () => {
           hook.rerender();
@@ -1290,7 +1290,7 @@ describe('useSlashCommandProcessor', () => {
         hook.rerender();
       });
       expect(hook.result.current.pendingHistoryItems).toEqual([]);
-      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith('Turn Id not set', true);
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({

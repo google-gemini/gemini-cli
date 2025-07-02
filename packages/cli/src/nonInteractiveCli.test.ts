@@ -88,7 +88,8 @@ describe('runNonInteractive', () => {
         abortSignal: expect.any(AbortSignal),
         tools: [{ functionDeclarations: [] }],
       },
-    });
+    },
+    expect.any(String),);
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Hello');
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(' World');
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('\n');
@@ -143,6 +144,7 @@ describe('runNonInteractive', () => {
       expect.objectContaining({
         message: [toolResponsePart],
       }),
+      expect.any(String),
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Final answer');
   });
@@ -199,6 +201,7 @@ describe('runNonInteractive', () => {
       expect.objectContaining({
         message: [errorResponsePart],
       }),
+      expect.any(String),
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
       'Could not complete request.',
@@ -277,6 +280,7 @@ describe('runNonInteractive', () => {
       expect.objectContaining({
         message: [errorResponsePart],
       }),
+      expect.any(String),
     );
 
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(

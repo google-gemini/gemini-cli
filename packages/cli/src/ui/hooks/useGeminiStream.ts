@@ -51,6 +51,7 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
+import {useSessionStats} from '../contexts/SessionContext.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -99,6 +100,7 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const {startNewTurn, getTurnCount} = useSessionStats();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -201,6 +203,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
+      turn_id: string,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -240,6 +243,7 @@ export const useGeminiStream = (
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
+              turn_id: turn_id,
             };
             scheduleToolCalls([toolCallRequest], abortSignal);
           }
@@ -485,7 +489,7 @@ export const useGeminiStream = (
   );
 
   const submitQuery = useCallback(
-    async (query: PartListUnion, options?: { isContinuation: boolean }) => {
+    async (query: PartListUnion, options?: { isContinuation: boolean }, turn_id?: string) => {
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
@@ -499,22 +503,32 @@ export const useGeminiStream = (
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
       turnCancelledRef.current = false;
+      
+      if (!turn_id) {
+        turn_id = config.getSessionId() + '########' + getTurnCount();
+      }
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
         abortSignal,
+        turn_id!,
       );
 
       if (!shouldProceed || queryToSend === null) {
         return;
+      }
+      
+      if (!options?.isContinuation) {
+        console.log('################# New turn started #################');
+        startNewTurn();
       }
 
       setIsResponding(true);
       setInitError(null);
 
       try {
-        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal);
+        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal, turn_id!);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -666,10 +680,13 @@ export const useGeminiStream = (
         (toolCall) => toolCall.request.callId,
       );
 
+      const turn_ids = geminiTools.map((toolCall) => toolCall.request.turn_id);
+      
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
       submitQuery(mergePartListUnions(responsesToSend), {
         isContinuation: true,
-      });
+      },
+      turn_ids[0],);
     },
     [
       isResponding,

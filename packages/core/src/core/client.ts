@@ -219,19 +219,20 @@ export class GeminiClient {
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
+    turn_id: string,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
-      return new Turn(this.getChat());
+      return new Turn(this.getChat(), turn_id);
     }
 
-    const compressed = await this.tryCompressChat();
+    const compressed = await this.tryCompressChat(turn_id);
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat());
+    const turn = new Turn(this.getChat(),turn_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       yield event;
@@ -246,7 +247,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, turn_id, boundedTurns - 1);
       }
     }
     return turn;
@@ -430,6 +431,7 @@ export class GeminiClient {
   }
 
   async tryCompressChat(
+    turn_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
     const curatedHistory = this.getChat().getHistory(true);
@@ -467,7 +469,7 @@ export class GeminiClient {
       config: {
         systemInstruction: { text: getCompressionPrompt() },
       },
-    });
+    }, turn_id);
     this.chat = await this.startChat([
       {
         role: 'user',
