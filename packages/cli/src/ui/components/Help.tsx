@@ -133,5 +133,17 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>{' '}
       - Quit application
     </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+L
+      </Text>{' '}
+      - Perform a clear action
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+T
+      </Text>{' '}
+      - Toggle between showing and hiding tool descriptions
+    </Text>
   </Box>
 );
