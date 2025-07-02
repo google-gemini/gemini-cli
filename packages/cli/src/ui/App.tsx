@@ -72,6 +72,12 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { cpLen } from './utils/textUtils.js';
+import {
+  startRecording,
+  stopRecording,
+  cleanupVoiceResources,
+} from '../modules/voice-input/voiceRecognizer.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -132,6 +138,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [isVoiceInputModeActive, setIsVoiceInputModeActive] = useState(false);
+  const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -298,6 +306,49 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     }
   }, []);
 
+  // Voice input effect
+  useEffect(() => {
+    if (isVoiceInputModeActive) {
+      setVoiceInputError(null); // Clear previous errors
+      startRecording({
+        onTranscription: (transcription, isFinal) => {
+          buffer.setText(transcription);
+          if (isFinal) {
+            // Potentially auto-submit if configured, or wait for Enter.
+            // For now, just update the buffer.
+            // To make it feel more responsive, we can move the cursor to the end.
+            buffer.moveToOffset(cpLen(transcription));
+          }
+        },
+        onError: (error) => {
+          setVoiceInputError(error.message);
+          addItem(
+            {
+              type: MessageType.ERROR,
+              text: `Voice input error: ${error.message}`,
+            },
+            Date.now(),
+          );
+          setIsVoiceInputModeActive(false); // Turn off voice mode on error
+        },
+      });
+    } else {
+      stopRecording();
+    }
+
+    // Cleanup on component unmount
+    return () => {
+      stopRecording();
+    };
+  }, [isVoiceInputModeActive, addItem, buffer]);
+
+  // Cleanup voice resources on app exit
+  useEffect(() => {
+    return () => {
+      cleanupVoiceResources();
+    };
+  }, []);
+
   const widthFraction = 0.9;
   const inputWidth = Math.max(
     20,
@@ -378,13 +429,43 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
-      if (buffer.text.length > 0) {
-        // Do nothing if there is text in the input.
-        return;
-      }
-      handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+      // Temporarily fully commenting out Ctrl+D to isolate the build error
+      // if (buffer.text.length > 0) {
+      //   return;
+      // }
+      // handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
+    } else if (key.ctrl && (input === 'm' || input === 'M')) {
+      if (isAuthenticating || isAuthDialogOpen || isEditorDialogOpen || isThemeDialogOpen || showHelp || showPrivacyNotice) {
+        // Don't toggle voice mode if a dialog is open
+        return;
+      }
+      setIsVoiceInputModeActive((prev) => {
+        const newMode = !prev;
+        setDebugMessage(
+          `Voice input mode ${newMode ? 'activated' : 'deactivated'}`,
+        );
+        if (!newMode) { // If turning off
+          stopRecording();
+        }
+        return newMode;
+      });
+    } else if (isVoiceInputModeActive && key.return) {
+      // If in voice mode and Enter is pressed, submit the current buffer content
+      // This allows editing the voice-transcribed text before submission.
+      // The actual submission logic is handled by InputPrompt's onSubmit
+    } else if (isVoiceInputModeActive) {
+      // While voice input is active, generally suppress other key inputs
+      // from being processed by the main input handler if they aren't global shortcuts.
+      // Specific keys like Enter (handled above) or Escape (potentially to cancel voice input)
+      // might need special handling.
+      // For now, we let `buffer.handleInput` manage its own state.
+      return;
+    }
+    // Pass other inputs to buffer if not in voice mode or if it's a global shortcut
+    if (!isVoiceInputModeActive || (key.ctrl && (input === 'o' || input === 't' || input === 'c' || input === 'd' || input === 's'))) {
+      // Standard input handling by buffer.handleInput will be called by InputPrompt
     }
   });
 
@@ -766,6 +847,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                       showToolDescriptions={showToolDescriptions}
                     />
                   )}
+                  {isVoiceInputModeActive && (
+                    <Text color={Colors.AccentCyan}> (🎤 Voice Input Active)</Text>
+                  )}
+                  {voiceInputError && (
+                    <Text color={Colors.AccentRed}> (Voice Error: {voiceInputError})</Text>
+                  )}
                 </Box>
                 <Box>
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
@@ -778,7 +865,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 </Box>
               </Box>
 
-              {showErrorDetails && (
+              {showErrorDetails && !isVoiceInputModeActive && (
                 <OverflowProvider>
                   <DetailedMessagesDisplay
                     messages={filteredConsoleMessages}
@@ -803,12 +890,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   slashCommands={slashCommands}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  isVoiceInputActive={isVoiceInputModeActive} // Pass voice mode state
                 />
               )}
             </>
           )}
 
-          {initError && streamingState !== StreamingState.Responding && (
+          {initError && streamingState !== StreamingState.Responding && !isVoiceInputModeActive && (
             <Box
               borderStyle="round"
               borderColor={Colors.AccentRed}

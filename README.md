@@ -134,3 +134,19 @@ Use MCP servers to integrate your local system tools with your enterprise collab
 ## Terms of Service and Privacy Notice
 
 For details on the terms of service and privacy notice applicable to your use of Gemini CLI, see the [Terms of Service and Privacy Notice](./docs/tos-privacy.md).
+
+## Voice Input Feature (NEW ✨)
+
+Gemini CLI now supports voice input for your prompts!
+
+*   **Toggle Voice Mode:** Press `Ctrl+M` to turn voice input mode on or off.
+*   **Visual Indicator:** When active, the prompt prefix will change to `🎤 >` and display "Listening...".
+*   **Real-time Transcription:** Speak into your microphone (Japanese language is configured by default), and your words will be transcribed into the prompt.
+*   **Execute:** Press `Enter` to run the transcribed (or edited) command as usual.
+
+**Setup Required:** This feature uses the Google Cloud Speech-to-Text API. You'll need to:
+1.  Have a Google Cloud Platform (GCP) project.
+2.  Enable the Speech-to-Text API in your project.
+3.  Ensure billing is enabled for the project (a free tier is available, check GCP for details).
+4.  Set up authentication by creating a service account key and setting the `GOOGLE_APPLICATION_CREDENTIALS` environment variable.
+    For detailed instructions, see the [Authentication Guide](./docs/cli/authentication.md#voice-input-authentication-google-cloud-speech-to-text-api).

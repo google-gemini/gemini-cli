@@ -34,6 +34,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  isVoiceInputActive?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -49,6 +50,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  isVoiceInputActive = false,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
 
@@ -381,12 +383,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={
+            isVoiceInputActive
+              ? Colors.AccentCyan
+              : shellModeActive
+                ? Colors.AccentYellow
+                : Colors.AccentPurple
+          }
         >
-          {shellModeActive ? '! ' : '> '}
+          {isVoiceInputActive
+            ? shellModeActive
+              ? '🎤 ! '
+              : '🎤 > '
+            : shellModeActive
+              ? '! '
+              : '> '}
         </Text>
         <Box flexGrow={1} flexDirection="column">
-          {buffer.text.length === 0 && placeholder ? (
+          {buffer.text.length === 0 && placeholder && !isVoiceInputActive ? (
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
@@ -395,6 +409,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             ) : (
               <Text color={Colors.Gray}>{placeholder}</Text>
             )
+          ) : buffer.text.length === 0 && isVoiceInputActive ? (
+            <Text color={Colors.AccentCyan}>Listening...</Text>
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;

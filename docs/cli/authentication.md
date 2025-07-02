@@ -66,6 +66,36 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
           echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
           source ~/.bashrc
           ```
+
+## Voice Input Authentication (Google Cloud Speech-to-Text API)
+
+The voice input feature in Gemini CLI utilizes the Google Cloud Speech-to-Text API. To use this feature, you need to configure authentication with Google Cloud Platform.
+
+### Prerequisites:
+
+1.  **Google Cloud Platform (GCP) Project:**
+    *   You must have an active GCP project.
+    *   In your GCP project, ensure the **Speech-to-Text API is enabled**.
+    *   Verify that **billing is enabled** for your project. While the Speech-to-Text API offers a free tier, usage beyond that will incur charges. Refer to the [official Speech-to-Text API pricing page](https://cloud.google.com/speech-to-text/pricing) for details.
+
+2.  **Service Account Key (Recommended):**
+    *   Navigate to **IAM & Admin > Service Accounts** in the GCP Console for your project.
+    *   Create a new service account or select an existing one.
+    *   Ensure the service account has the "**Speech-to-Text API User**" role (or a role that includes this permission, e.g., "Editor").
+    *   Create a key for the service account (JSON format is recommended) and download the key file to a secure location.
+    *   Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the absolute path of the downloaded JSON key file.
+        ```bash
+        export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/downloaded-keyfile.json"
+        ```
+        Gemini CLI (and other Google Cloud client libraries) will automatically use this environment variable to authenticate.
+    *   **Important Security Note:** The service account key JSON file contains sensitive credentials. **Do not commit this file to your repository or share it insecurely.** Add its name or path to your `.gitignore` file.
+
+### Usage Notes:
+
+*   A stable internet connection is required to use the voice input feature.
+*   Your operating system may prompt you for microphone access permission when the feature is first used.
+*   The accuracy of speech recognition can be affected by microphone quality and ambient noise levels.
+*   It is your responsibility to monitor your Speech-to-Text API usage and associated costs via the GCP Console.
     - If using express mode:
       - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key provided by express mode:
         - You can temporarily set these environment variables in your current shell session using the following commands:

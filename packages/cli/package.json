@@ -55,7 +55,9 @@
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
     "update-notifier": "^7.3.1",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "@google-cloud/speech": "^6.5.0",
+    "mic": "^2.1.2"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
