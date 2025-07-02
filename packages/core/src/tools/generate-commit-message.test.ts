@@ -192,7 +192,7 @@ describe('GenerateCommitMessageTool', () => {
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
-  it('should handle pre-commit hook modifications and retry successfully', async () => {
+  it('should return an error on pre-commit hook failure', async () => {
     let commitCallCount = 0;
     const stagedDiff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
     const statusOutput = 'M  file.txt';
@@ -227,7 +227,7 @@ describe('GenerateCommitMessageTool', () => {
       process.nextTick(() => {
         if (args.includes('commit')) {
           commitCallCount++;
-          child.emit('close', commitCallCount === 1 ? 1 : 0); // First fails, second succeeds
+          child.emit('close', 1); // Fail commit
         } else {
           child.emit('close', 0);
         }
@@ -242,8 +242,9 @@ describe('GenerateCommitMessageTool', () => {
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
-    expect(result.llmContent).toBe('Commit created successfully after pre-commit hook modifications!\n\nCommit message:\nfeat: test changes');
-    expect(commitCallCount).toBe(2);
+    expect(result.llmContent).toContain('Commit failed due to a pre-commit hook');
+    expect(result.llmContent).toContain('error in .git/hooks/pre-commit');
+    expect(commitCallCount).toBe(1);
     const addCalls = mockSpawn.mock.calls.filter(call => call[1]?.includes('add'));
     expect(addCalls).toHaveLength(0);
   });
