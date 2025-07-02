@@ -189,13 +189,19 @@ export function useCompletion(
       return;
     }
 
+    // Only provide suggestions if there are no spaces after the @
+    const pattern = query.substring(atIndex + 1);
+    if (pattern.includes(' ')) {
+      resetCompletionState();
+      return;
+    }
+
     const controller = new AbortController();
     const signal = controller.signal;
 
     const fetchSuggestions = async () => {
       setIsLoadingSuggestions(true);
       try {
-        const pattern = query.substring(query.lastIndexOf('@') + 1);
         const fetchedSuggestions = await getAtFileSuggestions(
           pattern,
           cwd,
