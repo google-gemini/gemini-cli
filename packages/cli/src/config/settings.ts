@@ -65,6 +65,10 @@ export interface Settings {
   hideWindowTitle?: boolean;
   hideTips?: boolean;
 
+  // Dynamic prompt control setting (default: true)
+  // Can be overridden by GEMINI_DYNAMIC_PROMPT environment variable
+  dynamicPrompt?: boolean;
+
   // Add other settings here.
 }
 
@@ -100,10 +104,14 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
-    return {
+    const merged = {
       ...this.user.settings,
       ...this.workspace.settings,
     };
+    
+    // Apply default values first, then environment overrides
+    const withDefaults = applyDefaultValues(merged);
+    return applyEnvironmentOverrides(withDefaults);
   }
 
   forScope(scope: SettingScope): SettingsFile {
@@ -170,6 +178,36 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   return obj;
+}
+
+/**
+ * Apply environment variable overrides to settings.
+ * This applies after loading and merging user/workspace settings.
+ */
+function applyEnvironmentOverrides(settings: Settings): Settings {
+  const overriddenSettings = { ...settings };
+
+  // Handle GEMINI_DYNAMIC_PROMPT environment variable
+  if (process.env.GEMINI_DYNAMIC_PROMPT !== undefined) {
+    const envValue = process.env.GEMINI_DYNAMIC_PROMPT.toLowerCase();
+    overriddenSettings.dynamicPrompt = envValue === 'true' || envValue === '1';
+  }
+
+  return overriddenSettings;
+}
+
+/**
+ * Apply default values for settings that have defined defaults.
+ */
+function applyDefaultValues(settings: Settings): Settings {
+  const settingsWithDefaults = { ...settings };
+
+  // Set default value for dynamicPrompt if not already set
+  if (settingsWithDefaults.dynamicPrompt === undefined) {
+    settingsWithDefaults.dynamicPrompt = true;
+  }
+
+  return settingsWithDefaults;
 }
 
 /**

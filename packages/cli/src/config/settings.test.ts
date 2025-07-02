@@ -92,7 +92,7 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({ dynamicPrompt: true });
       expect(settings.errors.length).toBe(0);
     });
 
@@ -122,7 +122,7 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual(userSettingsContent);
+      expect(settings.merged).toEqual({ ...userSettingsContent, dynamicPrompt: true });
     });
 
     it('should load workspace settings if only workspace file exists', () => {
@@ -149,7 +149,7 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
-      expect(settings.merged).toEqual(workspaceSettingsContent);
+      expect(settings.merged).toEqual({ ...workspaceSettingsContent, dynamicPrompt: true });
     });
 
     it('should merge user and workspace settings, with workspace taking precedence', () => {
@@ -184,6 +184,7 @@ describe('Settings Loading and Merging', () => {
         sandbox: true,
         coreTools: ['tool1'],
         contextFileName: 'WORKSPACE_CONTEXT.md',
+        dynamicPrompt: true,
       });
     });
 
@@ -332,7 +333,7 @@ describe('Settings Loading and Merging', () => {
       // Check that settings are empty due to parsing errors
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({ dynamicPrompt: true });
 
       // Check that error objects are populated in settings.errors
       expect(settings.errors).toBeDefined();
@@ -629,6 +630,161 @@ describe('Settings Loading and Merging', () => {
 
       expect(loadedSettings.workspace.settings.theme).toBe('ocean');
       expect(loadedSettings.merged.theme).toBe('ocean');
+    });
+  });
+
+  describe('Dynamic Prompt Settings', () => {
+    it('should apply default value true for dynamicPrompt when not set', () => {
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dynamicPrompt).toBe(true);
+    });
+
+    it('should respect user setting for dynamicPrompt', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = { dynamicPrompt: false };
+      (fs.readFileSync as Mock).mockReturnValue(
+        JSON.stringify(userSettingsContent),
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dynamicPrompt).toBe(false);
+    });
+
+    it('should respect workspace setting for dynamicPrompt', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = { dynamicPrompt: false };
+      (fs.readFileSync as Mock).mockReturnValue(
+        JSON.stringify(workspaceSettingsContent),
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dynamicPrompt).toBe(false);
+    });
+
+    it('should prioritize workspace dynamicPrompt setting over user setting', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = { dynamicPrompt: true };
+      const workspaceSettingsContent = { dynamicPrompt: false };
+      
+      (fs.readFileSync as Mock).mockImplementation((path: string) => {
+        if (path === USER_SETTINGS_PATH) {
+          return JSON.stringify(userSettingsContent);
+        } else if (path === MOCK_WORKSPACE_SETTINGS_PATH) {
+          return JSON.stringify(workspaceSettingsContent);
+        }
+        return '{}';
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dynamicPrompt).toBe(false);
+    });
+
+    it('should override settings with GEMINI_DYNAMIC_PROMPT environment variable set to true', () => {
+      const originalEnv = process.env.GEMINI_DYNAMIC_PROMPT;
+      process.env.GEMINI_DYNAMIC_PROMPT = 'true';
+
+      try {
+        (mockFsExistsSync as Mock).mockImplementation(
+          (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+        );
+        const userSettingsContent = { dynamicPrompt: false };
+        (fs.readFileSync as Mock).mockReturnValue(
+          JSON.stringify(userSettingsContent),
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(settings.merged.dynamicPrompt).toBe(true);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.GEMINI_DYNAMIC_PROMPT;
+        } else {
+          process.env.GEMINI_DYNAMIC_PROMPT = originalEnv;
+        }
+      }
+    });
+
+    it('should override settings with GEMINI_DYNAMIC_PROMPT environment variable set to false', () => {
+      const originalEnv = process.env.GEMINI_DYNAMIC_PROMPT;
+      process.env.GEMINI_DYNAMIC_PROMPT = 'false';
+
+      try {
+        (mockFsExistsSync as Mock).mockImplementation(
+          (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+        );
+        const userSettingsContent = { dynamicPrompt: true };
+        (fs.readFileSync as Mock).mockReturnValue(
+          JSON.stringify(userSettingsContent),
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(settings.merged.dynamicPrompt).toBe(false);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.GEMINI_DYNAMIC_PROMPT;
+        } else {
+          process.env.GEMINI_DYNAMIC_PROMPT = originalEnv;
+        }
+      }
+    });
+
+    it('should treat GEMINI_DYNAMIC_PROMPT=1 as true', () => {
+      const originalEnv = process.env.GEMINI_DYNAMIC_PROMPT;
+      process.env.GEMINI_DYNAMIC_PROMPT = '1';
+
+      try {
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(settings.merged.dynamicPrompt).toBe(true);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.GEMINI_DYNAMIC_PROMPT;
+        } else {
+          process.env.GEMINI_DYNAMIC_PROMPT = originalEnv;
+        }
+      }
+    });
+
+    it('should treat other GEMINI_DYNAMIC_PROMPT values as false', () => {
+      const originalEnv = process.env.GEMINI_DYNAMIC_PROMPT;
+      process.env.GEMINI_DYNAMIC_PROMPT = 'invalid';
+
+      try {
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(settings.merged.dynamicPrompt).toBe(false);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.GEMINI_DYNAMIC_PROMPT;
+        } else {
+          process.env.GEMINI_DYNAMIC_PROMPT = originalEnv;
+        }
+      }
+    });
+
+    it('should not override when GEMINI_DYNAMIC_PROMPT is undefined', () => {
+      const originalEnv = process.env.GEMINI_DYNAMIC_PROMPT;
+      delete process.env.GEMINI_DYNAMIC_PROMPT;
+
+      try {
+        (mockFsExistsSync as Mock).mockImplementation(
+          (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+        );
+        const userSettingsContent = { dynamicPrompt: false };
+        (fs.readFileSync as Mock).mockReturnValue(
+          JSON.stringify(userSettingsContent),
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(settings.merged.dynamicPrompt).toBe(false);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.GEMINI_DYNAMIC_PROMPT;
+        } else {
+          process.env.GEMINI_DYNAMIC_PROMPT = originalEnv;
+        }
+      }
     });
   });
 });

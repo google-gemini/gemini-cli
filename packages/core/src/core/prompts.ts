@@ -17,8 +17,20 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { detectWorkContext, WorkContextInfo } from '../utils/workContextDetector.js';
+import type { CompletedToolCall } from '../utils/workContextDetector.js';
+import { Config } from '../config/config.js';
 
-export function getCoreSystemPrompt(userMemory?: string): string {
+// Cache for work context to avoid re-detection within the same session
+let workContextCache: { [cacheKey: string]: WorkContextInfo } = {};
+
+export interface DynamicPromptOptions {
+  workContext?: WorkContextInfo;
+  config?: Config;
+  recentToolCalls?: CompletedToolCall[];
+}
+
+export function getCoreSystemPrompt(userMemory?: string, options?: DynamicPromptOptions): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
@@ -264,12 +276,422 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     }
   }
 
+  // Generate dynamic prompt sections if enabled and work context is provided
+  let dynamicPromptSections = '';
+  
+  if (options?.config?.getDynamicPrompt() && options?.workContext) {
+    try {
+      dynamicPromptSections = generateDynamicPromptSections(options.workContext);
+    } catch (error) {
+      // Silently continue if dynamic prompt generation fails
+      console.warn('Dynamic prompt generation failed:', error);
+    }
+  }
+
   const memorySuffix =
     userMemory && userMemory.trim().length > 0
       ? `\n\n---\n\n${userMemory.trim()}`
       : '';
 
-  return `${basePrompt}${memorySuffix}`;
+  return `${basePrompt}${dynamicPromptSections}${memorySuffix}`;
+}
+
+/**
+ * Detects or retrieves cached work context
+ */
+async function getWorkContext(options: DynamicPromptOptions): Promise<WorkContextInfo | null> {
+  // If work context is provided, use it directly
+  if (options.workContext) {
+    return options.workContext;
+  }
+
+  // If no config is provided, can't determine current working directory
+  if (!options.config) {
+    return null;
+  }
+
+  const cwd = options.config.getWorkingDir();
+  
+  // Check cache (simplified key without timestamp for this session)
+  const sessionCacheKey = cwd;
+  if (workContextCache[sessionCacheKey]) {
+    return workContextCache[sessionCacheKey];
+  }
+
+  try {
+    // Detect work context
+    const workContext = await detectWorkContext(cwd, options.recentToolCalls || []);
+    
+    // Cache the result for this session
+    workContextCache[sessionCacheKey] = workContext;
+    
+    return workContext;
+  } catch (error) {
+    console.warn('Failed to detect work context:', error);
+    return null;
+  }
+}
+
+/**
+ * Generates dynamic prompt sections based on work context
+ */
+function generateDynamicPromptSections(workContext: WorkContextInfo): string {
+  const sections: string[] = [];
+
+  // Project-specific guidelines
+  const projectSection = generateProjectSpecificSection(workContext);
+  if (projectSection) {
+    sections.push(projectSection);
+  }
+
+  // Language-specific best practices
+  const languageSection = generateLanguageSpecificSection(workContext);
+  if (languageSection) {
+    sections.push(languageSection);
+  }
+
+  // Framework-specific instructions
+  const frameworkSection = generateFrameworkSpecificSection(workContext);
+  if (frameworkSection) {
+    sections.push(frameworkSection);
+  }
+
+  // Git workflow adaptations
+  const gitSection = generateGitWorkflowSection(workContext);
+  if (gitSection) {
+    sections.push(gitSection);
+  }
+
+  // Tool usage pattern adaptations
+  const toolSection = generateToolUsageSection(workContext);
+  if (toolSection) {
+    sections.push(toolSection);
+  }
+
+  if (sections.length === 0) {
+    return '';
+  }
+
+  return `\n\n# Work Context Adaptations\n\n${sections.join('\n\n')}`;
+}
+
+/**
+ * Generates project-specific guidelines
+ */
+function generateProjectSpecificSection(workContext: WorkContextInfo): string {
+  const { projectType } = workContext;
+  
+  if (projectType.confidence < 0.5) {
+    return '';
+  }
+
+  const guidelines = PROJECT_GUIDELINES[projectType.primary];
+  if (!guidelines) {
+    return '';
+  }
+
+  return `## Project Type: ${projectType.primary.charAt(0).toUpperCase() + projectType.primary.slice(1)}\n${guidelines}`;
+}
+
+/**
+ * Generates language-specific best practices
+ */
+function generateLanguageSpecificSection(workContext: WorkContextInfo): string {
+  if (workContext.dominantLanguages.length === 0) {
+    return '';
+  }
+
+  const primaryLanguage = workContext.dominantLanguages[0];
+  if (primaryLanguage.percentage < 30) {
+    return '';
+  }
+
+  const practices = LANGUAGE_BEST_PRACTICES[primaryLanguage.language];
+  if (!practices) {
+    return '';
+  }
+
+  return `## Primary Language: ${primaryLanguage.language}\n${practices}`;
+}
+
+/**
+ * Generates framework-specific instructions
+ */
+function generateFrameworkSpecificSection(workContext: WorkContextInfo): string {
+  if (workContext.frameworks.length === 0) {
+    return '';
+  }
+
+  const primaryFramework = workContext.frameworks[0];
+  if (primaryFramework.confidence < 0.6) {
+    return '';
+  }
+
+  const instructions = FRAMEWORK_INSTRUCTIONS[primaryFramework.name];
+  if (!instructions) {
+    return '';
+  }
+
+  return `## Framework: ${primaryFramework.name}\n${instructions}`;
+}
+
+/**
+ * Generates Git workflow adaptations
+ */
+function generateGitWorkflowSection(workContext: WorkContextInfo): string {
+  if (!workContext.gitState.isRepository) {
+    return '';
+  }
+
+  let gitAdaptations = '## Git Workflow\n';
+  
+  if (workContext.gitState.currentBranch) {
+    const branchType = detectBranchType(workContext.gitState.currentBranch);
+    const branchInstructions = BRANCH_WORKFLOW_ADAPTATIONS[branchType];
+    if (branchInstructions) {
+      gitAdaptations += branchInstructions;
+    }
+  }
+
+  if (workContext.gitState.isDirty) {
+    gitAdaptations += '\n- **Note**: Working directory has uncommitted changes. Be extra careful with destructive operations.';
+  }
+
+  return gitAdaptations.length > '## Git Workflow\n'.length ? gitAdaptations : '';
+}
+
+/**
+ * Generates tool usage pattern adaptations
+ */
+function generateToolUsageSection(workContext: WorkContextInfo): string {
+  if (workContext.toolUsagePatterns.length === 0) {
+    return '';
+  }
+
+  const dominantPattern = workContext.toolUsagePatterns[0];
+  if (dominantPattern.percentage < 40) {
+    return '';
+  }
+
+  const adaptations = TOOL_USAGE_ADAPTATIONS[dominantPattern.category];
+  if (!adaptations) {
+    return '';
+  }
+
+  return `## Tool Usage Focus: ${dominantPattern.category}\n${adaptations}`;
+}
+
+/**
+ * Detects branch type from branch name
+ */
+function detectBranchType(branchName: string): string {
+  const branch = branchName.toLowerCase();
+  
+  if (branch === 'main' || branch === 'master') return 'main';
+  if (branch.startsWith('feature/') || branch.startsWith('feat/')) return 'feature';
+  if (branch.startsWith('bugfix/') || branch.startsWith('fix/')) return 'bugfix';
+  if (branch.startsWith('hotfix/')) return 'hotfix';
+  if (branch.startsWith('release/')) return 'release';
+  if (branch.startsWith('develop') || branch === 'dev') return 'develop';
+  
+  return 'other';
+}
+
+// Static prompt templates and guidelines
+
+const PROJECT_GUIDELINES: Record<string, string> = {
+  'web-application': `
+- **UI/UX Focus**: Prioritize responsive design and accessibility when making changes to components.
+- **State Management**: Follow established patterns for state management (Redux, Context, etc.).
+- **Performance**: Consider bundle size impact when adding dependencies.
+- **Testing**: Include unit tests for components and integration tests for user flows.`,
+
+  'node-library': `
+- **API Design**: Maintain backward compatibility and follow semantic versioning.
+- **Documentation**: Update README and JSDoc comments for public APIs.
+- **Testing**: Ensure comprehensive test coverage for all exported functions.
+- **Dependencies**: Minimize dependencies and prefer peer dependencies when appropriate.`,
+
+  'cli-tool': `
+- **User Experience**: Design clear command-line interfaces with helpful error messages.
+- **Configuration**: Support both CLI flags and configuration files.
+- **Error Handling**: Provide actionable error messages and exit codes.
+- **Documentation**: Include usage examples and man pages.`,
+
+  'python-package': `
+- **Code Style**: Follow PEP 8 and use type hints for all public APIs.
+- **Testing**: Use pytest and maintain high test coverage.
+- **Documentation**: Include docstrings and consider Sphinx for documentation.
+- **Dependencies**: Specify version ranges carefully and use extras_require for optional features.`,
+
+  'python-application': `
+- **Structure**: Follow standard Python application structure with proper package organization.
+- **Configuration**: Use environment variables or configuration files (YAML, TOML).
+- **Logging**: Implement proper logging with configurable levels.
+- **Error Handling**: Handle exceptions gracefully with proper error reporting.`,
+
+  'rust-application': `
+- **Safety**: Leverage Rust's ownership system and avoid unsafe code unless necessary.
+- **Error Handling**: Use Result types and proper error propagation.
+- **Performance**: Consider zero-cost abstractions and profile when needed.
+- **Testing**: Write unit tests and integration tests following Rust conventions.`,
+
+  'rust-library': `
+- **API Design**: Design ergonomic APIs that feel idiomatic to Rust developers.
+- **Documentation**: Write comprehensive rustdoc comments with examples.
+- **Features**: Use feature flags to make dependencies optional.
+- **Compatibility**: Follow semantic versioning and consider MSRV (Minimum Supported Rust Version).`,
+};
+
+const LANGUAGE_BEST_PRACTICES: Record<string, string> = {
+  'TypeScript': `
+- **Type Safety**: Use strict TypeScript settings and avoid 'any' types.
+- **Interfaces**: Define clear interfaces for complex objects and API responses.
+- **Generics**: Use generics for reusable components and functions.
+- **Utility Types**: Leverage TypeScript utility types (Partial, Pick, Omit, etc.).`,
+
+  'JavaScript': `
+- **Modern Syntax**: Use ES6+ features like arrow functions, destructuring, and async/await.
+- **Error Handling**: Use try/catch blocks for async operations and proper error propagation.
+- **Performance**: Be mindful of memory leaks and optimize for performance when needed.
+- **Code Quality**: Use ESLint and Prettier for consistent code style.`,
+
+  'Python': `
+- **Code Style**: Follow PEP 8 guidelines and use tools like black for formatting.
+- **Type Hints**: Add type hints for better code documentation and IDE support.
+- **Virtual Environments**: Always use virtual environments for dependency management.
+- **Error Handling**: Use specific exception types and proper exception handling patterns.`,
+
+  'Rust': `
+- **Ownership**: Understand and leverage Rust's ownership, borrowing, and lifetime system.
+- **Error Handling**: Use Result and Option types instead of panics for recoverable errors.
+- **Memory Safety**: Avoid unsafe code unless absolutely necessary and well-documented.
+- **Performance**: Take advantage of zero-cost abstractions and consider performance implications.`,
+
+  'Go': `
+- **Error Handling**: Always check and handle errors explicitly.
+- **Concurrency**: Use goroutines and channels effectively for concurrent programming.
+- **Interfaces**: Design small, focused interfaces following Go conventions.
+- **Testing**: Write table-driven tests and use the standard testing package.`,
+};
+
+const FRAMEWORK_INSTRUCTIONS: Record<string, string> = {
+  'react': `
+- **Component Design**: Use functional components with hooks as the default.
+- **State Management**: Use useState for local state, useContext for shared state.
+- **Performance**: Use React.memo, useMemo, and useCallback to optimize re-renders.
+- **Testing**: Use React Testing Library for component testing.`,
+
+  'vue': `
+- **Composition API**: Prefer Composition API over Options API for new components.
+- **Reactivity**: Understand Vue's reactivity system and use ref/reactive appropriately.
+- **Component Communication**: Use props down, events up pattern for component communication.
+- **Testing**: Use Vue Test Utils and Jest for component testing.`,
+
+  'express': `
+- **Middleware**: Use middleware for cross-cutting concerns like authentication and logging.
+- **Error Handling**: Implement proper error handling middleware.
+- **Security**: Use helmet and other security middleware for production applications.
+- **Testing**: Use supertest for API endpoint testing.`,
+
+  'next.js': `
+- **Routing**: Use file-based routing and understand the difference between pages and app directory.
+- **Rendering**: Choose appropriate rendering strategy (SSG, SSR, ISR) for each page.
+- **Performance**: Optimize images with next/image and use dynamic imports for code splitting.
+- **API Routes**: Use API routes for backend functionality when appropriate.`,
+
+  'django': `
+- **Models**: Design models with proper relationships and validation.
+- **Views**: Use class-based views for complex logic, function-based views for simple cases.
+- **Templates**: Use Django templates with proper template inheritance.
+- **Testing**: Use Django's testing framework with proper test database setup.`,
+
+  'flask': `
+- **Application Factory**: Use the application factory pattern for larger applications.
+- **Blueprints**: Organize routes using Flask blueprints.
+- **Error Handling**: Implement proper error handlers for different HTTP status codes.
+- **Testing**: Use pytest-flask for testing Flask applications.`,
+};
+
+const BRANCH_WORKFLOW_ADAPTATIONS: Record<string, string> = {
+  'main': `
+- **Stability Focus**: Changes should be well-tested and production-ready.
+- **Code Review**: Ensure thorough code review before merging.
+- **CI/CD**: Verify all automated tests and checks pass.`,
+
+  'feature': `
+- **Incremental Development**: Break down large features into smaller, reviewable commits.
+- **Testing**: Add tests for new functionality as you develop.
+- **Documentation**: Update relevant documentation for new features.`,
+
+  'bugfix': `
+- **Root Cause**: Identify and address the root cause of the issue.
+- **Regression Tests**: Add tests to prevent the bug from reoccurring.
+- **Minimal Impact**: Keep changes focused and minimal to reduce risk.`,
+
+  'hotfix': `
+- **Urgency**: Focus on quick, safe fixes for critical production issues.
+- **Testing**: Thoroughly test the fix in a production-like environment.
+- **Documentation**: Document the issue and fix for future reference.`,
+
+  'develop': `
+- **Integration**: Focus on integrating features and ensuring compatibility.
+- **Testing**: Run comprehensive integration tests.
+- **Preparation**: Prepare for the next release cycle.`,
+};
+
+const TOOL_USAGE_ADAPTATIONS: Record<string, string> = {
+  'file-operations': `
+- **File Management**: Focus on efficient file reading/writing operations.
+- **Batch Operations**: Consider batching file operations for better performance.
+- **Backup**: Be cautious with destructive file operations and consider backup strategies.`,
+
+  'development': `
+- **Build Tools**: Leverage project-specific build tools and scripts effectively.
+- **Development Workflow**: Follow established development and testing workflows.
+- **Environment Setup**: Ensure proper development environment configuration.`,
+
+  'search-analysis': `
+- **Code Discovery**: Use search tools effectively to understand codebase structure.
+- **Pattern Recognition**: Look for common patterns and architectural decisions.
+- **Documentation**: Document findings and insights for future reference.`,
+
+  'testing-building': `
+- **Test-Driven Development**: Write tests before implementing functionality.
+- **Build Optimization**: Focus on build performance and optimization.
+- **Quality Assurance**: Emphasize code quality and automated testing.`,
+};
+
+/**
+ * Async helper function to get core system prompt with work context detection
+ */
+export async function getCoreSystemPromptWithContext(
+  userMemory?: string,
+  config?: Config,
+  recentToolCalls?: CompletedToolCall[]
+): Promise<string> {
+  let workContext: WorkContextInfo | null = null;
+
+  if (config?.getDynamicPrompt()) {
+    try {
+      workContext = await getWorkContext({ config, recentToolCalls });
+    } catch (error) {
+      console.warn('Failed to detect work context for dynamic prompts:', error);
+    }
+  }
+
+  return getCoreSystemPrompt(userMemory, {
+    workContext: workContext || undefined,
+    config,
+    recentToolCalls,
+  });
+}
+
+/**
+ * Clears the work context cache (useful for testing or when directory changes)
+ */
+export function clearWorkContextCache(): void {
+  workContextCache = {};
 }
 
 /**

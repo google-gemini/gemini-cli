@@ -18,6 +18,7 @@ import {
   logToolCall,
   ToolCallEvent,
 } from '../index.js';
+import { ToolUsagePattern } from '../utils/workContextDetector.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import {
@@ -101,6 +102,25 @@ export type CompletedToolCall =
   | SuccessfulToolCall
   | CancelledToolCall
   | ErroredToolCall;
+
+// Tool call with timestamp for history tracking
+export interface CompletedToolCallWithTimestamp {
+  status: 'success' | 'error' | 'cancelled';
+  request: ToolCallRequestInfo;
+  response: ToolCallResponseInfo;
+  tool?: Tool;
+  durationMs?: number;
+  outcome?: ToolConfirmationOutcome;
+  completedAt: Date;
+}
+
+// Tool categorization for work context analysis
+const TOOL_CATEGORIES = {
+  'file-operations': ['Read', 'Write', 'Edit', 'MultiEdit', 'LS', 'Glob'],
+  'development': ['Bash', 'git', 'npm', 'yarn', 'cargo', 'go', 'python', 'node'],
+  'search-analysis': ['Grep', 'Task', 'WebFetch', 'WebSearch'],
+  'testing-building': ['test', 'build', 'compile', 'lint', 'format'],
+} as const;
 
 export type ConfirmHandler = (
   toolCall: WaitingToolCall,
@@ -224,12 +244,17 @@ interface CoreToolSchedulerOptions {
 export class CoreToolScheduler {
   private toolRegistry: Promise<ToolRegistry>;
   private toolCalls: ToolCall[] = [];
+  private toolCallHistory: CompletedToolCallWithTimestamp[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private approvalMode: ApprovalMode;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  
+  // Configuration for tool call history
+  private readonly maxHistorySize = 1000; // Limit to prevent unbounded growth
+  private readonly historyCleanupThreshold = 1200; // When to trigger cleanup
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -640,6 +665,20 @@ export class CoreToolScheduler {
       const completedCalls = [...this.toolCalls] as CompletedToolCall[];
       this.toolCalls = [];
 
+      // Store completed calls in history with timestamps
+      const timestampedCalls: CompletedToolCallWithTimestamp[] = completedCalls.map(call => ({
+        status: call.status,
+        request: call.request,
+        response: call.response,
+        tool: 'tool' in call ? call.tool : undefined,
+        durationMs: call.durationMs,
+        outcome: call.outcome,
+        completedAt: new Date(),
+      }));
+      
+      this.toolCallHistory.push(...timestampedCalls);
+      this.cleanupHistoryIfNeeded();
+
       for (const call of completedCalls) {
         logToolCall(this.config, new ToolCallEvent(call));
       }
@@ -654,6 +693,117 @@ export class CoreToolScheduler {
   private notifyToolCallsUpdate(): void {
     if (this.onToolCallsUpdate) {
       this.onToolCallsUpdate([...this.toolCalls]);
+    }
+  }
+
+  /**
+   * Returns recent tool usage data for work context detection.
+   * @param limit Maximum number of recent tool calls to return (default: 50)
+   */
+  getRecentToolCalls(limit: number = 50): CompletedToolCall[] {
+    return this.toolCallHistory
+      .slice(-limit)
+      .map(({ completedAt: _completedAt, ...call }) => call as CompletedToolCall); // Remove timestamp for backward compatibility
+  }
+
+  /**
+   * Analyzes recent tool usage and returns categorized patterns.
+   * @param limit Maximum number of recent tool calls to analyze (default: 100)
+   */
+  getToolUsagePatterns(limit: number = 100): ToolUsagePattern[] {
+    const recentCalls = this.toolCallHistory.slice(-limit);
+    
+    if (recentCalls.length === 0) {
+      return [];
+    }
+
+    return this.categorizeToolUsage(recentCalls);
+  }
+
+  /**
+   * Categorizes tool calls into usage patterns based on tool types.
+   */
+  private categorizeToolUsage(toolCalls: CompletedToolCallWithTimestamp[]): ToolUsagePattern[] {
+    const categoryCounts: Record<string, { count: number; tools: Set<string> }> = {};
+    
+    // Initialize categories
+    for (const category of Object.keys(TOOL_CATEGORIES)) {
+      categoryCounts[category] = { count: 0, tools: new Set() };
+    }
+    categoryCounts['other'] = { count: 0, tools: new Set() };
+
+    // Categorize tool calls
+    for (const toolCall of toolCalls) {
+      const toolName = toolCall.request.name;
+      let categorized = false;
+
+      for (const [category, tools] of Object.entries(TOOL_CATEGORIES)) {
+        if (tools.some(tool => toolName.toLowerCase().includes(tool.toLowerCase()))) {
+          categoryCounts[category].count++;
+          categoryCounts[category].tools.add(toolName);
+          categorized = true;
+          break;
+        }
+      }
+
+      if (!categorized) {
+        categoryCounts['other'].count++;
+        categoryCounts['other'].tools.add(toolName);
+      }
+    }
+
+    const totalCalls = toolCalls.length;
+    
+    return Object.entries(categoryCounts)
+      .filter(([, data]) => data.count > 0)
+      .map(([category, data]) => ({
+        category: category as ToolUsagePattern['category'],
+        count: data.count,
+        recentTools: Array.from(data.tools).slice(0, 5),
+        percentage: (data.count / totalCalls) * 100,
+      }))
+      .sort((a, b) => b.percentage - a.percentage);
+  }
+
+  /**
+   * Cleans up tool call history to prevent unbounded memory growth.
+   */
+  private cleanupHistoryIfNeeded(): void {
+    if (this.toolCallHistory.length > this.historyCleanupThreshold) {
+      // Keep only the most recent maxHistorySize entries
+      const toRemove = this.toolCallHistory.length - this.maxHistorySize;
+      this.toolCallHistory.splice(0, toRemove);
+      
+      // Optionally log pattern data before cleanup if telemetry is enabled
+      if (this.config.getTelemetryEnabled()) {
+        this.reportToolUsagePatternsToTelemetry();
+      }
+    }
+  }
+
+  /**
+   * Reports tool usage patterns to telemetry system (if enabled).
+   */
+  private reportToolUsagePatternsToTelemetry(): void {
+    if (!this.config.getTelemetryEnabled()) {
+      return;
+    }
+
+    try {
+      const patterns = this.getToolUsagePatterns();
+      
+      // Create a simple telemetry event for tool usage patterns
+      // This could be expanded to create a specific event type for tool patterns
+      const patternSummary = patterns.map(p => 
+        `${p.category}:${p.percentage.toFixed(1)}%`
+      ).join(',');
+      
+      // Log as a simple tool call event with pattern data
+      // In a real implementation, you might want to create a specific event type
+      console.debug('Tool usage patterns:', patternSummary);
+    } catch (error) {
+      // Silently fail telemetry reporting to avoid interrupting normal operation
+      console.warn('Failed to report tool usage patterns to telemetry:', error);
     }
   }
 }

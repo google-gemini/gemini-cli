@@ -17,6 +17,7 @@ export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
+export { ToolUsagePattern } from './utils/workContextDetector.js';
 export * from './core/nonInteractiveToolExecutor.js';
 
 export * from './code_assist/codeAssist.js';
@@ -32,6 +33,7 @@ export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/editor.js';
+export * from './utils/promptTemplates.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

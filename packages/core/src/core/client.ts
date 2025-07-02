@@ -22,7 +22,9 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
-import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getCoreSystemPromptWithContext, getCompressionPrompt } from './prompts.js';
+import { CompletedToolCall as CoreCompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall as WorkContextCompletedToolCall } from '../utils/workContextDetector.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -491,6 +493,78 @@ export class GeminiClient {
       originalTokenCount,
       newTokenCount,
     };
+  }
+
+  /**
+   * Creates a new GeminiChat instance with dynamic work context adaptation
+   * This method is similar to createChat but supports work context detection for dynamic prompts
+   */
+  async createChatWithContext(
+    history?: Content[],
+    tools?: Tool[],
+    extraHistory?: Content[],
+    recentToolCalls?: CoreCompletedToolCall[] // Using proper type
+  ): Promise<GeminiChat> {
+    const historyToUse = history ?? [
+      {
+        role: 'user',
+        parts: [{ text: 'I need to understand and work with the codebase.' }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'Got it. Thanks for the context!' }],
+      },
+      ...(extraHistory ?? []),
+    ];
+    
+    try {
+      const userMemory = this.config.getUserMemory();
+      
+      // Convert CoreCompletedToolCall to WorkContextCompletedToolCall format
+      const convertedToolCalls: WorkContextCompletedToolCall[] = recentToolCalls?.map(call => ({
+        status: call.status,
+        request: {
+          name: call.request.name,
+          args: call.request.args,
+          callId: call.request.callId,
+        },
+        durationMs: call.durationMs,
+      })) || [];
+      
+      const systemInstruction = await getCoreSystemPromptWithContext(
+        userMemory, 
+        this.config,
+        convertedToolCalls
+      );
+      
+      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+        ? {
+            ...this.generateContentConfig,
+            thinkingConfig: {
+              includeThoughts: true,
+            },
+          }
+        : this.generateContentConfig;
+        
+      return new GeminiChat(
+        this.config,
+        this.getContentGenerator(),
+        {
+          systemInstruction,
+          ...generateContentConfigWithThinking,
+          tools,
+        },
+        historyToUse,
+      );
+    } catch (error) {
+      await reportError(
+        error,
+        'Error initializing Gemini chat session with context.',
+        historyToUse,
+        'client.createChatWithContext',
+      );
+      throw error;
+    }
   }
 
   /**

@@ -20,3 +20,14 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+
+// Dynamic prompt system metrics
+export const METRIC_WORK_CONTEXT_DETECTION_DURATION = 'gemini_cli.work_context.detection.duration';
+export const METRIC_WORK_CONTEXT_DETECTION_SUCCESS = 'gemini_cli.work_context.detection.success';
+export const METRIC_WORK_CONTEXT_DETECTION_FAILURE = 'gemini_cli.work_context.detection.failure';
+export const METRIC_DYNAMIC_PROMPT_USAGE = 'gemini_cli.dynamic_prompt.usage';
+export const METRIC_DETECTED_PROJECT_TYPE = 'gemini_cli.detected.project_type';
+export const METRIC_DETECTED_LANGUAGE = 'gemini_cli.detected.language';
+export const METRIC_DETECTED_FRAMEWORK = 'gemini_cli.detected.framework';
+export const METRIC_PROMPT_GENERATION_DURATION = 'gemini_cli.prompt.generation.duration';
+export const METRIC_WORK_CONTEXT_CACHE_HITS = 'gemini_cli.work_context.cache.hits';

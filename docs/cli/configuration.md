@@ -12,6 +12,8 @@ Configuration is applied in the following order of precedence (lower numbers are
 4.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
 5.  **Command-line arguments:** Values passed when launching the CLI.
 
+For example, the `dynamicPrompt` setting defaults to `true`, but can be overridden by user settings, then workspace settings, and finally by the `GEMINI_DYNAMIC_PROMPT` environment variable. See [Dynamic Prompt Adaptation](#dynamic-prompt-adaptation) for detailed configuration options.
+
 ## The user settings file and project settings file
 
 Gemini CLI uses `settings.json` files for persistent configuration. There are two locations for these files:
@@ -185,6 +187,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`dynamicPrompt`** (boolean):
+  - **Description:** Controls whether the CLI uses dynamic prompt adaptation that automatically tailors the system prompt based on the current project context. When enabled, the system analyzes your project structure, programming languages, frameworks, git workflow, and recent tool usage patterns to provide more contextually relevant assistance. See [Dynamic Prompt Adaptation](#dynamic-prompt-adaptation) for more details.
+  - **Default:** `true`
+  - **Environment Variable Override:** `GEMINI_DYNAMIC_PROMPT` (accepts `true`, `1`, `false`, or any other value as false)
+  - **Example:**
+    ```json
+    "dynamicPrompt": false
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -209,7 +220,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false
+  "hideTips": false,
+  "dynamicPrompt": true
 }
 ```
 
@@ -277,6 +289,11 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+- **`GEMINI_DYNAMIC_PROMPT`**:
+  - Controls whether dynamic prompt adaptation is enabled, overriding any setting in `settings.json`.
+  - Accepts `true` or `1` to enable, `false` or any other value to disable.
+  - Takes precedence over user and workspace settings.
+  - Example: `export GEMINI_DYNAMIC_PROMPT=false`
 
 ## Command-Line Arguments
 
@@ -313,6 +330,157 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables [checkpointing](./commands.md#checkpointing-commands).
 - **`--version`**:
   - Displays the version of the CLI.
+
+## Dynamic Prompt Adaptation
+
+Gemini CLI includes an intelligent dynamic prompt adaptation system that automatically tailors the AI's behavior based on your current project context. This feature analyzes your project structure, programming languages, frameworks, git workflow, and recent tool usage patterns to provide more contextually relevant assistance.
+
+### What are Dynamic Prompts?
+
+Dynamic prompts enhance the base system prompt with context-specific instructions that adapt to your working environment. Instead of providing generic responses, the AI receives additional guidance about:
+
+- **Project type considerations** (web application, library, CLI tool, etc.)
+- **Language-specific best practices** (TypeScript type safety, Python PEP 8, Rust memory safety)
+- **Framework-specific patterns** (React hooks, Django models, Express middleware)
+- **Git workflow adaptations** (feature development vs. hotfix urgency)
+- **Tool usage optimization** (based on your recent command patterns)
+
+### Benefits of Dynamic Adaptation
+
+- **More Relevant Responses**: The AI understands your project context and provides appropriate suggestions
+- **Language & Framework Awareness**: Automatically applies best practices for your tech stack
+- **Workflow-Aware Assistance**: Adapts behavior based on git branch patterns and development phase
+- **Improved Code Quality**: Suggests patterns and practices specific to your project type
+- **Reduced Configuration**: No need to manually specify project details in every conversation
+
+### How It Works
+
+The system performs automatic context detection by analyzing:
+
+1. **Project Structure**: Package files (`package.json`, `Cargo.toml`, `setup.py`)
+2. **Language Composition**: File extensions and language percentages
+3. **Framework Detection**: Dependencies and configuration patterns
+4. **Git State**: Current branch, repository status, workflow patterns
+5. **Tool Usage**: Recent command history and usage patterns
+
+This analysis is cached per session for performance, and only activates when the feature is enabled.
+
+### Performance and Caching
+
+- **Session-based Caching**: Context detection results are cached to avoid repeated analysis
+- **Graceful Degradation**: Falls back to base prompt if context detection fails
+- **Confidence Thresholds**: Only includes adaptations with sufficient confidence scores
+- **Lazy Evaluation**: Context detection only occurs when dynamic prompts are enabled
+
+### Configuration Options
+
+Dynamic prompt adaptation can be controlled through multiple configuration layers:
+
+#### Settings File Configuration
+
+In your `settings.json` file:
+
+```json
+{
+  "dynamicPrompt": true
+}
+```
+
+**User Settings Example** (`~/.gemini/settings.json`):
+```json
+{
+  "theme": "GitHub",
+  "dynamicPrompt": true,
+  "autoAccept": false
+}
+```
+
+**Workspace Settings Example** (`<project>/.gemini/settings.json`):
+```json
+{
+  "dynamicPrompt": false,
+  "contextFileName": "PROJECT.md",
+  "fileFiltering": {
+    "respectGitIgnore": true
+  }
+}
+```
+
+#### Environment Variable Override
+
+Set the `GEMINI_DYNAMIC_PROMPT` environment variable to override any file-based setting:
+
+```bash
+# Enable dynamic prompts
+export GEMINI_DYNAMIC_PROMPT=true
+
+# Disable dynamic prompts  
+export GEMINI_DYNAMIC_PROMPT=false
+
+# Also accepts numeric values
+export GEMINI_DYNAMIC_PROMPT=1  # enables
+export GEMINI_DYNAMIC_PROMPT=0  # disables
+```
+
+#### Configuration Priority
+
+Settings are applied in this order of precedence (higher numbers override lower numbers):
+
+1. **Default value**: `true` (enabled by default)
+2. **User settings file**: `~/.gemini/settings.json`
+3. **Workspace settings file**: `<project>/.gemini/settings.json`
+4. **Environment variable**: `GEMINI_DYNAMIC_PROMPT`
+
+### When You Might Disable Dynamic Prompts
+
+Consider disabling this feature if:
+
+- **Consistency Requirements**: You need identical AI behavior across different projects
+- **Performance Concerns**: Working with very large codebases where analysis takes too long
+- **Custom Prompting**: You prefer to manually specify context through memory files
+- **Debugging**: Isolating issues by using only the base system prompt
+- **Legacy Workflows**: Existing automation depends on predictable prompt behavior
+
+### Troubleshooting Dynamic Prompt Issues
+
+If you experience unexpected AI behavior with dynamic prompts enabled:
+
+1. **Check Current Settings**: Verify your configuration with:
+   ```bash
+   # Check if dynamic prompts are enabled
+   echo $GEMINI_DYNAMIC_PROMPT
+   ```
+
+2. **Test with Feature Disabled**: Temporarily disable to isolate issues:
+   ```bash
+   GEMINI_DYNAMIC_PROMPT=false gemini
+   ```
+
+3. **Clear Cache**: Restart your session to refresh context detection
+
+4. **Check Project Structure**: Ensure your project has clear language/framework indicators
+
+5. **Review Memory Files**: Dynamic prompts complement but don't replace context files
+
+### FAQ
+
+**Q: Does this feature send my code to external services?**  
+A: No, dynamic prompt adaptation only analyzes file structure and metadata locally. No code content is transmitted.
+
+**Q: How often does context detection run?**  
+A: Once per session when enabled, with results cached until the session ends.
+
+**Q: Can I see what context was detected?**  
+A: Currently, context detection results are internal. Future versions may include debugging commands to view detected context.
+
+**Q: Does this work with all project types?**  
+A: The system includes templates for common web frameworks, languages, and project types. Unrecognized projects fall back to generic adaptations.
+
+**Q: What happens if context detection fails?**  
+A: The system gracefully falls back to the standard base prompt without dynamic adaptations.
+
+**Q: Can I customize the dynamic prompt templates?**  
+A: Currently, templates are built-in. Future versions may support user customization.
 
 ## Context Files (Hierarchical Instructional Context)
 
