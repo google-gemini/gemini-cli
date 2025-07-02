@@ -51,7 +51,7 @@ You have two options to install Gemini CLI.
    gemini
    ```
 
-In both options, continue the configuration with these instructions
+### Common Configuration steps
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
