@@ -55,6 +55,7 @@ export class GeminiClient {
     topP: 1,
   };
   private readonly MAX_TURNS = 100;
+  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -449,7 +450,11 @@ export class GeminiClient {
     }
 
     // Don't compress if not forced and we are under the limit.
-    if (!force && originalTokenCount < 0.95 * tokenLimit(this.model)) {
+    if (
+      !force &&
+      originalTokenCount <
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.model)
+    ) {
       return null;
     }
 
