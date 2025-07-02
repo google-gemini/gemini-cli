@@ -50,7 +50,15 @@
     "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
     "telemetry": "node scripts/telemetry.js",
     "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\"",
-    "prepublishOnly": "node scripts/prepublish.js"
+    "prepublishOnly": "node scripts/prepublish.js",
+    "webapp:build": "npm run build:frontend && npm run build:server",
+    "webapp:dev": "concurrently --raw --kill-others \"npm run dev:frontend\" \"npm run dev:server\"",
+    "webapp:start": "npm run build:frontend && npm run start:server",
+    "build:frontend": "cd frontend && npm run build",
+    "build:server": "echo 'Server build complete'",
+    "dev:frontend": "cd frontend && npm start",
+    "dev:server": "cd server && npm run dev",
+    "start:server": "cd server && npm start"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
