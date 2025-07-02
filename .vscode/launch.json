@@ -1,0 +1,77 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch CLI",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "GEMINI_SANDBOX": "false"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch E2E",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test:e2e", "read_many_files"],
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Attach",
+      "port": 9229,
+      "request": "attach",
+      "skipFiles": ["<node_internals>/**"],
+      "type": "node",
+      // fix source mapping when debugging in sandbox using global installation
+      // note this does not interfere when remoteRoot is also ${workspaceFolder}/packages
+      "remoteRoot": "/usr/local/share/npm-global/lib/node_modules/@gemini-cli",
+      "localRoot": "${workspaceFolder}/packages"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${file}",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Test File",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "test",
+        "-w",
+        "packages",
+        "--",
+        "--inspect-brk=9229",
+        "--no-file-parallelism",
+        "${input:testFile}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testFile",
+      "type": "promptString",
+      "description": "Enter the path to the test file (e.g., ${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx)",
+      "default": "${workspaceFolder}/packages/cli/src/ui/components/LoadingIndicator.test.tsx"
+    }
+  ]
+}

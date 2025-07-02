@@ -1,0 +1,203 @@
+
+[
+  {
+    "id": 1,
+    "command": "Add try-catch blocks around all API calls in packages/cli/src/gemini.tsx to handle network errors, logging errors to error.log"
+  },
+  {
+    "id": 2,
+    "command": "Create a new logging utility in packages/core/src/utils/logger.ts and integrate it into all command executions in packages/cli/src"
+  },
+  {
+    "id": 3,
+    "command": "Refactor command parsing in packages/cli/src/gemini.tsx to use a switch statement instead of if-else chains"
+  },
+  {
+    "id": 4,
+    "command": "Add input validation for user commands in packages/cli/src to reject invalid characters with error messages"
+  },
+  {
+    "id": 5,
+    "command": "Add JSDoc comments to all exported functions in packages/core/src/index.ts to document their purpose and parameters"
+  },
+  {
+    "id": 6,
+    "command": "Optimize FindFiles tool in packages/core/src/tools/findFiles.ts to use asynchronous file operations"
+  },
+  {
+    "id": 7,
+    "command": "Add rate-limiting checks in packages/cli/src/gemini.tsx to respect the 60 requests/minute limit"
+  },
+  {
+    "id": 8,
+    "command": "Add safety checks to Shell tool in packages/core/src/tools/shell.ts to block dangerous commands like 'rm -rf'"
+  },
+  {
+    "id": 9,
+    "command": "Generate unit tests for functions in packages/core/src/index.ts using Jest, saving them in packages/core/tests"
+  },
+  {
+    "id": 10,
+    "command": "Add a /backup command in packages/cli/src/gemini.tsx to create timestamped backups of the project directory"
+  },
+  {
+    "id": 11,
+    "command": "Replace all console.log statements in packages/cli/src with calls to the new logger utility"
+  },
+  {
+    "id": 12,
+    "command": "Add TypeScript type definitions for all command inputs in packages/cli/src/command.ts"
+  },
+  {
+    "id": 13,
+    "command": "Create a new tool in packages/core/src/tools/termux.ts to execute termux-toast for notifications"
+  },
+  {
+    "id": 14,
+    "command": "Find all .ts files in packages/core/src and add ESLint rules for consistent code style"
+  },
+  {
+    "id": 15,
+    "command": "Add a /version command in packages/cli/src/gemini.tsx to display the CLI version"
+  },
+  {
+    "id": 16,
+    "command": "Update ReadFile tool in packages/core/src/tools/readFile.ts to handle large files efficiently"
+  },
+  {
+    "id": 17,
+    "command": "Add error logging for failed file operations in packages/core/src/tools/writeFile.ts"
+  },
+  {
+    "id": 18,
+    "command": "Create a new config file in packages/core/src/config.ts to store user preferences"
+  },
+  {
+    "id": 19,
+    "command": "Add a /stats command to summarize file counts and sizes in the current directory"
+  },
+  {
+    "id": 20,
+    "command": "Integrate a progress bar in packages/cli/src/gemini.tsx for long-running commands"
+  },
+  {
+    "id": 21,
+    "command": "Find all .js files in /sdcard/projects and convert them to TypeScript"
+  },
+  {
+    "id": 22,
+    "command": "Add a /clean command to remove temporary files like *.tmp in the current directory"
+  },
+  {
+    "id": 23,
+    "command": "Generate a README.md for the current project with sections for setup and usage"
+  },
+  {
+    "id": 24,
+    "command": "Add type checking for all API responses in packages/cli/src/api.ts"
+  },
+  {
+    "id": 25,
+    "command": "Create a script in /sdcard/scripts to automate Termux package updates"
+  },
+  {
+    "id": 26,
+    "command": "Add a /search command to perform regex searches across all files in the current directory"
+  },
+  {
+    "id": 27,
+    "command": "Optimize WriteFile tool in packages/core/src/tools/writeFile.ts to use streams for large files"
+  },
+  {
+    "id": 28,
+    "command": "Add a /git command to automate git add, commit, and push in the current repository"
+  },
+  {
+    "id": 29,
+    "command": "Find all Python files in /sdcard/projects and add PEP 8 style comments"
+  },
+  {
+    "id": 30,
+    "command": "Create a new tool in packages/core/src/tools/backup.ts to zip the project directory"
+  },
+  {
+    "id": 31,
+    "command": "Add a /profile command to display Termux memory and CPU usage"
+  },
+  {
+    "id": 32,
+    "command": "Update packages/cli/src/gemini.tsx to support command history with up/down arrows"
+  },
+  {
+    "id": 33,
+    "command": "Add logging for all API requests in packages/cli/src/api.ts to debug.log"
+  },
+  {
+    "id": 34,
+    "command": "Create a new tool in packages/core/src/tools/termux-sms.ts to read SMS via Termux API"
+  },
+  {
+    "id": 35,
+    "command": "Find all .ts files and replace deprecated Promise.then with async/await"
+  },
+  {
+    "id": 36,
+    "command": "Add a /test command to run all unit tests in packages/core/tests"
+  },
+  {
+    "id": 37,
+    "command": "Create a .gitignore file in the current directory with common Node.js patterns"
+  },
+  {
+    "id": 38,
+    "command": "Add a /lint command to run ESLint on all .ts files in the current directory"
+  },
+  {
+    "id": 39,
+    "command": "Update Shell tool in packages/core/src/tools/shell.ts to log executed commands"
+  },
+  {
+    "id": 40,
+    "command": "Create a new script in /scriptions to monitor Termux battery status"
+  },
+  {
+    "id": 41,
+    "command": "Add a /format command to apply Prettier formatting to all .ts files in packages/cli/src"
+  },
+  {
+    "id": 42,
+    "command": "Generate API documentation for packages/core/src/index.ts using TypeDoc"
+  },
+  {
+    "id": 43,
+    "command": "Add a /monitor command to watch for file changes in the current directory"
+  },
+  {
+    "id": 44,
+    "command": "Update packages/cli/src/gemini.tsx to support tab completion for commands"
+  },
+  {
+    "id": 45,
+    "command": "Create a new tool in packages/core/src/tools/termux-camera.ts to access Termux camera"
+  },
+  {
+    "id": 46,
+    "command": "Add a /changelog command to generate a changelog from git commits"
+  },
+  {
+    "id": 47,
+    "command": "Find all .ts files in packages/core/src and add error boundaries for async functions"
+  },
+  {
+    "id": 48,
+    "command": "Create a new script in /sdcard/scripts to backup Termux home directory"
+  },
+  {
+    "id": 49,
+    "command": "Add a /help command to display detailed usage for all Gemini CLI commands"
+  },
+  {
+    "id": 50,
+    "command": "Update packages/cli/src/gemini.tsx to add a dark mode toggle for the CLI interface"
+  }
+]

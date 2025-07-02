@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "command": "Update ReadFile tool in packages/core/src/tools/readFile.ts to use streams for reading large files efficiently"
+  },
+  {
+    "id": 2,
+    "command": "Add error handling in ReadFile tool to log file-not-found errors to /sdcard/logs/read_errors.log"
+  },
+  {
+    "id": 3,
+    "command": "Create a /read command in packages/cli/src/gemini.tsx to display file contents with line numbers"
+  },
+  {
+    "id": 4,
+    "command": "Update WriteFile tool in packages/core/src/tools/writeFile.ts to use streams for writing large files"
+  },
+  {
+    "id": 5,
+    "command": "Add permission checks in WriteFile tool to ensure write access to /sdcard before saving"
+  },
+  {
+    "id": 6,
+    "command": "Add a /write command in packages/cli/src/gemini.tsx to save user input to a specified file"
+  },
+  {
+    "id": 7,
+    "command": "Update Edit tool in packages/core/src/tools/edit.ts to support regex-based string replacements"
+  },
+  {
+    "id": 8,
+    "command": "Add a /replace command in packages/cli/src/gemini.tsx to perform regex replacements in files"
+  },
+  {
+    "id": 9,
+    "command": "Add caching to ReadFile tool to store recently read files in memory for faster access"
+  },
+  {
+    "id": 10,
+    "command": "Create a script in /sdcard/scripts/read-analyze.sh to analyze file contents using ReadFile and termux-toast"
+  },
+  {
+    "id": 11,
+    "command": "Update WriteFile tool to append a timestamp to files written in /sdcard"
+  },
+  {
+    "id": 12,
+    "command": "Add a /append command in packages/cli/src/gemini.tsx to append text to existing files"
+  },
+  {
+    "id": 13,
+    "command": "Update Edit tool to support batch edits across multiple files with a single command"
+  },
+  {
+    "id": 14,
+    "command": "Add a /batch-edit command in packages/cli/src/gemini.tsx for multi-file edits"
+  },
+  {
+    "id": 15,
+    "command": "Add file type validation in ReadFile tool to check for supported extensions (e.g., .py, .ts)"
+  },
+  {
+    "id": 16,
+    "command": "Create a tool in packages/core/src/tools/read-preview.ts to preview first 10 lines of a file"
+  },
+  {
+    "id": 17,
+    "command": "Add a /preview command in packages/cli/src/gemini.tsx to show file previews"
+  },
+  {
+    "id": 18,
+    "command": "Update WriteFile tool to support JSON formatting for structured data output"
+  },
+  {
+    "id": 19,
+    "command": "Add a /write-json command in packages/cli/src/gemini.tsx to save JSON data to files"
+  },
+  {
+    "id": 20,
+    "command": "Update Edit tool to add inline comments to Python code during edits"
+  },
+  {
+    "id": 21,
+    "command": "Create a script in /sdcard/scripts/edit-format.sh to format edited files with black"
+  },
+  {
+    "id": 22,
+    "command": "Add a /format-edit command in packages/cli/src/gemini.tsx to format edited files"
+  },
+  {
+    "id": 23,
+    "command": "Update ReadFile tool to support reading from /sdcard with termux-toast notifications"
+  },
+  {
+    "id": 24,
+    "command": "Add a /read-sdcard command in packages/cli/src/gemini.tsx to read files from /sdcard"
+  },
+  {
+    "id": 25,
+    "command": "Update WriteFile tool to create backup copies before overwriting files"
+  },
+  {
+    "id": 26,
+    "command": "Add a /backup command in packages/cli/src/gemini.tsx to save file backups"
+  },
+  {
+    "id": 27,
+    "command": "Update Edit tool to support undoing last edit with a history log"
+  },
+  {
+    "id": 28,
+    "command": "Add a /undo command in packages/cli/src/gemini.tsx to revert file edits"
+  },
+  {
+    "id": 29,
+    "command": "Create a tool in packages/core/src/tools/read-meta.ts to read file metadata (e.g., size, modified date)"
+  },
+  {
+    "id": 30,
+    "command": "Add a /file-meta command in packages/cli/src/gemini.tsx to display file metadata"
+  },
+  {
+    "id": 31,
+    "command": "Update WriteFile tool to support appending to CSV files with proper formatting"
+  },
+  {
+    "id": 32,
+    "command": "Add a /write-csv command in packages/cli/src/gemini.tsx to append to CSV files"
+  },
+  {
+    "id": 33,
+    "command": "Update Edit tool to integrate with pylint for Python code suggestions"
+  },
+  {
+    "id": 34,
+    "command": "Add a /lint-edit command in packages/cli/src/gemini.tsx to apply pylint suggestions"
+  },
+  {
+    "id": 35,
+    "command": "Create a script in /sdcard/scripts/read-search.sh to search file contents with regex"
+  },
+  {
+    "id": 36,
+    "command": "Add a /search-file command in packages/cli/src/gemini.tsx to search within files"
+  },
+  {
+    "id": 37,
+    "command": "Update ReadFile tool to support reading compressed files (e.g., .gz)"
+  },
+  {
+    "id": 38,
+    "command": "Add a /read-zip command in packages/cli/src/gemini.tsx to read compressed files"
+  },
+  {
+    "id": 39,
+    "command": "Update WriteFile tool to support writing to /sdcard with termux-toast confirmation"
+  },
+  {
+    "id": 40,
+    "command": "Add a /write-sdcard command in packages/cli/src/gemini.tsx to write to /sdcard"
+  },
+  {
+    "id": 41,
+    "command": "Update Edit tool to add type hints to Python files during edits"
+  },
+  {
+    "id": 42,
+    "command": "Add a /type-edit command in packages/cli/src/gemini.tsx to add type hints"
+  },
+  {
+    "id": 43,
+    "command": "Create a script in /sdcard/scripts/edit-log.sh to log all Edit tool actions"
+  },
+  {
+    "id": 44,
+    "command": "Add a /edit-log command in packages/cli/src/gemini.tsx to view edit history"
+  },
+  {
+    "id": 45,
+    "command": "Update ReadFile tool to support reading from clipboard using termux-clipboard-get"
+  },
+  {
+    "id": 46,
+    "command": "Add a /read-clipboard command in packages/cli/src/gemini.tsx to read clipboard content"
+  },
+  {
+    "id": 47,
+    "command": "Update WriteFile tool to support writing to clipboard using termux-clipboard-set"
+  },
+  {
+    "id": 48,
+    "command": "Add a /write-clipboard command in packages/cli/src/gemini.tsx to write to clipboard"
+  },
+  {
+    "id": 49,
+    "command": "Update Edit tool to support code completion suggestions during edits"
+  },
+  {
+    "id": 50,
+    "command": "Add a /complete-edit command in packages/cli/src/gemini.tsx to apply code completion"
+  }
+]

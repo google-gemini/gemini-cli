@@ -1,0 +1,49 @@
+{
+  "contextFileName": "GEMINI.md",
+  "bugCommand": {
+    "url": "https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}"
+  },
+  "fileFiltering": {
+    "respectGitIgnore": true,
+    "enableRecursiveFileSearch": true
+  },
+  "coreTools": [
+    "ReadFileTool",
+    "GlobTool",
+    "ShellTool(ls)",
+    "ShellTool(cat)",
+    "ShellTool(echo)",
+    "ShellTool(pwd)",
+    "ShellTool(rm)",
+    "ShellTool(cp)",
+    "ShellTool(mv)",
+    "ShellTool(mkdir)",
+    "ShellTool(find)",
+    "ShellTool(grep)",
+    "ShellTool(sed)",
+    "ShellTool(awk)",
+    "ShellTool(head)",
+    "ShellTool(tail)",
+    "ShellTool(sort)",
+    "ShellTool(uniq)"
+  ],
+  "excludeTools": [],
+  "autoAccept": false,
+  "theme": "SolarizedDark",
+  "sandbox": false,
+  "toolDiscoveryCommand": "",
+  "toolCallCommand": "",
+  "mcpServers": {},
+  "checkpointing": {
+    "enabled": true
+  },
+  "preferredEditor": "nano",
+  "telemetry": {
+    "enabled": false,
+    "target": "local",
+    "otlpEndpoint": "",
+    "logPrompts": false
+  },
+  "usageStatisticsEnabled": false,
+  "hideTips": false
+}

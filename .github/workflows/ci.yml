@@ -1,0 +1,146 @@
+# .github/workflows/ci.yml
+
+name: Gemini CLI CI
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main, release]
+  merge_group:
+
+jobs:
+  build:
+    name: Build and Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # For checkout
+    strategy:
+      matrix:
+        node-version: [20.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run formatter check
+        run: |
+          npm run format
+          git diff --exit-code
+
+      - name: Run linter
+        run: npm run lint:ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.node-version }}
+          path: |
+            packages/*/dist
+            package-lock.json # Only upload dist and lockfile
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build # This job depends on the 'build' job
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    strategy:
+      matrix:
+        node-version: [20.x] # Should match the build job's matrix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.node-version }}
+          path: . # Download to the root, this will include package-lock.json and packages/*/dist
+
+      # Restore/create package structure for dist folders if necessary.
+      # The download-artifact action with path: . should place them correctly if the
+      # upload paths were relative to the workspace root.
+      # Example: if uploaded `packages/cli/dist`, it will be at `./packages/cli/dist`.
+
+      - name: Install dependencies for testing
+        run: npm ci # Install fresh dependencies using the downloaded package-lock.json
+
+      - name: Run tests and generate reports
+        run: NO_COLOR=true npm run test:ci
+
+      - name: Publish Test Report (for non-forks)
+        if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results (Node ${{ matrix.node-version }})
+          path: packages/*/junit.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+      - name: Upload Test Results Artifact (for forks)
+        if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-fork-${{ matrix.node-version }}
+          path: packages/*/junit.xml
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports-${{ matrix.node-version }}
+          path: packages/*/coverage
+
+  post_coverage_comment:
+    name: Post Coverage Comment
+    runs-on: ubuntu-latest
+    needs: test
+    if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
+    continue-on-error: true
+    permissions:
+      contents: read # For checkout
+      pull-requests: write # For commenting
+    strategy:
+      matrix:
+        node-version: [20.x] # Should match the test job's matrix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download coverage reports artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports-${{ matrix.node-version }}
+          path: coverage_artifact # Download to a specific directory
+
+      - name: Post Coverage Comment using Composite Action
+        uses: ./.github/actions/post-coverage-comment # Path to the composite action directory
+        with:
+          cli_json_file: coverage_artifact/cli/coverage/coverage-summary.json
+          core_json_file: coverage_artifact/core/coverage/coverage-summary.json
+          cli_full_text_summary_file: coverage_artifact/cli/coverage/full-text-summary.txt
+          core_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
+          node_version: ${{ matrix.node-version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,54 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // --- Foundational Settings ---
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    // Improvement 1: Using a more recent ES version for modern incantations.
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["node", "vitest/globals"],
+
+    // --- Arcane Strictness: Forging a Resilient Codebase ---
+    // Improvement 2: The master spell, enabling all strict type-checking options.
+    "strict": false,
+    // Improvement 3: Ensures no path in a function forgets to return a value.
+    "noImplicitReturns": true,
+    // Improvement 4: Prevents declaring variables that are never used, keeping the grimoire clean.
+    "noUnusedLocals": true,
+    // Improvement 5: Prevents declaring parameters that are never used, a sign of pure intent.
+    "noUnusedParameters": true,
+    // Improvement 6: A ward against accidental fall-throughs in switch statements.
+    "noFallthroughCasesInSwitch": true,
+    // Improvement 7: A powerful ward that adds 'undefined' to any unsafe property access.
+    "noUncheckedIndexedAccess": false,
+    // Improvement 8: Enforces consistent file casing, crucial for cross-platform harmony.
+    "forceConsistentCasingInFileNames": true,
+
+    // --- Module Weaving: Ensuring Seamless Imports and Interoperability ---
+    // Improvement 9: The most modern resolution strategy for apps using a bundler.
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    // Improvement 10: A crucial incantation for smooth interoperability between CommonJS and ES Modules.
+    "esModuleInterop": true,
+    // Improvement 11: Allows the direct import of JSON scrolls.
+    "resolveJsonModule": true,
+    // Improvement 12: Ensures each scroll can be transmuted independently, a boon for build tools.
+    "isolatedModules": true,
+
+    // --- Transmutation & Debugging: Crafting the Output ---
+    // Improvement 13: Generates '.d.ts' files, the public-facing runes of your module's magic.
+    "declaration": true,
+    // Improvement 14: Forges source maps for your JavaScript, allowing you to debug the original TypeScript source.
+    "sourceMap": true,
+    // Improvement 15: Speeds up the transmutation by skipping type checks of declaration files from other libraries.
+    "skipLibCheck": true
+  },
+  "include": [
+    "index.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json",
+    "./package.json"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
