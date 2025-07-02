@@ -41,7 +41,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
 
 3.  **Vertex AI:**
     - Obtain your Google Cloud API key: [Get an API Key](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=newuser)
-      - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key provided by express mode:
+      - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key:
         - You can temporarily set these environment variables in your current shell session using the following commands:
           ```bash
           export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
