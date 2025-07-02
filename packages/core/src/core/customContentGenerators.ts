@@ -71,7 +71,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
         ...this.config.customHeaders,
       },
       body: JSON.stringify(openAIRequest),
-      // Note: AbortSignal.timeout might not be available in older Node.js versions
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
     });
 
     if (!response.ok) {
@@ -105,6 +105,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
         ...this.config.customHeaders,
       },
       body: JSON.stringify(openAIRequest),
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
     });
 
     if (!response.ok) {
@@ -197,6 +198,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
         input: text,
         model: request.model || 'text-embedding-ada-002',
       }),
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
     });
 
     if (!response.ok) {
@@ -469,6 +471,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
         ...this.config.customHeaders,
       },
       body: JSON.stringify(anthropicRequest),
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
     });
 
     if (!response.ok) {
@@ -513,6 +516,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
         ...this.config.customHeaders,
       },
       body: JSON.stringify(anthropicRequest),
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
     });
 
     if (!response.ok) {
