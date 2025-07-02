@@ -45,7 +45,7 @@ export function ThemeDialog({
   const customThemes =
     selectedScope === SettingScope.User
       ? settings.user.settings.customThemes || {}
-      : { ...(settings.user.settings.customThemes || {}), ...(settings.workspace.settings.customThemes || {}) };
+      : settings.merged.customThemes || {};
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
