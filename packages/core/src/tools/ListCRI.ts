@@ -8,7 +8,7 @@ import { BaseTool, ToolResult } from './tools.js';
 import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { GoogleAuth } from 'google-auth-library';
-import { GaxiosResponse, Gaxios, GaxiosOptions } from 'gaxios';
+import { GaxiosResponse, Gaxios, GaxiosOptions, GaxiosError } from 'gaxios';
 
 // Interface for a single repository within a group
 interface RepositoryRef {
@@ -139,12 +139,41 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
   private async makeRequest<T>(options: GaxiosOptions): Promise<GaxiosResponse<T>> {
       try {
           return await this.client.request<T>(options);
-      } catch (error: any) {
-          const errorMessage = getErrorMessage(error);
-          let statusCode = error.code || error.response?.status;
-          throw new Error(`API call to ${options.url} failed: ${statusCode} - ${errorMessage} ${JSON.stringify(error.response?.data)}`);
+      } catch (error: unknown) {
+          let errorMessage = getErrorMessage(error);
+          let statusCode: number | string | undefined;
+          let responseData: any = undefined;
+
+          if (error instanceof GaxiosError) {
+              statusCode = error.response?.status || error.code;
+              responseData = error.response?.data;
+              if (typeof responseData === 'string') {
+                  try {
+                      const parsedData = JSON.parse(responseData);
+                      if (parsedData.error?.message) {
+                          errorMessage = parsedData.error.message;
+                      }
+                  } catch (parseError) {
+                      // Ignore JSON parse error, use original responseData
+                  }
+               }
+          } else if (error instanceof Error) {
+              statusCode = (error as any).code;
+          }
+
+          let dataString = '';
+          try {
+              dataString = responseData ? JSON.stringify(responseData) : '';
+          } catch (e) {
+              dataString = '[Non-JSON-serializable response data]';
+          }
+
+          throw new Error(
+              `API call to ${options.url} failed: ${statusCode ? `${statusCode} - ` : ''}${errorMessage} ${dataString}`,
+          );
       }
   }
+  
 
   // Helper function to list all groups for a single index
   private async listAllGroupsForIndex(
@@ -260,11 +289,12 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
               endpoint,
               pageSize,
             );
-          } catch (groupError: any) {
+          } catch (groupError: unknown) {
+            const errorMessage = getErrorMessage(groupError);
             console.error(
-              `Error fetching groups for ${index.name}: ${groupError.message}`,
+              `Error fetching groups for ${index.name}: ${errorMessage}`,
             );
-            indexWithGroups.groupsError = groupError.message;
+            indexWithGroups.groupsError = errorMessage;
           }
         }
         indexesWithGroups.push(indexWithGroups);
