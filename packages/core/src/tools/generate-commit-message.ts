@@ -91,19 +91,20 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
     const hasStagedChanges = Boolean(stagedDiff?.trim());
     const hasUnstagedChanges = Boolean(unstagedDiff?.trim());
-    const hasUntrackedFiles = statusOutput?.includes('??') || false;
+    // Fix: More accurate detection of untracked files using regex
+    const hasUntrackedFiles = /^\?\? /m.test(statusOutput || '');
 
     let commitMode: 'staged-only' | 'all-changes';
     let diffOutput: string;
 
     if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
       commitMode = 'staged-only';
-      diffOutput = stagedDiff!;
+      diffOutput = stagedDiff || '';
     } else {
       commitMode = 'all-changes';
       const diffs = [];
-      if (stagedDiff) diffs.push(stagedDiff);
-      if (unstagedDiff) diffs.push(unstagedDiff);
+      if (stagedDiff?.trim()) diffs.push(stagedDiff);
+      if (unstagedDiff?.trim()) diffs.push(unstagedDiff);
       diffOutput = diffs.join('\n');
     }
 
