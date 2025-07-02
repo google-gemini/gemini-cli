@@ -335,4 +335,72 @@ describe('ShellTool', () => {
     const isAllowed = shellTool.isCommandAllowed('gh issue list || rm -rf /');
     expect(isAllowed).toBe(false);
   });
+
+  describe('Delete Command Detection', () => {
+    it('should detect rm as a delete command', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      expect(shellTool['hasDeleteCommand']('rm file.txt')).toBe(true);
+    });
+
+    it('should detect delete commands in compound statements', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      expect(shellTool['hasDeleteCommand']('touch file.txt && rm file.txt')).toBe(true);
+    });
+
+    it('should not detect non-delete commands', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      expect(shellTool['hasDeleteCommand']('ls -la')).toBe(false);
+    });
+
+    it('should extract file paths from delete commands', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      const paths = shellTool['extractFilePathsFromCommand']('rm file1.txt file2.txt');
+      expect(paths).toEqual(['file1.txt', 'file2.txt']);
+    });
+
+    it('should extract file paths from compound commands', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      const paths = shellTool['extractFilePathsFromCommand']('touch test.txt && rm test.txt');
+      expect(paths).toEqual(['test.txt']);
+    });
+
+    it('should inject backup commands when delete commands are present', () => {
+      const config = {
+        getCoreTools: () => undefined,
+        getExcludeTools: () => undefined,
+        getDeleteBackupsEnabled: () => true,
+      } as unknown as Config;
+      const shellTool = new ShellTool(config);
+      const result = shellTool['injectBackupCommands']('rm test.txt', '/tmp');
+      expect(result.command).toContain('mkdir -p');
+      expect(result.command).toContain('cp -r');
+      expect(result.command).toContain('rm test.txt');
+      expect(result.backupMessages.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -98,6 +98,192 @@ Process Group PGID: Process group started or \`(none)\``,
       .pop(); // take last part and return command root (or undefined if previous line was empty)
   }
 
+  private hasDeleteCommand(command: string): boolean {
+    const deleteCommands = [
+      'rm', 'rmdir', 'del', 'erase', 'rd', // Unix/Linux and Windows delete commands
+      'Remove-Item', 'Remove-ItemProperty', // PowerShell
+      'unlink', 'trash' // Alternative delete commands
+    ];
+    
+    // Split command by shell operators to handle compound commands
+    const subCommands = this.splitIntoSubCommands(command);
+    
+    return subCommands.some(subCmd => {
+      const commandRoot = this.getCommandRoot(subCmd.trim());
+      return commandRoot ? deleteCommands.includes(commandRoot) : false;
+    });
+  }
+
+  private splitIntoSubCommands(command: string): string[] {
+    // Split on shell operators: &&, ||, |, ;
+    // This is a simplified approach - could be enhanced for complex parsing
+    return command.split(/&&|\|\||\||;/).map(cmd => cmd.trim()).filter(Boolean);
+  }
+
+  private extractFilePathsFromCommand(command: string): string[] {
+    const paths: string[] = [];
+    const isWindows = os.platform() === 'win32';
+    const deleteCommands = [
+      'rm', 'rmdir', 'del', 'erase', 'rd',
+      'Remove-Item', 'Remove-ItemProperty',
+      'unlink', 'trash'
+    ];
+    
+    // Split into sub-commands and process each one
+    const subCommands = this.splitIntoSubCommands(command);
+    
+    for (const subCmd of subCommands) {
+      const parts = subCmd.trim().split(/\s+/);
+      if (parts.length === 0) continue;
+      
+      const commandRoot = this.getCommandRoot(subCmd);
+      if (!commandRoot || !deleteCommands.includes(commandRoot)) continue;
+      
+      // Extract file paths from this delete command
+      for (let i = 1; i < parts.length; i++) {
+        const part = parts[i];
+        
+        // Skip flags (starting with - or /)
+        if (part.startsWith('-') || (isWindows && part.startsWith('/'))) continue;
+        
+        // This looks like a file path
+        if (part && !part.includes('=') && !part.includes('>') && !part.includes('<')) {
+          paths.push(part);
+        }
+      }
+    }
+    
+    return paths;
+  }
+
+  private async createBackup(filePath: string, workingDir: string): Promise<string | null> {
+    try {
+      const fullPath = path.isAbsolute(filePath) 
+        ? filePath 
+        : path.resolve(workingDir, filePath);
+      
+      // Check if file/directory exists
+      if (!fs.existsSync(fullPath)) {
+        return null; // Can't backup non-existent files
+      }
+      
+      // Create backup directory
+      const backupDir = path.join(workingDir, '.gemini', 'backups');
+      fs.mkdirSync(backupDir, { recursive: true });
+      
+      // Generate backup filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const basename = path.basename(fullPath);
+      const backupName = `${basename}.${timestamp}.backup`;
+      const backupPath = path.join(backupDir, backupName);
+      
+      // Copy file or directory to backup location
+      const stats = fs.statSync(fullPath);
+      if (stats.isDirectory()) {
+        await this.copyDirectory(fullPath, backupPath);
+      } else {
+        fs.copyFileSync(fullPath, backupPath);
+      }
+      
+      return backupPath;
+    } catch (error) {
+      console.error(`Failed to create backup for ${filePath}:`, error);
+      return null;
+    }
+  }
+
+  private async copyDirectory(src: string, dest: string): Promise<void> {
+    fs.mkdirSync(dest, { recursive: true });
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      
+      if (entry.isDirectory()) {
+        await this.copyDirectory(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+
+  private injectBackupCommands(command: string, workingDir: string): { command: string; backupMessages: string[] } {
+    const deleteCommands = [
+      'rm', 'rmdir', 'del', 'erase', 'rd',
+      'Remove-Item', 'Remove-ItemProperty',
+      'unlink', 'trash'
+    ];
+    const isWindows = os.platform() === 'win32';
+    const backupMessages: string[] = [];
+    
+    // Create backup directory command
+    const backupDir = path.join(workingDir, '.gemini', 'backups');
+    const mkdirCmd = isWindows 
+      ? `if not exist "${backupDir}" mkdir "${backupDir}"` 
+      : `mkdir -p "${backupDir}"`;
+    
+    // Split command and inject backup logic before each delete command
+    const subCommands = this.splitIntoSubCommands(command);
+    const modifiedSubCommands: string[] = [];
+    
+    for (const subCmd of subCommands) {
+      const trimmed = subCmd.trim();
+      const parts = trimmed.split(/\s+/);
+      if (parts.length === 0) {
+        modifiedSubCommands.push(trimmed);
+        continue;
+      }
+      
+      const commandRoot = this.getCommandRoot(trimmed);
+      if (!commandRoot || !deleteCommands.includes(commandRoot)) {
+        modifiedSubCommands.push(trimmed);
+        continue;
+      }
+      
+      // This is a delete command - inject backup logic
+      const filePaths: string[] = [];
+      for (let i = 1; i < parts.length; i++) {
+        const part = parts[i];
+        if (part.startsWith('-') || (isWindows && part.startsWith('/'))) continue;
+        if (part && !part.includes('=') && !part.includes('>') && !part.includes('<')) {
+          filePaths.push(part);
+        }
+      }
+      
+      if (filePaths.length > 0) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupCommands: string[] = [];
+        
+        for (const filePath of filePaths) {
+          const basename = path.basename(filePath);
+          const backupName = `${basename}.${timestamp}.backup`;
+          const backupPath = path.join(backupDir, backupName);
+          
+          if (isWindows) {
+            backupCommands.push(`if exist "${filePath}" copy "${filePath}" "${backupPath}" >nul 2>&1`);
+          } else {
+            backupCommands.push(`[ -e "${filePath}" ] && cp -r "${filePath}" "${backupPath}" 2>/dev/null || true`);
+          }
+          
+          const relativePath = path.relative(workingDir, backupPath);
+          backupMessages.push(`Backup will be created: ${relativePath}`);
+        }
+        
+        // Combine: mkdir + backup commands + original delete command
+        const combined = [mkdirCmd, ...backupCommands, trimmed].join(isWindows ? ' && ' : ' && ');
+        modifiedSubCommands.push(combined);
+      } else {
+        modifiedSubCommands.push(trimmed);
+      }
+    }
+    
+    // Rejoin with original operators (simplified - assumes &&)
+    const modifiedCommand = modifiedSubCommands.join(' && ');
+    
+    return { command: modifiedCommand, backupMessages };
+  }
+
   isCommandAllowed(command: string): boolean {
     // 0. Disallow command substitution
     if (command.includes('$(') || command.includes('`')) {
@@ -261,6 +447,17 @@ Process Group PGID: Process group started or \`(none)\``,
       };
     }
 
+    // Handle backup for delete commands by modifying the command
+    const workingDir = path.resolve(this.config.getTargetDir(), params.directory || '');
+    const backupMessages: string[] = [];
+    let modifiedCommand = params.command;
+    
+    if (this.config.getDeleteBackupsEnabled() && this.hasDeleteCommand(params.command)) {
+      const result = this.injectBackupCommands(params.command, workingDir);
+      modifiedCommand = result.command;
+      backupMessages.push(...result.backupMessages);
+    }
+
     const isWindows = os.platform() === 'win32';
     const tempFileName = `shell_pgrep_${crypto
       .randomBytes(6)
@@ -269,10 +466,10 @@ Process Group PGID: Process group started or \`(none)\``,
 
     // pgrep is not available on Windows, so we can't get background PIDs
     const command = isWindows
-      ? params.command
+      ? modifiedCommand
       : (() => {
           // wrap command to append subprocess pids (via pgrep) to temporary file
-          let command = params.command.trim();
+          let command = modifiedCommand.trim();
           if (!command.endsWith('&')) command += ';';
           return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
         })();
@@ -416,9 +613,17 @@ Process Group PGID: Process group started or \`(none)\``,
         llmContent += ' There was no output before it was cancelled.';
       }
     } else {
-      llmContent = [
+      const contentLines = [
         `Command: ${params.command}`,
         `Directory: ${params.directory || '(root)'}`,
+      ];
+      
+      // Add backup information if any backups were created
+      if (backupMessages.length > 0) {
+        contentLines.push(`Backups: ${backupMessages.join(', ')}`);
+      }
+      
+      contentLines.push(
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
         `Error: ${error ?? '(none)'}`,
@@ -426,30 +631,40 @@ Process Group PGID: Process group started or \`(none)\``,
         `Signal: ${processSignal ?? '(none)'}`,
         `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
         `Process Group PGID: ${shell.pid ?? '(none)'}`,
-      ].join('\n');
+      );
+      
+      llmContent = contentLines.join('\n');
     }
 
     let returnDisplayMessage = '';
     if (this.config.getDebugMode()) {
       returnDisplayMessage = llmContent;
     } else {
+      // Include backup messages in user output
+      const displayParts: string[] = [];
+      if (backupMessages.length > 0) {
+        displayParts.push(...backupMessages);
+      }
+      
       if (output.trim()) {
-        returnDisplayMessage = output;
+        displayParts.push(output);
       } else {
         // Output is empty, let's provide a reason if the command failed or was cancelled
         if (abortSignal.aborted) {
-          returnDisplayMessage = 'Command cancelled by user.';
+          displayParts.push('Command cancelled by user.');
         } else if (processSignal) {
-          returnDisplayMessage = `Command terminated by signal: ${processSignal}`;
+          displayParts.push(`Command terminated by signal: ${processSignal}`);
         } else if (error) {
           // If error is not null, it's an Error object (or other truthy value)
-          returnDisplayMessage = `Command failed: ${getErrorMessage(error)}`;
+          displayParts.push(`Command failed: ${getErrorMessage(error)}`);
         } else if (code !== null && code !== 0) {
-          returnDisplayMessage = `Command exited with code: ${code}`;
+          displayParts.push(`Command exited with code: ${code}`);
         }
         // If output is empty and command succeeded (code 0, no error/signal/abort),
-        // returnDisplayMessage will remain empty, which is fine.
+        // we still want to show backup messages if any
       }
+      
+      returnDisplayMessage = displayParts.join('\n');
     }
 
     return { llmContent, returnDisplay: returnDisplayMessage };
