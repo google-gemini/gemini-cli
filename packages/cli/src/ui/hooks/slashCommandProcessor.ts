@@ -225,7 +225,19 @@ export const useSlashCommandProcessor = (
               content: `Opening documentation in your browser: ${docsUrl}`,
               timestamp: new Date(),
             });
-            await open(docsUrl);
+            try {
+              await open(docsUrl);
+            } catch (e) {
+              const errorMessage = e instanceof Error ? e.message : String(e);
+              onDebugMessage(
+                `Failed to open browser for /docs: ${errorMessage}`,
+              );
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Could not open browser. Please open this URL manually: ${docsUrl}`,
+                timestamp: new Date(),
+              });
+            }
           }
         },
       },

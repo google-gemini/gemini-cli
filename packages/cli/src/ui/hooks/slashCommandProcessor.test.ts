@@ -1349,5 +1349,29 @@ describe('useSlashCommandProcessor', () => {
         expect.any(Number),
       );
     });
+
+    it('should show error when opening browser fails', async () => {
+      mockCanOpenBrowserFn.mockReturnValue(true);
+      const openMock = open as vi.Mock;
+      const errorMessage = 'Browser not found';
+      openMock.mockRejectedValue(new Error(errorMessage));
+
+      const { handleSlashCommand } = getProcessor();
+      await act(async () => {
+        await handleSlashCommand('/docs');
+      });
+
+      expect(openMock).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs');
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        `Failed to open browser for /docs: ${errorMessage}`,
+      );
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          text: 'Could not open browser. Please open this URL manually: https://goo.gle/gemini-cli-docs',
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });
