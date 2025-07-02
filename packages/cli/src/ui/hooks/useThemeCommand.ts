@@ -23,7 +23,7 @@ interface UseThemeCommandReturn {
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
-  addItem: (item: HistoryItem, timestamp: number) => void,
+  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
 
@@ -39,8 +39,18 @@ export const useThemeCommand = (
   }, [loadedSettings.merged.theme, setThemeError]);
 
   const openThemeDialog = useCallback(() => {
+    if (process.env.NO_COLOR) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'Theme configuration unavailable due to NO_COLOR env variable.',
+        },
+        Date.now(),
+      );
+      return;
+    }
     setIsThemeDialogOpen(true);
-  }, []);
+  }, [addItem]);
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {
