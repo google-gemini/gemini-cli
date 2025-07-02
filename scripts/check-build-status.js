@@ -153,7 +153,9 @@ if (major < 20) {
   try {
     fs.writeFileSync(warningsFilePath, warningMessages.join('\n'));
   } catch (err) {
-    console.error(`[Check Script] Error writing Node version warning: ${err.message}`);
+    console.error(
+      `[Check Script] Error writing Node version warning: ${err.message}`,
+    );
   }
 }
 
