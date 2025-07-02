@@ -54,14 +54,18 @@ The commit message MUST follow this structure:
 {{log}}
 \`\`\``;
 
-const COMMIT_CACHE_TIMEOUT_MS = 30000; // 30 seconds
+const COMMIT_CACHE_TIMEOUT_MS = 30000;
 
+/**
+ * Tool for analyzing git changes and generating conventional commit messages.
+ * Handles the complete commit workflow: analysis, message generation, and commit creation.
+ */
 export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   static readonly Name = 'generate_commit_message';
   private readonly client: GeminiClient;
   private readonly config: Config;
   
-  // Cache generated commit message to avoid regeneration
+  /** Cache to avoid regenerating commit messages between confirmation and execution */
   private cachedCommitData: {
     statusOutput: string;
     diffOutput: string;
@@ -70,6 +74,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     timestamp: number;
   } | null = null;
 
+  /** Gather git status, staged diff, and recent log in parallel */
   private async analyzeGitState(signal: AbortSignal): Promise<{
     statusOutput: string;
     diffOutput: string;
@@ -111,11 +116,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     return 'Analyze git changes and create commit.';
   }
 
+  /** Check if confirmation is needed and prepare confirmation details */
   async shouldConfirmExecute(
     _params: undefined,
     signal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Check if auto-commit is enabled
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
@@ -136,7 +141,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
       const finalCommitMessage = commitMessage;
       
-      // Cache the data for execute method
       this.cachedCommitData = {
         statusOutput: gitState.statusOutput,
         diffOutput: gitState.diffOutput,
@@ -145,7 +149,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         timestamp: Date.now(),
       };
 
-      // Determine which files will be committed for display
       const filesToCommit = this.parseFilesToBeCommitted(
         gitState.statusOutput
       );
@@ -177,23 +180,20 @@ Strategy: ${commitModeText}${filesDisplay}`,
       return confirmationDetails;
     } catch (error) {
       console.error('Error determining commit confirmation details:', error);
-      // If we can't gather git info or generate message, skip confirmation.
-      // The execute method will then attempt the operations again and report the error.
       return false;
     }
   }
 
+  /** Execute the commit workflow using cached data when available */
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
     try {
       let finalCommitMessage: string;
       let statusOutput: string;
 
-      // Check if we have cached data from shouldConfirmExecute
       if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS)) {
         finalCommitMessage = this.cachedCommitData.commitMessage;
         statusOutput = this.cachedCommitData.statusOutput;
         
-        // Keep cache for staging strategy execution - don't clear yet
       } else {
         
         const gitState = await this.analyzeGitState(signal);
@@ -215,7 +215,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
 
         finalCommitMessage = commitMessage;
         
-        // Cache the data for staging strategy
         this.cachedCommitData = {
           statusOutput: gitState.statusOutput,
           diffOutput: gitState.diffOutput,
@@ -225,15 +224,11 @@ Strategy: ${commitModeText}${filesDisplay}`,
         };
       }
 
-      // Step 3: Staging is now handled by the user before running the tool.
-      // The 'git add .' command has been removed to prevent accidentally staging untracked files.
-
-      // Step 4: Create commit
       
+      // Create commit with generated message
       try {
         await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
         
-        // Clear cache after successful commit
         this.cachedCommitData = null;
         
         return {
@@ -242,23 +237,20 @@ Strategy: ${commitModeText}${filesDisplay}`,
         };
       } catch (commitError) {
         if (!(commitError instanceof Error)) {
-          throw commitError; // Re-throw non-Error objects
+          throw commitError;
         }
 
         const isPreCommitHookError = /\.git\/hooks\//.test(commitError.message);
         const isIndexLockError = commitError.message.includes('index.lock');
 
         if (!isPreCommitHookError && !isIndexLockError) {
-          throw commitError; // Not a hook or lock error, re-throw
+          throw commitError;
         }
         
-        // It is a hook or lock error, so we retry once.
+        // Retry once for hook or lock errors
         try {
-          // Pre-commit hooks might have modified files. The user is expected to have re-staged them
-          // if necessary. We no longer automatically 'git add .'.
           await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
           
-          // Clear cache after successful retry commit
           this.cachedCommitData = null;
           
           return {
@@ -268,7 +260,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
               `Commit message:\n${finalCommitMessage}`,
           };
         } catch (retryError) {
-          // If retry fails, provide detailed error information
           const errorDetails = retryError instanceof Error ? 
             retryError.message : String(retryError);
           throw new Error(`Commit failed after pre-commit hook retry. ` +
@@ -286,6 +277,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     }
   }
 
+  /** Execute git command with proper error handling and stdin support */
   private async executeGitCommand(
     args: string[],
     signal: AbortSignal,
@@ -308,8 +300,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
         });
 
         if (stdin && child.stdin) {
-          // Sanitize stdin to remove potentially harmful control characters,
-          // allowing only printable ASCII and common whitespace.
+          // Sanitize to remove control characters while preserving basic formatting
           const sanitizedStdin = stdin.replace(/[^\x20-\x7E\n\r\t]/g, '');
           child.stdin.write(sanitizedStdin);
           child.stdin.end();
@@ -346,6 +337,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     });
   }
 
+  /** Format git error messages with user-friendly descriptions */
   private formatGitError(args: string[], exitCode: number, stderr: string): string {
     const command = args.join(' ');
     const baseError = `Git command failed (${command}) with exit code ${exitCode}`;
@@ -354,7 +346,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
       return `${baseError}: No error details available`;
     }
 
-    // Provide more specific error messages for common scenarios
     if (stderr.includes('not a git repository')) {
       return 'This directory is not a Git repository. ' +
         'Please run this command from within a Git repository.';
@@ -378,6 +369,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     }
   }
 
+  /** Parse git status output to extract files that will be committed */
   private parseFilesToBeCommitted(statusOutput: string): string[] {
     const lines = statusOutput.split('\n').filter(line => line.trim());
     const files: string[] = [];
@@ -388,11 +380,10 @@ Strategy: ${commitModeText}${filesDisplay}`,
       const status = line.substring(0, 2);
       const filename = line.substring(3).trim();
       
-      // Skip files in node_modules and .git
+      // Skip unimportant directories
       if (filename.includes('node_modules/') || filename.includes('.git/')) continue;
       
-      // First character represents staged status.
-      // Any character other than a space or '?' indicates a staged change.
+      // Include files with staged changes (first character not space or ?)
       if (status[0] !== ' ' && status[0] !== '?') {
         files.push(filename);
       }
@@ -401,6 +392,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     return files;
   }
 
+  /** Generate commit message using Gemini AI with conventional commits format */
   private async generateCommitMessage(
     status: string,
     diff: string,
@@ -422,13 +414,13 @@ Strategy: ${commitModeText}${filesDisplay}`,
 
       const generatedText = getResponseText(response) ?? '';
       
-      // Extract commit message from analysis (look for the message after </commit_analysis>)
+      // Extract commit message from analysis response
       const analysisEndIndex = generatedText.indexOf('</commit_analysis>');
       if (analysisEndIndex !== -1) {
         const commitMessage = generatedText
           .substring(analysisEndIndex + '</commit_analysis>'.length)
           .trim()
-          .replace(/^```[a-z]*\n?/, '')
+          .replace(/^```[a-z]*\n?/, '') // Remove code block markers
           .replace(/```$/, '')
           .trim();
         
