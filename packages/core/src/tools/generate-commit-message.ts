@@ -93,7 +93,6 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     const hasUnstagedChanges = Boolean(unstagedDiff?.trim());
     const hasUntrackedFiles = statusOutput?.includes('??') || false;
 
-
     let commitMode: 'staged-only' | 'all-changes';
     let diffOutput: string;
 
@@ -288,8 +287,11 @@ Strategy: ${commitModeText}${filesDisplay}`,
              commitError.message.includes('index.lock') ||
              commitError.message.includes('hook'))) {
           
-          // Stage all modified files comprehensively
-          await this.executeGitCommand(['add', '.'], signal);
+          // Only stage files if we're in 'all-changes' mode
+          // In 'staged-only' mode, pre-commit hooks should only modify already staged files
+          if (cachedData && cachedData.commitMode === 'all-changes') {
+            await this.executeGitCommand(['add', '.'], signal);
+          }
           
           try {
             await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
@@ -331,6 +333,13 @@ Strategy: ${commitModeText}${filesDisplay}`,
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const commandString = `git ${args.join(' ')}`;
+      let isSettled = false;
+      
+      const settlePromise = (action: () => void) => {
+        if (isSettled) return;
+        isSettled = true;
+        action();
+      };
       
       try {
         const child = spawn('git', args, { signal, stdio: 'pipe' });
@@ -345,55 +354,56 @@ Strategy: ${commitModeText}${filesDisplay}`,
           stderr += data.toString();
         });
 
-        // Write stdin if provided
         if (stdin && child.stdin) {
           child.stdin.write(stdin);
           child.stdin.end();
         }
 
         child.on('close', (exitCode) => {
-          if (exitCode !== 0) {
-            const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
-            console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
-            reject(new Error(errorMessage));
-          } else {
-            resolve(stdout.trim() || null);
-          }
+          settlePromise(() => {
+            if (exitCode !== 0) {
+              const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
+              console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
+              reject(new Error(errorMessage));
+            } else {
+              resolve(stdout.trim() || null);
+            }
+          });
         });
 
         child.on('error', (err) => {
-          const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-          console.error(`Spawn error: ${errorMessage}`);
-          
-          // Provide helpful error context
-          if (err.message.includes('ENOENT')) {
-            reject(new Error(`Git is not installed or not found in PATH. ` +
-              `Please install Git and try again.`));
-                      } else if (err.message.includes('EACCES')) {
-              reject(new Error(`Permission denied when executing git command. ` +
-                `Please check file permissions.`));
-          } else {
-            reject(new Error(errorMessage));
-          }
+          settlePromise(() => {
+            const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
+            console.error(`Spawn error: ${errorMessage}`);
+            
+            if (err.message.includes('ENOENT')) {
+              reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
+            } else if (err.message.includes('EACCES')) {
+              reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
+            } else {
+              reject(new Error(errorMessage));
+            }
+          });
         });
 
-        // Handle abort signal
         signal.addEventListener('abort', () => {
           child.kill('SIGTERM');
-          reject(new Error(`Git command '${commandString}' was aborted`));
         });
 
         if (signal.aborted) {
           child.kill('SIGTERM');
-          reject(new Error(`Git command '${commandString}' was aborted before starting`));
+          settlePromise(() => {
+            reject(new Error(`Git command '${commandString}' was aborted before starting`));
+          });
           return;
         }
         
       } catch (error) {
-        const errorMessage = `Failed to spawn git process: ` +
-          `${error instanceof Error ? error.message : String(error)}`;
-        console.error(`Spawn setup error: ${errorMessage}`);
-        reject(new Error(errorMessage));
+        settlePromise(() => {
+          const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(`Spawn setup error: ${errorMessage}`);
+          reject(new Error(errorMessage));
+        });
       }
     });
   }

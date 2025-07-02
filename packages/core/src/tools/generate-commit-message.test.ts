@@ -256,77 +256,88 @@ describe('GenerateCommitMessageTool', () => {
     expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.any(Object));
   });
 
-  it('should handle pre-commit hook modifications and retry', async () => {
-    const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
-    const statusOutput = 'M  file.txt';
-    const logOutput = 'abc1234 Previous commit message';
+  it('should handle pre-commit hook modifications and retry with appropriate staging strategy', async () => {
+    const testCases = [
+      {
+        name: 'all-changes mode',
+        statusOutput: 'M  file.txt\n M file2.txt', // Mixed changes
+        stagedDiff: 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new',
+        unstagedDiff: 'diff --git a/file2.txt b/file2.txt\n--- a/file2.txt\n+++ b/file2.txt\n@@ -1 +1 @@\n-old2\n+new2',
+        expectAddCalls: true
+      },
+      {
+        name: 'staged-only mode',
+        statusOutput: 'M  file.txt', // Only staged changes
+        stagedDiff: 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new',
+        unstagedDiff: '',
+        expectAddCalls: false
+      }
+    ];
 
-    let commitCallCount = 0;
-    mockSpawn.mockImplementation((_command, args) => {
-      const child = new EventEmitter() as EventEmitter & {
-        stdout: { on: ReturnType<typeof vi.fn> };
-        stderr: { on: ReturnType<typeof vi.fn> };
-      };
-      
-      child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        if (event === 'data') {
-          const argString = args.join(' ');
-          if (argString.includes('status')) {
-            listener(Buffer.from(statusOutput));
-          } else if (argString.includes('diff --cached')) {
-            listener(Buffer.from(diff));
-          } else if (argString.includes('diff') && !argString.includes('--cached')) {
-            listener(Buffer.from(''));
-          } else if (argString.includes('log')) {
-            listener(Buffer.from(logOutput));
-          } else {
-            listener(Buffer.from('')); // Default for add and commit
+    for (const testCase of testCases) {
+      let commitCallCount = 0;
+      mockSpawn.mockImplementation((_command, args) => {
+        const child = new EventEmitter() as EventEmitter & {
+          stdout: { on: ReturnType<typeof vi.fn> };
+          stderr: { on: ReturnType<typeof vi.fn> };
+        };
+        
+        child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data') {
+            const argString = args.join(' ');
+            if (argString.includes('status')) {
+              listener(Buffer.from(testCase.statusOutput));
+            } else if (argString.includes('diff --cached')) {
+              listener(Buffer.from(testCase.stagedDiff));
+            } else if (argString.includes('diff') && !argString.includes('--cached')) {
+              listener(Buffer.from(testCase.unstagedDiff));
+            } else if (argString.includes('log')) {
+              listener(Buffer.from('abc1234 Previous commit message'));
+            } else {
+              listener(Buffer.from(''));
+            }
           }
-        }
-      }) };
-      
-      child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        if (event === 'data' && args.includes('commit') && commitCallCount === 0) {
-          listener(Buffer.from('pre-commit hook failed'));
-        }
-      }) };
-      
-      process.nextTick(() => {
-        if (args.includes('commit')) {
-          commitCallCount++;
-          if (commitCallCount === 1) {
-            child.emit('close', 1); // First commit fails
-          } else {
-            child.emit('close', 0); // Second commit succeeds
+        }) };
+        
+        child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data' && args.includes('commit') && commitCallCount === 0) {
+            listener(Buffer.from('pre-commit hook failed'));
           }
-        } else {
-          child.emit('close', 0); // All other commands succeed
-        }
+        }) };
+        
+        process.nextTick(() => {
+          if (args.includes('commit')) {
+            commitCallCount++;
+            child.emit('close', commitCallCount === 1 ? 1 : 0); // First fails, second succeeds
+          } else {
+            child.emit('close', 0);
+          }
+        });
+        
+        return child;
       });
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'feat: test changes' }] } }],
+      });
+
+      const result = await tool.execute(undefined, new AbortController().signal);
+
+      expect(result.llmContent).toBe('Commit created successfully after pre-commit hook modifications!\n\nCommit message:\nfeat: test changes');
       
-      return child;
-    });
-
-    (mockClient.generateContent as Mock).mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [{ text: 'feat: new feature' }],
-          },
-        },
-      ],
-    });
-
-    const controller = new AbortController();
-    const result = await tool.execute(undefined, controller.signal);
-
-    expect(result.llmContent).toBe('Commit created successfully after pre-commit hook modifications!\n\nCommit message:\nfeat: new feature');
-    expect(result.returnDisplay).toBe('Commit created successfully after pre-commit hook modifications!\n\nCommit message:\nfeat: new feature');
-    
-    // Verify retry staging was called
-    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.any(Object));
-    // Verify both commit attempts were made
-    expect(commitCallCount).toBe(2);
+      const addCalls = mockSpawn.mock.calls.filter(call => 
+        call[0] === 'git' && call[1]?.includes('add') && call[1]?.includes('.')
+      );
+      
+      if (testCase.expectAddCalls) {
+        expect(addCalls.length).toBeGreaterThanOrEqual(1);
+      } else {
+        expect(addCalls).toHaveLength(0);
+      }
+      
+      expect(commitCallCount).toBe(2);
+      vi.clearAllMocks();
+    }
   });
 
   it('should return an error when spawn process fails to start', async () => {
