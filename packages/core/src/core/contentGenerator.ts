@@ -116,7 +116,10 @@ export async function createContentGeneratorConfig(
   }
 
   // OpenAI Compatible API (includes OpenAI, local LLMs with OpenAI-compatible endpoints)
-  if (authType === AuthType.USE_OPENAI_COMPATIBLE && openaiApiKey) {
+  if (authType === AuthType.USE_OPENAI_COMPATIBLE) {
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is required for openai-compatible auth type.');
+    }
     contentGeneratorConfig.apiKey = openaiApiKey;
     contentGeneratorConfig.baseUrl = customBaseUrl || 'https://api.openai.com/v1';
     // Use OpenAI model names instead of Gemini model names
