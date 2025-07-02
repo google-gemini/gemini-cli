@@ -188,33 +188,33 @@ Strategy: ${commitModeText}${filesDisplay}`,
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
     try {
       let finalCommitMessage: string;
-      let statusOutput: string;
 
-      if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS)) {
+      const gitState = await this.analyzeGitState(signal);
+
+      if (!gitState.diffOutput.trim()) {
+        return {
+          llmContent: 'No changes detected in the current workspace.',
+          returnDisplay: 'No changes detected in the current workspace.',
+        };
+      }
+
+      // Check if the cached data is still valid by comparing the staged diff
+      if (
+        this.cachedCommitData &&
+        Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS &&
+        this.cachedCommitData.diffOutput === gitState.diffOutput
+      ) {
         finalCommitMessage = this.cachedCommitData.commitMessage;
-        statusOutput = this.cachedCommitData.statusOutput;
-        
       } else {
-        
-        const gitState = await this.analyzeGitState(signal);
-        statusOutput = gitState.statusOutput;
-
-        if (!gitState.diffOutput.trim()) {
-          return {
-            llmContent: 'No changes detected in the current workspace.',
-            returnDisplay: 'No changes detected in the current workspace.',
-          };
-        }
-
         const commitMessage = await this.generateCommitMessage(
           gitState.statusOutput,
           gitState.diffOutput,
           gitState.logOutput,
-          signal
+          signal,
         );
 
         finalCommitMessage = commitMessage;
-        
+
         this.cachedCommitData = {
           statusOutput: gitState.statusOutput,
           diffOutput: gitState.diffOutput,
@@ -224,7 +224,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
         };
       }
 
-      
       // Create commit with generated message
       try {
         await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
