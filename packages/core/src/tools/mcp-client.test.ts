@@ -646,6 +646,29 @@ describe('discoverMcpTools', () => {
     expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
   });
 
+  it('should throw a specific error for 401 Unauthorized', async () => {
+    const serverConfig: MCPServerConfig = {
+      httpUrl: 'http://localhost:4001/mcp',
+    };
+    mockConfig.getMcpServers.mockReturnValue({
+      'unauthorized-server': serverConfig,
+    });
+    vi.mocked(Client.prototype.connect).mockRejectedValue(
+      new Error('Request failed with status 401'),
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      ),
+    ).rejects.toThrow(
+      "The MCP server at 'http://localhost:4001/mcp' requires OAuth2.x authentication, which is not yet fully supported by the Gemini CLI. As a temporary workaround, you can manually provide a bearer token. Please see PR #2477 for more details.",
+    );
+  });
+
   it('should assign mcpClient.onerror handler', async () => {
     const serverConfig: MCPServerConfig = { command: './mcp-onerror' };
     mockConfig.getMcpServers.mockReturnValue({
