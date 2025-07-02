@@ -78,7 +78,7 @@ export async function runNonInteractive(
 
       for await (const resp of responseStream) {
         if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
+          console.error('Operation canceled.');
           return;
         }
         const textPart = getResponseText(resp);

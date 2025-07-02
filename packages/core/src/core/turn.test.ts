@@ -158,7 +158,7 @@ describe('Turn', () => {
       expect(turn.getDebugResponses().length).toBe(1);
     });
 
-    it('should yield UserCancelled event if signal is aborted', async () => {
+    it('should yield UserCanceled event if signal is aborted', async () => {
       const abortController = new AbortController();
       const mockResponseStream = (async function* () {
         yield {
@@ -184,7 +184,7 @@ describe('Turn', () => {
       }
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'First part' },
-        { type: GeminiEventType.UserCancelled },
+        { type: GeminiEventType.UserCanceled },
       ]);
       expect(turn.getDebugResponses().length).toBe(1);
     });
