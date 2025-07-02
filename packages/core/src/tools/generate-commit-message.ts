@@ -16,49 +16,45 @@ import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
+const COMMIT_ANALYSIS_PROMPT = `Analyze the provided git diff and git status to generate a commit message that follows the Conventional Commits specification.
 
-const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise ` +
-  `and meaningful git commit messages following the Conventional Commits format.
+## Commit Message Format
+The commit message MUST follow this structure:
+\`\`\`
+<type>[optional scope]: <description>
 
-Your task is to analyze git changes and generate commit messages that follow this specific workflow:
+[optional body]
 
-# Analysis Process
-1. List the files that have been changed or added
-2. Summarize the nature of the changes (new feature, enhancement, bug fix, refactoring, test, docs, etc.)
-3. Determine the purpose or motivation behind these changes
-4. Assess the impact of these changes on the overall project
-5. Check for any sensitive information that shouldn't be committed
-6. Draft a concise commit message that focuses on the "why" rather than the "what"
+[optional footer(s)]
+\`\`\`
 
-# Commit Message Format
-- **Header**: \`type(scope): subject\` (lowercase)
-- **Types**: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
-- **Body**: Optional. Explain the "what" and "why" using imperative, present tense
-- **Footer**: Optional. For BREAKING CHANGES and issue references
+- **Main Types**:
+  - \`feat\`: A new feature (correlates with MINOR in SemVer).
+  - \`fix\`: A bug fix (correlates with PATCH in SemVer).
+- **Other Types**: \`docs\`, \`style\`, \`refactor\`, \`perf\`, \`test\`, \`build\`, \`ci\`, \`chore\`, \`revert\`.
+- **Breaking Changes**: Use a \`!\` after the type/scope (e.g., \`feat(api)!\`) and/or a footer starting with \`BREAKING CHANGE:\`. This correlates with MAJOR in SemVer.
+- **Scope**: A noun in parentheses describing the section of the codebase, e.g., \`(parser)\`.
 
-# Requirements
-- Message must be clear, concise, and to the point
-- Must accurately reflect the changes and their purpose
-- Avoid generic words like "Update" or "Fix" without context
-- Focus on the motivation and impact, not just the implementation details
+## Instructions
+1.  First, provide your analysis of the changes inside \`<commit_analysis>\` XML tags. Explain the purpose ("why") of the changes.
+2.  Then, on a new line, provide ONLY the raw commit message.
 
-# Output Format
-Please provide your analysis in <commit_analysis> tags, then provide the final commit message.
-
-# Git Status
+## Git Status
 \`\`\`
 {{status}}
 \`\`\`
 
-# Git Diff
+## Git Diff
 \`\`\`diff
 {{diff}}
 \`\`\`
 
-# Recent Commit Messages (for reference)
+## Recent Commit Messages (for reference)
 \`\`\`
 {{log}}
 \`\`\``;
+
+const COMMIT_CACHE_TIMEOUT_MS = 30000; // 30 seconds
 
 export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   static readonly Name = 'generate_commit_message';
@@ -71,48 +67,24 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     diffOutput: string;
     logOutput: string;
     commitMessage: string;
-    finalCommitMessage: string;
     timestamp: number;
-    commitMode: 'staged-only' | 'all-changes';
   } | null = null;
 
   private async analyzeGitState(signal: AbortSignal): Promise<{
     statusOutput: string;
     diffOutput: string;
     logOutput: string;
-    commitMode: 'staged-only' | 'all-changes';
   }> {
-    const [statusOutput, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
+    const [statusOutput, stagedDiff, logOutput] = await Promise.all([
       this.executeGitCommand(['status', '--porcelain'], signal),
       this.executeGitCommand(['diff', '--cached'], signal),
-      this.executeGitCommand(['diff'], signal),
       this.executeGitCommand(['log', '--oneline', '-10'], signal)
     ]);
 
-    const hasStagedChanges = Boolean(stagedDiff?.trim());
-    const hasUnstagedChanges = Boolean(unstagedDiff?.trim());
-    // Fix: More accurate detection of untracked files using regex
-    const hasUntrackedFiles = /^\?\? /m.test(statusOutput || '');
-
-    let commitMode: 'staged-only' | 'all-changes';
-    let diffOutput: string;
-
-    if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
-      commitMode = 'staged-only';
-      diffOutput = stagedDiff || '';
-    } else {
-      commitMode = 'all-changes';
-      const diffs = [];
-      if (stagedDiff?.trim()) diffs.push(stagedDiff);
-      if (unstagedDiff?.trim()) diffs.push(unstagedDiff);
-      diffOutput = diffs.join('\n');
-    }
-
     return {
       statusOutput: statusOutput || '',
-      diffOutput,
+      diffOutput: stagedDiff || '',
       logOutput: logOutput || '',
-      commitMode
     };
   }
 
@@ -162,7 +134,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         signal
       );
 
-      const finalCommitMessage = this.addGeminiSignature(commitMessage);
+      const finalCommitMessage = commitMessage;
       
       // Cache the data for execute method
       this.cachedCommitData = {
@@ -170,15 +142,12 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         diffOutput: gitState.diffOutput,
         logOutput: gitState.logOutput,
         commitMessage,
-        finalCommitMessage,
         timestamp: Date.now(),
-        commitMode: gitState.commitMode
       };
 
       // Determine which files will be committed for display
       const filesToCommit = this.parseFilesToBeCommitted(
-        gitState.statusOutput, 
-        gitState.commitMode === 'staged-only'
+        gitState.statusOutput
       );
       
       let filesDisplay = '';
@@ -187,14 +156,12 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           `${filesToCommit.map(f => `  ${f}`).join('\n')}`;
       }
 
-      const commitModeText = gitState.commitMode === 'staged-only' 
-        ? 'staged changes only' 
-        : 'all changes (staged & unstaged)';
+      const commitModeText = 'staged changes only';
 
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
         title: 'Confirm Git Commit',
-        command: `git commit ${gitState.commitMode === 'all-changes' ? '(will stage all changes) ' : ''}
+        command: `git commit 
 
 Commit message:
 ${finalCommitMessage}
@@ -222,8 +189,8 @@ Strategy: ${commitModeText}${filesDisplay}`,
       let statusOutput: string;
 
       // Check if we have cached data from shouldConfirmExecute
-      if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < 30000)) {
-        finalCommitMessage = this.cachedCommitData.finalCommitMessage;
+      if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS)) {
+        finalCommitMessage = this.cachedCommitData.commitMessage;
         statusOutput = this.cachedCommitData.statusOutput;
         
         // Keep cache for staging strategy execution - don't clear yet
@@ -246,7 +213,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
           signal
         );
 
-        finalCommitMessage = this.addGeminiSignature(commitMessage);
+        finalCommitMessage = commitMessage;
         
         // Cache the data for staging strategy
         this.cachedCommitData = {
@@ -254,17 +221,12 @@ Strategy: ${commitModeText}${filesDisplay}`,
           diffOutput: gitState.diffOutput,
           logOutput: gitState.logOutput,
           commitMessage,
-          finalCommitMessage,
           timestamp: Date.now(),
-          commitMode: gitState.commitMode
         };
       }
 
-      // Step 3: Handle staging based on cached strategy
-      const cachedData = this.cachedCommitData;
-      if (cachedData && cachedData.commitMode === 'all-changes') {
-        await this.executeGitCommand(['add', '.'], signal);
-      }
+      // Step 3: Staging is now handled by the user before running the tool.
+      // The 'git add .' command has been removed to prevent accidentally staging untracked files.
 
       // Step 4: Create commit
       
@@ -274,47 +236,44 @@ Strategy: ${commitModeText}${filesDisplay}`,
         // Clear cache after successful commit
         this.cachedCommitData = null;
         
-        // Step 5: Verify commit was successful
-        await this.executeGitCommand(['status', '--porcelain'], signal);
-        
         return {
           llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
           returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
         };
       } catch (commitError) {
-        // Handle pre-commit hook modifications with comprehensive retry
-        if (commitError instanceof Error && 
-            (commitError.message.includes('pre-commit') || 
-             commitError.message.includes('index.lock') ||
-             commitError.message.includes('hook'))) {
-          
-          // Only stage files if we're in 'all-changes' mode
-          // In 'staged-only' mode, pre-commit hooks should only modify already staged files
-          if (cachedData && cachedData.commitMode === 'all-changes') {
-            await this.executeGitCommand(['add', '.'], signal);
-          }
-          
-          try {
-            await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
-            
-            // Clear cache after successful retry commit
-            this.cachedCommitData = null;
-            
-            return {
-              llmContent: `Commit created successfully after pre-commit hook modifications!\n\n` +
-                `Commit message:\n${finalCommitMessage}`,
-              returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\n` +
-                `Commit message:\n${finalCommitMessage}`,
-            };
-          } catch (retryError) {
-            // If retry fails, provide detailed error information
-            const errorDetails = retryError instanceof Error ? 
-              retryError.message : String(retryError);
-            throw new Error(`Commit failed after pre-commit hook retry. ` +
-              `Original error: ${commitError.message}. Retry error: ${errorDetails}`);
-          }
+        if (!(commitError instanceof Error)) {
+          throw commitError; // Re-throw non-Error objects
         }
-        throw commitError;
+
+        const isPreCommitHookError = /\.git\/hooks\//.test(commitError.message);
+        const isIndexLockError = commitError.message.includes('index.lock');
+
+        if (!isPreCommitHookError && !isIndexLockError) {
+          throw commitError; // Not a hook or lock error, re-throw
+        }
+        
+        // It is a hook or lock error, so we retry once.
+        try {
+          // Pre-commit hooks might have modified files. The user is expected to have re-staged them
+          // if necessary. We no longer automatically 'git add .'.
+          await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
+          
+          // Clear cache after successful retry commit
+          this.cachedCommitData = null;
+          
+          return {
+            llmContent: `Commit created successfully after pre-commit hook modifications!\n\n` +
+              `Commit message:\n${finalCommitMessage}`,
+            returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\n` +
+              `Commit message:\n${finalCommitMessage}`,
+          };
+        } catch (retryError) {
+          // If retry fails, provide detailed error information
+          const errorDetails = retryError instanceof Error ? 
+            retryError.message : String(retryError);
+          throw new Error(`Commit failed after pre-commit hook retry. ` +
+            `Original error: ${commitError.message}. Retry error: ${errorDetails}`);
+        }
       }
 
     } catch (error) {
@@ -334,13 +293,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const commandString = `git ${args.join(' ')}`;
-      let isSettled = false;
-      
-      const settlePromise = (action: () => void) => {
-        if (isSettled) return;
-        isSettled = true;
-        action();
-      };
       
       try {
         const child = spawn('git', args, { signal, stdio: 'pipe' });
@@ -356,55 +308,40 @@ Strategy: ${commitModeText}${filesDisplay}`,
         });
 
         if (stdin && child.stdin) {
-          child.stdin.write(stdin);
+          // Sanitize stdin to remove potentially harmful control characters,
+          // allowing only printable ASCII and common whitespace.
+          const sanitizedStdin = stdin.replace(/[^\x20-\x7E\n\r\t]/g, '');
+          child.stdin.write(sanitizedStdin);
           child.stdin.end();
         }
 
         child.on('close', (exitCode) => {
-          settlePromise(() => {
-            if (exitCode !== 0) {
-              const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
-              console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
-              reject(new Error(errorMessage));
-            } else {
-              resolve(stdout.trim() || null);
-            }
-          });
+          if (exitCode !== 0) {
+            const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
+            console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
+            reject(new Error(errorMessage));
+          } else {
+            resolve(stdout.trim() || null);
+          }
         });
 
         child.on('error', (err) => {
-          settlePromise(() => {
-            const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-            console.error(`Spawn error: ${errorMessage}`);
-            
-            if (err.message.includes('ENOENT')) {
-              reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
-            } else if (err.message.includes('EACCES')) {
-              reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
-            } else {
-              reject(new Error(errorMessage));
-            }
-          });
+          const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
+          console.error(`Spawn error: ${errorMessage}`);
+          
+          if (err.message.includes('ENOENT')) {
+            reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
+          } else if (err.message.includes('EACCES')) {
+            reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
+          } else {
+            reject(new Error(errorMessage));
+          }
         });
-
-        signal.addEventListener('abort', () => {
-          child.kill('SIGTERM');
-        });
-
-        if (signal.aborted) {
-          child.kill('SIGTERM');
-          settlePromise(() => {
-            reject(new Error(`Git command '${commandString}' was aborted before starting`));
-          });
-          return;
-        }
         
       } catch (error) {
-        settlePromise(() => {
-          const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
-          console.error(`Spawn setup error: ${errorMessage}`);
-          reject(new Error(errorMessage));
-        });
+        const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`Spawn setup error: ${errorMessage}`);
+        reject(new Error(errorMessage));
       }
     });
   }
@@ -441,7 +378,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     }
   }
 
-  private parseFilesToBeCommitted(statusOutput: string, hasStagedChanges: boolean): string[] {
+  private parseFilesToBeCommitted(statusOutput: string): string[] {
     const lines = statusOutput.split('\n').filter(line => line.trim());
     const files: string[] = [];
 
@@ -454,17 +391,10 @@ Strategy: ${commitModeText}${filesDisplay}`,
       // Skip files in node_modules and .git
       if (filename.includes('node_modules/') || filename.includes('.git/')) continue;
       
-      // If we have staged changes, only show staged files
-      if (hasStagedChanges) {
-        // First character represents staged status
-        if (status[0] !== ' ' && status[0] !== '?') {
-          files.push(filename);
-        }
-      } else {
-        // If no staged changes, show all modified and untracked files
-        if (status[0] !== ' ' || status[1] !== ' ') {
-          files.push(filename);
-        }
+      // First character represents staged status.
+      // Any character other than a space or '?' indicates a staged change.
+      if (status[0] !== ' ' && status[0] !== '?') {
+        files.push(filename);
       }
     }
 
@@ -511,10 +441,5 @@ Strategy: ${commitModeText}${filesDisplay}`,
       throw new Error(`Failed to generate commit message: ` +
         `${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  private addGeminiSignature(commitMessage: string): string {
-    // Return the commit message without any signature
-    return commitMessage;
   }
 }
