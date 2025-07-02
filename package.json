@@ -84,5 +84,8 @@
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
   },
-  "dependencies": {}
+  "dependencies": {
+    "tailwindcss": "^4.1.11",
+    "tailwindcss-animate": "^1.0.7"
+  }
 }
