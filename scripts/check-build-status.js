@@ -145,18 +145,4 @@ if (newerSourceFileFound) {
   }
 }
 
-// Node version check
-const [major] = process.versions.node.split('.').map(Number);
-if (major < 20) {
-  const nodeWarning = `Warning: You are using Node.js v${process.versions.node}. Updating to Node.js 20 or higher is recommended for best results.`;
-  warningMessages.push(nodeWarning);
-  try {
-    fs.writeFileSync(warningsFilePath, warningMessages.join('\n'));
-  } catch (err) {
-    console.error(
-      `[Check Script] Error writing Node version warning: ${err.message}`,
-    );
-  }
-}
-
 process.exit(0); // Always exit successfully so the app starts

@@ -21,6 +21,7 @@ import {
   USER_SETTINGS_PATH,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
+import { getNodeVersionWarning } from './utils/nodeVersionWarning.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
@@ -165,7 +166,13 @@ export async function main() {
     }
   }
   let input = config.getQuestion();
+
+  // Collect startup warnings and add Node.js version warning if needed
   const startupWarnings = await getStartupWarnings();
+  const nodeWarning = getNodeVersionWarning(20);
+  if (nodeWarning) {
+    startupWarnings.unshift(nodeWarning); // Show Node warning first
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
