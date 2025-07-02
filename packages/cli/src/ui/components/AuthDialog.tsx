@@ -95,10 +95,22 @@ export function AuthDialog({
         const keyExists = lines.some(line => line.startsWith(`${keyName}=`));
         
         if (keyExists) {
-          // Update existing key
+          // Update existing key while preserving comments and formatting
           envContent = lines.map(line => {
-            if (line.startsWith(`${keyName}=`)) {
-              return `${keyName}=${cleanedApiKey}`;
+            // Match the key at the beginning of the line
+            const keyPattern = new RegExp(`^${keyName}=`);
+            if (keyPattern.test(line)) {
+              // Replace only the value, preserving any comments
+              const commentIndex = line.indexOf('#');
+              if (commentIndex > -1) {
+                // Preserve inline comments
+                const beforeComment = line.substring(0, commentIndex).trimEnd();
+                const comment = line.substring(commentIndex);
+                return `${keyName}=${cleanedApiKey} ${comment}`;
+              } else {
+                // No comments, just replace the line
+                return `${keyName}=${cleanedApiKey}`;
+              }
             }
             return line;
           }).join('\n');

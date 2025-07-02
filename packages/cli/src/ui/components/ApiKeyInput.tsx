@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdin } from 'ink';
 import { Colors } from '../colors.js';
 
@@ -16,6 +16,16 @@ export function ApiKeyInput({
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const { stdin, setRawMode } = useStdin();
+  
+  // Use refs to avoid effect re-runs
+  const apiKeyRef = useRef(apiKey);
+  const onSubmitRef = useRef(onSubmit);
+  const onCancelRef = useRef(onCancel);
+  
+  // Update refs when values change
+  apiKeyRef.current = apiKey;
+  onSubmitRef.current = onSubmit;
+  onCancelRef.current = onCancel;
 
   useEffect(() => {
     setRawMode(true);
@@ -25,16 +35,16 @@ export function ApiKeyInput({
       
       // Handle special keys
       if (input === '\x03') { // Ctrl+C
-        onCancel();
+        onCancelRef.current();
         return;
       }
       if (input === '\x1b') { // Escape
-        onCancel();
+        onCancelRef.current();
         return;
       }
       if (input === '\r' || input === '\n') { // Enter
-        if (apiKey.trim()) {
-          onSubmit(apiKey.trim());
+        if (apiKeyRef.current.trim()) {
+          onSubmitRef.current(apiKeyRef.current.trim());
         }
         return;
       }
@@ -65,7 +75,7 @@ export function ApiKeyInput({
       setRawMode(false);
       stdin?.off('data', handleData);
     };
-  }, [stdin, setRawMode, apiKey, onSubmit, onCancel]);
+  }, [stdin, setRawMode]); // Dependencies fixed - no apiKey, onSubmit, onCancel
 
   const displayValue = showKey ? apiKey : '*'.repeat(Math.min(apiKey.length, 60));
 
