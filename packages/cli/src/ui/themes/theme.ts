@@ -58,7 +58,7 @@ export const darkTheme: ColorsTheme = {
 
 export const ansiTheme: ColorsTheme = {
   type: 'ansi',
-  Background: 'black',
+  Background: '#010101',
   Foreground: 'white',
   LightBlue: 'blue',
   AccentBlue: 'blue',

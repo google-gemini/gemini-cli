@@ -8,7 +8,7 @@ import { type ColorsTheme, Theme } from './theme.js';
 
 const ansiColors: ColorsTheme = {
   type: 'dark',
-  Background: 'black',
+  Background: '#010101',
   Foreground: 'white',
   LightBlue: 'bluebright',
   AccentBlue: '#0000FF',
@@ -30,7 +30,7 @@ export const ANSI: Theme = new Theme(
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: 'black', // Mapped from #1E1E1E
+      background: '#010101', // Mapped from #1E1E1E
       color: 'white', // Mapped from #DCDCDC
     },
     'hljs-keyword': {
