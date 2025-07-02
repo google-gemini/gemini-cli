@@ -498,7 +498,7 @@ describe('useReactToolScheduler', () => {
     ]);
   });
 
-  it.skip('should handle tool requiring confirmation - cancelled by user', async () => {
+      it.skip('should handle tool requiring confirmation - canceled by user', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
     const { result } = renderScheduler();
     const schedule = result.current[1];
@@ -533,14 +533,14 @@ describe('useReactToolScheduler', () => {
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
-        status: 'cancelled',
+        status: 'canceled',
         request,
         response: expect.objectContaining({
           responseParts: expect.arrayContaining([
             expect.objectContaining({
               functionResponse: expect.objectContaining({
                 response: expect.objectContaining({
-                  error: `User did not allow tool call ${request.name}. Reason: User cancelled.`,
+                  error: `User did not allow tool call ${request.name}. Reason: User canceled.`,
                 }),
               }),
             }),
@@ -945,17 +945,17 @@ describe('mapToDisplay', () => {
       expectedDescription: baseTool.getDescription(baseRequest.args),
     },
     {
-      name: 'cancelled',
-      status: 'cancelled',
+      name: 'canceled',
+      status: 'canceled',
       extraProps: {
         tool: baseTool,
         response: {
           ...baseResponse,
-          resultDisplay: 'Cancelled display',
+          resultDisplay: 'canceled display',
         },
       },
-      expectedStatus: ToolCallStatus.Canceled,
-      expectedResultDisplay: 'Cancelled display',
+              expectedStatus: ToolCallStatus.canceled,
+              expectedResultDisplay: 'canceled display',
       expectedName: baseTool.displayName,
       expectedDescription: baseTool.getDescription(baseRequest.args),
     },

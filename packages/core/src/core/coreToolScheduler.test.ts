@@ -118,7 +118,7 @@ describe('CoreToolScheduler', () => {
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('cancelled');
+    expect(completedCalls[0].status).toBe('canceled');
   });
 });
 

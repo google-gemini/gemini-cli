@@ -25,7 +25,7 @@ export enum GeminiEventType {
 
 export enum ToolCallStatus {
   Pending = 'Pending',
-  Canceled = 'Canceled',
+  canceled = 'canceled',
   Confirming = 'Confirming',
   Executing = 'Executing',
   Success = 'Success',

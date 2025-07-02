@@ -102,9 +102,9 @@ describe('<ToolMessage />', () => {
       expect(lastFrame()).toContain('?');
     });
 
-    it('shows - for Canceled status', () => {
+    it('shows - for canceled status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Canceled} />,
+        <ToolMessage {...baseProps} status={ToolCallStatus.canceled} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toContain('-');

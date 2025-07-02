@@ -132,7 +132,7 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
     {status === ToolCallStatus.Confirming && (
       <Text color={Colors.AccentYellow}>?</Text>
     )}
-    {status === ToolCallStatus.Canceled && (
+    {status === ToolCallStatus.canceled && (
       <Text color={Colors.AccentYellow} bold>
         -
       </Text>
@@ -175,7 +175,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
     <Box>
       <Text
         wrap="truncate-end"
-        strikethrough={status === ToolCallStatus.Canceled}
+        strikethrough={status === ToolCallStatus.canceled}
       >
         <Text color={nameColor} bold>
           {name}

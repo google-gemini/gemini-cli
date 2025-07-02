@@ -173,7 +173,7 @@ describe('executeToolCall', () => {
       args: { param1: 'value1' },
       isClientInitiated: false,
     };
-    const cancellationError = new Error('Operation cancelled');
+    const cancellationError = new Error('Operation canceled');
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
 
     vi.mocked(mockTool.execute).mockImplementation(async (_args, signal) => {
@@ -188,7 +188,7 @@ describe('executeToolCall', () => {
         const timeoutId = setTimeout(
           () =>
             reject(
-              new Error('Should have been cancelled if not aborted prior'),
+              new Error('Should have been canceled if not aborted prior'),
             ),
           100,
         );
@@ -206,7 +206,7 @@ describe('executeToolCall', () => {
 
     expect(response.callId).toBe('call4');
     expect(response.error?.message).toBe(cancellationError.message);
-    expect(response.resultDisplay).toBe('Operation cancelled');
+          expect(response.resultDisplay).toBe('Operation canceled');
   });
 
   it('should correctly format llmContent with inlineData', async () => {

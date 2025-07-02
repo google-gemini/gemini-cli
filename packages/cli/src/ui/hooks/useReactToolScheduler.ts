@@ -12,7 +12,7 @@ import {
   ValidatingToolCall,
   WaitingToolCall,
   CompletedToolCall,
-  CancelledToolCall,
+  canceledToolCall,
   CoreToolScheduler,
   OutputUpdateHandler,
   AllToolCallsCompleteHandler,
@@ -51,7 +51,7 @@ export type TrackedExecutingToolCall = ExecutingToolCall & {
 export type TrackedCompletedToolCall = CompletedToolCall & {
   responseSubmittedToGemini?: boolean;
 };
-export type TrackedCancelledToolCall = CancelledToolCall & {
+export type TrackedcanceledToolCall = canceledToolCall & {
   responseSubmittedToGemini?: boolean;
 };
 
@@ -61,7 +61,7 @@ export type TrackedToolCall =
   | TrackedWaitingToolCall
   | TrackedExecutingToolCall
   | TrackedCompletedToolCall
-  | TrackedCancelledToolCall;
+  | TrackedcanceledToolCall;
 
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => void,
@@ -190,8 +190,8 @@ function mapCoreStatusToDisplayStatus(coreStatus: CoreStatus): ToolCallStatus {
       return ToolCallStatus.Executing;
     case 'success':
       return ToolCallStatus.Success;
-    case 'cancelled':
-      return ToolCallStatus.Canceled;
+    case 'canceled':
+      return ToolCallStatus.canceled;
     case 'error':
       return ToolCallStatus.Error;
     case 'scheduled':
@@ -259,7 +259,7 @@ export function mapToDisplay(
             resultDisplay: trackedCall.response.resultDisplay,
             confirmationDetails: undefined,
           };
-        case 'cancelled':
+        case 'canceled':
           return {
             ...baseDisplayProperties,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),

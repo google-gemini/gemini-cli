@@ -256,8 +256,8 @@ Process Group PGID: Process group started or \`(none)\``,
 
     if (abortSignal.aborted) {
       return {
-        llmContent: 'Command was cancelled by user before it could start.',
-        returnDisplay: 'Command cancelled by user.',
+        llmContent: 'Command was canceled by user before it could start.',
+        returnDisplay: 'Command canceled by user.',
       };
     }
 
@@ -409,11 +409,11 @@ Process Group PGID: Process group started or \`(none)\``,
 
     let llmContent = '';
     if (abortSignal.aborted) {
-      llmContent = 'Command was cancelled by user before it could complete.';
+      llmContent = 'Command was canceled by user before it could complete.';
       if (output.trim()) {
-        llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${output}`;
+        llmContent += ` Below is the output (on stdout and stderr) before it was canceled:\n${output}`;
       } else {
-        llmContent += ' There was no output before it was cancelled.';
+        llmContent += ' There was no output before it was canceled.';
       }
     } else {
       llmContent = [
@@ -436,9 +436,9 @@ Process Group PGID: Process group started or \`(none)\``,
       if (output.trim()) {
         returnDisplayMessage = output;
       } else {
-        // Output is empty, let's provide a reason if the command failed or was cancelled
+        // Output is empty, let's provide a reason if the command failed or was canceled
         if (abortSignal.aborted) {
-          returnDisplayMessage = 'Command cancelled by user.';
+          returnDisplayMessage = 'Command canceled by user.';
         } else if (processSignal) {
           returnDisplayMessage = `Command terminated by signal: ${processSignal}`;
         } else if (error) {
