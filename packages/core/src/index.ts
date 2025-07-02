@@ -55,6 +55,8 @@ export * from './tools/web-search.js';
 export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
+export * from './tools/ListCRI.js';
+
 
 // Export telemetry functions
 export * from './telemetry/index.js';
