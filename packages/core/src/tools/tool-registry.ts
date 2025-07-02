@@ -10,6 +10,10 @@ import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
 import { discoverMcpTools } from './mcp-client.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { ManifestParser } from './manifest-parser.js';
+import { VirtualShellTool } from './virtual-shell-tool.js';
+import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -230,5 +234,48 @@ export class ToolRegistry {
    */
   getTool(name: string): Tool | undefined {
     return this.tools.get(name);
+  }
+
+  /**
+   * Discovers and registers virtual tools from GEMINI.md manifests.
+   */
+  async discoverVirtualTools(): Promise<void> {
+    try {
+      // Create a minimal FileDiscoveryService instance for memory discovery
+      const fileService = new FileDiscoveryService(this.config.getTargetDir());
+      
+      // Load hierarchical memory to get all GEMINI.md content
+      const { memoryContent } = await loadServerHierarchicalMemory(
+        this.config.getTargetDir(),
+        false, // debugMode
+        fileService,
+        [], // extensionContextFilePaths
+      );
+
+      // Parse virtual tools from the memory content
+      const virtualTools = await ManifestParser.parse(
+        memoryContent,
+        'GEMINI.md (hierarchical)',
+      );
+
+      // Register each virtual tool
+      for (const toolDef of virtualTools) {
+        const virtualTool = new VirtualShellTool(toolDef, this.config);
+        if (this.tools.has(virtualTool.name)) {
+          console.warn(
+            `[ToolRegistry] A tool named '${virtualTool.name}' is already registered. The virtual tool will be ignored.`,
+          );
+        } else {
+          this.registerTool(virtualTool);
+          console.log(
+            `[ToolRegistry] Registered virtual tool '${virtualTool.name}' from GEMINI.md manifest.`,
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[ToolRegistry] Failed to discover virtual tools: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

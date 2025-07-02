@@ -501,6 +501,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(WebSearchTool, config);
   return (async () => {
     await registry.discoverTools();
+    await registry.discoverVirtualTools();
     return registry;
   })();
 }
