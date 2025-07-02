@@ -405,6 +405,9 @@ describe('GenerateCommitMessageTool', () => {
     const logOutput = 'abc1234 Previous commit message';
     const stagedDiff = 'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-old\n+new';
 
+    // Spy on console.debug to capture debug output
+    const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
     // Use a more specific mock that clearly separates the git commands
     mockSpawn.mockImplementation((_command: string, args: string[]) => {
       const child = new EventEmitter() as EventEmitter & {
@@ -427,6 +430,8 @@ describe('GenerateCommitMessageTool', () => {
       } else if (argString === 'commit -F -') {
         child.stdin = { write: vi.fn(), end: vi.fn() };
         output = '';
+      } else if (argString === 'add .') {
+        output = ''; // Handle git add . command
       }
       
       child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
@@ -475,6 +480,27 @@ describe('GenerateCommitMessageTool', () => {
     const addCalls = mockSpawn.mock.calls.filter(call => 
       call[0] === 'git' && call[1] && call[1].includes('add') && call[1].includes('.')
     );
+
+    // Debug: Collect debug info for failure message
+    const debugMessages = consoleDebugSpy.mock.calls.map((call, index) => 
+      `${index}: ${call.join(' ')}`
+    ).join('\n');
+    
+    const gitCommands = mockSpawn.mock.calls.map((call, index) => 
+      `${index}: git ${call[1]?.join(' ')}`
+    ).join('\n');
+
+
     expect(addCalls).toHaveLength(0);
+    if (addCalls.length > 0) {
+      throw new Error(
+        `Expected no 'git add .' calls, but found ${addCalls.length}.\n\n` +
+        `Debug Messages:\n${debugMessages}\n\n` +
+        `Git Commands:\n${gitCommands}`
+      );
+    }
+
+    // Clean up spy
+    consoleDebugSpy.mockRestore();
   });
 });

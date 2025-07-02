@@ -16,13 +16,6 @@ import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
-// Simple logger for consistent logging format
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [GenerateCommitMessage]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR] [GenerateCommitMessage]', ...args),
-};
 
 const COMMIT_ANALYSIS_PROMPT = `You are an expert software engineer specializing in writing concise ` +
   `and meaningful git commit messages following the Conventional Commits format.
@@ -96,9 +89,10 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       this.executeGitCommand(['log', '--oneline', '-10'], signal)
     ]);
 
-    const hasStagedChanges = stagedDiff?.trim() !== '';
-    const hasUnstagedChanges = unstagedDiff?.trim() !== '';
+    const hasStagedChanges = Boolean(stagedDiff?.trim());
+    const hasUnstagedChanges = Boolean(unstagedDiff?.trim());
     const hasUntrackedFiles = statusOutput?.includes('??') || false;
+
 
     let commitMode: 'staged-only' | 'all-changes';
     let diffOutput: string;
@@ -214,28 +208,26 @@ Strategy: ${commitModeText}${filesDisplay}`,
         },
       };
       return confirmationDetails;
-    } catch (_error) {
-      // If we can't gather git info or generate message, skip confirmation
+    } catch (error) {
+      console.error('Error determining commit confirmation details:', error);
+      // If we can't gather git info or generate message, skip confirmation.
+      // The execute method will then attempt the operations again and report the error.
       return false;
     }
   }
 
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
-    logger.debug('Starting git commit workflow...');
-
     try {
       let finalCommitMessage: string;
       let statusOutput: string;
 
       // Check if we have cached data from shouldConfirmExecute
       if (this.cachedCommitData && (Date.now() - this.cachedCommitData.timestamp < 30000)) {
-        logger.debug('Using cached commit message from confirmation...');
         finalCommitMessage = this.cachedCommitData.finalCommitMessage;
         statusOutput = this.cachedCommitData.statusOutput;
         
         // Keep cache for staging strategy execution - don't clear yet
       } else {
-        logger.debug('No valid cache, generating fresh commit message...');
         
         const gitState = await this.analyzeGitState(signal);
         statusOutput = gitState.statusOutput;
@@ -271,13 +263,10 @@ Strategy: ${commitModeText}${filesDisplay}`,
       // Step 3: Handle staging based on cached strategy
       const cachedData = this.cachedCommitData;
       if (cachedData && cachedData.commitMode === 'all-changes') {
-        logger.debug('Staging all changes using git add .');
         await this.executeGitCommand(['add', '.'], signal);
       }
 
       // Step 4: Create commit
-      logger.debug('Creating commit with message:', 
-        finalCommitMessage.substring(0, 100) + '...');
       
       try {
         await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
@@ -298,8 +287,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
             (commitError.message.includes('pre-commit') || 
              commitError.message.includes('index.lock') ||
              commitError.message.includes('hook'))) {
-          logger.debug('Pre-commit hook or staging issue detected, ' +
-            'implementing comprehensive retry...');
           
           // Stage all modified files comprehensively
           await this.executeGitCommand(['add', '.'], signal);
@@ -328,7 +315,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
       }
 
     } catch (error) {
-      logger.error('Error during execution:', error);
+      console.error('Error during execution:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error during commit workflow: ${errorMessage}`,
@@ -344,7 +331,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
   ): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const commandString = `git ${args.join(' ')}`;
-      logger.debug(`Executing: ${commandString}`);
       
       try {
         const child = spawn('git', args, { signal, stdio: 'pipe' });
@@ -368,17 +354,16 @@ Strategy: ${commitModeText}${filesDisplay}`,
         child.on('close', (exitCode) => {
           if (exitCode !== 0) {
             const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
-            logger.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
+            console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
             reject(new Error(errorMessage));
           } else {
-            logger.debug(`Command succeeded: ${commandString}`);
             resolve(stdout.trim() || null);
           }
         });
 
         child.on('error', (err) => {
           const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-          logger.error(`Spawn error: ${errorMessage}`);
+          console.error(`Spawn error: ${errorMessage}`);
           
           // Provide helpful error context
           if (err.message.includes('ENOENT')) {
@@ -407,7 +392,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
       } catch (error) {
         const errorMessage = `Failed to spawn git process: ` +
           `${error instanceof Error ? error.message : String(error)}`;
-        logger.error(`Spawn setup error: ${errorMessage}`);
+        console.error(`Spawn setup error: ${errorMessage}`);
         reject(new Error(errorMessage));
       }
     });
@@ -486,7 +471,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
       .replace('{{diff}}', diff)
       .replace('{{log}}', log);
 
-    logger.debug('Calling Gemini API for commit analysis...');
 
     try {
       const response = await this.client.generateContent(
@@ -512,7 +496,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
 
       return generatedText;
     } catch (error) {
-      logger.error('Error during Gemini API call:', error);
+      console.error('Error during Gemini API call:', error);
       throw new Error(`Failed to generate commit message: ` +
         `${error instanceof Error ? error.message : String(error)}`);
     }
