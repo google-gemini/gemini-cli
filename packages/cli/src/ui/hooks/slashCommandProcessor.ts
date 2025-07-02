@@ -730,8 +730,8 @@ export const useSlashCommandProcessor = (
       {
         name: 'chat',
         description:
-        hasSubCommand: true,
           'Manage conversation history. Usage: /chat <list|save|resume> <tag>',
+        hasSubCommand: true,
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
