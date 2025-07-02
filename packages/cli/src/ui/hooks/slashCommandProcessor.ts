@@ -1110,19 +1110,8 @@ export const useSlashCommandProcessor = (
                 response.candidates[0].content) ||
               '[Could not extract a valid text response from Gemini]';
             addMessage({
-              type: MessageType.USER,
-              content: prompt,
-              timestamp: new Date(),
-            });
-            addMessage({
               type: MessageType.INFO,
               content: aiResponse,
-              timestamp: new Date(),
-            });
-          } else {
-            addMessage({
-              type: MessageType.USER,
-              content: prompt,
               timestamp: new Date(),
             });
           }
