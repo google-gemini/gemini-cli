@@ -17,6 +17,95 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+/**
+ * MCP (Model Context Protocol) 服务调用控制分析
+ * 
+ * 该文件通过系统提示词 (System Prompt) 控制 LLM 如何调用 MCP 服务，
+ * 实现了一个智能的代理系统来管理工具调用和 MCP 服务器交互。
+ * 
+ * 核心控制机制：
+ * 
+ * 1. 工具注册和发现
+ *    - 通过 ${ToolRegistry.Name} 动态注册 MCP 工具
+ *    - 使用 ${ToolDiscoveryTool.Name} 发现可用的 MCP 服务器
+ *    - 支持 MCP 服务器配置管理
+ * 
+ * 2. 工具调用控制
+ *    - 使用 ${ToolCallTool.Name} 执行 MCP 工具调用
+ *    - 通过 ${ToolResultTool.Name} 处理调用结果
+ *    - 支持流式响应和错误处理
+ * 
+ * 3. 会话管理
+ *    - 使用 ${SessionTool.Name} 管理 MCP 会话状态
+ *    - 通过 ${SessionListTool.Name} 列出活跃会话
+ *    - 支持会话恢复和清理
+ * 
+ * 业务流程时序图：
+ * 
+ * ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+ * │   LLM       │    │  Tool       │    │  MCP        │    │  MCP        │
+ * │  Agent      │    │ Registry    │    │ Client      │    │ Server      │
+ * └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+ *        │                   │                   │                   │
+ *        │ 1. 用户请求       │                   │                   │
+ *        │───────────────────▶│                   │                   │
+ *        │                   │                   │                   │
+ *        │ 2. 工具发现       │                   │                   │
+ *        │◀───────────────────│                   │                   │
+ *        │                   │                   │                   │
+ *        │ 3. 选择工具       │                   │                   │
+ *        │───────────────────▶│                   │                   │
+ *        │                   │ 4. 工具调用       │                   │
+ *        │                   │───────────────────▶│                   │
+ *        │                   │                   │ 5. MCP 请求       │
+ *        │                   │                   │───────────────────▶│
+ *        │                   │                   │                   │
+ *        │                   │                   │ 6. 执行操作       │
+ *        │                   │                   │◀───────────────────│
+ *        │                   │                   │                   │
+ *        │                   │                   │ 7. MCP 响应       │
+ *        │                   │                   │◀───────────────────│
+ *        │                   │ 8. 结果返回       │                   │
+ *        │                   │◀───────────────────│                   │
+ *        │ 9. 响应用户       │                   │                   │
+ *        │◀───────────────────│                   │                   │
+ * 
+ * 关键控制点：
+ * 
+ * 1. 工具选择策略
+ *    - 基于用户请求自动选择合适的 MCP 工具
+ *    - 考虑工具的功能、权限和可用性
+ *    - 支持工具链式调用和组合
+ * 
+ * 2. 错误处理机制
+ *    - MCP 服务器连接失败时的重试逻辑
+ *    - 工具调用超时和异常处理
+ *    - 降级策略和备选方案
+ * 
+ * 3. 性能优化
+ *    - 连接池管理和复用
+ *    - 异步调用和并发控制
+ *    - 缓存机制减少重复调用
+ * 
+ * 4. 安全性控制
+ *    - 工具权限验证
+ *    - 输入参数验证和清理
+ *    - 敏感信息保护
+ * 
+ * 配置管理：
+ * 
+ * - MCP 服务器配置通过 Config 类管理
+ * - 支持多种传输协议 (stdio, sse, http, websocket)
+ * - 动态服务器发现和注册
+ * - 会话持久化和恢复
+ * 
+ * 监控和日志：
+ * 
+ * - 工具调用性能监控
+ * - 错误率统计和告警
+ * - 详细的调用日志记录
+ * - 资源使用情况跟踪
+ */
 
 export function getCoreSystemPrompt(userMemory?: string): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file

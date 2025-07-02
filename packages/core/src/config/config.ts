@@ -418,7 +418,7 @@ export class Config {
     return this.proxy;
   }
 
-  getWorkingDir(): string {
+   getWorkingDir(): string {
     return this.cwd;
   }
 
@@ -461,7 +461,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
     : undefined;
 
   // helper to create & register core tools that are enabled
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any 
   const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
     // check both the tool name (.Name) and the class name (.name)
     if (

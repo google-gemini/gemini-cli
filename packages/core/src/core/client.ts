@@ -44,6 +44,70 @@ function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }
+/**
+ * 深度分析 GeminiClient 类的核心业务流程
+ * 
+ * 该类是 Gemini AI 客户端的核心实现，负责与 Gemini API 进行交互，
+ * 管理聊天会话、内容生成、嵌入向量等功能。
+ * 
+ * 核心业务流程分析：
+ * 
+ * 1. 初始化流程 (Initialization Flow)
+ *    - 构造函数：设置代理、模型配置
+ *    - initialize(): 创建内容生成器和聊天会话
+ *    - 支持多种认证方式：OAuth2、API密钥、Vertex AI
+ * 
+ * 2. 聊天会话管理 (Chat Session Management)
+ *    - startChat(): 创建新的聊天会话
+ *    - addHistory(): 添加历史消息
+ *    - getHistory()/setHistory(): 获取/设置聊天历史
+ *    - 支持聊天历史压缩和上下文管理
+ * 
+ * 3. 内容生成流程 (Content Generation Flow)
+ *    - generateContent(): 同步生成内容
+ *    - generateContentStream(): 流式生成内容
+ *    - generateJson(): 生成结构化JSON内容
+ *    - 支持工具调用和函数调用
+ * 
+ * 4. 嵌入向量处理 (Embedding Processing)
+ *    - generateEmbedding(): 生成文本嵌入向量
+ *    - 用于语义搜索和相似度计算
+ * 
+ * 5. 工具集成 (Tool Integration)
+ *    - 支持多种内置工具：文件操作、搜索、Shell等
+ *    - 动态工具发现和注册
+ *    - 工具调用结果处理
+ * 
+ * 6. 错误处理和重试机制 (Error Handling & Retry)
+ *    - 网络错误重试
+ *    - API限制处理
+ *    - 错误报告和日志记录
+ * 
+ * 7. 配置管理 (Configuration Management)
+ *    - 模型选择（Gemini 1.5/2.0/2.5）
+ *    - 代理设置
+ *    - 温度和采样参数
+ *    - 令牌限制管理
+ * 
+ * 8. 性能优化 (Performance Optimization)
+ *    - 聊天历史压缩
+ *    - 令牌计数和限制
+ *    - 流式响应处理
+ *    - 缓存机制
+ * 
+ * 关键设计模式：
+ * - 工厂模式：内容生成器创建
+ * - 策略模式：不同认证方式
+ * - 观察者模式：流式响应处理
+ * - 命令模式：工具调用
+ * 
+ * 数据流：
+ * 用户输入 → 预处理 → API调用 → 响应处理 → 结果输出
+ *     ↓
+ * 工具调用 → 执行 → 结果返回 → 继续对话
+ *     ↓
+ * 历史管理 → 压缩 → 上下文维护
+ */
 
 export class GeminiClient {
   private chat?: GeminiChat;

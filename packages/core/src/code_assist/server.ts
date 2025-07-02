@@ -44,6 +44,131 @@ export const CODE_ASSIST_ENDPOINT =
   process.env.CODE_ASSIST_ENDPOINT ?? 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
+/**
+ * CodeAssistServer 业务流程分析
+ * 
+ * 1. 初始化流程 (Initialization Flow)
+ *    - 构造函数接收 AuthClient、projectId 和 httpOptions
+ *    - 建立与 Code Assist API 的连接
+ *    - 配置认证和项目上下文
+ * 
+ * 2. 内容生成流程 (Content Generation Flow)
+ *    - generateContent(): 同步生成内容
+ *    - generateContentStream(): 流式生成内容
+ *    - 支持请求参数转换和响应处理
+ * 
+ * 3. 用户管理流程 (User Management Flow)
+ *    - onboardUser(): 用户注册和初始化
+ *    - loadCodeAssist(): 加载用户配置和设置
+ *    - 支持长期运行操作
+ * 
+ * 4. API 调用流程 (API Call Flow)
+ *    - callEndpoint(): 同步 API 调用
+ *    - streamEndpoint(): 流式 API 调用
+ *    - 统一的错误处理和重试机制
+ * 
+ * 调用时序图 (Sequence Diagram):
+ * 
+ * ┌─────────┐    ┌─────────────────┐    ┌─────────────┐    ┌─────────────┐
+ * │ Client  │    │ CodeAssistServer│    │   Converter │    │     API     │
+ * └────┬────┘    └─────────┬───────┘    └──────┬──────┘    └──────┬──────┘
+ *      │                   │                   │                  │
+ *      │ 构造函数           │                   │                  │
+ *      │ (auth,projectId)  │                   │                  │
+ *      │ ──────────────────>│                   │                  │
+ *      │                   │ 验证认证信息       │                  │
+ *      │                   │ ─────────────────────────────────────>│
+ *      │                   │                   │                  │
+ *      │ generateContent() │                   │                  │
+ *      │ ──────────────────>│                   │                  │
+ *      │                   │ toGenerateContent │                  │
+ *      │                   │ Request()         │                  │
+ *      │                   │ ──────────────────>│                  │
+ *      │                   │                   │ 转换后的请求      │
+ *      │                   │                   │ ─────────────────>│
+ *      │                   │                   │                  │
+ *      │                   │                   │                  │ 处理请求
+ *      │                   │                   │                  │ ──┐
+ *      │                   │                   │                  │   │
+ *      │                   │                   │                  │ <─┘
+ *      │                   │                   │                  │
+ *      │                   │                   │ CaGenerateContent│
+ *      │                   │                   │ Response         │
+ *      │                   │                   │ <────────────────│
+ *      │                   │ fromGenerateContent│                 │
+ *      │                   │ Response()        │                  │
+ *      │                   │ <──────────────────│                  │
+ *      │ GenerateContent   │                   │                  │
+ *      │ Response          │                   │                  │
+ *      │ <─────────────────│                   │                  │
+ *      │                   │                   │                  │
+ *      │ generateContent   │                   │                  │
+ *      │ Stream()          │                   │                  │
+ *      │ ──────────────────>│                   │                  │
+ *      │                   │ toGenerateContent │                  │
+ *      │                   │ Request()         │                  │
+ *      │                   │ ──────────────────>│                  │
+ *      │                   │                   │ 转换后的请求      │
+ *      │                   │                   │ ─────────────────>│
+ *      │                   │                   │                  │
+ *      │                   │                   │                  │ 流式处理
+ *      │                   │                   │                  │ ──┐
+ *      │                   │                   │                  │   │
+ *      │                   │                   │                  │ <─┘
+ *      │                   │                   │                  │
+ *      │                   │                   │ Stream<Response> │
+ *      │                   │                   │ <────────────────│
+ *      │                   │ fromGenerateContent│                 │
+ *      │                   │ Response()        │                  │
+ *      │                   │ <──────────────────│                  │
+ *      │ AsyncGenerator    │                   │                  │
+ *      │ <Response>        │                   │                  │
+ *      │ <─────────────────│                   │                  │
+ *      │                   │                   │                  │
+ *      │ onboardUser()     │                   │                  │
+ *      │ ──────────────────>│                   │                  │
+ *      │                   │                   │                  │
+ *      │                   │ POST /onboardUser │                  │
+ *      │                   │ ─────────────────────────────────────>│
+ *      │                   │                   │                  │
+ *      │                   │ LongrunningOp     │                  │
+ *      │                   │ Response          │                  │
+ *      │                   │ <────────────────────────────────────│
+ *      │                   │                   │                  │
+ *      │ LongrunningOp     │                   │                  │
+ *      │ Response          │                   │                  │
+ *      │ <─────────────────│                   │                  │
+ *      │                   │                   │                  │
+ *      │ loadCodeAssist()  │                   │                  │
+ *      │ ──────────────────>│                   │                  │
+ *      │                   │                   │                  │
+ *      │                   │ POST /loadCodeAssist                 │
+ *      │                   │ ─────────────────────────────────────>│
+ *      │                   │                   │                  │
+ *      │                   │ LoadCodeAssist    │                  │
+ *      │                   │ Response          │                  │
+ *      │                   │ <────────────────────────────────────│
+ *      │                   │                   │                  │
+ *      │ LoadCodeAssist    │                   │                  │
+ *      │ Response          │                   │                  │
+ *      │ <─────────────────│                   │                  │
+ * 
+ * 关键设计模式：
+ * - 适配器模式：请求/响应转换
+ * - 工厂模式：内容生成器创建
+ * - 策略模式：不同 API 端点处理
+ * - 观察者模式：流式响应处理
+ * 
+ * 数据流：
+ * 用户请求 → 参数转换 → API调用 → 响应转换 → 结果返回
+ *     ↓
+ * 流式处理 → 实时转换 → 增量返回
+ *     ↓
+ * 错误处理 → 重试机制 → 异常报告
+ * 
+ */
+
+
 export class CodeAssistServer implements ContentGenerator {
   constructor(
     readonly auth: AuthClient,
