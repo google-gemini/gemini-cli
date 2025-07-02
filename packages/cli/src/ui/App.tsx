@@ -4,74 +4,76 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import {
+  ApprovalMode,
+  EditorType,
+  getAllGeminiMdFilenames,
+  getErrorMessage,
+  isEditorAvailable,
+  type Config,
+} from '@google/gemini-cli-core';
+import ansiEscapes from 'ansi-escapes';
+import * as fs from 'fs';
 import {
   Box,
   DOMElement,
   measureElement,
   Static,
   Text,
+  useInput,
   useStdin,
   useStdout,
-  useInput,
   type Key as InkKeyType,
 } from 'ink';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
-import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
-import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useAuthCommand } from './hooks/useAuthCommand.js';
-import { useEditorSettings } from './hooks/useEditorSettings.js';
-import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
-import { useConsoleMessages } from './hooks/useConsoleMessages.js';
-import { Header } from './components/Header.js';
-import { LoadingIndicator } from './components/LoadingIndicator.js';
-import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
-import { ShellModeIndicator } from './components/ShellModeIndicator.js';
-import { InputPrompt } from './components/InputPrompt.js';
-import { Footer } from './components/Footer.js';
-import { ThemeDialog } from './components/ThemeDialog.js';
-import { AuthDialog } from './components/AuthDialog.js';
-import { AuthInProgress } from './components/AuthInProgress.js';
-import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
-import { Colors } from './colors.js';
-import { Help } from './components/Help.js';
+import process from 'node:process';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
-import { Tips } from './components/Tips.js';
+import { Colors } from './colors.js';
+import { AuthDialog } from './components/AuthDialog.js';
+import { AuthInProgress } from './components/AuthInProgress.js';
+import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
-import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
-import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
-import { useHistory } from './hooks/useHistoryManager.js';
-import process from 'node:process';
-import {
-  getErrorMessage,
-  type Config,
-  getAllGeminiMdFilenames,
-  ApprovalMode,
-  isEditorAvailable,
-  EditorType,
-} from '@google/gemini-cli-core';
-import { validateAuthMethod } from '../config/auth.js';
-import { useLogger } from './hooks/useLogger.js';
-import { StreamingContext } from './contexts/StreamingContext.js';
+import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
+import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { Footer } from './components/Footer.js';
+import { Header } from './components/Header.js';
+import { Help } from './components/Help.js';
+import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
+import { InputPrompt } from './components/InputPrompt.js';
+import { LoadingIndicator } from './components/LoadingIndicator.js';
+import { PromptsDialog } from './components/prompts-dialog/PromptsDialog.js';
+import { useTextBuffer } from './components/shared/text-buffer.js';
+import { ShellModeIndicator } from './components/ShellModeIndicator.js';
+import { ShowMoreLines } from './components/ShowMoreLines.js';
+import { ThemeDialog } from './components/ThemeDialog.js';
+import { Tips } from './components/Tips.js';
+import { UpdateNotification } from './components/UpdateNotification.js';
+import { OverflowProvider } from './contexts/OverflowContext.js';
 import {
   SessionStatsProvider,
   useSessionStats,
 } from './contexts/SessionContext.js';
-import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { StreamingContext } from './contexts/StreamingContext.js';
+import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
+import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
-import { useTextBuffer } from './components/shared/text-buffer.js';
-import * as fs from 'fs';
-import { UpdateNotification } from './components/UpdateNotification.js';
-import { checkForUpdates } from './utils/updateCheck.js';
-import ansiEscapes from 'ansi-escapes';
-import { OverflowProvider } from './contexts/OverflowContext.js';
-import { ShowMoreLines } from './components/ShowMoreLines.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useEditorSettings } from './hooks/useEditorSettings.js';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { useHistory } from './hooks/useHistoryManager.js';
+import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useLogger } from './hooks/useLogger.js';
+import { usePromptsCommand } from './hooks/usePromptsCommand.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { MessageType, StreamingState, type HistoryItem } from './types.js';
+import { checkForUpdates } from './utils/updateCheck.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -156,6 +158,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
+
+  const { isPromptsDialogOpen, openPromptsDialog, closePromptsDialog } =
+    usePromptsCommand();
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -278,6 +283,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
+    openPromptsDialog,
     performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
@@ -541,6 +547,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     return getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
 
+  const handlePromptsSubmit = useCallback(
+    (query: string) => {
+      closePromptsDialog();
+      handleFinalSubmit(query);
+    },
+    [closePromptsDialog, handleFinalSubmit],
+  );
+
   if (quittingMessages) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -673,6 +687,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 onSelect={handleAuthSelect}
                 settings={settings}
                 initialErrorMessage={authError}
+              />
+            </Box>
+          ) : isPromptsDialogOpen ? (
+            <Box flexDirection="column">
+              <PromptsDialog
+                onSubmit={handlePromptsSubmit}
+                config={config}
+                onEscape={closePromptsDialog}
               />
             </Box>
           ) : isEditorDialogOpen ? (

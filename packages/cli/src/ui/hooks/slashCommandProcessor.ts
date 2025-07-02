@@ -4,12 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo } from 'react';
-import { type PartListUnion } from '@google/genai';
-import open from 'open';
-import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
 import {
   Config,
   GitService,
@@ -19,20 +13,26 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
 } from '@google/gemini-cli-core';
+import { type PartListUnion } from '@google/genai';
+import { promises as fs } from 'fs';
+import process from 'node:process';
+import open from 'open';
+import path from 'path';
+import { useCallback, useMemo } from 'react';
+import { LoadedSettings } from '../../config/settings.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { getCliVersion } from '../../utils/version.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
+  HistoryItem,
+  HistoryItemWithoutId,
   Message,
   MessageType,
-  HistoryItemWithoutId,
-  HistoryItem,
 } from '../types.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { createShowMemoryAction } from './useShowMemoryCommand.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { createShowMemoryAction } from './useShowMemoryCommand.js';
+import { useStateAndRef } from './useStateAndRef.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -72,6 +72,7 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
+  openPromptsDialog: () => void,
   performMemoryRefresh: () => Promise<void>,
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
@@ -912,6 +913,13 @@ export const useSlashCommandProcessor = (
           setPendingCompressionItem(null);
         },
       },
+      {
+        name: 'prompts',
+        description: 'Select a predefined prompt',
+        action: async (_mainCommand, _subCommand, _args) => {
+          openPromptsDialog();
+        },
+      },
     ];
 
     if (config?.getCheckpointingEnabled()) {
@@ -1042,6 +1050,7 @@ export const useSlashCommandProcessor = (
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
+    openPromptsDialog,
     clearItems,
     performMemoryRefresh,
     showMemoryAction,

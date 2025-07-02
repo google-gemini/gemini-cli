@@ -6,44 +6,44 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
+import { GeminiClient } from '../core/client.js';
 import {
   AuthType,
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { GlobTool } from '../tools/glob.js';
-import { EditTool } from '../tools/edit.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import {
-  MemoryTool,
-  setGeminiMdFilename,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
-} from '../tools/memoryTool.js';
-import { WebSearchTool } from '../tools/web-search.js';
-import { GeminiClient } from '../core/client.js';
+import { PredefinedPrompt } from '../core/prompts.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { getProjectTempDir } from '../utils/paths.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import {
-  initializeTelemetry,
-  DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-  TelemetryTarget,
+  DEFAULT_TELEMETRY_TARGET,
+  initializeTelemetry,
   StartSessionEvent,
+  TelemetryTarget,
 } from '../telemetry/index.js';
+import { EditTool } from '../tools/edit.js';
+import { GlobTool } from '../tools/glob.js';
+import { GrepTool } from '../tools/grep.js';
+import { LSTool } from '../tools/ls.js';
+import {
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
+  MemoryTool,
+  setGeminiMdFilename,
+} from '../tools/memoryTool.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { ReadManyFilesTool } from '../tools/read-many-files.js';
+import { ShellTool } from '../tools/shell.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { WebFetchTool } from '../tools/web-fetch.js';
+import { WebSearchTool } from '../tools/web-search.js';
+import { WriteFileTool } from '../tools/write-file.js';
+import { getProjectTempDir } from '../utils/paths.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { PredefinedPrompt } from '../core/prompts.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -350,7 +350,7 @@ export class Config {
     return this.mcpServers;
   }
 
-  getPredefinedPrompts(): unknown[] | undefined {
+  getPredefinedPrompts(): PredefinedPrompt[] | undefined {
     return this.prompts;
   }
 
