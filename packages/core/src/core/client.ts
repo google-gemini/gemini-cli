@@ -41,6 +41,9 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 function isThinkingSupported(model: string) {
+  // TODO: This is a temporary workaround for Github Issue #1953
+  // There should be a more robust way to determine if thinking is supported.
+  if (model === 'gemini-2.5-flash-lite-preview-06-17') return false;
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }
