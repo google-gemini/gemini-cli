@@ -16,6 +16,8 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
+import { ContentGeneratorAdapter } from '../providers/content-generator-adapter.js';
+import { ProviderFactoryConfig } from '../providers/factory.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -38,6 +40,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  USE_COPILOT = 'github-copilot',
 }
 
 export type ContentGeneratorConfig = {
@@ -45,6 +48,9 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  copilot?: {
+    bridgeUrl?: string;
+  };
 };
 
 export async function createContentGeneratorConfig(
@@ -67,6 +73,15 @@ export async function createContentGeneratorConfig(
 
   // if we are using google auth nothing else to validate for now
   if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_COPILOT) {
+    // Copilot doesn't need an API key, just optional bridge URL
+    const bridgeUrl = process.env.COPILOT_BRIDGE_URL;
+    if (bridgeUrl) {
+      contentGeneratorConfig.copilot = { bridgeUrl };
+    }
     return contentGeneratorConfig;
   }
 
@@ -106,15 +121,36 @@ export async function createContentGenerator(
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
     headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
+      'User-Agent': `GeminiCopilot/${version} (${process.platform}; ${process.arch})`,
     },
   };
+  
   if (config.authType === AuthType.LOGIN_WITH_GOOGLE) {
     return createCodeAssistContentGenerator(
       httpOptions,
       config.authType,
       sessionId,
     );
+  }
+
+  if (config.authType === AuthType.USE_COPILOT) {
+    // Use our provider factory for Copilot
+    const providerConfig: ProviderFactoryConfig = {
+      defaultProvider: 'copilot',
+      fallbackProvider: config.apiKey ? 'gemini' : undefined,
+      copilot: {
+        bridgeUrl: config.copilot?.bridgeUrl || 'http://localhost:7337',
+        model: config.model,
+      },
+      gemini: config.apiKey ? {
+        apiKey: config.apiKey,
+        model: config.model,
+      } : undefined,
+    };
+
+    const adapter = new ContentGeneratorAdapter(providerConfig);
+    await adapter.initialize();
+    return adapter;
   }
 
   if (

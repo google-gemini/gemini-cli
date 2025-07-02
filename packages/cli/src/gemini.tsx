@@ -102,14 +102,28 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // set default fallback to gemini api key
-  // this has to go after load cli because thats where the env is set
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
-    settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.USE_GEMINI,
-    );
+  // Set default auth type based on binary name and environment
+  // This has to go after load cli because that's where the env is set
+  if (!settings.merged.selectedAuthType) {
+    // Check if running as gemini-copilot binary
+    const binaryName = process.argv[1] || '';
+    const isGeminiCopilot = binaryName.includes('gemini-copilot');
+    
+    if (isGeminiCopilot) {
+      // Default to Copilot for gemini-copilot binary
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_COPILOT,
+      );
+    } else if (process.env.GEMINI_API_KEY) {
+      // Fall back to Gemini API key if available
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_GEMINI,
+      );
+    }
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
