@@ -176,6 +176,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "usageStatisticsEnabled": false
     ```
 
+- **`hideTips`** (boolean):
+  - **Description:** Enables or disables helpful tips in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideTips": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -199,7 +208,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "otlpEndpoint": "http://localhost:4317",
     "logPrompts": true
   },
-  "usageStatisticsEnabled": true
+  "usageStatisticsEnabled": true,
+  "hideTips": false
 }
 ```
 
