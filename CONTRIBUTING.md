@@ -91,6 +91,25 @@ This section guides contributors on how to build, modify, and understand the dev
 1. Install [Node 18+](https://nodejs.org/en/download)
 2. Git
 
+<details>
+<summary>Windows Users: Required Setup (.env file)</summary>
+
+To avoid build hangs and improve logging, create a `.env` file at the root of the project with the following contents:
+
+```dotenv
+GEMINI_SANDBOX=true
+VERBOSE=true
+````
+
+> **Why?**
+>
+> * `GEMINI_SANDBOX=true` ensures proper sandboxing behavior when Podman or Docker is installed.
+> * `VERBOSE=true` enables progress messages during the build, helping diagnose potential stalls.
+>
+> Some environments (e.g., PowerShell, CMD) may not automatically load `.env` files. Consider using [`dotenv-cli`](https://github.com/entropitor/dotenv-cli) or ensure your shell is configured to source `.env`.
+
+</details>
+
 ### Build Process
 
 To clone the repository:
