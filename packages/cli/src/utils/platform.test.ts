@@ -23,7 +23,15 @@ describe('canOpenBrowser', () => {
   it('should return false on Linux when DISPLAY is not set', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
     delete process.env.DISPLAY;
+    delete process.env.WAYLAND_DISPLAY;
     expect(canOpenBrowser()).toBe(false);
+  });
+
+  it('should return true on Linux when WAYLAND_DISPLAY is set', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    delete process.env.DISPLAY;
+    process.env.WAYLAND_DISPLAY = 'wayland-0';
+    expect(canOpenBrowser()).toBe(true);
   });
 
   it('should return true on Linux when DISPLAY is set', () => {

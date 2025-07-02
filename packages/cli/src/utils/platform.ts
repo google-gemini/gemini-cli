@@ -5,7 +5,11 @@
  */
 
 export const canOpenBrowser = () => {
-  if (process.platform === 'linux' && !process.env.DISPLAY) {
+  if (
+    process.platform === 'linux' &&
+    !process.env.DISPLAY &&
+    !process.env.WAYLAND_DISPLAY
+  ) {
     return false;
   }
   return true;
