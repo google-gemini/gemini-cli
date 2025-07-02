@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import yaml from 'js-yaml';
+import yaml from 'yaml';
 
 export interface CustomSlashCommand {
   name: string;
@@ -26,7 +26,7 @@ export async function loadCustomSlashCommands(): Promise<CustomSlashCommand[]> {
           const match = content.match(/^---\n([\s\S]+?)\n---\n([\s\S]*)$/);
           let meta: Record<string, any> = {}, body = content;
           if (match) {
-            meta = yaml.load(match[1]) as Record<string, any>;
+            meta = yaml.parse(match[1]) as Record<string, any>;
             body = match[2];
           }
           commands.push({
