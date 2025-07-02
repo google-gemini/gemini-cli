@@ -34,35 +34,42 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   private whitelist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
-    const toolDisplayName = 'Shell';
-
-    let toolDescription: string;
-    let toolParameterSchema: Record<string, unknown>;
-
-    try {
-      const descriptionUrl = new URL('shell.md', import.meta.url);
-      toolDescription = fs.readFileSync(descriptionUrl, 'utf-8');
-      const schemaUrl = new URL('shell.json', import.meta.url);
-      toolParameterSchema = JSON.parse(fs.readFileSync(schemaUrl, 'utf-8'));
-    } catch {
-      // Fallback with minimal descriptions for tests when file reading fails
-      toolDescription = 'Execute shell commands';
-      toolParameterSchema = {
-        type: 'object',
-        properties: {
-          command: { type: 'string', description: 'Command to execute' },
-          description: { type: 'string', description: 'Command description' },
-          directory: { type: 'string', description: 'Working directory' },
-        },
-        required: ['command'],
-      };
-    }
-
     super(
       ShellTool.Name,
-      toolDisplayName,
-      toolDescription,
-      toolParameterSchema,
+      'Shell',
+      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+The following information is returned:
+
+Command: Executed command.
+Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+Error: Error or \`(none)\` if no error was reported for the subprocess.
+Exit Code: Exit code or \`(none)\` if terminated by signal.
+Signal: Signal number or \`(none)\` if no signal was received.
+Background PIDs: List of background processes started or \`(none)\`.
+Process Group PGID: Process group started or \`(none)\``,
+      {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'Exact bash command to execute as `bash -c <command>`',
+          },
+          description: {
+            type: 'string',
+            description:
+              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
+          },
+          directory: {
+            type: 'string',
+            description:
+              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+          },
+        },
+        required: ['command'],
+      },
       false, // output is not markdown
       true, // output can be updated
     );
@@ -91,7 +98,92 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       .pop(); // take last part and return command root (or undefined if previous line was empty)
   }
 
+  isCommandAllowed(command: string): boolean {
+    // 0. Disallow command substitution
+    if (command.includes('$(') || command.includes('`')) {
+      return false;
+    }
+
+    const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
+
+    const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
+
+    /**
+     * Checks if a command string starts with a given prefix, ensuring it's a
+     * whole word match (i.e., followed by a space or it's an exact match).
+     * e.g., `isPrefixedBy('npm install', 'npm')` -> true
+     * e.g., `isPrefixedBy('npm', 'npm')` -> true
+     * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
+     */
+    const isPrefixedBy = (cmd: string, prefix: string): boolean => {
+      if (!cmd.startsWith(prefix)) {
+        return false;
+      }
+      return cmd.length === prefix.length || cmd[prefix.length] === ' ';
+    };
+
+    /**
+     * Extracts and normalizes shell commands from a list of tool strings.
+     * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
+     */
+    const extractCommands = (tools: string[]): string[] =>
+      tools.flatMap((tool) => {
+        for (const toolName of SHELL_TOOL_NAMES) {
+          if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
+            return [normalize(tool.slice(toolName.length + 1, -1))];
+          }
+        }
+        return [];
+      });
+
+    const coreTools = this.config.getCoreTools() || [];
+    const excludeTools = this.config.getExcludeTools() || [];
+
+    // 1. Check if the shell tool is globally disabled.
+    if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
+      return false;
+    }
+
+    const blockedCommands = new Set(extractCommands(excludeTools));
+    const allowedCommands = new Set(extractCommands(coreTools));
+
+    const hasSpecificAllowedCommands = allowedCommands.size > 0;
+    const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
+      coreTools.includes(name),
+    );
+
+    const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
+
+    for (const cmd of commandsToValidate) {
+      // 2. Check if the command is on the blocklist.
+      const isBlocked = [...blockedCommands].some((blocked) =>
+        isPrefixedBy(cmd, blocked),
+      );
+      if (isBlocked) {
+        return false;
+      }
+
+      // 3. If in strict allow-list mode, check if the command is permitted.
+      const isStrictAllowlist =
+        hasSpecificAllowedCommands && !isWildcardAllowed;
+      if (isStrictAllowlist) {
+        const isAllowed = [...allowedCommands].some((allowed) =>
+          isPrefixedBy(cmd, allowed),
+        );
+        if (!isAllowed) {
+          return false;
+        }
+      }
+    }
+
+    // 4. If all checks pass, the command is allowed.
+    return true;
+  }
+
   validateToolParams(params: ShellToolParams): string | null {
+    if (!this.isCommandAllowed(params.command)) {
+      return `Command is not allowed: ${params.command}`;
+    }
     if (
       !SchemaValidator.validate(
         this.parameterSchema as Record<string, unknown>,

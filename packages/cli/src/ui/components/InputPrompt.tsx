@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Text, Box, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -16,6 +16,7 @@ import stringWidth from 'string-width';
 import process from 'node:process';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
+import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 import { Config } from '@google/gemini-cli-core';
@@ -112,7 +113,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
       const query = buffer.text;
-      const selectedSuggestion = completionSuggestions[indexToUse];
+      const suggestion = completionSuggestions[indexToUse].value;
 
       if (query.trimStart().startsWith('/')) {
         const parts = query.trimStart().substring(1).split(' ');
@@ -121,11 +122,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const base = query.substring(0, slashIndex + 1);
 
         const command = slashCommands.find((cmd) => cmd.name === commandName);
-        if (command && command.completion) {
-          const newValue = `${base}${commandName} ${selectedSuggestion.value}`;
-          buffer.setText(newValue);
+        // Make sure completion isn't the original command when command.completigion hasn't happened yet.
+        if (command && command.completion && suggestion !== commandName) {
+          const newValue = `${base}${commandName} ${suggestion}`;
+          if (newValue === query) {
+            handleSubmitAndClear(newValue);
+          } else {
+            buffer.setText(newValue);
+          }
         } else {
-          const newValue = base + selectedSuggestion.value;
+          const newValue = base + suggestion;
           buffer.setText(newValue);
           handleSubmitAndClear(newValue);
         }
@@ -141,7 +147,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.replaceRangeByOffset(
           autoCompleteStartIndex,
           buffer.text.length,
-          selectedSuggestion.value,
+          suggestion,
         );
       }
       resetCompletionState();
@@ -155,29 +161,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useInput(
-    (input, key) => {
+  const handleInput = useCallback(
+    (key: Key) => {
       if (!focus) {
         return;
       }
       const query = buffer.text;
 
-      if (input === '!' && query === '' && !completion.showSuggestions) {
+      if (key.sequence === '!' && query === '' && !completion.showSuggestions) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
         return true;
       }
 
       if (completion.showSuggestions) {
-        if (key.upArrow) {
+        if (key.name === 'up') {
           completion.navigateUp();
           return;
         }
-        if (key.downArrow) {
+        if (key.name === 'down') {
           completion.navigateDown();
           return;
         }
-        if (key.tab) {
+        if (key.name === 'tab') {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -189,7 +195,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           return;
         }
-        if (key.return) {
+        if (key.name === 'return') {
           if (completion.activeSuggestionIndex >= 0) {
             handleAutocomplete(completion.activeSuggestionIndex);
           } else if (query.trim()) {
@@ -199,19 +205,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       } else {
         // Keybindings when suggestions are not shown
-        if (key.ctrl && input === 'l') {
+        if (key.ctrl && key.name === 'l') {
           onClearScreen();
-          return true;
+          return;
         }
-        if (key.ctrl && input === 'p') {
+        if (key.ctrl && key.name === 'p') {
           inputHistory.navigateUp();
-          return true;
+          return;
         }
-        if (key.ctrl && input === 'n') {
+        if (key.ctrl && key.name === 'n') {
           inputHistory.navigateDown();
-          return true;
+          return;
         }
-        if (key.escape) {
+        if (key.name === 'escape') {
           if (shellModeActive) {
             setShellModeActive(false);
             return;
@@ -222,54 +228,55 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Ctrl+A (Home)
-      if (key.ctrl && input === 'a') {
+      if (key.ctrl && key.name === 'a') {
         buffer.move('home');
         buffer.moveToOffset(0);
         return;
       }
       // Ctrl+E (End)
-      if (key.ctrl && input === 'e') {
+      if (key.ctrl && key.name === 'e') {
         buffer.move('end');
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+L (Clear Screen)
-      if (key.ctrl && input === 'l') {
+      if (key.ctrl && key.name === 'l') {
         onClearScreen();
         return;
       }
       // Ctrl+P (History Up)
-      if (key.ctrl && input === 'p' && !completion.showSuggestions) {
+      if (key.ctrl && key.name === 'p' && !completion.showSuggestions) {
         inputHistory.navigateUp();
         return;
       }
       // Ctrl+N (History Down)
-      if (key.ctrl && input === 'n' && !completion.showSuggestions) {
+      if (key.ctrl && key.name === 'n' && !completion.showSuggestions) {
         inputHistory.navigateDown();
         return;
       }
 
       // Core text editing from MultilineTextEditor's useInput
-      if (key.ctrl && input === 'k') {
+      if (key.ctrl && key.name === 'k') {
         buffer.killLineRight();
         return;
       }
-      if (key.ctrl && input === 'u') {
+      if (key.ctrl && key.name === 'u') {
         buffer.killLineLeft();
         return;
       }
       const isCtrlX =
-        (key.ctrl && (input === 'x' || input === '\x18')) || input === '\x18';
+        (key.ctrl && (key.name === 'x' || key.sequence === '\x18')) ||
+        key.sequence === '\x18';
       const isCtrlEFromEditor =
-        (key.ctrl && (input === 'e' || input === '\x05')) ||
-        input === '\x05' ||
+        (key.ctrl && (key.name === 'e' || key.sequence === '\x05')) ||
+        key.sequence === '\x05' ||
         (!key.ctrl &&
-          input === 'e' &&
-          input.length === 1 &&
-          input.charCodeAt(0) === 5);
+          key.name === 'e' &&
+          key.sequence.length === 1 &&
+          key.sequence.charCodeAt(0) === 5);
 
       if (isCtrlX || isCtrlEFromEditor) {
-        if (isCtrlEFromEditor && !(key.ctrl && input === 'e')) {
+        if (isCtrlEFromEditor && !(key.ctrl && key.name === 'e')) {
           // Avoid double handling Ctrl+E
           buffer.openInExternalEditor();
           return;
@@ -284,16 +291,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         process.env['TEXTBUFFER_DEBUG'] === '1' ||
         process.env['TEXTBUFFER_DEBUG'] === 'true'
       ) {
-        console.log('[InputPromptCombined] event', { input, key });
+        console.log('[InputPromptCombined] event', { key });
       }
 
       // Ctrl+Enter for newline, Enter for submit
-      if (key.return) {
+      if (key.name === 'return') {
         const [row, col] = buffer.cursor;
         const line = buffer.lines[row];
         const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-
-        if (key.ctrl || charBefore === '\\') {
+        if (key.ctrl || key.meta || charBefore === '\\' || key.paste) {
           // Ctrl+Enter or escaped newline
           if (charBefore === '\\') {
             buffer.backspace();
@@ -309,7 +315,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Standard arrow navigation within the buffer
-      if (key.upArrow && !completion.showSuggestions) {
+      if (key.name === 'up' && !completion.showSuggestions) {
         if (shellModeActive) {
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) {
@@ -328,7 +334,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         return;
       }
-      if (key.downArrow && !completion.showSuggestions) {
+      if (key.name === 'down' && !completion.showSuggestions) {
         if (shellModeActive) {
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) {
@@ -349,12 +355,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Fallback to buffer's default input handling
-      buffer.handleInput(input, key as Record<string, boolean>);
+      buffer.handleInput(key);
     },
-    {
-      isActive: focus,
-    },
+    [
+      focus,
+      buffer,
+      completion,
+      shellModeActive,
+      setShellModeActive,
+      onClearScreen,
+      inputHistory,
+      handleAutocomplete,
+      handleSubmitAndClear,
+      shellHistory,
+    ],
   );
+
+  useKeypress(handleInput, { isActive: focus });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
