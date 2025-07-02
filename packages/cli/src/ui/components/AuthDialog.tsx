@@ -1,12 +1,8 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { AuthType } from '@google/gemini-cli-core';
 import { Box, Text, useInput } from 'ink';
+import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import React, { useState } from 'react';
 import { validateAuthMethod } from '../../config/auth.js';
@@ -19,6 +15,7 @@ interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
   settings: LoadedSettings;
   initialErrorMessage?: string | null;
+  onStatusMessage?: (message: string, type: 'info' | 'warning' | 'error') => void;
 }
 
 // Clean up terminal escape sequences from pasted input
@@ -36,6 +33,7 @@ export function AuthDialog({
   onSelect,
   settings,
   initialErrorMessage,
+  onStatusMessage,
 }: AuthDialogProps): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialErrorMessage || null,
@@ -83,51 +81,93 @@ export function AuthDialog({
     const keyName = selectedAuthMethod === AuthType.USE_VERTEX_AI ? 'GOOGLE_API_KEY' : 'GEMINI_API_KEY';
     process.env[keyName] = cleanedApiKey;
     
-    // Try to save to .env file
+    // Save to secure location in home directory
     try {
-      const envPath = path.join(process.cwd(), '.env');
-      let envContent = '';
+      const homeDir = os.homedir();
+      const geminiDir = path.join(homeDir, '.gemini');
+      const credentialsPath = path.join(geminiDir, 'credentials');
       
-      if (fs.existsSync(envPath)) {
-        envContent = fs.readFileSync(envPath, 'utf8');
-        // Check if key already exists
-        const lines = envContent.split('\n');
-        const keyExists = lines.some(line => line.startsWith(`${keyName}=`));
-        
-        if (keyExists) {
-          // Update existing key while preserving comments and formatting
-          envContent = lines.map(line => {
-            // Match the key at the beginning of the line
-            const keyPattern = new RegExp(`^${keyName}=`);
-            if (keyPattern.test(line)) {
-              // Replace only the value, preserving any comments
-              const commentIndex = line.indexOf('#');
-              if (commentIndex > -1) {
-                // Preserve inline comments
-                const beforeComment = line.substring(0, commentIndex).trimEnd();
-                const comment = line.substring(commentIndex);
-                return `${keyName}=${cleanedApiKey} ${comment}`;
-              } else {
-                // No comments, just replace the line
-                return `${keyName}=${cleanedApiKey}`;
-              }
-            }
-            return line;
-          }).join('\n');
-        } else {
-          // Add new key
-          envContent = envContent.trim() + `\n${keyName}=${cleanedApiKey}\n`;
-        }
-      } else {
-        // Create new .env file
-        envContent = `${keyName}=${cleanedApiKey}\n`;
+      // Ensure .gemini directory exists with proper permissions
+      if (!fs.existsSync(geminiDir)) {
+        fs.mkdirSync(geminiDir, { mode: 0o700 }); // rwx------
       }
       
-      fs.writeFileSync(envPath, envContent);
-      console.log(`\nAPI key saved to .env file (${cleanedApiKey.length} characters)`);
+      // Read existing credentials or create new object
+      let credentials: Record<string, string> = {};
+      if (fs.existsSync(credentialsPath)) {
+        try {
+          const parsed = dotenv.parse(fs.readFileSync(credentialsPath, 'utf8'));
+          credentials = parsed;
+        } catch (parseError) {
+          // If parsing fails, start fresh
+          credentials = {};
+        }
+      }
+      
+      // Update the key
+      credentials[keyName] = cleanedApiKey;
+      
+      // Write back using dotenv format (handles special characters properly)
+      const envContent = Object.entries(credentials)
+        .map(([key, value]) => {
+          // Quote values that contain spaces or special characters
+          if (/[\s"'`${}()#]/.test(value)) {
+            // Escape quotes in the value and wrap in double quotes
+            const escapedValue = value.replace(/"/g, '\\"');
+            return `${key}="${escapedValue}"`;
+          }
+          return `${key}=${value}`;
+        })
+        .join('\n') + '\n';
+      
+      // Write file with restrictive permissions
+      fs.writeFileSync(credentialsPath, envContent, { mode: 0o600 }); // rw-------
+      
+      if (onStatusMessage) {
+        onStatusMessage(
+          `API key saved securely to ~/.gemini/credentials (${cleanedApiKey.length} characters)`,
+          'info'
+        );
+      }
+      
+      // Also check if .env exists in current directory for backward compatibility
+      const localEnvPath = path.join(process.cwd(), '.env');
+      if (fs.existsSync(localEnvPath)) {
+        try {
+          // Load and update local .env
+          const localEnv = dotenv.parse(fs.readFileSync(localEnvPath, 'utf8'));
+          localEnv[keyName] = cleanedApiKey;
+          
+          const localEnvContent = Object.entries(localEnv)
+            .map(([key, value]) => {
+              if (/[\s"'`${}()#]/.test(value)) {
+                const escapedValue = value.replace(/"/g, '\\"');
+                return `${key}="${escapedValue}"`;
+              }
+              return `${key}=${value}`;
+            })
+            .join('\n') + '\n';
+          
+          fs.writeFileSync(localEnvPath, localEnvContent);
+          
+          if (onStatusMessage) {
+            onStatusMessage('Also updated local .env file', 'info');
+          }
+        } catch (e) {
+          // Ignore local .env update errors
+          if (onStatusMessage) {
+            onStatusMessage('Could not update local .env file', 'warning');
+          }
+        }
+      }
     } catch (e) {
-      // If we can't write to .env, continue anyway since we have it in memory
-      console.warn(`Could not save ${keyName} to .env file:`, e);
+      // If we can't write to file, continue anyway since we have it in memory
+      if (onStatusMessage) {
+        onStatusMessage(
+          `Could not save ${keyName} to file: ${e instanceof Error ? e.message : String(e)}`,
+          'warning'
+        );
+      }
     }
     
     setShowApiKeyInput(false);
