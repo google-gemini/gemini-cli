@@ -30,7 +30,7 @@ With the Gemini CLI you can:
 
    ```bash
    npm install -g @google/gemini-cli
-   gemini
+   bob-gemini
    ```
 
 3. **Pick a color theme**
@@ -59,7 +59,7 @@ You can start a project from a new directory:
 
 ```sh
 cd new-project/
-gemini
+bob-gemini
 > Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
@@ -68,7 +68,7 @@ Or work with an existing project:
 ```sh
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
-gemini
+bob-gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
 
@@ -89,7 +89,7 @@ having issues.
 
 ### Explore a new codebase
 
-Start by `cd`ing into an existing or newly-cloned repository and running `gemini`.
+Start by `cd`ing into an existing or newly-cloned repository and running `bob-gemini`.
 
 ```text
 > Describe the main pieces of this system's architecture.
