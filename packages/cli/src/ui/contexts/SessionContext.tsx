@@ -6,6 +6,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
   useMemo,
@@ -26,6 +27,7 @@ export interface SessionStatsState {
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
+  turnCount: number;
 }
 
 export interface ComputedSessionStats {
@@ -46,6 +48,8 @@ export interface ComputedSessionStats {
 // and the functions to update it.
 interface SessionStatsContextValue {
   stats: SessionStatsState;
+  startNewTurn: () => void;
+  getTurnCount: () => number;
 }
 
 // --- Context Definition ---
@@ -63,6 +67,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
+    turnCount: 0,
   });
 
   useEffect(() => {
@@ -92,11 +97,24 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+  const startNewTurn = useCallback(() => {
+    setStats((prevState) => ({
+      ...prevState,
+      turnCount: prevState.turnCount + 1,
+    }));
+  }, []);
+
+  const getTurnCount = useCallback(() => {
+    return stats.turnCount;
+  }, [stats.turnCount]);
+
   const value = useMemo(
     () => ({
       stats,
+      startNewTurn,
+      getTurnCount,
     }),
-    [stats],
+    [stats, startNewTurn, getTurnCount],
   );
 
   return (

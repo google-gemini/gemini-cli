@@ -99,6 +99,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
 }
 
 export function logToolCall(config: Config, event: ToolCallEvent): void {
+  console.log('#################### logToolCall ####################', event);
   const uiEvent = {
     ...event,
     'event.name': EVENT_TOOL_CALL,
@@ -157,6 +158,7 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
 }
 
 export function logApiError(config: Config, event: ApiErrorEvent): void {
+  console.log('#################### logApiError ####################', event);
   const uiEvent = {
     ...event,
     'event.name': EVENT_API_ERROR,
@@ -199,6 +201,7 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
+  console.log('#################### logApiResponse ####################', event);
   const uiEvent = {
     ...event,
     'event.name': EVENT_API_RESPONSE,

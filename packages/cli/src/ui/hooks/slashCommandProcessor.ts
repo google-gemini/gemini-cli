@@ -852,7 +852,7 @@ export const useSlashCommandProcessor = (
           try {
             const compressed = await config!
               .getGeminiClient()!
-              .tryCompressChat(true);
+              .tryCompressChat('Turn Id not set', true);
             if (compressed) {
               addMessage({
                 type: MessageType.COMPRESSION,

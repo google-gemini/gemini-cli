@@ -158,6 +158,7 @@ export class GeminiChat {
 
   private async _logApiResponse(
     durationMs: number,
+    turn_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
   ): Promise<void> {
@@ -166,13 +167,14 @@ export class GeminiChat {
       new ApiResponseEvent(
         this.config.getModel(),
         durationMs,
+        turn_id,
         usageMetadata,
         responseText,
       ),
     );
   }
 
-  private _logApiError(durationMs: number, error: unknown): void {
+  private _logApiError(durationMs: number, error: unknown, turn_id: string): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
 
@@ -182,6 +184,7 @@ export class GeminiChat {
         this.config.getModel(),
         errorMessage,
         durationMs,
+        turn_id,
         errorType,
       ),
     );
@@ -244,7 +247,10 @@ export class GeminiChat {
    */
   async sendMessage(
     params: SendMessageParameters,
+    turn_id: string,
   ): Promise<GenerateContentResponse> {
+    console.log('############################ SendMessage TurnId:', turn_id);
+    
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
@@ -277,6 +283,7 @@ export class GeminiChat {
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
         durationMs,
+        turn_id,
         response.usageMetadata,
         getStructuredResponse(response),
       );
@@ -308,7 +315,7 @@ export class GeminiChat {
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, turn_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -338,7 +345,14 @@ export class GeminiChat {
    */
   async sendMessageStream(
     params: SendMessageParameters,
+    turn_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    
+    console.log(
+      '############################ SendMessageStream TurnId:',
+      turn_id,
+    );
+    
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
@@ -383,11 +397,12 @@ export class GeminiChat {
         streamResponse,
         userContent,
         startTime,
+        turn_id,
       );
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, turn_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -459,6 +474,7 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,
     startTime: number,
+    turn_id: string,
   ) {
     const outputContent: Content[] = [];
     const chunks: GenerateContentResponse[] = [];
@@ -482,7 +498,7 @@ export class GeminiChat {
     } catch (error) {
       errorOccurred = true;
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, turn_id);
       throw error;
     }
 
@@ -497,6 +513,7 @@ export class GeminiChat {
       const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
+        turn_id,
         this.getFinalUsageMetadata(chunks),
         fullText,
       );
