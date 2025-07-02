@@ -247,24 +247,13 @@ Strategy: ${commitModeText}${filesDisplay}`,
           throw commitError;
         }
         
-        // Retry once for hook or lock errors
-        try {
-          await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
-          
-          this.cachedCommitData = null;
-          
-          return {
-            llmContent: `Commit created successfully after pre-commit hook modifications!\n\n` +
-              `Commit message:\n${finalCommitMessage}`,
-            returnDisplay: `Commit created successfully after pre-commit hook modifications!\n\n` +
-              `Commit message:\n${finalCommitMessage}`,
-          };
-        } catch (retryError) {
-          const errorDetails = retryError instanceof Error ? 
-            retryError.message : String(retryError);
-          throw new Error(`Commit failed after pre-commit hook retry. ` +
-            `Original error: ${commitError.message}. Retry error: ${errorDetails}`);
-        }
+        // It is a hook or lock error. Abort and inform the user.
+        const hookOrLockError = new Error(
+          `Commit failed due to a pre-commit hook or a locked index. ` +
+            `Please resolve the issues, stage any changes, and try again. ` +
+            `Original error: ${commitError.message}`
+        );
+        throw hookOrLockError;
       }
 
     } catch (error) {
@@ -424,7 +413,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
           .replace(/```$/, '')
           .trim();
         
-        return commitMessage || generatedText;
+        return commitMessage;
       }
 
       return generatedText;
