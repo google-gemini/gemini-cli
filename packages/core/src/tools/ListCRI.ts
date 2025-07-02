@@ -77,7 +77,7 @@ export interface ListCRIResult extends ToolResult {
 export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
   static readonly Name: string = 'list_code_repository_indexes_and_groups';
   private auth: GoogleAuth;
-  private client: Gaxios;
+  //private client: Gaxios;
 
   constructor(private readonly config: Config) {
     super(
@@ -122,7 +122,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
     this.auth = new GoogleAuth({
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
-    this.client = new Gaxios();
+    //this.client = new Gaxios();
   }
 
   getDescription(params: ListCRIParams): string {
@@ -140,7 +140,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
     options: GaxiosOptions,
   ): Promise<GaxiosResponse<T>> {
     try {
-      return await this.client.request<T>(options);
+      return await this.auth.request<T>(options);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const gaxiosError = error as {
@@ -215,14 +215,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
     const listGroups = params.listGroups !== false;
 
     try {
-      const authClient = await this.auth.getClient();
-      const token = await authClient.getAccessToken();
-      if (!token.token) {
-        throw new Error('Failed to retrieve access token.');
-      }
-
       const headers = {
-        Authorization: `Bearer ${token.token}`,
         'Content-Type': 'application/json',
         'X-Goog-User-Project': projectId,
       };
@@ -256,28 +249,28 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
 
       console.log(`Total indexes fetched: ${allIndexes.length}`);
 
-      const indexesWithGroups: CRIWithGroups[] = [];
-      for (const index of allIndexes) {
-        const indexWithGroups: CRIWithGroups = { ...index, groups: [] };
-        if (listGroups) {
-          try {
-            indexWithGroups.groups = await this.listAllGroupsForIndex(
-              index.name,
-              headers,
-              endpoint,
-              pageSize,
-            );
-          } catch (groupError: unknown) {
-            const message = getErrorMessage(groupError);
-            console.error(
-              `Error fetching groups for ${index.name}: ${message}`,
-            );
-            indexWithGroups.groupsError = message;
-          }
+  const indexesWithGroups: CRIWithGroups[] = await Promise.all(
+    allIndexes.map(async (index) => {
+      const indexWithGroups: CRIWithGroups = { ...index, groups: [] };
+      if (listGroups) {
+        try {
+          indexWithGroups.groups = await this.listAllGroupsForIndex(
+            index.name,
+            headers,
+            endpoint,
+            pageSize,
+          );
+        } catch (groupError: unknown) {
+          const message = getErrorMessage(groupError);
+          console.error(
+            `Error fetching groups for ${index.name}: ${message}`,
+          );
+          indexWithGroups.groupsError = message;
         }
-        indexesWithGroups.push(indexWithGroups);
       }
-
+      return indexWithGroups;
+    }),
+  );
       // Format the output for the LLM
       const formattedOutput = indexesWithGroups
         .map((iwg, i) => {
