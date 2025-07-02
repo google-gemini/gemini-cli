@@ -103,7 +103,7 @@ VERBOSE=true
 
 > **Why?**
 >
-> * `GEMINI_SANDBOX=true` ensures proper sandboxing behavior when Podman or Docker is installed.
+> * `GEMINI_SANDBOX=true` prevents a build hang on Windows by bypassing a problematic sandbox detection script.
 > * `VERBOSE=true` enables progress messages during the build, helping diagnose potential stalls.
 >
 > Some environments (e.g., PowerShell, CMD) may not automatically load `.env` files. Consider using [`dotenv-cli`](https://github.com/entropitor/dotenv-cli) or ensure your shell is configured to source `.env`.
