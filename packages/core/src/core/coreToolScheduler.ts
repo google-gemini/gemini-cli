@@ -282,21 +282,9 @@ export class CoreToolScheduler {
 
       // currentCall is a non-terminal state here and should have startTime and tool.
       const existingStartTime = currentCall.startTime;
-      const toolInstance = (
-        currentCall as
-          | ValidatingToolCall
-          | ScheduledToolCall
-          | ExecutingToolCall
-          | WaitingToolCall
-      ).tool;
+      const toolInstance = currentCall.tool;
 
-      const outcome = (
-        currentCall as
-          | ValidatingToolCall
-          | ScheduledToolCall
-          | ExecutingToolCall
-          | WaitingToolCall
-      ).outcome;
+      const outcome = currentCall.outcome;
 
       switch (newStatus) {
         case 'success': {
@@ -579,7 +567,7 @@ export class CoreToolScheduler {
       callsToExecute.forEach((toolCall) => {
         if (toolCall.status !== 'scheduled') return;
 
-        const scheduledCall = toolCall as ScheduledToolCall;
+        const scheduledCall = toolCall;
         const { callId, name: toolName } = scheduledCall.request;
         this.setStatusInternal(callId, 'executing');
 
@@ -591,7 +579,7 @@ export class CoreToolScheduler {
                 }
                 this.toolCalls = this.toolCalls.map((tc) =>
                   tc.request.callId === callId && tc.status === 'executing'
-                    ? { ...(tc as ExecutingToolCall), liveOutput: outputChunk }
+                    ? { ...tc, liveOutput: outputChunk }
                     : tc,
                 );
                 this.notifyToolCallsUpdate();

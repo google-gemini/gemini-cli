@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EditorType } from '../utils/editor.js';
+import { EditorType, openDiff } from '../utils/editor.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import * as Diff from 'diff';
-import { openDiff } from '../utils/editor.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
 import { Tool } from './tools.js';
@@ -58,15 +57,16 @@ function createTempFilesForModify(
     fs.mkdirSync(diffDir, { recursive: true });
   }
 
-  const fileName = path.basename(file_path);
+  const ext = path.extname(file_path);
+  const fileName = path.basename(file_path, ext);
   const timestamp = Date.now();
   const tempOldPath = path.join(
     diffDir,
-    `gemini-cli-modify-${fileName}-old-${timestamp}`,
+    `gemini-cli-modify-${fileName}-old-${timestamp}${ext}`,
   );
   const tempNewPath = path.join(
     diffDir,
-    `gemini-cli-modify-${fileName}-new-${timestamp}`,
+    `gemini-cli-modify-${fileName}-new-${timestamp}${ext}`,
   );
 
   fs.writeFileSync(tempOldPath, currentContent, 'utf8');

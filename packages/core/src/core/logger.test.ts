@@ -393,12 +393,6 @@ describe('Logger', () => {
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ];
 
-    it('should save a checkpoint to the default file when no tag is provided', async () => {
-      await logger.saveCheckpoint(conversation);
-      const fileContent = await fs.readFile(TEST_CHECKPOINT_FILE_PATH, 'utf-8');
-      expect(JSON.parse(fileContent)).toEqual(conversation);
-    });
-
     it('should save a checkpoint to a tagged file when a tag is provided', async () => {
       const tag = 'my-test-tag';
       await logger.saveCheckpoint(conversation, tag);
@@ -418,7 +412,7 @@ describe('Logger', () => {
         .mockImplementation(() => {});
 
       await expect(
-        uninitializedLogger.saveCheckpoint(conversation),
+        uninitializedLogger.saveCheckpoint(conversation, 'tag'),
       ).resolves.not.toThrow();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
@@ -437,11 +431,6 @@ describe('Logger', () => {
         TEST_CHECKPOINT_FILE_PATH,
         JSON.stringify(conversation, null, 2),
       );
-    });
-
-    it('should load from the default checkpoint file when no tag is provided', async () => {
-      const loaded = await logger.loadCheckpoint();
-      expect(loaded).toEqual(conversation);
     });
 
     it('should load from a tagged checkpoint file when a tag is provided', async () => {
@@ -468,9 +457,9 @@ describe('Logger', () => {
       expect(loaded).toEqual([]);
     });
 
-    it('should return an empty array if the default checkpoint file does not exist', async () => {
+    it('should return an empty array if the checkpoint file does not exist', async () => {
       await fs.unlink(TEST_CHECKPOINT_FILE_PATH); // Ensure it's gone
-      const loaded = await logger.loadCheckpoint();
+      const loaded = await logger.loadCheckpoint('missing');
       expect(loaded).toEqual([]);
     });
 
@@ -479,11 +468,11 @@ describe('Logger', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      const loadedCheckpoint = await logger.loadCheckpoint();
+      const loadedCheckpoint = await logger.loadCheckpoint('missing');
       expect(loadedCheckpoint).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to read or parse checkpoint file'),
-        expect.any(SyntaxError),
+        expect.any(Error),
       );
     });
 
@@ -493,7 +482,7 @@ describe('Logger', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      const loadedCheckpoint = await uninitializedLogger.loadCheckpoint();
+      const loadedCheckpoint = await uninitializedLogger.loadCheckpoint('tag');
       expect(loadedCheckpoint).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',

@@ -51,7 +51,6 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -469,9 +468,6 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value);
             break;
-          case ServerGeminiEventType.UsageMetadata:
-            addUsage(event.value);
-            break;
           case ServerGeminiEventType.ToolCallConfirmation:
           case ServerGeminiEventType.ToolCallResponse:
             // do nothing
@@ -540,10 +536,6 @@ export const useGeminiStream = (
         return;
       }
 
-      if (!options?.isContinuation) {
-        startNewTurn();
-      }
-
       setIsResponding(true);
       setInitError(null);
 
@@ -592,7 +584,6 @@ export const useGeminiStream = (
       setPendingHistoryItem,
       setInitError,
       geminiClient,
-      startNewTurn,
       onAuthError,
       config,
     ],

@@ -40,9 +40,10 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   totalTokenCount,
   isPlanMode,
+  promptTokenCount,
 }) => {
   const limit = tokenLimit(model);
-  const percentage = totalTokenCount / limit;
+  const percentage = promptTokenCount / limit;
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
