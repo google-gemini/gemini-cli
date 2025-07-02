@@ -129,7 +129,10 @@ export async function createContentGeneratorConfig(
   }
 
   // Anthropic API
-  if (authType === AuthType.USE_ANTHROPIC && anthropicApiKey) {
+  if (authType === AuthType.USE_ANTHROPIC) {
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY environment variable is required for anthropic auth type.');
+    }
     contentGeneratorConfig.apiKey = anthropicApiKey;
     contentGeneratorConfig.baseUrl = customBaseUrl || 'https://api.anthropic.com';
     // Use Anthropic model names instead of Gemini model names
