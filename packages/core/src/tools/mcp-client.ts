@@ -256,13 +256,14 @@ async function connectAndDiscover(
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     // Check for OAuth2.x authentication error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((error as any).toString().includes('401')) {
-      const origin = mcpServerConfig.httpUrl || mcpServerConfig.url;
-      throw new Error(
-        `The MCP server at '${origin}' requires OAuth2.x authentication, which is not yet fully supported by the Gemini CLI. As a temporary workaround, you can manually provide a bearer token. Please see PR #2477 for more details.`,
-      );
-    }
+// Check for OAuth2.x authentication error more robustly.
+// The `error` is of type `unknown` in a catch block, so we first check if it's an Error instance.
+if (error instanceof Error && error.message.includes('401')) {
+  const origin = mcpServerConfig.httpUrl || mcpServerConfig.url;
+  throw new Error(
+    `The MCP server at '${origin}' requires OAuth2.x authentication, which is not yet fully supported by the Gemini CLI. As a temporary workaround, you can manually provide a bearer token. Please see PR #2477 for more details.`,
+  );
+}
     return;
   }
 
