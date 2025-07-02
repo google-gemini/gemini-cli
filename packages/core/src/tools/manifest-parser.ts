@@ -27,14 +27,13 @@ export class ManifestParser {
     }
     const toolsSection = manifestContent.substring(toolsHeaderIndex);
 
-    // 2. Use Regex to find each tool definition block.
-    // This regex looks for a level-4 header and captures everything until the next one.
-    const toolRegex = /^####\s+([\w-]+)\s*([\s\S]*?)(?=^####\s|$)/gm;
+    // 2. Split the tools section by level-4 headers and process each tool
+    const toolSections = toolsSection.split(/^####\s+/gm).slice(1); // Skip the first empty element
+    const toolHeaders = [...toolsSection.matchAll(/^####\s+([\w-]+)/gm)];
 
-    let match;
-    while ((match = toolRegex.exec(toolsSection)) !== null) {
-      const toolName = match[1].trim();
-      const toolBody = match[2];
+    for (let i = 0; i < toolSections.length && i < toolHeaders.length; i++) {
+      const toolName = toolHeaders[i][1].trim();
+      const toolBody = toolSections[i];
 
       // 3. Extract the script and schema from the tool's body.
       const script = this.extractCodeBlock(toolBody, 'sh');
@@ -80,25 +79,15 @@ export class ManifestParser {
     body: string,
     lang: 'sh' | 'json',
   ): string | null {
-    // First try: Look for ```lang format
-    const langFirstRegex = new RegExp(`\`\`\`${lang}\\s*([\\s\\S]*?)\`\`\``, 'i');
-    const langFirstMatch = body.match(langFirstRegex);
-    if (langFirstMatch) {
-      return langFirstMatch[1].trim();
+    // Look for ```lang or ``` lang (with optional space) followed by content until closing ```
+    const regex = new RegExp(`\`\`\`\\s*${lang}\\s*\\n([\\s\\S]*?)\\n\`\`\``, 'i');
+    const match = body.match(regex);
+    if (match) {
+      return match[1].trim();
     }
 
-    // Second try: Look for ``` followed by lang on the same line
-    const sameLIneRegex = new RegExp(`\`\`\`\\s*${lang}\\s*([\\s\\S]*?)\`\`\``, 'i');
-    const sameLineMatch = body.match(sameLIneRegex);
-    if (sameLineMatch) {
-      return sameLineMatch[1].trim();
-    }
-
-    // Third try: Look for any code block with lang mentioned (fallback)
-    const fallbackRegex = new RegExp(
-      `\`\`\`[\\s\\S]*?${lang}[\\s\\S]*?([\\s\\S]*?)\`\`\``,
-      'i',
-    );
+    // Fallback: Look for ```lang without newlines but allowing spaces
+    const fallbackRegex = new RegExp(`\`\`\`\\s*${lang}\\s*([\\s\\S]*?)\`\`\``, 'i');
     const fallbackMatch = body.match(fallbackRegex);
     if (fallbackMatch) {
       return fallbackMatch[1].trim();
