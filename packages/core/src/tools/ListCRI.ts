@@ -136,14 +136,22 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
     return 'https://staging-cloudaicompanion.sandbox.googleapis.com';
   }
 
-  private async makeRequest<T>(options: GaxiosOptions): Promise<GaxiosResponse<T>> {
-      try {
-          return await this.client.request<T>(options);
-      } catch (error: any) {
-          const errorMessage = getErrorMessage(error);
-          let statusCode = error.code || error.response?.status;
-          throw new Error(`API call to ${options.url} failed: ${statusCode} - ${errorMessage} ${JSON.stringify(error.response?.data)}`);
-      }
+  private async makeRequest<T>(
+    options: GaxiosOptions,
+  ): Promise<GaxiosResponse<T>> {
+    try {
+      return await this.client.request<T>(options);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      const gaxiosError = error as {
+        code?: string | number;
+        response?: { status: number; data: unknown };
+      };
+      const statusCode = gaxiosError.code || gaxiosError.response?.status;
+      throw new Error(
+        `API call to ${options.url} failed: ${statusCode} - ${errorMessage} ${JSON.stringify(gaxiosError.response?.data)}`,
+      );
+    }
   }
 
   // Helper function to list all groups for a single index
@@ -156,12 +164,10 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
     let allGroups: CodeRepositoryGroup[] = [];
     let pageToken: string | undefined = undefined;
     const baseApiUrl = `${endpoint}/v1/${indexName}/repositoryGroups`; // Corrected URL part
-    let pageCount = 0;
 
     console.log(`   Fetching groups for index: ${indexName}`);
 
     do {
-      pageCount++;
       const urlParams = new URLSearchParams();
       urlParams.append('pageSize', pageSize.toString());
       if (pageToken) {
@@ -175,7 +181,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
         await this.makeRequest<ListCodeRepositoryGroupsResponse>({
           url: apiUrl,
           method: 'GET',
-          headers: headers,
+          headers,
         });
 
       if (response.status !== 200) {
@@ -185,7 +191,8 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
       }
 
       const data = response.data;
-      if (data.repositoryGroups) { // Corrected key
+      if (data.repositoryGroups) {
+        // Corrected key
         allGroups = allGroups.concat(data.repositoryGroups);
       }
       pageToken = data.nextPageToken;
@@ -215,7 +222,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
       }
 
       const headers = {
-        'Authorization': `Bearer ${token.token}`,
+        Authorization: `Bearer ${token.token}`,
         'Content-Type': 'application/json',
         'X-Goog-User-Project': projectId,
       };
@@ -239,7 +246,7 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
           await this.makeRequest<ListCodeRepositoryIndexesResponse>({
             url: apiUrl,
             method: 'GET',
-            headers: headers,
+            headers,
           });
         if (response.data.codeRepositoryIndexes) {
           allIndexes = allIndexes.concat(response.data.codeRepositoryIndexes);
@@ -260,11 +267,12 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
               endpoint,
               pageSize,
             );
-          } catch (groupError: any) {
+          } catch (groupError: unknown) {
+            const message = getErrorMessage(groupError);
             console.error(
-              `Error fetching groups for ${index.name}: ${groupError.message}`,
+              `Error fetching groups for ${index.name}: ${message}`,
             );
-            indexWithGroups.groupsError = groupError.message;
+            indexWithGroups.groupsError = message;
           }
         }
         indexesWithGroups.push(indexWithGroups);
@@ -289,7 +297,14 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
                       let groupStr = `    Group ${j + 1}: ${g.name}`;
                       if (g.repositories && g.repositories.length > 0) {
                         groupStr += `\n      Repositories:`;
-                        groupStr += '\n' + g.repositories.map(r => `        - ${r.resource} (Branch: ${r.branchPattern || 'N/A'})`).join('\n');
+                        groupStr +=
+                          '\n' +
+                          g.repositories
+                            .map(
+                              (r) =>
+                                `        - ${r.resource} (Branch: ${r.branchPattern || 'N/A'})`,
+                            )
+                            .join('\n');
                       } else {
                         groupStr += `\n      Repositories: None`;
                       }
@@ -319,21 +334,31 @@ export class ListCRITool extends BaseTool<ListCRIParams, ListCRIResult> {
       const errorMessage = getErrorMessage(error);
       console.error(`Error in ListCRITool: ${errorMessage}`);
       let displayError = 'Error listing code repository indexes.';
-      if (errorMessage.includes('PERMISSION_DENIED') || errorMessage.includes('403')) {
+      if (
+        errorMessage.includes('PERMISSION_DENIED') ||
+        errorMessage.includes('403')
+      ) {
         displayError =
           'Error: Permission denied. Ensure the caller has the necessary IAM roles (cloudaicompanion.codeRepositoryIndexes.list and cloudaicompanion.repositoryGroups.list) on the project.';
-      } else if (errorMessage.includes('NOT_FOUND') || errorMessage.includes('404')) {
-         displayError = `Error: API endpoint not found or resource not found in ${env}. Check project, location, and API enablement for the *staging* API.`;
-      } else if (errorMessage.includes('enable the API')){
+      } else if (
+        errorMessage.includes('NOT_FOUND') ||
+        errorMessage.includes('404')
+      ) {
+        displayError = `Error: API endpoint not found or resource not found in ${env}. Check project, location, and API enablement for the *staging* API.`;
+      } else if (errorMessage.includes('enable the API')) {
         displayError = `Error: Cloud AI Companion API (Staging) is not enabled. Please enable ${this.getApiEndpoint(env).replace('https://', '')} in the Google Cloud Console for project ${params.projectId}.`;
-      } else if (errorMessage.includes('Failed to retrieve access token') || errorMessage.includes('Could not refresh access token')) {
-         displayError = 'Error: Authentication failed. Please run `gcloud auth login` and `gcloud auth application-default login`.';
+      } else if (
+        errorMessage.includes('Failed to retrieve access token') ||
+        errorMessage.includes('Could not refresh access token')
+      ) {
+        displayError =
+          'Error: Authentication failed. Please run `gcloud auth login` and `gcloud auth application-default login`.';
       } else if (errorMessage.includes('API call to')) {
-          displayError = errorMessage;
+        displayError = errorMessage;
       } else {
-          displayError = `Error listing resources: ${errorMessage}`;
+        displayError = `Error listing resources: ${errorMessage}`;
       }
-       return {
+      return {
         llmContent: `Error listing resources: ${errorMessage}`,
         returnDisplay: displayError,
       };

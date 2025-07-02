@@ -502,7 +502,6 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(WebSearchTool, config);
   registerCoreTool(ListCRITool, config);
 
-
   return (async () => {
     await registry.discoverTools();
     return registry;
