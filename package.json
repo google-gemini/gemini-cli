@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.5",
+  "version": "0.1.9",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -10,7 +10,7 @@
   ],
   "repository": "google-gemini/gemini-cli",
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.4"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.8"
   },
   "scripts": {
     "generate": "node scripts/generate-git-commit-info.js",
@@ -44,11 +44,13 @@
     "build:packages": "npm run build:core && npm run build:cli",
     "build:sandbox:fast": "node scripts/build_sandbox.js --skip-npm-install-build",
     "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
+    "prepare:packages": "node scripts/prepare-cli-packagejson.js && node scripts/prepare-core-package.js",
     "publish:sandbox": "node scripts/publish-sandbox.js",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
     "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
     "telemetry": "node scripts/telemetry.js",
-    "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\""
+    "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\"",
+    "prepublishOnly": "node scripts/prepublish.js"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -82,7 +84,5 @@
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
   },
-  "dependencies": {
-    "@google/gemini-cli": "^0.1.1"
-  }
+  "dependencies": {}
 }

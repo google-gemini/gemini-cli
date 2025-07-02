@@ -296,19 +296,9 @@ describe('useSlashCommandProcessor', () => {
   describe('/stats command', () => {
     it('should show detailed session statistics', async () => {
       // Arrange
-      const cumulativeStats = {
-        totalTokenCount: 900,
-        promptTokenCount: 200,
-        candidatesTokenCount: 400,
-        cachedContentTokenCount: 100,
-        turnCount: 1,
-        toolUsePromptTokenCount: 50,
-        thoughtsTokenCount: 150,
-      };
       mockUseSessionStats.mockReturnValue({
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-          cumulative: cumulativeStats,
         },
       });
 
@@ -326,13 +316,133 @@ describe('useSlashCommandProcessor', () => {
         2, // Called after the user message
         expect.objectContaining({
           type: MessageType.STATS,
-          stats: cumulativeStats,
           duration: '1h 2m 3s',
         }),
         expect.any(Number),
       );
 
       vi.useRealTimers();
+    });
+
+    it('should show model-specific statistics when using /stats model', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats model');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.MODEL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show tool-specific statistics when using /stats tools', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats tools');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.TOOL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('/about command', () => {
+    it('should show the about box with all details including auth and project', async () => {
+      // Arrange
+      mockGetCliVersionFn.mockResolvedValue('test-version');
+      process.env.SANDBOX = 'gemini-sandbox';
+      process.env.GOOGLE_CLOUD_PROJECT = 'test-gcp-project';
+      vi.mocked(mockConfig.getModel).mockReturnValue('test-model-from-config');
+
+      const settings = {
+        merged: {
+          selectedAuthType: 'test-auth-type',
+          contextFileName: 'GEMINI.md',
+        },
+      } as LoadedSettings;
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          [],
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockPerformMemoryRefresh,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+        ),
+      );
+
+      // Act
+      await act(async () => {
+        await result.current.handleSlashCommand('/about');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenCalledTimes(2); // user message + about message
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: 'about',
+          cliVersion: 'test-version',
+          osVersion: 'test-platform',
+          sandboxEnv: 'gemini-sandbox',
+          modelVersion: 'test-model-from-config',
+          selectedAuthType: 'test-auth-type',
+          gcpProject: 'test-gcp-project',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show sandbox-exec profile when applicable', async () => {
+      // Arrange
+      mockGetCliVersionFn.mockResolvedValue('test-version');
+      process.env.SANDBOX = 'sandbox-exec';
+      process.env.SEATBELT_PROFILE = 'test-profile';
+      vi.mocked(mockConfig.getModel).mockReturnValue('test-model-from-config');
+
+      const { result } = getProcessorHook();
+
+      // Act
+      await act(async () => {
+        await result.current.handleSlashCommand('/about');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sandboxEnv: 'sandbox-exec (test-profile)',
+        }),
+        expect.any(Number),
+      );
     });
   });
 
@@ -515,7 +625,6 @@ describe('useSlashCommandProcessor', () => {
           },
           {
             type: 'quit',
-            stats: expect.any(Object),
             duration: '1h 2m 3s',
             id: expect.any(Number),
           },
