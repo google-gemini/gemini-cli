@@ -18,7 +18,7 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
-import { SlashCommand } from '../hooks/slashCommandProcessor.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 
 export interface InputPromptProps {
@@ -28,6 +28,7 @@ export interface InputPromptProps {
   onClearScreen: () => void;
   config: Config; // Added config for useCompletion
   slashCommands: SlashCommand[]; // Added slashCommands for useCompletion
+  commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
   inputWidth: number;
@@ -43,6 +44,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onClearScreen,
   config,
   slashCommands,
+  commandContext,
   placeholder = '  Type your message or @path/to/file',
   focus = true,
   inputWidth,
@@ -57,6 +59,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     config.getTargetDir(),
     isAtCommand(buffer.text) || isSlashCommand(buffer.text),
     slashCommands,
+    commandContext,
     config,
   );
 
@@ -116,28 +119,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const suggestion = completionSuggestions[indexToUse].value;
 
       if (query.trimStart().startsWith('/')) {
-        const parts = query.trimStart().substring(1).split(' ');
-        const commandName = parts[0];
-        const slashIndex = query.indexOf('/');
-        const base = query.substring(0, slashIndex + 1);
+        const hasTrailingSpace = query.endsWith(' ');
+        const parts = query
+          .trimStart()
+          .substring(1)
+          .split(/\s+/)
+          .filter(Boolean);
 
-        const command = slashCommands.find((cmd) => cmd.name === commandName);
-        // Make sure completion isn't the original command when command.completion hasn't happened yet.
-        if (command && command.completion && suggestion !== commandName) {
-          const newValue = `${base}${commandName} ${suggestion}`;
-          if (newValue === query) {
-            handleSubmitAndClear(newValue);
-          } else {
-            buffer.setText(newValue);
-          }
-        } else {
-          const newValue = base + suggestion;
-          if (newValue === query) {
-            handleSubmitAndClear(newValue);
-          } else {
-            buffer.setText(newValue);
+        let isParentPath = false;
+        // If there's no trailing space, we need to check if the current query
+        // is already a complete path to a parent command.
+        if (!hasTrailingSpace) {
+          let currentLevel: SlashCommand[] | undefined = slashCommands;
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            const found: SlashCommand | undefined = currentLevel?.find(
+              (cmd) => cmd.name === part || cmd.altName === part,
+            );
+
+            if (found) {
+              if (i === parts.length - 1 && found.subCommands) {
+                isParentPath = true;
+              }
+              currentLevel = found.subCommands;
+            } else {
+              // Path is invalid, so it can't be a parent path.
+              currentLevel = undefined;
+              break;
+            }
           }
         }
+
+        // Determine the base path of the command.
+        // - If there's a trailing space, the whole command is the base.
+        // - If it's a known parent path, the whole command is the base.
+        // - Otherwise, the base is everything EXCEPT the last partial part.
+        const basePath =
+          hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
+        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+
+        buffer.setText(newValue);
       } else {
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
@@ -155,13 +176,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       resetCompletionState();
     },
-    [
-      resetCompletionState,
-      handleSubmitAndClear,
-      buffer,
-      completionSuggestions,
-      slashCommands,
-    ],
+    [resetCompletionState, buffer, completionSuggestions, slashCommands],
   );
 
   const handleInput = useCallback(
@@ -187,10 +202,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
         if (key.name === 'tab') {
+          // if (completion.suggestions.length > 0) {
+          //   const targetIndex =
+          //     completion.activeSuggestionIndex === -1
+          //       ? 0
+          //       : completion.activeSuggestionIndex;
+          //   if (targetIndex < completion.suggestions.length) {
+          //     handleAutocomplete(targetIndex);
+          //   }
+          // }
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
-                ? 0
+                ? 0 // Default to the first suggestion if none is active
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
               handleAutocomplete(targetIndex);
@@ -198,14 +222,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           return;
         }
-        if (key.name === 'return') {
-          if (completion.activeSuggestionIndex >= 0) {
-            handleAutocomplete(completion.activeSuggestionIndex);
-          } else if (query.trim()) {
-            handleSubmitAndClear(query);
-          }
-          return;
-        }
+        // if (key.name === 'return') {
+        //   // If suggestions are showing, Enter's ONLY job is to act like Tab.
+        //   // It accepts the currently highlighted suggestion.
+        //   // It should NOT submit the form.
+        //   if (completion.suggestions.length > 0) {
+        //     const targetIndex =
+        //       completion.activeSuggestionIndex === -1
+        //         ? 0 // Default to the first suggestion if none is active
+        //         : completion.activeSuggestionIndex;
+        //     if (targetIndex < completion.suggestions.length) {
+        //       handleAutocomplete(targetIndex);
+        //     }
+        //   }
+        //   // After autocompleting, we are done. We wait for the user's NEXT Enter press to submit.
+        //   return;
+        // }
       } else {
         // Keybindings when suggestions are not shown
         if (key.ctrl && key.name === 'l') {

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Command, CommandContext, CommandArgs } from './types.js';
+import { SlashCommand } from './types.js';
 
-export const helpCommand: Command = {
+export const helpCommand: SlashCommand = {
   name: 'help',
   altName: '?',
   description: 'for help on gemini-cli',
-  action: (context: CommandContext, _args: CommandArgs) => {
+  action: (context, _args) => {
     context.utils.onDebugMessage('Opening help.');
     context.dialogs.setShowHelp(true);
   },

@@ -28,23 +28,20 @@ import {
 } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { createShowMemoryAction } from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
 import {
-  type Command,
-  type CommandArgs,
   type CommandContext,
   type SlashCommandActionReturn,
+  type SlashCommand,
 } from '../commands/types.js';
-import { registeredCommands } from '../commands/index.js';
 import { CommandService } from '../../services/CommandService.js';
 
 // LEGACY TYPE: This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
-export interface SlashCommand {
+export interface LegacySlashCommand {
   name: string;
   altName?: string;
   description?: string;
@@ -82,7 +79,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
-  const [customCommands, setCustomCommands] = useState<Command[]>([]);
+  const [commandTree, setCommandTree] = useState<SlashCommand[]>([]);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -222,60 +219,16 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => {
-    if (!config) {
-      return null;
-    }
-    return new CommandService(config, commandContext);
-  }, [config, commandContext]);
+  const commandService = useMemo(() => new CommandService(), []);
 
   useEffect(() => {
-    if (!commandService) {
-      return;
-    }
-
     const load = async () => {
       await commandService.loadCommands();
-      setCustomCommands(commandService.getCommands());
+      setCommandTree(commandService.getCommandTree());
     };
 
     load();
   }, [commandService]);
-
-  const showMemoryAction = useCallback(async () => {
-    const actionFn = createShowMemoryAction(config, settings, addMessage);
-    await actionFn();
-  }, [config, settings, addMessage]);
-
-  const addMemoryAction = useCallback(
-    (
-      _mainCommand: string,
-      _subCommand?: string,
-      args?: string,
-    ): SlashCommandActionReturn | void => {
-      if (!args || args.trim() === '') {
-        addMessage({
-          type: MessageType.ERROR,
-          content: 'Usage: /memory add <text to remember>',
-          timestamp: new Date(),
-        });
-        return;
-      }
-      // UI feedback for attempting to schedule
-      addMessage({
-        type: MessageType.INFO,
-        content: `Attempting to save to memory: "${args.trim()}"`,
-        timestamp: new Date(),
-      });
-      // Return info for scheduling the tool call
-      return {
-        shouldScheduleTool: true,
-        toolName: 'save_memory',
-        toolArgs: { fact: args.trim() },
-      };
-    },
-    [addMessage],
-  );
 
   const savedChatTags = useCallback(async () => {
     const geminiDir = config?.getProjectTempDir();
@@ -297,8 +250,8 @@ export const useSlashCommandProcessor = (
   // Define legacy commands
   // This list contains all commands that have NOT YET been migrated to the
   // new system. As commands are migrated, they are removed from this list.
-  const legacyCommands: SlashCommand[] = useMemo(() => {
-    const commands: SlashCommand[] = [
+  const legacyCommands: LegacySlashCommand[] = useMemo(() => {
+    const commands: LegacySlashCommand[] = [
       // `/help` and `/clear` have been migrated and REMOVED from this list.
       {
         name: 'docs',
@@ -570,38 +523,6 @@ export const useSlashCommandProcessor = (
             content: message,
             timestamp: new Date(),
           });
-        },
-      },
-      {
-        name: 'memory',
-        description:
-          'manage memory. Usage: /memory <show|refresh|add> [text for add]',
-        action: (mainCommand, subCommand, args) => {
-          switch (subCommand) {
-            case 'show':
-              showMemoryAction();
-              return;
-            case 'refresh':
-              performMemoryRefresh();
-              return;
-            case 'add':
-              return addMemoryAction(mainCommand, subCommand, args); // Return the object
-            case undefined:
-              addMessage({
-                type: MessageType.ERROR,
-                content:
-                  'Missing command\nUsage: /memory <show|refresh|add> [text for add]',
-                timestamp: new Date(),
-              });
-              return;
-            default:
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Unknown /memory command: ${subCommand}. Available: show, refresh, add`,
-                timestamp: new Date(),
-              });
-              return;
-          }
         },
       },
       {
@@ -1120,9 +1041,6 @@ export const useSlashCommandProcessor = (
     openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
-    performMemoryRefresh,
-    showMemoryAction,
-    addMemoryAction,
     toggleCorgiMode,
     savedChatTags,
     config,
@@ -1139,40 +1057,6 @@ export const useSlashCommandProcessor = (
     refreshStatic,
   ]);
 
-  // Combine Command Sources
-  // This is the coexistence strategy. We map the new, strongly-typed commands
-  // from the registry to the legacy `SlashCommand` interface. Then, we
-  // combine them with the remaining legacy commands. The `handleSlashCommand`
-  // function can then operate on this single, combined list, unaware of the
-  // underlying source.
-  const slashCommands = useMemo(() => {
-    // Adapt the new commands to the old interface.
-    const newCommandsAsLegacy = [
-      ...registeredCommands,
-      ...customCommands,
-    ].map(
-      (cmd: Command): SlashCommand => ({
-        name: cmd.name,
-        altName: cmd.altName,
-        description: cmd.description,
-        completion: cmd.completion
-          ? () => cmd.completion!(commandContext)
-                    : undefined,
-        action: (mainCommand, subCommand, args) => {
-          const commandArgs: CommandArgs = {
-            mainCommand,
-            subCommand,
-            rest: args || '',
-          };
-          // Execute the new command's action with the context and parsed args.
-          return cmd.action(commandContext, commandArgs);
-        },
-      }),
-    );
-
-    return [...newCommandsAsLegacy, ...legacyCommands];
-  }, [legacyCommands, commandContext, customCommands]);
-
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
@@ -1180,10 +1064,12 @@ export const useSlashCommandProcessor = (
       if (typeof rawQuery !== 'string') {
         return false;
       }
+
       const trimmed = rawQuery.trim();
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
         return false;
       }
+
       const userMessageTimestamp = Date.now();
       if (trimmed !== '/quit' && trimmed !== '/exit') {
         addItem(
@@ -1192,35 +1078,82 @@ export const useSlashCommandProcessor = (
         );
       }
 
-      let subCommand: string | undefined;
-      let args: string | undefined;
+      const parts = trimmed.substring(1).trim().split(/\s+/);
+      const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
 
-      const commandToMatch = (() => {
-        if (trimmed.startsWith('?')) {
-          return 'help';
-        }
-        const parts = trimmed.substring(1).trim().split(/\s+/);
-        if (parts.length > 1) {
-          subCommand = parts[1];
-        }
-        if (parts.length > 2) {
-          args = parts.slice(2).join(' ');
-        }
-        return parts[0];
-      })();
+      // --- Start of New Tree Traversal Logic ---
 
-      const mainCommand = commandToMatch;
+      let currentCommands = commandTree;
+      let commandToExecute: SlashCommand | undefined;
+      let pathIndex = 0;
 
-      for (const cmd of slashCommands) {
+      for (const part of commandPath) {
+        const foundCommand = currentCommands.find(
+          (cmd) => cmd.name === part || cmd.altName === part,
+        );
+
+        if (foundCommand) {
+          commandToExecute = foundCommand;
+          pathIndex++;
+          if (foundCommand.subCommands) {
+            currentCommands = foundCommand.subCommands;
+          } else {
+            // We found a terminal command, stop searching down the tree.
+            break;
+          }
+        } else {
+          // This part is not a known command/subcommand, so stop traversal.
+          break;
+        }
+      }
+
+      if (commandToExecute) {
+        // We found a command in the new system.
+        const args = parts.slice(pathIndex).join(' ');
+
+        if (commandToExecute.action) {
+          // Case 1: The command has an action. Execute it.
+          const result = await commandToExecute.action(commandContext, args);
+          if (typeof result === 'object' && result?.shouldScheduleTool) {
+            return result;
+          }
+          return true; // Command was handled.
+        } else if (commandToExecute.subCommands) {
+          // Case 2: No action, but has subCommands (e.g. user typed `/memory`). Show help for it.
+          const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
+            .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
+            .join('\n')}`;
+          addMessage({
+            type: MessageType.INFO,
+            content: helpText,
+            timestamp: new Date(),
+          });
+          return true; // Command was handled by showing help.
+        }
+      }
+
+      // --- End of New Tree Traversal Logic ---
+
+      // --- Legacy Fallback Logic (for commands not yet migrated) ---
+
+      const mainCommand = parts[0];
+      const subCommand = parts[1];
+      const legacyArgs = parts.slice(2).join(' ');
+
+      for (const cmd of legacyCommands) {
         if (mainCommand === cmd.name || mainCommand === cmd.altName) {
-          const actionResult = await cmd.action(mainCommand, subCommand, args);
+          const actionResult = await cmd.action(
+            mainCommand,
+            subCommand,
+            legacyArgs,
+          );
           if (
             typeof actionResult === 'object' &&
             actionResult?.shouldScheduleTool
           ) {
-            return actionResult; // Return the object for useGeminiStream
+            return actionResult;
           }
-          return true; // Command was handled, but no tool to schedule
+          return true;
         }
       }
 
@@ -1229,10 +1162,55 @@ export const useSlashCommandProcessor = (
         content: `Unknown command: ${trimmed}`,
         timestamp: new Date(),
       });
-      return true; // Indicate command was processed (even if unknown)
+      return true;
     },
-    [addItem, slashCommands, addMessage],
+    [addItem, commandTree, legacyCommands, commandContext, addMessage],
   );
 
-  return { handleSlashCommand, slashCommands, pendingHistoryItems };
+  // You'll also need to update how `allCommands` is constructed for the Help component
+  // to prevent duplication, since legacyCommands will eventually be empty.
+  const allCommands = useMemo(() => {
+    // --- START OF NEW ADAPTER LOGIC ---
+    // Adapt legacy commands to the new SlashCommand interface
+    const adaptedLegacyCommands: SlashCommand[] = legacyCommands.map(
+      (legacyCmd) => ({
+        name: legacyCmd.name,
+        altName: legacyCmd.altName,
+        description: legacyCmd.description,
+        // The action now matches the new interface.
+        // It wraps the old action, providing the arguments it expects.
+        action: async (_context: CommandContext, args: string) => {
+          // We need to parse the args string back into the old format
+          // that legacy commands expect (main, sub, rest).
+          const parts = args.split(/\s+/);
+          const subCommand = parts[0] || undefined;
+          const restOfArgs = parts.slice(1).join(' ') || undefined;
+
+          // Note: We use the legacyCmd.name as the main command.
+          return legacyCmd.action(legacyCmd.name, subCommand, restOfArgs);
+        },
+        // Adapt the completion function as well
+        completion: legacyCmd.completion
+          ? async (_context: CommandContext, _partialArg: string) =>
+              // The old completion didn't take args, so we just call it.
+              legacyCmd.completion!()
+          : undefined,
+      }),
+    );
+    // --- END OF NEW ADAPTER LOGIC ---
+
+    const newCommandNames = new Set(commandTree.map((c) => c.name));
+    const filteredAdaptedLegacy = adaptedLegacyCommands.filter(
+      (c) => !newCommandNames.has(c.name),
+    );
+
+    return [...commandTree, ...filteredAdaptedLegacy];
+  }, [commandTree, legacyCommands]);
+
+  return {
+    handleSlashCommand,
+    slashCommands: allCommands,
+    pendingHistoryItems,
+    commandContext,
+  };
 };

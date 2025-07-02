@@ -10,13 +10,6 @@ import { HistoryItem, HistoryItemWithoutId, Message } from '../types.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { SessionStatsState } from '../contexts/SessionContext.js';
 
-// The arguments parsed from the user's input
-export interface CommandArgs {
-  mainCommand: string;
-  subCommand?: string;
-  rest?: string; // The rest of the input after the subCommand
-}
-
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
   // Core services and configuration
@@ -68,19 +61,27 @@ export interface SlashCommandActionReturn {
   message?: string; // For simple messages or errors
 }
 
-// The core Command interface
-export interface Command {
+// The standardized contract for any command in the system.
+export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
-  // Completion function for autocompletion suggestions
-  completion?: (context: CommandContext) => Promise<string[]>;
-  // The action to execute. Note it now receives context and args.
-  action: (
+
+  // The action to run. Optional for parent commands that only group sub-commands.
+  action?: (
     context: CommandContext,
-    args: CommandArgs,
+    args: string,
   ) =>
     | void
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
+
+  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  completion?: (
+    context: CommandContext,
+    partialArg: string,
+  ) => Promise<string[]>;
+
+  // The key to the nested structure, allowing commands to have children.
+  subCommands?: SlashCommand[];
 }

@@ -20,7 +20,7 @@ import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
-import { SlashCommand } from './slashCommandProcessor.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -40,6 +40,7 @@ export function useCompletion(
   cwd: string,
   isActive: boolean,
   slashCommands: SlashCommand[],
+  commandContext: CommandContext,
   config?: Config,
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -125,69 +126,115 @@ export function useCompletion(
 
     const trimmedQuery = query.trimStart(); // Trim leading whitespace
 
-    // --- Handle Slash Command Completion ---
     if (trimmedQuery.startsWith('/')) {
-      const parts = trimmedQuery.substring(1).split(' ');
-      const commandName = parts[0];
-      const subCommand = parts.slice(1).join(' ');
+      const fullPath = trimmedQuery.substring(1);
+      const hasTrailingSpace = trimmedQuery.endsWith(' ');
 
-      const command = slashCommands.find(
-        (cmd) => cmd.name === commandName || cmd.altName === commandName,
-      );
+      // Get all non-empty parts of the command.
+      const rawParts = fullPath.split(/\s+/).filter((p) => p);
 
-      // Continue to show command help until user types past command name.
-      if (command && command.completion && parts.length > 1) {
+      let commandPathParts = rawParts;
+      let partial = '';
+
+      // If there's no trailing space, the last part is potentially a partial segment.
+      // We tentatively separate it.
+      if (!hasTrailingSpace && rawParts.length > 0) {
+        partial = rawParts[rawParts.length - 1];
+        commandPathParts = rawParts.slice(0, -1);
+      }
+
+      // --- 1. Traverse the Command Tree using the tentative completed path ---
+      let currentLevel: SlashCommand[] | undefined = slashCommands;
+      let leafCommand: SlashCommand | null = null;
+
+      for (const part of commandPathParts) {
+        if (!currentLevel) {
+          leafCommand = null;
+          currentLevel = [];
+          break;
+        }
+        const found: SlashCommand | undefined = currentLevel.find(
+          (cmd) => cmd.name === part || cmd.altName === part,
+        );
+        if (found) {
+          leafCommand = found;
+          currentLevel = found.subCommands;
+        } else {
+          leafCommand = null;
+          currentLevel = [];
+          break;
+        }
+      }
+
+      // --- 2. Handle the Ambiguous Case ---
+      // This is the key fix. If we had no trailing space, our "partial" might actually
+      // be a completed parent command. We must check for this.
+      if (!hasTrailingSpace && currentLevel) {
+        const exactMatchAsParent = currentLevel.find(
+          (cmd) =>
+            (cmd.name === partial || cmd.altName === partial) &&
+            cmd.subCommands,
+        );
+
+        if (exactMatchAsParent) {
+          // It's a perfect match for a parent command. Override our initial guess.
+          // Treat it as a completed command path.
+          leafCommand = exactMatchAsParent;
+          currentLevel = exactMatchAsParent.subCommands;
+          partial = ''; // We now want to suggest ALL of its sub-commands.
+        }
+      }
+
+      const depth = commandPathParts.length;
+
+      // --- 3. Provide Suggestions based on the now-corrected context ---
+
+      // CASE A: Argument Completion
+      if (
+        leafCommand?.completion &&
+        (hasTrailingSpace ||
+          (rawParts.length > depth && depth > 0 && partial !== ''))
+      ) {
         const fetchAndSetSuggestions = async () => {
           setIsLoadingSuggestions(true);
-          if (command.completion) {
-            const results = await command.completion();
-            const filtered = results.filter((r) => r.startsWith(subCommand));
-            const newSuggestions = filtered.map((s) => ({
-              label: s,
-              value: s,
-            }));
-            setSuggestions(newSuggestions);
-            setShowSuggestions(newSuggestions.length > 0);
-            setActiveSuggestionIndex(newSuggestions.length > 0 ? 0 : -1);
-          }
+          const argString = rawParts.slice(depth).join(' ');
+          const results =
+            (await leafCommand!.completion!(commandContext, argString)) || [];
+          const finalSuggestions = results.map((s) => ({ label: s, value: s }));
+          setSuggestions(finalSuggestions);
+          setShowSuggestions(finalSuggestions.length > 0);
+          setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
           setIsLoadingSuggestions(false);
         };
         fetchAndSetSuggestions();
         return;
       }
 
-      const partialCommand = trimmedQuery.substring(1);
-      const filteredSuggestions = slashCommands
-        .filter(
-          (cmd) =>
-            cmd.name.startsWith(partialCommand) ||
-            cmd.altName?.startsWith(partialCommand),
-        )
-        // Filter out ? and any other single character commands unless it's the only char
-        .filter((cmd) => {
-          const nameMatch = cmd.name.startsWith(partialCommand);
-          const altNameMatch = cmd.altName?.startsWith(partialCommand);
-          if (partialCommand.length === 1) {
-            return nameMatch || altNameMatch; // Allow single char match if query is single char
-          }
-          return (
-            (nameMatch && cmd.name.length > 1) ||
-            (altNameMatch && cmd.altName && cmd.altName.length > 1)
-          );
-        })
-        .filter((cmd) => cmd.description)
-        .map((cmd) => ({
-          label: cmd.name, // Always show the main name as label
-          value: cmd.name, // Value should be the main command name for execution
-          description: cmd.description,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+      // CASE B: Command/Sub-command Completion
+      const commandsToSearch = currentLevel || [];
+      if (commandsToSearch.length > 0) {
+        const suggestions = commandsToSearch
+          .filter(
+            (cmd) =>
+              cmd.description &&
+              (cmd.name.startsWith(partial) ||
+                cmd.altName?.startsWith(partial)),
+          )
+          .map((cmd) => ({
+            label: cmd.name,
+            value: cmd.name,
+            description: cmd.description,
+          }));
 
-      setSuggestions(filteredSuggestions);
-      setShowSuggestions(filteredSuggestions.length > 0);
-      setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
-      setVisibleStartIndex(0);
-      setIsLoadingSuggestions(false);
+        setSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+        setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
+        setIsLoadingSuggestions(false);
+        return;
+      }
+
+      // If we fall through, no suggestions are available.
+      resetCompletionState();
       return;
     }
 
@@ -451,7 +498,15 @@ export function useCompletion(
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
-  }, [query, cwd, isActive, resetCompletionState, slashCommands, config]);
+  }, [
+    query,
+    cwd,
+    isActive,
+    resetCompletionState,
+    slashCommands,
+    commandContext,
+    config,
+  ]);
 
   return {
     suggestions,

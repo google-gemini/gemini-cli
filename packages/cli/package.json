@@ -53,8 +53,7 @@
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
     "update-notifier": "^7.3.1",
-    "yargs": "^17.7.2",
-    "js-yaml": "^4.1.0"
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
@@ -62,7 +61,6 @@
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
