@@ -83,6 +83,45 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     commitMode: 'staged-only' | 'all-changes';
   } | null = null;
 
+  private async analyzeGitState(signal: AbortSignal): Promise<{
+    statusOutput: string;
+    diffOutput: string;
+    logOutput: string;
+    commitMode: 'staged-only' | 'all-changes';
+  }> {
+    const [statusOutput, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
+      this.executeGitCommand(['status', '--porcelain'], signal),
+      this.executeGitCommand(['diff', '--cached'], signal),
+      this.executeGitCommand(['diff'], signal),
+      this.executeGitCommand(['log', '--oneline', '-10'], signal)
+    ]);
+
+    const hasStagedChanges = stagedDiff?.trim() !== '';
+    const hasUnstagedChanges = unstagedDiff?.trim() !== '';
+    const hasUntrackedFiles = statusOutput?.includes('??') || false;
+
+    let commitMode: 'staged-only' | 'all-changes';
+    let diffOutput: string;
+
+    if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
+      commitMode = 'staged-only';
+      diffOutput = stagedDiff!;
+    } else {
+      commitMode = 'all-changes';
+      const diffs = [];
+      if (stagedDiff) diffs.push(stagedDiff);
+      if (unstagedDiff) diffs.push(unstagedDiff);
+      diffOutput = diffs.join('\n');
+    }
+
+    return {
+      statusOutput: statusOutput || '',
+      diffOutput,
+      logOutput: logOutput || '',
+      commitMode
+    };
+  }
+
   constructor(config: Config) {
     super(
       GenerateCommitMessageTool.Name,
@@ -116,74 +155,58 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     }
 
     try {
-      // First gather git information
-      const [statusOutput, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
-        this.executeGitCommand(['status', '--porcelain'], signal),
-        this.executeGitCommand(['diff', '--cached'], signal),
-        this.executeGitCommand(['diff'], signal),
-        this.executeGitCommand(['log', '--oneline', '-10'], signal)
-      ]);
-      
-      const diffOutput = stagedDiff?.trim() ? stagedDiff : unstagedDiff;
+      const gitState = await this.analyzeGitState(signal);
 
-      if (!diffOutput?.trim()) {
-        // No changes to confirm
+      if (!gitState.diffOutput.trim()) {
         return false;
       }
 
-      // Generate commit message first and cache it
       const commitMessage = await this.generateCommitMessage(
-        statusOutput || '',
-        diffOutput,
-        logOutput || '',
+        gitState.statusOutput,
+        gitState.diffOutput,
+        gitState.logOutput,
         signal
       );
 
       const finalCommitMessage = this.addGeminiSignature(commitMessage);
       
-      // Determine commit strategy based on current git state
-      const hasStagedChanges = stagedDiff?.trim() !== '';
-      const hasUnstagedChanges = unstagedDiff?.trim() !== '';
-      const hasUntrackedFiles = statusOutput?.includes('??') || false;
-      
-      let commitMode: 'staged-only' | 'all-changes';
-      
-      if (hasStagedChanges && !hasUnstagedChanges && !hasUntrackedFiles) {
-        // Only staged changes exist, commit staged files only
-        commitMode = 'staged-only';
-      } else {
-        // In all other cases (unstaged, untracked, or mixed), we'll stage all changes.
-        commitMode = 'all-changes';
-      }
-      
       // Cache the data for execute method
       this.cachedCommitData = {
-        statusOutput: statusOutput || '',
-        diffOutput,
-        logOutput: logOutput || '',
+        statusOutput: gitState.statusOutput,
+        diffOutput: gitState.diffOutput,
+        logOutput: gitState.logOutput,
         commitMessage,
         finalCommitMessage,
         timestamp: Date.now(),
-        commitMode
+        commitMode: gitState.commitMode
       };
 
       // Determine which files will be committed for display
       const filesToCommit = this.parseFilesToBeCommitted(
-        statusOutput || '', 
-        commitMode === 'staged-only'
+        gitState.statusOutput, 
+        gitState.commitMode === 'staged-only'
       );
       
       let filesDisplay = '';
       if (filesToCommit.length > 0) {
         filesDisplay = `\n\nFiles to be committed:\n` +
-          `${filesToCommit.map(f => `  - ${f}`).join('\n')}`;
+          `${filesToCommit.map(f => `  ${f}`).join('\n')}`;
       }
+
+      const commitModeText = gitState.commitMode === 'staged-only' 
+        ? 'staged changes only' 
+        : 'all changes (staged & unstaged)';
 
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
         title: 'Confirm Git Commit',
-        command: `Commit with message:\n\n${finalCommitMessage}${filesDisplay}`,
-        rootCommand: 'git-commit',
+        command: `git commit ${gitState.commitMode === 'all-changes' ? '(will stage all changes) ' : ''}
+
+Commit message:
+${finalCommitMessage}
+
+Strategy: ${commitModeText}${filesDisplay}`,
+        rootCommand: 'git commit',
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlways) {
             this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -214,54 +237,42 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       } else {
         logger.debug('No valid cache, generating fresh commit message...');
         
-        // Step 1: Gather git information (parallel execution)
-        const [statusOut, stagedDiff, unstagedDiff, logOutput] = await Promise.all([
-          this.executeGitCommand(['status', '--porcelain'], signal),
-          this.executeGitCommand(['diff', '--cached'], signal),
-          this.executeGitCommand(['diff'], signal),
-          this.executeGitCommand(['log', '--oneline', '-10'], signal)
-        ]);
-        
-        const diffOutput = stagedDiff?.trim() ? stagedDiff : unstagedDiff;
+        const gitState = await this.analyzeGitState(signal);
+        statusOutput = gitState.statusOutput;
 
-        statusOutput = statusOut || '';
-
-        if (!diffOutput?.trim()) {
+        if (!gitState.diffOutput.trim()) {
           return {
             llmContent: 'No changes detected in the current workspace.',
             returnDisplay: 'No changes detected in the current workspace.',
           };
         }
 
-        // Step 2: Generate commit message using AI analysis
         const commitMessage = await this.generateCommitMessage(
-          statusOutput,
-          diffOutput,
-          logOutput || '',
+          gitState.statusOutput,
+          gitState.diffOutput,
+          gitState.logOutput,
           signal
         );
 
         finalCommitMessage = this.addGeminiSignature(commitMessage);
+        
+        // Cache the data for staging strategy
+        this.cachedCommitData = {
+          statusOutput: gitState.statusOutput,
+          diffOutput: gitState.diffOutput,
+          logOutput: gitState.logOutput,
+          commitMessage,
+          finalCommitMessage,
+          timestamp: Date.now(),
+          commitMode: gitState.commitMode
+        };
       }
 
-      // Step 3: Handle staging based on cached strategy or current state
+      // Step 3: Handle staging based on cached strategy
       const cachedData = this.cachedCommitData;
       if (cachedData && cachedData.commitMode === 'all-changes') {
-        // Stage all changes using git add .
         logger.debug('Staging all changes using git add .');
         await this.executeGitCommand(['add', '.'], signal);
-      } else if (!cachedData) {
-        // Fallback for non-cached execution - determine staging strategy
-        const currentStagedDiff = await this.executeGitCommand(['diff', '--cached'], signal);
-        const currentUnstagedDiff = await this.executeGitCommand(['diff'], signal);
-        const hasOnlyUnstagedChanges = !currentStagedDiff?.trim() && 
-          currentUnstagedDiff?.trim();
-        const hasUntrackedFiles = statusOutput?.includes('??');
-        
-        if (hasOnlyUnstagedChanges || hasUntrackedFiles) {
-          logger.debug('Staging all changes using git add .');
-          await this.executeGitCommand(['add', '.'], signal);
-        }
       }
 
       // Step 4: Create commit

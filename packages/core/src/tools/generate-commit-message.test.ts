@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { GenerateCommitMessageTool } from './generate-commit-message.js';
 import { Config, ApprovalMode } from '../config/config.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { spawn } from 'child_process';
 import { GeminiClient } from '../core/client.js';
 import { EventEmitter } from 'events';
@@ -68,10 +69,10 @@ describe('GenerateCommitMessageTool', () => {
 
   it('should return a message when there are no changes', async () => {
     mockSpawn.mockImplementation(createGitCommandMock({
-      'status': '',
+      'status --porcelain': '',
       'diff --cached': '',
       'diff': '',
-      'log': 'abc1234 Previous commit'
+      'log --oneline': 'abc1234 Previous commit'
     }));
 
     const result = await tool.execute(undefined, new AbortController().signal);
@@ -213,10 +214,10 @@ describe('GenerateCommitMessageTool', () => {
     const logOutput = 'abc1234 Previous commit message';
 
     mockSpawn.mockImplementation(createGitCommandMock({
-      'status': statusOutput,
+      'status --porcelain': statusOutput,
       'diff --cached': '', // No staged changes
       diff,
-      'log': logOutput,
+      'log --oneline': logOutput,
       add: '',
       'commit': ''
     }));
@@ -351,12 +352,14 @@ describe('GenerateCommitMessageTool', () => {
   it('should handle mixed staged and unstaged changes intelligently', async () => {
     const statusOutput = 'MM file.txt\n?? newfile.txt';
     const logOutput = 'abc1234 Previous commit message';
+    const stagedDiff = 'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-line2\n+line2 modified';
+    const unstagedDiff = 'diff --git a/file.txt b/file.txt\n@@ -2 +2 @@\n+line3 added';
 
     mockSpawn.mockImplementation(createGitCommandMock({
-      'status': statusOutput,
-      'diff --cached': 'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-line2\n+line2 modified',
-      'diff': 'diff --git a/file.txt b/file.txt\n@@ -2 +2 @@\n+line3 added',
-      'log': logOutput,
+      'status --porcelain': statusOutput,
+      'diff --cached': stagedDiff,
+      'diff': unstagedDiff,
+      'log --oneline': logOutput,
       add: '',
       'commit': ''
     }));
@@ -377,7 +380,101 @@ describe('GenerateCommitMessageTool', () => {
     expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: mixed changes');
     expect(result.returnDisplay).toBe('Commit created successfully!\n\nCommit message:\nfeat: mixed changes');
     
-    // In the non-cached path, it should check for untracked files and stage them
+    // Verify AI receives combined diff for mixed changes scenario
+    expect(mockClient.generateContent).toHaveBeenCalledWith(
+      [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: expect.stringContaining('line2 modified'),
+            },
+          ],
+        },
+      ],
+      {},
+      controller.signal,
+    );
+    
+    // Should stage all changes before committing
     expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.any(Object));
+  });
+
+  it('should use only staged diff when only staged changes exist', async () => {
+    const statusOutput = 'M  file.txt';
+    const logOutput = 'abc1234 Previous commit message';
+    const stagedDiff = 'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+
+    // Use a more specific mock that clearly separates the git commands
+    mockSpawn.mockImplementation((_command: string, args: string[]) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: { on: ReturnType<typeof vi.fn> };
+        stderr: { on: ReturnType<typeof vi.fn> };
+        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
+      };
+      
+      const argString = args.join(' ');
+      let output = '';
+      
+      if (argString === 'status --porcelain') {
+        output = statusOutput;
+      } else if (argString === 'diff --cached') {
+        output = stagedDiff;
+      } else if (argString === 'diff') {
+        output = ''; // No unstaged changes
+      } else if (argString === 'log --oneline -10') {
+        output = logOutput;
+      } else if (argString === 'commit -F -') {
+        child.stdin = { write: vi.fn(), end: vi.fn() };
+        output = '';
+      }
+      
+      child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+        if (event === 'data') {
+          listener(Buffer.from(output));
+        }
+      }) };
+      
+      child.stderr = { on: vi.fn() };
+      process.nextTick(() => child.emit('close', 0));
+      return child;
+    });
+
+    (mockClient.generateContent as Mock).mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'feat: staged only changes' }],
+          },
+        },
+      ],
+    });
+
+    const controller = new AbortController();
+    const result = await tool.execute(undefined, controller.signal);
+
+    expect(result.llmContent).toBe('Commit created successfully!\n\nCommit message:\nfeat: staged only changes');
+    
+    // Verify AI receives only staged diff
+    expect(mockClient.generateContent).toHaveBeenCalledWith(
+      [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: expect.stringContaining('-old\n+new'),
+            },
+          ],
+        },
+      ],
+      {},
+      controller.signal,
+    );
+    
+    // Should NOT stage additional changes - verify that git add . was not called
+    const addCalls = mockSpawn.mock.calls.filter(call => 
+      call[0] === 'git' && call[1] && call[1].includes('add') && call[1].includes('.')
+    );
+    expect(addCalls).toHaveLength(0);
   });
 });
