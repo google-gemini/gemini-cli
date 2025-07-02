@@ -73,6 +73,7 @@ interface UseTextBufferProps {
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
+  shellModeActive?: boolean; // Whether the text buffer is in shell mode
 }
 
 interface UndoHistoryEntry {
