@@ -289,9 +289,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
         });
 
         if (stdin && child.stdin) {
-          // Sanitize to remove control characters while preserving basic formatting
-          const sanitizedStdin = stdin.replace(/[^\x20-\x7E\n\r\t]/g, '');
-          child.stdin.write(sanitizedStdin);
+          child.stdin.write(stdin);
           child.stdin.end();
         }
 
