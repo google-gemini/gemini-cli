@@ -130,6 +130,10 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  copilot?: {
+    bridgeUrl?: string;
+    enableFallback?: boolean;
+  };
 }
 
 export class Config {
@@ -170,6 +174,10 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
+  private readonly copilot?: {
+    bridgeUrl?: string;
+    enableFallback?: boolean;
+  };
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -211,6 +219,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.copilot = params.copilot;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -293,6 +302,10 @@ export class Config {
 
   getEmbeddingModel(): string {
     return this.embeddingModel;
+  }
+
+  getCopilotSettings(): { bridgeUrl?: string; enableFallback?: boolean } {
+    return this.copilot || {};
   }
 
   getSandbox(): SandboxConfig | undefined {

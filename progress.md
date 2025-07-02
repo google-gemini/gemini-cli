@@ -56,15 +56,26 @@ Building a fork of Google's Gemini CLI that uses GitHub Copilot as the default L
 - [x] Implemented streaming support for both providers
 - [x] Added provider exports and index file
 
-### ⏳ Milestone 4: CLI Integration and Configuration (Week 6) - NOT STARTED
-**Status**: 0% Complete
+### 🚧 Milestone 4: CLI Integration and Configuration (Week 6) - IN PROGRESS
+**Status**: 85% Complete
+
+#### Completed:
+- [x] Updated CLI configuration to use Copilot as default (when running as gemini-copilot)
+- [x] Modified authentication flow to support USE_COPILOT auth type
+- [x] Added Copilot to AuthDialog as first option
+- [x] Integrated ContentGeneratorAdapter to bridge providers
+- [x] Updated auth validation (no env vars needed for Copilot)
+- [x] Fixed fallback behavior to be opt-in instead of default
+- [x] Added `copilot.enableFallback` setting to settings.json
+- [x] Added `COPILOT_ENABLE_FALLBACK` environment variable support
+- [x] Added `--copilot-fallback` CLI flag for explicit opt-in
+- [x] Modified loadCliConfig to return both config and argv for flag handling
 
 #### TODO:
-- [ ] Update CLI configuration to use Copilot as default
-- [ ] Modify authentication flow
-- [ ] Add --provider flag
-- [ ] Create setup wizard
-- [ ] Update help text
+- [ ] Complete --provider flag implementation in main function
+- [ ] Create setup wizard for first-time users
+- [ ] Update help text and documentation
+- [ ] Add health check on startup for VSCode bridge
 
 ### ⏳ Milestone 5: Testing and Quality Assurance (Week 7) - NOT STARTED
 **Status**: 0% Complete
@@ -85,25 +96,29 @@ Building a fork of Google's Gemini CLI that uses GitHub Copilot as the default L
 - [ ] npm package publication
 
 ## Current Focus
-Working on refactoring the existing Gemini code into the GeminiProvider to complete the provider abstraction layer. Next steps include integrating the provider factory into the CLI.
+Completing CLI integration (Milestone 4). The provider system is fully implemented and integrated. Fallback behavior has been fixed to be opt-in only (addressing enterprise security concerns). Currently implementing the --provider CLI flag to allow users to override the default LLM provider at runtime.
 
 ## Technical Decisions Made
 
 1. **Architecture**: Clean provider abstraction with factory pattern
 2. **Communication**: HTTP + WebSocket bridge between CLI and VSCode
 3. **Default Port**: 7337 for bridge server
-4. **Error Handling**: Graceful fallback to Gemini when Copilot unavailable
+4. **Error Handling**: Opt-in fallback to Gemini (disabled by default for enterprise security)
 5. **Testing**: Maintaining high test coverage (90%+ target)
+6. **Fallback Behavior**: Three ways to enable - settings file, environment variable, or CLI flag
+7. **Provider Selection**: Default based on binary name (gemini-copilot uses Copilot)
 
 ## Known Issues
 - VSCode API types need careful handling (LanguageModelChat vs LanguageModelChatModel)
 - TypeScript compilation requires DOM lib and skipLibCheck for VSCode extension
 
 ## Next Steps
-1. Write tests for provider abstraction
-2. Implement CopilotProvider
-3. Refactor GeminiProvider
-4. Test bridge connection between CLI and VSCode
+1. Complete --provider flag implementation in main function
+2. Test end-to-end flow with actual VSCode bridge
+3. Create setup wizard for first-time Copilot users
+4. Update help text and documentation
+5. Add health check on startup for VSCode bridge
+6. Begin comprehensive testing phase (Milestone 5)
 
 ---
 

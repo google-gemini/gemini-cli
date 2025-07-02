@@ -65,6 +65,12 @@ export interface Settings {
   hideWindowTitle?: boolean;
   hideTips?: boolean;
 
+  // Copilot-specific settings
+  copilot?: {
+    bridgeUrl?: string;
+    enableFallback?: boolean;
+  };
+
   // Add other settings here.
 }
 

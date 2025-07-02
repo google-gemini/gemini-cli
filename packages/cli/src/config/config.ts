@@ -53,6 +53,8 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  provider: string | undefined;
+  'copilot-fallback': boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -128,6 +130,16 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('provider', {
+      type: 'string',
+      choices: ['copilot', 'gemini', 'google', 'vertex'],
+      description: 'Override the default LLM provider',
+    })
+    .option('copilot-fallback', {
+      type: 'boolean',
+      description: 'Enable fallback to Gemini if Copilot is unavailable (requires GEMINI_API_KEY)',
+      default: false,
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -165,7 +177,7 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
-): Promise<Config> {
+): Promise<{ config: Config; argv: CliArgs }> {
   loadEnvironment();
 
   const argv = await parseArguments();
@@ -246,7 +258,13 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    copilot: {
+      ...settings.copilot,
+      enableFallback: argv['copilot-fallback'] ?? settings.copilot?.enableFallback ?? false,
+    },
   });
+  
+  return { config, argv };
 }
 
 function mergeMcpServers(settings: Settings, extensions: Extension[]) {

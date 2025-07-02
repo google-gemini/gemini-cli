@@ -50,13 +50,14 @@ export type ContentGeneratorConfig = {
   authType?: AuthType | undefined;
   copilot?: {
     bridgeUrl?: string;
+    enableFallback?: boolean;
   };
 };
 
 export async function createContentGeneratorConfig(
   model: string | undefined,
   authType: AuthType | undefined,
-  config?: { getModel?: () => string },
+  config?: { getModel?: () => string; getCopilotSettings?: () => { bridgeUrl?: string; enableFallback?: boolean } },
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
@@ -77,11 +78,16 @@ export async function createContentGeneratorConfig(
   }
 
   if (authType === AuthType.USE_COPILOT) {
-    // Copilot doesn't need an API key, just optional bridge URL
-    const bridgeUrl = process.env.COPILOT_BRIDGE_URL;
-    if (bridgeUrl) {
-      contentGeneratorConfig.copilot = { bridgeUrl };
-    }
+    // Copilot doesn't need an API key, just optional bridge URL and fallback setting
+    const copilotSettings = config?.getCopilotSettings?.() || {};
+    const bridgeUrl = copilotSettings.bridgeUrl || process.env.COPILOT_BRIDGE_URL;
+    const enableFallback = copilotSettings.enableFallback ?? (process.env.COPILOT_ENABLE_FALLBACK === 'true');
+    
+    contentGeneratorConfig.copilot = {
+      bridgeUrl,
+      enableFallback,
+    };
+    
     return contentGeneratorConfig;
   }
 
@@ -137,12 +143,13 @@ export async function createContentGenerator(
     // Use our provider factory for Copilot
     const providerConfig: ProviderFactoryConfig = {
       defaultProvider: 'copilot',
-      fallbackProvider: config.apiKey ? 'gemini' : undefined,
+      // Only enable fallback if explicitly requested and API key is available
+      fallbackProvider: (config.copilot?.enableFallback && config.apiKey) ? 'gemini' : undefined,
       copilot: {
         bridgeUrl: config.copilot?.bridgeUrl || 'http://localhost:7337',
         model: config.model,
       },
-      gemini: config.apiKey ? {
+      gemini: (config.copilot?.enableFallback && config.apiKey) ? {
         apiKey: config.apiKey,
         model: config.model,
       } : undefined,
