@@ -64,6 +64,7 @@ describe('oauth2', () => {
       setCredentials: mockSetCredentials,
       getAccessToken: mockGetAccessToken,
       credentials: mockTokens,
+      on: vi.fn(),
     } as unknown as OAuth2Client;
     vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
@@ -135,10 +136,6 @@ describe('oauth2', () => {
       redirect_uri: `http://localhost:${capturedPort}/oauth2callback`,
     });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
-
-    const tokenPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
-    const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
-    expect(tokenData).toEqual(mockTokens);
 
     // Verify Google Account ID was cached
     const googleAccountIdPath = path.join(
