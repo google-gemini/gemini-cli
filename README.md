@@ -1,13 +1,16 @@
-# Gemini CLI
+# Gemini Copilot
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+[![Gemini Copilot CI](https://github.com/binnyarora/gemini-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/binnyarora/gemini-copilot/actions/workflows/ci.yml)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+**Disclaimer: This is a fork of Google's Gemini CLI. This project is not affiliated with or endorsed by Google.**
 
-With the Gemini CLI you can:
+This repository contains **Gemini Copilot**, a fork of Google's Gemini CLI that uses GitHub Copilot as the default LLM provider via VSCode's Language Model API. This allows users with GitHub Copilot subscriptions to use their existing authentication instead of Google's Gemini API.
+
+Based on Google's Gemini CLI - Original repository: https://github.com/google-gemini/gemini-cli
+
+With Gemini Copilot you can:
 
 - Query and edit large codebases in and beyond Gemini's 1M token context window.
 - Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
@@ -19,58 +22,62 @@ With the Gemini CLI you can:
 
 ## Quickstart
 
-1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+1. **Prerequisites:** 
+   - [Node.js version 18](https://nodejs.org/en/download) or higher
+   - [VSCode](https://code.visualstudio.com/) with [GitHub Copilot Extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot)
+   - Active GitHub Copilot subscription
+
+2. **Install and run:**
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   npm install -g binora/gemini-copilot
+   gemini-copilot
    ```
 
-   Or install it with:
+3. **Setup:** The first run will guide you through:
+   - VSCode detection and connection
+   - GitHub Copilot authentication verification  
+   - Bridge extension installation
+   - Color theme selection
 
-   ```bash
-   npm install -g @google/gemini-cli
-   gemini
-   ```
+You are now ready to use Gemini Copilot with your existing GitHub Copilot subscription!
 
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
+### Fallback to Gemini API (Optional):
 
-You are now ready to use the Gemini CLI!
-
-### Use a Gemini API key:
-
-The Gemini API provides a free tier with [100 requets per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
+If you want to use Gemini as a fallback when VSCode/Copilot is not available:
 
 1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
+2. Set it as an environment variable in your terminal:
 
    ```bash
    export GEMINI_API_KEY="YOUR_API_KEY"
    ```
 
-3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
+3. Configure fallback in your settings:
+   ```bash
+   gemini-copilot config --provider copilot --fallback-to-gemini true
+   ```
 
-For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+For other authentication methods, see the [authentication](./docs/cli/authentication.md) guide.
 
 ## Examples
 
-Once the CLI is running, you can start interacting with Gemini from your shell.
+Once the CLI is running, you can start interacting with GitHub Copilot from your shell.
 
 You can start a project from a new directory:
 
 ```sh
 cd new-project/
-gemini
-> Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
+gemini-copilot
+> Write me a Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
 Or work with an existing project:
 
 ```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
-gemini
+git clone https://github.com/binnyarora/gemini-copilot
+cd gemini-copilot
+gemini-copilot
 > Give me a summary of all of the changes that went in yesterday
 ```
 
@@ -91,7 +98,7 @@ having issues.
 
 ### Explore a new codebase
 
-Start by `cd`ing into an existing or newly-cloned repository and running `gemini`.
+Start by `cd`ing into an existing or newly-cloned repository and running `gemini-copilot`.
 
 ```text
 > Describe the main pieces of this system's architecture.

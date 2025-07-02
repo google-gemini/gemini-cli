@@ -1,5 +1,5 @@
 {
-  "name": "@google/gemini-cli",
+  "name": "binora/gemini-copilot",
   "version": "0.1.9",
   "engines": {
     "node": ">=18.0.0"
@@ -8,7 +8,7 @@
   "workspaces": [
     "packages/*"
   ],
-  "repository": "google-gemini/gemini-cli",
+  "repository": "binnyarora/gemini-copilot",
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.8"
   },
@@ -53,7 +53,7 @@
     "prepublishOnly": "node scripts/prepublish.js"
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "gemini-copilot": "bundle/gemini.js"
   },
   "files": [
     "bundle/",

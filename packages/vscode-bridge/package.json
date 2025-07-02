@@ -1,0 +1,92 @@
+{
+  "name": "gemini-copilot-bridge",
+  "displayName": "Gemini Copilot Bridge",
+  "description": "Bridge extension that connects Gemini Copilot CLI to GitHub Copilot via VSCode Language Model API",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=18.0.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Gemini Copilot Bridge",
+      "properties": {
+        "geminiCopilotBridge.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Gemini Copilot Bridge"
+        },
+        "geminiCopilotBridge.port": {
+          "type": "number",
+          "default": 7337,
+          "description": "Port for the bridge server"
+        },
+        "geminiCopilotBridge.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Log level for the bridge"
+        },
+        "geminiCopilotBridge.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the bridge server on VSCode startup"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "geminiCopilotBridge.start",
+        "title": "Start Bridge Server",
+        "category": "Gemini Copilot"
+      },
+      {
+        "command": "geminiCopilotBridge.stop",
+        "title": "Stop Bridge Server",
+        "category": "Gemini Copilot"
+      },
+      {
+        "command": "geminiCopilotBridge.restart",
+        "title": "Restart Bridge Server",
+        "category": "Gemini Copilot"
+      },
+      {
+        "command": "geminiCopilotBridge.status",
+        "title": "Show Bridge Status",
+        "category": "Gemini Copilot"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "build": "npm run compile",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "18.x",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.30.1",
+    "@typescript-eslint/parser": "^8.30.1",
+    "eslint": "^9.24.0",
+    "typescript": "^5.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "ws": "^8.17.0",
+    "axios": "^1.7.0"
+  }
+}
