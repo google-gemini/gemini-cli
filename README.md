@@ -19,6 +19,10 @@ With the Gemini CLI you can:
 
 ## Quickstart
 
+You have two options to install Gemini CLI.
+
+### With Node 
+
 1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
 2. **Run the CLI:** Execute the following command in your terminal:
 
@@ -32,6 +36,22 @@ With the Gemini CLI you can:
    npm install -g @google/gemini-cli
    gemini
    ```
+
+### With Brew
+
+1. **Prerequisites:** Ensure you have [Brew](https://brew.sh/) installed.
+2. **Install the CLI** Execute the following command in your terminal:
+
+   ```bash
+   brew install gemini-cli
+   ```
+
+   and **run it** with:
+   ```bash
+   gemini
+   ```
+
+In both options, continue the configuration with these instructions
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
