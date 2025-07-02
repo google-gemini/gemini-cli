@@ -54,20 +54,26 @@ describe('memoryImportProcessor', () => {
       );
     });
 
-    it('should warn and fail for non-md file imports', async () => {
+    it('should import non-md files just like md files', async () => {
       const content = 'Some content @./instructions.txt more content';
       const basePath = '/test/path';
+      const importedContent = 'This is a text file.';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
 
       const result = await processImports(content, basePath, true);
 
-      expect(console.warn).toHaveBeenCalledWith(
-        '[WARN] [ImportProcessor]',
-        'Import processor only supports .md files. Attempting to import non-md file: ./instructions.txt. This will fail.',
-      );
+      expect(result).toContain('<!-- Imported from: ./instructions.txt -->');
+      expect(result).toContain(importedContent);
       expect(result).toContain(
-        '<!-- Import failed: ./instructions.txt - Only .md files are supported -->',
+        '<!-- End of import from: ./instructions.txt -->',
       );
-      expect(mockedFs.readFile).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, './instructions.txt'),
+        'utf-8',
+      );
     });
 
     it('should handle circular imports', async () => {
@@ -89,7 +95,7 @@ describe('memoryImportProcessor', () => {
       const result = await processImports(content, basePath, true, importState);
 
       // The circular import should be detected when processing the nested import
-      expect(result).toContain('<!-- Circular import detected: ./main.md -->');
+      expect(result).toContain('<!-- File already processed: ./main.md -->');
     });
 
     it('should handle file not found errors', async () => {
@@ -182,6 +188,95 @@ describe('memoryImportProcessor', () => {
       expect(result).toContain('<!-- Imported from: ./second.md -->');
       expect(result).toContain(firstContent);
       expect(result).toContain(secondContent);
+    });
+
+    it('should ignore imports inside code blocks', async () => {
+      const content = [
+        'Normal content @./should-import.md',
+        '```',
+        'code block with @./should-not-import.md',
+        '```',
+        'More content @./should-import2.md',
+      ].join('\n');
+      const basePath = '/test/project/src';
+      const importedContent1 = 'Imported 1';
+      const importedContent2 = 'Imported 2';
+      // Only the imports outside code blocks should be processed
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(importedContent1)
+        .mockResolvedValueOnce(importedContent2);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+      );
+      expect(result).toContain(importedContent1);
+      expect(result).toContain(importedContent2);
+      expect(result).toContain('@./should-not-import.md'); // Should remain as-is
+    });
+
+    it('should ignore imports inside inline code', async () => {
+      const content = [
+        'Normal content @./should-import.md',
+        '`inline code with @./should-not-import.md`',
+        'More content @./should-import2.md',
+      ].join('\n');
+      const basePath = '/test/project/src';
+      const importedContent1 = 'Imported 1';
+      const importedContent2 = 'Imported 2';
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(importedContent1)
+        .mockResolvedValueOnce(importedContent2);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+      );
+      expect(result).toContain(importedContent1);
+      expect(result).toContain(importedContent2);
+      expect(result).toContain('@./should-not-import.md'); // Should remain as-is
+    });
+
+    it('should allow imports from parent and subdirectories within project root', async () => {
+      const content =
+        'Parent import: @../parent.md Subdir import: @./components/sub.md';
+      const basePath = '/test/project/src';
+      const importedParent = 'Parent file content';
+      const importedSub = 'Subdir file content';
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(importedParent)
+        .mockResolvedValueOnce(importedSub);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+      );
+      expect(result).toContain(importedParent);
+      expect(result).toContain(importedSub);
+    });
+
+    it('should reject imports outside project root', async () => {
+      const content = 'Outside import: @../../../etc/passwd';
+      const basePath = '/test/project/src';
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+      );
+      expect(result).toContain(
+        '<!-- Import failed: ../../../etc/passwd - Path traversal attempt -->',
+      );
     });
   });
 
