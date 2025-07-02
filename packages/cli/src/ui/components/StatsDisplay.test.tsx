@@ -260,4 +260,44 @@ describe('<StatsDisplay />', () => {
       expect(lastFrame()).toMatchSnapshot();
     });
   });
+
+  describe('Title Rendering', () => {
+    const zeroMetrics: SessionMetrics = {
+      models: {},
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        byName: {},
+      },
+    };
+
+    it('renders the default title when no title prop is provided', () => {
+      const { lastFrame } = renderWithMockedStats(zeroMetrics);
+      const output = lastFrame();
+      expect(output).toContain('Session Stats');
+      expect(output).not.toContain('Agent powering down');
+      expect(output).toMatchSnapshot();
+    });
+
+    it('renders the custom title when a title prop is provided', () => {
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionStartTime: new Date(),
+          metrics: zeroMetrics,
+          lastPromptTokenCount: 0,
+        },
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay duration="1s" title="Agent powering down. Goodbye!" />,
+      );
+      const output = lastFrame();
+      expect(output).toContain('Agent powering down. Goodbye!');
+      expect(output).not.toContain('Session Stats');
+      expect(output).toMatchSnapshot();
+    });
+  });
 });
