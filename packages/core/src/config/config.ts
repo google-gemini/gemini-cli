@@ -43,6 +43,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { PredefinedPrompt } from '../core/prompts.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -111,6 +112,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  prompts?: PredefinedPrompt[];
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
@@ -148,6 +150,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly prompts: PredefinedPrompt[] | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
@@ -186,6 +189,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.prompts = params.prompts;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
@@ -344,6 +348,10 @@ export class Config {
 
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getPredefinedPrompts(): unknown[] | undefined {
+    return this.prompts;
   }
 
   getUserMemory(): string {

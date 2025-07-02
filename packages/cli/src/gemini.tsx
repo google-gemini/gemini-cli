@@ -34,9 +34,11 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  PredefinedPrompt,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { loadPrompts } from './config/prompt.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -100,7 +102,13 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const prompts = loadPrompts(workspaceRoot);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    prompts,
+    sessionId,
+  );
 
   // set default fallback to gemini api key
   // this has to go after load cli because thats where the env is set
@@ -203,6 +211,7 @@ export async function main() {
   const nonInteractiveConfig = await loadNonInteractiveConfig(
     config,
     extensions,
+    prompts,
     settings,
   );
 
@@ -238,6 +247,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
+  prompts: PredefinedPrompt[],
   settings: LoadedSettings,
 ) {
   let finalConfig = config;
@@ -261,6 +271,7 @@ async function loadNonInteractiveConfig(
     finalConfig = await loadCliConfig(
       nonInteractiveSettings,
       extensions,
+      prompts,
       config.getSessionId(),
     );
   }
