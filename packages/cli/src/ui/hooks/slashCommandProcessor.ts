@@ -1081,8 +1081,9 @@ export const useSlashCommandProcessor = (
           const shellCommands: { index: number; cmd: string }[] = [];
 
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].startsWith('!')) {
-              shellCommands.push({ index: i, cmd: lines[i].slice(1).trim() });
+            const match = lines[i].match(/^!\s*`([^`]*)`/);
+            if (match) {
+              shellCommands.push({ index: i, cmd: match[1] });
             }
             if (shellCommands.length > 0) {
               setPendingShellCommand({ lines, shellCommands, cmd, args: args || '' });
