@@ -75,13 +75,14 @@ export const useThemeCommand = (
   const handleThemeSelect = useCallback(
     (themeName: string | undefined, scope: SettingScope) => {
       try {
-        // Only allow selecting themes available in the chosen scope or built-in themes
-        const customThemes =
-          scope === SettingScope.User
-            ? loadedSettings.user.settings.customThemes || {}
-            : loadedSettings.workspace.settings.customThemes || {};
+        // Merge user and workspace custom themes (workspace takes precedence)
+        const mergedCustomThemes = {
+          ...(loadedSettings.user.settings.customThemes || {}),
+          ...(loadedSettings.workspace.settings.customThemes || {}),
+        };
+        // Only allow selecting themes available in the merged custom themes or built-in themes
         const isBuiltIn = themeManager.findThemeByName(themeName);
-        const isCustom = themeName && customThemes[themeName];
+        const isCustom = themeName && mergedCustomThemes[themeName];
         if (!isBuiltIn && !isCustom) {
           setThemeError(`Theme "${themeName}" not found in selected scope.`);
           setIsThemeDialogOpen(true);

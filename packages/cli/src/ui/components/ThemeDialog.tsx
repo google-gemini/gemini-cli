@@ -45,7 +45,7 @@ export function ThemeDialog({
   const customThemes =
     selectedScope === SettingScope.User
       ? settings.user.settings.customThemes || {}
-      : settings.workspace.settings.customThemes || {};
+      : { ...(settings.user.settings.customThemes || {}), ...(settings.workspace.settings.customThemes || {}) };
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
@@ -67,11 +67,13 @@ export function ThemeDialog({
   ];
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
-  // Determine which radio button should be initially selected in the theme list
-  // This should reflect the theme *saved* for the selected scope, or the default
+  // Find the index of the selected theme, but only if it exists in the list
+  const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
-    (item) => item.value === (settings.merged.theme || DEFAULT_THEME.name),
+    (item) => item.value === selectedThemeName
   );
+  // If not found, fallback to the first theme
+  const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const scopeItems = [
     { label: 'User Settings', value: SettingScope.User },
@@ -134,8 +136,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      PREVIEW_PANE_WIDTH_PERCENTAGE *
+      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
@@ -211,7 +213,7 @@ export function ThemeDialog({
           <RadioButtonSelect
             key={selectInputKey}
             items={themeItems}
-            initialIndex={initialThemeIndex}
+            initialIndex={safeInitialThemeIndex}
             onSelect={handleThemeSelect}
             onHighlight={handleThemeHighlight}
             isFocused={currenFocusedSection === 'theme'}
