@@ -44,6 +44,7 @@ interface VertexGenerateContentRequest {
   labels?: Record<string, string>;
   safetySettings?: SafetySetting[];
   generationConfig?: VertexGenerationConfig;
+  session_id?: string;
 }
 
 interface VertexGenerationConfig {
@@ -114,11 +115,12 @@ export function fromCountTokenResponse(
 export function toGenerateContentRequest(
   req: GenerateContentParameters,
   project?: string,
+  sessionId?: string,
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
-    request: toVertexGenerateContentRequest(req),
+    request: toVertexGenerateContentRequest(req, sessionId),
   };
 }
 
@@ -136,6 +138,7 @@ export function fromGenerateContentResponse(
 
 function toVertexGenerateContentRequest(
   req: GenerateContentParameters,
+  sessionId?: string,
 ): VertexGenerateContentRequest {
   return {
     contents: toContents(req.contents),
@@ -146,6 +149,7 @@ function toVertexGenerateContentRequest(
     labels: req.config?.labels,
     safetySettings: req.config?.safetySettings,
     generationConfig: toVertexGenerationConfig(req.config),
+    session_id: sessionId,
   };
 }
 
