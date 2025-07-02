@@ -205,7 +205,7 @@ describe('InputPrompt', () => {
 
       // Send Ctrl+V
       stdin.write('\x16'); // Ctrl+V
-      await wait(100); // Give async operations time to complete
+      await wait();
 
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
       expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
@@ -214,7 +214,6 @@ describe('InputPrompt', () => {
       expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
         props.config.getTargetDir()
       );
-      // The implementation now uses replaceRangeByOffset instead of setText
       expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
       unmount();
     });
@@ -226,7 +225,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x16'); // Ctrl+V
-      await wait(100);
+      await wait();
 
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
       expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
@@ -242,7 +241,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x16'); // Ctrl+V
-      await wait(100);
+      await wait();
 
       expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
       expect(mockBuffer.setText).not.toHaveBeenCalled();
@@ -265,7 +264,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x16'); // Ctrl+V
-      await wait(100);
+      await wait();
 
       // Should insert at cursor position with spaces
       expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
@@ -288,7 +287,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x16'); // Ctrl+V
-      await wait(100);
+      await wait();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error handling clipboard image:',
