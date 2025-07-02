@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Trivial change: touched for commit.
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -54,7 +58,6 @@ describe('memoryImportProcessor', () => {
       );
     });
 
-
     it('should import non-md files just like md files', async () => {
       const content = 'Some content @./instructions.txt more content';
       const basePath = '/test/path';
@@ -75,22 +78,6 @@ describe('memoryImportProcessor', () => {
         path.resolve(basePath, './instructions.txt'),
         'utf-8',
       );
-=======
-    it('should warn and fail for non-md file imports', async () => {
-      const content = 'Some content @./instructions.txt more content';
-      const basePath = '/test/path';
-
-      const result = await processImports(content, basePath, true);
-
-      expect(console.warn).toHaveBeenCalledWith(
-        '[WARN] [ImportProcessor]',
-        'Import processor only supports .md files. Attempting to import non-md file: ./instructions.txt. This will fail.',
-      );
-      expect(result).toContain(
-        '<!-- Import failed: ./instructions.txt - Only .md files are supported -->',
-      );
-      expect(mockedFs.readFile).not.toHaveBeenCalled();
-
     });
 
     it('should handle circular imports', async () => {
@@ -112,11 +99,7 @@ describe('memoryImportProcessor', () => {
       const result = await processImports(content, basePath, true, importState);
 
       // The circular import should be detected when processing the nested import
-
       expect(result).toContain('<!-- File already processed: ./main.md -->');
-=======
-      expect(result).toContain('<!-- Circular import detected: ./main.md -->');
-
     });
 
     it('should handle file not found errors', async () => {
@@ -211,7 +194,6 @@ describe('memoryImportProcessor', () => {
       expect(result).toContain(secondContent);
     });
 
-
     it('should ignore imports inside code blocks', async () => {
       const content = [
         'Normal content @./should-import.md',
@@ -300,8 +282,6 @@ describe('memoryImportProcessor', () => {
         '<!-- Import failed: ../../../etc/passwd - Path traversal attempt -->',
       );
     });
-=======
-
   });
 
   describe('validateImportPath', () => {
