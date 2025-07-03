@@ -27,9 +27,8 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
-      turnCount:5,
+      turnCount: 5,
     },
-
 
     getTurnCount: () => 5,
     startNewTurn: vi.fn(),
@@ -293,7 +292,7 @@ describe('<StatsDisplay />', () => {
           sessionStartTime: new Date(),
           metrics: zeroMetrics,
           lastPromptTokenCount: 0,
-          turnCount:5,
+          turnCount: 5,
         },
 
         getTurnCount: () => 5,

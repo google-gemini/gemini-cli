@@ -232,7 +232,7 @@ export class GeminiClient {
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat(),turn_id);
+    const turn = new Turn(this.getChat(), turn_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       yield event;
@@ -247,7 +247,12 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turn_id, boundedTurns - 1);
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          turn_id,
+          boundedTurns - 1,
+        );
       }
     }
     return turn;
@@ -462,14 +467,17 @@ export class GeminiClient {
       return null;
     }
 
-    const { text: summary } = await this.getChat().sendMessage({
-      message: {
-        text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+    const { text: summary } = await this.getChat().sendMessage(
+      {
+        message: {
+          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+        },
+        config: {
+          systemInstruction: { text: getCompressionPrompt() },
+        },
       },
-      config: {
-        systemInstruction: { text: getCompressionPrompt() },
-      },
-    }, turn_id);
+      turn_id,
+    );
     this.chat = await this.startChat([
       {
         role: 'user',

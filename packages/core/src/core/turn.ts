@@ -144,7 +144,10 @@ export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
 
-  constructor(private readonly chat: GeminiChat, private readonly turn_id: string) {
+  constructor(
+    private readonly chat: GeminiChat,
+    private readonly turn_id: string,
+  ) {
     this.pendingToolCalls = [];
     this.debugResponses = [];
   }
@@ -154,12 +157,15 @@ export class Turn {
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
-      const responseStream = await this.chat.sendMessageStream({
-        message: req,
-        config: {
-          abortSignal: signal,
+      const responseStream = await this.chat.sendMessageStream(
+        {
+          message: req,
+          config: {
+            abortSignal: signal,
+          },
         },
-      }, this.turn_id);
+        this.turn_id,
+      );
 
       for await (const resp of responseStream) {
         if (signal?.aborted) {
