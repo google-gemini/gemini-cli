@@ -193,6 +193,7 @@ export async function loadCliConfig(
   );
 
   const mcpServers = mergeMcpServers(settings, extensions);
+  const excludeTools = mergeExcludeTools(settings, extensions);
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
@@ -205,7 +206,7 @@ export async function loadCliConfig(
     question: argv.prompt || '',
     fullContext: argv.all_files || false,
     coreTools: settings.coreTools || undefined,
-    excludeTools: settings.excludeTools || undefined,
+    excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
@@ -268,6 +269,19 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
     );
   }
   return mcpServers;
+}
+
+function mergeExcludeTools(
+  settings: Settings,
+  extensions: Extension[],
+): string[] {
+  const allExcludeTools = new Set(settings.excludeTools || []);
+  for (const extension of extensions) {
+    for (const tool of extension.config.excludeTools || []) {
+      allExcludeTools.add(tool);
+    }
+  }
+  return [...allExcludeTools];
 }
 
 function findEnvFile(startDir: string): string | null {

@@ -56,6 +56,7 @@ export class GeminiClient {
     labels: {},
   };
   private readonly MAX_TURNS = 100;
+  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -77,6 +78,7 @@ export class GeminiClient {
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config.getSessionId(),
     );
     this.chat = await this.startChat();
   }
@@ -228,7 +230,9 @@ export class GeminiClient {
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!turns) {
+    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
+    const boundedTurns = Math.min(turns, this.MAX_TURNS);
+    if (!boundedTurns) {
       return new Turn(this.getChat());
     }
 
@@ -251,7 +255,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
       }
     }
     return turn;
@@ -455,7 +459,11 @@ export class GeminiClient {
     }
 
     // Don't compress if not forced and we are under the limit.
-    if (!force && originalTokenCount < 0.95 * tokenLimit(this.model)) {
+    if (
+      !force &&
+      originalTokenCount <
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.model)
+    ) {
       return null;
     }
 

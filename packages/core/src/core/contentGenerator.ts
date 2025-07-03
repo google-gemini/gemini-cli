@@ -114,6 +114,7 @@ export async function createContentGeneratorConfig(
 
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
+  sessionId?: string,
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
@@ -123,7 +124,11 @@ export async function createContentGenerator(
   };
 
   if (config.authType === AuthType.LOGIN_WITH_GOOGLE) {
-    return createCodeAssistContentGenerator(httpOptions, config.authType);
+    return createCodeAssistContentGenerator(
+      httpOptions,
+      config.authType,
+      sessionId,
+    );
   }
 
   const options: GoogleGenAIOptions = { httpOptions };
