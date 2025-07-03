@@ -32,7 +32,7 @@ interface ImportState {
 }
 
 // Helper to find the project root (looks for .git directory)
-async function findProjectRoot(startDir: string): Promise<string> {
+function findProjectRoot(startDir: string): string {
   let currentDir = path.resolve(startDir);
   while (true) {
     const gitPath = path.join(currentDir, '.git');
