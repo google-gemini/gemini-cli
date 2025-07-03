@@ -6,6 +6,9 @@ import { IModelProvider, ProviderFactoryConfig, ProviderConfig } from './types.j
 import { CopilotProvider } from './copilot-provider.js';
 import { GeminiProvider } from './gemini-provider.js';
 
+// Re-export types
+export type { ProviderFactoryConfig } from './types.js';
+
 /**
  * Factory for creating and managing model providers
  */

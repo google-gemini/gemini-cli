@@ -3,7 +3,6 @@
 // Licensed under Apache 2.0
 
 import axios, { AxiosInstance } from 'axios';
-import WebSocket from 'ws';
 import { 
   IModelProvider, 
   Model, 
@@ -33,6 +32,8 @@ export class CopilotProvider implements IModelProvider {
   }
 
   async initialize(config?: ProviderConfig): Promise<void> {
+    console.log('🔧 CopilotProvider.initialize() called with config:', config);
+    
     if (config?.bridgeUrl) {
       this.bridgeUrl = config.bridgeUrl;
     }
@@ -81,16 +82,21 @@ export class CopilotProvider implements IModelProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
+    console.log('🚀 CopilotProvider.chat() called with model:', request.model);
+    
     if (!this.initialized) {
       throw new Error('Provider not initialized. Call initialize() first.');
     }
 
     try {
+      console.log('📡 Making POST request to bridge /chat endpoint');
       const response = await this.httpClient.post('/chat', {
         ...request,
         stream: false
       });
 
+      console.log('✅ Got response from bridge:', response.status);
+      console.log('📦 Response data:', JSON.stringify(response.data, null, 2));
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -109,88 +115,51 @@ export class CopilotProvider implements IModelProvider {
   }
 
   async *chatStream(request: ChatRequest): AsyncGenerator<ChatResponseChunk> {
+    console.log('🌊 CopilotProvider.chatStream() called with model:', request.model);
+    
     if (!this.initialized) {
       throw new Error('Provider not initialized. Call initialize() first.');
     }
 
-    // Use WebSocket for streaming
-    const wsUrl = this.bridgeUrl.replace(/^http/, 'ws') + '/stream';
-    const ws = new WebSocket(wsUrl);
-
     try {
-      await new Promise<void>((resolve, reject) => {
-        ws.on('open', () => resolve());
-        ws.on('error', reject);
-        
-        // Timeout connection
-        setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
+      console.log('📡 Making streaming request to bridge /chat endpoint');
+      
+      // Make streaming request using Server-Sent Events
+      const response = await this.httpClient.post('/chat', {
+        ...request,
+        stream: true
+      }, {
+        responseType: 'stream'
       });
 
-      // Send the chat request
-      ws.send(JSON.stringify({
-        type: 'chat',
-        data: {
-          ...request,
-          stream: true
-        }
-      }));
+      const stream = response.data;
+      let buffer = '';
 
-      // Receive streaming responses
-      const messageQueue: any[] = [];
-      let done = false;
-      let error: Error | null = null;
+      for await (const chunk of stream) {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-      ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          
-          switch (message.type) {
-            case 'chat_chunk':
-              messageQueue.push(message.data);
-              break;
-            case 'chat_done':
-              done = true;
-              break;
-            case 'error':
-              error = new Error(message.error);
-              done = true;
-              break;
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              return;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              console.log('📨 Received chunk:', parsed);
+              yield parsed;
+            } catch (e) {
+              console.error('Failed to parse SSE data:', data);
+            }
           }
-        } catch (err) {
-          error = new Error(`Failed to parse WebSocket message: ${err}`);
-          done = true;
-        }
-      });
-
-      ws.on('error', (err) => {
-        error = err;
-        done = true;
-      });
-
-      ws.on('close', () => {
-        done = true;
-      });
-
-      // Yield messages as they arrive
-      while (!done || messageQueue.length > 0) {
-        if (error) {
-          throw error;
-        }
-
-        if (messageQueue.length > 0) {
-          const chunk = messageQueue.shift();
-          yield chunk;
-        } else {
-          // Wait for more messages
-          await new Promise(resolve => setTimeout(resolve, 10));
         }
       }
-
-      if (error) {
-        throw error;
-      }
-    } finally {
-      ws.close();
+    } catch (error) {
+      console.error('🔥 Streaming failed:', error);
+      throw error;
     }
   }
 

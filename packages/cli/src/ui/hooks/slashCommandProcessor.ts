@@ -18,6 +18,7 @@ import {
   MCPServerStatus,
   getMCPDiscoveryState,
   getMCPServerStatus,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
@@ -1034,6 +1035,108 @@ export const useSlashCommandProcessor = (
         },
       });
     }
+
+    // Add model command
+    commands.push({
+      name: 'model',
+      description: 'Switch or show current model. Usage: /model [list|<model-name>]',
+      action: async (_mainCommand, subCommand, _args) => {
+        if (!config) {
+          addMessage({
+            type: MessageType.ERROR,
+            content: 'Configuration not available',
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        if (!subCommand) {
+          // Show current model
+          const currentModel = config.getModel();
+          addMessage({
+            type: MessageType.INFO,
+            content: `Current model: ${currentModel}`,
+            timestamp: new Date(),
+          });
+          return;
+        }
+
+        if (subCommand === 'list') {
+          // List available models
+          try {
+            const authType = settings.merged.selectedAuthType;
+            if (authType === AuthType.USE_COPILOT) {
+              // Fetch available Copilot models from bridge
+              const response = await fetch('http://localhost:7337/models');
+              if (!response.ok) {
+                throw new Error('Bridge not available');
+              }
+              const data = await response.json();
+              const modelList = data.models.map((m: any) => `${m.id} (${m.name})`).join('\n');
+              addMessage({
+                type: MessageType.INFO,
+                content: `Available Copilot models:\n\n${modelList}`,
+                timestamp: new Date(),
+              });
+            } else {
+              // Show Gemini models
+              addMessage({
+                type: MessageType.INFO,
+                content: `Available Gemini models:
+• gemini-2.5-pro
+• gemini-2.5-flash
+• gemini-1.5-pro
+• gemini-1.5-flash`,
+                timestamp: new Date(),
+              });
+            }
+          } catch (error) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: `Failed to list models: ${error}`,
+              timestamp: new Date(),
+            });
+          }
+          return;
+        }
+
+        // Switch to specified model
+        try {
+          config.setModel(subCommand);
+          addMessage({
+            type: MessageType.INFO,
+            content: `Switched to model: ${subCommand}`,
+            timestamp: new Date(),
+          });
+        } catch (error) {
+          addMessage({
+            type: MessageType.ERROR,
+            content: `Failed to switch model: ${error}`,
+            timestamp: new Date(),
+          });
+        }
+      },
+      completion: async () => {
+        if (!config) return [];
+        
+        try {
+          const authType = settings.merged.selectedAuthType;
+          if (authType === AuthType.USE_COPILOT) {
+            // Get Copilot model completions
+            const response = await fetch('http://localhost:7337/models');
+            if (response.ok) {
+              const data = await response.json();
+              return ['list', ...data.models.map((m: any) => m.id)];
+            }
+          }
+          // Return Gemini models as fallback
+          return ['list', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+        } catch {
+          return ['list'];
+        }
+      },
+    });
+
     return commands;
   }, [
     onDebugMessage,

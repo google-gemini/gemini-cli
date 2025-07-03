@@ -32,7 +32,7 @@ describe('CopilotProvider', () => {
     };
 
     mockedAxios.create.mockReturnValue(mockAxiosInstance);
-    mockedAxios.isAxiosError = axios.isAxiosError;
+    (mockedAxios as any).isAxiosError = axios.isAxiosError;
 
     provider = new CopilotProvider();
   });

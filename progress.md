@@ -56,8 +56,8 @@ Building a fork of Google's Gemini CLI that uses GitHub Copilot as the default L
 - [x] Implemented streaming support for both providers
 - [x] Added provider exports and index file
 
-### 🚧 Milestone 4: CLI Integration and Configuration (Week 6) - IN PROGRESS
-**Status**: 85% Complete
+### ✅ Milestone 4: CLI Integration and Configuration (Week 6) - COMPLETED
+**Status**: 100% Complete
 
 #### Completed:
 - [x] Updated CLI configuration to use Copilot as default (when running as gemini-copilot)
@@ -70,12 +70,16 @@ Building a fork of Google's Gemini CLI that uses GitHub Copilot as the default L
 - [x] Added `COPILOT_ENABLE_FALLBACK` environment variable support
 - [x] Added `--copilot-fallback` CLI flag for explicit opt-in
 - [x] Modified loadCliConfig to return both config and argv for flag handling
-
-#### TODO:
-- [ ] Complete --provider flag implementation in main function
-- [ ] Create setup wizard for first-time users
-- [ ] Update help text and documentation
-- [ ] Add health check on startup for VSCode bridge
+- [x] Complete --provider flag implementation in main function (users can now use --provider copilot|gemini|google|vertex)
+- [x] Changed banner/branding to "Gemini Copilot" throughout the UI
+- [x] Created setup wizard for first-time Copilot users with VSCode/extension checks
+- [x] Added health check on startup for VSCode bridge with warnings
+- [x] Updated ASCII art to show "GEMINI COPILOT"
+- [x] Added /model command for switching between available models
+- [x] Implemented bridge extension installation instructions
+- [x] Fixed model switching to read dynamically from config instead of caching
+- [x] Added JSON response cleaning for markdown code blocks
+- [x] Implemented HTTP streaming with Server-Sent Events for chat responses
 
 ### ⏳ Milestone 5: Testing and Quality Assurance (Week 7) - NOT STARTED
 **Status**: 0% Complete
@@ -96,7 +100,15 @@ Building a fork of Google's Gemini CLI that uses GitHub Copilot as the default L
 - [ ] npm package publication
 
 ## Current Focus
-Completing CLI integration (Milestone 4). The provider system is fully implemented and integrated. Fallback behavior has been fixed to be opt-in only (addressing enterprise security concerns). Currently implementing the --provider CLI flag to allow users to override the default LLM provider at runtime.
+Milestone 4 (CLI Integration and Configuration) is now complete! The provider system is fully implemented and integrated with the following key features:
+- Copilot as default provider for gemini-copilot binary
+- Opt-in fallback behavior (via settings, env var, or CLI flag)
+- --provider CLI flag for runtime provider selection
+- Setup wizard for first-time Copilot users
+- Health checks for VSCode bridge
+- Updated branding to "Gemini Copilot"
+
+Next focus: Milestone 5 (Testing and Quality Assurance) - comprehensive testing of all new features.
 
 ## Technical Decisions Made
 
@@ -122,4 +134,4 @@ Completing CLI integration (Milestone 4). The provider system is fully implement
 
 ---
 
-*Last Updated: 2025-07-02*
+*Last Updated: 2025-07-03*

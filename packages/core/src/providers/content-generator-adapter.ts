@@ -11,7 +11,7 @@ import {
   EmbedContentResponse,
   Content,
   Part,
-  GenerateContentCandidate,
+  Candidate,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { ContentGenerator } from '../core/contentGenerator.js';
@@ -82,7 +82,11 @@ export class ContentGeneratorAdapter implements ContentGenerator {
     // This is a rough approximation - ideally each provider should implement this
     let totalChars = 0;
     
-    for (const content of request.contents) {
+    // Handle ContentListUnion properly
+    const contentArray = this.normalizeContents(request.contents);
+    
+    for (const content of contentArray) {
+      if (!content.parts) continue;
       for (const part of content.parts) {
         if ('text' in part && part.text) {
           totalChars += part.text.length;
@@ -105,13 +109,69 @@ export class ContentGeneratorAdapter implements ContentGenerator {
     throw new Error('Embedding not supported by current provider');
   }
 
+  private normalizeContents(contents: any): Content[] {
+    // Handle ContentListUnion - normalize to Content array
+    if (typeof contents === 'string') {
+      return [{ role: 'user', parts: [{ text: contents }] }];
+    } else if (Array.isArray(contents)) {
+      if (contents.length > 0 && typeof contents[0] === 'string') {
+        // Array of strings
+        return [{ role: 'user', parts: contents.map(text => ({ text })) }];
+      } else if (contents.length > 0 && 'text' in contents[0]) {
+        // Array of Parts
+        return [{ role: 'user', parts: contents }];
+      } else {
+        // Array of Content
+        return contents;
+      }
+    } else if ('role' in contents) {
+      // Single Content
+      return [contents];
+    } else if ('text' in contents) {
+      // Single Part
+      return [{ role: 'user', parts: [contents] }];
+    }
+    return [];
+  }
+
   /**
    * Convert Gemini Content array to our ChatMessage array
    */
-  private convertContentsToMessages(contents: Content[]): ChatMessage[] {
+  private convertContentsToMessages(contents: any): ChatMessage[] {
+    // Handle ContentListUnion - normalize to Content array
+    let contentArray: Content[];
+    
+    if (typeof contents === 'string') {
+      contentArray = [{ role: 'user', parts: [{ text: contents }] }];
+    } else if (Array.isArray(contents)) {
+      if (contents.length > 0 && typeof contents[0] === 'string') {
+        // Array of strings
+        contentArray = [{ role: 'user', parts: contents.map(text => ({ text })) }];
+      } else if (contents.length > 0 && 'text' in contents[0]) {
+        // Array of Parts
+        contentArray = [{ role: 'user', parts: contents }];
+      } else {
+        // Array of Content
+        contentArray = contents;
+      }
+    } else if ('role' in contents) {
+      // Single Content
+      contentArray = [contents];
+    } else if ('text' in contents) {
+      // Single Part
+      contentArray = [{ role: 'user', parts: [contents] }];
+    } else {
+      contentArray = [];
+    }
+
+    return this.convertContentArrayToMessages(contentArray);
+  }
+
+  private convertContentArrayToMessages(contents: Content[]): ChatMessage[] {
     const messages: ChatMessage[] = [];
 
     for (const content of contents) {
+      if (!content.parts) continue;
       const text = content.parts
         .map(part => {
           if ('text' in part && part.text) {
@@ -138,7 +198,9 @@ export class ContentGeneratorAdapter implements ContentGenerator {
   private convertToGenerateContentResponse(response: any): GenerateContentResponse {
     const text = response.choices[0]?.message?.content || '';
     
-    const candidate: GenerateContentCandidate = {
+    console.log('🔄 Converting response to Gemini format. Text:', text);
+    
+    const candidate: Candidate = {
       content: {
         role: 'model',
         parts: [{ text }],
@@ -154,12 +216,30 @@ export class ContentGeneratorAdapter implements ContentGenerator {
       cachedContentTokenCount: 0,
     } : undefined;
 
-    return {
+    // Create a mock GenerateContentResponse with required getters
+    const result = {
       candidates: [candidate],
       promptFeedback: {},
       usageMetadata,
       modelVersion: response.model,
+      get text() {
+        return candidate.content?.parts?.[0]?.text || '';
+      },
+      get data() {
+        return '' as any;
+      },
+      get functionCalls() {
+        return [];
+      },
+      get executableCode() {
+        return '' as any;
+      },
+      get codeExecutionResult() {
+        return undefined;
+      }
     };
+    
+    return result as GenerateContentResponse;
   }
 
   /**
@@ -171,7 +251,7 @@ export class ContentGeneratorAdapter implements ContentGenerator {
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || '';
       
-      const candidate: GenerateContentCandidate = {
+      const candidate: Candidate = {
         content: {
           role: 'model',
           parts: [{ text }],
@@ -180,11 +260,29 @@ export class ContentGeneratorAdapter implements ContentGenerator {
         finishReason: chunk.choices[0]?.finishReason,
       };
 
-      yield {
+      // Create a mock GenerateContentResponse for streaming
+      const result = {
         candidates: [candidate],
         promptFeedback: {},
         modelVersion: chunk.model,
+        get text() {
+          return candidate.content?.parts?.[0]?.text || '';
+        },
+        get data() {
+          return '' as any;
+        },
+        get functionCalls() {
+          return [];
+        },
+        get executableCode() {
+          return '' as any;
+        },
+        get codeExecutionResult() {
+          return undefined;
+        }
       };
+      
+      yield result as GenerateContentResponse;
     }
   }
 

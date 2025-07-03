@@ -15,6 +15,8 @@ function activate(context) {
     logger.info('Gemini Copilot Bridge extension activated');
     // Register commands
     const startCommand = vscode.commands.registerCommand('geminiCopilotBridge.start', async () => {
+        // According to VSCode docs, Language Model API requires user-initiated actions
+        // This command execution counts as user-initiated
         await startBridge();
     });
     const stopCommand = vscode.commands.registerCommand('geminiCopilotBridge.stop', async () => {
@@ -56,7 +58,8 @@ async function startBridge() {
         const config = vscode.workspace.getConfiguration('geminiCopilotBridge');
         const port = config.get('port', 7337);
         const logLevel = config.get('logLevel', 'info');
-        logger.setLevel(logLevel);
+        // Force debug mode for now to help diagnose
+        logger.setLevel('debug');
         bridgeServer = new bridgeServer_1.BridgeServer(port, logger);
         await bridgeServer.start();
         vscode.window.showInformationMessage(`Gemini Copilot Bridge started on port ${port}`);

@@ -3,6 +3,12 @@
   "displayName": "Gemini Copilot Bridge",
   "description": "Bridge extension that connects Gemini Copilot CLI to GitHub Copilot via VSCode Language Model API",
   "version": "0.1.0",
+  "publisher": "binora",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/binnyarora/gemini-copilot.git",
+    "directory": "packages/vscode-bridge"
+  },
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18.0.0"
@@ -11,7 +17,11 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onCommand:geminiCopilotBridge.start",
+    "onCommand:geminiCopilotBridge.stop",
+    "onCommand:geminiCopilotBridge.restart",
+    "onCommand:geminiCopilotBridge.status"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -77,7 +87,6 @@
   "devDependencies": {
     "@types/vscode": "^1.85.0",
     "@types/node": "18.x",
-    "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^8.30.1",
     "@typescript-eslint/parser": "^8.30.1",
     "eslint": "^9.24.0",
@@ -85,8 +94,5 @@
     "@vscode/test-electron": "^2.3.0",
     "@vscode/vsce": "^2.22.0"
   },
-  "dependencies": {
-    "ws": "^8.17.0",
-    "axios": "^1.7.0"
-  }
+  "dependencies": {}
 }

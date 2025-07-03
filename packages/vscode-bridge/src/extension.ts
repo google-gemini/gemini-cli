@@ -15,6 +15,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     const startCommand = vscode.commands.registerCommand('geminiCopilotBridge.start', async () => {
+        // According to VSCode docs, Language Model API requires user-initiated actions
+        // This command execution counts as user-initiated
         await startBridge();
     });
 
@@ -66,7 +68,8 @@ async function startBridge() {
         const port = config.get('port', 7337);
         const logLevel = config.get('logLevel', 'info');
         
-        logger.setLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+        // Force debug mode for now to help diagnose
+        logger.setLevel('debug');
         
         bridgeServer = new BridgeServer(port, logger);
         await bridgeServer.start();

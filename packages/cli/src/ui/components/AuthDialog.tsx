@@ -11,6 +11,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
+import { CopilotSetupWizard } from './CopilotSetupWizard.js';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -26,6 +27,8 @@ export function AuthDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialErrorMessage || null,
   );
+  const [showCopilotSetup, setShowCopilotSetup] = useState(false);
+  
   const items = [
     { label: 'GitHub Copilot (via VSCode)', value: AuthType.USE_COPILOT },
     { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
@@ -41,14 +44,31 @@ export function AuthDialog({
     initialAuthIndex = 0;
   }
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethod(authMethod);
+  const handleAuthSelect = async (authMethod: AuthType) => {
+    if (authMethod === AuthType.USE_COPILOT && !settings.merged.selectedAuthType) {
+      // First time selecting Copilot, show setup wizard
+      setShowCopilotSetup(true);
+      return;
+    }
+    
+    const error = await validateAuthMethod(authMethod);
     if (error) {
       setErrorMessage(error);
     } else {
       setErrorMessage(null);
       onSelect(authMethod, SettingScope.User);
     }
+  };
+
+  const handleSetupComplete = () => {
+    setShowCopilotSetup(false);
+    setErrorMessage(null);
+    onSelect(AuthType.USE_COPILOT, SettingScope.User);
+  };
+
+  const handleSetupCancel = () => {
+    setShowCopilotSetup(false);
+    setErrorMessage('GitHub Copilot setup was cancelled');
   };
 
   useInput((_input, key) => {
@@ -63,6 +83,15 @@ export function AuthDialog({
       onSelect(undefined, SettingScope.User);
     }
   });
+
+  if (showCopilotSetup) {
+    return (
+      <CopilotSetupWizard
+        onComplete={handleSetupComplete}
+        onCancel={handleSetupCancel}
+      />
+    );
+  }
 
   return (
     <Box

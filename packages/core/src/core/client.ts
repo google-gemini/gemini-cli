@@ -48,7 +48,7 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
-  private model: string;
+  // Model is now read dynamically from config instead of being cached
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -62,7 +62,8 @@ export class GeminiClient {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.model = config.getModel();
+    // Don't cache the model - read it dynamically from config
+    // this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
   }
 
@@ -187,7 +188,7 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+      const generateContentConfigWithThinking = isThinkingSupported(this.config.getModel())
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -256,7 +257,7 @@ export class GeminiClient {
     contents: Content[],
     schema: SchemaUnion,
     abortSignal: AbortSignal,
-    model: string = DEFAULT_GEMINI_FLASH_MODEL,
+    model: string = '', // Will use config.getModel() if empty
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
     try {
@@ -268,9 +269,12 @@ export class GeminiClient {
         ...config,
       };
 
+      // Use dynamic model if not specified
+      const modelToUse = model || this.config.getModel();
+      
       const apiCall = () =>
         this.getContentGenerator().generateContent({
-          model,
+          model: modelToUse,
           config: {
             ...requestConfig,
             systemInstruction,
@@ -300,7 +304,29 @@ export class GeminiClient {
         throw error;
       }
       try {
-        return JSON.parse(text);
+        // Clean response text - remove markdown code blocks if present
+        let cleanText = text.trim();
+        
+        // Remove ```json and ``` wrapper if present
+        if (cleanText.startsWith('```json')) {
+          cleanText = cleanText.slice(7); // Remove ```json
+        } else if (cleanText.startsWith('```')) {
+          cleanText = cleanText.slice(3); // Remove ```
+        }
+        
+        if (cleanText.endsWith('```')) {
+          cleanText = cleanText.slice(0, -3); // Remove trailing ```
+        }
+        
+        cleanText = cleanText.trim();
+        
+        // Debug logging
+        if (text !== cleanText) {
+          console.log('🧹 Cleaned JSON response from:', text.substring(0, 50) + '...');
+          console.log('🧹 To:', cleanText.substring(0, 50) + '...');
+        }
+        
+        return JSON.parse(cleanText);
       } catch (parseError) {
         await reportError(
           parseError,
@@ -345,7 +371,7 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
+    const modelToUse = this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -441,11 +467,11 @@ export class GeminiClient {
 
     let { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        model: this.config.getModel(),
         contents: curatedHistory,
       });
     if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${this.model}.`);
+      console.warn(`Could not determine token count for model ${this.config.getModel()}.`);
       originalTokenCount = 0;
     }
 
@@ -453,7 +479,7 @@ export class GeminiClient {
     if (
       !force &&
       originalTokenCount <
-        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.model)
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(this.config.getModel())
     ) {
       return null;
     }
@@ -479,7 +505,7 @@ export class GeminiClient {
 
     const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        model: this.config.getModel(),
         contents: this.getChat().getHistory(),
       });
     if (newTokenCount === undefined) {
@@ -503,7 +529,7 @@ export class GeminiClient {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -518,7 +544,6 @@ export class GeminiClient {
         const accepted = await fallbackHandler(currentModel, fallbackModel);
         if (accepted) {
           this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
           return fallbackModel;
         }
       } catch (error) {

@@ -233,9 +233,11 @@ export class GeminiProvider implements IModelProvider {
         } else {
           // Prepend to existing first user message
           const firstUserContent = contents[0];
-          firstUserContent.parts[0] = { 
-            text: `System: ${message.content}\n\n${(firstUserContent.parts[0] as any).text}` 
-          };
+          if (firstUserContent.parts && firstUserContent.parts[0]) {
+            firstUserContent.parts[0] = { 
+              text: `System: ${message.content}\n\n${(firstUserContent.parts[0] as any).text}` 
+            };
+          }
         }
       } else if (message.role === 'user') {
         contents.push({
@@ -263,8 +265,8 @@ export class GeminiProvider implements IModelProvider {
     }
 
     const text = candidate.content.parts
-      .map(part => (part as any).text || '')
-      .join('');
+      ? candidate.content.parts.map(part => (part as any).text || '').join('')
+      : '';
 
     return {
       id: response.modelVersion || 'gemini-response',
@@ -295,8 +297,8 @@ export class GeminiProvider implements IModelProvider {
     
     if (candidate?.content) {
       text = candidate.content.parts
-        .map(part => (part as any).text || '')
-        .join('');
+        ? candidate.content.parts.map(part => (part as any).text || '').join('')
+        : '';
     }
 
     return {

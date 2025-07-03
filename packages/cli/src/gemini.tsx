@@ -37,6 +37,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import axios from 'axios';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -82,6 +83,23 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 
+async function checkCopilotBridgeHealth(): Promise<string | null> {
+  try {
+    const response = await axios.get('http://localhost:7337/health', { 
+      timeout: 2000 
+    });
+    if (response.data.status === 'ok') {
+      return null; // All good
+    }
+    return 'VSCode bridge is not healthy';
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.code === 'ECONNREFUSED') {
+      return 'VSCode bridge is not running. Please start VSCode and run "Gemini Copilot: Start Bridge" command.';
+    }
+    return 'Failed to connect to VSCode bridge';
+  }
+}
+
 export async function main() {
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
@@ -100,7 +118,26 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const { config, argv } = await loadCliConfig(settings.merged, extensions, sessionId);
+
+  // Handle --provider flag to override auth type
+  if (argv.provider) {
+    const providerToAuthType: { [key: string]: AuthType } = {
+      'copilot': AuthType.USE_COPILOT,
+      'gemini': AuthType.USE_GEMINI,
+      'google': AuthType.LOGIN_WITH_GOOGLE,
+      'vertex': AuthType.USE_VERTEX_AI,
+    };
+    
+    const overrideAuthType = providerToAuthType[argv.provider];
+    if (overrideAuthType) {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        overrideAuthType,
+      );
+    }
+  }
 
   // Set default auth type based on binary name and environment
   // This has to go after load cli because that's where the env is set
@@ -157,7 +194,7 @@ export async function main() {
       if (settings.merged.selectedAuthType) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
+          const err = await validateAuthMethod(settings.merged.selectedAuthType);
           if (err) {
             throw new Error(err);
           }
@@ -178,8 +215,24 @@ export async function main() {
       }
     }
   }
+  // Check Copilot bridge health if using Copilot
+  const authType = settings.merged.selectedAuthType;
+  let copilotBridgeWarning: string | undefined;
+  if (authType === AuthType.USE_COPILOT) {
+    const bridgeError = await checkCopilotBridgeHealth();
+    if (bridgeError) {
+      copilotBridgeWarning = bridgeError;
+      if (config.getDebugMode()) {
+        console.warn(`Warning: ${bridgeError}`);
+      }
+    }
+  }
+
   let input = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
+  if (copilotBridgeWarning) {
+    startupWarnings.push(copilotBridgeWarning);
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
@@ -226,7 +279,7 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    process.stdout.write(`\x1b]2; Gemini Copilot - ${title} \x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
@@ -272,11 +325,12 @@ async function loadNonInteractiveConfig(
       ...settings.merged,
       excludeTools: newExcludeTools,
     };
-    finalConfig = await loadCliConfig(
+    const { config: newConfig } = await loadCliConfig(
       nonInteractiveSettings,
       extensions,
       config.getSessionId(),
     );
+    finalConfig = newConfig;
   }
 
   return await validateNonInterActiveAuth(
@@ -300,7 +354,7 @@ async function validateNonInterActiveAuth(
   }
 
   selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
+  const err = await validateAuthMethod(selectedAuthType);
   if (err != null) {
     console.error(err);
     process.exit(1);

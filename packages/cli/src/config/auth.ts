@@ -6,16 +6,41 @@
 
 import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment } from './config.js';
+import axios from 'axios';
 
-export const validateAuthMethod = (authMethod: string): string | null => {
+async function checkVSCodeBridge(): Promise<boolean> {
+  try {
+    const response = await axios.get('http://localhost:7337/health', { 
+      timeout: 1000 
+    });
+    return response.data.status === 'ok';
+  } catch {
+    return false;
+  }
+}
+
+export const validateAuthMethod = async (authMethod: string): Promise<string | null> => {
   loadEnvironment();
   if (authMethod === AuthType.LOGIN_WITH_GOOGLE) {
     return null;
   }
 
   if (authMethod === AuthType.USE_COPILOT) {
-    // Copilot doesn't require any environment variables
-    // The VSCode bridge handles authentication
+    // Check if VSCode bridge is running
+    const bridgeRunning = await checkVSCodeBridge();
+    if (!bridgeRunning) {
+      return `VSCode bridge is not running. To install and start it:
+
+1. Open VSCode
+2. Install the bridge extension:
+   - cd packages/vscode-bridge
+   - npm run package
+   - code --install-extension gemini-copilot-bridge-0.1.0.vsix
+3. Press Cmd/Ctrl+Shift+P to open command palette
+4. Run "Gemini Copilot: Start Bridge" command
+5. Wait for "Bridge started on port 7337" notification
+6. Try again`;
+    }
     return null;
   }
 

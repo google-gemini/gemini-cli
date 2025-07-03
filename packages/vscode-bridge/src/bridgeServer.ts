@@ -3,8 +3,8 @@
 // Licensed under Apache 2.0
 
 import * as http from 'http';
+import * as url from 'url';
 import * as vscode from 'vscode';
-import { WebSocketServer, WebSocket } from 'ws';
 import { Logger } from './logger';
 import { CopilotService } from './copilotService';
 
@@ -31,7 +31,6 @@ export interface ChatResponse {
 
 export class BridgeServer {
     private server: http.Server | undefined;
-    private wss: WebSocketServer | undefined;
     private copilotService: CopilotService;
     private running = false;
 
@@ -55,12 +54,6 @@ export class BridgeServer {
             this.handleHttpRequest(req, res);
         });
 
-        // Create WebSocket server
-        this.wss = new WebSocketServer({ server: this.server });
-        this.wss.on('connection', (ws) => {
-            this.handleWebSocketConnection(ws);
-        });
-
         // Start listening
         return new Promise((resolve, reject) => {
             this.server!.listen(this.port, (err?: Error) => {
@@ -81,14 +74,11 @@ export class BridgeServer {
         }
 
         return new Promise((resolve) => {
-            // Close WebSocket server
-            this.wss?.close(() => {
-                // Close HTTP server
-                this.server?.close(() => {
-                    this.running = false;
-                    this.logger.info('Bridge server stopped');
-                    resolve();
-                });
+            // Close HTTP server
+            this.server?.close(() => {
+                this.running = false;
+                this.logger.info('Bridge server stopped');
+                resolve();
             });
         });
     }
@@ -98,6 +88,9 @@ export class BridgeServer {
     }
 
     private async handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse) {
+        // Log ALL incoming requests to see if bridge is being called
+        this.logger.info(`🌉 BRIDGE REQUEST: ${req.method} ${req.url} from ${req.headers['user-agent'] || 'unknown'}`);
+        
         // Enable CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -109,10 +102,13 @@ export class BridgeServer {
             return;
         }
 
-        const url = new URL(req.url!, `http://localhost:${this.port}`);
+        const parsedUrl = url.parse(req.url!, true);
+        const pathname = parsedUrl.pathname;
+        
+        this.logger.debug(`HTTP ${req.method} ${pathname}`);
         
         try {
-            switch (url.pathname) {
+            switch (pathname) {
                 case '/health':
                     await this.handleHealth(req, res);
                     break;
@@ -155,7 +151,10 @@ export class BridgeServer {
     }
 
     private async handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
+        this.logger.info('Chat request received');
+        
         if (req.method !== 'POST') {
+            this.logger.warn(`Invalid method for /chat: ${req.method}`);
             res.writeHead(405, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Method not allowed' }));
             return;
@@ -169,12 +168,23 @@ export class BridgeServer {
 
         req.on('end', async () => {
             try {
+                this.logger.debug(`Chat request body: ${body}`);
                 const chatRequest: ChatRequest = JSON.parse(body);
+                this.logger.info(`Chat request for model: ${chatRequest.model}, messages: ${chatRequest.messages.length}`);
                 
                 if (chatRequest.stream) {
-                    // For streaming, we should use WebSocket
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Use WebSocket for streaming' }));
+                    // Handle streaming response with HTTP
+                    res.writeHead(200, { 
+                        'Content-Type': 'text/event-stream',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive'
+                    });
+                    
+                    const stream = this.copilotService.chatStream(chatRequest);
+                    for await (const chunk of stream) {
+                        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+                    }
+                    res.end();
                     return;
                 }
 
@@ -187,62 +197,5 @@ export class BridgeServer {
                 res.end(JSON.stringify({ error: 'Chat request failed' }));
             }
         });
-    }
-
-    private handleWebSocketConnection(ws: WebSocket) {
-        this.logger.debug('WebSocket connection established');
-
-        ws.on('message', async (data) => {
-            try {
-                const request = JSON.parse(data.toString());
-                
-                if (request.type === 'chat') {
-                    await this.handleWebSocketChat(ws, request.data);
-                } else {
-                    ws.send(JSON.stringify({ 
-                        type: 'error', 
-                        error: 'Unknown request type' 
-                    }));
-                }
-            } catch (error) {
-                this.logger.error(`WebSocket message error: ${error}`);
-                ws.send(JSON.stringify({ 
-                    type: 'error', 
-                    error: 'Invalid request format' 
-                }));
-            }
-        });
-
-        ws.on('close', () => {
-            this.logger.debug('WebSocket connection closed');
-        });
-
-        ws.on('error', (error) => {
-            this.logger.error(`WebSocket error: ${error}`);
-        });
-    }
-
-    private async handleWebSocketChat(ws: WebSocket, chatRequest: ChatRequest) {
-        try {
-            // Use streaming chat
-            const stream = this.copilotService.chatStream(chatRequest);
-            
-            for await (const chunk of stream) {
-                ws.send(JSON.stringify({
-                    type: 'chat_chunk',
-                    data: chunk
-                }));
-            }
-
-            ws.send(JSON.stringify({
-                type: 'chat_done'
-            }));
-        } catch (error) {
-            this.logger.error(`Streaming chat error: ${error}`);
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: 'Streaming chat failed'
-            }));
-        }
     }
 }

@@ -159,11 +159,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
-      const error = validateAuthMethod(settings.merged.selectedAuthType);
-      if (error) {
-        setAuthError(error);
-        openAuthDialog();
-      }
+      validateAuthMethod(settings.merged.selectedAuthType).then(error => {
+        if (error) {
+          setAuthError(error);
+          openAuthDialog();
+        }
+      });
     }
   }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
 
