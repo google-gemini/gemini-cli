@@ -37,6 +37,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { connectToHyphaService } from './hypha-connect.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -102,6 +103,54 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  // Check for Hypha connection options
+  const argv = process.argv;
+  const connectIndex = argv.indexOf('--connect');
+  const workspaceIndex = argv.indexOf('--workspace');
+  const tokenIndex = argv.indexOf('--token');
+  const serviceIdIndex = argv.indexOf('--service-id');
+
+  // If --connect is specified, use Hypha connection instead of local execution
+  if (connectIndex !== -1) {
+    const serverUrl = argv[connectIndex + 1];
+    const workspace = workspaceIndex !== -1 ? argv[workspaceIndex + 1] : undefined;
+    const token = tokenIndex !== -1 ? argv[tokenIndex + 1] : undefined;
+    const serviceId = serviceIdIndex !== -1 ? argv[serviceIdIndex + 1] : 'gemini-agent';
+
+    if (!serverUrl || !workspace || !token) {
+      console.error('Error: When using --connect, you must also specify --workspace and --token');
+      console.error('Usage: gemini --connect <server-url> --workspace <workspace> --token <token> [--service-id <service-id>] <query>');
+      process.exit(1);
+    }
+
+    // Get the query from remaining arguments
+    let input = config.getQuestion();
+    
+    // If not a TTY, read from stdin
+    if (!process.stdin.isTTY) {
+      input += await readStdin();
+    }
+    
+    if (!input) {
+      console.error('No input provided. Please provide a query when using --connect mode.');
+      process.exit(1);
+    }
+
+    // Connect to Hypha service
+    await connectToHyphaService(
+      {
+        serverUrl,
+        workspace,
+        token,
+        serviceId,
+      },
+      input
+    );
+    
+    process.exit(0);
+  }
+
+  // Continue with normal local execution if not using Hypha connection
   // set default fallback to gemini api key
   // this has to go after load cli because thats where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {

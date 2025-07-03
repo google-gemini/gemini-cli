@@ -53,6 +53,11 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  // Hypha connection options
+  connect: string | undefined;
+  workspace: string | undefined;
+  token: string | undefined;
+  'service-id': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -127,6 +132,23 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
       default: false,
+    })
+    .option('connect', {
+      type: 'string',
+      description: 'Connect to a Hypha server URL instead of running locally',
+    })
+    .option('workspace', {
+      type: 'string',
+      description: 'Hypha workspace to connect to (required when using --connect)',
+    })
+    .option('token', {
+      type: 'string',
+      description: 'Hypha authentication token (required when using --connect)',
+    })
+    .option('service-id', {
+      type: 'string',
+      description: 'Service ID to use on the Hypha server (defaults to "gemini-agent")',
+      default: 'gemini-agent',
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
