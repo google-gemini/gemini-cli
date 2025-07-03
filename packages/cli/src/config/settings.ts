@@ -42,7 +42,7 @@ export interface Settings {
   coreTools?: string[];
   excludeTools?: string[];
   allowCommands?: string[];
-  denyCommands?: string[];
+  confirmCommands?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;

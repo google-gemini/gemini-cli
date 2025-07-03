@@ -420,8 +420,8 @@ describe('Configuration Integration Tests', () => {
     });
   });
 
-  describe('denyCommands Configuration', () => {
-    it('should handle undefined denyCommands', () => {
+  describe('confirmCommands Configuration', () => {
+    it('should handle undefined confirmCommands', () => {
       const configParams: ConfigParameters = {
         cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
@@ -434,10 +434,10 @@ describe('Configuration Integration Tests', () => {
       };
 
       const config = new Config(configParams);
-      expect(config.getDenyCommands()).toBeUndefined();
+      expect(config.getConfirmCommands()).toBeUndefined();
     });
 
-    it('should load denyCommands from configuration', () => {
+    it('should load confirmCommands from configuration', () => {
       const configParams: ConfigParameters = {
         cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
@@ -447,18 +447,18 @@ describe('Configuration Integration Tests', () => {
         debugMode: false,
         sessionId: 'test-session',
         model: 'test-model',
-        denyCommands: ['rm -rf', 'sudo*', 'chmod 777'],
+        confirmCommands: ['rm -rf', 'sudo*', 'chmod 777'],
       };
 
       const config = new Config(configParams);
-      expect(config.getDenyCommands()).toEqual([
+      expect(config.getConfirmCommands()).toEqual([
         'rm -rf',
         'sudo*',
         'chmod 777',
       ]);
     });
 
-    it('should handle empty denyCommands array', () => {
+    it('should handle empty confirmCommands array', () => {
       const configParams: ConfigParameters = {
         cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
@@ -468,11 +468,11 @@ describe('Configuration Integration Tests', () => {
         debugMode: false,
         sessionId: 'test-session',
         model: 'test-model',
-        denyCommands: [],
+        confirmCommands: [],
       };
 
       const config = new Config(configParams);
-      expect(config.getDenyCommands()).toEqual([]);
+      expect(config.getConfirmCommands()).toEqual([]);
     });
 
     it('should work alongside allowCommands', () => {
@@ -486,18 +486,18 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
         allowCommands: ['git*', 'npm*'],
-        denyCommands: ['git push --force', 'npm publish'],
+        confirmCommands: ['git push --force', 'npm publish'],
       };
 
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toEqual(['git*', 'npm*']);
-      expect(config.getDenyCommands()).toEqual([
+      expect(config.getConfirmCommands()).toEqual([
         'git push --force',
         'npm publish',
       ]);
     });
 
-    it('should handle various pattern types in denyCommands', () => {
+    it('should handle various pattern types in confirmCommands', () => {
       const configParams: ConfigParameters = {
         cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
@@ -507,7 +507,7 @@ describe('Configuration Integration Tests', () => {
         debugMode: false,
         sessionId: 'test-session',
         model: 'test-model',
-        denyCommands: [
+        confirmCommands: [
           'rm -rf', // exact match
           'sudo*', // glob pattern
           '*.sh', // glob pattern
@@ -517,7 +517,7 @@ describe('Configuration Integration Tests', () => {
       };
 
       const config = new Config(configParams);
-      expect(config.getDenyCommands()).toEqual([
+      expect(config.getConfirmCommands()).toEqual([
         'rm -rf',
         'sudo*',
         '*.sh',
@@ -537,7 +537,7 @@ describe('Configuration Integration Tests', () => {
         sessionId: 'test-session',
         model: 'test-model',
         allowCommands: ['ls', 'pwd', 'git status', 'git log', 'npm test'],
-        denyCommands: [
+        confirmCommands: [
           'sudo*',
           'rm -rf',
           'chmod 777',
@@ -550,10 +550,10 @@ describe('Configuration Integration Tests', () => {
 
       const config = new Config(configParams);
       expect(config.getAllowCommands()).toBeDefined();
-      expect(config.getDenyCommands()).toBeDefined();
+      expect(config.getConfirmCommands()).toBeDefined();
       expect(config.getExcludeTools()).toBeDefined();
       expect(config.getAllowCommands()?.length).toBe(5);
-      expect(config.getDenyCommands()?.length).toBe(6);
+      expect(config.getConfirmCommands()?.length).toBe(6);
     });
   });
 });

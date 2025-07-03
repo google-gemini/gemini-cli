@@ -54,7 +54,7 @@ interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   allow_commands?: string | undefined;
-  deny_commands?: string | undefined;
+  confirm_commands?: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -107,9 +107,10 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: 'Comma-separated list of allowed shell commands',
     })
-    .option('deny-commands', {
+    .option('confirm-commands', {
       type: 'string',
-      description: 'Comma-separated list of denied shell commands',
+      description:
+        'Comma-separated list of shell commands that require confirmation',
     })
     .option('telemetry', {
       type: 'boolean',
@@ -220,9 +221,9 @@ export async function loadCliConfig(
     allowCommands: argv.allow_commands
       ? argv.allow_commands.split(',').map((cmd) => cmd.trim())
       : settings.allowCommands || undefined,
-    denyCommands: argv.deny_commands
-      ? argv.deny_commands.split(',').map((cmd) => cmd.trim())
-      : settings.denyCommands || undefined,
+    confirmCommands: argv.confirm_commands
+      ? argv.confirm_commands.split(',').map((cmd) => cmd.trim())
+      : settings.confirmCommands || undefined,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,

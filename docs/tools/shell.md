@@ -158,11 +158,11 @@ To block all shell commands, you can add the `ShellTool` wildcard to `excludeToo
 
 ## Fine-Grained Command Control
 
-For more advanced command access control, see [Shell Command Access Control](../shell-command-control.md) which provides:
+For more advanced command access control, see [Command Access Control](../command-access-control.md) which provides:
 - `allowCommands` - Pre-approve safe commands
-- `denyCommands` - Always require confirmation for dangerous commands
+- `confirmCommands` - Always require confirmation for dangerous commands
 - Pattern matching (exact, glob, regex)
-- Session learning with `/pushcmdz`
+- Session learning with `/pushcmdz` and `/pushconfirm`
 
 ## Security Note for `excludeTools`
 

@@ -7,7 +7,7 @@
       "git status",
       "npm test"
     ],
-    "denyCommands": [
+    "confirmCommands": [
       "rm -rf",
       "sudo*"
     ]
@@ -23,7 +23,7 @@
       "docker ps",
       "docker images"
     ],
-    "denyCommands": [
+    "confirmCommands": [
       "git push --force",
       "npm publish",
       "rm -rf",
@@ -39,7 +39,7 @@
       "/^npm\\s+(test|audit)$/",
       "/^docker\\s+(ps|images|logs)$/"
     ],
-    "denyCommands": [
+    "confirmCommands": [
       "*--force*",
       "*--no-verify*",
       "sudo*",

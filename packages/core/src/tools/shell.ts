@@ -278,17 +278,17 @@ Process Group PGID: Process group started or \`(none)\``,
     }
     const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
 
-    // Check if command is in denyCommands list FIRST
-    const denyCommands = this.config.getDenyCommands();
-    if (denyCommands && denyCommands.length > 0) {
+    // Check if command is in confirmCommands list FIRST
+    const confirmCommands = this.config.getConfirmCommands();
+    if (confirmCommands && confirmCommands.length > 0) {
       // Check each pattern against the appropriate command string
-      for (const pattern of denyCommands) {
+      for (const pattern of confirmCommands) {
         const commandToMatch = this.getCommandToMatch(params.command, pattern);
         if (this.matchesAllowPattern(commandToMatch, pattern)) {
-          // Command is denied - always require confirmation
+          // Command requires confirmation - always prompt user
           const confirmationDetails: ToolExecuteConfirmationDetails = {
             type: 'exec',
-            title: 'Confirm Denied Command',
+            title: 'Confirm Command',
             command: params.command,
             rootCommand,
             onConfirm: async (outcome: ToolConfirmationOutcome) => {

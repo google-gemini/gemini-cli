@@ -108,7 +108,7 @@ export interface ConfigParameters {
   coreTools?: string[];
   excludeTools?: string[];
   allowCommands?: string[];
-  denyCommands?: string[];
+  confirmCommands?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -147,7 +147,7 @@ export class Config {
   private readonly coreTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly allowCommands: string[] | undefined;
-  private readonly denyCommands: string[] | undefined;
+  private readonly confirmCommands: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
@@ -187,7 +187,7 @@ export class Config {
     this.coreTools = params.coreTools;
     this.excludeTools = params.excludeTools;
     this.allowCommands = params.allowCommands;
-    this.denyCommands = params.denyCommands;
+    this.confirmCommands = params.confirmCommands;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
@@ -340,8 +340,8 @@ export class Config {
     return this.allowCommands;
   }
 
-  getDenyCommands(): string[] | undefined {
-    return this.denyCommands;
+  getConfirmCommands(): string[] | undefined {
+    return this.confirmCommands;
   }
 
   getToolDiscoveryCommand(): string | undefined {

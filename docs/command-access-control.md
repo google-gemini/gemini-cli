@@ -1,13 +1,15 @@
-# Command Access Control: allowCommands & denyCommands
+# Command Access Control: allowCommands & confirmCommands
 
 ## Overview
 
 Gemini CLI provides fine-grained access control for shell commands through two complementary features:
 
 - **`allowCommands`**: Pre-approve specific commands to run without confirmation
-- **`denyCommands`**: Always require confirmation for specific dangerous commands
+- **`confirmCommands`**: Always require confirmation for specific commands
 
-These features help balance workflow efficiency with security. The `denyCommands` list always takes precedence over `allowCommands`, ensuring dangerous commands remain protected even if they match an allow pattern.
+These features help balance workflow efficiency with security. The `confirmCommands` list always takes precedence over `allowCommands`, ensuring dangerous commands remain protected even if they match an allow pattern.
+
+**Important**: Commands in `confirmCommands` will always prompt for user confirmation, even if they match an `allowCommands` pattern. They are not silently blocked.
 
 ## Table of Contents
 
@@ -24,34 +26,20 @@ These features help balance workflow efficiency with security. The `denyCommands
 ### 1. Settings Files
 
 **Project Settings** (`.gemini/settings.json`):
+
 ```json
 {
-  "allowCommands": [
-    "ls",
-    "pwd",
-    "git status",
-    "npm test"
-  ],
-  "denyCommands": [
-    "rm -rf",
-    "sudo*",
-    "chmod 777"
-  ]
+  "allowCommands": ["ls", "pwd", "git status", "npm test"],
+  "confirmCommands": ["rm -rf", "sudo*", "chmod 777"]
 }
 ```
 
 **Global Settings** (`~/.gemini/settings.json`):
+
 ```json
 {
-  "allowCommands": [
-    "ls",
-    "echo",
-    "cat"
-  ],
-  "denyCommands": [
-    "sudo*",
-    "rm -rf /*"
-  ]
+  "allowCommands": ["ls", "echo", "cat"],
+  "confirmCommands": ["sudo*", "rm -rf /*"]
 }
 ```
 
@@ -61,11 +49,11 @@ These features help balance workflow efficiency with security. The `denyCommands
 # Allow specific commands
 gemini --allow-commands 'ls,pwd,git status'
 
-# Deny specific commands
-gemini --deny-commands 'rm -rf,sudo*'
+# Require confirmation for specific commands
+gemini --confirm-commands 'rm -rf,sudo*'
 
 # Use both together
-gemini --allow-commands 'git*,npm*' --deny-commands 'git push --force,npm publish'
+gemini --allow-commands 'git*,npm*' --confirm-commands 'git push --force,npm publish'
 ```
 
 ### 3. Configuration Precedence
@@ -76,7 +64,7 @@ gemini --allow-commands 'git*,npm*' --deny-commands 'git push --force,npm publis
 
 ## Pattern Syntax
 
-Both `allowCommands` and `denyCommands` support three pattern types:
+Both `allowCommands` and `confirmCommands` support three pattern types:
 
 ### 1. Exact Match (Default)
 
@@ -85,7 +73,7 @@ Both `allowCommands` and `denyCommands` support three pattern types:
 "git status"  → matches only "git status"
 ```
 
-### 2. Glob Patterns (* and ?)
+### 2. Glob Patterns (\* and ?)
 
 ```json
 "git*"        → matches: git, gitk, github
@@ -109,18 +97,19 @@ Must be wrapped in forward slashes:
 
 ## Precedence Rules
 
-### Key Rule: Deny Always Wins
+### Key Rule: Confirmation Takes Precedence
 
-If a command matches both `allowCommands` and `denyCommands`, it will **always require confirmation**.
+If a command matches both `allowCommands` and `confirmCommands`, it will **always require confirmation** (not silently blocked).
 
 ```json
 {
-  "allowCommands": ["git*"],           // Allow all git commands
-  "denyCommands": ["git push --force"] // But deny force push
+  "allowCommands": ["git*"], // Allow all git commands
+  "confirmCommands": ["git push --force"] // But require confirmation for force push
 }
 ```
 
 Results:
+
 - `git status` → No confirmation (allowed)
 - `git push` → No confirmation (allowed)
 - `git push --force` → **Requires confirmation** (denied)
@@ -140,15 +129,18 @@ Only the command name (not arguments) is checked:
 ```json
 {
   "allowCommands": [
-    "ls", "pwd", "cd", "cat", "echo",
-    "git status", "git diff", "git log",
-    "npm test", "npm run"
+    "ls",
+    "pwd",
+    "cd",
+    "cat",
+    "echo",
+    "git status",
+    "git diff",
+    "git log",
+    "npm test",
+    "npm run"
   ],
-  "denyCommands": [
-    "rm -rf",
-    "sudo*",
-    "chmod 777"
-  ]
+  "confirmCommands": ["rm -rf", "sudo*", "chmod 777"]
 }
 ```
 
@@ -157,16 +149,16 @@ Only the command name (not arguments) is checked:
 ```json
 {
   "allowCommands": [
-    "/^ls(\\s+-[la]+)?$/",      // ls with safe flags only
-    "/^git\\s+(status|log)$/",   // read-only git commands
-    "/^npm\\s+(test|audit)$/"    // safe npm commands
+    "/^ls(\\s+-[la]+)?$/", // ls with safe flags only
+    "/^git\\s+(status|log)$/", // read-only git commands
+    "/^npm\\s+(test|audit)$/" // safe npm commands
   ],
-  "denyCommands": [
-    "*--force*",                 // any force flag
-    "sudo*",                     // all sudo commands
-    "rm*",                       // all rm variants
-    "chmod*",                    // all chmod commands
-    "/.*>.*/"                    // commands with output redirection
+  "confirmCommands": [
+    "*--force*", // any force flag
+    "sudo*", // all sudo commands
+    "rm*", // all rm variants
+    "chmod*", // all chmod commands
+    "/.*>.*/" // commands with output redirection
   ]
 }
 ```
@@ -182,7 +174,7 @@ Only the command name (not arguments) is checked:
     "docker build",
     "docker tag"
   ],
-  "denyCommands": [
+  "confirmCommands": [
     "*--no-verify*",
     "git push*",
     "npm publish",
@@ -207,20 +199,20 @@ Saved 3 command(s) to project settings:
 Total allowed commands: 5
 ```
 
-### /pushdeny - View Deny Suggestions
+### /pushconfirm - View Confirmation Suggestions
 
-Shows commands from the current session that could be added to the deny list:
+Shows commands from the current session that could be added to the confirm list:
 
 ```
-> /pushdeny
-Commands run this session that could be added to deny list:
+> /pushconfirm
+Commands run this session that could be added to confirm list:
   - rm
   - sudo
   - chmod
 
-Existing deny list has 3 command(s).
+Existing confirm list has 3 command(s).
 
-To add specific commands to the deny list, edit .gemini/settings.json
+To add specific commands to the confirm list, edit .gemini/settings.json
 ```
 
 ## Best Practices
@@ -232,7 +224,7 @@ Begin with a minimal allow list and expand as needed:
 ```json
 {
   "allowCommands": ["ls", "pwd", "echo"],
-  "denyCommands": ["sudo*", "rm*"]
+  "confirmCommands": ["sudo*", "rm*"]
 }
 ```
 
@@ -255,32 +247,34 @@ Combine with other Gemini CLI security features:
 ```json
 {
   "allowCommands": ["git*"],
-  "denyCommands": ["git push --force"],
+  "confirmCommands": ["git push --force"],
   "excludeTools": ["ShellTool(rm -rf /)"]
 }
 ```
 
 ### 4. Regular Review
 
-Use `/pushcmdz` and `/pushdeny` to review and update your lists periodically.
+Use `/pushcmdz` and `/pushconfirm` to review and update your lists periodically.
 
 ### 5. Project-Specific Rules
 
 Keep dangerous commands in project settings, safe commands in global:
 
 **Global** (`~/.gemini/settings.json`):
+
 ```json
 {
   "allowCommands": ["ls", "pwd", "cat"],
-  "denyCommands": ["sudo*"]
+  "confirmCommands": ["sudo*"]
 }
 ```
 
 **Project** (`.gemini/settings.json`):
+
 ```json
 {
   "allowCommands": ["npm run deploy", "terraform apply"],
-  "denyCommands": ["git push --force"]
+  "confirmCommands": ["git push --force"]
 }
 ```
 
@@ -290,45 +284,46 @@ Keep dangerous commands in project settings, safe commands in global:
 
 1. **Command Arguments**: Only the command name is checked
    - `rm` is checked, not `rm -rf /*`
-   
 2. **Command Context**: Working directory is not considered
    - `cd /etc && rm *` only checks `cd`
-   
 3. **Command Chaining**: Each command checked separately
    - `ls && rm -rf /` checks `ls` and `rm` independently
 
 ### Potential Risks
 
 1. **Overly Broad Patterns**:
+
    ```json
    // Dangerous
    "allowCommands": ["*"]
-   
+
    // Better
    "allowCommands": ["git status", "git log"]
    ```
 
-2. **Missing Deny Rules**:
+2. **Missing Confirmation Rules**:
+
    ```json
    // Good
    {
      "allowCommands": ["git*"],
-     "denyCommands": ["git push --force", "git reset --hard"]
+     "confirmCommands": ["git push --force", "git reset --hard"]
    }
    ```
 
 3. **Pattern Confusion**:
+
    ```json
    // This is a literal string, not a pattern
    "allowCommands": ["git.*"]
-   
+
    // This is a regex pattern
    "allowCommands": ["/git.*/"]
    ```
 
 ### Recommendations
 
-1. **Always include a deny list** for dangerous commands
+1. **Always include a confirm list** for dangerous commands
 2. **Test patterns** before deploying to production
 3. **Review logs** regularly for unexpected command executions
 4. **Combine with sandboxing** for additional security
@@ -341,7 +336,7 @@ Keep dangerous commands in project settings, safe commands in global:
 1. Check command spelling (case-sensitive)
 2. Verify settings file location
 3. Remember only command root is checked
-4. Check if command matches a deny pattern
+4. Check if command matches a confirmation pattern
 5. CLI flags override settings files
 
 ### Pattern Not Working
@@ -356,11 +351,36 @@ Keep dangerous commands in project settings, safe commands in global:
 Run with `--debug` to see pattern matching details:
 
 ```bash
-gemini --debug --allow-commands 'git*' --deny-commands 'git push'
+gemini --debug --allow-commands 'git*' --confirm-commands 'git push'
+```
+
+## API Reference
+
+### Config Methods
+
+```typescript
+config.getAllowCommands(): string[] | undefined
+config.getConfirmCommands(): string[] | undefined
+```
+
+### ShellTool Methods
+
+```typescript
+shellTool.matchesAllowPattern(command: string, pattern: string): boolean
+shellTool.getCommandRoot(command: string): string | undefined
+shellTool.getWhitelist(): Set<string>
+```
+
+### Settings Interface
+
+```typescript
+interface Settings {
+  allowCommands?: string[]; // Pre-approved patterns
+  confirmCommands?: string[]; // Always-confirm patterns
+}
 ```
 
 ## Related Documentation
 
-- [Quick Start Guide](./allow-commands-quick-start.md)
-- [API Reference](./allow-commands-api.md)
+- [Shell Tool Documentation](./tools/shell.md)
 - [Examples](../examples/allow-commands-examples.json)

@@ -957,8 +957,9 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'pushdeny',
-        description: 'Save currently denied shell commands to project settings',
+        name: 'pushconfirm',
+        description:
+          'Save currently confirmed shell commands to project settings',
         action: async (_mainCommand, _subCommand, _args) => {
           const toolRegistry = await config?.getToolRegistry();
           if (!toolRegistry) {
@@ -984,8 +985,8 @@ export const useSlashCommandProcessor = (
             return;
           }
 
-          // For denyCommands, we can suggest commands based on the current whitelist
-          // These are commands that have been run, which the user might want to deny
+          // For confirmCommands, we can suggest commands based on the current whitelist
+          // These are commands that have been run, which the user might want to require confirmation for
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const getWhitelist = (shellTool as any).getWhitelist;
           if (typeof getWhitelist !== 'function') {
@@ -1004,20 +1005,20 @@ export const useSlashCommandProcessor = (
             addMessage({
               type: MessageType.INFO,
               content:
-                'No commands have been run in this session yet to suggest for deny list.',
+                'No commands have been run in this session yet to suggest for confirm list.',
               timestamp: new Date(),
             });
             return;
           }
 
-          // Get existing denyCommands from settings
-          const existingDenyCommands =
-            settings.workspace.settings.denyCommands || [];
+          // Get existing confirmCommands from settings
+          const existingConfirmCommands =
+            settings.workspace.settings.confirmCommands || [];
 
-          // Show the user what commands they can add to denyCommands
+          // Show the user what commands they can add to confirmCommands
           addMessage({
             type: MessageType.INFO,
-            content: `Commands run this session that could be added to deny list:\n  - ${sessionCommands.join('\n  - ')}\n\nExisting deny list has ${existingDenyCommands.length} command(s).\n\nTo add specific commands to the deny list, edit .gemini/settings.json and add them to the "denyCommands" array.`,
+            content: `Commands run this session that could be added to confirm list:\n  - ${sessionCommands.join('\n  - ')}\n\nExisting confirm list has ${existingConfirmCommands.length} command(s).\n\nTo add specific commands to the confirm list, edit .gemini/settings.json and add them to the "confirmCommands" array.`,
             timestamp: new Date(),
           });
         },

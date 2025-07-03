@@ -179,7 +179,7 @@ describe('ShellTool', () => {
     beforeEach(() => {
       config = {
         getAllowCommands: vi.fn(),
-        getDenyCommands: vi.fn(),
+        getConfirmCommands: vi.fn(),
         getTargetDir: () => '/test/dir',
         getDebugMode: () => false,
         getCoreTools: () => undefined,
@@ -187,7 +187,7 @@ describe('ShellTool', () => {
       } as unknown as Config;
 
       // Default mock returns
-      vi.mocked(config.getDenyCommands).mockReturnValue(undefined);
+      vi.mocked(config.getConfirmCommands).mockReturnValue(undefined);
 
       shellTool = new ShellTool(config);
     });
@@ -584,14 +584,14 @@ describe('ShellTool', () => {
     });
   });
 
-  describe('denyCommands', () => {
+  describe('confirmCommands', () => {
     let config: Config;
     let shellTool: ShellTool;
 
     beforeEach(() => {
       config = {
         getAllowCommands: vi.fn(),
-        getDenyCommands: vi.fn(),
+        getConfirmCommands: vi.fn(),
         getTargetDir: () => '/test/dir',
         getDebugMode: () => false,
         getCoreTools: () => undefined,
@@ -600,8 +600,8 @@ describe('ShellTool', () => {
       shellTool = new ShellTool(config);
     });
 
-    it('should require confirmation for commands matching deny patterns', async () => {
-      vi.mocked(config.getDenyCommands).mockReturnValue([
+    it('should require confirmation for commands matching confirm patterns', async () => {
+      vi.mocked(config.getConfirmCommands).mockReturnValue([
         'rm',
         'del*',
         '/^sudo/',
@@ -614,7 +614,7 @@ describe('ShellTool', () => {
         new AbortController().signal,
       );
       expect(result1).not.toBe(false);
-      expect(result1).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result1).toHaveProperty('title', 'Confirm Command');
 
       // Test glob pattern
       const result2 = await shellTool.shouldConfirmExecute(
@@ -622,7 +622,7 @@ describe('ShellTool', () => {
         new AbortController().signal,
       );
       expect(result2).not.toBe(false);
-      expect(result2).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result2).toHaveProperty('title', 'Confirm Command');
 
       // Test regex pattern
       const result3 = await shellTool.shouldConfirmExecute(
@@ -630,12 +630,12 @@ describe('ShellTool', () => {
         new AbortController().signal,
       );
       expect(result3).not.toBe(false);
-      expect(result3).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result3).toHaveProperty('title', 'Confirm Command');
     });
 
-    it('should check denyCommands before allowCommands', async () => {
+    it('should check confirmCommands before allowCommands', async () => {
       vi.mocked(config.getAllowCommands).mockReturnValue(['rm', 'git*']);
-      vi.mocked(config.getDenyCommands).mockReturnValue([
+      vi.mocked(config.getConfirmCommands).mockReturnValue([
         'rm -rf',
         'git push --force',
       ]);
@@ -647,13 +647,13 @@ describe('ShellTool', () => {
       );
       expect(result1).toBe(false); // rm is allowed
 
-      // rm -rf / matches the deny pattern 'rm -rf' (patterns with spaces match full command)
+      // rm -rf / matches the confirm pattern 'rm -rf' (patterns with spaces match full command)
       const result1b = await shellTool.shouldConfirmExecute(
         { command: 'rm -rf /' },
         new AbortController().signal,
       );
       expect(result1b).not.toBe(false);
-      expect(result1b).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result1b).toHaveProperty('title', 'Confirm Command');
 
       // git is allowed with glob
       const result2 = await shellTool.shouldConfirmExecute(
@@ -662,17 +662,17 @@ describe('ShellTool', () => {
       );
       expect(result2).toBe(false); // git is allowed by glob
 
-      // git push --force matches deny pattern (patterns with spaces match full command)
+      // git push --force matches confirm pattern (patterns with spaces match full command)
       const result3 = await shellTool.shouldConfirmExecute(
         { command: 'git push --force' },
         new AbortController().signal,
       );
       expect(result3).not.toBe(false);
-      expect(result3).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result3).toHaveProperty('title', 'Confirm Command');
     });
 
-    it('should handle empty denyCommands array', async () => {
-      vi.mocked(config.getDenyCommands).mockReturnValue([]);
+    it('should handle empty confirmCommands array', async () => {
+      vi.mocked(config.getConfirmCommands).mockReturnValue([]);
       vi.mocked(config.getAllowCommands).mockReturnValue(['ls']);
 
       const result = await shellTool.shouldConfirmExecute(
@@ -682,8 +682,8 @@ describe('ShellTool', () => {
       expect(result).toBe(false); // Should proceed to allowCommands check
     });
 
-    it('should handle undefined denyCommands', async () => {
-      vi.mocked(config.getDenyCommands).mockReturnValue(undefined);
+    it('should handle undefined confirmCommands', async () => {
+      vi.mocked(config.getConfirmCommands).mockReturnValue(undefined);
       vi.mocked(config.getAllowCommands).mockReturnValue(['ls']);
 
       const result = await shellTool.shouldConfirmExecute(
@@ -693,8 +693,8 @@ describe('ShellTool', () => {
       expect(result).toBe(false); // Should proceed to allowCommands check
     });
 
-    it('should add denied commands to whitelist if user confirms with always', async () => {
-      vi.mocked(config.getDenyCommands).mockReturnValue(['rm']);
+    it('should add confirmed commands to whitelist if user confirms with always', async () => {
+      vi.mocked(config.getConfirmCommands).mockReturnValue(['rm']);
       vi.mocked(config.getAllowCommands).mockReturnValue(undefined);
 
       const confirmResult = await shellTool.shouldConfirmExecute(
@@ -718,17 +718,17 @@ describe('ShellTool', () => {
       const whitelist = shellTool.getWhitelist();
       expect(whitelist.has('rm')).toBe(true);
 
-      // Subsequent calls should still require confirmation since denyCommands is checked first
+      // Subsequent calls should still require confirmation since confirmCommands is checked first
       const result2 = await shellTool.shouldConfirmExecute(
         { command: 'rm another.txt' },
         new AbortController().signal,
       );
       expect(result2).not.toBe(false);
-      expect(result2).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result2).toHaveProperty('title', 'Confirm Command');
     });
 
-    it('should support complex deny patterns', async () => {
-      vi.mocked(config.getDenyCommands).mockReturnValue([
+    it('should support complex confirm patterns', async () => {
+      vi.mocked(config.getConfirmCommands).mockReturnValue([
         '/^rm\\s+-rf\\s+/', // regex: rm -rf commands (matches full command)
         'sudo*', // glob: any sudo command
         'chmod 777', // exact: specific chmod (pattern with space, matches as prefix)
@@ -739,11 +739,11 @@ describe('ShellTool', () => {
 
       // Test each pattern type
       const testCases = [
-        { command: 'rm -rf /', shouldDeny: true }, // Regex pattern matches full command
-        { command: 'sudo apt update', shouldDeny: true },
-        { command: 'chmod 777 /etc/passwd', shouldDeny: true }, // Pattern with space matches as prefix
-        { command: 'script.sh', shouldDeny: true },
-        { command: 'curl-test', shouldDeny: false }, // 'curl-test' doesn't match 'curl*--output*'
+        { command: 'rm -rf /', shouldConfirm: true }, // Regex pattern matches full command
+        { command: 'sudo apt update', shouldConfirm: true },
+        { command: 'chmod 777 /etc/passwd', shouldConfirm: true }, // Pattern with space matches as prefix
+        { command: 'script.sh', shouldConfirm: true },
+        { command: 'curl-test', shouldConfirm: false }, // 'curl-test' doesn't match 'curl*--output*'
       ];
 
       for (const testCase of testCases) {
@@ -752,29 +752,29 @@ describe('ShellTool', () => {
           new AbortController().signal,
         );
 
-        if (testCase.shouldDeny) {
+        if (testCase.shouldConfirm) {
           expect(result).not.toBe(false);
-          expect(result).toHaveProperty('title', 'Confirm Denied Command');
+          expect(result).toHaveProperty('title', 'Confirm Command');
         } else {
           // May or may not require confirmation based on other rules
-          // But should not have 'Confirm Denied Command' title
+          // But should not have 'Confirm Command' title
           if (result && typeof result !== 'boolean') {
             expect(result).toHaveProperty('title');
             expect((result as { title: string }).title).not.toBe(
-              'Confirm Denied Command',
+              'Confirm Command',
             );
           }
         }
       }
     });
 
-    it('should work with allowCommands and denyCommands together', async () => {
+    it('should work with allowCommands and confirmCommands together', async () => {
       vi.mocked(config.getAllowCommands).mockReturnValue([
         'git*',
         'npm*',
         'ls',
       ]);
-      vi.mocked(config.getDenyCommands).mockReturnValue([
+      vi.mocked(config.getConfirmCommands).mockReturnValue([
         'git push --force',
         'npm publish',
         'sudo*',
@@ -787,15 +787,15 @@ describe('ShellTool', () => {
       );
       expect(result).toBe(false);
 
-      // Denied despite matching allow pattern (patterns with spaces match full command)
+      // Requires confirmation despite matching allow pattern (patterns with spaces match full command)
       result = await shellTool.shouldConfirmExecute(
         { command: 'git push --force' },
         new AbortController().signal,
       );
       expect(result).not.toBe(false); // Denied by 'git push --force' pattern
-      expect(result).toHaveProperty('title', 'Confirm Denied Command');
+      expect(result).toHaveProperty('title', 'Confirm Command');
 
-      // Not in allow or deny list
+      // Not in allow or confirm list
       result = await shellTool.shouldConfirmExecute(
         { command: 'echo hello' },
         new AbortController().signal,
