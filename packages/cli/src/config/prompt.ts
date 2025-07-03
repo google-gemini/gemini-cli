@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { parse as parseYaml } from 'yaml';
 import { PredefinedPrompt } from '@google/gemini-cli-core';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { parse as parseYaml } from 'yaml';
 
 export const PROMPTS_DIRECTORY_NAME = path.join('.gemini', 'prompts');
 

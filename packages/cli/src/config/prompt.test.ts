@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { PredefinedPromptVariable } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stringify as stringifyYaml } from 'yaml';
 import { PROMPTS_DIRECTORY_NAME, loadPrompts } from './prompt.js';
-import { PredefinedPromptVariable } from '@google/gemini-cli-core';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
