@@ -274,32 +274,37 @@ export async function getRawGoogleAccountId(
 ): Promise<string | null> {
   try {
     // 1. Get a new Access Token including the id_token
-    const refreshedTokens = await new Promise<{ id_token?: string } | null>(
+    const refreshedTokens = await new Promise<Credentials | null>(
       (resolve, reject) => {
         client.refreshAccessToken((err, tokens) => {
           if (err) {
-            reject(err);
-            return;
+            return reject(err);
           }
-          if (!tokens || !tokens.id_token) {
-            resolve(null);
-            return;
-          }
-          resolve({ id_token: tokens.id_token });
+          resolve(tokens ?? null);
         });
       },
     );
-    if (!refreshedTokens || !refreshedTokens.id_token) {
+
+    if (!refreshedTokens?.id_token) {
       console.warn('No id_token obtained after refreshing tokens.');
       return null;
     }
-    // 2. Extract and decode the raw gaia id from the id_token
-    const googleAccountId = await extractRawGaiaIdFromIdToken(
-      refreshedTokens.id_token,
-    );
-    return googleAccountId;
+
+    // 2. Verify the ID token to securely get the user's Google Account ID.
+    const ticket = await client.verifyIdToken({
+      idToken: refreshedTokens.id_token,
+      audience: OAUTH_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub) {
+      console.warn('Could not extract sub claim from verified ID token.');
+      return null;
+    }
+
+    return payload.sub;
   } catch (error) {
-    console.error('Error retrieving Google Account ID:', error);
+    console.error('Error retrieving or verifying Google Account ID:', error);
     return null;
   }
 }
