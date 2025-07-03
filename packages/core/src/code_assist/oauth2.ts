@@ -14,13 +14,6 @@ import path from 'node:path';
 import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
 
-interface DecodedIdTokenPayload {
-  sub: string;
-  // Add other fields you might need from the id_token
-  email?: string;
-  name?: string;
-}
-
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
   '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
@@ -305,33 +298,6 @@ export async function getRawGoogleAccountId(
     return payload.sub;
   } catch (error) {
     console.error('Error retrieving or verifying Google Account ID:', error);
-    return null;
-  }
-}
-
-async function extractRawGaiaIdFromIdToken(
-  idToken: string,
-): Promise<string | null> {
-  try {
-    // Split the id_token into header, payload, and signature
-    const parts = idToken.split('.');
-    if (parts.length !== 3) {
-      console.warn('Invalid ID token format');
-      return null;
-    }
-    const payloadBase64 = parts[1];
-
-    // Decode the payload from base64
-    const payload = JSON.parse(
-      Buffer.from(payloadBase64, 'base64').toString('utf-8'),
-    ) as DecodedIdTokenPayload;
-    if (!payload || !payload.sub) {
-      console.warn('Could not extract sub claim from ID token.');
-      return null;
-    }
-    return payload.sub;
-  } catch (error) {
-    console.error('Error decoding ID token:', error);
     return null;
   }
 }

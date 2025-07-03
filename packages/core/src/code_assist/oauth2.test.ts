@@ -68,12 +68,20 @@ describe('oauth2', () => {
       };
       callback(null, mockTokensWithIdToken);
     });
+    const mockVerifyIdToken = vi.fn().mockResolvedValue({
+      getPayload: () => ({
+        sub: 'test-google-account-id-123',
+        aud: 'test-audience',
+        iss: 'https://accounts.google.com',
+      }),
+    });
     const mockOAuth2Client = {
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
       setCredentials: mockSetCredentials,
       getAccessToken: mockGetAccessToken,
       refreshAccessToken: mockRefreshAccessToken,
+      verifyIdToken: mockVerifyIdToken,
       credentials: mockTokens,
       on: vi.fn(),
     } as unknown as OAuth2Client;
