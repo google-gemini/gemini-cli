@@ -219,18 +219,39 @@ Stage 4: Publishing to NPM
 
 Summary of File Flow
 
-    1 [Project Root]
-    2 ├── packages/core/src/*.ts  ───────┐
-    3 └── packages/cli/src/*.ts   ───────┼──(Build)──> [Bundled JS] ─────┐
-    4                                   │                               │
-    5 ├── packages/cli/package.json ──(Transform)──> [Final package.json] │
-    6                                   │                               │
-    7 ├── README.md ────────────────────┤                               ├─(Assemble)─> `bundle`/
-    8 ├── LICENSE ─────────────────────┤                               │
-    9 └── packages/cli/src/utils/*.sb ─┴───────────────────────────────>│
+```mermaid
+graph TD
+    subgraph "Source Files"
+        A["packages/core/src/*.ts<br/>packages/cli/src/*.ts"]
+        B["packages/cli/package.json"]
+        C["README.md<br/>LICENSE<br/>packages/cli/src/utils/*.sb"]
+    end
 
-10 │
-11 └─(Publish)─> NPM Registry
+    subgraph "Process"
+        D(Build)
+        E(Transform)
+        F(Assemble)
+        G(Publish)
+    end
+
+    subgraph "Artifacts"
+        H["Bundled JS"]
+        I["Final package.json"]
+        J["bundle/"]
+    end
+
+    subgraph "Destination"
+        K["NPM Registry"]
+    end
+
+    A --> D --> H
+    B --> E --> I
+    C --> F
+    H --> F
+    I --> F
+    F --> J
+    J --> G --> K
+```
 
 This process ensures that the final published artifact is a purpose-built, clean, and efficient representation of the
 project, rather than a direct copy of the development workspace.
