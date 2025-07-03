@@ -116,7 +116,7 @@ describe('PromptsDialog', () => {
     expect(output).toContain(
       'MockRadioButtonSelect[Test Prompt 1,Test Prompt 2]',
     );
-    expect(output).toContain('(Use Enter to select)');
+    expect(output).toContain('Search: Type to filter prompts');
   });
 
   it('should render with empty prompts list', () => {
