@@ -27,8 +27,6 @@ export interface PredefinedPrompt {
 
 export interface PredefinedPromptVariable {
   name: string;
-  type: string;
-  required?: boolean;
 }
 
 export function getCoreSystemPrompt(userMemory?: string): string {
