@@ -1,48 +1,25 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import fs from 'fs';
 import path from 'path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
-// Add these imports for SVG to PNG conversion
 import sharp from 'sharp';
-//@
-// Constants for text file processing
+import { JSDOM } from 'jsdom';
+import DOMPurify from 'dompurify';
+
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
 const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 
-// Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
 
-/**
- * Looks up the specific MIME type for a file path.
- * @param filePath Path to the file.
- * @returns The specific MIME type string (e.g., 'text/python', 'application/javascript') or undefined if not found or ambiguous.
- */
 export function getSpecificMimeType(filePath: string): string | undefined {
   const lookedUpMime = mime.lookup(filePath);
   return typeof lookedUpMime === 'string' ? lookedUpMime : undefined;
 }
 
-/**
- * Checks if a path is within a given root directory.
- * @param pathToCheck The absolute path to check.
- * @param rootDirectory The absolute root directory.
- * @returns True if the path is within the root directory, false otherwise.
- */
-export function isWithinRoot(
-  pathToCheck: string,
-  rootDirectory: string,
-): boolean {
+export function isWithinRoot(pathToCheck: string, rootDirectory: string): boolean {
   const normalizedPathToCheck = path.normalize(pathToCheck);
   const normalizedRootDirectory = path.normalize(rootDirectory);
 
-  // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
-  // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
     normalizedRootDirectory === path.sep ||
     normalizedRootDirectory.endsWith(path.sep)
@@ -55,17 +32,9 @@ export function isWithinRoot(
   );
 }
 
-/**
- * Determines if a file is likely binary based on content sampling.
- * @param filePath Path to the file.
- * @returns True if the file appears to be binary.
- */
-
-
 export function isBinaryFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
 
-  // Explicitly treat these extensions as text
   const alwaysTextExtensions = ['.svg', '.xml', '.html', '.js', '.ts', '.css', '.json'];
   if (alwaysTextExtensions.includes(ext)) {
     return false;
@@ -100,24 +69,14 @@ export function isBinaryFile(filePath: string): boolean {
   }
 }
 
-
-/**
- * Detects the type of file based on extension and content.
- * @param filePath Path to the file.
- * @returns 'text', 'image', 'pdf', 'audio', 'video', or 'binary'.
- */
-export function detectFileType(
-  filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
+export function detectFileType(filePath: string): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
-  // to assume these are typescript files instead.
   if (ext === '.ts') {
     return 'text';
   }
 
-  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
+  const lookedUpMimeType = mime.lookup(filePath);
   if (lookedUpMimeType) {
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
@@ -133,8 +92,6 @@ export function detectFileType(
     }
   }
 
-  // Stricter binary check for common non-text extensions before content check
-  // These are often not well-covered by mime-types or might be misidentified.
   if (
     [
       '.zip',
@@ -170,8 +127,6 @@ export function detectFileType(
     return 'binary';
   }
 
-  // Fallback to content-based check if mime type wasn't conclusive for image/pdf
-  // and it's not a known binary extension.
   if (isBinaryFile(filePath)) {
     return 'binary';
   }
@@ -179,14 +134,24 @@ export function detectFileType(
   return 'text';
 }
 
-/**
- * Converts SVG to PNG using Sharp library
- * @param svgBuffer Buffer containing SVG data
- * @returns Promise<Buffer> PNG buffer
- */
+function sanitizeSvg(svgString: string): string {
+  const window = new JSDOM('').window;
+  const purify = DOMPurify(window as any);
+
+  const sanitizedSvg = purify.sanitize(svgString, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+  });
+
+  return sanitizedSvg;
+}
+
 async function convertSvgToPng(svgBuffer: Buffer): Promise<Buffer> {
   try {
-    return await sharp(svgBuffer)
+    const svgString = svgBuffer.toString('utf8');
+    const sanitizedSvg = sanitizeSvg(svgString);
+    const sanitizedBuffer = Buffer.from(sanitizedSvg, 'utf8');
+    
+    return await sharp(sanitizedBuffer)
       .png()
       .toBuffer();
   } catch (error) {
@@ -195,22 +160,14 @@ async function convertSvgToPng(svgBuffer: Buffer): Promise<Buffer> {
 }
 
 export interface ProcessedFileReadResult {
-  llmContent: PartUnion; // string for text, Part for image/pdf/unreadable binary
+  llmContent: PartUnion;
   returnDisplay: string;
-  error?: string; // Optional error message for the LLM if file processing failed
-  isTruncated?: boolean; // For text files, indicates if content was truncated
-  originalLineCount?: number; // For text files
-  linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
+  error?: string;
+  isTruncated?: boolean;
+  originalLineCount?: number;
+  linesShown?: [number, number];
 }
 
-/**
- * Reads and processes a single file, handling text, images, and PDFs.
- * @param filePath Absolute path to the file.
- * @param rootDirectory Absolute path to the project root for relative path display.
- * @param offset Optional offset for text files (0-based line number).
- * @param limit Optional limit for text files (number of lines to read).
- * @returns ProcessedFileReadResult object.
- */
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
@@ -219,13 +176,13 @@ export async function processSingleFileContent(
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
-      // Sync check is acceptable before async read
       return {
         llmContent: '',
         returnDisplay: 'File not found.',
         error: `File not found: ${filePath}`,
       };
     }
+    
     const stats = await fs.promises.stat(filePath);
     if (stats.isDirectory()) {
       return {
@@ -236,7 +193,6 @@ export async function processSingleFileContent(
     }
 
     const fileSizeInBytes = stats.size;
-    // 20MB limit
     const maxFileSize = 20 * 1024 * 1024;
 
     if (fileSizeInBytes > maxFileSize) {
@@ -268,9 +224,7 @@ export async function processSingleFileContent(
         const startLine = offset || 0;
         const effectiveLimit =
           limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-        // Ensure endLine does not exceed originalLineCount
         const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
-        // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
         const actualStartLine = Math.min(startLine, originalLineCount);
         const selectedLines = lines.slice(actualStartLine, endLine);
 
@@ -310,7 +264,6 @@ export async function processSingleFileContent(
       case 'video': {
         const contentBuffer = await fs.promises.readFile(filePath);
         
-        // Check if it's an SVG file and convert to PNG
         const fileExtension = path.extname(filePath).toLowerCase();
         const originalMimeType = mime.lookup(filePath) || 'application/octet-stream';
         
@@ -322,23 +275,22 @@ export async function processSingleFileContent(
               llmContent: {
                 inlineData: {
                   data: base64Data,
-                  mimeType: 'image/png', // Changed from SVG to PNG MIME type
+                  mimeType: 'image/png',
                 },
               },
               returnDisplay: `Read SVG file (converted to PNG): ${relativePathForDisplay}`,
             };
           } catch (conversionError) {
-            // If conversion fails, fall back to returning the original SVG as text
             const svgText = contentBuffer.toString('utf8');
+            const sanitizedSvg = sanitizeSvg(svgText);
             return {
-              llmContent: `SVG file content (conversion to PNG failed):\n${svgText}`,
+              llmContent: `SVG file content (conversion to PNG failed):\n${sanitizedSvg}`,
               returnDisplay: `Read SVG file as text (PNG conversion failed): ${relativePathForDisplay}`,
               error: `SVG to PNG conversion failed: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`,
             };
           }
         }
         
-        // For all other image/pdf/audio/video files, use original logic
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
@@ -351,7 +303,6 @@ export async function processSingleFileContent(
         };
       }
       default: {
-        // Should not happen with current detectFileType logic
         const exhaustiveCheck: never = fileType;
         return {
           llmContent: `Unhandled file type: ${exhaustiveCheck}`,
