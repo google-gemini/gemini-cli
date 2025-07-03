@@ -56,6 +56,122 @@ The commit message MUST follow this structure:
 
 const COMMIT_CACHE_TIMEOUT_MS = 30000;
 
+/** Format git error messages with user-friendly descriptions */
+function formatGitError(
+  args: string[],
+  exitCode: number,
+  stderr: string,
+): string {
+  const command = args.join(' ');
+  const baseError = `Git command failed (${command}) with exit code ${exitCode}`;
+
+  if (!stderr.trim()) {
+    return `${baseError}: No error details available`;
+  }
+
+  if (stderr.includes('not a git repository')) {
+    return (
+      'This directory is not a Git repository. ' +
+      'Please run this command from within a Git repository.'
+    );
+  } else if (stderr.includes('no changes added to commit')) {
+    return 'No changes have been staged for commit. Use "git add" to stage changes first.';
+  } else if (stderr.includes('nothing to commit')) {
+    return 'No changes detected. There is nothing to commit.';
+  } else if (stderr.includes('index.lock')) {
+    return 'Git index is locked. Another git process may be running. Please wait and try again.';
+  } else if (stderr.includes('refusing to merge unrelated histories')) {
+    return (
+      'Cannot merge unrelated Git histories. ' +
+      'This may require manual intervention.'
+    );
+  } else if (
+    stderr.includes('pathspec') &&
+    stderr.includes('did not match any files')
+  ) {
+    return (
+      'No files match the specified path. ' +
+      'Please check the file paths and try again.'
+    );
+  } else if (
+    stderr.includes('fatal: could not read') ||
+    stderr.includes('fatal: unable to read')
+  ) {
+    return 'Unable to read Git repository data. The repository may be corrupted.';
+  } else {
+    return `${baseError}: ${stderr.trim()}`;
+  }
+}
+
+/** Execute git command with proper error handling and stdin support */
+async function executeGitCommand(
+  args: string[],
+  signal: AbortSignal,
+  stdin?: string,
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const commandString = `git ${args.join(' ')}`;
+
+    try {
+      const child = spawn('git', args, { signal, stdio: 'pipe' });
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      if (stdin && child.stdin) {
+        child.stdin.write(stdin);
+        child.stdin.end();
+      }
+
+      child.on('close', (exitCode) => {
+        if (exitCode !== 0) {
+          const errorMessage = formatGitError(args, exitCode ?? -1, stderr);
+          console.error(
+            `Command failed: ${commandString}, Error: ${errorMessage}`,
+          );
+          reject(new Error(errorMessage));
+        } else {
+          resolve(stdout.trim() || null);
+        }
+      });
+
+      child.on('error', (err) => {
+        const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
+        console.error(`Spawn error: ${errorMessage}`);
+
+        if (err.message.includes('ENOENT')) {
+          reject(
+            new Error(
+              `Git is not installed or not found in PATH. Please install Git and try again.`,
+            ),
+          );
+        } else if (err.message.includes('EACCES')) {
+          reject(
+            new Error(
+              `Permission denied when executing git command. Please check file permissions.`,
+            ),
+          );
+        } else {
+          reject(new Error(errorMessage));
+        }
+      });
+    } catch (error) {
+      const errorMessage = `Failed to spawn git process: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      console.error(`Spawn setup error: ${errorMessage}`);
+      reject(new Error(errorMessage));
+    }
+  });
+}
+
 /**
  * Tool for analyzing git changes and generating conventional commit messages.
  * Handles the complete commit workflow: analysis, message generation, and commit creation.
@@ -81,9 +197,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     logOutput: string;
   }> {
     const [statusOutput, stagedDiff, logOutput] = await Promise.all([
-      this.executeGitCommand(['status', '--porcelain'], signal),
-      this.executeGitCommand(['diff', '--cached'], signal),
-      this.executeGitCommand(['log', '--oneline', '-10'], signal)
+      executeGitCommand(['status', '--porcelain'], signal),
+      executeGitCommand(['diff', '--cached'], signal),
+      executeGitCommand(['log', '--oneline', '-10'], signal)
     ]);
 
     return {
@@ -237,7 +353,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
 
   /**
    * Attempts to create a git commit with a generated message, including a retry
-   * mechanism to handle pre-commit hooks and index lock files.
+   * mechanism to handle index lock files. Pre-commit hook failures are not retried.
    */
   private async commitWithRetry(
     commitMessage: string,
@@ -246,7 +362,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     const maxRetries = 1;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        await this.executeGitCommand(
+        await executeGitCommand(
           ['commit', '-F', '-'],
           signal,
           commitMessage
@@ -282,96 +398,6 @@ Strategy: ${commitModeText}${filesDisplay}`,
       }
     }
     throw new Error('Commit failed after all retry attempts.');
-  }
-
-  /** Execute git command with proper error handling and stdin support */
-  private async executeGitCommand(
-    args: string[],
-    signal: AbortSignal,
-    stdin?: string,
-  ): Promise<string | null> {
-    return new Promise((resolve, reject) => {
-      const commandString = `git ${args.join(' ')}`;
-      
-      try {
-        const child = spawn('git', args, { signal, stdio: 'pipe' });
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout?.on('data', (data) => {
-          stdout += data.toString();
-        });
-
-        child.stderr?.on('data', (data) => {
-          stderr += data.toString();
-        });
-
-        if (stdin && child.stdin) {
-          child.stdin.write(stdin);
-          child.stdin.end();
-        }
-
-        child.on('close', (exitCode) => {
-          if (exitCode !== 0) {
-            const errorMessage = this.formatGitError(args, exitCode ?? -1, stderr);
-            console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
-            reject(new Error(errorMessage));
-          } else {
-            resolve(stdout.trim() || null);
-          }
-        });
-
-        child.on('error', (err) => {
-          const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-          console.error(`Spawn error: ${errorMessage}`);
-          
-          if (err.message.includes('ENOENT')) {
-            reject(new Error(`Git is not installed or not found in PATH. Please install Git and try again.`));
-          } else if (err.message.includes('EACCES')) {
-            reject(new Error(`Permission denied when executing git command. Please check file permissions.`));
-          } else {
-            reject(new Error(errorMessage));
-          }
-        });
-        
-      } catch (error) {
-        const errorMessage = `Failed to spawn git process: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`Spawn setup error: ${errorMessage}`);
-        reject(new Error(errorMessage));
-      }
-    });
-  }
-
-  /** Format git error messages with user-friendly descriptions */
-  private formatGitError(args: string[], exitCode: number, stderr: string): string {
-    const command = args.join(' ');
-    const baseError = `Git command failed (${command}) with exit code ${exitCode}`;
-    
-    if (!stderr.trim()) {
-      return `${baseError}: No error details available`;
-    }
-
-    if (stderr.includes('not a git repository')) {
-      return 'This directory is not a Git repository. ' +
-        'Please run this command from within a Git repository.';
-    } else if (stderr.includes('no changes added to commit')) {
-      return 'No changes have been staged for commit. Use "git add" to stage changes first.';
-    } else if (stderr.includes('nothing to commit')) {
-      return 'No changes detected. There is nothing to commit.';
-    } else if (stderr.includes('index.lock')) {
-      return 'Git index is locked. Another git process may be running. Please wait and try again.';
-    } else if (stderr.includes('refusing to merge unrelated histories')) {
-      return 'Cannot merge unrelated Git histories. ' +
-        'This may require manual intervention.';
-    } else if (stderr.includes('pathspec') && stderr.includes('did not match any files')) {
-      return 'No files match the specified path. ' +
-        'Please check the file paths and try again.';
-    } else if (stderr.includes('fatal: could not read') || 
-               stderr.includes('fatal: unable to read')) {
-      return 'Unable to read Git repository data. The repository may be corrupted.';
-    } else {
-      return `${baseError}: ${stderr.trim()}`;
-    }
   }
 
   /** Parse git status output to extract files that will be committed */

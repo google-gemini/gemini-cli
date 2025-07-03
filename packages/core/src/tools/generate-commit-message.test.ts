@@ -192,9 +192,10 @@ describe('GenerateCommitMessageTool', () => {
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
-  it('should return an error on pre-commit hook failure', async () => {
+  it('should return an error on pre-commit hook failure and not retry', async () => {
     let commitCallCount = 0;
-    const stagedDiff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+    const stagedDiff =
+      'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
     const statusOutput = 'M  file.txt';
 
     const mockStdin = { write: vi.fn(), end: vi.fn() };
@@ -207,33 +208,39 @@ describe('GenerateCommitMessageTool', () => {
       };
 
       child.stdin = mockStdin;
-      
-      child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        if (event === 'data') {
-          const argString = args.join(' ');
-          if (argString.includes('status')) listener(Buffer.from(statusOutput));
-          else if (argString.includes('diff --cached')) listener(Buffer.from(stagedDiff));
-          else if (argString.includes('log')) listener(Buffer.from('abc1234 Previous commit'));
-          else listener(Buffer.from(''));
-        }
-      }) };
-      
-      child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        // Fail on any commit attempt for this test
-        if (event === 'data' && args.includes('commit')) {
-          listener(Buffer.from('error in .git/hooks/pre-commit'));
-        }
-      }) };
-      
+
+      child.stdout = {
+        on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data') {
+            const argString = args.join(' ');
+            if (argString.includes('status'))
+              listener(Buffer.from(statusOutput));
+            else if (argString.includes('diff --cached'))
+              listener(Buffer.from(stagedDiff));
+            else if (argString.includes('log'))
+              listener(Buffer.from('abc1234 Previous commit'));
+            else listener(Buffer.from(''));
+          }
+        }),
+      };
+
+      child.stderr = {
+        on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data' && args.includes('commit')) {
+            listener(Buffer.from('error in .git/hooks/pre-commit'));
+          }
+        }),
+      };
+
       process.nextTick(() => {
         if (args.includes('commit')) {
           commitCallCount++;
-          child.emit('close', 1); // Fail commit
+          child.emit('close', 1);
         } else {
-          child.emit('close', 0); // Succeed other commands like 'add'
+          child.emit('close', 0);
         }
       });
-      
+
       return child;
     });
 
@@ -243,11 +250,15 @@ describe('GenerateCommitMessageTool', () => {
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Commit failed due to a pre-commit hook');
+    expect(result.llmContent).toContain(
+      'Commit failed due to a pre-commit hook',
+    );
     expect(result.llmContent).toContain('error in .git/hooks/pre-commit');
-    expect(commitCallCount).toBe(1); // It should only try to commit once.
-    const addCalls = mockSpawn.mock.calls.filter(call => call[1]?.includes('add'));
-    expect(addCalls).toHaveLength(0); // It should NOT try to re-stage changes.
+    expect(commitCallCount).toBe(1);
+    const addCalls = mockSpawn.mock.calls.filter((call) =>
+      call[1]?.includes('add'),
+    );
+    expect(addCalls).toHaveLength(0);
   });
 
   it('should return an error when spawn process fails to start', async () => {
