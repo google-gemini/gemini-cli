@@ -384,6 +384,17 @@ Expectation for required parameters:
       };
     }
 
+    // Permission check - EditTool essentially performs a write operation.
+    const permissionService = this.config.getFilePermissionService();
+    if (!permissionService.canPerformOperation(params.file_path, 'write')) {
+      const relativePath = makeRelative(params.file_path, this.rootDirectory);
+      const errorMessage = `Edit (write) operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+      };
+    }
+
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(params, signal);

@@ -12,8 +12,9 @@ import {
   afterEach,
   vi,
   type Mocked,
+  MockProxy,
 } from 'vitest';
-import { WriteFileTool } from './write-file.js';
+import { WriteFileTool, WriteFileToolParams } from './write-file.js';
 import {
   FileDiff,
   ToolConfirmationOutcome,
@@ -31,6 +32,7 @@ import {
   ensureCorrectFileContent,
   CorrectedEditResult,
 } from '../utils/editCorrector.js';
+import { FilePermissionService } from '../services/filePermissionService.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -81,6 +83,7 @@ const mockConfig = mockConfigInternal as unknown as Config;
 describe('WriteFileTool', () => {
   let tool: WriteFileTool;
   let tempDir: string;
+  let mockFilePermissionService: MockProxy<FilePermissionService>;
 
   beforeEach(() => {
     // Create a unique temporary directory for files created outside the root
@@ -103,10 +106,17 @@ describe('WriteFileTool', () => {
       mockGeminiClientInstance,
     );
 
+    // Setup FilePermissionService mock
+    mockFilePermissionService = vi.mocked(new FilePermissionService(mockConfig));
+    // @ts-expect-error - getFilePermissionService is a new method we are adding to the mock
+    mockConfigInternal.getFilePermissionService = vi.fn(() => mockFilePermissionService);
+
+
     tool = new WriteFileTool(mockConfig);
 
     // Reset mocks before each test
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    mockFilePermissionService.canPerformOperation.mockReturnValue(true); // Default to allow
     mockConfigInternal.setApprovalMode.mockClear();
     mockEnsureCorrectEdit.mockReset();
     mockEnsureCorrectFileContent.mockReset();
