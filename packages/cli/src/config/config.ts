@@ -53,6 +53,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  allowed_mcp_server_names: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -128,6 +129,10 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('allowed_mcp_server_names', {
+      type: 'string',
+      description: 'Allowed MCP server names',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -193,8 +198,21 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  const mcpServers = mergeMcpServers(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, extensions);
   const excludeTools = mergeExcludeTools(settings, extensions);
+
+  if (argv.allowed_mcp_server_names) {
+    const allowedNames = new Set(
+      argv.allowed_mcp_server_names.split(',').filter(Boolean),
+    );
+    if (allowedNames.size > 0) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+      );
+    } else {
+      mcpServers = {};
+    }
+  }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
