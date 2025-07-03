@@ -189,6 +189,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     commitMessage: string;
     timestamp: number;
   } | null = null;
+  
+  /** Lock to prevent concurrent cache operations */
+  private commitLock = false;
 
   /** Gather git status, staged diff, and recent log in parallel */
   private async analyzeGitState(signal: AbortSignal): Promise<{
@@ -302,45 +305,13 @@ Strategy: ${commitModeText}${filesDisplay}`,
 
   /** Execute the commit workflow using cached data when available */
   async execute(_params: undefined, signal: AbortSignal): Promise<ToolResult> {
+    if (this.commitLock) {
+      throw new Error('Another commit operation is in progress');
+    }
+    
+    this.commitLock = true;
     try {
-      let finalCommitMessage: string;
-
-      const gitState = await this.analyzeGitState(signal);
-
-      if (!gitState.diffOutput.trim()) {
-        return {
-          llmContent: 'No changes detected in the current workspace.',
-          returnDisplay: 'No changes detected in the current workspace.',
-        };
-      }
-
-      // Check if the cached data is still valid by comparing the staged diff
-      if (
-        this.cachedCommitData &&
-        Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS &&
-        this.cachedCommitData.diffOutput === gitState.diffOutput
-      ) {
-        finalCommitMessage = this.cachedCommitData.commitMessage;
-      } else {
-        const commitMessage = await this.generateCommitMessage(
-          gitState.statusOutput,
-          gitState.diffOutput,
-          gitState.logOutput,
-          signal,
-        );
-
-        finalCommitMessage = commitMessage;
-
-        this.cachedCommitData = {
-          statusOutput: gitState.statusOutput,
-          diffOutput: gitState.diffOutput,
-          logOutput: gitState.logOutput,
-          commitMessage,
-          timestamp: Date.now(),
-        };
-      }
-
-      return await this.commitWithRetry(finalCommitMessage, signal);
+      return await this.executeCommitWorkflow(signal);
     } catch (error) {
       console.error('Error during execution:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -348,6 +319,79 @@ Strategy: ${commitModeText}${filesDisplay}`,
         llmContent: `Error during commit workflow: ${errorMessage}`,
         returnDisplay: `Error during commit workflow: ${errorMessage}`,
       };
+    } finally {
+      this.commitLock = false;
+    }
+  }
+  
+  /** Internal commit workflow implementation */
+  private async executeCommitWorkflow(signal: AbortSignal): Promise<ToolResult> {
+    const gitState = await this.analyzeGitState(signal);
+
+    if (!gitState.diffOutput.trim()) {
+      return {
+        llmContent: 'No changes detected in the current workspace.',
+        returnDisplay: 'No changes detected in the current workspace.',
+      };
+    }
+
+    const finalCommitMessage = await this.getOrGenerateCommitMessage(gitState, signal);
+    
+    try {
+      return await this.commitWithRetry(finalCommitMessage, signal);
+    } catch (error) {
+      this.clearCacheOnCommitError(error);
+      throw error;
+    }
+  }
+  
+  /** Get cached commit message or generate new one */
+  private async getOrGenerateCommitMessage(
+    gitState: { statusOutput: string; diffOutput: string; logOutput: string },
+    signal: AbortSignal
+  ): Promise<string> {
+    // Check if cached data is still valid
+    if (
+      this.cachedCommitData &&
+      Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS &&
+      this.cachedCommitData.diffOutput === gitState.diffOutput &&
+      this.cachedCommitData.statusOutput === gitState.statusOutput &&
+      this.cachedCommitData.logOutput === gitState.logOutput
+    ) {
+      return this.cachedCommitData.commitMessage;
+    }
+
+    const commitMessage = await this.generateCommitMessage(
+      gitState.statusOutput,
+      gitState.diffOutput,
+      gitState.logOutput,
+      signal,
+    );
+
+    if (!commitMessage?.trim()) {
+      throw new Error('Generated commit message is empty');
+    }
+
+    this.cachedCommitData = {
+      statusOutput: gitState.statusOutput,
+      diffOutput: gitState.diffOutput,
+      logOutput: gitState.logOutput,
+      commitMessage,
+      timestamp: Date.now(),
+    };
+
+    return commitMessage;
+  }
+  
+  /** Clear cache only for specific error types */
+  private clearCacheOnCommitError(error: unknown): void {
+    if (error instanceof Error) {
+      // Only clear cache for state-related errors, not transient ones
+      if (error.message.includes('Git state changed') || 
+          error.message.includes('not a git repository') ||
+          error.message.includes('nothing to commit')) {
+        this.cachedCommitData = null;
+      }
     }
   }
 
@@ -359,6 +403,20 @@ Strategy: ${commitModeText}${filesDisplay}`,
     commitMessage: string,
     signal: AbortSignal
   ): Promise<ToolResult> {
+    // Final validation: ensure git state hasn't changed
+    const currentState = await this.analyzeGitState(signal);
+    if (
+      this.cachedCommitData &&
+      (currentState.diffOutput !== this.cachedCommitData.diffOutput ||
+        currentState.statusOutput !== this.cachedCommitData.statusOutput ||
+        currentState.logOutput !== this.cachedCommitData.logOutput)
+    ) {
+      this.cachedCommitData = null;
+      throw new Error(
+        'Git state changed since message generation. Please try again.',
+      );
+    }
+
     const maxRetries = 1;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
