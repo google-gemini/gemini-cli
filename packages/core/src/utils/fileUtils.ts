@@ -60,16 +60,25 @@ export function isWithinRoot(
  * @param filePath Path to the file.
  * @returns True if the file appears to be binary.
  */
+
+
 export function isBinaryFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+
+  // Explicitly treat these extensions as text
+  const alwaysTextExtensions = ['.svg', '.xml', '.html', '.js', '.ts', '.css', '.json'];
+  if (alwaysTextExtensions.includes(ext)) {
+    return false;
+  }
+
   try {
     const fd = fs.openSync(filePath, 'r');
-    // Read up to 4KB or file size, whichever is smaller
     const fileSize = fs.fstatSync(fd).size;
     if (fileSize === 0) {
-      // Empty file is not considered binary for content checking
       fs.closeSync(fd);
       return false;
     }
+
     const bufferSize = Math.min(4096, fileSize);
     const buffer = Buffer.alloc(bufferSize);
     const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
@@ -79,19 +88,18 @@ export function isBinaryFile(filePath: string): boolean {
 
     let nonPrintableCount = 0;
     for (let i = 0; i < bytesRead; i++) {
-      if (buffer[i] === 0) return true; // Null byte is a strong indicator
+      if (buffer[i] === 0) return true;
       if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) {
         nonPrintableCount++;
       }
     }
-    // If >30% non-printable characters, consider it binary
+
     return nonPrintableCount / bytesRead > 0.3;
   } catch {
-    // If any error occurs (e.g. file not found, permissions),
-    // treat as not binary here; let higher-level functions handle existence/access errors.
     return false;
   }
 }
+
 
 /**
  * Detects the type of file based on extension and content.
