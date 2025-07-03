@@ -50,6 +50,7 @@ interface CliArgs {
   telemetryLogPrompts: boolean | undefined;
   'allowed-mcp-server-names': string | undefined;
   'disable-extensions': string | undefined;
+  'list-extensions': boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -139,6 +140,11 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: 'Comma-separated list of extensions to disable.',
     })
+    .option('list-extensions', {
+      alias: 'l',
+      type: 'boolean',
+      description: 'List all available extensions and exit.',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -181,7 +187,8 @@ export async function loadCliConfig(
   const debugMode = argv.debug || false;
 
   const disabledExtensions =
-    argv['disable-extensions']?.split(',').map((e) => e.trim().toLowerCase()) || [];
+    argv['disable-extensions']?.split(',').map((e) => e.trim().toLowerCase()) ||
+    [];
   const activeExtensions = extensions.filter(
     (e) => !disabledExtensions.includes(e.config.name.toLowerCase()),
   );
@@ -276,6 +283,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    listExtensions: argv['list-extensions'] || false,
   });
 }
 
