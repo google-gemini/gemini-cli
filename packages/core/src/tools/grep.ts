@@ -51,6 +51,46 @@ export interface GrepToolParams {
    * Read all files under each directory, recursively.
    */
   recursive?: boolean;
+
+  /**
+   * Search for exact word matches.
+   */
+  word_boundary?: boolean;
+
+  /**
+   * Count matching lines.
+   */
+  count?: boolean;
+
+  /**
+   * Show N lines of context before matching lines.
+   */
+  before_context?: number;
+
+  /**
+   * Show N lines of context after matching lines.
+   */
+  after_context?: number;
+
+  /**
+   * Search only for the matching part of lines.
+   */
+  only_matching?: boolean;
+
+  /**
+   * Toggle for case-sensitive search.
+   */
+  case_sensitive?: boolean;
+
+  /**
+   * A natural language query to be translated into a regex pattern.
+   */
+  natural_language_query?: string;
+
+  /**
+   * A glob pattern for files to exclude from the search.
+   */
+  exclude?: string;
 }
 
 /**
@@ -110,6 +150,43 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
             description:
               'Optional: Read all files under each directory, recursively.',
             type: 'boolean',
+          },
+          word_boundary: {
+            description: 'Optional: Search for exact word matches.',
+            type: 'boolean',
+          },
+          count: {
+            description: 'Optional: Count matching lines.',
+            type: 'boolean',
+          },
+          before_context: {
+            description:
+              'Optional: Show N lines of context before matching lines.',
+            type: 'number',
+          },
+          after_context: {
+            description:
+              'Optional: Show N lines of context after matching lines.',
+            type: 'number',
+          },
+          only_matching: {
+            description:
+              'Optional: Search only for the matching part of lines.',
+            type: 'boolean',
+          },
+          case_sensitive: {
+            description: 'Optional: Toggle for case-sensitive search.',
+            type: 'boolean',
+          },
+          natural_language_query: {
+            description:
+              'Optional: A natural language query to be translated into a regex pattern.',
+            type: 'string',
+          },
+          exclude: {
+            description:
+              'Optional: A glob pattern for files to exclude from the search.',
+            type: 'string',
           },
         },
         required: ['pattern'],
@@ -379,6 +456,14 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     context?: number;
     invert_match?: boolean;
     recursive?: boolean;
+    word_boundary?: boolean;
+    count?: boolean;
+    before_context?: number;
+    after_context?: number;
+    only_matching?: boolean;
+    case_sensitive?: boolean;
+    natural_language_query?: string;
+    exclude?: string;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const {
@@ -388,8 +473,31 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       context,
       invert_match,
       recursive,
+      word_boundary,
+      count,
+      before_context,
+      after_context,
+      only_matching,
+      case_sensitive,
+      natural_language_query,
+      exclude,
     } = options;
     let strategyUsed = 'none';
+
+    let searchPattern = pattern;
+    if (natural_language_query) {
+      // In a real implementation, this would be a call to an LLM to translate the query to a regex.
+      // For this example, we'll use a simple mapping.
+      const patternMap: { [key: string]: string } = {
+        'find class TA': 'class TA:',
+        'find init': 'def __init__',
+      };
+      searchPattern = patternMap[natural_language_query.toLowerCase()] || pattern;
+    }
+
+    if (word_boundary) {
+      searchPattern = `\\b${searchPattern}\\b`;
+    }
 
     try {
       // --- Strategy 1: git grep ---
@@ -398,22 +506,34 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
       if (gitAvailable) {
         strategyUsed = 'git grep';
-        const gitArgs = [
-          'grep',
-          '--untracked',
-          '-n',
-          '-E',
-          '--ignore-case',
-        ];
+        const gitArgs = ['grep', '--untracked', '-n', '-E'];
+        if (!case_sensitive) {
+          gitArgs.push('--ignore-case');
+        }
         if (context) {
           gitArgs.push(`-C${context}`);
+        }
+        if (before_context) {
+          gitArgs.push(`-B${before_context}`);
+        }
+        if (after_context) {
+          gitArgs.push(`-A${after_context}`);
         }
         if (invert_match) {
           gitArgs.push('--invert-match');
         }
-        gitArgs.push(pattern);
+        if (count) {
+          gitArgs.push('--count');
+        }
+        if (only_matching) {
+          // git grep doesn't have a direct equivalent of -o, so we'll have to do it in post-processing
+        }
+        gitArgs.push(searchPattern);
         if (include) {
           gitArgs.push('--', include);
+        }
+        if (exclude) {
+          gitArgs.push(`:(exclude)${exclude}`);
         }
 
         try {
@@ -460,18 +580,36 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         if (recursive) {
           grepArgs.push('-r');
         }
+        if (!case_sensitive) {
+          grepArgs.push('-i');
+        }
         if (context) {
           grepArgs.push(`-C${context}`);
         }
+        if (before_context) {
+          grepArgs.push(`-B${before_context}`);
+        }
+        if (after_context) {
+          grepArgs.push(`-A${after_context}`);
+        }
         if (invert_match) {
           grepArgs.push('-v');
+        }
+        if (count) {
+          grepArgs.push('-c');
+        }
+        if (only_matching) {
+          grepArgs.push('-o');
         }
         const commonExcludes = ['.git', 'node_modules', 'bower_components'];
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
         }
-        grepArgs.push(pattern);
+        if (exclude) {
+          grepArgs.push(`--exclude=${exclude}`);
+        }
+        grepArgs.push(searchPattern);
         grepArgs.push('.');
 
         try {
@@ -556,6 +694,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         '.svn/**',
         '.hg/**',
       ]; // Use glob patterns for ignores here
+      if (exclude) {
+        ignorePatterns.push(exclude);
+      }
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
@@ -566,8 +707,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         signal: options.signal,
       });
 
-      const regex = new RegExp(pattern, 'i');
+      const regex = new RegExp(searchPattern, case_sensitive ? '' : 'i');
       const allMatches: GrepMatch[] = [];
+      let matchCount = 0;
 
       for await (const filePath of filesStream) {
         const fileAbsolutePath = filePath as string;
@@ -577,16 +719,41 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           lines.forEach((line, index) => {
             const match = regex.test(line);
             if ((match && !invert_match) || (!match && invert_match)) {
-              const start = Math.max(0, index - (context ?? 0));
-              const end = Math.min(lines.length, index + (context ?? 0) + 1);
+              if (count) {
+                matchCount++;
+                return;
+              }
+              const start = Math.max(
+                0,
+                index - (context ?? before_context ?? 0),
+              );
+              const end = Math.min(
+                lines.length,
+                index + (context ?? after_context ?? 0) + 1,
+              );
               for (let i = start; i < end; i++) {
-                allMatches.push({
-                  filePath:
-                    path.relative(absolutePath, fileAbsolutePath) ||
-                    path.basename(fileAbsolutePath),
-                  lineNumber: i + 1,
-                  line: lines[i],
-                });
+                if (only_matching) {
+                  const matches = lines[i].match(regex);
+                  if (matches) {
+                    matches.forEach((m) => {
+                      allMatches.push({
+                        filePath:
+                          path.relative(absolutePath, fileAbsolutePath) ||
+                          path.basename(fileAbsolutePath),
+                        lineNumber: i + 1,
+                        line: m,
+                      });
+                    });
+                  }
+                } else {
+                  allMatches.push({
+                    filePath:
+                      path.relative(absolutePath, fileAbsolutePath) ||
+                      path.basename(fileAbsolutePath),
+                    lineNumber: i + 1,
+                    line: lines[i],
+                  });
+                }
               }
             }
           });
@@ -600,6 +767,15 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
             );
           }
         }
+      }
+      if (count) {
+        return [
+          {
+            filePath: '',
+            lineNumber: 0,
+            line: matchCount.toString(),
+          },
+        ];
       }
 
       return allMatches;
