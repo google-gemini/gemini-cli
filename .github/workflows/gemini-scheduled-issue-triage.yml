@@ -85,7 +85,7 @@ jobs:
             - Focus on applying: kind/* (bug/enhancement/documentation), area/* (core/cli/testing/windows), and priority/* labels
             - If an issue has insufficient information, consider applying "status/need-information"
             - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
-            - After applying appropriate labels to an issue, remove the "status/needs-triage" label and add the "status/ready-for-human-review" label: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "status/ready-for-human-review"` and `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/needs-triage"
+            - After applying appropriate labels to an issue, remove the "status/need-triage" label and add the "status/ready-for-human-review" label: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "status/ready-for-human-review"` and `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"
 
             Example triage logic:
             - Issues with "bug", "error", "broken" → kind/bug
