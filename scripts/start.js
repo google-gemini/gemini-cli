@@ -22,6 +22,8 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 
+const originalCwd = process.cwd();
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
@@ -62,6 +64,7 @@ const env = {
   ...process.env,
   CLI_VERSION: pkg.version,
   DEV: 'true',
+  GEMINI_CLI_ORIGINAL_CWD: originalCwd,
 };
 
 if (process.env.DEBUG) {
@@ -69,7 +72,7 @@ if (process.env.DEBUG) {
   // than the relauncehd process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
-const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+const child = spawn('node', nodeArgs, { stdio: 'inherit', env, cwd: root });
 
 child.on('close', (code) => {
   process.exit(code);

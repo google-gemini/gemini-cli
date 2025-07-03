@@ -188,7 +188,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     );
     try {
       const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-        process.cwd(),
+        config.getCwd(),
         config.getDebugMode(),
         config.getFileService(),
         config.getExtensionContextFilePaths(),
@@ -531,7 +531,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     return consoleMessages.filter((msg) => msg.type !== 'debug');
   }, [consoleMessages, config]);
 
-  const branchName = useGitBranchName(config.getTargetDir());
+  const branchName = useGitBranchName(config.getCwd());
 
   const contextFileNames = useMemo(() => {
     const fromSettings = settings.merged.contextFileName;

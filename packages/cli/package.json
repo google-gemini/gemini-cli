@@ -29,7 +29,7 @@
     "sandboxImageUri": "gemini-cli-sandbox"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "*",
+    "@google/gemini-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",

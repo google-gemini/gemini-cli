@@ -125,7 +125,7 @@ export interface ConfigParameters {
   };
   checkpointing?: boolean;
   proxy?: string;
-  cwd: string;
+  readonly cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
   model: string;
@@ -206,7 +206,7 @@ export class Config {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
-    this.cwd = params.cwd ?? process.cwd();
+    this.cwd = params.cwd; // Assign params.cwd directly
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
@@ -422,7 +422,7 @@ export class Config {
     return this.proxy;
   }
 
-  getWorkingDir(): string {
+  getCwd(): string {
     return this.cwd;
   }
 

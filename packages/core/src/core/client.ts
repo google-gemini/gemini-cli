@@ -105,7 +105,7 @@ export class GeminiClient {
   }
 
   private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.config.getWorkingDir();
+    const cwd = this.config.getCwd();
     const today = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
       year: 'numeric',

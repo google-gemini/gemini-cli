@@ -19,6 +19,7 @@ import {
   loadSettings,
   SettingScope,
   USER_SETTINGS_PATH,
+  Settings,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -83,8 +84,9 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 export async function main() {
-  const workspaceRoot = process.cwd();
-  const settings = loadSettings(workspaceRoot);
+  const settings = loadSettings(
+    process.env.GEMINI_CLI_ORIGINAL_CWD || process.cwd(),
+  );
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
@@ -99,7 +101,8 @@ export async function main() {
     process.exit(1);
   }
 
-  const extensions = loadExtensions(workspaceRoot);
+  const extensions = loadExtensions((settings.merged as Settings).cwd || process.cwd());
+  console.log('DEBUG: settings.merged in gemini.tsx:', settings.merged);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
   // set default fallback to gemini api key
@@ -169,7 +172,7 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
-    setWindowTitle(basename(workspaceRoot), settings);
+    setWindowTitle(basename(config.getCwd()), settings);
     render(
       <React.StrictMode>
         <AppWrapper

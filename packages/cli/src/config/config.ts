@@ -171,6 +171,8 @@ export async function loadCliConfig(
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
+  const cliCwd = process.env.GEMINI_CLI_ORIGINAL_CWD || process.cwd();
+
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
@@ -184,10 +186,10 @@ export async function loadCliConfig(
 
   const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
 
-  const fileService = new FileDiscoveryService(process.cwd());
+  const fileService = new FileDiscoveryService(cliCwd);
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
+    cliCwd,
     debugMode,
     fileService,
     extensionContextFilePaths,
@@ -202,7 +204,7 @@ export async function loadCliConfig(
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
-    targetDir: process.cwd(),
+    targetDir: cliCwd,
     debugMode,
     question: argv.prompt || '',
     fullContext: argv.all_files || false,
@@ -241,7 +243,7 @@ export async function loadCliConfig(
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
       process.env.http_proxy,
-    cwd: process.cwd(),
+    cwd: cliCwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
@@ -310,7 +312,8 @@ function findEnvFile(startDir: string): string | null {
 }
 
 export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
+  const cliCwd = process.env.GEMINI_CLI_ORIGINAL_CWD || process.cwd();
+  const envFilePath = findEnvFile(cliCwd);
   if (envFilePath) {
     dotenv.config({ path: envFilePath, quiet: true });
   }
