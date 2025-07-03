@@ -10,7 +10,7 @@ import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
 // Add these imports for SVG to PNG conversion
 import sharp from 'sharp';
-
+//@
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
 const MAX_LINE_LENGTH_TEXT_FILE = 2000;
