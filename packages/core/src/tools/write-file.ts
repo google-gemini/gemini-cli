@@ -1,10 +1,10 @@
-/**
+25 /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
+import fs from 'fs/promises'; // Use promises API for async operations
 import path from 'path';
 import * as Diff from 'diff';
 import { Config, ApprovalMode } from '../config/config.js';
@@ -52,15 +52,22 @@ export interface WriteFileToolParams {
   modified_by_user?: boolean;
 }
 
+/**
+ * Result interface for _getCorrectedFileContent, providing comprehensive status.
+ */
 interface GetCorrectedFileContentResult {
-  originalContent: string;
-  correctedContent: string;
-  fileExists: boolean;
-  error?: { message: string; code?: string };
+  originalContent: string; // The content read from the file, or empty string.
+  correctedContent: string; // The content after potential LLM correction.
+  fileExists: boolean; // True if the file existed, regardless of readability.
+  isReadable: boolean; // True if the file existed AND was successfully read.
+  error?: { message: string; code?: string }; // Error details if file existed but couldn't be read.
 }
 
 /**
- * Implementation of the WriteFile tool logic
+ * Implementation of the WriteFile tool logic.
+ * This tool allows writing content to a specified file, with robust path validation,
+ * user confirmation flow, and automatic content correction via LLM if enabled.
+ * It integrates with telemetry for file operation tracking.
  */
 export class WriteFileTool
   extends BaseTool<WriteFileToolParams, ToolResult>
@@ -73,8 +80,8 @@ export class WriteFileTool
     super(
       WriteFileTool.Name,
       'WriteFile',
-      `Writes content to a specified file in the local filesystem. 
-      
+      `Writes content to a specified file in the local filesystem.
+
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
       {
         properties: {
@@ -96,19 +103,34 @@ export class WriteFileTool
     this.client = this.config.getGeminiClient();
   }
 
+  /**
+   * Checks if the given path is within the configured root directory.
+   * @param pathToCheck The absolute path to validate.
+   * @returns True if the path is within the root, false otherwise.
+   */
   private isWithinRoot(pathToCheck: string): boolean {
     const normalizedPath = path.normalize(pathToCheck);
     const normalizedRoot = path.normalize(this.config.getTargetDir());
+
+    // Ensure the root path ends with a separator to correctly check subdirectories
+    // without matching prefixes that are not true subdirectories (e.g., /root and /root-dir)
     const rootWithSep = normalizedRoot.endsWith(path.sep)
       ? normalizedRoot
       : normalizedRoot + path.sep;
+
     return (
       normalizedPath === normalizedRoot ||
       normalizedPath.startsWith(rootWithSep)
     );
   }
 
-  validateToolParams(params: WriteFileToolParams): string | null {
+  /**
+   * Validates the parameters for the WriteFile tool, ensuring path safety and correctness.
+   * @param params The parameters provided to the tool.
+   * @returns A string with an error message if validation fails, otherwise null.
+   */
+  async validateToolParams(params: WriteFileToolParams): Promise<string | null> {
+    // 1. Schema Validation
     if (
       this.schema.parameters &&
       !SchemaValidator.validate(
@@ -118,32 +140,45 @@ export class WriteFileTool
     ) {
       return 'Parameters failed schema validation.';
     }
+
     const filePath = params.file_path;
+
+    // 2. Absolute Path Check
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
+
+    // 3. Within Root Directory Check
     if (!this.isWithinRoot(filePath)) {
       return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
 
+    // 4. Directory Check (if path exists)
     try {
-      // This check should be performed only if the path exists.
-      // If it doesn't exist, it's a new file, which is valid for writing.
-      if (fs.existsSync(filePath)) {
-        const stats = fs.lstatSync(filePath);
-        if (stats.isDirectory()) {
-          return `Path is a directory, not a file: ${filePath}`;
+      // Use fs.promises.stat for async check and to avoid race conditions with lstatSync
+      const stats = await fs.stat(filePath).catch((err: unknown) => {
+        if (isNodeError(err) && err.code === 'ENOENT') {
+          return null; // File does not exist, which is fine for writing (new file)
         }
+        throw err; // Re-throw other errors
+      });
+
+      if (stats && stats.isDirectory()) {
+        return `Path is a directory, not a file: ${filePath}`;
       }
     } catch (statError: unknown) {
-      // If fs.existsSync is true but lstatSync fails (e.g., permissions, race condition where file is deleted)
-      // this indicates an issue with accessing the path that should be reported.
-      return `Error accessing path properties for validation: ${filePath}. Reason: ${statError instanceof Error ? statError.message : String(statError)}`;
+      // If fs.stat fails for reasons other than ENOENT (e.g., permissions), report it.
+      return `Error accessing path properties for validation: ${filePath}. Reason: ${getErrorMessage(statError)}`;
     }
 
-    return null;
+    return null; // All validations passed
   }
 
+  /**
+   * Provides a concise description of the tool's action based on its parameters.
+   * @param params The parameters for the WriteFile tool.
+   * @returns A string describing the action.
+   */
   getDescription(params: WriteFileToolParams): string {
     if (!params.file_path || !params.content) {
       return `Model did not provide valid parameters for write file tool`;
@@ -156,18 +191,22 @@ export class WriteFileTool
   }
 
   /**
-   * Handles the confirmation prompt for the WriteFile tool.
+   * Handles the confirmation prompt for the WriteFile tool, showing a diff if applicable.
+   * @param params The parameters for the tool call.
+   * @param abortSignal An AbortSignal to cancel ongoing operations.
+   * @returns Details for confirmation or false if no confirmation is needed.
    */
   async shouldConfirmExecute(
     params: WriteFileToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
+      return false; // Auto-approve in AUTO_EDIT mode
     }
 
-    const validationError = this.validateToolParams(params);
+    const validationError = await this.validateToolParams(params);
     if (validationError) {
+      // If validation fails, do not confirm and let execute handle the error message.
       return false;
     }
 
@@ -177,8 +216,8 @@ export class WriteFileTool
       abortSignal,
     );
 
-    if (correctedContentResult.error) {
-      // If file exists but couldn't be read, we can't show a diff for confirmation.
+    // If file existed but was unreadable, we can't show a meaningful diff.
+    if (!correctedContentResult.isReadable && correctedContentResult.fileExists) {
       return false;
     }
 
@@ -189,12 +228,13 @@ export class WriteFileTool
     );
     const fileName = path.basename(params.file_path);
 
+    // Create the diff for display. Original content will be empty if new file or unreadable.
     const fileDiff = Diff.createPatch(
       fileName,
-      originalContent, // Original content (empty if new file or unreadable)
-      correctedContent, // Content after potential correction
-      'Current',
-      'Proposed',
+      originalContent, // Content before the write operation
+      correctedContent, // Content after potential LLM correction, ready to be written
+      'Current', // Label for the original content
+      'Proposed', // Label for the new content
       DEFAULT_DIFF_OPTIONS,
     );
 
@@ -203,8 +243,10 @@ export class WriteFileTool
       title: `Confirm Write: ${shortenPath(relativePath)}`,
       fileName,
       fileDiff,
+      // Callback to handle user's confirmation outcome
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // If user chooses "Proceed Always", set approval mode to AUTO_EDIT for future operations.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
       },
@@ -212,11 +254,17 @@ export class WriteFileTool
     return confirmationDetails;
   }
 
+  /**
+   * Executes the WriteFile tool, performing the file write operation.
+   * @param params The parameters for the tool call.
+   * @param abortSignal An AbortSignal to cancel ongoing operations.
+   * @returns A ToolResult indicating success or failure.
+   */
   async execute(
     params: WriteFileToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolResult> {
-    const validationError = this.validateToolParams(params);
+    const validationError = await this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
@@ -230,11 +278,12 @@ export class WriteFileTool
       abortSignal,
     );
 
-    if (correctedContentResult.error) {
+    // Handle cases where file existed but was unreadable.
+    if (!correctedContentResult.isReadable && correctedContentResult.fileExists) {
       const errDetails = correctedContentResult.error;
-      const errorMsg = `Error checking existing file: ${errDetails.message}`;
+      const errorMsg = `Error checking existing file: ${errDetails?.message || 'Unknown error'}`;
       return {
-        llmContent: `Error checking existing file ${params.file_path}: ${errDetails.message}`,
+        llmContent: `Error checking existing file ${params.file_path}: ${errDetails?.message || 'Unknown error'}`,
         returnDisplay: errorMsg,
       };
     }
@@ -244,34 +293,24 @@ export class WriteFileTool
       correctedContent: fileContent,
       fileExists,
     } = correctedContentResult;
-    // fileExists is true if the file existed (and was readable or unreadable but caught by readError).
-    // fileExists is false if the file did not exist (ENOENT).
-    const isNewFile =
-      !fileExists ||
-      (correctedContentResult.error !== undefined &&
-        !correctedContentResult.fileExists);
+
+    // Determine if it's a new file or an overwrite.
+    const isNewFile = !fileExists;
 
     try {
       const dirName = path.dirname(params.file_path);
-      if (!fs.existsSync(dirName)) {
-        fs.mkdirSync(dirName, { recursive: true });
-      }
+      // Ensure the directory exists; create recursively if not.
+      await fs.mkdir(dirName, { recursive: true });
 
-      fs.writeFileSync(params.file_path, fileContent, 'utf8');
+      // Write the file content.
+      await fs.writeFile(params.file_path, fileContent, 'utf8');
 
-      // Generate diff for display result
+      // Generate diff for the return display, showing 'Original' vs 'Written'.
       const fileName = path.basename(params.file_path);
-      // If there was a readError, originalContent in correctedContentResult is '',
-      // but for the diff, we want to show the original content as it was before the write if possible.
-      // However, if it was unreadable, currentContentForDiff will be empty.
-      const currentContentForDiff = correctedContentResult.error
-        ? '' // Or some indicator of unreadable content
-        : originalContent;
-
       const fileDiff = Diff.createPatch(
         fileName,
-        currentContentForDiff,
-        fileContent,
+        originalContent, // This is the actual content before the write, or empty for new files.
+        fileContent, // The content that was just written.
         'Original',
         'Written',
         DEFAULT_DIFF_OPTIONS,
@@ -290,9 +329,11 @@ export class WriteFileTool
 
       const displayResult: FileDiff = { fileDiff, fileName };
 
+      // Record telemetry metrics.
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(params.file_path);
-      const extension = path.extname(params.file_path); // Get extension
+      const extension = path.extname(params.file_path);
+
       if (isNewFile) {
         recordFileOperationMetric(
           this.config,
@@ -316,7 +357,7 @@ export class WriteFileTool
         returnDisplay: displayResult,
       };
     } catch (error) {
-      const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMsg = `Error writing to file: ${getErrorMessage(error)}`;
       return {
         llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
         returnDisplay: `Error: ${errorMsg}`,
@@ -324,6 +365,14 @@ export class WriteFileTool
     }
   }
 
+  /**
+   * Attempts to read the original file content and then corrects the proposed content
+   * using the LLM, if necessary. Handles cases where the file doesn't exist or is unreadable.
+   * @param filePath The path to the file.
+   * @param proposedContent The content proposed by the LLM.
+   * @param abortSignal An AbortSignal to cancel LLM operations.
+   * @returns A GetCorrectedFileContentResult object.
+   */
   private async _getCorrectedFileContent(
     filePath: string,
     proposedContent: string,
@@ -331,34 +380,34 @@ export class WriteFileTool
   ): Promise<GetCorrectedFileContentResult> {
     let originalContent = '';
     let fileExists = false;
+    let isReadable = false;
     let correctedContent = proposedContent;
+    let error: { message: string; code?: string } | undefined;
 
     try {
-      originalContent = fs.readFileSync(filePath, 'utf8');
-      fileExists = true; // File exists and was read
-    } catch (err) {
+      originalContent = await fs.readFile(filePath, 'utf8');
+      fileExists = true;
+      isReadable = true; // File existed and was successfully read
+    } catch (err: unknown) {
       if (isNodeError(err) && err.code === 'ENOENT') {
-        fileExists = false;
+        fileExists = false; // File does not exist
         originalContent = '';
       } else {
-        // File exists but could not be read (permissions, etc.)
-        fileExists = true; // Mark as existing but problematic
+        // File exists but could not be read (e.g., permissions, corrupted file)
+        fileExists = true;
+        isReadable = false; // File exists but not readable
         originalContent = ''; // Can't use its content
-        const error = {
+        error = {
           message: getErrorMessage(err),
           code: isNodeError(err) ? err.code : undefined,
         };
-        // Return early as we can't proceed with content correction meaningfully
-        return { originalContent, correctedContent, fileExists, error };
       }
     }
 
-    // If readError is set, we have returned.
-    // So, file was either read successfully (fileExists=true, originalContent set)
-    // or it was ENOENT (fileExists=false, originalContent='').
-
-    if (fileExists) {
-      // This implies originalContent is available
+    // Only attempt correction if the file was readable (exists and content is available)
+    // or if it's a new file (ENOENT, so originalContent is '').
+    // If fileExists is true but isReadable is false, we cannot perform content-based correction.
+    if (isReadable) {
       const { params: correctedParams } = await ensureCorrectEdit(
         originalContent,
         {
@@ -370,17 +419,25 @@ export class WriteFileTool
         abortSignal,
       );
       correctedContent = correctedParams.new_string;
-    } else {
-      // This implies new file (ENOENT)
+    } else if (!fileExists) { // This implies a new file (ENOENT case)
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
         this.client,
         abortSignal,
       );
     }
-    return { originalContent, correctedContent, fileExists };
+    // If fileExists is true and isReadable is false, correctedContent remains proposedContent,
+    // and an error will be indicated in the result.
+
+    return { originalContent, correctedContent, fileExists, isReadable, error };
   }
 
+  /**
+   * Provides context for modifying the tool's parameters, specifically for file content.
+   * This is used by the UI/agent to allow user modifications to the file content.
+   * @param abortSignal An AbortSignal to cancel LLM operations.
+   * @returns A ModifyContext object.
+   */
   getModifyContext(
     abortSignal: AbortSignal,
   ): ModifyContext<WriteFileToolParams> {
@@ -392,7 +449,9 @@ export class WriteFileTool
           params.content,
           abortSignal,
         );
-        return correctedContentResult.originalContent;
+        // Only return originalContent if it was successfully read.
+        // Otherwise, returning empty string implies it's a new file or unreadable.
+        return correctedContentResult.isReadable ? correctedContentResult.originalContent : '';
       },
       getProposedContent: async (params: WriteFileToolParams) => {
         const correctedContentResult = await this._getCorrectedFileContent(
@@ -403,13 +462,13 @@ export class WriteFileTool
         return correctedContentResult.correctedContent;
       },
       createUpdatedParams: (
-        _oldContent: string,
+        _oldContent: string, // `_oldContent` is unused here, but part of the interface
         modifiedProposedContent: string,
         originalParams: WriteFileToolParams,
       ) => ({
         ...originalParams,
         content: modifiedProposedContent,
-        modified_by_user: true,
+        modified_by_user: true, // Indicate that the content was user-modified
       }),
     };
   }
