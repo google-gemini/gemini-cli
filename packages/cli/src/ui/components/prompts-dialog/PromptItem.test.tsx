@@ -9,9 +9,9 @@ import { render } from 'ink-testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PromptItem } from './PromptItem.js';
 
-// Mock the renderPromptTemplate function
-vi.mock('../../../config/prompt.js', () => ({
-  renderPromptTemplate: vi.fn(),
+// Mock the renderTemplate function
+vi.mock('../../../utils/template.js', () => ({
+  renderTemplate: vi.fn(),
 }));
 
 // Extend global interface for test mocking
@@ -120,8 +120,8 @@ describe('PromptItem', () => {
   });
 
   it('should handle single variable input', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockReturnValue('Hello John!');
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
     const prompt = createPrompt(
       'Single Variable',
@@ -147,15 +147,15 @@ describe('PromptItem', () => {
     mockTextInputSubmit!('John');
     await wait();
 
-    expect(renderPromptTemplate).toHaveBeenCalledWith('Hello {{name}}!', {
+    expect(renderTemplate).toHaveBeenCalledWith('Hello {{name}}!', {
       name: 'John',
     });
     expect(mockOnSubmit).toHaveBeenCalledWith('Hello John!');
   });
 
   it('should handle multiple variables sequentially', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockReturnValue(
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockReturnValue(
       'class UserController extends Controller {}',
     );
 
@@ -195,7 +195,7 @@ describe('PromptItem', () => {
     mockTextInputSubmit!('Controller');
     await wait();
 
-    expect(renderPromptTemplate).toHaveBeenCalledWith(
+    expect(renderTemplate).toHaveBeenCalledWith(
       'class {{name}}{{type}} extends {{base}} {}',
       { name: 'User', type: 'Controller', base: 'Controller' },
     );
@@ -259,8 +259,8 @@ describe('PromptItem', () => {
   });
 
   it('should trim input values', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockReturnValue('Hello John!');
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
     const prompt = createPrompt('Trim Test', 'Hello {{name}}!', undefined, [
       { name: 'name', type: 'string', required: true },
@@ -281,15 +281,15 @@ describe('PromptItem', () => {
     mockTextInputSubmit!('  John  ');
     await wait();
 
-    expect(renderPromptTemplate).toHaveBeenCalledWith('Hello {{name}}!', {
+    expect(renderTemplate).toHaveBeenCalledWith('Hello {{name}}!', {
       name: 'John',
     });
     expect(mockOnSubmit).toHaveBeenCalledWith('Hello John!');
   });
 
   it('should handle template rendering errors', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockImplementation(() => {
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockImplementation(() => {
       throw new Error('Template rendering failed');
     });
 
@@ -348,8 +348,8 @@ describe('PromptItem', () => {
   });
 
   it('should show completion message when all variables are filled', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockReturnValue('Complete template');
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockReturnValue('Complete template');
 
     const prompt = createPrompt(
       'Completion Test',
@@ -378,8 +378,8 @@ describe('PromptItem', () => {
   });
 
   it('should clear error message on successful input', async () => {
-    const { renderPromptTemplate } = await import('../../../config/prompt.js');
-    vi.mocked(renderPromptTemplate).mockReturnValue('Hello ValidName!');
+    const { renderTemplate } = await import('../../../utils/template.js');
+    vi.mocked(renderTemplate).mockReturnValue('Hello ValidName!');
 
     const prompt = createPrompt(
       'Error Clear Test',

@@ -11,8 +11,8 @@ import {
 import { Box, Text } from 'ink';
 import { UncontrolledTextInput } from 'ink-text-input';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { renderPromptTemplate } from '../../../config/prompt.js';
 import { Colors } from '../../colors.js';
+import { renderTemplate } from '../../../utils/template.js';
 
 interface Props {
   prompt: PredefinedPrompt;
@@ -64,7 +64,7 @@ export function PromptItem({ prompt, onSubmit, setErrorMessage }: Props) {
         );
 
         try {
-          const query = renderPromptTemplate(prompt.template, variableMap);
+          const query = renderTemplate(prompt.template, variableMap);
           onSubmit(query);
         } catch (renderError) {
           console.error('Error rendering prompt template:', renderError);

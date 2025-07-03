@@ -63,13 +63,3 @@ function loadPrompt(promptPath: string): PredefinedPrompt | null {
     return null;
   }
 }
-
-export function renderPromptTemplate(
-  template: string,
-  variables: Record<string, string>,
-): string {
-  return template.replace(
-    /\{\{\s*(\w+)\s*\}\}/g,
-    (_match, p1) => variables[p1] || '',
-  );
-}

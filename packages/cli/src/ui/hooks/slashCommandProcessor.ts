@@ -917,7 +917,17 @@ export const useSlashCommandProcessor = (
         name: 'prompts',
         description: 'Select a predefined prompt',
         action: async (_mainCommand, _subCommand, _args) => {
-          openPromptsDialog();
+          const prompts = config?.getPredefinedPrompts() ?? [];
+          if (prompts.length > 0) {
+            openPromptsDialog();
+          } else {
+            addMessage({
+              type: MessageType.INFO,
+              content:
+                'No prompts found. Please add prompt files to ./.gemini/prompts or ~/.gemini/prompts.',
+              timestamp: new Date(),
+            });
+          }
         },
       },
     ];
