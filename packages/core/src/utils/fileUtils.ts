@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
-import sharp from 'sharp';
+import { Resvg } from '@resvg/resvg-js';
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
 
@@ -149,11 +149,12 @@ async function convertSvgToPng(svgBuffer: Buffer): Promise<Buffer> {
   try {
     const svgString = svgBuffer.toString('utf8');
     const sanitizedSvg = sanitizeSvg(svgString);
-    const sanitizedBuffer = Buffer.from(sanitizedSvg, 'utf8');
     
-    return await sharp(sanitizedBuffer)
-      .png()
-      .toBuffer();
+    const resvg = new Resvg(sanitizedSvg);
+    const pngData = resvg.render();
+    const pngBuffer = pngData.asPng();
+    
+    return Buffer.from(pngBuffer);
   } catch (error) {
     throw new Error(`Failed to convert SVG to PNG: ${error instanceof Error ? error.message : String(error)}`);
   }
