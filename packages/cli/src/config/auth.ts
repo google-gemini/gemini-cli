@@ -20,6 +20,13 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.USE_AZURE) {
+    if (!process.env.AZURE_API_KEY || !process.env.AZURE_ENDPOINT_URL || !process.env.AZURE_API_VERSION) {
+      return 'AZURE_API_KEY, AZURE_ENDPOINT_URL, and AZURE_API_VERSION environment variables are required for Azure authentication. Add these to your .env file and try again!';
+    }
+    return null;
+  }
+
   if (authMethod === AuthType.USE_VERTEX_AI) {
     const hasVertexProjectLocationConfig =
       !!process.env.GOOGLE_CLOUD_PROJECT && !!process.env.GOOGLE_CLOUD_LOCATION;

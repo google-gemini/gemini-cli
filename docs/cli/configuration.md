@@ -275,6 +275,17 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - API key for local LLM endpoints (can be dummy value for most local setups).
   - Used with `--auth-type local-llm`.
   - Example: `export LOCAL_LLM_API_KEY="dummy-key"`
+- **`AZURE_API_KEY`**:
+  - Your Azure API key for accessing the Azure OpenAI service.
+  - Required when using `--auth-type azure`.
+  - Example: `export AZURE_API_KEY="your-azure-key"`
+- **`AZURE_ENDPOINT_URL`**:
+  - Azure OpenAI endpoint starting with "https://".
+  - Example: `export AZURE_ENDPOINT_URL="https://example-region.openai.azure.com"`
+- **`AZURE_API_VERSION`**:
+  - Azure API version to use (e.g., **`2025-01-01-preview`**).
+  - Required for calling Azure OpenAI models.
+  - Example: `export AZURE_API_VERSION="2025-01-01-preview"`
 - **`CUSTOM_BASE_URL`**:
   - Custom base URL for API endpoints.
   - Used to point to local LLM servers or alternative API endpoints.

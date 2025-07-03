@@ -51,11 +51,70 @@ function normalizeContents(contents: any): Content[] {
   return [];
 }
 
+export class AzureContentGenerator implements ContentGenerator {
+  constructor(private config: ContentGeneratorConfig) { }
+
+  private buildAzureUrl(model: string): string {
+    const baseUrl = this.config.baseUrl;
+    const apiVersion = this.config.apiVersion || '2025-01-01-preview';
+    return `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=${apiVersion}`;
+  }
+
+  async generateContent(request: GenerateContentParameters): Promise<GenerateContentResponse> {
+    const azureUrl = this.buildAzureUrl(request.model || this.config.model);
+    const contents = normalizeContents(request.contents);
+
+    const requestBody = {
+      messages: contents.map((content) => ({
+        role: content.role === 'model' ? 'assistant' : content.role,
+        content: content.parts.map(part => ('text' in part ? part.text : '')).join(' '),
+      })),
+      temperature: request.config?.temperature || 0.7,
+      max_tokens: request.config?.maxOutputTokens || 2048,
+    };
+
+    const response = await fetch(azureUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': this.config.apiKey,
+        ...this.config.customHeaders,
+      },
+      body: JSON.stringify(requestBody),
+      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorMsg = await response.text();
+      throw new Error(`Azure API Error: ${response.status} - ${errorMsg}`);
+    }
+
+    const data = await response.json();
+    return {
+      candidates: [
+        {
+          content: { parts: [{ text: data.choices[0].message.content }], role: 'model' },
+          index: 0,
+          finishReason: data.choices[0].finish_reason || 'STOP',
+        },
+      ],
+    };
+  }
+
+  async countTokens(request: CountTokensParameters): Promise<CountTokensResponse> {
+    const contents = normalizeContents(request.contents);
+    const text = contents.map((c) => c.parts.map((p) => ('text' in p ? p.text : '')).join(' ')).join(' ');
+    return { totalTokens: Math.ceil(text.length / 4) }; // Simple token approximation
+  }
+
+  // Add other methods like `generateContentStream` and `embedContent` if needed.
+}
+
 /**
  * Generic HTTP-based content generator for OpenAI-compatible APIs
  */
 export class OpenAICompatibleContentGenerator implements ContentGenerator {
-  constructor(private config: ContentGeneratorConfig) {}
+  constructor(private config: ContentGeneratorConfig) { }
 
   async generateContent(
     request: GenerateContentParameters,
@@ -96,7 +155,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const openAIRequest = { ...this.convertToOpenAIFormat(request), stream: true };
-    
+
     const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -186,7 +245,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
   async embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse> {
     const contents = normalizeContents(request.contents);
     const text = this.extractTextFromContents(contents);
-    
+
     const response = await fetch(`${this.config.baseUrl}/embeddings`, {
       method: 'POST',
       headers: {
@@ -455,13 +514,13 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
  * Anthropic Claude API content generator
  */
 export class AnthropicContentGenerator implements ContentGenerator {
-  constructor(private config: ContentGeneratorConfig) {}
+  constructor(private config: ContentGeneratorConfig) { }
 
   async generateContent(
     request: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
     const anthropicRequest = this.convertToAnthropicFormat(request);
-    
+
     const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {

@@ -45,6 +45,7 @@ export enum AuthType {
   USE_OPENAI_COMPATIBLE = 'openai-compatible',
   USE_ANTHROPIC = 'anthropic',
   USE_LOCAL_LLM = 'local-llm',
+  USE_AZURE = 'azure',
 }
 
 export type ContentGeneratorConfig = {
@@ -74,6 +75,9 @@ export async function createContentGeneratorConfig(
   const localLlmApiKey = process.env.LOCAL_LLM_API_KEY;
   const customBaseUrl = process.env.CUSTOM_BASE_URL;
   const customTimeout = process.env.CUSTOM_TIMEOUT;
+  const azureApiKey = process.env.AZURE_API_KEY;
+  const azureEndpointUrl = process.env.AZURE_ENDPOINT_URL;
+  const azureApiVersion = process.env.AZURE_API_VERSION;
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
@@ -96,6 +100,17 @@ export async function createContentGeneratorConfig(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
     );
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_AZURE) {
+    if (!azureApiKey || !azureEndpointUrl || !azureApiVersion) {
+      throw new Error('AZURE_API_KEY, AZURE_ENDPOINT_URL, and AZURE_API_VERSION must be set for Azure auth type.');
+    }
+
+    contentGeneratorConfig.apiKey = azureApiKey;
+    contentGeneratorConfig.baseUrl = azureEndpointUrl;
+    contentGeneratorConfig.apiVersion = azureApiVersion;
     return contentGeneratorConfig;
   }
 
@@ -179,6 +194,9 @@ export async function createContentGenerator(
       config.authType,
       sessionId,
     );
+  }
+  if (config.authType === AuthType.USE_AZURE) {
+    return new AzureContentGenerator(config);
   }
 
   // Google Gemini API and Vertex AI
