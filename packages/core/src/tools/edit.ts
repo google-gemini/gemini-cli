@@ -44,7 +44,11 @@ export interface EditToolParams {
   modified_by_user?: boolean;
   reason?: string;
   dry_run?: boolean;
-  use_regex?: boolean; // New: Allow regex for old_string
+  use_regex?: boolean; // Allow regex for old_string
+  line?: number; // Line number for replacement
+  delete?: string; // Pattern for line deletion
+  append?: string; // Content to append
+  insert_after?: string; // Pattern to insert after
 }
 
 /**
@@ -119,8 +123,12 @@ export class EditTool
           reason: { type: 'string', description: 'Purpose of the edit.', optional: true },
           dry_run: { type: 'boolean', description: 'Preview changes without writing.', optional: true },
           use_regex: { type: 'boolean', description: 'Treat old_string as regex.', optional: true },
+          line: { type: 'number', description: 'Line number for replacement.', optional: true },
+          delete: { type: 'string', description: 'Pattern for line deletion.', optional: true },
+          append: { type: 'string', description: 'Content to append.', optional: true },
+          insert_after: { type: 'string', description: 'Pattern to insert after.', optional: true },
         },
-        required: ['file_path', 'old_string', 'new_string'],
+        required: ['file_path'],
         type: 'object',
       },
     );
@@ -458,11 +466,30 @@ export class EditTool
     const permissionService = this.config.getFilePermissionService();
     if (!permissionService.canPerformOperation(params.file_path, 'write')) {
       const relativePath = makeRelative(params.file_path, this.rootDirectory);
-      const errorMessage = `Edit (write) operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
+      const errorMessage = `Edit (write) operation on file '${shortenPath(
+        relativePath,
+      )}' denied by file permission configuration.`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
       };
+    }
+
+    if (params.append) {
+      try {
+        fs.appendFileSync(params.file_path, '\n' + params.append, 'utf8');
+        return {
+          llmContent: `Appended to ${params.file_path}`,
+          returnDisplay: `Appended to ${params.file_path}`,
+        };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error(`Append failed for ${params.file_path}: ${errorMsg}`);
+        return {
+          llmContent: `Error executing append: ${errorMsg}`,
+          returnDisplay: `Error executing append: ${errorMsg}`,
+        };
+      }
     }
 
     let editData: CalculatedEdit;
@@ -513,18 +540,44 @@ export class EditTool
 
     try {
       this.ensureParentDirectoriesExist(params.file_path);
-      fs.writeFileSync(params.file_path, editData.newContent, 'utf8');
-      this.fileCache.set(params.file_path, editData.newContent); // Update cache
+      let newContent = editData.newContent;
+      if (params.line) {
+        const lines = (editData.currentContent ?? '').split('\n');
+        lines[params.line - 1] = params.new_string;
+        newContent = lines.join('\n');
+      }
+      if (params.delete) {
+        const lines = (editData.currentContent ?? '').split('\n');
+        const regex = new RegExp(params.delete);
+        newContent = lines.filter((line) => !regex.test(line)).join('\n');
+      }
+      if (params.insert_after) {
+        const lines = (editData.currentContent ?? '').split('\n');
+        const regex = new RegExp(params.insert_after);
+        const newLines: string[] = [];
+        lines.forEach((line) => {
+          newLines.push(line);
+          if (regex.test(line)) {
+            newLines.push(params.new_string);
+          }
+        });
+        newContent = newLines.join('\n');
+      }
+
+      fs.writeFileSync(params.file_path, newContent, 'utf8');
+      this.fileCache.set(params.file_path, newContent); // Update cache
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+        displayResult = `Created ${shortenPath(
+          makeRelative(params.file_path, this.rootDirectory),
+        )}`;
       } else {
         const fileName = path.basename(params.file_path);
         const fileDiff = Diff.createPatch(
           fileName,
           editData.currentContent ?? '',
-          editData.newContent,
+          newContent,
           'Current',
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
@@ -538,13 +591,17 @@ export class EditTool
           : `Modified ${params.file_path} (${editData.occurrences} replacements)`,
       ];
       if (params.modified_by_user) {
-        llmSuccessMessageParts.push(`User modified new_string to: "${params.new_string}"`);
+        llmSuccessMessageParts.push(
+          `User modified new_string to: "${params.new_string}"`,
+        );
       }
       if (params.reason) {
         llmSuccessMessageParts.push(`Reason: "${params.reason}"`);
       }
       if (params.use_regex) {
-        llmSuccessMessageParts.push(`Applied regex pattern: "${params.old_string}"`);
+        llmSuccessMessageParts.push(
+          `Applied regex pattern: "${params.old_string}"`,
+        );
       }
 
       logger.info(`Edit successful: ${llmSuccessMessageParts.join(' ')}`);

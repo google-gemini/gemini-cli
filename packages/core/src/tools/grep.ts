@@ -36,6 +36,21 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Show N lines of context around matching lines.
+   */
+  context?: number;
+
+  /**
+   * Invert the sense of matching, to select non-matching lines.
+   */
+  invert_match?: boolean;
+
+  /**
+   * Read all files under each directory, recursively.
+   */
+  recursive?: boolean;
 }
 
 /**
@@ -80,6 +95,21 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
             description:
               "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
             type: 'string',
+          },
+          context: {
+            description:
+              'Optional: Show N lines of context around matching lines.',
+            type: 'number',
+          },
+          invert_match: {
+            description:
+              'Optional: Invert the sense of matching, to select non-matching lines.',
+            type: 'boolean',
+          },
+          recursive: {
+            description:
+              'Optional: Read all files under each directory, recursively.',
+            type: 'boolean',
           },
         },
         required: ['pattern'],
@@ -346,9 +376,19 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     pattern: string;
     path: string; // Expects absolute path
     include?: string;
+    context?: number;
+    invert_match?: boolean;
+    recursive?: boolean;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
-    const { pattern, path: absolutePath, include } = options;
+    const {
+      pattern,
+      path: absolutePath,
+      include,
+      context,
+      invert_match,
+      recursive,
+    } = options;
     let strategyUsed = 'none';
 
     try {
@@ -364,8 +404,14 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           '-n',
           '-E',
           '--ignore-case',
-          pattern,
         ];
+        if (context) {
+          gitArgs.push(`-C${context}`);
+        }
+        if (invert_match) {
+          gitArgs.push('--invert-match');
+        }
+        gitArgs.push(pattern);
         if (include) {
           gitArgs.push('--', include);
         }
@@ -399,7 +445,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           return this.parseGrepOutput(output, absolutePath);
         } catch (gitError: unknown) {
           console.debug(
-            `GrepLogic: git grep failed: ${getErrorMessage(gitError)}. Falling back...`,
+            `GrepLogic: git grep failed: ${getErrorMessage(
+              gitError,
+            )}. Falling back...`,
           );
         }
       }
@@ -408,7 +456,16 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E'];
+        const grepArgs = ['-n', '-H', '-E'];
+        if (recursive) {
+          grepArgs.push('-r');
+        }
+        if (context) {
+          grepArgs.push(`-C${context}`);
+        }
+        if (invert_match) {
+          grepArgs.push('-v');
+        }
         const commonExcludes = ['.git', 'node_modules', 'bower_components'];
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
@@ -479,7 +536,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: unknown) {
           console.debug(
-            `GrepLogic: System grep failed: ${getErrorMessage(grepError)}. Falling back...`,
+            `GrepLogic: System grep failed: ${getErrorMessage(
+              grepError,
+            )}. Falling back...`,
           );
         }
       }
@@ -516,21 +575,28 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
           lines.forEach((line, index) => {
-            if (regex.test(line)) {
-              allMatches.push({
-                filePath:
-                  path.relative(absolutePath, fileAbsolutePath) ||
-                  path.basename(fileAbsolutePath),
-                lineNumber: index + 1,
-                line,
-              });
+            const match = regex.test(line);
+            if ((match && !invert_match) || (!match && invert_match)) {
+              const start = Math.max(0, index - (context ?? 0));
+              const end = Math.min(lines.length, index + (context ?? 0) + 1);
+              for (let i = start; i < end; i++) {
+                allMatches.push({
+                  filePath:
+                    path.relative(absolutePath, fileAbsolutePath) ||
+                    path.basename(fileAbsolutePath),
+                  lineNumber: i + 1,
+                  line: lines[i],
+                });
+              }
             }
           });
         } catch (readError: unknown) {
           // Ignore errors like permission denied or file gone during read
           if (!isNodeError(readError) || readError.code !== 'ENOENT') {
             console.debug(
-              `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
+              `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(
+                readError,
+              )}`,
             );
           }
         }
@@ -539,7 +605,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       return allMatches;
     } catch (error: unknown) {
       console.error(
-        `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(error)}`,
+        `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(
+          error,
+        )}`,
       );
       throw error; // Re-throw
     }

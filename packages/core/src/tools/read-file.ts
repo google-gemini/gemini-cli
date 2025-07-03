@@ -24,9 +24,9 @@ import {
  */
 export interface ReadFileToolParams {
   /**
-   * The absolute path to the file to read
+   * The absolute path(s) to the file(s) to read. Can be a single path or an array of paths.
    */
-  absolute_path: string;
+  absolute_path: string | string[];
 
   /**
    * A string specifying a range of lines to read (e.g., '10-20'). This is 1-based.
@@ -47,6 +47,11 @@ export interface ReadFileToolParams {
    * The number of lines to read (optional)
    */
   limit?: number;
+
+  /**
+   * Precede each line of output with the line number.
+   */
+  line_numbers?: boolean;
 }
 
 /**
@@ -67,9 +72,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         properties: {
           absolute_path: {
             description:
-              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-            type: 'string',
-            pattern: '^/',
+              "The absolute path(s) to the file(s) to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide absolute path(s).",
+            oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
           },
           lines: {
             description:
@@ -92,6 +96,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
             description:
               "Optional (legacy): For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Prefer using the 'lines' parameter. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: 'number',
+          },
+          line_numbers: {
+            description:
+              'Optional: Precede each line of output with the line number.',
+            type: 'boolean',
           },
         },
         required: ['absolute_path'],
@@ -161,163 +170,188 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       };
     }
 
-    // Permission check
-    const permissionService = this.config.getFilePermissionService();
-    if (!permissionService.canPerformOperation(params.absolute_path, 'read')) {
-      const relativePath = makeRelative(params.absolute_path, this.rootDirectory);
-      const errorMessage = `Read operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
-      return {
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
-      };
-    }
+    const filePaths = Array.isArray(params.absolute_path)
+      ? params.absolute_path
+      : [params.absolute_path];
+    let combinedLlmContent = '';
+    let combinedReturnDisplay = '';
 
-    const { lines, section, offset, limit } = params;
-    if ((lines && section) || (lines && offset) || (section && offset)) {
-      const errorMsg =
-        'The `lines`, `section`, and `offset`/`limit` parameters are mutually exclusive.';
-      return {
-        llmContent: `Error: ${errorMsg}`,
-        returnDisplay: `Error: ${errorMsg}`,
-      };
-    }
+    for (const filePath of filePaths) {
+      // Permission check
+      const permissionService = this.config.getFilePermissionService();
+      if (!permissionService.canPerformOperation(filePath, 'read')) {
+        const relativePath = makeRelative(filePath, this.rootDirectory);
+        const errorMessage = `Read operation on file '${shortenPath(
+          relativePath,
+        )}' denied by file permission configuration.`;
+        return {
+          llmContent: `Error: ${errorMessage}`,
+          returnDisplay: `Error: ${errorMessage}`,
+        };
+      }
 
-    let readOffset: number | undefined = offset;
-    let readLimit: number | undefined = limit;
-
-    if (lines) {
-      const parts = lines.split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts.length > 1 ? parseInt(parts[1], 10) : start;
-      if (isNaN(start) || isNaN(end) || start <= 0 || end < start) {
+      const { lines, section, offset, limit, line_numbers } = params;
+      if ((lines && section) || (lines && offset) || (section && offset)) {
         const errorMsg =
-          "Invalid line range format. Use 'start' or 'start-end'. Lines are 1-based.";
-        return {
-          llmContent: `Error: ${errorMsg}`,
-          returnDisplay: `Error: ${errorMsg}`,
-        };
-      }
-      readOffset = start - 1;
-      readLimit = end - start + 1;
-    }
-
-    if (section) {
-      const fileContentResult = await processSingleFileContent(
-        params.absolute_path,
-        this.rootDirectory,
-      );
-
-      if (
-        fileContentResult.error ||
-        typeof fileContentResult.llmContent !== 'string'
-      ) {
-        return {
-          llmContent:
-            fileContentResult.error || 'Could not read file to find section.',
-          returnDisplay:
-            fileContentResult.returnDisplay || 'Could not read file.',
-        };
-      }
-
-      const fileContent = fileContentResult.llmContent;
-      const fileLines = fileContent.split('\n');
-
-      const sectionRegex = new RegExp(`(function\\s+${section}|const\\s+${section}\\s*=\\s*function|let\\s+${section}\\s*=\\s*function|var\\s+${section}\\s*=\\s*function)`);
-      let startLine = -1;
-      for (let i = 0; i < fileLines.length; i++) {
-        if (sectionRegex.test(fileLines[i])) {
-          startLine = i;
-          break;
-        }
-      }
-
-      if (startLine === -1) {
-        const errorMsg = `Section '${section}' not found in file.`;
+          'The `lines`, `section`, and `offset`/`limit` parameters are mutually exclusive.';
         return {
           llmContent: `Error: ${errorMsg}`,
           returnDisplay: `Error: ${errorMsg}`,
         };
       }
 
-      let braceCount = 0;
-      let endLine = -1;
-      let foundFirstBrace = false;
-      for (let i = startLine; i < fileLines.length; i++) {
-        for (const char of fileLines[i]) {
-          if (char === '{') {
-            braceCount++;
-            foundFirstBrace = true;
-          } else if (char === '}') {
-            braceCount--;
-          }
-        }
-        if (foundFirstBrace && braceCount === 0) {
-          endLine = i;
-          break;
-        }
-      }
+      let readOffset: number | undefined = offset;
+      let readLimit: number | undefined = limit;
 
-      if (endLine === -1) {
-        const oneLinerRegex = new RegExp(
-          `(const\\s+${section}\\s*=\\s*\\(.*\\)\\s*=>)`,
-        );
-        if (oneLinerRegex.test(fileLines[startLine])) {
-          endLine = startLine;
-        } else {
-          const errorMsg = `Could not find end of section '${section}'.`;
+      if (lines) {
+        const parts = lines.split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts.length > 1 ? parseInt(parts[1], 10) : start;
+        if (isNaN(start) || isNaN(end) || start <= 0 || end < start) {
+          const errorMsg =
+            "Invalid line range format. Use 'start' or 'start-end'. Lines are 1-based.";
           return {
             llmContent: `Error: ${errorMsg}`,
             returnDisplay: `Error: ${errorMsg}`,
           };
         }
+        readOffset = start - 1;
+        readLimit = end - start + 1;
       }
 
-      const sectionContent = fileLines.slice(startLine, endLine + 1).join('\n');
+      if (section) {
+        const fileContentResult = await processSingleFileContent(
+          filePath,
+          this.rootDirectory,
+        );
 
+        if (
+          fileContentResult.error ||
+          typeof fileContentResult.llmContent !== 'string'
+        ) {
+          return {
+            llmContent:
+              fileContentResult.error || 'Could not read file to find section.',
+            returnDisplay:
+              fileContentResult.returnDisplay || 'Could not read file.',
+          };
+        }
+
+        const fileContent = fileContentResult.llmContent;
+        const fileLines = fileContent.split('\n');
+
+        const sectionRegex = new RegExp(
+          `(function\\s+${section}|const\\s+${section}\\s*=\\s*function|let\\s+${section}\\s*=\\s*function|var\\s+${section}\\s*=\\s*function)`,
+        );
+        let startLine = -1;
+        for (let i = 0; i < fileLines.length; i++) {
+          if (sectionRegex.test(fileLines[i])) {
+            startLine = i;
+            break;
+          }
+        }
+
+        if (startLine === -1) {
+          const errorMsg = `Section '${section}' not found in file.`;
+          return {
+            llmContent: `Error: ${errorMsg}`,
+            returnDisplay: `Error: ${errorMsg}`,
+          };
+        }
+
+        let braceCount = 0;
+        let endLine = -1;
+        let foundFirstBrace = false;
+        for (let i = start; i < fileLines.length; i++) {
+          for (const char of fileLines[i]) {
+            if (char === '{') {
+              braceCount++;
+              foundFirstBrace = true;
+            } else if (char === '}') {
+              braceCount--;
+            }
+          }
+          if (foundFirstBrace && braceCount === 0) {
+            endLine = i;
+            break;
+          }
+        }
+
+        if (endLine === -1) {
+          const oneLinerRegex = new RegExp(
+            `(const\\s+${section}\\s*=\\s*\\(.*\\)\\s*=>)`,
+          );
+          if (oneLinerRegex.test(fileLines[startLine])) {
+            endLine = startLine;
+          } else {
+            const errorMsg = `Could not find end of section '${section}'.`;
+            return {
+              llmContent: `Error: ${errorMsg}`,
+              returnDisplay: `Error: ${errorMsg}`,
+            };
+          }
+        }
+
+        const sectionContent = fileLines
+          .slice(startLine, endLine + 1)
+          .join('\n');
+
+        recordFileOperationMetric(
+          this.config,
+          FileOperation.READ,
+          endLine - startLine + 1,
+          getSpecificMimeType(filePath),
+          path.extname(filePath),
+        );
+
+        combinedLlmContent += `Content of section '${section}' in ${filePath}:\n${sectionContent}\n`;
+        combinedReturnDisplay += `Content of section '${section}' in ${filePath}:\n${sectionContent}\n`;
+        continue;
+      }
+
+      const result = await processSingleFileContent(
+        filePath,
+        this.rootDirectory,
+        readOffset,
+        readLimit,
+      );
+
+      if (result.error) {
+        return {
+          llmContent: result.error, // The detailed error for LLM
+          returnDisplay: result.returnDisplay, // User-friendly error
+        };
+      }
+
+      let content =
+        typeof result.llmContent === 'string' ? result.llmContent : '';
+      if (line_numbers) {
+        content = content
+          .split('\n')
+          .map((line, index) => `${index + 1}: ${line}`)
+          .join('\n');
+      }
+
+      const resultLines =
+        typeof result.llmContent === 'string'
+          ? result.llmContent.split('\n').length
+          : undefined;
+      const mimetype = getSpecificMimeType(filePath);
       recordFileOperationMetric(
         this.config,
         FileOperation.READ,
-        endLine - startLine + 1,
-        getSpecificMimeType(params.absolute_path),
-        path.extname(params.absolute_path),
+        resultLines,
+        mimetype,
+        path.extname(filePath),
       );
 
-      return {
-        llmContent: sectionContent,
-        returnDisplay: `Content of section '${section}':\n${sectionContent}`,
-      };
+      combinedLlmContent += `Content of ${filePath}:\n${content}\n`;
+      combinedReturnDisplay += `Content of ${filePath}:\n${content}\n`;
     }
-
-    const result = await processSingleFileContent(
-      params.absolute_path,
-      this.rootDirectory,
-      readOffset,
-      readLimit,
-    );
-
-    if (result.error) {
-      return {
-        llmContent: result.error, // The detailed error for LLM
-        returnDisplay: result.returnDisplay, // User-friendly error
-      };
-    }
-
-    const resultLines =
-      typeof result.llmContent === 'string'
-        ? result.llmContent.split('\n').length
-        : undefined;
-    const mimetype = getSpecificMimeType(params.absolute_path);
-    recordFileOperationMetric(
-      this.config,
-      FileOperation.READ,
-      resultLines,
-      mimetype,
-      path.extname(params.absolute_path),
-    );
 
     return {
-      llmContent: result.llmContent,
-      returnDisplay: result.returnDisplay,
+      llmContent: combinedLlmContent,
+      returnDisplay: combinedReturnDisplay,
     };
   }
 }
