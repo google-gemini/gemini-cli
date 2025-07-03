@@ -11,7 +11,7 @@ import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
@@ -67,7 +67,7 @@ export async function getOauthClient(): Promise<OAuth2Client> {
     // Check if we need to retrieve Google Account ID
     if (!getCachedGoogleAccountId()) {
       try {
-        const googleAccountId = await getGoogleAccountId(client);
+        const googleAccountId = await getRawGoogleAccountId(client);
         if (googleAccountId) {
           await cacheGoogleAccountId(googleAccountId);
         }
@@ -135,7 +135,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           client.setCredentials(tokens);
           // Retrieve and cache Google Account ID during authentication
           try {
-            const googleAccountId = await getGoogleAccountId(client);
+            const googleAccountId = await getRawGoogleAccountId(client);
             if (googleAccountId) {
               await cacheGoogleAccountId(googleAccountId);
             }
@@ -237,13 +237,12 @@ async function cacheGoogleAccountId(googleAccountId: string): Promise<void> {
 export function getCachedGoogleAccountId(): string | null {
   try {
     const filePath = getGoogleAccountIdCachePath();
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-    const fs_sync = require('fs');
-    if (fs_sync.existsSync(filePath)) {
-      return fs_sync.readFileSync(filePath, 'utf-8').trim() || null;
+    if (existsSync(filePath)) {
+      return readFileSync(filePath, 'utf-8').trim() || null;
     }
     return null;
-  } catch (_error) {
+  } catch (error) {
+    console.debug('Error reading cached Google Account ID:', error);
     return null;
   }
 }
@@ -263,37 +262,42 @@ export async function clearCachedCredentialFile() {
  * @param client - The authenticated OAuth2Client
  * @returns The user's Google Account ID or null if not available
  */
-export async function getGoogleAccountId(
+export async function getRawGoogleAccountId(
   client: OAuth2Client,
 ): Promise<string | null> {
   try {
-    const { token } = await client.getAccessToken();
-    if (!token) {
-      return null;
-    }
-
-    const response = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    // 1. Get a new Access Token including the id_token
+    const refreshedTokens = await new Promise<Credentials | null>(
+      (resolve, reject) => {
+        client.refreshAccessToken((err, tokens) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(tokens ?? null);
+        });
       },
     );
 
-    if (!response.ok) {
-      console.error(
-        'Failed to fetch user info:',
-        response.status,
-        response.statusText,
-      );
+    if (!refreshedTokens?.id_token) {
+      console.warn('No id_token obtained after refreshing tokens.');
       return null;
     }
 
-    const userInfo = await response.json();
-    return userInfo.id || null;
+    // 2. Verify the ID token to securely get the user's Google Account ID.
+    const ticket = await client.verifyIdToken({
+      idToken: refreshedTokens.id_token,
+      audience: OAUTH_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub) {
+      console.warn('Could not extract sub claim from verified ID token.');
+      return null;
+    }
+
+    return payload.sub;
   } catch (error) {
-    console.error('Error retrieving Google Account ID:', error);
+    console.error('Error retrieving or verifying Google Account ID:', error);
     return null;
   }
 }
