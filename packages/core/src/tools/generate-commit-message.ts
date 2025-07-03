@@ -283,12 +283,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
         title: 'Confirm Git Commit',
-        command: `git commit 
-
-Commit message:
-${finalCommitMessage}
-
-Strategy: ${commitModeText}${filesDisplay}`,
+        command: `git commit -m "${finalCommitMessage.replace(/"/g, '\\"')}"`,
         rootCommand: 'git commit',
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -345,22 +340,50 @@ Strategy: ${commitModeText}${filesDisplay}`,
     }
   }
   
-  /** Get cached commit message or generate new one */
+  /** Get cached commit message or abort if git state changed */
   private async getOrGenerateCommitMessage(
     gitState: { statusOutput: string; diffOutput: string; logOutput: string },
     signal: AbortSignal
   ): Promise<string> {
-    // Check if cached data is still valid
-    if (
-      this.cachedCommitData &&
-      Date.now() - this.cachedCommitData.timestamp < COMMIT_CACHE_TIMEOUT_MS &&
-      this.cachedCommitData.diffOutput === gitState.diffOutput &&
-      this.cachedCommitData.statusOutput === gitState.statusOutput &&
-      this.cachedCommitData.logOutput === gitState.logOutput
-    ) {
-      return this.cachedCommitData.commitMessage;
+    if (this.cachedCommitData) {
+      // If cache is present, validate it.
+      const isCacheStale =
+        Date.now() - this.cachedCommitData.timestamp >= COMMIT_CACHE_TIMEOUT_MS;
+      const hasStateChanged =
+        this.cachedCommitData.diffOutput !== gitState.diffOutput ||
+        this.cachedCommitData.statusOutput !== gitState.statusOutput ||
+        this.cachedCommitData.logOutput !== gitState.logOutput;
+
+      if (isCacheStale) {
+        this.cachedCommitData = null; // Invalidate stale cache and proceed to generate new message
+      } else if (hasStateChanged) {
+        // SECURITY: Git state changed since confirmation. Abort with detailed error.
+        const cachedData = this.cachedCommitData;
+        this.cachedCommitData = null; // Clear cache
+        
+        const changes = [];
+        if (gitState.diffOutput !== cachedData.diffOutput) {
+          changes.push('staged changes');
+        }
+        if (gitState.statusOutput !== cachedData.statusOutput) {
+          changes.push('file status');
+        }
+        if (gitState.logOutput !== cachedData.logOutput) {
+          changes.push('commit history');
+        }
+        
+        throw new Error(
+          `Security: Git state changed since confirmation (${changes.join(', ')} modified). ` +
+          `Operation aborted to prevent committing unintended changes. ` +
+          `Please run the command again to review and confirm the current state.`
+        );
+      } else {
+        // Cache is valid and state is unchanged.
+        return this.cachedCommitData.commitMessage;
+      }
     }
 
+    // Only generate new commit message if no valid cached data exists.
     const commitMessage = await this.generateCommitMessage(
       gitState.statusOutput,
       gitState.diffOutput,
@@ -388,6 +411,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
     if (error instanceof Error) {
       // Only clear cache for state-related errors, not transient ones
       if (error.message.includes('Git state changed') || 
+          error.message.includes('Operation aborted for security') ||
           error.message.includes('not a git repository') ||
           error.message.includes('nothing to commit')) {
         this.cachedCommitData = null;
@@ -403,19 +427,8 @@ Strategy: ${commitModeText}${filesDisplay}`,
     commitMessage: string,
     signal: AbortSignal
   ): Promise<ToolResult> {
-    // Final validation: ensure git state hasn't changed
-    const currentState = await this.analyzeGitState(signal);
-    if (
-      this.cachedCommitData &&
-      (currentState.diffOutput !== this.cachedCommitData.diffOutput ||
-        currentState.statusOutput !== this.cachedCommitData.statusOutput ||
-        currentState.logOutput !== this.cachedCommitData.logOutput)
-    ) {
-      this.cachedCommitData = null;
-      throw new Error(
-        'Git state changed since message generation. Please try again.',
-      );
-    }
+    // The git state has already been validated by `getOrGenerateCommitMessage`
+    // before this function is called, so we can proceed directly to commit.
 
     const maxRetries = 1;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
