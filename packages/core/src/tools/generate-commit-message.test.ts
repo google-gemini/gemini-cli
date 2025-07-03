@@ -219,7 +219,8 @@ describe('GenerateCommitMessageTool', () => {
       }) };
       
       child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        if (event === 'data' && args.includes('commit') && commitCallCount === 0) {
+        // Fail on any commit attempt for this test
+        if (event === 'data' && args.includes('commit')) {
           listener(Buffer.from('error in .git/hooks/pre-commit'));
         }
       }) };
@@ -229,7 +230,7 @@ describe('GenerateCommitMessageTool', () => {
           commitCallCount++;
           child.emit('close', 1); // Fail commit
         } else {
-          child.emit('close', 0);
+          child.emit('close', 0); // Succeed other commands like 'add'
         }
       });
       
@@ -244,9 +245,9 @@ describe('GenerateCommitMessageTool', () => {
 
     expect(result.llmContent).toContain('Commit failed due to a pre-commit hook');
     expect(result.llmContent).toContain('error in .git/hooks/pre-commit');
-    expect(commitCallCount).toBe(1);
+    expect(commitCallCount).toBe(2); // It should try once, then retry once more.
     const addCalls = mockSpawn.mock.calls.filter(call => call[1]?.includes('add'));
-    expect(addCalls).toHaveLength(0);
+    expect(addCalls).toHaveLength(1); // It should try to re-stage changes.
   });
 
   it('should return an error when spawn process fails to start', async () => {

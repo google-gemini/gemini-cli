@@ -224,37 +224,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
         };
       }
 
-      // Create commit with generated message
-      try {
-        await this.executeGitCommand(['commit', '-F', '-'], signal, finalCommitMessage);
-        
-        this.cachedCommitData = null;
-        
-        return {
-          llmContent: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
-          returnDisplay: `Commit created successfully!\n\nCommit message:\n${finalCommitMessage}`,
-        };
-      } catch (commitError) {
-        if (!(commitError instanceof Error)) {
-          throw commitError;
-        }
-
-        const isPreCommitHookError = /\.git\/hooks\//.test(commitError.message);
-        const isIndexLockError = commitError.message.includes('index.lock');
-
-        if (!isPreCommitHookError && !isIndexLockError) {
-          throw commitError;
-        }
-        
-        // It is a hook or lock error. Abort and inform the user.
-        const hookOrLockError = new Error(
-          `Commit failed due to a pre-commit hook or a locked index. ` +
-            `Please resolve the issues, stage any changes, and try again. ` +
-            `Original error: ${commitError.message}`
-        );
-        throw hookOrLockError;
-      }
-
+      return await this.commitWithRetry(finalCommitMessage, signal);
     } catch (error) {
       console.error('Error during execution:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -263,6 +233,66 @@ Strategy: ${commitModeText}${filesDisplay}`,
         returnDisplay: `Error during commit workflow: ${errorMessage}`,
       };
     }
+  }
+
+  /**
+   * Attempts to create a git commit with a generated message, including a retry
+   * mechanism to handle pre-commit hooks and index lock files.
+   */
+  private async commitWithRetry(
+    commitMessage: string,
+    signal: AbortSignal
+  ): Promise<ToolResult> {
+    const maxRetries = 1;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await this.executeGitCommand(
+          ['commit', '-F', '-'],
+          signal,
+          commitMessage
+        );
+
+        this.cachedCommitData = null; // Clear cache on success
+
+        return {
+          llmContent: `Commit created successfully!\n\nCommit message:\n${commitMessage}`,
+          returnDisplay: `Commit created successfully!\n\nCommit message:\n${commitMessage}`,
+        };
+      } catch (commitError) {
+        if (!(commitError instanceof Error)) {
+          throw commitError; // Rethrow unknown errors
+        }
+
+        const isPreCommitHookError = /\.git\/hooks\//.test(
+          commitError.message
+        );
+        const isIndexLockError = commitError.message.includes('index.lock');
+
+        // If it's not a recoverable error OR it's the last attempt, throw.
+        if (
+          (!isPreCommitHookError && !isIndexLockError) ||
+          attempt === maxRetries
+        ) {
+          const hookOrLockError = new Error(
+            `Commit failed due to a pre-commit hook or a locked index. ` +
+              `Please resolve the issues, stage any changes, and try again. ` +
+              `Original error: ${commitError.message}`
+          );
+          throw hookOrLockError;
+        }
+
+        // It's a recoverable error, let's try to fix it.
+        if (isIndexLockError) {
+          // Wait a bit for the lock to be released.
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Re-stage any changes made by hooks.
+        await this.executeGitCommand(['add', '-u'], signal);
+      }
+    }
+    // This line should be unreachable if the loop logic is correct.
+    throw new Error('Commit failed after all retry attempts.');
   }
 
   /** Execute git command with proper error handling and stdin support */
