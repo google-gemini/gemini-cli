@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
-import { Config } from '../config/config.js';
+import { BaseTool, Tool, ToolResult } from './tools.js';
 import { EditTool } from './edit.js';
 import { ReadFileTool } from './read-file.js';
 import { WriteFileTool } from './write-file.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { GlobTool } from './glob.js';
 import { GrepTool } from './grep.js';
-import { LsTool } from './ls.js';
+import { LSTool } from './ls.js';
 import { MemoryTool } from './memoryTool.js';
 import { ShellTool } from './shell.js';
 import { WebFetchTool } from './web-fetch.js';
@@ -24,14 +23,18 @@ export interface CustomToolsetToolParams {
   tools: string[];
 }
 
-export class CustomToolsetTool extends BaseTool<CustomToolsetToolParams, ToolResult> {
+export class CustomToolsetTool extends BaseTool<
+  CustomToolsetToolParams,
+  ToolResult
+> {
   static readonly Name = 'custom_toolset';
+  private tools: Tool[];
 
-  constructor(private readonly config: Config) {
+  constructor(tools: Tool[]) {
     super(
       CustomToolsetTool.Name,
       'CustomToolset',
-      'Defines a custom toolset for specific workflows.',
+      'Creates a custom toolset that can be used by a sub-agent.',
       {
         properties: {
           name: {
@@ -41,41 +44,54 @@ export class CustomToolsetTool extends BaseTool<CustomToolsetToolParams, ToolRes
           tools: {
             type: 'array',
             items: { type: 'string' },
-            description: 'A list of tools to be included in the custom toolset.',
+            description: 'A list of tools to be included in the toolset.',
           },
         },
         required: ['name', 'tools'],
         type: 'object',
       },
     );
+    this.tools = tools;
   }
 
-  async execute(params: CustomToolsetToolParams): Promise<ToolResult> {
+  getTools(): Tool[] {
+    return this.tools;
+  }
+
+  execute(params: CustomToolsetToolParams): Promise<ToolResult> {
     const { name, tools } = params;
-    const toolset = this.getToolset(tools);
-    this.config.addToolset(name, toolset);
-    return {
-      llmContent: `Custom toolset '${name}' created with ${tools.length} tools.`,
-      returnDisplay: `Custom toolset '${name}' created with ${tools.length} tools.`,
-    };
+    const toolset = this.createToolset(tools);
+    this.config.addCustomToolset(name, toolset);
+    return Promise.resolve({
+      llmContent: `Custom toolset "${name}" created with tools: ${tools.join(
+        ', ',
+      )}`,
+      returnDisplay: `Custom toolset "${name}" created.`,
+    });
   }
 
-  private getToolset(toolset: string[]): BaseTool<unknown, ToolResult>[] {
+  private createToolset(toolNames: string[]): Tool[] {
     const allTools = {
       [EditTool.Name]: new EditTool(this.config),
-      [ReadFileTool.Name]: new ReadFileTool(this.config.getTargetDir(), this.config),
+      [ReadFileTool.Name]: new ReadFileTool(
+        this.config.getTargetDir(),
+        this.config,
+      ),
       [WriteFileTool.Name]: new WriteFileTool(this.config),
-      [ReadManyFilesTool.Name]: new ReadManyFilesTool(this.config.getTargetDir(), this.config),
+      [ReadManyFilesTool.Name]: new ReadManyFilesTool(
+        this.config.getTargetDir(),
+        this.config,
+      ),
       [GlobTool.Name]: new GlobTool(this.config.getTargetDir()),
       [GrepTool.Name]: new GrepTool(this.config.getTargetDir()),
-      [LsTool.Name]: new LsTool(this.config.getTargetDir()),
+      [LSTool.Name]: new LSTool(this.config.getTargetDir()),
       [MemoryTool.Name]: new MemoryTool(this.config.getMemory()),
       [ShellTool.Name]: new ShellTool(this.config),
       [WebFetchTool.Name]: new WebFetchTool(),
       [WebSearchTool.Name]: new WebSearchTool(),
       [SubAgentTool.Name]: new SubAgentTool(this.config),
     };
-    return toolset.map((toolName) => {
+    return toolNames.map((toolName) => {
       const tool = allTools[toolName];
       if (!tool) {
         throw new Error(`Tool ${toolName} not found.`);

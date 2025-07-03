@@ -13,7 +13,7 @@ import os from 'os';
 import fs from 'fs'; // For actual fs operations in setup
 import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { FilePermissionService, FilePermissionRule } from '../services/filePermissionService.js';
+import { FilePermissionService } from '../services/filePermissionService.js';
 
 // Mock fileUtils.processSingleFileContent
 vi.mock('../utils/fileUtils', async () => {
@@ -30,8 +30,8 @@ const mockProcessSingleFileContent = fileUtils.processSingleFileContent as Mock;
 describe('ReadFileTool', () => {
   let tempRootDir: string;
   let tool: ReadFileTool;
-   let mockCoreConfig: MockProxy<Config>;
-   let mockFilePermissionService: MockProxy<FilePermissionService>;
+  let mockCoreConfig: MockProxy<Config>;
+  let mockFilePermissionService: MockProxy<FilePermissionService>;
   const abortSignal = new AbortController().signal;
 
   beforeEach(() => {
@@ -49,10 +49,11 @@ describe('ReadFileTool', () => {
 
     const fileService = new FileDiscoveryService(tempRootDir);
     mockCoreConfig.getFileService.mockReturnValue(fileService);
-    mockCoreConfig.getFilePermissionService.mockReturnValue(mockFilePermissionService);
+    mockCoreConfig.getFilePermissionService.mockReturnValue(
+      mockFilePermissionService,
+    );
     // Mock getTargetDir as it's used by the tool directly or indirectly
     mockCoreConfig.getTargetDir.mockReturnValue(tempRootDir);
-
 
     tool = new ReadFileTool(tempRootDir, mockCoreConfig);
     mockProcessSingleFileContent.mockReset();
@@ -264,14 +265,18 @@ describe('ReadFileTool', () => {
       // Simulate file exists for validation purposes
       fs.writeFileSync(filePath, 'secret content');
 
-      mockFilePermissionService.canPerformOperation.mockImplementation((fp, op) => {
-        return !(fp === filePath && op === 'read');
-      });
+      mockFilePermissionService.canPerformOperation.mockImplementation(
+        (fp, op) => !(fp === filePath && op === 'read'),
+      );
 
       const result = await tool.execute(params, abortSignal);
 
-      expect(result.llmContent).toMatch(/Error: Read operation on file 'protected.txt' denied by file permission configuration./);
-      expect(result.returnDisplay).toMatch(/Error: Read operation on file 'protected.txt' denied by file permission configuration./);
+      expect(result.llmContent).toMatch(
+        /Error: Read operation on file 'protected.txt' denied by file permission configuration./,
+      );
+      expect(result.returnDisplay).toMatch(
+        /Error: Read operation on file 'protected.txt' denied by file permission configuration./,
+      );
       expect(mockProcessSingleFileContent).not.toHaveBeenCalled();
     });
 
@@ -296,7 +301,9 @@ describe('ReadFileTool', () => {
       // An ignored file will be blocked by validateToolParams first.
 
       const validationResult = tool.validateToolParams(params);
-      expect(validationResult).toMatch(/'foo.bar' is ignored by .geminiignore pattern\(s\)/);
+      expect(validationResult).toMatch(
+        /'foo.bar' is ignored by .geminiignore pattern\(s\)/,
+      );
 
       // If we wanted to test the permission service interaction *despite* .geminiignore,
       // we might need to mock `validateToolParams` or adjust its logic.
@@ -306,15 +313,21 @@ describe('ReadFileTool', () => {
       // We need a file that is NOT ignored by .geminiignore but IS denied by FilePermissionService.
       const anotherFilePath = path.join(tempRootDir, 'another.txt');
       fs.writeFileSync(anotherFilePath, 'some other content');
-      const paramsForAnotherFile: ReadFileToolParams = { absolute_path: anotherFilePath };
+      const paramsForAnotherFile: ReadFileToolParams = {
+        absolute_path: anotherFilePath,
+      };
 
-      mockFilePermissionService.canPerformOperation.mockImplementation((fp, op) => {
-        return !(fp === anotherFilePath && op === 'read'); // Deny read for another.txt
-      });
+      mockFilePermissionService.canPerformOperation.mockImplementation(
+        (fp, op) => !(fp === anotherFilePath && op === 'read'), // Deny read for another.txt
+      );
 
       const result = await tool.execute(paramsForAnotherFile, abortSignal);
-      expect(result.llmContent).toMatch(/Error: Read operation on file 'another.txt' denied by file permission configuration./);
-      expect(result.returnDisplay).toMatch(/Error: Read operation on file 'another.txt' denied by file permission configuration./);
+      expect(result.llmContent).toMatch(
+        /Error: Read operation on file 'another.txt' denied by file permission configuration./,
+      );
+      expect(result.returnDisplay).toMatch(
+        /Error: Read operation on file 'another.txt' denied by file permission configuration./,
+      );
       expect(mockProcessSingleFileContent).not.toHaveBeenCalled();
     });
   });

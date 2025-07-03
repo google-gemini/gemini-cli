@@ -48,7 +48,8 @@ export interface DiffCommand {
  */
 function commandExists(cmd: string): boolean {
   try {
-    const platformCommand = process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`;
+    const platformCommand =
+      process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`;
     execSync(platformCommand, { stdio: 'ignore' });
     if (process.env.DEBUG) {
       console.log(`DEBUG: Command '${cmd}' exists.`);
@@ -56,7 +57,9 @@ function commandExists(cmd: string): boolean {
     return true;
   } catch (error) {
     if (process.env.DEBUG) {
-      console.error(`DEBUG: Command '${cmd}' does not exist. Error: ${error.message}`);
+      console.error(
+        `DEBUG: Command '${cmd}' does not exist. Error: ${error.message}`,
+      );
     }
     return false;
   }
@@ -88,7 +91,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'code.cmd', default: 'code' },
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -97,7 +103,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'code-insiders.cmd', default: 'code-insiders' },
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -106,7 +115,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'codium.cmd', default: 'codium' },
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -115,7 +127,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'windsurf', default: 'windsurf' },
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -124,7 +139,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'cursor', default: 'cursor' },
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -189,7 +207,10 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
     {
       commands: { win32: 'zed', default: 'zed' }, // Assume 'zed' is in PATH for Windows if used
       sandboxCompatible: false,
-      getDiffArgs: (oldPath, newPath, wait) => (wait ? ['--wait', '--diff', oldPath, newPath] : ['--diff', oldPath, newPath]),
+      getDiffArgs: (oldPath, newPath, wait) =>
+        wait
+          ? ['--wait', '--diff', oldPath, newPath]
+          : ['--diff', oldPath, newPath],
       isGUI: true,
     },
   ],
@@ -244,12 +265,19 @@ export function isEditorAvailable(editor: string | undefined): boolean {
     const defaultEditor = process.env.EDITOR as EditorType;
     if (defaultEditor && isValidEditorType(defaultEditor)) {
       if (process.env.DEBUG) {
-        console.log(`DEBUG: No editor specified, falling back to EDITOR env var: ${defaultEditor}`);
+        console.log(
+          `DEBUG: No editor specified, falling back to EDITOR env var: ${defaultEditor}`,
+        );
       }
-      return checkHasEditorType(defaultEditor) && allowEditorTypeInSandbox(defaultEditor);
+      return (
+        checkHasEditorType(defaultEditor) &&
+        allowEditorTypeInSandbox(defaultEditor)
+      );
     }
     if (process.env.DEBUG) {
-      console.log('DEBUG: No editor specified and EDITOR env var is not valid/available.');
+      console.log(
+        'DEBUG: No editor specified and EDITOR env var is not valid/available.',
+      );
     }
     return false;
   }
@@ -286,7 +314,11 @@ export function getDiffCommand(
   }
 
   const command = resolveEditorCommand(config.commands);
-  const args = config.getDiffArgs(resolve(oldPath), resolve(newPath), waitForClose); // Resolve paths
+  const args = config.getDiffArgs(
+    resolve(oldPath),
+    resolve(newPath),
+    waitForClose,
+  ); // Resolve paths
 
   return { command, args, isGUI: config.isGUI };
 }
@@ -307,14 +339,23 @@ export async function openDiff(
   editor: EditorType,
   waitForClose: boolean = true,
 ): Promise<void> {
-  const diffCommand = getDiffCommand(oldFilePath, newFilePath, editor, waitForClose);
+  const diffCommand = getDiffCommand(
+    oldFilePath,
+    newFilePath,
+    editor,
+    waitForClose,
+  );
 
   if (!diffCommand) {
-    throw new Error(`Failed to get diff command for editor: ${editor}. Please ensure it's installed and configured.`);
+    throw new Error(
+      `Failed to get diff command for editor: ${editor}. Please ensure it's installed and configured.`,
+    );
   }
 
   if (process.env.DEBUG) {
-    console.log(`DEBUG: Opening diff with command: ${diffCommand.command} ${diffCommand.args.join(' ')}`);
+    console.log(
+      `DEBUG: Opening diff with command: ${diffCommand.command} ${diffCommand.args.join(' ')}`,
+    );
   }
 
   try {
@@ -326,26 +367,40 @@ export async function openDiff(
 
     if (diffCommand.isGUI && waitForClose) {
       return new Promise((resolve, reject) => {
-        const childProcess = spawn(diffCommand.command, diffCommand.args, spawnOptions);
+        const childProcess = spawn(
+          diffCommand.command,
+          diffCommand.args,
+          spawnOptions,
+        );
 
         childProcess.on('close', (code) => {
           if (code === 0) {
             resolve();
           } else {
-            reject(new Error(`Editor '${editor}' exited with code ${code}. Check the file paths and editor installation.`));
+            reject(
+              new Error(
+                `Editor '${editor}' exited with code ${code}. Check the file paths and editor installation.`,
+              ),
+            );
           }
         });
 
         childProcess.on('error', (error: Error) => {
-          reject(new Error(`Failed to open editor '${editor}': ${error.message}. Ensure the editor is installed and in your PATH.`));
+          reject(
+            new Error(
+              `Failed to open editor '${editor}': ${error.message}. Ensure the editor is installed and in your PATH.`,
+            ),
+          );
         });
       });
     } else {
       // For terminal editors or GUI editors when not waiting
-      const commandString = `${diffCommand.command} ${diffCommand.args.map(arg => {
-        // Quote arguments that contain spaces for shell execution, especially important on Linux/macOS
-        return process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '\\"')}"`;
-      }).join(' ')}`;
+      const commandString = `${diffCommand.command} ${diffCommand.args
+        .map((arg) =>
+          // Quote arguments that contain spaces for shell execution, especially important on Linux/macOS
+          process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '\"')}"`,
+        )
+        .join(' ')}`;
 
       execSync(commandString, spawnOptions);
       return Promise.resolve(); // For non-waiting or terminal-blocking commands, resolve immediately after execSync
@@ -355,7 +410,9 @@ export async function openDiff(
       console.error(`Error opening diff with ${editor}: ${error.message}`);
       throw error; // Re-throw to allow caller to handle
     } else {
-      console.error(`An unknown error occurred while opening diff with ${editor}.`);
+      console.error(
+        `An unknown error occurred while opening diff with ${editor}.`,
+      );
       throw new Error(`Unknown error opening diff with ${editor}.`);
     }
   }

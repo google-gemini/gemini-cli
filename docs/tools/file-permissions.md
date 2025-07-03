@@ -8,14 +8,14 @@ Pattern-based file permissions are configured within your `settings.json` file (
 
 Each rule object has the following properties:
 
-*   `patterns` (array of strings): An array of glob patterns that specify the files or directories this rule applies to. Patterns are matched relative to your project's target directory.
-*   `operations` (array of strings): An array defining the operations this rule governs. Valid operations are:
-    *   `"read"`: Allows or denies reading the content of matching files.
-    *   `"write"`: Allows or denies writing to or modifying matching files (this includes creating, overwriting, and editing files).
-*   `effect` (string): Determines the outcome of the rule. Valid effects are:
-    *   `"allow"`: Permits the specified operations on matching files.
-    *   `"deny"`: Prohibits the specified operations on matching files.
-*   `description` (string, optional): A brief description of what the rule does, for your own reference.
+- `patterns` (array of strings): An array of glob patterns that specify the files or directories this rule applies to. Patterns are matched relative to your project's target directory.
+- `operations` (array of strings): An array defining the operations this rule governs. Valid operations are:
+  - `"read"`: Allows or denies reading the content of matching files.
+  - `"write"`: Allows or denies writing to or modifying matching files (this includes creating, overwriting, and editing files).
+- `effect` (string): Determines the outcome of the rule. Valid effects are:
+  - `"allow"`: Permits the specified operations on matching files.
+  - `"deny"`: Prohibits the specified operations on matching files.
+- `description` (string, optional): A brief description of what the rule does, for your own reference.
 
 **Example `settings.json`:**
 
@@ -62,24 +62,24 @@ Each rule object has the following properties:
 
 Glob patterns are a powerful way to specify sets of filenames using wildcard characters. Some common examples:
 
-*   `*.txt`: Matches all files ending with `.txt` in the immediate directory relative to where the pattern is being applied (within `targetDir` context).
-*   `src/**/*.js`: Matches all JavaScript files in the `src` directory and any of its subdirectories.
-*   `docs/chapter?.md`: Matches `chapter1.md`, `chapterA.md`, etc., in the `docs` directory.
-*   `!(*.log)`: (If supported by the glob library, often requires specific flags) Can be used for negating patterns, though direct `allow`/`deny` is usually clearer.
+- `*.txt`: Matches all files ending with `.txt` in the immediate directory relative to where the pattern is being applied (within `targetDir` context).
+- `src/**/*.js`: Matches all JavaScript files in the `src` directory and any of its subdirectories.
+- `docs/chapter?.md`: Matches `chapter1.md`, `chapterA.md`, etc., in the `docs` directory.
+- `!(*.log)`: (If supported by the glob library, often requires specific flags) Can be used for negating patterns, though direct `allow`/`deny` is usually clearer.
 
 The Gemini CLI uses a standard glob matching library (minimatch).
 
 ## Rule Evaluation
 
-*   **Order Matters:** Rules in the `filePermissions` array are evaluated in the order they are defined. The **first rule** that matches the file path and the operation determines the outcome.
-*   **Default-Deny Policy:** If a file operation is attempted and **no rule** in the `filePermissions` array explicitly allows it by matching the file and operation, the operation will be **denied** by default. This is a security-first approach. For an operation to be permitted, there must be an `allow` rule that matches it, and no preceding `deny` rule that also matches.
+- **Order Matters:** Rules in the `filePermissions` array are evaluated in the order they are defined. The **first rule** that matches the file path and the operation determines the outcome.
+- **Default-Deny Policy:** If a file operation is attempted and **no rule** in the `filePermissions` array explicitly allows it by matching the file and operation, the operation will be **denied** by default. This is a security-first approach. For an operation to be permitted, there must be an `allow` rule that matches it, and no preceding `deny` rule that also matches.
 
 ## Interaction with Other Mechanisms
 
-*   **Tool Enablement (`coreTools` / `excludeTools`):** Pattern-based permissions provide control *within* enabled tools. If a tool like `WriteFileTool` is globally disabled via `excludeTools`, these file permissions will not re-enable it for specific files.
-*   **Target Directory (`targetDir`):** All operations are still confined to the project's `targetDir`. Pattern-based permissions do not grant access outside this directory.
-*   **Ignore Files (`.geminiignore`, `.gitignore`):** Files listed in `.geminiignore` (and `.gitignore` if `respectGitIgnore` is enabled) are typically hidden from discovery tools (like `ls` or when the agent searches for context).
-    *   If a tool attempts to operate on a file path *explicitly provided* to it (e.g., `read_file /path/to/ignored.txt`), pattern-based permissions will still be checked. A `deny` rule in `filePermissions` will always be respected. An `allow` rule *could* permit an operation on such an explicitly targeted file, but this depends on the specific tool's behavior with ignored files.
+- **Tool Enablement (`coreTools` / `excludeTools`):** Pattern-based permissions provide control _within_ enabled tools. If a tool like `WriteFileTool` is globally disabled via `excludeTools`, these file permissions will not re-enable it for specific files.
+- **Target Directory (`targetDir`):** All operations are still confined to the project's `targetDir`. Pattern-based permissions do not grant access outside this directory.
+- **Ignore Files (`.geminiignore`, `.gitignore`):** Files listed in `.geminiignore` (and `.gitignore` if `respectGitIgnore` is enabled) are typically hidden from discovery tools (like `ls` or when the agent searches for context).
+  - If a tool attempts to operate on a file path _explicitly provided_ to it (e.g., `read_file /path/to/ignored.txt`), pattern-based permissions will still be checked. A `deny` rule in `filePermissions` will always be respected. An `allow` rule _could_ permit an operation on such an explicitly targeted file, but this depends on the specific tool's behavior with ignored files.
 
 ## Examples
 
@@ -100,8 +100,9 @@ You want to ensure the agent can never read from or write to any file within a `
   ]
 }
 ```
+
 *Because this deny rule is broad, place more specific `allow` rules for other paths *after* it if they are less critical, or *before* it if they are exceptions within `secrets/` that should be allowed (though generally, denying all to `secrets/` is safer).*
-*Correction: Given "first rule wins", to deny all to `secrets/`, this rule should ideally be placed early in the list if there are other broader allow rules.*
+_Correction: Given "first rule wins", to deny all to `secrets/`, this rule should ideally be placed early in the list if there are other broader allow rules._
 
 **Scenario 2: Allow writing only to a `dist/` output directory**
 
@@ -134,6 +135,7 @@ You want the agent to be able to read from `src/` but only write files into the 
   ]
 }
 ```
-*In this setup, the specific `allow write` for `dist/**/*` would be matched first for files in `dist/`. Then, the `deny write` for `**/*` would prevent writes elsewhere. Reads from `src/` are allowed. Default deny handles reads elsewhere if no other rule permits them.*
+
+_In this setup, the specific `allow write` for `dist/\*\*/_`would be matched first for files in`dist/`. Then, the `deny write`for`\*_/_`would prevent writes elsewhere. Reads from`src/` are allowed. Default deny handles reads elsewhere if no other rule permits them.\*
 
 By carefully crafting your `filePermissions` rules, you can create a secure and controlled environment for the Gemini CLI agent to operate within your projects. Remember the "first match wins" and "default deny" principles when ordering your rules.

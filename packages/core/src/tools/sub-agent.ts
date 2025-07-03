@@ -12,7 +12,7 @@ import { WriteFileTool } from './write-file.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { GlobTool } from './glob.js';
 import { GrepTool } from './grep.js';
-import { LsTool } from './ls.js';
+import { LSTool } from './ls.js';
 import { MemoryTool } from './memoryTool.js';
 import { ShellTool } from './shell.js';
 import { WebFetchTool } from './web-fetch.js';
@@ -40,7 +40,8 @@ export class SubAgentTool extends BaseTool<SubAgentToolParams, ToolResult> {
           toolset: {
             type: 'array',
             items: { type: 'string' },
-            description: 'A list of tools to be made available to the sub-agent.',
+            description:
+              'A list of tools to be made available to the sub-agent.',
           },
         },
         required: ['task'],
@@ -64,15 +65,21 @@ export class SubAgentTool extends BaseTool<SubAgentToolParams, ToolResult> {
     };
   }
 
-  private getToolset(toolset: string[]): BaseTool<unknown, ToolResult>[] {
+  private getToolset(toolset: string[]): Array<BaseTool<unknown, ToolResult>> {
     const allTools = {
       [EditTool.Name]: new EditTool(this.config),
-      [ReadFileTool.Name]: new ReadFileTool(this.config.getTargetDir(), this.config),
+      [ReadFileTool.Name]: new ReadFileTool(
+        this.config.getTargetDir(),
+        this.config,
+      ),
       [WriteFileTool.Name]: new WriteFileTool(this.config),
-      [ReadManyFilesTool.Name]: new ReadManyFilesTool(this.config.getTargetDir(), this.config),
+      [ReadManyFilesTool.Name]: new ReadManyFilesTool(
+        this.config.getTargetDir(),
+        this.config,
+      ),
       [GlobTool.Name]: new GlobTool(this.config.getTargetDir()),
       [GrepTool.Name]: new GrepTool(this.config.getTargetDir()),
-      [LsTool.Name]: new LsTool(this.config.getTargetDir()),
+      [LSTool.Name]: new LSTool(this.config.getTargetDir()),
       [MemoryTool.Name]: new MemoryTool(this.config.getMemory()),
       [ShellTool.Name]: new ShellTool(this.config),
       [WebFetchTool.Name]: new WebFetchTool(),

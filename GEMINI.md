@@ -31,22 +31,23 @@ This section summarizes the latest features, enhancements, and fixes to the Gemi
 - **Multimodal Capabilities**: Supports generating apps from PDFs or sketches and integrating with media generation models like Imagen, Veo, or Lyria.
 
 ### Functionality Enhancements
+
 Expansions to the capabilities of read, write, edit, and other tools, addressing complex developer needs and community requests.
 
-| ID  | Title                        | Description                                                                                | Implementation                                                                                             |
-| --- | ---------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| 11  | Sub-agent functionality      | Allow creating sub-agents for specific tasks with their own context and tool access.       | Extend the agent framework to support nested agents with isolated contexts. Add CLI commands to spawn and manage sub-agents. |
-| 12  | Custom toolsets              | Enable users to define custom toolsets for specific workflows (e.g., 'code review' toolset). | Add a configuration file to define toolsets as JSON objects. Allow CLI flags to select toolsets.         |
-| 13  | Multi-file operations        | Support handling multiple files or directories in a single command.                        | Modify read/write tools to accept glob patterns or directory paths. Process files in a loop.               |
-| 14  | Partial file reading         | Enable reading specific lines or sections of a file without loading the entire file.       | Add options like `--lines 10-20` or `--section 'function main'` to the read tool.                          |
-| 15  | File format parsing          | Automatically parse common file formats (e.g., JSON, YAML) for structured output.          | Integrate libraries like `json` and `yaml` to parse and format output during read operations.              |
-| 16  | Templating for write operations | Support templating languages for generating content with variables.                        | Add support for a templating engine (e.g., Jinja2) in the write tool with variable substitution.           |
-| 17  | Version control integration  | Automatically commit changes made by the write tool to Git.                                | Integrate with `libgit2` to perform commits after write operations with configurable commit messages.      |
-| 18  | Diff-based editing           | Allow applying diffs or patches for precise file modifications.                            | Add a diff parser to the edit tool to apply patch files or inline diffs.                                   |
-| 19  | Merge conflict resolution    | Assist in resolving merge conflicts by suggesting resolutions.                             | Use AI to analyze merge conflicts and propose resolutions via the edit tool.                               |
-| 20  | Code refactoring suggestions | Provide suggestions for refactoring, like renaming variables or extracting methods.        | Integrate an AST parser to analyze code and suggest refactorings during edit operations.                   |
-| 21  | Interactive editing mode     | Offer step-by-step AI-suggested changes for user approval.                                 | Add an interactive CLI mode with prompts for accepting/rejecting changes.                                  |
-| 22  | Undo/redo functionality      | Keep a history of changes for undo/redo functionality.                                     | Store changes in a session history and provide commands to undo/redo them.                                 |
+| ID  | Title                           | Description                                                                                  | Implementation                                                                                                               |
+| --- | ------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 11  | Sub-agent functionality         | Allow creating sub-agents for specific tasks with their own context and tool access.         | Extend the agent framework to support nested agents with isolated contexts. Add CLI commands to spawn and manage sub-agents. |
+| 12  | Custom toolsets                 | Enable users to define custom toolsets for specific workflows (e.g., 'code review' toolset). | Add a configuration file to define toolsets as JSON objects. Allow CLI flags to select toolsets.                             |
+| 13  | Multi-file operations           | Support handling multiple files or directories in a single command.                          | Modify read/write tools to accept glob patterns or directory paths. Process files in a loop.                                 |
+| 14  | Partial file reading            | Enable reading specific lines or sections of a file without loading the entire file.         | Add options like `--lines 10-20` or `--section 'function main'` to the read tool.                                            |
+| 15  | File format parsing             | Automatically parse common file formats (e.g., JSON, YAML) for structured output.            | Integrate libraries like `json` and `yaml` to parse and format output during read operations.                                |
+| 16  | Templating for write operations | Support templating languages for generating content with variables.                          | Add support for a templating engine (e.g., Jinja2) in the write tool with variable substitution.                             |
+| 17  | Version control integration     | Automatically commit changes made by the write tool to Git.                                  | Integrate with `libgit2` to perform commits after write operations with configurable commit messages.                        |
+| 18  | Diff-based editing              | Allow applying diffs or patches for precise file modifications.                              | Add a diff parser to the edit tool to apply patch files or inline diffs.                                                     |
+| 19  | Merge conflict resolution       | Assist in resolving merge conflicts by suggesting resolutions.                               | Use AI to analyze merge conflicts and propose resolutions via the edit tool.                                                 |
+| 20  | Code refactoring suggestions    | Provide suggestions for refactoring, like renaming variables or extracting methods.          | Integrate an AST parser to analyze code and suggest refactorings during edit operations.                                     |
+| 21  | Interactive editing mode        | Offer step-by-step AI-suggested changes for user approval.                                   | Add an interactive CLI mode with prompts for accepting/rejecting changes.                                                    |
+| 22  | Undo/redo functionality         | Keep a history of changes for undo/redo functionality.                                       | Store changes in a session history and provide commands to undo/redo them.                                                   |
 
 ### General Updates
 

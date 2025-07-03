@@ -12,7 +12,6 @@ import {
   BaseTool,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
-  ToolEditConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
@@ -69,7 +68,12 @@ interface CalculatedEdit {
   currentContent: string | null;
   newContent: string;
   occurrences: number;
-  error?: { display: string; raw: string; code?: string; suggestions?: string[] };
+  error?: {
+    display: string;
+    raw: string;
+    code?: string;
+    suggestions?: string[];
+  };
   isNewFile: boolean;
   finalOldString: string;
   finalNewString: string;
@@ -84,14 +88,16 @@ const ErrorMessages = {
   FILE_NOT_FOUND: 'File not found.',
   FILE_ALREADY_EXISTS: 'File already exists.',
   STRING_NOT_FOUND: 'Failed to edit, could not find the string to replace.',
-  REPLACEMENT_MISMATCH: 'Failed to edit, expected {expected} {term} but found {found}.',
+  REPLACEMENT_MISMATCH:
+    'Failed to edit, expected {expected} {term} but found {found}.',
   INVALID_PARAMETERS: 'Invalid parameters provided.',
   ROOT_DIRECTORY_VIOLATION: 'File path must be within the root directory.',
   ABSOLUTE_PATH_REQUIRED: 'File path must be absolute.',
   FAILED_TO_READ_CONTENT: 'Failed to read content of file.',
   FAILED_TO_WRITE_FILE: 'Error writing file.',
   ERROR_PREPARING_EDIT: 'Error preparing edit:',
-  EMPTY_NEW_STRING_ERROR: 'Cannot replace content with an empty string unless creating a new file.',
+  EMPTY_NEW_STRING_ERROR:
+    'Cannot replace content with an empty string unless creating a new file.',
   INVALID_FILE_TYPE: 'Target path is not a file or is a directory.',
   REGEX_INVALID: 'Invalid regex pattern provided for old_string.',
   NO_BACKUP_FOUND: 'No backup found for the last edit.',
@@ -103,7 +109,7 @@ const ErrorMessages = {
  */
 export class EditTool
   extends BaseTool<EditToolParams, ToolResult>
-  implements ModifiableTool<EditToolPrams>
+  implements ModifiableTool<EditToolParams>
 {
   static readonly Name = 'replace';
   private readonly config: Config;
@@ -119,33 +125,110 @@ export class EditTool
       `Replaces text within a file in the Termux realm, weaving precision and power. By default, replaces a single occurrence, but can replace multiple with \`expected_replacements\`. Use regex with \`use_regex: true\` for complex patterns. Always summon \`${ReadFileTool.Name}\` to inspect file content first.\n\n      **Parameters**:\n      - \`file_path\`: Absolute path (e.g., /data/data/com.termux/files/home/...).\n      - \`old_string\`: Exact text or regex pattern (if \`use_regex\`) to replace, including 3+ lines of context.\n      - \`new_string\`: Replacement text, preserving code style.\n      - \`expected_replacements\`: Number of replacements (default: 1).\n      - \`use_regex\`: If true, treat \`old_string\` as a regex pattern.\n      - \`reason\`: Purpose of the edit.\n      - \`dry_run\`: If true, preview changes without writing.\n      - \`line\`: Line number for replacement.\n      - \`delete\`: Pattern for line deletion.\n      - \`append\`: Content to append.\n      - \`insert_after\`: Pattern to insert after.\n      - \`undo\`: Undo the last edit.\n      - \`natural_language_query\`: Natural language edit command.\n      - \`batch\`: Batch edit multiple files.\n      - \`interactive\`: Interactive edit with confirmation.\n      - \`lookbehind\`: For advanced regex with context.\n      - \`lookahead\`: For advanced regex with context.\n      - \`case_insensitive\`: Perform case-insensitive regex matching.\n      - \`condition_pattern\`: Apply replacement only if this pattern is found.\n      - \`count\`: Limit the number of replacements.\n\n      **Critical**: \`old_string\` must uniquely match or use regex. Use \`${ReadFileTool.Name}\` to verify content. For new files, set \`old_string\` to empty string.`,
       {
         properties: {
-          file_path: { type: 'string', description: 'Absolute path to the file.' },
-          old_string: { type: 'string', description: 'Exact text or regex pattern to replace.' },
+          file_path: {
+            type: 'string',
+            description: 'Absolute path to the file.',
+          },
+          old_string: {
+            type: 'string',
+            description: 'Exact text or regex pattern to replace.',
+          },
           new_string: { type: 'string', description: 'Replacement text.' },
-          expected_replacements: { type: 'number', description: 'Number of replacements.', minimum: 1 },
-          reason: { type: 'string', description: 'Purpose of the edit.', optional: true },
-          dry_run: { type: 'boolean', description: 'Preview changes without writing.', optional: true },
-          use_regex: { type: 'boolean', description: 'Treat old_string as regex.', optional: true },
-          line: { type: 'number', description: 'Line number for replacement.', optional: true },
-          delete: { type: 'string', description: 'Pattern for line deletion.', optional: true },
-          append: { type: 'string', description: 'Content to append.', optional: true },
-          insert_after: { type: 'string', description: 'Pattern to insert after.', optional: true },
-          undo: { type: 'boolean', description: 'Undo the last edit.', optional: true },
-          natural_language_query: { type: 'string', description: 'Natural language edit command.', optional: true },
-          batch: { type: 'boolean', description: 'Batch edit multiple files.', optional: true },
-          interactive: { type: 'boolean', description: 'Interactive edit with confirmation.', optional: true },
-          lookbehind: { type: 'string', description: 'For advanced regex with context.', optional: true },
-          lookahead: { type: 'string', description: 'For advanced regex with context.', optional: true },
-          case_insensitive: { type: 'boolean', description: 'Perform case-insensitive regex matching.', optional: true },
-          condition_pattern: { type: 'string', description: 'Apply replacement only if this pattern is found.', optional: true },
-          count: { type: 'number', description: 'Limit the number of replacements.', minimum: 1, optional: true },
+          expected_replacements: {
+            type: 'number',
+            description: 'Number of replacements.',
+            minimum: 1,
+          },
+          reason: {
+            type: 'string',
+            description: 'Purpose of the edit.',
+            optional: true,
+          },
+          dry_run: {
+            type: 'boolean',
+            description: 'Preview changes without writing.',
+            optional: true,
+          },
+          use_regex: {
+            type: 'boolean',
+            description: 'Treat old_string as regex.',
+            optional: true,
+          },
+          line: {
+            type: 'number',
+            description: 'Line number for replacement.',
+            optional: true,
+          },
+          delete: {
+            type: 'string',
+            description: 'Pattern for line deletion.',
+            optional: true,
+          },
+          append: {
+            type: 'string',
+            description: 'Content to append.',
+            optional: true,
+          },
+          insert_after: {
+            type: 'string',
+            description: 'Pattern to insert after.',
+            optional: true,
+          },
+          undo: {
+            type: 'boolean',
+            description: 'Undo the last edit.',
+            optional: true,
+          },
+          natural_language_query: {
+            type: 'string',
+            description: 'Natural language edit command.',
+            optional: true,
+          },
+          batch: {
+            type: 'boolean',
+            description: 'Batch edit multiple files.',
+            optional: true,
+          },
+          interactive: {
+            type: 'boolean',
+            description: 'Interactive edit with confirmation.',
+            optional: true,
+          },
+          lookbehind: {
+            type: 'string',
+            description: 'For advanced regex with context.',
+            optional: true,
+          },
+          lookahead: {
+            type: 'string',
+            description: 'For advanced regex with context.',
+            optional: true,
+          },
+          case_insensitive: {
+            type: 'boolean',
+            description: 'Perform case-insensitive regex matching.',
+            optional: true,
+          },
+          condition_pattern: {
+            type: 'string',
+            description: 'Apply replacement only if this pattern is found.',
+            optional: true,
+          },
+          count: {
+            type: 'number',
+            description: 'Limit the number of replacements.',
+            minimum: 1,
+            optional: true,
+          },
         },
         required: ['file_path'],
         type: 'object',
       },
     );
     this.config = config;
-    this.rootDirectory = path.resolve(this.config.getTargetDir() || '/data/data/com.termux/files/home');
+    this.rootDirectory = path.resolve(
+      this.config.getTargetDir() || '/data/data/com.termux/files/home',
+    );
     this.client = config.getGeminiClient();
     logger.info(`EditTool forged for Termux realm at ${this.rootDirectory}`);
   }
@@ -156,12 +239,17 @@ export class EditTool
     const relative = path.relative(normalizedRoot, normalizedPath);
     const isValid = !relative.startsWith('..') && !path.isAbsolute(relative);
     if (!isValid) {
-      logger.warn(`Path ${pathToCheck} attempts to escape the root ${normalizedRoot}`);
+      logger.warn(
+        `Path ${pathToCheck} attempts to escape the root ${normalizedRoot}`,
+      );
     }
     return isValid;
   }
 
-  private checkFilePermission(filePath: string, operation: 'read' | 'write'): boolean {
+  private checkFilePermission(
+    filePath: string,
+    operation: 'read' | 'write',
+  ): boolean {
     const rules = this.config.getFilePermissionService().getRules();
     for (const rule of rules) {
       if (minimatch(filePath, rule.pattern)) {
@@ -174,9 +262,19 @@ export class EditTool
   }
 
   validateToolParams(params: EditToolParams): string | null {
-    if (!SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params)) {
-      const errors = SchemaValidator.validate(this.schema.parameters as Record<string, unknown>, params, true);
-      const errorMsg = typeof errors === 'string' ? errors : 'Schema validation failed.';
+    if (
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      const errors = SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+        true,
+      );
+      const errorMsg =
+        typeof errors === 'string' ? errors : 'Schema validation failed.';
       logger.error(`Validation failed: ${errorMsg}`);
       return `Parameters failed schema validation: ${errorMsg}`;
     }
@@ -253,8 +351,12 @@ export class EditTool
     let pattern = oldString;
 
     // Escape lookbehind and lookahead for regex safety
-    const escapedLookbehind = lookbehind ? lookbehind.replace(/[.*+?^${}()|[\]\\]/g, '\$&') : '';
-    const escapedLookahead = lookahead ? lookahead.replace(/[.*+?^${}()|[\]\\]/g, '\$&') : '';
+    const escapedLookbehind = lookbehind
+      ? lookbehind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      : '';
+    const escapedLookahead = lookahead
+      ? lookahead.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      : '';
 
     if (useRegex) {
       let flags = 'gs'; // 'g' for global, 's' for dotAll
@@ -276,7 +378,10 @@ export class EditTool
         let lastIndex = 0;
         const parts: string[] = [];
 
-        while ((match = regex.exec(currentContent)) !== null && replacedCount < count) {
+        while (
+          (match = regex.exec(currentContent)) !== null &&
+          replacedCount < count
+        ) {
           parts.push(currentContent.substring(lastIndex, match.index));
           parts.push(newString);
           lastIndex = regex.lastIndex;
@@ -296,7 +401,10 @@ export class EditTool
         const parts: string[] = [];
         let currentIndex = 0;
 
-        while (replacedCount < count && (currentIndex = currentContent.indexOf(oldString, lastIndex)) !== -1) {
+        while (
+          replacedCount < count &&
+          (currentIndex = currentContent.indexOf(oldString, lastIndex)) !== -1
+        ) {
           parts.push(currentContent.substring(lastIndex, currentIndex));
           parts.push(newString);
           lastIndex = currentIndex + oldString.length;
@@ -323,7 +431,9 @@ export class EditTool
     let isNewFile = false;
     let finalOldString = params.old_string;
     let finalNewString = params.new_string;
-    let error: { display: string; raw: string; code?: string; suggestions?: string[] } | undefined;
+    let error:
+      | { display: string; raw: string; code?: string; suggestions?: string[] }
+      | undefined;
     let occurrences = 0;
 
     // Check if path is a directory
@@ -361,7 +471,9 @@ export class EditTool
       logger.info(`Using cached content for ${params.file_path}`);
     } else {
       try {
-        currentContent = fs.readFileSync(params.file_path, 'utf8').replace(/\r\n/g, '\n');
+        currentContent = fs
+          .readFileSync(params.file_path, 'utf8')
+          .replace(/\r\n/g, '\n');
         this.fileCache.set(params.file_path, currentContent);
         fileExists = true;
       } catch (err: unknown) {
@@ -395,41 +507,50 @@ export class EditTool
       };
     } else if (currentContent !== null) {
       if (params.condition_pattern) {
-      const conditionRegex = new RegExp(params.condition_pattern, params.case_insensitive ? 'i' : '');
-      if (!conditionRegex.test(currentContent || '')) {
-        error = {
-          display: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}. No edit performed.`,
-          raw: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}.`,
-          code: 'CONDITION_NOT_MET',
-        };
-        return {
-          currentContent,
-          newContent: currentContent ?? '',
-          occurrences: 0,
-          error,
-          isNewFile,
-          finalOldString: finalOldString || '',
-          finalNewString: finalNewString || '',
-          originalParams: params,
-          timestamp: new Date(),
-        };
+        const conditionRegex = new RegExp(
+          params.condition_pattern,
+          params.case_insensitive ? 'i' : '',
+        );
+        if (!conditionRegex.test(currentContent || '')) {
+          error = {
+            display: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}. No edit performed.`,
+            raw: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}.`,
+            code: 'CONDITION_NOT_MET',
+          };
+          return {
+            currentContent,
+            newContent: currentContent ?? '',
+            occurrences: 0,
+            error,
+            isNewFile,
+            finalOldString: finalOldString || '',
+            finalNewString: finalNewString || '',
+            originalParams: params,
+            timestamp: new Date(),
+          };
+        }
       }
-    }
 
-    const correctedEdit = await ensureCorrectEdit(currentContent, params, this.client, abortSignal);
+      const correctedEdit = await ensureCorrectEdit(
+        currentContent,
+        params,
+        this.client,
+        abortSignal,
+      );
       finalOldString = correctedEdit.params.old_string;
       finalNewString = correctedEdit.params.new_string;
-      const { newContent, occurrences: calcOccurrences } = this.applyReplacement(
-        currentContent,
-        finalOldString || '',
-        finalNewString || '',
-        isNewFile,
-        params.use_regex ?? false,
-        params.lookbehind,
-        params.lookahead,
-        params.case_insensitive ?? false,
-        params.count,
-      );
+      const { newContent, occurrences: calcOccurrences } =
+        this.applyReplacement(
+          currentContent,
+          finalOldString || '',
+          finalNewString || '',
+          isNewFile,
+          params.use_regex ?? false,
+          params.lookbehind,
+          params.lookahead,
+          params.case_insensitive ?? false,
+          params.count,
+        );
       occurrences = calcOccurrences;
 
       if (occurrences === 0) {
@@ -494,7 +615,10 @@ export class EditTool
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (params.dry_run || this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (
+      params.dry_run ||
+      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT
+    ) {
       logger.info('Skipping confirmation due to dry_run or AUTO_EDIT mode');
       return false;
     }
@@ -597,16 +721,24 @@ export class EditTool
       return `No changes to ${shortenPath(relativePath)}`;
     }
 
-    const snippet = (str: string) => str.split('\n')[0].substring(0, 30) + (str.length > 30 ? '...' : '');
+    const snippet = (str: string) =>
+      str.split('\n')[0].substring(0, 30) + (str.length > 30 ? '...' : '');
     const regexNote = params.use_regex ? ' (Regex)' : '';
     const dryRunNote = params.dry_run ? ' (Dry Run)' : '';
-    const lookbehindNote = params.lookbehind ? ` (Lookbehind: "${snippet(params.lookbehind)}")` : '';
-    const lookaheadNote = params.lookahead ? ` (Lookahead: "${snippet(params.lookahead)}")` : '';
+    const lookbehindNote = params.lookbehind
+      ? ` (Lookbehind: "${snippet(params.lookbehind)}")`
+      : '';
+    const lookaheadNote = params.lookahead
+      ? ` (Lookahead: "${snippet(params.lookahead)}")`
+      : '';
 
     return `${shortenPath(relativePath)}: "${snippet(params.old_string || '')}"${regexNote}${lookbehindNote}${lookaheadNote} => "${snippet(params.new_string || '')}"${dryRunNote}`;
   }
 
-  async execute(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: EditToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       logger.error(`Execution failed: ${validationError}`);
@@ -650,14 +782,21 @@ export class EditTool
 
     // Backup current file content before any modification
     try {
-      const currentContent = fs.readFileSync(params.file_path, 'utf8').replace(/\n/g, '\n');
-      this.lastEditBackup = { filePath: params.file_path, content: currentContent };
+      const currentContent = fs
+        .readFileSync(params.file_path, 'utf8')
+        .replace(/\n/g, '\n');
+      this.lastEditBackup = {
+        filePath: params.file_path,
+        content: currentContent,
+      };
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOENT') {
         // File doesn't exist, no backup needed for new file creation
         this.lastEditBackup = null;
       } else {
-        logger.error(`Failed to create backup for ${params.file_path}: ${error}`);
+        logger.error(
+          `Failed to create backup for ${params.file_path}: ${error}`,
+        );
         return {
           llmContent: `Error: Failed to create backup for ${params.file_path}: ${error}`,
           returnDisplay: `Error: Failed to create backup for ${params.file_path}: ${error}`,
@@ -743,7 +882,11 @@ export class EditTool
         const lines = editData.currentContent.split('\n');
         const regex = new RegExp(params.delete);
         newContent = lines.filter((line) => !regex.test(line)).join('\n');
-      } else if (params.insert_after && params.new_string && editData.currentContent !== null) {
+      } else if (
+        params.insert_after &&
+        params.new_string &&
+        editData.currentContent !== null
+      ) {
         const lines = editData.currentContent.split('\n');
         const regex = new RegExp(params.insert_after);
         const newLines: string[] = [];
@@ -799,7 +942,9 @@ export class EditTool
         llmSuccessMessageParts.push(`Replaced line ${params.line}`);
       }
       if (params.delete) {
-        llmSuccessMessageParts.push(`Deleted lines matching "${params.delete}"`);
+        llmSuccessMessageParts.push(
+          `Deleted lines matching "${params.delete}"`,
+        );
       }
       if (params.insert_after) {
         llmSuccessMessageParts.push(`Inserted after "${params.insert_after}"`);
@@ -814,10 +959,14 @@ export class EditTool
         llmSuccessMessageParts.push(`Case-insensitive: true`);
       }
       if (params.condition_pattern) {
-        llmSuccessMessageParts.push(`Condition pattern: "${params.condition_pattern}"`);
+        llmSuccessMessageParts.push(
+          `Condition pattern: "${params.condition_pattern}"`,
+        );
       }
       if (params.count !== undefined) {
-        llmSuccessMessageParts.push(`Limited to ${params.count} replacement(s)`);
+        llmSuccessMessageParts.push(
+          `Limited to ${params.count} replacement(s)`,
+        );
       }
 
       logger.info(`Edit successful: ${llmSuccessMessageParts.join(' ')}`);
@@ -836,7 +985,10 @@ export class EditTool
   }
 
   private async handleUndo(params: EditToolParams): Promise<ToolResult> {
-    if (!this.lastEditBackup || this.lastEditBackup.filePath !== params.file_path) {
+    if (
+      !this.lastEditBackup ||
+      this.lastEditBackup.filePath !== params.file_path
+    ) {
       return {
         llmContent: `Error: ${ErrorMessages.NO_BACKUP_FOUND}`,
         returnDisplay: `Error: ${ErrorMessages.NO_BACKUP_FOUND}`,
@@ -844,8 +996,15 @@ export class EditTool
     }
 
     try {
-      fs.writeFileSync(this.lastEditBackup.filePath, this.lastEditBackup.content, 'utf8');
-      this.fileCache.set(this.lastEditBackup.filePath, this.lastEditBackup.content);
+      fs.writeFileSync(
+        this.lastEditBackup.filePath,
+        this.lastEditBackup.content,
+        'utf8',
+      );
+      this.fileCache.set(
+        this.lastEditBackup.filePath,
+        this.lastEditBackup.content,
+      );
       this.lastEditBackup = null; // Clear backup after restore
       return {
         llmContent: `Successfully restored ${this.lastEditBackup.filePath} from backup.`,
@@ -861,22 +1020,35 @@ export class EditTool
     }
   }
 
-  private async handleNaturalLanguageEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+  private async handleNaturalLanguageEdit(
+    params: EditToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     // This is a placeholder. In a real scenario, this would involve an AI model
     // to parse the natural_language_query and determine the appropriate
     // old_string, new_string, and use_regex parameters.
     // For now, we'll use a simple hardcoded mapping as per the Python snippet example.
-    const editMap: { [key: string]: { old_pattern: string; new_text: string; use_regex: boolean; lookbehind?: string; lookahead?: string } } = {
-      "fix ta constructor": {
-        old_pattern: "def __init__\\(self, logger,.*?\\)(.*?)(?=\\n\\s*def|\\n\\s*class|\\Z)",
-        new_text: "def __init__(self, logger, symbol, timeframe, api_key=None, api_secret=None):\n        self.logger = logger\n        self.symbol = symbol\n        self.timeframe = timeframe\n        self.api_key = api_key\n        this.api_secret = api_secret\n        self.logger.info(f'Initialized TA for {symbol} on {timeframe} timeframe')",
+    const editMap: {
+      [key: string]: {
+        old_pattern: string;
+        new_text: string;
+        use_regex: boolean;
+        lookbehind?: string;
+        lookahead?: string;
+      };
+    } = {
+      'fix ta constructor': {
+        old_pattern:
+          'def __init__\\(self, logger,.*?\\)(.*?)(?=\\n\\s*def|\\n\\s*class|\\Z)',
+        new_text:
+          "def __init__(self, logger, symbol, timeframe, api_key=None, api_secret=None):\n        self.logger = logger\n        self.symbol = symbol\n        self.timeframe = timeframe\n        self.api_key = api_key\n        this.api_secret = api_secret\n        self.logger.info(f'Initialized TA for {symbol} on {timeframe} timeframe')",
         use_regex: true,
       },
-      "fix import": {
-        old_pattern: "from indicators import TMT\\s*(?=\\n)",
-        new_text: "from indicators import TMT, BybitWebSocket",
+      'fix import': {
+        old_pattern: 'from indicators import TMT\\s*(?=\\n)',
+        new_text: 'from indicators import TMT, BybitWebSocket',
         use_regex: true,
-      }
+      },
       // Add more natural language mappings here
     };
 
@@ -903,12 +1075,20 @@ export class EditTool
     return this.execute(newParams, signal);
   }
 
-  private async handleBatchEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+  private async handleBatchEdit(
+    params: EditToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     // This assumes file_path in batch mode is a glob pattern for files to edit
     const globPattern = params.file_path;
-    const files = fs.readdirSync(this.rootDirectory, { recursive: true, withFileTypes: true })
-      .filter(dirent => dirent.isFile() && minimatch(path.join(dirent.path, dirent.name), globPattern))
-      .map(dirent => path.join(this.rootDirectory, dirent.path, dirent.name));
+    const files = fs
+      .readdirSync(this.rootDirectory, { recursive: true, withFileTypes: true })
+      .filter(
+        (dirent) =>
+          dirent.isFile() &&
+          minimatch(path.join(dirent.path, dirent.name), globPattern),
+      )
+      .map((dirent) => path.join(this.rootDirectory, dirent.path, dirent.name));
 
     if (files.length === 0) {
       return {
@@ -920,7 +1100,9 @@ export class EditTool
     const results: string[] = [];
     for (const filePath of files) {
       if (!this.checkFilePermission(filePath, 'write')) {
-        results.push(`Skipped ${shortenPath(makeRelative(filePath, this.rootDirectory))}: Permission denied.`);
+        results.push(
+          `Skipped ${shortenPath(makeRelative(filePath, this.rootDirectory))}: Permission denied.`,
+        );
         continue;
       }
 
@@ -932,9 +1114,13 @@ export class EditTool
 
       try {
         const result = await this.execute(newParams, signal);
-        results.push(`Processed ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${result.llmContent}`);
+        results.push(
+          `Processed ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${result.llmContent}`,
+        );
       } catch (error) {
-        results.push(`Failed to edit ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${String(error)}`);
+        results.push(
+          `Failed to edit ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${String(error)}`,
+        );
       }
     }
 
@@ -944,7 +1130,10 @@ export class EditTool
     };
   }
 
-  private async handleInteractiveEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+  private async handleInteractiveEdit(
+    params: EditToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     // This will require user interaction, which is not directly supported by the tool execution.
     // Instead, we'll return a message prompting the user to confirm.
     // The actual interactive logic would be handled by the CLI client.
@@ -1005,7 +1194,9 @@ export class EditTool
           return this.fileCache.get(params.file_path)!;
         }
         try {
-          const content = fs.readFileSync(params.file_path, 'utf8').replace(/\r\n/g, '\n');
+          const content = fs
+            .readFileSync(params.file_path, 'utf8')
+            .replace(/\r\n/g, '\n');
           this.fileCache.set(params.file_path, content);
           return content;
         } catch (err) {
@@ -1017,7 +1208,8 @@ export class EditTool
         }
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
-        const content = await this.getModifyContext(_).getCurrentContent(params);
+        const content =
+          await this.getModifyContext(_).getCurrentContent(params);
         const isNewFileContext = params.old_string === '' && content === '';
         const { newContent } = this.applyReplacement(
           content,

@@ -10,6 +10,7 @@ export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
+  backoffFactor: number;
   shouldRetry: (error: Error) => boolean;
   onPersistent429?: (authType?: string) => Promise<string | null>;
   authType?: string;
@@ -17,8 +18,9 @@ export interface RetryOptions {
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: 5,
-  initialDelayMs: 5000,
-  maxDelayMs: 30000, // 30 seconds
+  initialDelayMs: 1000,
+  maxDelayMs: 60000, // 60 seconds
+  backoffFactor: 2,
   shouldRetry: defaultShouldRetry,
 };
 
@@ -67,6 +69,7 @@ export async function retryWithBackoff<T>(
     maxAttempts,
     initialDelayMs,
     maxDelayMs,
+    backoffFactor,
     onPersistent429,
     authType,
     shouldRetry,
@@ -135,11 +138,10 @@ export async function retryWithBackoff<T>(
       } else {
         // Fallback to exponential backoff with jitter
         logRetryAttempt(attempt, error, errorStatus);
-        // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         await delay(delayWithJitter);
-        currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+        currentDelay = Math.min(maxDelayMs, currentDelay * backoffFactor);
       }
     }
   }

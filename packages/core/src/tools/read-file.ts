@@ -83,7 +83,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           absolute_path: {
             description:
               "The absolute path(s) to the file(s) to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide absolute path(s).",
-            oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+            oneOf: [
+              { type: 'string' },
+              { type: 'array', items: { type: 'string' } },
+            ],
           },
           lines: {
             description:
@@ -93,7 +96,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           },
           section: {
             description:
-              "Optional: For text files, the name of a section (e.g., a function name) to read. The tool will attempt to find the section and return its content.",
+              'Optional: For text files, the name of a section (e.g., a function name) to read. The tool will attempt to find the section and return its content.',
             type: 'string',
           },
           offset: {

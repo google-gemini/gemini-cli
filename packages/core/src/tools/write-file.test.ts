@@ -14,7 +14,7 @@ import {
   type Mocked,
   MockProxy,
 } from 'vitest';
-import { WriteFileTool, WriteFileToolParams } from './write-file.js';
+import { WriteFileTool } from './write-file.js';
 import {
   FileDiff,
   ToolConfirmationOutcome,
@@ -107,10 +107,13 @@ describe('WriteFileTool', () => {
     );
 
     // Setup FilePermissionService mock
-    mockFilePermissionService = vi.mocked(new FilePermissionService(mockConfig));
+    mockFilePermissionService = vi.mocked(
+      new FilePermissionService(mockConfig),
+    );
     // @ts-expect-error - getFilePermissionService is a new method we are adding to the mock
-    mockConfigInternal.getFilePermissionService = vi.fn(() => mockFilePermissionService);
-
+    mockConfigInternal.getFilePermissionService = vi.fn(
+      () => mockFilePermissionService,
+    );
 
     tool = new WriteFileTool(mockConfig);
 

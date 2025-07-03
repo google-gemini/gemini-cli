@@ -37,6 +37,29 @@ import {
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 /**
+ * Custom error for invalid chat history.
+ */
+export class InvalidHistoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidHistoryError';
+  }
+}
+
+/**
+ * Custom error for API-related issues.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public underlyingError?: Error,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/**
  * Returns true if the response is valid, false otherwise.
  */
 function isValidResponse(response: GenerateContentResponse): boolean {
@@ -223,6 +246,38 @@ export class GeminiChat {
   }
 
   /**
+   * Validates a message before sending it to the API.
+   *
+   * @param params - The message parameters to validate.
+   * @throws An error if the message is invalid.
+   */
+  private validateMessage(params: SendMessageParameters): void {
+    if (!params.message) {
+      throw new Error('Message cannot be empty.');
+    }
+  }
+
+  /**
+   * Sends a message to the model and returns the response.
+   *
+   * @remarks
+   * This method will wait for the previous message to be processed before
+   * sending the next message.
+   *
+   * @see {@link Chat#sendMessageStream} for streaming method.
+   * @param params - parameters for sending messages within a chat session.
+   * @returns The model's response.
+   *
+   * @example
+   * ```ts
+   * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+   * const response = await chat.sendMessage({
+   *   message: 'Why is the sky blue?'
+   * });
+   * console.log(response.text);
+   * ```
+   */
+  /**
    * Sends a message to the model and returns the response.
    *
    * @remarks
@@ -245,6 +300,7 @@ export class GeminiChat {
   async sendMessage(
     params: SendMessageParameters,
   ): Promise<GenerateContentResponse> {
+    this.validateMessage(params);
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
@@ -314,6 +370,28 @@ export class GeminiChat {
     }
   }
 
+  /**
+   * Sends a message to the model and returns the response in chunks.
+   *
+   * @remarks
+   * This method will wait for the previous message to be processed before
+   * sending the next message.
+   *
+   * @see {@link Chat#sendMessage} for non-streaming method.
+   * @param params - parameters for sending the message.
+   * @return The model's response.
+   *
+   * @example
+   * ```ts
+   * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+   * const response = await chat.sendMessageStream({
+   *   message: 'Why is the sky blue?'
+   * });
+   * for await (const chunk of response) {
+   *   console.log(chunk.text);
+   * }
+   * ```
+   */
   /**
    * Sends a message to the model and returns the response in chunks.
    *
@@ -416,6 +494,29 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    *     chat session.
    */
+  /**
+   * Returns the chat history.
+   *
+   * @remarks
+   * The history is a list of contents alternating between user and model.
+   *
+   * There are two types of history:
+   * - The `curated history` contains only the valid turns between user and
+   * model, which will be included in the subsequent requests sent to the model.
+   * - The `comprehensive history` contains all turns, including invalid or
+   *   empty model outputs, providing a complete record of the history.
+   *
+   * The history is updated after receiving the response from the model,
+   * for streaming response, it means receiving the last chunk of the response.
+   *
+   * The `comprehensive history` is returned by default. To get the `curated
+   * history`, set the `curated` parameter to `true`.
+   *
+   * @param curated - whether to return the curated history or the comprehensive
+   *     history.
+   * @return History contents alternating between user and model for the entire
+   *     chat session.
+   */
   getHistory(curated: boolean = false): Content[] {
     const history = curated
       ? extractCuratedHistory(this.history)
@@ -428,6 +529,9 @@ export class GeminiChat {
   /**
    * Clears the chat history.
    */
+  /**
+   * Clears the chat history.
+   */
   clearHistory(): void {
     this.history = [];
   }
@@ -437,9 +541,19 @@ export class GeminiChat {
    *
    * @param content - The content to add to the history.
    */
+  /**
+   * Adds a new entry to the chat history.
+   *
+   * @param content - The content to add to the history.
+   */
   addHistory(content: Content): void {
     this.history.push(content);
   }
+  /**
+   * Sets the chat history.
+   *
+   * @param history - The history to set.
+   */
   setHistory(history: Content[]): void {
     this.history = history;
   }
@@ -513,26 +627,6 @@ export class GeminiChat {
       (content) => !this.isThoughtContent(content),
     );
 
-    let outputContents: Content[] = [];
-    if (
-      nonThoughtModelOutput.length > 0 &&
-      nonThoughtModelOutput.every((content) => content.role !== undefined)
-    ) {
-      outputContents = nonThoughtModelOutput;
-    } else if (nonThoughtModelOutput.length === 0 && modelOutput.length > 0) {
-      // This case handles when the model returns only a thought.
-      // We don't want to add an empty model response in this case.
-    } else {
-      // When not a function response appends an empty content when model returns empty response, so that the
-      // history is always alternating between user and model.
-      // Workaround for: https://b.corp.google.com/issues/420354090
-      if (!isFunctionResponse(userInput)) {
-        outputContents.push({
-          role: 'model',
-          parts: [],
-        } as Content);
-      }
-    }
     if (
       automaticFunctionCallingHistory &&
       automaticFunctionCallingHistory.length > 0
@@ -544,49 +638,13 @@ export class GeminiChat {
       this.history.push(userInput);
     }
 
-    // Consolidate adjacent model roles in outputContents
-    const consolidatedOutputContents: Content[] = [];
-    for (const content of outputContents) {
-      if (this.isThoughtContent(content)) {
-        continue;
-      }
-      const lastContent =
-        consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
-        // If both current and last are text, combine their text into the lastContent's first part
-        // and append any other parts from the current content.
-        lastContent.parts[0].text += content.parts[0].text || '';
-        if (content.parts.length > 1) {
-          lastContent.parts.push(...content.parts.slice(1));
-        }
-      } else {
-        consolidatedOutputContents.push(content);
-      }
-    }
-
-    if (consolidatedOutputContents.length > 0) {
-      const lastHistoryEntry = this.history[this.history.length - 1];
-      const canMergeWithLastHistory =
-        !automaticFunctionCallingHistory ||
-        automaticFunctionCallingHistory.length === 0;
-
-      if (
-        canMergeWithLastHistory &&
-        this.isTextContent(lastHistoryEntry) &&
-        this.isTextContent(consolidatedOutputContents[0])
-      ) {
-        // If both current and last are text, combine their text into the lastHistoryEntry's first part
-        // and append any other parts from the current content.
-        lastHistoryEntry.parts[0].text +=
-          consolidatedOutputContents[0].parts[0].text || '';
-        if (consolidatedOutputContents[0].parts.length > 1) {
-          lastHistoryEntry.parts.push(
-            ...consolidatedOutputContents[0].parts.slice(1),
-          );
-        }
-        consolidatedOutputContents.shift(); // Remove the first element as it's merged
-      }
-      this.history.push(...consolidatedOutputContents);
+    if (nonThoughtModelOutput.length > 0) {
+      this.history.push(...nonThoughtModelOutput);
+    } else if (modelOutput.length === 0 && !isFunctionResponse(userInput)) {
+      this.history.push({
+        role: 'model',
+        parts: [],
+      });
     }
   }
 

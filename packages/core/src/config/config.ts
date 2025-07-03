@@ -43,7 +43,10 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { FilePermissionRule, FilePermissionService } from '../services/filePermissionService.js';
+import {
+  FilePermissionRule,
+  FilePermissionService,
+} from '../services/filePermissionService.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -467,11 +470,11 @@ export class Config {
     return this.gitService;
   }
 
-  public getFilePermissionRules(): FilePermissionRule[] | undefined {
+  getFilePermissionRules(): FilePermissionRule[] | undefined {
     return this.filePermissions;
   }
 
-  public getFilePermissionService(): FilePermissionService {
+  getFilePermissionService(): FilePermissionService {
     return this.filePermissionService;
   }
 }

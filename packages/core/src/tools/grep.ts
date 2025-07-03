@@ -492,7 +492,8 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         'find class TA': 'class TA:',
         'find init': 'def __init__',
       };
-      searchPattern = patternMap[natural_language_query.toLowerCase()] || pattern;
+      searchPattern =
+        patternMap[natural_language_query.toLowerCase()] || pattern;
     }
 
     if (word_boundary) {

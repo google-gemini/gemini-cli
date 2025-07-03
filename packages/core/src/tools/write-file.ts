@@ -146,7 +146,9 @@ export class WriteFileTool
    * @param params The parameters provided to the tool.
    * @returns A string with an error message if validation fails, otherwise null.
    */
-  async validateToolParams(params: WriteFileToolParams): Promise<string | null> {
+  async validateToolParams(
+    params: WriteFileToolParams,
+  ): Promise<string | null> {
     // 1. Schema Validation
     if (
       this.schema.parameters &&
@@ -209,7 +211,7 @@ export class WriteFileTool
    * @returns A string describing the action.
    */
   getDescription(params: WriteFileToolParams): string {
-    if (!params.file_path && (!params.content && !params.template)) {
+    if (!params.file_path && !params.content && !params.template) {
       return `Model did not provide valid parameters for write file tool`;
     }
     const relativePath = makeRelative(
@@ -239,7 +241,9 @@ export class WriteFileTool
       return false;
     }
 
-    const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+    const content =
+      params.content ??
+      this._renderTemplate(params.template!, params.variables!);
 
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
@@ -248,7 +252,10 @@ export class WriteFileTool
     );
 
     // If file existed but was unreadable, we can't show a meaningful diff.
-    if (!correctedContentResult.isReadable && correctedContentResult.fileExists) {
+    if (
+      !correctedContentResult.isReadable &&
+      correctedContentResult.fileExists
+    ) {
       return false;
     }
 
@@ -306,7 +313,10 @@ export class WriteFileTool
     // Permission check
     const permissionService = this.config.getFilePermissionService();
     if (!permissionService.canPerformOperation(params.file_path, 'write')) {
-      const relativePath = makeRelative(params.file_path, this.config.getTargetDir());
+      const relativePath = makeRelative(
+        params.file_path,
+        this.config.getTargetDir(),
+      );
       const errorMessage = `Write operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
       return {
         llmContent: `Error: ${errorMessage}`,
@@ -314,7 +324,9 @@ export class WriteFileTool
       };
     }
 
-    const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+    const content =
+      params.content ??
+      this._renderTemplate(params.template!, params.variables!);
 
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
@@ -323,7 +335,10 @@ export class WriteFileTool
     );
 
     // Handle cases where file existed but was unreadable.
-    if (!correctedContentResult.isReadable && correctedContentResult.fileExists) {
+    if (
+      !correctedContentResult.isReadable &&
+      correctedContentResult.fileExists
+    ) {
       const errDetails = correctedContentResult.error;
       const errorMsg = `Error checking existing file: ${errDetails?.message || 'Unknown error'}`;
       return {
@@ -463,7 +478,8 @@ export class WriteFileTool
         abortSignal,
       );
       correctedContent = correctedParams.new_string;
-    } else if (!fileExists) { // This implies a new file (ENOENT case)
+    } else if (!fileExists) {
+      // This implies a new file (ENOENT case)
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
         this.client,
@@ -488,7 +504,9 @@ export class WriteFileTool
     return {
       getFilePath: (params: WriteFileToolParams) => params.file_path,
       getCurrentContent: async (params: WriteFileToolParams) => {
-        const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+        const content =
+          params.content ??
+          this._renderTemplate(params.template!, params.variables!);
         const correctedContentResult = await this._getCorrectedFileContent(
           params.file_path,
           content,
@@ -496,10 +514,14 @@ export class WriteFileTool
         );
         // Only return originalContent if it was successfully read.
         // Otherwise, returning empty string implies it's a new file or unreadable.
-        return correctedContentResult.isReadable ? correctedContentResult.originalContent : '';
+        return correctedContentResult.isReadable
+          ? correctedContentResult.originalContent
+          : '';
       },
       getProposedContent: async (params: WriteFileToolParams) => {
-        const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+        const content =
+          params.content ??
+          this._renderTemplate(params.template!, params.variables!);
         const correctedContentResult = await this._getCorrectedFileContent(
           params.file_path,
           content,
@@ -521,7 +543,10 @@ export class WriteFileTool
     };
   }
 
-  private _renderTemplate(template: string, variables: Record<string, unknown>): string {
+  private _renderTemplate(
+    template: string,
+    variables: Record<string, unknown>,
+  ): string {
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate(variables);
   }

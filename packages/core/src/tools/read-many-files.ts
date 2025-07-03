@@ -183,16 +183,7 @@ export class ReadManyFilesTool extends BaseTool<
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
-      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'patterns' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded). It can also parse JSON and YAML files into a structured format.
-
-This tool is useful when you need to understand or analyze a collection of files, such as:
-- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
-- Finding where specific functionality is implemented if the user asks broad questions about code.
-- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
-- Gathering context from multiple configuration files.
-- When the user asks to "read all files in X directory" or "show me the content of all Y files".
-
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'patterns' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded). It can also parse JSON and YAML files into a structured format.\n\nThis tool is useful when you need to understand or analyze a collection of files, such as:\n- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).\n- Finding where specific functionality is implemented if the user asks broad questions about code.\n- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).\n- Gathering context from multiple configuration files.\n- When the user asks to "read all files in X directory" or "show me the content of all Y files".\n\nUse this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
       parameterSchema,
     );
     this.targetDir = path.resolve(targetDir);
@@ -249,7 +240,9 @@ Use this tool when the user's query implies needing the content of several files
 
   getDescription(params: ReadManyFilesParams): string {
     const allPatterns = [...params.patterns, ...(params.include || [])];
-    const pathDesc = `using patterns: \`${allPatterns.join('`, `')}\` (within target directory: \`${this.targetDir}\`)`;
+    const pathDesc = `using patterns: ${allPatterns.join(
+      ', ',
+    )} (within target directory: ${this.targetDir})`;
 
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = params.exclude || [];
@@ -260,7 +253,15 @@ Use this tool when the user's query implies needing the content of several files
         ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
         : [...paramExcludes, ...this.geminiIgnorePatterns];
 
-    let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...\`' : '\`'}` : 'none specified'}`;
+    let excludeDesc = `Excluding: ${
+      finalExclusionPatternsForDescription.length > 0
+        ? `patterns like ${finalExclusionPatternsForDescription
+            .slice(0, 2)
+            .join(', ')}${
+            finalExclusionPatternsForDescription.length > 2 ? '...' : ''
+          }`
+        : 'none specified'
+    }`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
     if (this.geminiIgnorePatterns.length > 0) {
@@ -272,7 +273,10 @@ Use this tool when the user's query implies needing the content of several files
       }
     }
 
-    return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace('{filePath}', 'path/to/file.ext')}".`;
+    return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+      '{filePath}',
+      'path/to/file.ext',
+    )}"`;
   }
 
   async execute(
@@ -371,7 +375,9 @@ Use this tool when the user's query implies needing the content of several files
     } catch (error) {
       return {
         llmContent: `Error during file search: ${getErrorMessage(error)}`,
-        returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(
+          error,
+        )}\n\`\`\``,
       };
     }
 
@@ -425,13 +431,13 @@ Use this tool when the user's query implies needing the content of several files
           if (fileExtension === '.json') {
             try {
               content = JSON.stringify(JSON.parse(content), null, 2);
-            } catch (e) {
+            } catch {
               // Not a valid JSON file, treat as plain text
             }
           } else if (fileExtension === '.yaml' || fileExtension === '.yml') {
             try {
               content = yaml.dump(yaml.load(content));
-            } catch (e) {
+            } catch {
               // Not a valid YAML file, treat as plain text
             }
           }
@@ -455,20 +461,22 @@ Use this tool when the user's query implies needing the content of several files
       }
     }
 
-    let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.targetDir}\`)\n\n`;
+    let displayMessage = `### ReadManyFiles Result (Target Dir: ${this.targetDir})\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
       if (processedFilesRelativePaths.length <= 10) {
         displayMessage += `\n**Processed Files:**\n`;
         processedFilesRelativePaths.forEach(
-          (p) => (displayMessage += `- \`${p}\`\n`),
+          (p) => (displayMessage += `- ${p}\n`),
         );
       } else {
         displayMessage += `\n**Processed Files (first 10 shown):**\n`;
         processedFilesRelativePaths
           .slice(0, 10)
-          .forEach((p) => (displayMessage += `- \`${p}\`\n`));
-        displayMessage += `- ...and ${processedFilesRelativePaths.length - 10} more.\n`;
+          .forEach((p) => (displayMessage += `- ${p}\n`));
+        displayMessage += `- ...and ${
+          processedFilesRelativePaths.length - 10
+        } more.\n`;
       }
     }
 
@@ -479,12 +487,14 @@ Use this tool when the user's query implies needing the content of several files
       if (skippedFiles.length <= 5) {
         displayMessage += `\n**Skipped ${skippedFiles.length} item(s):**\n`;
       } else {
-        displayMessage += `\n**Skipped ${skippedFiles.length} item(s) (first 5 shown):**\n`;
+        displayMessage += `\n**Skipped ${
+          skippedFiles.length
+        } item(s) (first 5 shown):**\n`;
       }
       skippedFiles
         .slice(0, 5)
         .forEach(
-          (f) => (displayMessage += `- \`${f.path}\` (Reason: ${f.reason})\n`),
+          (f) => (displayMessage += `- ${f.path} (Reason: ${f.reason})\n`),
         );
       if (skippedFiles.length > 5) {
         displayMessage += `- ...and ${skippedFiles.length - 5} more.\n`;

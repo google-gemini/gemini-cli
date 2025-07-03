@@ -46,14 +46,22 @@ export class FilePermissionService {
    * @param operation The operation to check ('read' or 'write').
    * @returns True if the operation is allowed, false otherwise.
    */
-  public canPerformOperation(absoluteFilePath: string, operation: FileOperation): boolean {
+  canPerformOperation(
+    absoluteFilePath: string,
+    operation: FileOperation,
+  ): boolean {
     const relativeFilePath = path.relative(this.targetDir, absoluteFilePath);
 
     // Ensure the path is within the targetDir before checking rules.
     // This is a safeguard, as individual tools also perform this check.
-    if (relativeFilePath.startsWith('..') || path.isAbsolute(relativeFilePath)) {
+    if (
+      relativeFilePath.startsWith('..') ||
+      path.isAbsolute(relativeFilePath)
+    ) {
       // Path is outside the targetDir or resolution failed unexpectedly
-      console.warn(`[FilePermissionService] Path ${absoluteFilePath} is outside targetDir ${this.targetDir}. Denying.`);
+      console.warn(
+        `[FilePermissionService] Path ${absoluteFilePath} is outside targetDir ${this.targetDir}. Denying.`,
+      );
       return false;
     }
 
