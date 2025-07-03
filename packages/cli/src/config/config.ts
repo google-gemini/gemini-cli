@@ -178,7 +178,8 @@ export async function loadCliConfig(
   const debugMode = argv.debug || false;
 
   const disabledExtensions =
-    argv['disable-extensions']?.split(',').map((e) => e.trim().toLowerCase()) || [];
+    argv['disable-extensions']?.split(',').map((e) => e.trim().toLowerCase()) ||
+    [];
   const activeExtensions = extensions.filter(
     (e) => !disabledExtensions.includes(e.config.name.toLowerCase()),
   );
