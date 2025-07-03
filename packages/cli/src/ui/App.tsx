@@ -72,6 +72,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { LearningDiscoveryDialog } from './components/learning/LearningDiscoveryDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -132,9 +133,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [showLearningDiscovery, setShowLearningDiscovery] = useState<boolean>(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
+  }, []);
+
+  const openLearningDiscovery = useCallback(() => {
+    setShowLearningDiscovery(true);
   }, []);
 
   const errorCount = useMemo(
@@ -284,6 +290,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
+    openLearningDiscovery,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -694,6 +701,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}
               config={config}
+            />
+          ) : showLearningDiscovery ? (
+            <LearningDiscoveryDialog
+              isOpen={showLearningDiscovery}
+              onClose={() => setShowLearningDiscovery(false)}
             />
           ) : (
             <>

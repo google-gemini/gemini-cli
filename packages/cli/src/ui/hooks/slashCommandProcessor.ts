@@ -77,6 +77,7 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openLearningDiscovery: () => void,
 ) => {
   const session = useSessionStats();
   const gitService = useMemo(() => {
@@ -883,6 +884,15 @@ export const useSlashCommandProcessor = (
           setPendingCompressionItem(null);
         },
       },
+      {
+        name: 'new',
+        description: '新しい分野の学習を開始します（Sensei-AI）',
+        action: (_mainCommand, _subCommand, _args) => {
+          onDebugMessage('Opening learning discovery dialog.');
+          openLearningDiscovery();
+          return;
+        },
+      },
     ];
 
     if (config?.getCheckpointingEnabled()) {
@@ -1031,6 +1041,7 @@ export const useSlashCommandProcessor = (
     pendingCompressionItemRef,
     setPendingCompressionItem,
     openPrivacyNotice,
+    openLearningDiscovery,
   ]);
 
   const handleSlashCommand = useCallback(
