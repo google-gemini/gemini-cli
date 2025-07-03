@@ -11,8 +11,15 @@ import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
+
+interface DecodedIdTokenPayload {
+  sub: string;
+  // Add other fields you might need from the id_token
+  email?: string;
+  name?: string;
+}
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -67,7 +74,7 @@ export async function getOauthClient(): Promise<OAuth2Client> {
     // Check if we need to retrieve Google Account ID
     if (!getCachedGoogleAccountId()) {
       try {
-        const googleAccountId = await getGoogleAccountId(client);
+        const googleAccountId = await getRawGoogleAccountId(client);
         if (googleAccountId) {
           await cacheGoogleAccountId(googleAccountId);
         }
@@ -135,7 +142,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           client.setCredentials(tokens);
           // Retrieve and cache Google Account ID during authentication
           try {
-            const googleAccountId = await getGoogleAccountId(client);
+            const googleAccountId = await getRawGoogleAccountId(client);
             if (googleAccountId) {
               await cacheGoogleAccountId(googleAccountId);
             }
@@ -237,13 +244,12 @@ async function cacheGoogleAccountId(googleAccountId: string): Promise<void> {
 export function getCachedGoogleAccountId(): string | null {
   try {
     const filePath = getGoogleAccountIdCachePath();
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-    const fs_sync = require('fs');
-    if (fs_sync.existsSync(filePath)) {
-      return fs_sync.readFileSync(filePath, 'utf-8').trim() || null;
+    if (existsSync(filePath)) {
+      return readFileSync(filePath, 'utf-8').trim() || null;
     }
     return null;
-  } catch (_error) {
+  } catch (error) {
+    console.debug('Error reading cached Google Account ID:', error);
     return null;
   }
 }
@@ -263,37 +269,64 @@ export async function clearCachedCredentialFile() {
  * @param client - The authenticated OAuth2Client
  * @returns The user's Google Account ID or null if not available
  */
-export async function getGoogleAccountId(
+export async function getRawGoogleAccountId(
   client: OAuth2Client,
 ): Promise<string | null> {
   try {
-    const { token } = await client.getAccessToken();
-    if (!token) {
-      return null;
-    }
-
-    const response = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    // 1. Get a new Access Token including the id_token
+    const refreshedTokens = await new Promise<{ id_token?: string } | null>(
+      (resolve, reject) => {
+        client.refreshAccessToken((err, tokens) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          if (!tokens || !tokens.id_token) {
+            resolve(null);
+            return;
+          }
+          resolve({ id_token: tokens.id_token });
+        });
       },
     );
-
-    if (!response.ok) {
-      console.error(
-        'Failed to fetch user info:',
-        response.status,
-        response.statusText,
-      );
+    if (!refreshedTokens || !refreshedTokens.id_token) {
+      console.warn('No id_token obtained after refreshing tokens.');
       return null;
     }
-
-    const userInfo = await response.json();
-    return userInfo.id || null;
+    // 2. Extract and decode the raw gaia id from the id_token
+    const googleAccountId = await extractRawGaiaIdFromIdToken(
+      refreshedTokens.id_token,
+    );
+    return googleAccountId;
   } catch (error) {
     console.error('Error retrieving Google Account ID:', error);
+    return null;
+  }
+}
+
+async function extractRawGaiaIdFromIdToken(
+  idToken: string,
+): Promise<string | null> {
+  try {
+    // Split the id_token into header, payload, and signature
+    const parts = idToken.split('.');
+    if (parts.length !== 3) {
+      console.warn('Invalid ID token format');
+      return null;
+    }
+    const payloadBase64 = parts[1];
+
+    // Decode the payload from base64
+    const payload = JSON.parse(
+      Buffer.from(payloadBase64, 'base64').toString('utf-8'),
+    ) as DecodedIdTokenPayload;
+    if (!payload || !payload.sub) {
+      console.warn('Could not extract sub claim from ID token.');
+      return null;
+    }
+    return payload.sub;
+  } catch (error) {
+    console.error('Error decoding ID token:', error);
     return null;
   }
 }
