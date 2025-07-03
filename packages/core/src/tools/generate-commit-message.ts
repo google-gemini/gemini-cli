@@ -252,7 +252,7 @@ Strategy: ${commitModeText}${filesDisplay}`,
           commitMessage
         );
 
-        this.cachedCommitData = null; // Clear cache on success
+        this.cachedCommitData = null;
 
         return {
           llmContent: `Commit created successfully!\n\nCommit message:\n${commitMessage}`,
@@ -260,38 +260,27 @@ Strategy: ${commitModeText}${filesDisplay}`,
         };
       } catch (commitError) {
         if (!(commitError instanceof Error)) {
-          throw commitError; // Rethrow unknown errors
+          throw commitError;
         }
 
-        const isPreCommitHookError = /\.git\/hooks\//.test(
-          commitError.message
-        );
-        const isIndexLockError = commitError.message.includes('index.lock');
-
-        // If it's not a recoverable error OR it's the last attempt, throw.
-        if (
-          (!isPreCommitHookError && !isIndexLockError) ||
-          attempt === maxRetries
-        ) {
-          const hookOrLockError = new Error(
-            `Commit failed due to a pre-commit hook or a locked index. ` +
+        if (/\.git\/hooks\//.test(commitError.message)) {
+          const hookError = new Error(
+            `Commit failed due to a pre-commit hook. ` +
               `Please resolve the issues, stage any changes, and try again. ` +
               `Original error: ${commitError.message}`
           );
-          throw hookOrLockError;
+          throw hookError;
         }
 
-        // It's a recoverable error, let's try to fix it.
-        if (isIndexLockError) {
-          // Wait a bit for the lock to be released.
-          await new Promise(resolve => setTimeout(resolve, 500));
+        const isIndexLockError = commitError.message.includes('index.lock');
+
+        if (!isIndexLockError || attempt === maxRetries) {
+          throw commitError;
         }
 
-        // Re-stage any changes made by hooks.
-        await this.executeGitCommand(['add', '-u'], signal);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
-    // This line should be unreachable if the loop logic is correct.
     throw new Error('Commit failed after all retry attempts.');
   }
 

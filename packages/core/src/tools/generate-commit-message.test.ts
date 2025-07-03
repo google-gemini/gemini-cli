@@ -245,9 +245,9 @@ describe('GenerateCommitMessageTool', () => {
 
     expect(result.llmContent).toContain('Commit failed due to a pre-commit hook');
     expect(result.llmContent).toContain('error in .git/hooks/pre-commit');
-    expect(commitCallCount).toBe(2); // It should try once, then retry once more.
+    expect(commitCallCount).toBe(1); // It should only try to commit once.
     const addCalls = mockSpawn.mock.calls.filter(call => call[1]?.includes('add'));
-    expect(addCalls).toHaveLength(1); // It should try to re-stage changes.
+    expect(addCalls).toHaveLength(0); // It should NOT try to re-stage changes.
   });
 
   it('should return an error when spawn process fails to start', async () => {
