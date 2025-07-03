@@ -274,7 +274,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 
 export function getPlanModeSystemPrompt(userMemory?: string): string {
   const basePrompt = getCoreSystemPrompt(userMemory);
-  
+
   const planModeInstructions = `
 
 # PLAN MODE ACTIVE
@@ -308,7 +308,8 @@ Instead of executing tools, provide responses like:
 Remember: You are in PLAN MODE - describe and plan, don't execute file modifications.`;
 
   return `${basePrompt}${planModeInstructions}`;
-  
+}
+
 /**
  * Provides the system prompt for the history compression process.
  * This prompt instructs the model to act as a specialized state manager,
