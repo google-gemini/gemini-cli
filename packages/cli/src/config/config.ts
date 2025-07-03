@@ -49,6 +49,7 @@ interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   'allowed-mcp-server-names': string | undefined;
+  'disable-extensions': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -133,6 +134,11 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: 'Allowed MCP server names',
     })
+    .option('disable-extensions', {
+      alias: 'e',
+      type: 'string',
+      description: 'Comma-separated list of extensions to disable.',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -174,6 +180,12 @@ export async function loadCliConfig(
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
+  const disabledExtensions =
+    argv['disable-extensions']?.split(',').map((e) => e.trim().toLowerCase()) || [];
+  const activeExtensions = extensions.filter(
+    (e) => !disabledExtensions.includes(e.config.name.toLowerCase()),
+  );
+
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
@@ -185,7 +197,9 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
+  const extensionContextFilePaths = activeExtensions.flatMap(
+    (e) => e.contextFiles,
+  );
 
   const fileService = new FileDiscoveryService(process.cwd());
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
@@ -196,8 +210,8 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  let mcpServers = mergeMcpServers(settings, extensions);
-  const excludeTools = mergeExcludeTools(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, activeExtensions);
+  const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
   if (argv['allowed-mcp-server-names']) {
     const allowedNames = new Set(
