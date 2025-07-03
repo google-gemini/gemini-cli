@@ -31,9 +31,11 @@
   "dependencies": {
     "@google/gemini-cli-core": "*",
     "@types/update-notifier": "^6.0.8",
+    "chalk": "^5.3.0",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
     "dotenv": "^16.6.1",
+    "fs-extra": "^11.2.0",
     "gaxios": "^6.1.1",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",

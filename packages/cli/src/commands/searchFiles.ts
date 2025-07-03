@@ -1,0 +1,45 @@
+import chalk from 'chalk';
+import fs from 'fs-extra';
+import path from 'path';
+import { MockGeminiAPI } from '../utils/mockGeminiAPI';
+
+async function searchFiles(dirPath: string, searchTerm: string, searchContent: string): Promise<void> {
+  console.log(chalk.green('// Pyrmethus conjures the File Searcher with Gemini’s aid!'));
+
+  const suggestion = await MockGeminiAPI.getSuggestion('Search files in TypeScript.');
+  if (suggestion) console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+
+  const targetPath = dirPath || '/data/data/com.termux/files/home';
+  if (!fs.existsSync(targetPath)) {
+    console.log(chalk.red(`The path '${targetPath}' eludes the ether!`));
+    const debug = await MockGeminiAPI.getSuggestion(`Debug path '${targetPath}' not found.`);
+    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    return;
+  }
+
+  try {
+    console.log(chalk.cyan(`// Searching '${targetPath}' for '${searchTerm}'...`));
+    const results: string[] = [];
+    const searchDir = async (currentPath: string) => {
+      const entries = await fs.readdir(currentPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(currentPath, entry.name);
+        if (entry.isDirectory()) {
+          await searchDir(fullPath);
+        } else if (entry.name.includes(searchTerm)) {
+          results.push(`[FILE] ${fullPath}`);
+        } else if (searchContent.toLowerCase() === 'yes') {
+          const content = await fs.readFile(fullPath, 'utf-8');
+          if (content.includes(searchTerm)) results.push(`[CONTENT] ${fullPath}`);
+        }
+      }
+    };
+    await searchDir(targetPath);
+    console.log(chalk.yellow(results.join('\n') || 'No matches found.'));
+    console.log(chalk.green(`Success! Found ${results.length} matches in '${targetPath}'.`));
+  } catch (error: any) {
+    console.log(chalk.red(`The spirits falter: ${error.message}`));
+    const debug = await MockGeminiAPI.getSuggestion(`Debug error: ${error.message}`);
+    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+  }
+}

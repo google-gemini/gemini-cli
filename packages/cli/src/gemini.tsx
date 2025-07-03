@@ -23,6 +23,17 @@ import {
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+
+// Import new commands
+import { generateCode } from './commands/generate.js';
+import { debugCode } from './commands/debug.js';
+import { explainCode } from './commands/explain.js';
+import { listFiles } from './commands/listFiles.js';
+import { deleteFile } from './commands/deleteFile.js';
+import { searchFiles } from './commands/searchFiles.js';
+import { fileInfo } from './commands/fileInfo.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import {
@@ -101,6 +112,142 @@ export async function main() {
 
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
+
+  // Handle direct CLI commands using yargs
+  const argv = yargs(hideBin(process.argv))
+    .command(
+      'generate <prompt>',
+      'Generates code based on user prompts.',
+      (yargs) => {
+        yargs.positional('prompt', {
+          describe: 'The prompt for code generation.',
+          type: 'string',
+        });
+      },
+      (argv) => {
+        generateCode(argv.prompt as string).catch(console.error);
+      },
+    )
+    .command(
+      'debug <codeOrPath> [errorMsg]',
+      'Debugs code snippets or files with error analysis.',
+      (yargs) => {
+        yargs
+          .positional('codeOrPath', {
+            describe: 'The code snippet or path to the file to debug.',
+            type: 'string',
+          })
+          .positional('errorMsg', {
+            describe: 'Optional error message to provide context for debugging.',
+            type: 'string',
+          });
+      },
+      (argv) => {
+        debugCode(argv.codeOrPath as string, argv.errorMsg as string).catch(
+          console.error,
+        );
+      },
+    )
+    .command(
+      'explain <codeOrPath>',
+      'Explains code or concepts.',
+      (yargs) => {
+        yargs.positional('codeOrPath', {
+          describe: 'The code snippet or path to the file to explain.',
+          type: 'string',
+        });
+      },
+      (argv) => {
+        explainCode(argv.codeOrPath as string).catch(console.error);
+      },
+    )
+    .command(
+      'listFiles [dirPath] [filter]',
+      'Lists directory contents with filtering.',
+      (yargs) => {
+        yargs
+          .positional('dirPath', {
+            describe: 'Optional directory path to list (defaults to home).',
+            type: 'string',
+          })
+          .positional('filter', {
+            describe: 'Optional filter for file names.',
+            type: 'string',
+          });
+      },
+      (argv) => {
+        listFiles(argv.dirPath as string, argv.filter as string).catch(
+          console.error,
+        );
+      },
+    )
+    .command(
+      'deleteFile <pathToDelete> <confirm>',
+      'Deletes files or directories with confirmation.',
+      (yargs) => {
+        yargs
+          .positional('pathToDelete', {
+            describe: 'The path to the file or directory to delete.',
+            type: 'string',
+          })
+          .positional('confirm', {
+            describe: 'Type "yes" to confirm deletion.',
+            type: 'string',
+          });
+      },
+      (argv) => {
+        deleteFile(argv.pathToDelete as string, argv.confirm as string).catch(
+          console.error,
+        );
+      },
+    )
+    .command(
+      'searchFiles [dirPath] <searchTerm> [searchContent]',
+      'Searches for files by name or content.',
+      (yargs) => {
+        yargs
+          .positional('dirPath', {
+            describe: 'Optional directory path to search within (defaults to home).',
+            type: 'string',
+          })
+          .positional('searchTerm', {
+            describe: 'The term to search for in file names or content.',
+            type: 'string',
+          })
+          .positional('searchContent', {
+            describe: 'Type "yes" to search file content, otherwise only search names.',
+            type: 'string',
+          });
+      },
+      (argv) => {
+        searchFiles(
+          argv.dirPath as string,
+          argv.searchTerm as string,
+          argv.searchContent as string,
+        ).catch(console.error);
+      },
+    )
+    .command(
+      'fileInfo <filePath>',
+      'Displays file metadata.',
+      (yargs) => {
+        yargs.positional('filePath', {
+          describe: 'The path to the file to inspect.',
+          type: 'string',
+        });
+      },
+      (argv) => {
+        fileInfo(argv.filePath as string).catch(console.error);
+      },
+    )
+    .demandCommand(1, 'You need to specify a command.')
+    .help().argv;
+
+  // If a command was executed, yargs will handle process.exit.
+  // Otherwise, continue with the existing interactive/non-interactive logic.
+  if (argv._.length > 0) {
+    return; // A command was found and executed, exit main function.
+  }
 
   // set default fallback to gemini api key
   // this has to go after load cli because thats where the env is set
