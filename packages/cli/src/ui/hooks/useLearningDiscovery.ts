@@ -18,6 +18,12 @@ import {
   QuestionFeedback,
   FeedbackType,
 } from '../types/learning.js';
+import { QuestionGeneratorTool } from '@google/gemini-cli-core';
+
+export interface UseLearningDiscoveryProps {
+  /** Gemini APIクライアント */
+  geminiClient?: any; // TODO: 適切な型定義に置き換え
+}
 
 export interface UseLearningDiscoveryReturn {
   /** 現在の学習発見状態 */
@@ -45,12 +51,15 @@ export interface UseLearningDiscoveryReturn {
 /**
  * 学習発見セッションを管理するカスタムフック
  * 
- * Phase 1の基本実装：
+ * Phase 2の拡張実装：
+ * - AI統合による動的質問生成
+ * - 理解度評価問題の出題
+ * - 即時フィードバック機能
  * - 基本的な状態管理
  * - 質問と回答の履歴管理
  * - UI状態の管理
  */
-export function useLearningDiscovery(): UseLearningDiscoveryReturn {
+export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLearningDiscoveryReturn {
   // メイン状態
   const [state, setState] = useState<LearningDiscoveryState | null>(null);
   
@@ -66,6 +75,74 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
   // 参照用
   const stateRef = useRef<LearningDiscoveryState | null>(null);
   stateRef.current = state;
+
+  // 質問生成ツール
+  const questionGeneratorTool = useRef(new QuestionGeneratorTool());
+
+  // AI統合用の質問生成
+  const generateQuestionWithAI = useCallback(async (params: any): Promise<LearningQuestion> => {
+    try {
+      // Phase 2: 実際のAI統合
+      // 現在はフォールバック実装を使用
+      const result = await questionGeneratorTool.current.getQuestionData(params);
+      
+      const newQuestion: LearningQuestion = {
+        id: uuidv4(),
+        type: result.type as QuestionType,
+        question: result.question,
+        suggestedOptions: result.suggestedOptions,
+        correctAnswer: result.correctAnswer,
+      };
+
+      return newQuestion;
+    } catch (error) {
+      console.error('Failed to generate question with AI:', error);
+      // フォールバック: 基本的な質問を生成
+      return generateFallbackQuestion(params);
+    }
+  }, []);
+
+  // フォールバック質問生成
+  const generateFallbackQuestion = useCallback((params: any): LearningQuestion => {
+    if (params.phase === 'discovery') {
+      const basicQuestions = [
+        '学習する主な目的は何ですか？',
+        '現在の知識レベルはどの程度ですか？',
+        'どのくらいの期間で習得したいですか？',
+        'どのような学習方法を好みますか？'
+      ];
+      
+      const basicOptions = [
+        ['仕事・キャリアアップのため', '個人的な興味として', '学校の課題のため', '他分野の理解のため'],
+        ['全くの初心者', '少し知識がある', 'ある程度理解している', '結構詳しい'],
+        ['1-2週間程度', '1-3ヶ月程度', '半年から1年', '特に期限なし'],
+        ['理論から段階的に', '実践例から学ぶ', '問題解決型', '視覚的資料活用']
+      ];
+
+      const questionIndex = Math.min(params.previousQuestions.length, basicQuestions.length - 1);
+      
+      return {
+        id: uuidv4(),
+        type: 'discovery',
+        question: basicQuestions[questionIndex],
+        suggestedOptions: basicOptions[questionIndex],
+      };
+    } else {
+      // assessment フェーズのフォールバック
+      return {
+        id: uuidv4(),
+        type: 'assessment',
+        question: `${params.subject}について基本的な理解度を確認します。重要だと思う要素はどれですか？`,
+        suggestedOptions: [
+          '基礎概念の正確な理解',
+          '実践的な応用能力',
+          '関連分野との関係性',
+          '最新動向の把握'
+        ],
+        correctAnswer: '基礎概念の正確な理解',
+      };
+    }
+  }, []);
 
   /**
    * 新しい学習セッションを開始
@@ -109,36 +186,46 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
   }, []);
 
   /**
-   * 最初の質問を生成（Phase 1では固定質問）
+   * 最初の質問を生成（Phase 2: AI統合対応）
    */
-  const generateFirstQuestion = useCallback(() => {
+  const generateFirstQuestion = useCallback(async () => {
     if (!stateRef.current) return;
 
-    const firstQuestion: LearningQuestion = {
-      id: uuidv4(),
-      type: 'discovery',
-      question: 'どのような分野について学びたいですか？',
-      suggestedOptions: [
-        '数学・統計学（線形代数、微積分、統計など）',
-        'プログラミング・コンピューターサイエンス',
-        '歴史・社会科学（日本史、世界史、政治など）',
-        '自然科学（物理、化学、生物など）',
-      ],
-    };
+    setUiState(prev => ({ ...prev, isGeneratingQuestion: true }));
 
-    setState(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        questions: [firstQuestion],
-        currentQuestionIndex: 0,
+    try {
+      // 最初の質問は分野選択（固定）
+      const firstQuestion: LearningQuestion = {
+        id: uuidv4(),
+        type: 'discovery',
+        question: 'どのような分野について学びたいですか？',
+        suggestedOptions: [
+          '数学・統計学（線形代数、微積分、統計など）',
+          'プログラミング・コンピューターサイエンス',
+          '歴史・社会科学（日本史、世界史、政治など）',
+          '自然科学（物理、化学、生物など）',
+        ],
       };
-    });
 
-    setUiState(prev => ({
-      ...prev,
-      isGeneratingQuestion: false,
-    }));
+      setState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: [firstQuestion],
+          currentQuestionIndex: 0,
+        };
+      });
+    } catch (error) {
+      setUiState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to generate first question',
+      }));
+    } finally {
+      setUiState(prev => ({
+        ...prev,
+        isGeneratingQuestion: false,
+      }));
+    }
   }, []);
 
   /**
@@ -177,15 +264,19 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
       };
     });
 
-    // Phase 1では基本的なフィードバックのみ
+    // Phase 2: 即時フィードバック実装
     if (currentQuestion.type === 'assessment') {
-      // 評価問題の場合は即時フィードバックを表示
-      const feedback: QuestionFeedback = {
-        type: 'neutral', // Phase 1では中性的なフィードバック
-        message: 'ご回答ありがとうございます。',
-        explanation: '詳細な評価は今後の実装で追加予定です。',
-      };
-      showFeedback(feedback);
+      // 評価問題の場合は即座にフィードバックを生成・表示
+      const feedback = generateImmediateFeedback(currentQuestion, answer);
+      if (feedback) {
+        // 質問にフィードバックを追加
+        updatedQuestion.feedback = feedback;
+        
+        // フィードバックを表示
+        setTimeout(() => {
+          showFeedback(feedback);
+        }, 100);
+      }
     }
 
     // 次の質問を生成
@@ -193,7 +284,30 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
   }, []);
 
   /**
-   * 次の質問を生成
+   * 即時フィードバック生成
+   */
+  const generateImmediateFeedback = useCallback((question: LearningQuestion, userAnswer: string): QuestionFeedback | null => {
+    if (question.type !== 'assessment' || !question.correctAnswer) {
+      return null;
+    }
+
+    const isCorrect = userAnswer.trim() === question.correctAnswer.trim();
+    
+    return {
+      type: isCorrect ? 'correct' : 'incorrect',
+      message: isCorrect 
+        ? '正解です！よく理解されています。' 
+        : `不正解です。正解は「${question.correctAnswer}」です。`,
+      explanation: question.feedback?.explanation || 
+        (isCorrect 
+          ? 'この概念をしっかりと理解されています。' 
+          : 'この概念について、もう少し詳しく学習してみましょう。'),
+      relatedConcepts: isCorrect ? [] : ['基礎概念の復習', '関連する学習リソース'],
+    };
+  }, []);
+
+  /**
+   * 次の質問を生成 (Phase 2: AI統合対応)
    */
   const generateNextQuestion = useCallback(async () => {
     if (!stateRef.current) return;
@@ -201,62 +315,67 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
     setUiState(prev => ({ ...prev, isGeneratingQuestion: true }));
 
     try {
-      // Phase 1では事前定義された質問パターンを使用
-      const currentIndex = stateRef.current.currentQuestionIndex;
-      const nextIndex = currentIndex + 1;
+      const currentState = stateRef.current;
+      const currentIndex = currentState.currentQuestionIndex;
+      
+      // 履歴を質問生成用の形式に変換
+      const previousQuestions = currentState.questions
+        .filter(q => q.userResponse) // 回答済みの質問のみ
+        .map(q => ({
+          question: q.question,
+          answer: q.userResponse!,
+          type: q.type as 'discovery' | 'assessment' | 'open-ended',
+        }));
 
-      // 基本的な質問パターン（Phase 1）
-      const questionPatterns = [
-        // 1番目: 学習分野（既に表示済み）
-        {
-          question: 'なぜその分野を学びたいと思ったのですか？',
-          options: [
-            '仕事・キャリアアップのため',
-            '個人的な興味・趣味として',
-            '学校の課題・受験のため',
-            '他の分野の理解を深めるため',
-          ],
-        },
-        {
-          question: 'どのくらいの期間で習得したいですか？',
-          options: [
-            '1-2週間程度で基礎を理解したい',
-            '1-3ヶ月で実用的なレベルに',
-            '半年から1年かけてじっくりと',
-            '特に期限は設けていない',
-          ],
-        },
-        {
-          question: 'その分野についての現在の知識レベルはどの程度ですか？',
-          options: [
-            '全くの初心者（基本的な用語も知らない）',
-            '少し知識がある（本を読んだことがある程度）',
-            'ある程度理解している（基礎は身についている）',
-            '結構詳しい（応用的な内容も理解できる）',
-          ],
-        },
-      ];
+      // AI統合による質問生成
+      const params = {
+        phase: currentState.phase as 'discovery' | 'assessment',
+        subject: currentState.subject,
+        previousQuestions,
+        questionType: currentState.phase === 'discovery' ? 'discovery' : 'assessment',
+        currentLevel: 'beginner' as const, // TODO: 動的に判定
+      };
 
-      // 質問パターンの範囲内かチェック
-      if (nextIndex < questionPatterns.length) {
-        const pattern = questionPatterns[nextIndex];
-        const nextQuestion: LearningQuestion = {
-          id: uuidv4(),
-          type: 'discovery',
-          question: pattern.question,
-          suggestedOptions: pattern.options,
-        };
+      const nextQuestion = await generateQuestionWithAI(params);
 
-        setState(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            questions: [...prev.questions, nextQuestion],
-            currentQuestionIndex: nextIndex,
+      // AIが十分な情報が集まったと判断した場合
+      if (params.phase === 'discovery' && previousQuestions.length >= 3) {
+        // 理解度評価フェーズに移行するかチェック
+        const shouldMoveToAssessment = await checkShouldMoveToAssessment(currentState);
+        
+        if (shouldMoveToAssessment) {
+          setState(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              phase: 'assessment',
+            };
+          });
+          
+          // 最初の理解度評価問題を生成
+          const assessmentParams = {
+            ...params,
+            phase: 'assessment' as const,
+            questionType: 'assessment' as const,
           };
-        });
-      } else {
-        // 十分な情報が集まったと判定
+          
+          const assessmentQuestion = await generateQuestionWithAI(assessmentParams);
+          
+          setState(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              questions: [...prev.questions, assessmentQuestion],
+              currentQuestionIndex: prev.questions.length,
+            };
+          });
+          
+          return;
+        }
+      }
+
+      // 理解度評価フェーズで十分な評価が完了した場合
+      if (params.phase === 'assessment' && previousQuestions.filter(q => q.type === 'assessment').length >= 2) {
         setState(prev => {
           if (!prev) return prev;
           return {
@@ -270,15 +389,35 @@ export function useLearningDiscovery(): UseLearningDiscoveryReturn {
         await generateLearningPath();
         return;
       }
+
+      // 通常の次の質問を追加
+      setState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: [...prev.questions, nextQuestion],
+          currentQuestionIndex: prev.questions.length,
+        };
+      });
+
     } catch (error) {
       setUiState(prev => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        isGeneratingQuestion: false,
+        error: error instanceof Error ? error.message : 'Failed to generate next question',
       }));
     } finally {
       setUiState(prev => ({ ...prev, isGeneratingQuestion: false }));
     }
+  }, [generateQuestionWithAI]);
+
+  /**
+   * 理解度評価フェーズに移行するかチェック
+   */
+  const checkShouldMoveToAssessment = useCallback(async (currentState: LearningDiscoveryState): Promise<boolean> => {
+    // Phase 2: シンプルな判定ロジック
+    // 3つ以上の発見質問に回答していれば評価フェーズに移行
+    const discoveryAnswers = currentState.questions.filter(q => q.type === 'discovery' && q.userResponse);
+    return discoveryAnswers.length >= 3;
   }, []);
 
   /**

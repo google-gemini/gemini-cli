@@ -85,14 +85,25 @@ export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = (
         </Box>
       )}
 
-      {/* フェーズ表示 */}
-      <Box marginBottom={1}>
-        <Text dimColor>
-          フェーズ: <Text color={Colors.AccentGreen}>{getPhaseDisplayName(state.phase)}</Text>
-          {state.questions.length > 0 && (
-            <Text dimColor> ({state.currentQuestionIndex + 1}/{state.questions.length})</Text>
-          )}
-        </Text>
+      {/* フェーズ表示と進捗 */}
+      <Box marginBottom={1} flexDirection="column">
+        <Box marginBottom={1}>
+          <Text dimColor>
+            フェーズ: <Text color={Colors.AccentGreen}>{getPhaseDisplayName(state.phase)}</Text>
+          </Text>
+        </Box>
+        
+        {/* 進捗バー */}
+        <Box marginBottom={1}>
+          <ProgressBar state={state} />
+        </Box>
+        
+        {/* 詳細進捗情報 */}
+        <Box>
+          <Text dimColor>
+            {getProgressInfo(state)}
+          </Text>
+        </Box>
       </Box>
 
       {/* メインコンテンツ */}
@@ -161,6 +172,65 @@ export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = (
     </Box>
   );
 };
+
+/**
+ * 進捗バーコンポーネント
+ */
+const ProgressBar: React.FC<{ state: any }> = ({ state }) => {
+  const getProgressPercentage = (): number => {
+    switch (state.phase) {
+      case 'discovery':
+        const discoveryQuestions = state.questions.filter((q: any) => q.type === 'discovery' && q.userResponse);
+        return Math.min((discoveryQuestions.length / 3) * 40, 40); // 40%まで
+      case 'assessment':
+        const assessmentQuestions = state.questions.filter((q: any) => q.type === 'assessment' && q.userResponse);
+        return 40 + Math.min((assessmentQuestions.length / 2) * 40, 40); // 40-80%
+      case 'path-generation':
+        return 80; // 80%
+      case 'completed':
+        return 100; // 100%
+      default:
+        return 0;
+    }
+  };
+
+  const percentage = getProgressPercentage();
+  const filledBlocks = Math.floor((percentage / 100) * 20);
+  const emptyBlocks = 20 - filledBlocks;
+
+  return (
+    <Box>
+      <Text color={Colors.AccentBlue}>
+        {'█'.repeat(filledBlocks)}
+      </Text>
+      <Text color={Colors.Gray}>
+        {'░'.repeat(emptyBlocks)}
+      </Text>
+      <Text dimColor> {percentage.toFixed(0)}%</Text>
+    </Box>
+  );
+};
+
+/**
+ * 詳細進捗情報を取得
+ */
+function getProgressInfo(state: any): string {
+  const discoveryAnswered = state.questions.filter((q: any) => q.type === 'discovery' && q.userResponse).length;
+  const assessmentAnswered = state.questions.filter((q: any) => q.type === 'assessment' && q.userResponse).length;
+
+  switch (state.phase) {
+    case 'discovery':
+      return `深堀り質問: ${discoveryAnswered}/3 完了`;
+    case 'assessment':
+      return `深堀り: 3/3 完了 | 理解度評価: ${assessmentAnswered}/2 完了`;
+    case 'path-generation':
+      return `深堀り: 3/3 完了 | 理解度評価: 2/2 完了 | パス生成中...`;
+    case 'completed':
+      return `すべての段階が完了しました！`;
+    default:
+      return '進捗情報を取得中...';
+  }
+}
 
 /**
  * フェーズ名を日本語表示に変換
