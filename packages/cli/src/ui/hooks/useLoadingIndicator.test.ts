@@ -16,11 +16,11 @@ import {
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    let seed = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => {
-      seed += 0.1;
-      return seed;
-    });
+let callCount = 0;
+vi.spyOn(Math, 'random').mockImplementation(() => {
+  callCount++;
+  return (callCount / 10) % 1;
+});
   });
 
   afterEach(() => {
