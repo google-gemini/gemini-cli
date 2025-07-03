@@ -8,6 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
+// Add these imports for SVG to PNG conversion
+import sharp from 'sharp';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -169,6 +171,21 @@ export function detectFileType(
   return 'text';
 }
 
+/**
+ * Converts SVG to PNG using Sharp library
+ * @param svgBuffer Buffer containing SVG data
+ * @returns Promise<Buffer> PNG buffer
+ */
+async function convertSvgToPng(svgBuffer: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(svgBuffer)
+      .png()
+      .toBuffer();
+  } catch (error) {
+    throw new Error(`Failed to convert SVG to PNG: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export interface ProcessedFileReadResult {
   llmContent: PartUnion; // string for text, Part for image/pdf/unreadable binary
   returnDisplay: string;
@@ -284,12 +301,42 @@ export async function processSingleFileContent(
       case 'audio':
       case 'video': {
         const contentBuffer = await fs.promises.readFile(filePath);
+        
+        // Check if it's an SVG file and convert to PNG
+        const fileExtension = path.extname(filePath).toLowerCase();
+        const originalMimeType = mime.lookup(filePath) || 'application/octet-stream';
+        
+        if (fileExtension === '.svg' || originalMimeType === 'image/svg+xml') {
+          try {
+            const pngBuffer = await convertSvgToPng(contentBuffer);
+            const base64Data = pngBuffer.toString('base64');
+            return {
+              llmContent: {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: 'image/png', // Changed from SVG to PNG MIME type
+                },
+              },
+              returnDisplay: `Read SVG file (converted to PNG): ${relativePathForDisplay}`,
+            };
+          } catch (conversionError) {
+            // If conversion fails, fall back to returning the original SVG as text
+            const svgText = contentBuffer.toString('utf8');
+            return {
+              llmContent: `SVG file content (conversion to PNG failed):\n${svgText}`,
+              returnDisplay: `Read SVG file as text (PNG conversion failed): ${relativePathForDisplay}`,
+              error: `SVG to PNG conversion failed: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`,
+            };
+          }
+        }
+        
+        // For all other image/pdf/audio/video files, use original logic
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.lookup(filePath) || 'application/octet-stream',
+              mimeType: originalMimeType,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
