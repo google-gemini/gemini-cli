@@ -139,6 +139,17 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       };
     }
 
+    // Permission check
+    const permissionService = this.config.getFilePermissionService();
+    if (!permissionService.canPerformOperation(params.absolute_path, 'read')) {
+      const relativePath = makeRelative(params.absolute_path, this.rootDirectory);
+      const errorMessage = `Read operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+      };
+    }
+
     const result = await processSingleFileContent(
       params.absolute_path,
       this.rootDirectory,

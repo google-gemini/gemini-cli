@@ -243,9 +243,10 @@ export async function loadCliConfig(
       process.env.http_proxy,
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
-    bugCommand: settings.bugCommand,
+    bugCommand: mergedSettings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    filePermissions: mergedSettings.filePermissions, // Pass the loaded rules
   });
 }
 

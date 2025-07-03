@@ -272,6 +272,17 @@ export class WriteFileTool
       };
     }
 
+    // Permission check
+    const permissionService = this.config.getFilePermissionService();
+    if (!permissionService.canPerformOperation(params.file_path, 'write')) {
+      const relativePath = makeRelative(params.file_path, this.config.getTargetDir());
+      const errorMessage = `Write operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+      };
+    }
+
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
       params.content,

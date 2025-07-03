@@ -65,7 +65,20 @@ export interface Settings {
   hideWindowTitle?: boolean;
   hideTips?: boolean;
 
+  filePermissions?: FilePermissionRule[]; // New field
+  hideTips?: boolean;
+
   // Add other settings here.
+}
+
+// Define FilePermissionRule if not imported from a shared location yet
+// This should ideally be defined in a way that core can also access it without circular dependency.
+// For now, defining it here to match the structure expected by FilePermissionService.
+export interface FilePermissionRule {
+  description?: string;
+  patterns: string[];
+  operations: Array<'read' | 'write'>;
+  effect: 'allow' | 'deny';
 }
 
 export interface SettingsError {
