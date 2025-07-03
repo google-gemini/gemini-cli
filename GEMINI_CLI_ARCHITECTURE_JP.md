@@ -89,8 +89,8 @@ Gemini CLIは、GoogleのGemini AIモデルを使用したコマンドライン�
 ### Phase 2: Core Package理解
 
 6. **`packages/core/src/config/config.ts`** - 設定管理の仕組み
-7. **`packages/core/src/core/client.ts`** - Gemini APIクライアント
-8. **`packages/core/src/core/turn.ts`** - 対話ターンの管理
+7. **`packages/core/src/core/client.ts`** - Gemini APIクライアント ✅️
+8. **`packages/core/src/core/turn.ts`** - 対話ターンの管理 ✅️
 9. **`packages/core/src/tools/tool-registry.ts`** - ツール管理システム
 10. **`packages/core/src/tools/tools.ts`** - ツールの基底クラス
 

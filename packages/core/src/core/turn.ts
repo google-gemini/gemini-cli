@@ -22,7 +22,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { GeminiChat } from './geminiChat.js';
 import { UnauthorizedError, toFriendlyError } from '../utils/errors.js';
 
-// Define a structure for tools passed to the server
+// Define a structure for tools passed to the server 
 export interface ServerTool {
   name: string;
   schema: FunctionDeclaration;
