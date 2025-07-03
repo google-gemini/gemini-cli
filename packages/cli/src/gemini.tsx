@@ -165,8 +165,6 @@ export async function main() {
     }
   }
   let input = config.getQuestion();
-
-  // Collect startup warnings and add Node.js version warning if needed
   const startupWarnings = await getStartupWarnings();
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
