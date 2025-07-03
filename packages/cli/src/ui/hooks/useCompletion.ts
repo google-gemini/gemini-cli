@@ -22,6 +22,8 @@ import {
 } from '../components/SuggestionsDisplay.js';
 import { SlashCommand } from './slashCommandProcessor.js';
 
+const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
