@@ -191,9 +191,7 @@ export function getAvailablePort(): Promise<number> {
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   try {
-    const keyFile =
-      process.env.GOOGLE_APPLICATION_CREDENTIALS || getCachedCredentialPath();
-
+    const keyFile = getCachedCredentialPath();
     const creds = await fs.readFile(keyFile, 'utf-8');
     client.setCredentials(JSON.parse(creds));
 
@@ -221,7 +219,7 @@ async function cacheCredentials(credentials: Credentials) {
 }
 
 function getCachedCredentialPath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
+  return process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
 }
 
 function getGoogleAccountIdCachePath(): string {
