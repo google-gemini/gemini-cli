@@ -29,7 +29,7 @@ export function PromptsDialog({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const prompts = config.getPredefinedPrompts() || [];
+  const prompts = useMemo(() => config.getPredefinedPrompts() || [], [config]);
 
   const filteredItems = useMemo(
     () =>
