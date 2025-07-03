@@ -39,6 +39,7 @@
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
     "ignore": "^7.0.0",
+    "marked": "^15.0.12",
     "micromatch": "^4.0.8",
     "open": "^10.1.2",
     "shell-quote": "^1.8.2",
