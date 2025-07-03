@@ -25,6 +25,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import minimatch from 'minimatch'; // Import minimatch for permission checks
 
 // Centralized logger for Termux
 const logger = {
@@ -38,8 +39,8 @@ const logger = {
  */
 export interface EditToolParams {
   file_path: string;
-  old_string: string;
-  new_string: string;
+  old_string?: string;
+  new_string?: string;
   expected_replacements?: number;
   modified_by_user?: boolean;
   reason?: string;
@@ -49,6 +50,16 @@ export interface EditToolParams {
   delete?: string; // Pattern for line deletion
   append?: string; // Content to append
   insert_after?: string; // Pattern to insert after
+  undo?: boolean; // Undo the last edit
+  multi_line?: boolean; // Multi-line pattern replacement (handled by use_regex with 's' flag)
+  natural_language_query?: string; // Natural language edit command
+  batch?: boolean; // Batch edit multiple files
+  interactive?: boolean; // Interactive edit with confirmation
+  lookbehind?: string; // For advanced regex with context
+  lookahead?: string; // For advanced regex with context
+  case_insensitive?: boolean; // Perform case-insensitive regex matching
+  condition_pattern?: string; // Apply replacement only if this pattern is found
+  count?: number; // Limit the number of replacements
 }
 
 /**
@@ -70,7 +81,7 @@ interface CalculatedEdit {
  * Common error messages
  */
 const ErrorMessages = {
- (FILE_NOT_FOUND: 'File not found.',
+  FILE_NOT_FOUND: 'File not found.',
   FILE_ALREADY_EXISTS: 'File already exists.',
   STRING_NOT_FOUND: 'Failed to edit, could not find the string to replace.',
   REPLACEMENT_MISMATCH: 'Failed to edit, expected {expected} {term} but found {found}.',
@@ -83,6 +94,8 @@ const ErrorMessages = {
   EMPTY_NEW_STRING_ERROR: 'Cannot replace content with an empty string unless creating a new file.',
   INVALID_FILE_TYPE: 'Target path is not a file or is a directory.',
   REGEX_INVALID: 'Invalid regex pattern provided for old_string.',
+  NO_BACKUP_FOUND: 'No backup found for the last edit.',
+  PERMISSION_DENIED: 'Operation denied by file permission configuration.',
 };
 
 /**
@@ -90,30 +103,20 @@ const ErrorMessages = {
  */
 export class EditTool
   extends BaseTool<EditToolParams, ToolResult>
-  implements ModifiableTool<EditToolParams>
+  implements ModifiableTool<EditToolPrams>
 {
   static readonly Name = 'replace';
   private readonly config: Config;
   private readonly rootDirectory: string;
   private readonly client: GeminiClient;
   private fileCache: Map<string, string> = new Map(); // Cache file contents
+  private lastEditBackup: { filePath: string; content: string } | null = null; // For undo functionality
 
   constructor(config: Config) {
     super(
       EditTool.Name,
       'Edit',
-      `Replaces text within a file in the Termux realm, weaving precision and power. By default, replaces a single occurrence, but can replace multiple with \`expected_replacements\`. Use regex with \`use_regex: true\` for complex patterns. Always summon \`${ReadFileTool.Name}\` to inspect file content first.
-
-      **Parameters**:
-      - \`file_path\`: Absolute path (e.g., /data/data/com.termux/files/home/...).
-      - \`old_string\`: Exact text or regex pattern (if \`use_regex\`) to replace, including 3+ lines of context.
-      - \`new_string\`: Replacement text, preserving code style.
-      - \`expected_replacements\`: Number of replacements (default: 1).
-      - \`use_regex\`: If true, treat \`old_string\` as a regex pattern.
-      - \`reason\`: Purpose of the edit.
-      - \`dry_run\`: If true, preview changes without writing.
-
-      **Critical**: \`old_string\` must uniquely match or use regex. Use \`${ReadFileTool.Name}\` to verify content. For new files, set \`old_string\` to empty string.`,
+      `Replaces text within a file in the Termux realm, weaving precision and power. By default, replaces a single occurrence, but can replace multiple with \`expected_replacements\`. Use regex with \`use_regex: true\` for complex patterns. Always summon \`${ReadFileTool.Name}\` to inspect file content first.\n\n      **Parameters**:\n      - \`file_path\`: Absolute path (e.g., /data/data/com.termux/files/home/...).\n      - \`old_string\`: Exact text or regex pattern (if \`use_regex\`) to replace, including 3+ lines of context.\n      - \`new_string\`: Replacement text, preserving code style.\n      - \`expected_replacements\`: Number of replacements (default: 1).\n      - \`use_regex\`: If true, treat \`old_string\` as a regex pattern.\n      - \`reason\`: Purpose of the edit.\n      - \`dry_run\`: If true, preview changes without writing.\n      - \`line\`: Line number for replacement.\n      - \`delete\`: Pattern for line deletion.\n      - \`append\`: Content to append.\n      - \`insert_after\`: Pattern to insert after.\n      - \`undo\`: Undo the last edit.\n      - \`natural_language_query\`: Natural language edit command.\n      - \`batch\`: Batch edit multiple files.\n      - \`interactive\`: Interactive edit with confirmation.\n      - \`lookbehind\`: For advanced regex with context.\n      - \`lookahead\`: For advanced regex with context.\n      - \`case_insensitive\`: Perform case-insensitive regex matching.\n      - \`condition_pattern\`: Apply replacement only if this pattern is found.\n      - \`count\`: Limit the number of replacements.\n\n      **Critical**: \`old_string\` must uniquely match or use regex. Use \`${ReadFileTool.Name}\` to verify content. For new files, set \`old_string\` to empty string.`,
       {
         properties: {
           file_path: { type: 'string', description: 'Absolute path to the file.' },
@@ -127,6 +130,15 @@ export class EditTool
           delete: { type: 'string', description: 'Pattern for line deletion.', optional: true },
           append: { type: 'string', description: 'Content to append.', optional: true },
           insert_after: { type: 'string', description: 'Pattern to insert after.', optional: true },
+          undo: { type: 'boolean', description: 'Undo the last edit.', optional: true },
+          natural_language_query: { type: 'string', description: 'Natural language edit command.', optional: true },
+          batch: { type: 'boolean', description: 'Batch edit multiple files.', optional: true },
+          interactive: { type: 'boolean', description: 'Interactive edit with confirmation.', optional: true },
+          lookbehind: { type: 'string', description: 'For advanced regex with context.', optional: true },
+          lookahead: { type: 'string', description: 'For advanced regex with context.', optional: true },
+          case_insensitive: { type: 'boolean', description: 'Perform case-insensitive regex matching.', optional: true },
+          condition_pattern: { type: 'string', description: 'Apply replacement only if this pattern is found.', optional: true },
+          count: { type: 'number', description: 'Limit the number of replacements.', minimum: 1, optional: true },
         },
         required: ['file_path'],
         type: 'object',
@@ -147,6 +159,18 @@ export class EditTool
       logger.warn(`Path ${pathToCheck} attempts to escape the root ${normalizedRoot}`);
     }
     return isValid;
+  }
+
+  private checkFilePermission(filePath: string, operation: 'read' | 'write'): boolean {
+    const rules = this.config.getFilePermissionService().getRules();
+    for (const rule of rules) {
+      if (minimatch(filePath, rule.pattern)) {
+        if (rule.operations.includes(operation)) {
+          return rule.effect === 'allow';
+        }
+      }
+    }
+    return false; // Default-deny policy
   }
 
   validateToolParams(params: EditToolParams): string | null {
@@ -171,13 +195,33 @@ export class EditTool
       return ErrorMessages.EMPTY_NEW_STRING_ERROR;
     }
 
-    if (params.use_regex) {
+    if (params.use_regex && params.old_string) {
       try {
         new RegExp(params.old_string);
       } catch (err) {
         logger.error(`Invalid regex: ${params.old_string}`);
         return `${ErrorMessages.REGEX_INVALID}: ${String(err)}`;
       }
+    }
+
+    // Ensure only one primary edit operation is specified
+    const editOperations = [
+      params.old_string !== undefined && params.new_string !== undefined,
+      params.line !== undefined,
+      params.delete !== undefined,
+      params.append !== undefined,
+      params.insert_after !== undefined,
+      params.undo,
+      params.natural_language_query !== undefined,
+      params.batch,
+      params.interactive,
+    ].filter(Boolean).length;
+
+    if (editOperations > 1) {
+      return `${ErrorMessages.INVALID_PARAMETERS}: Only one primary edit operation (replace, line, delete, append, insert_after, undo, natural_language_query, batch, interactive) can be specified at a time.`;
+    }
+    if (editOperations === 0 && !params.dry_run) {
+      return `${ErrorMessages.INVALID_PARAMETERS}: No edit operation specified.`;
     }
 
     return null;
@@ -189,6 +233,10 @@ export class EditTool
     newString: string,
     isNewFile: boolean,
     useRegex: boolean = false,
+    lookbehind?: string,
+    lookahead?: string,
+    caseInsensitive: boolean = false,
+    count?: number,
   ): { newContent: string; occurrences: number } {
     if (isNewFile) {
       return { newContent: newString, occurrences: 1 };
@@ -202,13 +250,65 @@ export class EditTool
 
     let occurrences = 0;
     let newContent = currentContent;
+    let pattern = oldString;
+
+    // Escape lookbehind and lookahead for regex safety
+    const escapedLookbehind = lookbehind ? lookbehind.replace(/[.*+?^${}()|[\]\\]/g, '\$&') : '';
+    const escapedLookahead = lookahead ? lookahead.replace(/[.*+?^${}()|[\]\\]/g, '\$&') : '';
+
     if (useRegex) {
-      const regex = new RegExp(oldString, 'g');
-      occurrences = (currentContent.match(regex) || []).length;
-      newContent = currentContent.replace(regex, newString);
+      let flags = 'gs'; // 'g' for global, 's' for dotAll
+      if (caseInsensitive) {
+        flags += 'i';
+      }
+
+      if (lookbehind) {
+        pattern = `(?<=${escapedLookbehind})${pattern}`;
+      }
+      if (lookahead) {
+        pattern = `${pattern}(?=${escapedLookahead})`;
+      }
+      const regex = new RegExp(pattern, flags);
+
+      if (count !== undefined && count > 0) {
+        let match;
+        let replacedCount = 0;
+        let lastIndex = 0;
+        const parts: string[] = [];
+
+        while ((match = regex.exec(currentContent)) !== null && replacedCount < count) {
+          parts.push(currentContent.substring(lastIndex, match.index));
+          parts.push(newString);
+          lastIndex = regex.lastIndex;
+          replacedCount++;
+        }
+        parts.push(currentContent.substring(lastIndex));
+        newContent = parts.join('');
+        occurrences = replacedCount;
+      } else {
+        occurrences = (currentContent.match(regex) || []).length;
+        newContent = currentContent.replace(regex, newString);
+      }
     } else {
-      occurrences = currentContent.split(oldString).length - 1;
-      newContent = currentContent.replaceAll(oldString, newString);
+      if (count !== undefined && count > 0) {
+        let replacedCount = 0;
+        let lastIndex = 0;
+        const parts: string[] = [];
+        let currentIndex = 0;
+
+        while (replacedCount < count && (currentIndex = currentContent.indexOf(oldString, lastIndex)) !== -1) {
+          parts.push(currentContent.substring(lastIndex, currentIndex));
+          parts.push(newString);
+          lastIndex = currentIndex + oldString.length;
+          replacedCount++;
+        }
+        parts.push(currentContent.substring(lastIndex));
+        newContent = parts.join('');
+        occurrences = replacedCount;
+      } else {
+        occurrences = currentContent.split(oldString).length - 1;
+        newContent = currentContent.replaceAll(oldString, newString);
+      }
     }
     return { newContent, occurrences };
   }
@@ -241,8 +341,8 @@ export class EditTool
           occurrences,
           error,
           isNewFile,
-          finalOldString,
-          finalNewString,
+          finalOldString: finalOldString || '',
+          finalNewString: finalNewString || '',
           originalParams: params,
           timestamp: new Date(),
         };
@@ -294,15 +394,41 @@ export class EditTool
         code: 'FILE_NOT_FOUND',
       };
     } else if (currentContent !== null) {
-      const correctedEdit = await ensureCorrectEdit(currentContent, params, this.client, abortSignal);
+      if (params.condition_pattern) {
+      const conditionRegex = new RegExp(params.condition_pattern, params.case_insensitive ? 'i' : '');
+      if (!conditionRegex.test(currentContent || '')) {
+        error = {
+          display: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}. No edit performed.`,
+          raw: `Condition pattern '${params.condition_pattern}' not found in ${params.file_path}.`,
+          code: 'CONDITION_NOT_MET',
+        };
+        return {
+          currentContent,
+          newContent: currentContent ?? '',
+          occurrences: 0,
+          error,
+          isNewFile,
+          finalOldString: finalOldString || '',
+          finalNewString: finalNewString || '',
+          originalParams: params,
+          timestamp: new Date(),
+        };
+      }
+    }
+
+    const correctedEdit = await ensureCorrectEdit(currentContent, params, this.client, abortSignal);
       finalOldString = correctedEdit.params.old_string;
       finalNewString = correctedEdit.params.new_string;
       const { newContent, occurrences: calcOccurrences } = this.applyReplacement(
         currentContent,
-        finalOldString,
-        finalNewString,
+        finalOldString || '',
+        finalNewString || '',
         isNewFile,
         params.use_regex ?? false,
+        params.lookbehind,
+        params.lookahead,
+        params.case_insensitive ?? false,
+        params.count,
       );
       occurrences = calcOccurrences;
 
@@ -338,8 +464,8 @@ export class EditTool
         occurrences,
         error,
         isNewFile,
-        finalOldString,
-        finalNewString,
+        finalOldString: finalOldString || '',
+        finalNewString: finalNewString || '',
         originalParams: params,
         timestamp: new Date(),
       };
@@ -357,8 +483,8 @@ export class EditTool
       occurrences,
       error,
       isNewFile,
-      finalOldString,
-      finalNewString,
+      finalOldString: finalOldString || '',
+      finalNewString: finalNewString || '',
       originalParams: params,
       timestamp: new Date(),
     };
@@ -434,11 +560,36 @@ export class EditTool
   }
 
   getDescription(params: EditToolParams): string {
-    if (!params.file_path || params.old_string === undefined || params.new_string === undefined) {
+    if (!params.file_path) {
       return 'Invalid parameters for edit spell';
     }
 
     const relativePath = makeRelative(params.file_path, this.rootDirectory);
+
+    if (params.undo) {
+      return `Undo last edit for ${shortenPath(relativePath)}`;
+    }
+    if (params.natural_language_query) {
+      return `Apply natural language edit "${params.natural_language_query}" to ${shortenPath(relativePath)}`;
+    }
+    if (params.batch) {
+      return `Batch edit files matching ${params.file_path}`;
+    }
+    if (params.interactive) {
+      return `Interactive edit for ${shortenPath(relativePath)}`;
+    }
+    if (params.line !== undefined) {
+      return `Replace line ${params.line} in ${shortenPath(relativePath)}`;
+    }
+    if (params.delete) {
+      return `Delete lines matching "${params.delete}" in ${shortenPath(relativePath)}`;
+    }
+    if (params.append) {
+      return `Append to ${shortenPath(relativePath)}`;
+    }
+    if (params.insert_after) {
+      return `Insert after "${params.insert_after}" in ${shortenPath(relativePath)}`;
+    }
     if (params.old_string === '' && params.new_string !== '') {
       return `Create ${shortenPath(relativePath)}`;
     }
@@ -449,7 +600,10 @@ export class EditTool
     const snippet = (str: string) => str.split('\n')[0].substring(0, 30) + (str.length > 30 ? '...' : '');
     const regexNote = params.use_regex ? ' (Regex)' : '';
     const dryRunNote = params.dry_run ? ' (Dry Run)' : '';
-    return `${shortenPath(relativePath)}: "${snippet(params.old_string)}"${regexNote} => "${snippet(params.new_string)}"${dryRunNote}`;
+    const lookbehindNote = params.lookbehind ? ` (Lookbehind: "${snippet(params.lookbehind)}")` : '';
+    const lookaheadNote = params.lookahead ? ` (Lookahead: "${snippet(params.lookahead)}")` : '';
+
+    return `${shortenPath(relativePath)}: "${snippet(params.old_string || '')}"${regexNote}${lookbehindNote}${lookaheadNote} => "${snippet(params.new_string || '')}"${dryRunNote}`;
   }
 
   async execute(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
@@ -463,16 +617,52 @@ export class EditTool
     }
 
     // Permission check - EditTool essentially performs a write operation.
-    const permissionService = this.config.getFilePermissionService();
-    if (!permissionService.canPerformOperation(params.file_path, 'write')) {
+    if (!this.checkFilePermission(params.file_path, 'write')) {
       const relativePath = makeRelative(params.file_path, this.rootDirectory);
-      const errorMessage = `Edit (write) operation on file '${shortenPath(
+      const errorMessage = `${ErrorMessages.PERMISSION_DENIED} Edit (write) operation on file '${shortenPath(
         relativePath,
       )}' denied by file permission configuration.`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
       };
+    }
+
+    // Handle undo operation
+    if (params.undo) {
+      return this.handleUndo(params);
+    }
+
+    // Handle natural language query (simple mapping for now, can be expanded with AI)
+    if (params.natural_language_query) {
+      return this.handleNaturalLanguageEdit(params, signal);
+    }
+
+    // Handle batch edit
+    if (params.batch) {
+      return this.handleBatchEdit(params, signal);
+    }
+
+    // Handle interactive edit
+    if (params.interactive) {
+      return this.handleInteractiveEdit(params, signal);
+    }
+
+    // Backup current file content before any modification
+    try {
+      const currentContent = fs.readFileSync(params.file_path, 'utf8').replace(/\n/g, '\n');
+      this.lastEditBackup = { filePath: params.file_path, content: currentContent };
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        // File doesn't exist, no backup needed for new file creation
+        this.lastEditBackup = null;
+      } else {
+        logger.error(`Failed to create backup for ${params.file_path}: ${error}`);
+        return {
+          llmContent: `Error: Failed to create backup for ${params.file_path}: ${error}`,
+          returnDisplay: `Error: Failed to create backup for ${params.file_path}: ${error}`,
+        };
+      }
     }
 
     if (params.append) {
@@ -541,18 +731,20 @@ export class EditTool
     try {
       this.ensureParentDirectoriesExist(params.file_path);
       let newContent = editData.newContent;
-      if (params.line) {
+
+      if (params.line !== undefined && params.new_string !== undefined) {
         const lines = (editData.currentContent ?? '').split('\n');
+        if (params.line <= 0 || params.line > lines.length) {
+          throw new Error(`Invalid line number: ${params.line}`);
+        }
         lines[params.line - 1] = params.new_string;
         newContent = lines.join('\n');
-      }
-      if (params.delete) {
-        const lines = (editData.currentContent ?? '').split('\n');
+      } else if (params.delete && editData.currentContent !== null) {
+        const lines = editData.currentContent.split('\n');
         const regex = new RegExp(params.delete);
         newContent = lines.filter((line) => !regex.test(line)).join('\n');
-      }
-      if (params.insert_after) {
-        const lines = (editData.currentContent ?? '').split('\n');
+      } else if (params.insert_after && params.new_string && editData.currentContent !== null) {
+        const lines = editData.currentContent.split('\n');
         const regex = new RegExp(params.insert_after);
         const newLines: string[] = [];
         lines.forEach((line) => {
@@ -603,6 +795,30 @@ export class EditTool
           `Applied regex pattern: "${params.old_string}"`,
         );
       }
+      if (params.line !== undefined) {
+        llmSuccessMessageParts.push(`Replaced line ${params.line}`);
+      }
+      if (params.delete) {
+        llmSuccessMessageParts.push(`Deleted lines matching "${params.delete}"`);
+      }
+      if (params.insert_after) {
+        llmSuccessMessageParts.push(`Inserted after "${params.insert_after}"`);
+      }
+      if (params.lookbehind) {
+        llmSuccessMessageParts.push(`With lookbehind: "${params.lookbehind}"`);
+      }
+      if (params.lookahead) {
+        llmSuccessMessageParts.push(`With lookahead: "${params.lookahead}"`);
+      }
+      if (params.case_insensitive) {
+        llmSuccessMessageParts.push(`Case-insensitive: true`);
+      }
+      if (params.condition_pattern) {
+        llmSuccessMessageParts.push(`Condition pattern: "${params.condition_pattern}"`);
+      }
+      if (params.count !== undefined) {
+        llmSuccessMessageParts.push(`Limited to ${params.count} replacement(s)`);
+      }
 
       logger.info(`Edit successful: ${llmSuccessMessageParts.join(' ')}`);
       return {
@@ -617,6 +833,155 @@ export class EditTool
         returnDisplay: `${ErrorMessages.FAILED_TO_WRITE_FILE}: ${errorMsg}`,
       };
     }
+  }
+
+  private async handleUndo(params: EditToolParams): Promise<ToolResult> {
+    if (!this.lastEditBackup || this.lastEditBackup.filePath !== params.file_path) {
+      return {
+        llmContent: `Error: ${ErrorMessages.NO_BACKUP_FOUND}`,
+        returnDisplay: `Error: ${ErrorMessages.NO_BACKUP_FOUND}`,
+      };
+    }
+
+    try {
+      fs.writeFileSync(this.lastEditBackup.filePath, this.lastEditBackup.content, 'utf8');
+      this.fileCache.set(this.lastEditBackup.filePath, this.lastEditBackup.content);
+      this.lastEditBackup = null; // Clear backup after restore
+      return {
+        llmContent: `Successfully restored ${this.lastEditBackup.filePath} from backup.`,
+        returnDisplay: `Successfully restored ${shortenPath(makeRelative(this.lastEditBackup.filePath, this.rootDirectory))} from backup.`,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to undo edit for ${params.file_path}: ${errorMsg}`);
+      return {
+        llmContent: `Error: Failed to undo edit for ${params.file_path}: ${errorMsg}`,
+        returnDisplay: `Error: Failed to undo edit for ${params.file_path}: ${errorMsg}`,
+      };
+    }
+  }
+
+  private async handleNaturalLanguageEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+    // This is a placeholder. In a real scenario, this would involve an AI model
+    // to parse the natural_language_query and determine the appropriate
+    // old_string, new_string, and use_regex parameters.
+    // For now, we'll use a simple hardcoded mapping as per the Python snippet example.
+    const editMap: { [key: string]: { old_pattern: string; new_text: string; use_regex: boolean; lookbehind?: string; lookahead?: string } } = {
+      "fix ta constructor": {
+        old_pattern: "def __init__\\(self, logger,.*?\\)(.*?)(?=\\n\\s*def|\\n\\s*class|\\Z)",
+        new_text: "def __init__(self, logger, symbol, timeframe, api_key=None, api_secret=None):\n        self.logger = logger\n        self.symbol = symbol\n        self.timeframe = timeframe\n        self.api_key = api_key\n        this.api_secret = api_secret\n        self.logger.info(f'Initialized TA for {symbol} on {timeframe} timeframe')",
+        use_regex: true,
+      },
+      "fix import": {
+        old_pattern: "from indicators import TMT\\s*(?=\\n)",
+        new_text: "from indicators import TMT, BybitWebSocket",
+        use_regex: true,
+      }
+      // Add more natural language mappings here
+    };
+
+    const mappedEdit = editMap[params.natural_language_query!.toLowerCase()];
+
+    if (!mappedEdit) {
+      return {
+        llmContent: `Error: Natural language query "${params.natural_language_query}" not understood or mapped to an edit operation.`,
+        returnDisplay: `Error: Natural language query "${params.natural_language_query}" not understood.`,
+      };
+    }
+
+    const newParams: EditToolParams = {
+      ...params,
+      old_string: mappedEdit.old_pattern,
+      new_string: mappedEdit.new_text,
+      use_regex: mappedEdit.use_regex,
+      lookbehind: mappedEdit.lookbehind,
+      lookahead: mappedEdit.lookahead,
+      natural_language_query: undefined, // Clear to avoid recursion
+    };
+
+    // Re-run execute with the mapped parameters
+    return this.execute(newParams, signal);
+  }
+
+  private async handleBatchEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+    // This assumes file_path in batch mode is a glob pattern for files to edit
+    const globPattern = params.file_path;
+    const files = fs.readdirSync(this.rootDirectory, { recursive: true, withFileTypes: true })
+      .filter(dirent => dirent.isFile() && minimatch(path.join(dirent.path, dirent.name), globPattern))
+      .map(dirent => path.join(this.rootDirectory, dirent.path, dirent.name));
+
+    if (files.length === 0) {
+      return {
+        llmContent: `No files found matching pattern "${globPattern}" for batch edit.`,
+        returnDisplay: `No files found for batch edit.`,
+      };
+    }
+
+    const results: string[] = [];
+    for (const filePath of files) {
+      if (!this.checkFilePermission(filePath, 'write')) {
+        results.push(`Skipped ${shortenPath(makeRelative(filePath, this.rootDirectory))}: Permission denied.`);
+        continue;
+      }
+
+      const newParams: EditToolParams = {
+        ...params,
+        file_path: filePath,
+        batch: undefined, // Clear to avoid recursion
+      };
+
+      try {
+        const result = await this.execute(newParams, signal);
+        results.push(`Processed ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${result.llmContent}`);
+      } catch (error) {
+        results.push(`Failed to edit ${shortenPath(makeRelative(filePath, this.rootDirectory))}: ${String(error)}`);
+      }
+    }
+
+    return {
+      llmContent: `Batch edit completed. Results:\n${results.join('\n')}`,
+      returnDisplay: `Batch edit completed.`,
+    };
+  }
+
+  private async handleInteractiveEdit(params: EditToolParams, signal: AbortSignal): Promise<ToolResult> {
+    // This will require user interaction, which is not directly supported by the tool execution.
+    // Instead, we'll return a message prompting the user to confirm.
+    // The actual interactive logic would be handled by the CLI client.
+
+    const editData = await this.calculateEdit(params, signal);
+
+    if (editData.error) {
+      return {
+        llmContent: editData.error.raw,
+        returnDisplay: {
+          message: `Error: ${editData.error.display}`,
+          suggestions: editData.error.suggestions,
+        },
+      };
+    }
+
+    const fileName = path.basename(params.file_path);
+    const fileDiff = Diff.createPatch(
+      fileName,
+      editData.currentContent ?? '',
+      editData.newContent,
+      'Current',
+      'Proposed',
+      DEFAULT_DIFF_OPTIONS,
+    );
+
+    return {
+      llmContent: `Interactive edit requested for ${params.file_path}. Please review the proposed changes and confirm.`,
+      returnDisplay: {
+        fileDiff,
+        fileName,
+        message: `(Interactive Edit) Proposed ${editData.occurrences} changes for ${shortenPath(
+          makeRelative(params.file_path, this.rootDirectory),
+        )}. Confirm to write changes.`,
+        outcome: ToolConfirmationOutcome.Proceed, // Indicate that confirmation is needed
+      },
+    };
   }
 
   private ensureParentDirectoriesExist(filePath: string): void {
@@ -656,10 +1021,14 @@ export class EditTool
         const isNewFileContext = params.old_string === '' && content === '';
         const { newContent } = this.applyReplacement(
           content,
-          params.old_string,
-          params.new_string,
+          params.old_string || '',
+          params.new_string || '',
           isNewFileContext,
           params.use_regex ?? false,
+          params.lookbehind,
+          params.lookahead,
+          params.case_insensitive ?? false,
+          params.count,
         );
         return newContent;
       },

@@ -59,31 +59,7 @@ export interface ReadFileToolParams {
   nonblank_numbers?: boolean;
 
   /**
-   * Display a `/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, ToolResult } from './tools.js';
-import {
-  isWithinRoot,
-  processSingleFileContent,
-  getSpecificMimeType,
-} from '../utils/fileUtils.js';
-import { Config } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
-
-/**
- * Parameters for the ReadFile tool
- */
- at the end of each line.
+   * Display a `$` at the end of each line.
    */
   show_ends?: boolean;
 }
@@ -113,7 +89,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
             description:
               "Optional: A string specifying a range of lines to read (e.g., '10-20'). This is 1-based.",
             type: 'string',
-            pattern: '^\\d+(-\\d+)?\n,
+            pattern: '^\\d+(-\\d+)?$',
           },
           section: {
             description:
@@ -140,111 +116,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
             type: 'boolean',
           },
           show_ends: {
-            description: 'Optional: Display a `/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, ToolResult } from './tools.js';
-import {
-  isWithinRoot,
-  processSingleFileContent,
-  getSpecificMimeType,
-} from '../utils/fileUtils.js';
-import { Config } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
-
-/**
- * Parameters for the ReadFile tool
- */
-export interface ReadFileToolParams {
-  /**
-   * The absolute path(s) to the file(s) to read. Can be a single path or an array of paths.
-   */
-  absolute_path: string | string[];
-
-  /**
-   * A string specifying a range of lines to read (e.g., '10-20'). This is 1-based.
-   */
-  lines?: string;
-
-  /**
-   * For text files, the name of a section (e.g., a function name) to read.
-   */
-  section?: string;
-
-  /**
-   * The line number to start reading from (optional)
-   */
-  offset?: number;
-
-  /**
-   * The number of lines to read (optional)
-   */
-  limit?: number;
-
-  /**
-   * Precede each line of output with the line number.
-   */
-  line_numbers?: boolean;
-
-  /**
-   * Number non-blank output lines.
-   */
-  nonblank_numbers?: boolean;
-
-  /**
-   * Display a `/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, ToolResult } from './tools.js';
-import {
-  isWithinRoot,
-  processSingleFileContent,
-  getSpecificMimeType,
-} from '../utils/fileUtils.js';
-import { Config } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
-
-/**
- * Parameters for the ReadFile tool
- */
- at the end of each line.
-   */
-  show_ends?: boolean;
-}
-
-/**
- * Implementation of the ReadFile tool logic
- */
-export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
-  static readonly Name: string = 'read_file';
-
-  constructor(
-    private rootDirectory: string,
-    private config: Config,
-  ) {
-    super(
-      ReadFileTool.Name,
-      'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges or sections.',
-       at the end of each line.',
+            description: 'Optional: Display a `$` at the end of each line.',
             type: 'boolean',
           },
         },
@@ -394,7 +266,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         const fileLines = fileContent.split('\n');
 
         const sectionRegex = new RegExp(
-          `(function\s+${section}|const\s+${section}\s*=\s*function|let\s+${section}\s*=\s*function|var\s+${section}\s*=\s*function)`,
+          `(function\\s+${section}|const\\s+${section}\\s*=\\s*function|let\\s+${section}\\s*=\\s*function|var\\s+${section}\\s*=\\s*function)`,
         );
         let startLine = -1;
         for (let i = 0; i < fileLines.length; i++) {
@@ -432,7 +304,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
 
         if (endLine === -1) {
           const oneLinerRegex = new RegExp(
-            `(const\s+${section}\s*=\s*\(.*\)\s*=>)`,
+            `(const\\s+${section}\\s*=\\s*\\(.*\\)\\s*=>)`,
           );
           if (oneLinerRegex.test(fileLines[startLine])) {
             endLine = startLine;

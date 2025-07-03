@@ -91,9 +91,7 @@ export class WriteFileTool
     super(
       WriteFileTool.Name,
       'WriteFile',
-      `Writes content to a specified file in the local filesystem. Can also use a template to generate content.
-
-      The user has the ability to modify `content`. If modified, this will be stated in the response.`,
+      `Writes content to a specified file in the local filesystem. Can also use a template to generate content.`,
       {
         properties: {
           file_path: {
@@ -369,7 +367,7 @@ export class WriteFileTool
       ];
       if (params.modified_by_user) {
         llmSuccessMessageParts.push(
-          `User modified the `content` to be: ${params.content}`,
+          `User modified the content to be: ${params.content}`,
         );
       }
 
