@@ -114,7 +114,7 @@ export async function main() {
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
   // Handle direct CLI commands using yargs
-  const argv = yargs(hideBin(process.argv))
+  const argv = await yargs(hideBin(process.argv))
     .command(
       'generate <prompt>',
       'Generates code based on user prompts.',
@@ -138,7 +138,8 @@ export async function main() {
             type: 'string',
           })
           .positional('errorMsg', {
-            describe: 'Optional error message to provide context for debugging.',
+            describe:
+              'Optional error message to provide context for debugging.',
             type: 'string',
           });
       },
@@ -207,7 +208,8 @@ export async function main() {
       (yargs) => {
         yargs
           .positional('dirPath', {
-            describe: 'Optional directory path to search within (defaults to home).',
+            describe:
+              'Optional directory path to search within (defaults to home).',
             type: 'string',
           })
           .positional('searchTerm', {
@@ -215,7 +217,8 @@ export async function main() {
             type: 'string',
           })
           .positional('searchContent', {
-            describe: 'Type "yes" to search file content, otherwise only search names.',
+            describe:
+              'Type "yes" to search file content, otherwise only search names.',
             type: 'string',
           });
       },

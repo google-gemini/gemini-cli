@@ -1,17 +1,29 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import chalk from 'chalk';
 import fs from 'fs-extra';
-import path from 'path';
-import { MockGeminiAPI } from '../utils/mockGeminiAPI';
+import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
-async function fileInfo(filePath: string): Promise<void> {
-  console.log(chalk.green('// Pyrmethus conjures the File Inspector with Gemini’s aid!'));
+export async function fileInfo(filePath: string): Promise<void> {
+  console.log(
+    chalk.green('// Pyrmethus conjures the File Inspector with Gemini’s aid!'),
+  );
 
-  const suggestion = await MockGeminiAPI.getSuggestion('Get file metadata in TypeScript.');
-  if (suggestion) console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+  const suggestion = await MockGeminiAPI.getSuggestion(
+    'Get file metadata in TypeScript.',
+  );
+  if (suggestion)
+    console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   if (!fs.existsSync(filePath)) {
     console.log(chalk.red(`The path '${filePath}' eludes the ether!`));
-    const debug = await MockGeminiAPI.getSuggestion(`Debug path '${filePath}' not found.`);
+    const debug = await MockGeminiAPI.getSuggestion(
+      `Debug path '${filePath}' not found.`,
+    );
     if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
@@ -28,10 +40,15 @@ async function fileInfo(filePath: string): Promise<void> {
     ].join('\n');
     console.log(chalk.yellow(info));
     console.log(chalk.green(`Success! Metadata retrieved for '${filePath}'.`));
-  } catch (error: any) {
-    console.log(chalk.red(`The spirits falter: ${error.message}`));
-    const debug = await MockGeminiAPI.getSuggestion(`Debug error: ${error.message}`);
+  } catch (error: unknown) {
+    let errorMessage = 'An unknown error occurred.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    console.log(chalk.red(`The spirits falter: ${errorMessage}`));
+    const debug = await MockGeminiAPI.getSuggestion(
+      `Debug error: ${errorMessage}`,
+    );
     if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
-

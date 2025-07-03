@@ -1,12 +1,26 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import chalk from 'chalk';
 import fs from 'fs-extra';
-import { MockGeminiAPI } from '../utils/mockGeminiAPI';
+import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
-export async function debugCode(codeOrPath: string, errorMsg?: string): Promise<void> {
-  console.log(chalk.green('// Pyrmethus conjures the Code Debugger with Gemini’s aid!'));
+export async function debugCode(
+  codeOrPath: string,
+  errorMsg?: string,
+): Promise<void> {
+  console.log(
+    chalk.green('// Pyrmethus conjures the Code Debugger with Gemini’s aid!'),
+  );
 
-  const suggestion = await MockGeminiAPI.getSuggestion('Debug code in TypeScript.');
-  if (suggestion) console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+  const suggestion = await MockGeminiAPI.getSuggestion(
+    'Debug code in TypeScript.',
+  );
+  if (suggestion)
+    console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   let code: string;
   if (fs.existsSync(codeOrPath)) {
@@ -28,9 +42,15 @@ export async function debugCode(codeOrPath: string, errorMsg?: string): Promise<
       : 'No errors found. Code appears syntactically correct.';
     console.log(chalk.yellow(debugOutput));
     console.log(chalk.green('Debugging complete.'));
-  } catch (error: any) {
-    console.log(chalk.red(`The spirits falter: ${error.message}`));
-    const debug = await MockGeminiAPI.getSuggestion(`Debug error: ${error.message}`);
+  } catch (error: unknown) {
+    let errorMessage = 'An unknown error occurred.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    console.log(chalk.red(`The spirits falter: ${errorMessage}`));
+    const debug = await MockGeminiAPI.getSuggestion(
+      `Debug error: ${errorMessage}`,
+    );
     if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }

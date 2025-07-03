@@ -477,4 +477,4 @@ describe('mergeExcludeTools', () => {
     await loadCliConfig(settings, extensions, 'test-session');
     expect(settings).toEqual(originalSettings);
   });
-}
+});
