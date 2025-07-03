@@ -74,7 +74,7 @@
     "eslint-plugin-license-header": "^0.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "glob": "^10.4.5",
+    "glob": "^9.3.5",
     "globals": "^16.0.0",
     "json": "^11.0.0",
     "lodash": "^4.17.21",
@@ -84,5 +84,7 @@
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
   },
-  "dependencies": {}
+  "dependencies": {
+    "lru-cache": "^11.1.0"
+  }
 }
