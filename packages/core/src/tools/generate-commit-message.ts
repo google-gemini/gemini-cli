@@ -16,28 +16,34 @@ import { GeminiClient } from '../core/client.js';
 import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
-const COMMIT_ANALYSIS_PROMPT = `Analyze the provided git diff and git status to generate a commit message that follows the Conventional Commits specification.
+const COMMIT_ANALYSIS_PROMPT = `Generate a conventional commit message. Output ONLY the commit message text without any formatting, code blocks, or extra text.
 
-## Commit Message Format
-The commit message MUST follow this structure:
-\`\`\`
-<type>[optional scope]: <description>
+Format: <type>[scope]: <description>
 
-[optional body]
+Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 
-[optional footer(s)]
-\`\`\`
+Rules:
+- Lowercase type and description
+- Present tense, no period
+- Breaking changes: use ! after type/scope OR "BREAKING CHANGE:" in footer
+- Body: explain motivation (optional)
+- Footer: "BREAKING CHANGE:", "Closes #123", "Refs #456" (optional)
 
-- **Main Types**:
-  - \`feat\`: A new feature (correlates with MINOR in SemVer).
-  - \`fix\`: A bug fix (correlates with PATCH in SemVer).
-- **Other Types**: \`docs\`, \`style\`, \`refactor\`, \`perf\`, \`test\`, \`build\`, \`ci\`, \`chore\`, \`revert\`.
-- **Breaking Changes**: Use a \`!\` after the type/scope (e.g., \`feat(api)!\`) and/or a footer starting with \`BREAKING CHANGE:\`. This correlates with MAJOR in SemVer.
-- **Scope**: A noun in parentheses describing the section of the codebase, e.g., \`(parser)\`.
+Examples:
+feat(auth): add user login validation
 
-## Instructions
-1.  First, provide your analysis of the changes inside \`<commit_analysis>\` XML tags. Explain the purpose ("why") of the changes.
-2.  Then, on a new line, provide ONLY the raw commit message.
+Improve security by validating user credentials.
+
+Closes #456
+
+---
+feat(api)!: remove deprecated endpoints
+
+BREAKING CHANGE: The /v1/users endpoint has been removed. Use /v2/users instead.
+
+Instructions:
+1. Analyze changes in <commit_analysis> tags
+2. Output ONLY the raw commit message text
 
 ## Git Status
 \`\`\`
