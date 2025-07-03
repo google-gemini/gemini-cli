@@ -40,7 +40,7 @@ You are now ready to use the Gemini CLI!
 
 ### Use a Gemini API key:
 
-The Gemini API provides a free tier with [100 requets per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
+The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
 
 1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
 2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
@@ -140,3 +140,4 @@ Head over to the [Uninstall](docs/Uninstall.md) guide for uninstallation instruc
 ## Terms of Service and Privacy Notice
 
 For details on the terms of service and privacy notice applicable to your use of Gemini CLI, see the [Terms of Service and Privacy Notice](./docs/tos-privacy.md).
+# gemini-cli-newtech
