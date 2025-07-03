@@ -1,0 +1,87 @@
+name: Gemini Scheduled PR Triage 🚀
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs at the beginning of every hour
+  workflow_dispatch: {}
+
+jobs:
+  audit-prs:
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Run Gemini Scheduled PR Triage
+        uses: google-gemini/gemini-cli-action@41c0f1b3cbd1a0b284251bd1aac034edd07a3a2f
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        with:
+          version: 0.1.8-rc.0
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(gh pr list)",
+                "run_shell_command(gh pr view)",
+                "run_shell_command(gh pr edit)",
+                "run_shell_command(gh issue view)"
+              ]
+            }
+          prompt: |
+            You are a PR auditing assistant. Your task is to scan all open pull requests in the repository and ensure they are correctly triaged by performing a full label synchronization from the linked issue.
+
+            The repository is ${{ github.repository }}.
+
+            Follow these steps for each open pull request:
+            1.  **Get all open pull requests.**
+                `gh pr list --repo ${{ github.repository }} --state open --json number -q '.[].number'`
+
+            2.  **Iterate through each PR number** and perform the following triage steps:
+                a. **Check for a linked issue in the PR body.**
+                   `gh pr view <PR_NUMBER> --repo ${{ github.repository }} --json body -q .body`
+
+                b. **Scan the body for an issue reference** (e.g., `#123`, `Closes #456`).
+
+                c. **Process the result:**
+                   - If **no issue reference is found**, add the `status/need-issue` label to the PR:
+                     `gh pr edit <PR_NUMBER> --repo ${{ github.repository }} --add-label "status/need-issue"`
+
+                   - If **an issue reference is found**, perform a full label synchronization:
+                     i. **Remove the `status/need-issue` label** (if present):
+                        `gh pr edit <PR_NUMBER> --repo ${{ github.repository }} --remove-label "status/need-issue"`
+
+                     ii. **Extract the issue number** from the reference.
+
+                     iii. **Fetch all labels for the issue** and store them.
+                          `gh issue view <ISSUE_NUMBER> --repo ${{ github.repository }} --json labels`
+
+                     iv. **Fetch all labels for the PR** and store them.
+                          `gh pr view <PR_NUMBER> --repo ${{ github.repository }} --json labels`
+
+                     v. **Compare the two sets of labels.**
+                        - Identify labels to **add**: those on the issue but not on the PR.
+                        - Identify labels to **remove**: those on the PR but not on the issue.
+
+                     vi. **Execute the synchronization.**
+                         - If there are labels to add, run: `gh pr edit <PR_NUMBER> --repo ${{ github.repository }} --add-label "label1,label2,..."`
+                         - If there are labels to remove, run: `gh pr edit <PR_NUMBER> --repo ${{ github.repository }} --remove-label "label3,label4,..."`
+
+            **Strictly follow these rules:**
+            - Execute the logic for every open pull request.
+            - Only use the `gh` commands provided.
+            - Do not add any comments.
+            - The final set of labels on each PR must exactly match the labels on its linked issue.
