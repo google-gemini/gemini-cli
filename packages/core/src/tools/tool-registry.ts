@@ -10,6 +10,8 @@ import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
 import { discoverMcpTools } from './mcp-client.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { SubAgentTool } from './sub-agent.js';
+import { CustomToolsetTool } from './custom-toolset.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -128,6 +130,8 @@ export class ToolRegistry {
 
   constructor(config: Config) {
     this.config = config;
+    this.registerTool(new SubAgentTool(config));
+    this.registerTool(new CustomToolsetTool(config));
   }
 
   /**

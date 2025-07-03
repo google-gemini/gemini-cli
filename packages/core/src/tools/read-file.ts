@@ -29,6 +29,16 @@ export interface ReadFileToolParams {
   absolute_path: string;
 
   /**
+   * A string specifying a range of lines to read (e.g., '10-20'). This is 1-based.
+   */
+  lines?: string;
+
+  /**
+   * For text files, the name of a section (e.g., a function name) to read.
+   */
+  section?: string;
+
+  /**
    * The line number to start reading from (optional)
    */
   offset?: number;
@@ -52,7 +62,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     super(
       ReadFileTool.Name,
       'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
+      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges or sections.',
       {
         properties: {
           absolute_path: {
@@ -61,14 +71,26 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
             type: 'string',
             pattern: '^/',
           },
+          lines: {
+            description:
+              "Optional: A string specifying a range of lines to read (e.g., '10-20'). This is 1-based.",
+            type: 'string',
+            pattern: '^\\d+(-\\d+)?
+,
+          },
+          section: {
+            description:
+              "Optional: For text files, the name of a section (e.g., a function name) to read. The tool will attempt to find the section and return its content.",
+            type: 'string',
+          },
           offset: {
             description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+              "Optional (legacy): For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Prefer using the 'lines' parameter. Use for paginating through large files.",
             type: 'number',
           },
           limit: {
             description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+              "Optional (legacy): For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Prefer using the 'lines' parameter. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: 'number',
           },
         },
@@ -150,11 +172,127 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       };
     }
 
+    const { lines, section, offset, limit } = params;
+    if ((lines && section) || (lines && offset) || (section && offset)) {
+      const errorMsg =
+        'The `lines`, `section`, and `offset`/`limit` parameters are mutually exclusive.';
+      return {
+        llmContent: `Error: ${errorMsg}`,
+        returnDisplay: `Error: ${errorMsg}`,
+      };
+    }
+
+    let readOffset: number | undefined = offset;
+    let readLimit: number | undefined = limit;
+
+    if (lines) {
+      const parts = lines.split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts.length > 1 ? parseInt(parts[1], 10) : start;
+      if (isNaN(start) || isNaN(end) || start <= 0 || end < start) {
+        const errorMsg =
+          "Invalid line range format. Use 'start' or 'start-end'. Lines are 1-based.";
+        return {
+          llmContent: `Error: ${errorMsg}`,
+          returnDisplay: `Error: ${errorMsg}`,
+        };
+      }
+      readOffset = start - 1;
+      readLimit = end - start + 1;
+    }
+
+    if (section) {
+      const fileContentResult = await processSingleFileContent(
+        params.absolute_path,
+        this.rootDirectory,
+      );
+
+      if (
+        fileContentResult.error ||
+        typeof fileContentResult.llmContent !== 'string'
+      ) {
+        return {
+          llmContent:
+            fileContentResult.error || 'Could not read file to find section.',
+          returnDisplay:
+            fileContentResult.returnDisplay || 'Could not read file.',
+        };
+      }
+
+      const fileContent = fileContentResult.llmContent;
+      const fileLines = fileContent.split('\n');
+
+      const sectionRegex = new RegExp(`(function\\s+${section}|const\\s+${section}\\s*=\\s*function|let\\s+${section}\\s*=\\s*function|var\\s+${section}\\s*=\\s*function)`);
+      let startLine = -1;
+      for (let i = 0; i < fileLines.length; i++) {
+        if (sectionRegex.test(fileLines[i])) {
+          startLine = i;
+          break;
+        }
+      }
+
+      if (startLine === -1) {
+        const errorMsg = `Section '${section}' not found in file.`;
+        return {
+          llmContent: `Error: ${errorMsg}`,
+          returnDisplay: `Error: ${errorMsg}`,
+        };
+      }
+
+      let braceCount = 0;
+      let endLine = -1;
+      let foundFirstBrace = false;
+      for (let i = startLine; i < fileLines.length; i++) {
+        for (const char of fileLines[i]) {
+          if (char === '{') {
+            braceCount++;
+            foundFirstBrace = true;
+          } else if (char === '}') {
+            braceCount--;
+          }
+        }
+        if (foundFirstBrace && braceCount === 0) {
+          endLine = i;
+          break;
+        }
+      }
+
+      if (endLine === -1) {
+        const oneLinerRegex = new RegExp(
+          `(const\\s+${section}\\s*=\\s*\\(.*\\)\\s*=>)`,
+        );
+        if (oneLinerRegex.test(fileLines[startLine])) {
+          endLine = startLine;
+        } else {
+          const errorMsg = `Could not find end of section '${section}'.`;
+          return {
+            llmContent: `Error: ${errorMsg}`,
+            returnDisplay: `Error: ${errorMsg}`,
+          };
+        }
+      }
+
+      const sectionContent = fileLines.slice(startLine, endLine + 1).join('\n');
+
+      recordFileOperationMetric(
+        this.config,
+        FileOperation.READ,
+        endLine - startLine + 1,
+        getSpecificMimeType(params.absolute_path),
+        path.extname(params.absolute_path),
+      );
+
+      return {
+        llmContent: sectionContent,
+        returnDisplay: `Content of section '${section}':\n${sectionContent}`,
+      };
+    }
+
     const result = await processSingleFileContent(
       params.absolute_path,
       this.rootDirectory,
-      params.offset,
-      params.limit,
+      readOffset,
+      readLimit,
     );
 
     if (result.error) {
@@ -164,7 +302,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       };
     }
 
-    const lines =
+    const resultLines =
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
         : undefined;
@@ -172,7 +310,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     recordFileOperationMetric(
       this.config,
       FileOperation.READ,
-      lines,
+      resultLines,
       mimetype,
       path.extname(params.absolute_path),
     );

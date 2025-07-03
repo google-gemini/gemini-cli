@@ -1,4 +1,4 @@
-25 /**
+/**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -31,6 +31,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import Handlebars from 'handlebars';
 
 /**
  * Parameters for the WriteFile tool
@@ -44,7 +45,17 @@ export interface WriteFileToolParams {
   /**
    * The content to write to the file
    */
-  content: string;
+  content?: string;
+
+  /**
+   * The template to use for generating the content
+   */
+  template?: string;
+
+  /**
+   * The variables to use with the template
+   */
+  variables?: Record<string, unknown>;
 
   /**
    * Whether the proposed content was modified by the user.
@@ -80,9 +91,9 @@ export class WriteFileTool
     super(
       WriteFileTool.Name,
       'WriteFile',
-      `Writes content to a specified file in the local filesystem.
+      `Writes content to a specified file in the local filesystem. Can also use a template to generate content.
 
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      The user has the ability to modify `content`. If modified, this will be stated in the response.`,
       {
         properties: {
           file_path: {
@@ -94,8 +105,16 @@ export class WriteFileTool
             description: 'The content to write to the file.',
             type: 'string',
           },
+          template: {
+            description: 'The template to use for generating the content.',
+            type: 'string',
+          },
+          variables: {
+            description: 'The variables to use with the template.',
+            type: 'object',
+          },
         },
-        required: ['file_path', 'content'],
+        required: ['file_path'],
         type: 'object',
       },
     );
@@ -141,6 +160,18 @@ export class WriteFileTool
       return 'Parameters failed schema validation.';
     }
 
+    if (!params.content && !params.template) {
+      return 'Either `content` or `template` must be provided.';
+    }
+
+    if (params.content && params.template) {
+      return '`content` and `template` cannot be used at the same time.';
+    }
+
+    if (params.template && !params.variables) {
+      return '`variables` must be provided when using a `template`.';
+    }
+
     const filePath = params.file_path;
 
     // 2. Absolute Path Check
@@ -180,7 +211,7 @@ export class WriteFileTool
    * @returns A string describing the action.
    */
   getDescription(params: WriteFileToolParams): string {
-    if (!params.file_path || !params.content) {
+    if (!params.file_path && (!params.content && !params.template)) {
       return `Model did not provide valid parameters for write file tool`;
     }
     const relativePath = makeRelative(
@@ -210,9 +241,11 @@ export class WriteFileTool
       return false;
     }
 
+    const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
-      params.content,
+      content,
       abortSignal,
     );
 
@@ -283,9 +316,11 @@ export class WriteFileTool
       };
     }
 
+    const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
+
     const correctedContentResult = await this._getCorrectedFileContent(
       params.file_path,
-      params.content,
+      content,
       abortSignal,
     );
 
@@ -334,7 +369,7 @@ export class WriteFileTool
       ];
       if (params.modified_by_user) {
         llmSuccessMessageParts.push(
-          `User modified the \`content\` to be: ${params.content}`,
+          `User modified the `content` to be: ${params.content}`,
         );
       }
 
@@ -455,9 +490,10 @@ export class WriteFileTool
     return {
       getFilePath: (params: WriteFileToolParams) => params.file_path,
       getCurrentContent: async (params: WriteFileToolParams) => {
+        const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
         const correctedContentResult = await this._getCorrectedFileContent(
           params.file_path,
-          params.content,
+          content,
           abortSignal,
         );
         // Only return originalContent if it was successfully read.
@@ -465,9 +501,10 @@ export class WriteFileTool
         return correctedContentResult.isReadable ? correctedContentResult.originalContent : '';
       },
       getProposedContent: async (params: WriteFileToolParams) => {
+        const content = params.content ?? this._renderTemplate(params.template!, params.variables!);
         const correctedContentResult = await this._getCorrectedFileContent(
           params.file_path,
-          params.content,
+          content,
           abortSignal,
         );
         return correctedContentResult.correctedContent;
@@ -479,8 +516,15 @@ export class WriteFileTool
       ) => ({
         ...originalParams,
         content: modifiedProposedContent,
+        template: undefined,
+        variables: undefined,
         modified_by_user: true, // Indicate that the content was user-modified
       }),
     };
+  }
+
+  private _renderTemplate(template: string, variables: Record<string, unknown>): string {
+    const compiledTemplate = Handlebars.compile(template);
+    return compiledTemplate(variables);
   }
 }

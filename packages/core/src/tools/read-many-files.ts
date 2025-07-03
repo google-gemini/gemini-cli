@@ -22,21 +22,21 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import * as yaml from 'js-yaml';
 
 /**
  * Parameters for the ReadManyFilesTool.
  */
 export interface ReadManyFilesParams {
   /**
-   * An array of file paths or directory paths to search within.
+   * An array of file paths, directory paths, or glob patterns to search within.
    * Paths are relative to the tool's configured target directory.
-   * Glob patterns can be used directly in these paths.
    */
-  paths: string[];
+  patterns: string[];
 
   /**
    * Optional. Glob patterns for files to include.
-   * These are effectively combined with the `paths`.
+   * These are effectively combined with the `patterns`.
    * Example: ["*.ts", "src/** /*.md"]
    */
   include?: string[];
@@ -138,17 +138,17 @@ export class ReadManyFilesTool extends BaseTool<
     const parameterSchema: Record<string, unknown> = {
       type: 'object',
       properties: {
-        paths: {
+        patterns: {
           type: 'array',
           items: { type: 'string' },
           description:
-            "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
+            "Required. An array of glob patterns, file paths, or directory paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
         },
         include: {
           type: 'array',
           items: { type: 'string' },
           description:
-            'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
+            'Optional. Additional glob patterns to include. These are merged with `patterns`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
           default: [],
         },
         exclude: {
@@ -177,13 +177,13 @@ export class ReadManyFilesTool extends BaseTool<
           default: true,
         },
       },
-      required: ['paths'],
+      required: ['patterns'],
     };
 
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
-      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'patterns' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded). It can also parse JSON and YAML files into a structured format.
 
 This tool is useful when you need to understand or analyze a collection of files, such as:
 - Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
@@ -203,11 +203,11 @@ Use this tool when the user's query implies needing the content of several files
 
   validateParams(params: ReadManyFilesParams): string | null {
     if (
-      !params.paths ||
-      !Array.isArray(params.paths) ||
-      params.paths.length === 0
+      !params.patterns ||
+      !Array.isArray(params.patterns) ||
+      params.patterns.length === 0
     ) {
-      return 'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.';
+      return 'The "patterns" parameter is required and must be a non-empty array of strings/glob patterns.';
     }
     if (
       this.schema.parameters &&
@@ -217,17 +217,17 @@ Use this tool when the user's query implies needing the content of several files
       )
     ) {
       if (
-        !params.paths ||
-        !Array.isArray(params.paths) ||
-        params.paths.length === 0
+        !params.patterns ||
+        !Array.isArray(params.patterns) ||
+        params.patterns.length === 0
       ) {
-        return 'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.';
+        return 'The "patterns" parameter is required and must be a non-empty array of strings/glob patterns.';
       }
-      return 'Parameters failed schema validation. Ensure "paths" is a non-empty array and other parameters match their expected types.';
+      return 'Parameters failed schema validation. Ensure "patterns" is a non-empty array and other parameters match their expected types.';
     }
-    for (const p of params.paths) {
+    for (const p of params.patterns) {
       if (typeof p !== 'string' || p.trim() === '') {
-        return 'Each item in "paths" must be a non-empty string/glob pattern.';
+        return 'Each item in "patterns" must be a non-empty string/glob pattern.';
       }
     }
     if (
@@ -248,7 +248,7 @@ Use this tool when the user's query implies needing the content of several files
   }
 
   getDescription(params: ReadManyFilesParams): string {
-    const allPatterns = [...params.paths, ...(params.include || [])];
+    const allPatterns = [...params.patterns, ...(params.include || [])];
     const pathDesc = `using patterns: \`${allPatterns.join('`, `')}\` (within target directory: \`${this.targetDir}\`)`;
 
     // Determine the final list of exclusion patterns exactly as in execute method
@@ -260,7 +260,7 @@ Use this tool when the user's query implies needing the content of several files
         ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
         : [...paramExcludes, ...this.geminiIgnorePatterns];
 
-    let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
+    let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...\`' : '\`'}` : 'none specified'}`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
     if (this.geminiIgnorePatterns.length > 0) {
@@ -288,7 +288,7 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     const {
-      paths: inputPatterns,
+      patterns: inputPatterns,
       include = [],
       exclude = [],
       useDefaultExcludes = true,
@@ -420,7 +420,22 @@ Use this tool when the user's query implies needing the content of several files
             '{filePath}',
             relativePathForDisplay,
           );
-          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
+          let content = fileReadResult.llmContent;
+          const fileExtension = path.extname(filePath).toLowerCase();
+          if (fileExtension === '.json') {
+            try {
+              content = JSON.stringify(JSON.parse(content), null, 2);
+            } catch (e) {
+              // Not a valid JSON file, treat as plain text
+            }
+          } else if (fileExtension === '.yaml' || fileExtension === '.yml') {
+            try {
+              content = yaml.dump(yaml.load(content));
+            } catch (e) {
+              // Not a valid YAML file, treat as plain text
+            }
+          }
+          contentParts.push(`${separator}\n\n${content}\n\n`);
         } else {
           contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
         }

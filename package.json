@@ -60,6 +60,9 @@
     "README.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "readline-sync": "^1.4.10"
+  },
   "devDependencies": {
     "@types/archiver": "^6.0.3",
     "@types/fs-extra": "^11.0.4",
@@ -78,6 +81,8 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "glob": "^10.4.5",
     "globals": "^16.0.0",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.0",
     "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
