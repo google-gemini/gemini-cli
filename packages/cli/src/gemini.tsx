@@ -4,6 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Fix for Node.js environment - ImageData is not available
+if (typeof globalThis.ImageData === 'undefined') {
+  class MockImageData {
+    data: any;
+    width: number;
+    height: number;
+    
+    constructor(data: any, width: number, height: number) {
+      this.data = data;
+      this.width = width;
+      this.height = height;
+    }
+  }
+  (globalThis as any).ImageData = MockImageData;
+}
+
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
@@ -109,8 +125,9 @@ export async function main() {
   const workspaceIndex = argv.indexOf('--workspace');
   const tokenIndex = argv.indexOf('--token');
   const serviceIdIndex = argv.indexOf('--service-id');
+  const promptIndex = argv.indexOf('--prompt');
 
-  // If --connect is specified, use Hypha connection instead of local execution
+  // If --connect is specified, handle Hypha connection
   if (connectIndex !== -1) {
     const serverUrl = argv[connectIndex + 1];
     const workspace = workspaceIndex !== -1 ? argv[workspaceIndex + 1] : undefined;
@@ -119,35 +136,50 @@ export async function main() {
 
     if (!serverUrl || !workspace || !token) {
       console.error('Error: When using --connect, you must also specify --workspace and --token');
-      console.error('Usage: gemini --connect <server-url> --workspace <workspace> --token <token> [--service-id <service-id>] <query>');
+      console.error('Usage:');
+      console.error('  Register as service: gemini --connect <server-url> --workspace <workspace> --token <token> [--service-id <service-id>]');
+      console.error('  Connect to service:  gemini --connect <server-url> --workspace <workspace> --token <token> [--service-id <service-id>] --prompt <query>');
       process.exit(1);
     }
 
-    // Get the query from remaining arguments
-    let input = config.getQuestion();
-    
-    // If not a TTY, read from stdin
-    if (!process.stdin.isTTY) {
-      input += await readStdin();
-    }
-    
-    if (!input) {
-      console.error('No input provided. Please provide a query when using --connect mode.');
-      process.exit(1);
-    }
+    // If --prompt is provided, connect to existing service
+    if (promptIndex !== -1) {
+      let input = config.getQuestion();
+      
+      // If not a TTY, read from stdin
+      if (!process.stdin.isTTY) {
+        input += await readStdin();
+      }
+      
+      if (!input) {
+        console.error('No input provided. Please provide a query when using --connect mode with --prompt.');
+        process.exit(1);
+      }
 
-    // Connect to Hypha service
-    await connectToHyphaService(
-      {
+      // Connect to Hypha service
+      await connectToHyphaService(
+        {
+          serverUrl,
+          workspace,
+          token,
+          serviceId,
+        },
+        input
+      );
+      
+      process.exit(0);
+    } else {
+      // No --prompt provided, register as a service
+      await registerAsHyphaService({
         serverUrl,
         workspace,
         token,
         serviceId,
-      },
-      input
-    );
-    
-    process.exit(0);
+        config
+      });
+      
+      return; // Keep running as a service
+    }
   }
 
   // Continue with normal local execution if not using Hypha connection
@@ -343,4 +375,231 @@ async function validateNonInterActiveAuth(
 
   await nonInteractiveConfig.refreshAuth(selectedAuthType);
   return nonInteractiveConfig;
+}
+
+async function registerAsHyphaService(options: {
+  serverUrl: string;
+  workspace: string;
+  token: string;
+  serviceId: string;
+  config: Config;
+}) {
+  // Dynamic import for hypha-rpc
+  const hyphaRpc = await import('hypha-rpc');
+  const { hyphaWebsocketClient } = hyphaRpc.default;
+
+  console.log(`Registering Gemini CLI as Hypha service...`);
+  console.log(`Server: ${options.serverUrl}`);
+  console.log(`Workspace: ${options.workspace}`);
+  console.log(`Service ID: ${options.serviceId}`);
+
+  try {
+    // Ensure Gemini is properly configured and authenticated
+    if (!options.config.getContentGeneratorConfig()) {
+      // set default fallback to gemini api key
+      if (process.env.GEMINI_API_KEY) {
+        const settings = loadSettings(process.cwd());
+        settings.setValue(SettingScope.User, 'selectedAuthType', AuthType.USE_GEMINI);
+        await options.config.refreshAuth(AuthType.USE_GEMINI);
+      } else {
+        console.error('No Gemini API key found. Please set GEMINI_API_KEY environment variable.');
+        process.exit(1);
+      }
+    }
+
+    // Connect to Hypha server
+    const server = await hyphaWebsocketClient.connectToServer({
+      server_url: options.serverUrl,
+      workspace: options.workspace,
+      token: options.token
+    });
+
+    console.log(`Connected to workspace: ${server.config.workspace}`);
+
+    // Create chat function
+    const chat = async function* (query: string) {
+      console.log(`Processing query: ${query}`);
+      
+      try {
+        yield {
+          type: 'status',
+          content: 'Initializing Gemini client...',
+          timestamp: new Date().toISOString()
+        };
+
+        // Get the Gemini client
+        const geminiClient = options.config.getGeminiClient();
+        const toolRegistry = await options.config.getToolRegistry();
+        const geminiChat = await geminiClient.getChat();
+
+        yield {
+          type: 'status',
+          content: 'Processing query with Gemini...',
+          timestamp: new Date().toISOString()
+        };
+
+        let currentMessages = [{ role: 'user', parts: [{ text: query }] }];
+        let fullResponse = '';
+
+        while (true) {
+          const functionCalls: any[] = [];
+
+          const responseStream = await geminiChat.sendMessageStream({
+            message: currentMessages[0]?.parts || [],
+            config: {
+              tools: [
+                { functionDeclarations: toolRegistry.getFunctionDeclarations() },
+              ],
+            },
+          });
+
+          // Process streaming response
+          for await (const resp of responseStream) {
+            const textPart = getResponseText(resp);
+            if (textPart) {
+              fullResponse += textPart;
+              yield {
+                type: 'text',
+                content: textPart,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            if (resp.functionCalls) {
+              functionCalls.push(...resp.functionCalls);
+            }
+          }
+
+          // Handle function calls if any
+          if (functionCalls.length > 0) {
+            yield {
+              type: 'status',
+              content: `Executing ${functionCalls.length} tool call(s)...`,
+              timestamp: new Date().toISOString()
+            };
+
+            const toolResponseParts: any[] = [];
+
+            for (const fc of functionCalls) {
+              const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+              const requestInfo = {
+                callId,
+                name: fc.name,
+                args: fc.args ?? {},
+                isClientInitiated: false,
+              };
+
+              try {
+                const { executeToolCall } = await import('@google/gemini-cli-core');
+                const toolResponse = await executeToolCall(
+                  options.config,
+                  requestInfo,
+                  toolRegistry,
+                  new AbortController().signal
+                );
+
+                if (toolResponse.error) {
+                  yield {
+                    type: 'error',
+                    content: `Tool execution error: ${toolResponse.error.message}`,
+                    timestamp: new Date().toISOString()
+                  };
+                }
+
+                if (toolResponse.responseParts) {
+                  const parts = Array.isArray(toolResponse.responseParts)
+                    ? toolResponse.responseParts
+                    : [toolResponse.responseParts];
+                  for (const part of parts) {
+                    if (typeof part === 'string') {
+                      toolResponseParts.push({ text: part });
+                    } else if (part) {
+                      toolResponseParts.push(part);
+                    }
+                  }
+                }
+              } catch (error) {
+                yield {
+                  type: 'error',
+                  content: `Tool execution failed: ${(error as Error).message}`,
+                  timestamp: new Date().toISOString()
+                };
+              }
+            }
+
+            currentMessages = [{ role: 'user', parts: toolResponseParts }];
+          } else {
+            // No more function calls, we're done
+            break;
+          }
+        }
+
+        // Yield final response
+        yield {
+          type: 'final',
+          content: fullResponse || 'Query processed successfully',
+          timestamp: new Date().toISOString()
+        };
+
+      } catch (error) {
+        console.error('Error processing query:', error);
+        yield {
+          type: 'error',
+          content: (error as Error).message,
+          timestamp: new Date().toISOString()
+        };
+      }
+    };
+
+    // Register the service
+    const service = await server.registerService({
+      id: options.serviceId,
+      name: 'Gemini CLI Agent Service',
+      description: 'Remote access to Gemini CLI agent with streaming responses',
+      config: {
+        visibility: 'public',
+        require_context: false
+      },
+      chat
+    });
+
+    console.log(`✅ Service registered with ID: ${service.id}`);
+    console.log(`🌐 Service URL: ${options.serverUrl}/${server.config.workspace}/services/${options.serviceId}/chat`);
+    console.log(`🚀 Service is now running. Press Ctrl+C to stop.`);
+    
+    // Keep the service running
+    process.on('SIGINT', () => {
+      console.log('\n🛑 Shutting down service...');
+      process.exit(0);
+    });
+
+    // Keep alive
+    await new Promise(() => {});
+    
+  } catch (error) {
+    console.error(`❌ Failed to register service: ${error}`);
+    process.exit(1);
+  }
+}
+
+function getResponseText(response: any) {
+  if (response.candidates && response.candidates.length > 0) {
+    const candidate = response.candidates[0];
+    if (
+      candidate.content &&
+      candidate.content.parts &&
+      candidate.content.parts.length > 0
+    ) {
+      // Skip thought parts in headless mode
+      const thoughtPart = candidate.content.parts[0];
+      if (thoughtPart?.thought) {
+        return null;
+      }
+      return candidate.content.parts
+        .filter((part: any) => part.text)
+        .map((part: any) => part.text)
+        .join('');
+    }
+  }
+  return null;
 }

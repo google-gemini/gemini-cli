@@ -1,14 +1,14 @@
 # Gemini CLI Hypha Integration
 
-This project provides a Hypha service wrapper for the Gemini CLI agent, enabling remote programmatic access to the Gemini agent through Hypha RPC.
+This project provides Hypha service integration for the Gemini CLI agent, enabling remote programmatic access to the Gemini agent through Hypha RPC.
 
 ## Overview
 
 The integration consists of:
 
-1. **Hypha Service** (`hypha-gemini-service.js`) - A Node.js service that wraps the Gemini CLI agent and registers it with a Hypha server
-2. **CLI Command Extension** - New command-line options for the Gemini CLI to connect to remote Hypha services
-3. **Python Test Client** (`test_gemini_service.py`) - Example client for testing the service
+1. **CLI Service Mode** - The Gemini CLI can register itself as a Hypha service
+2. **CLI Client Mode** - The Gemini CLI can connect to remote Hypha services  
+3. **Python Client** (`test_gemini_service.py`) - Example client for testing the service
 
 ## Features
 
@@ -46,29 +46,33 @@ The integration consists of:
 
 ## Usage
 
-### Starting the Hypha Service
+### Register Gemini CLI as a Hypha Service
 
-Run the Hypha service to register the Gemini agent:
+Register the Gemini CLI as a service on the Hypha server:
 
 ```bash
-node hypha-gemini-service.js
+gemini --connect https://hypha.aicell.io \
+       --workspace ws-user-github|478667 \
+       --token YOUR_TOKEN \
+       --service-id gemini-agent
 ```
 
-The service will:
+This will:
 - Connect to the Hypha server at `https://hypha.aicell.io`
-- Register a service with ID `gemini-agent`
+- Register as a service with ID `gemini-agent`
 - Provide a `chat` function that yields streaming responses
+- Keep running to serve requests
 
-### Using the CLI with Hypha Connection
+### Connect to Remote Gemini Service
 
-Connect to the remote Gemini service using the extended CLI:
+Use the Gemini CLI to connect to an existing remote service:
 
 ```bash
-node packages/cli/dist/index.js \
-  --connect https://hypha.aicell.io \
-  --workspace ws-user-github|478667 \
-  --token YOUR_TOKEN \
-  --prompt "What is machine learning?"
+gemini --connect https://hypha.aicell.io \
+       --workspace ws-user-github|478667 \
+       --token YOUR_TOKEN \
+       --service-id gemini-agent \
+       --prompt "What is machine learning?"
 ```
 
 #### Parameters
@@ -77,7 +81,7 @@ node packages/cli/dist/index.js \
 - `--workspace <workspace>`: Target workspace ID
 - `--token <token>`: Authentication token
 - `--service-id <id>`: Service ID (defaults to "gemini-agent")
-- `--prompt <query>`: Query to send to the agent
+- `--prompt <query>`: Query to send to the agent (only for client mode)
 
 ### Using Python Client
 
@@ -119,36 +123,68 @@ python3 test_gemini_service.py simple
 python3 test_gemini_service.py
 ```
 
-## Configuration
+## Usage Modes
 
-### Service Configuration
+### 1. Service Mode (Register)
 
-The service can be configured by modifying the constants in `hypha-gemini-service.js`:
+When you run without `--prompt`, the CLI registers as a service:
 
-```javascript
-const HYPHA_SERVER_URL = 'https://hypha.aicell.io';
-const WORKSPACE = 'ws-user-github|478667';
-const TOKEN = 'your-token-here';
-const SERVICE_ID = 'gemini-agent';
+```bash
+gemini --connect https://hypha.aicell.io --workspace WORKSPACE --token TOKEN
 ```
+
+Output:
+```
+Registering Gemini CLI as Hypha service...
+Server: https://hypha.aicell.io
+Workspace: ws-user-github|478667
+Service ID: gemini-agent
+✅ Service registered with ID: ws-user-github|478667/abc123:gemini-agent
+🌐 Service URL: https://hypha.aicell.io/ws-user-github|478667/services/gemini-agent/chat
+🚀 Service is now running. Press Ctrl+C to stop.
+```
+
+### 2. Client Mode (Connect)
+
+When you run with `--prompt`, the CLI connects to existing service:
+
+```bash
+gemini --connect https://hypha.aicell.io --workspace WORKSPACE --token TOKEN --prompt "Your question"
+```
+
+Output:
+```
+Connecting to Hypha server at https://hypha.aicell.io...
+Connected to workspace: ws-user-github|478667
+Looking for service: ws-user-github|478667/gemini-agent
+Found service: ws-user-github|478667/abc123:gemini-agent
+
+Processing query: Your question
+
+[STATUS] Initializing Gemini client...
+[STATUS] Processing query with Gemini...
+Your answer appears here...
+[COMPLETED] Query processed successfully
+```
+
+## Configuration
 
 ### Default Credentials
 
 The current setup uses:
 - **Server**: https://hypha.aicell.io
 - **Workspace**: ws-user-github|478667
-- **Token**: [Provided token with admin access]
+- **Token**: [Your provided token with admin access]
 - **Service ID**: gemini-agent
 
 ## Architecture
 
 ### Service Flow
 
-1. **Initialization**: Service loads Gemini configuration and authenticates with Gemini API
-2. **Registration**: Service registers with Hypha server providing a `chat` function
-3. **Request Processing**: Client calls `chat` function with query
-4. **Response Generation**: Service processes query through Gemini CLI core and yields streaming responses
-5. **Tool Execution**: If needed, service executes tools and provides tool output
+1. **Registration**: Gemini CLI registers itself as a Hypha service
+2. **Request Processing**: Client calls `chat` function with query
+3. **Response Generation**: Service processes query through Gemini CLI core and yields streaming responses
+4. **Tool Execution**: If needed, service executes tools and provides tool output
 
 ### Response Types
 
@@ -180,8 +216,8 @@ Common issues and solutions:
 
 To extend the service:
 
-1. Modify `hypha-gemini-service.js` to add new methods
-2. Update the service registration to include new functions
+1. Modify the `chat` function in `registerAsHyphaService`
+2. Add new methods to the service registration
 3. Test with Python or JavaScript clients
 
 ### Debugging

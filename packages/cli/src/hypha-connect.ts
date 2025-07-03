@@ -44,12 +44,30 @@ export async function connectToHyphaService(options: HyphaConnectOptions, query:
 
     console.log(`Connected to workspace: ${server.config.workspace}`);
 
-    // Get the Gemini service
+    // Find the Gemini service by iterating through available services
     const serviceFullId = `${server.config.workspace}/${options.serviceId}`;
     console.log(`Looking for service: ${serviceFullId}`);
     
-    const service = await server.getService(serviceFullId);
-    console.log(`Found service: ${service.id}`);
+    let service = null;
+    try {
+      // First try to find a service by iterating through available services
+      const services = await server.listServices();
+      for (const svc of services) {
+        if (svc.id.includes(options.serviceId) && svc.id.includes('gemini-agent')) {
+          service = await server.getService(svc.id);
+          console.log(`Found service: ${service.id}`);
+          break;
+        }
+      }
+      
+      if (!service) {
+        console.error(`No ${options.serviceId} service found in available services`);
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(`Failed to find service: ${error}`);
+      process.exit(1);
+    }
 
     console.log(`\nProcessing query: ${query}\n`);
 

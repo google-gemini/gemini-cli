@@ -35,19 +35,24 @@ async def test_gemini_service():
         service_full_id = f"{server.config.workspace}/{SERVICE_ID}"
         print(f"Looking for service: {service_full_id}")
         
-        # Try to get the service
+        # Try to get our specific service
+        service = None
+        
         try:
-            service = await server.get_service(service_full_id)
-            print(f"Found service: {service.id}")
+            # First try to find a service by iterating through available services
+            services = await server.list_services()
+            for svc in services:
+                if SERVICE_ID in svc.id and 'gemini-agent' in svc.id:
+                    service = await server.get_service(svc.id)
+                    print(f"✓ Found Gemini service: {service.id}")
+                    break
+            
+            if not service:
+                print(f"✗ No {SERVICE_ID} service found in available services")
+                return
+                
         except Exception as e:
-            print(f"Failed to find service {service_full_id}: {e}")
-            print("Available services:")
-            try:
-                services = await server.list_services()
-                for svc in services:
-                    print(f"  - {svc}")
-            except Exception as list_error:
-                print(f"Could not list services: {list_error}")
+            print(f"✗ Could not access Gemini service: {e}")
             return
         
         # Test queries
@@ -123,9 +128,20 @@ async def simple_test():
         
         # Try to get our specific service
         service_full_id = f"{server.config.workspace}/{SERVICE_ID}"
+        service = None
+        
         try:
-            service = await server.get_service(service_full_id)
-            print(f"✓ Found Gemini service: {service.id}")
+            # First try to find a service by iterating through available services
+            services = await server.list_services()
+            for svc in services:
+                if SERVICE_ID in svc.id and 'gemini-agent' in svc.id:
+                    service = await server.get_service(svc.id)
+                    print(f"✓ Found Gemini service: {service.id}")
+                    break
+            
+            if not service:
+                print(f"✗ No {SERVICE_ID} service found in available services")
+                return
             
             # Test a simple query
             print("\nTesting with simple query...")
