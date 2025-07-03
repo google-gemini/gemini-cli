@@ -18,7 +18,8 @@ import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
 import {
   OpenAICompatibleContentGenerator,
-  AnthropicContentGenerator
+  AnthropicContentGenerator,
+  AzureContentGenerator,
 } from './customContentGenerators.js';
 
 /**
@@ -55,6 +56,7 @@ export type ContentGeneratorConfig = {
   authType?: AuthType | undefined;
   // New fields for custom endpoints
   baseUrl?: string;
+  apiVersion?: string;
   customHeaders?: Record<string, string>;
   timeout?: number;
 };

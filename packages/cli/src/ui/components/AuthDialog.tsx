@@ -30,6 +30,7 @@ export function AuthDialog({
     { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
     { label: 'Gemini API Key (AI Studio)', value: AuthType.USE_GEMINI },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Azure OpenAI', value: AuthType.USE_AZURE },
     { label: 'OpenAI Compatible', value: AuthType.USE_OPENAI_COMPATIBLE },
     { label: 'Anthropic Claude', value: AuthType.USE_ANTHROPIC },
     { label: 'Local LLM', value: AuthType.USE_LOCAL_LLM },

@@ -131,8 +131,8 @@ async function parseArguments(): Promise<CliArgs> {
     })
     .option('auth-type', {
       type: 'string',
-      description: 'Authentication type (oauth-personal, gemini-api-key, vertex-ai, openai-compatible, anthropic, local-llm)',
-      choices: ['oauth-personal', 'gemini-api-key', 'vertex-ai', 'openai-compatible', 'anthropic', 'local-llm'],
+      description: 'Authentication type (oauth-personal, gemini-api-key, vertex-ai, openai-compatible, anthropic, azure, local-llm)',
+      choices: ['oauth-personal', 'gemini-api-key', 'vertex-ai', 'openai-compatible', 'anthropic', 'azure', 'local-llm'],
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')

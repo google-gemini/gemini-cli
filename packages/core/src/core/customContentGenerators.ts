@@ -52,22 +52,18 @@ function normalizeContents(contents: any): Content[] {
 }
 
 export class AzureContentGenerator implements ContentGenerator {
-  constructor(private config: ContentGeneratorConfig) { }
-
-  private buildAzureUrl(model: string): string {
-    const baseUrl = this.config.baseUrl;
-    const apiVersion = this.config.apiVersion || '2025-01-01-preview';
-    return `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=${apiVersion}`;
+  constructor(private config: ContentGeneratorConfig) {
+    // Set default model if no model is provided
+    this.config.model = this.config.model || 'gpt-4o';
   }
-
   async generateContent(request: GenerateContentParameters): Promise<GenerateContentResponse> {
-    const azureUrl = this.buildAzureUrl(request.model || this.config.model);
+    const azureUrl = `${this.config.baseUrl}/openai/deployments/${request.model || this.config.model}/chat/completions?api-version=${this.config.apiVersion}`;
     const contents = normalizeContents(request.contents);
 
     const requestBody = {
       messages: contents.map((content) => ({
         role: content.role === 'model' ? 'assistant' : content.role,
-        content: content.parts.map(part => ('text' in part ? part.text : '')).join(' '),
+        content: content.parts?.map(part => ('text' in part ? part.text : '')).join(' ') || '',
       })),
       temperature: request.config?.temperature || 0.7,
       max_tokens: request.config?.maxOutputTokens || 2048,
@@ -77,7 +73,7 @@ export class AzureContentGenerator implements ContentGenerator {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api-key': this.config.apiKey,
+        'api-key': this.config.apiKey || '',
         ...this.config.customHeaders,
       },
       body: JSON.stringify(requestBody),
@@ -98,16 +94,113 @@ export class AzureContentGenerator implements ContentGenerator {
           finishReason: data.choices[0].finish_reason || 'STOP',
         },
       ],
+      text: data.choices[0].message.content,
+      data,
+      functionCalls: [],
+      executableCode: undefined,
+      codeExecutionResult: undefined,
     };
+  }
+  async generateContentStream(
+    request: GenerateContentParameters
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const self = this;
+
+    return (async function* () {
+      const azureUrl = `${self.config.baseUrl}/openai/deployments/${request.model || self.config.model}/chat/completions?api-version=${self.config.apiVersion}`;
+      const contents = normalizeContents(request.contents);
+
+      const requestBody = {
+        messages: contents.map((content) => ({
+          role: content.role === 'model' ? 'assistant' : content.role,
+          content: content.parts?.map(part => ('text' in part ? part.text : '')).join(' ') || '',
+        })),
+        temperature: request.config?.temperature || 0.7,
+        max_tokens: request.config?.maxOutputTokens || 2048,
+        stream: true, // Enable streaming
+      };
+
+      const response = await fetch(azureUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'api-key': self.config.apiKey || '',
+          ...self.config.customHeaders,
+        },
+        body: JSON.stringify(requestBody),
+        signal: self.config.timeout ? AbortSignal.timeout(self.config.timeout) : undefined,
+      });
+
+      if (!response.ok) {
+        const errorMsg = await response.text();
+        throw new Error(`Azure API Streaming Error: ${response.status} - ${errorMsg}, URL ${azureUrl}`);
+      }
+
+      if (!response.body) {
+        throw new Error('Streaming response body is empty!');
+      }
+
+      const decoder = new TextDecoder();
+      const reader = response.body.getReader();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // If the line is incomplete, buffer it for the next read.
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') {
+                return;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices[0]?.delta?.content ?? '';
+                // Yield the streaming response as an incremental GenerateContentResponse
+                yield {
+                  candidates: [
+                    {
+                      content: { parts: [{ text: content }], role: 'model' },
+                      index: 0,
+                      finishReason: parsed.choices[0]?.finish_reason || 'STOP',
+                    },
+                  ],
+                  functionCalls: [],
+                  text: content,
+                  data: undefined,
+                  executableCode: undefined,
+                  codeExecutionResult: undefined,
+                };
+              } catch (e) {
+                console.error('Failed to parse streaming response:', e);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    })();
   }
 
   async countTokens(request: CountTokensParameters): Promise<CountTokensResponse> {
     const contents = normalizeContents(request.contents);
-    const text = contents.map((c) => c.parts.map((p) => ('text' in p ? p.text : '')).join(' ')).join(' ');
-    return { totalTokens: Math.ceil(text.length / 4) }; // Simple token approximation
+    const text = contents.map((c) => c.parts?.map((p) => ('text' in p ? p.text : '')).join(' ') || '').join(' ');
+    return { totalTokens: Math.ceil(text.length / 4) }; // Rough approximation
   }
 
-  // Add other methods like `generateContentStream` and `embedContent` if needed.
+  async embedContent(): Promise<EmbedContentResponse> {
+    throw new Error('AzureContentGenerator does not support embeddings.');
+  }
 }
 
 /**
@@ -120,7 +213,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
     const openAIRequest = this.convertToOpenAIFormat(request);
-    const url = `${this.config.baseUrl}/chat/completions`;
+    const url = `${this.config.baseUrl} / chat / completions`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -156,7 +249,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
   ): AsyncGenerator<GenerateContentResponse> {
     const openAIRequest = { ...this.convertToOpenAIFormat(request), stream: true };
 
-    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+    const response = await fetch(`${this.config.baseUrl} / chat / completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -246,7 +339,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     const contents = normalizeContents(request.contents);
     const text = this.extractTextFromContents(contents);
 
-    const response = await fetch(`${this.config.baseUrl}/embeddings`, {
+    const response = await fetch(`${this.config.baseUrl} / embeddings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -287,7 +380,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
 
     // Handle JSON generation requests by adding a system message
     if (request.config?.responseMimeType === 'application/json' && request.config?.responseSchema) {
-      const jsonInstruction = `You must respond with valid JSON only. No additional text, explanations, or formatting. The response must conform to this schema: ${JSON.stringify(request.config.responseSchema)}`;
+      const jsonInstruction = `You must respond with valid JSON only.No additional text, explanations, or formatting.The response must conform to this schema: ${JSON.stringify(request.config.responseSchema)} `;
 
       // Add system message at the beginning
       messages = [
@@ -366,7 +459,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
             }
 
             // Get the actual call ID from the mapping or use the current ID
-            const callId = indexToIdMap.get(index) || toolCall.id || `call_${index}`;
+            const callId = indexToIdMap.get(index) || toolCall.id || `call_${index} `;
 
             if (!toolCallAccumulator.has(callId)) {
               toolCallAccumulator.set(callId, {
@@ -521,7 +614,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const anthropicRequest = this.convertToAnthropicFormat(request);
 
-    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+    const response = await fetch(`${this.config.baseUrl} /v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -541,7 +634,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       } catch (e) {
         errorDetails = await response.text();
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}. Details: ${errorDetails}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}.Details: ${errorDetails} `);
     }
 
     const data = await response.json();
@@ -566,7 +659,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       stream: true
     };
 
-    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+    const response = await fetch(`${this.config.baseUrl} /v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -586,7 +679,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       } catch (e) {
         errorDetails = await response.text();
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}. Details: ${errorDetails}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}.Details: ${errorDetails} `);
     }
 
     const reader = response.body?.getReader();
@@ -707,7 +800,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
                 ? part.functionResponse.response
                 : JSON.stringify(part.functionResponse.response, null, 2);
 
-              summaryText += `### ${part.functionResponse.name}\n`;
+              summaryText += `### ${part.functionResponse.name} \n`;
               summaryText += '```\n';
               summaryText += response;
               summaryText += '\n```\n\n';
