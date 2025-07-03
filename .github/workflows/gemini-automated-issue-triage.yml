@@ -49,7 +49,7 @@ jobs:
             2. Review the issue title and body provided in the environment variables.
             3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
             4. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
-            5. Add the label "status/ready-for-human-review" after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/ready-for-human-review"`
+            5. After applying appropriate labels to an issue, remove the "status/needs-triage" label and add the "status/ready-for-human-review" label: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "status/ready-for-human-review"` and `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/needs-triage"
 
             Guidelines:
             - Only use labels that already exist in the repository.
