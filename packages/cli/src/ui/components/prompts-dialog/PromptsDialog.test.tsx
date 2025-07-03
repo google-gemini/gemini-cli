@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config, PredefinedPrompt } from '@google/gemini-cli-core';
+import {
+  Config,
+  PredefinedPrompt,
+  PredefinedPromptVariable,
+} from '@google/gemini-cli-core';
 import { Text } from 'ink';
 import { render } from 'ink-testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -85,21 +89,21 @@ describe('PromptsDialog', () => {
     }) as Config;
 
   const createPrompt = (
+    id: string,
     name: string,
     template: string,
-    description?: string,
-    variables?: Array<{ name: string; type: string; required?: boolean }>,
+    variables?: PredefinedPromptVariable[],
   ): PredefinedPrompt => ({
+    id,
     name,
     template,
-    description,
     variables,
   });
 
   it('should render the prompt selection UI with available prompts', () => {
     const prompts = [
-      createPrompt('Test Prompt 1', 'Template 1'),
-      createPrompt('Test Prompt 2', 'Template 2'),
+      createPrompt('id1', 'Test Prompt 1', 'Template 1'),
+      createPrompt('id2', 'Test Prompt 2', 'Template 2'),
     ];
     const config = createMockConfig(prompts);
 
@@ -137,7 +141,9 @@ describe('PromptsDialog', () => {
 
   it('should handle valid prompt selection', async () => {
     const prompts = [
-      createPrompt('Valid Prompt', 'Hello {{name}}!', 'A test prompt'),
+      createPrompt('id1', 'Valid Prompt', 'Hello {{name}}!', [
+        { name: 'name' },
+      ]),
     ];
     const config = createMockConfig(prompts);
 
@@ -154,7 +160,7 @@ describe('PromptsDialog', () => {
     // Simulate selecting a valid prompt
     const radioButtonSelect = global.mockRadioButtonSelect;
     expect(radioButtonSelect).toBeDefined();
-    radioButtonSelect!.onSelect('Valid Prompt');
+    radioButtonSelect!.onSelect('id1');
 
     await wait();
 
@@ -170,7 +176,7 @@ describe('PromptsDialog', () => {
   });
 
   it('should handle invalid prompt selection', async () => {
-    const prompts = [createPrompt('Valid Prompt', 'Template')];
+    const prompts = [createPrompt('id1', 'Valid Prompt', 'Template')];
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
@@ -185,19 +191,19 @@ describe('PromptsDialog', () => {
 
     // Simulate selecting an invalid prompt
     const radioButtonSelect = global.mockRadioButtonSelect;
-    radioButtonSelect!.onSelect('Invalid Prompt');
+    radioButtonSelect!.onSelect('id2');
 
     await wait();
 
     // Should show error message and stay on selection screen
     const output = lastFrame();
-    expect(output).toContain('Invalid prompt selected "Invalid Prompt".');
+    expect(output).toContain('Invalid prompt selected "id2".');
     expect(output).toContain('MockRadioButtonSelect');
     expect(output).not.toContain('MockPromptItem');
   });
 
   it('should clear error message on valid selection after invalid one', async () => {
-    const prompts = [createPrompt('Valid Prompt', 'Template')];
+    const prompts = [createPrompt('id1', 'Valid Prompt', 'Template')];
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
@@ -213,13 +219,13 @@ describe('PromptsDialog', () => {
     const radioButtonSelect = global.mockRadioButtonSelect;
 
     // First select invalid prompt
-    radioButtonSelect!.onSelect('Invalid Prompt');
+    radioButtonSelect!.onSelect('id2');
     await wait();
 
-    expect(lastFrame()).toContain('Invalid prompt selected "Invalid Prompt".');
+    expect(lastFrame()).toContain('Invalid prompt selected "id2".');
 
     // Then select valid prompt
-    radioButtonSelect!.onSelect('Valid Prompt');
+    radioButtonSelect!.onSelect('id1');
     await wait();
 
     // Should transition to PromptItem without error
@@ -266,7 +272,7 @@ describe('PromptsDialog', () => {
   });
 
   it('should handle submit with valid query from PromptItem', async () => {
-    const prompts = [createPrompt('Test Prompt', 'Hello {{name}}!')];
+    const prompts = [createPrompt('id1', 'Test Prompt', 'Hello {{name}}!')];
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
@@ -281,7 +287,7 @@ describe('PromptsDialog', () => {
 
     // Select a prompt to transition to PromptItem
     const radioButtonSelect = global.mockRadioButtonSelect;
-    radioButtonSelect!.onSelect('Test Prompt');
+    radioButtonSelect!.onSelect('id1');
     await wait();
 
     // Simulate PromptItem submitting a query
@@ -298,7 +304,7 @@ describe('PromptsDialog', () => {
   });
 
   it('should handle submit with empty query from PromptItem', async () => {
-    const prompts = [createPrompt('Test Prompt', 'Hello {{name}}!')];
+    const prompts = [createPrompt('id1', 'Test Prompt', 'Hello {{name}}!')];
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
@@ -313,7 +319,7 @@ describe('PromptsDialog', () => {
 
     // Select a prompt to transition to PromptItem
     const radioButtonSelect = global.mockRadioButtonSelect;
-    radioButtonSelect!.onSelect('Test Prompt');
+    radioButtonSelect!.onSelect('id1');
     await wait();
 
     // Simulate PromptItem submitting empty query
@@ -329,7 +335,7 @@ describe('PromptsDialog', () => {
   });
 
   it('should handle submit with whitespace-only query from PromptItem', async () => {
-    const prompts = [createPrompt('Test Prompt', 'Hello {{name}}!')];
+    const prompts = [createPrompt('id1', 'Test Prompt', 'Hello {{name}}!')];
     const config = createMockConfig(prompts);
 
     render(
@@ -344,7 +350,7 @@ describe('PromptsDialog', () => {
 
     // Select a prompt to transition to PromptItem
     const radioButtonSelect = global.mockRadioButtonSelect;
-    radioButtonSelect!.onSelect('Test Prompt');
+    radioButtonSelect!.onSelect('id1');
     await wait();
 
     // Simulate PromptItem submitting whitespace-only query
@@ -357,7 +363,7 @@ describe('PromptsDialog', () => {
   });
 
   it('should pass setErrorMessage to PromptItem', async () => {
-    const prompts = [createPrompt('Test Prompt', 'Template')];
+    const prompts = [createPrompt('id1', 'Test Prompt', 'Template')];
     const config = createMockConfig(prompts);
 
     render(
@@ -372,7 +378,7 @@ describe('PromptsDialog', () => {
 
     // Select a prompt to transition to PromptItem
     const radioButtonSelect = global.mockRadioButtonSelect;
-    radioButtonSelect!.onSelect('Test Prompt');
+    radioButtonSelect!.onSelect('id1');
     await wait();
 
     // Verify PromptItem received setErrorMessage function
@@ -408,10 +414,10 @@ describe('PromptsDialog', () => {
 
   it('should render prompts with different properties correctly', () => {
     const prompts = [
-      createPrompt('Simple', 'Simple template'),
-      createPrompt('With Description', 'Template', 'Has description'),
-      createPrompt('With Variables', 'Hello {{name}}!', undefined, [
-        { name: 'name', type: 'string', required: true },
+      createPrompt('id1', 'Simple', 'Simple template'),
+      createPrompt('id2', 'With Description', 'Template'),
+      createPrompt('id3', 'With Variables', 'Hello {{name}}!', [
+        { name: 'name' },
       ]),
     ];
     const config = createMockConfig(prompts);
@@ -432,9 +438,9 @@ describe('PromptsDialog', () => {
     // Verify RadioButtonSelect received correct items
     const radioButtonSelect = global.mockRadioButtonSelect;
     expect(radioButtonSelect!.items).toEqual([
-      { label: 'Simple', value: 'Simple' },
-      { label: 'With Description', value: 'With Description' },
-      { label: 'With Variables', value: 'With Variables' },
+      { label: 'Simple', value: 'id1' },
+      { label: 'With Description', value: 'id2' },
+      { label: 'With Variables', value: 'id3' },
     ]);
   });
 });

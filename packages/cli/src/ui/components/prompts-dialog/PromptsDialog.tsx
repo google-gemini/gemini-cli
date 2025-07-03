@@ -40,13 +40,13 @@ export function PromptsDialog({
         .slice(0, 10)
         .map((prompt) => ({
           label: prompt.name,
-          value: prompt.name,
+          value: prompt.id,
         })),
     [prompts, searchQuery],
   );
 
-  const handleSelect = (value: string | null) => {
-    const prompt = prompts.find((p) => p.name === value);
+  const handleSelect = (value: string) => {
+    const prompt = prompts.find((p) => p.id === value);
     if (!prompt) {
       setErrorMessage(`Invalid prompt selected "${value}".`);
     } else {

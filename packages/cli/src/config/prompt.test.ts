@@ -48,46 +48,46 @@ describe('loadPrompts', () => {
     createPrompt(
       workspaceExtensionsDir,
       'controller',
-      'class {{name}}Controller extends Controller {}',
       'Generates a new nestjs controller',
+      'class {{name}}Controller extends Controller {}',
       [{ name: 'name', type: 'string', required: true }],
     );
     createPrompt(
       workspaceExtensionsDir,
       'module',
-      'class TestModule extends OnInit {}',
       'Generates a new nestjs module',
+      'class TestModule extends OnInit {}',
     );
 
     const prompts = loadPrompts(tempWorkspaceDir);
 
     expect(prompts).toHaveLength(2);
-    const p1 = prompts.find((p) => p.name === 'controller');
-    const p2 = prompts.find((p) => p.name === 'module');
+    const p1 = prompts.find((p) => p.id === 'controller');
+    const p2 = prompts.find((p) => p.id === 'module');
 
     expect(p1?.variables?.length).toEqual(1);
     expect(p1?.template).toEqual(
       'class {{name}}Controller extends Controller {}',
     );
-    expect(p2?.variables).toBeUndefined();
+    expect(p2?.variables).toEqual([]);
     expect(p2?.template).toEqual('class TestModule extends OnInit {}');
   });
 });
 
 function createPrompt(
   promptsDir: string,
+  id: string,
   name: string,
   template: string,
-  description?: string,
   variables?: PredefinedPromptVariable[],
 ): void {
   const promptPath = path.join(promptsDir, `${name}.yaml`);
   fs.writeFileSync(
     promptPath,
     stringifyYaml({
+      id,
       name,
       template,
-      description,
       variables,
     }),
     'utf-8',

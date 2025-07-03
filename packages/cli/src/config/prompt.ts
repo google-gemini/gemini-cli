@@ -19,12 +19,12 @@ export function loadPrompts(workspaceDir: string): PredefinedPrompt[] {
   ];
 
   const uniquePrompts: PredefinedPrompt[] = [];
-  const seenNames = new Set<string>();
+  const seenIds = new Set<string>();
   for (const prompt of allPrompts) {
-    if (!seenNames.has(prompt.name)) {
-      console.log(`Loading prompt: ${prompt.name}`);
+    if (!seenIds.has(prompt.id)) {
+      console.log(`Loading prompt: ${prompt.id}`);
       uniquePrompts.push(prompt);
-      seenNames.add(prompt.name);
+      seenIds.add(prompt.id);
     }
   }
 
@@ -52,11 +52,32 @@ function loadPrompt(promptPath: string): PredefinedPrompt | null {
   try {
     const content = fs.readFileSync(promptPath, 'utf-8');
     const config = parseYaml(content);
+
+    if (!config.id) {
+      console.log(`Prompt ${promptPath} is missing required field "id"`);
+      return null;
+    }
+
+    if (!config.name) {
+      console.log(`Prompt ${promptPath} is missing required field "name"`);
+      return null;
+    }
+
+    if (!config.template) {
+      console.log(`Prompt ${promptPath} is missing required field "template"`);
+      return null;
+    }
+
+    if (config.variables && !Array.isArray(config.variables)) {
+      console.log(`Prompt ${promptPath} variables must be an array`);
+      return null;
+    }
+
     return {
+      id: config.id,
       name: config.name,
       template: config.template,
-      description: config.description,
-      variables: config.variables,
+      variables: config.variables || [],
     };
   } catch (e) {
     console.error(`Warning: error parsing prompt in ${promptPath}: ${e}`);

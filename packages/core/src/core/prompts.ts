@@ -19,14 +19,15 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
 export interface PredefinedPrompt {
+  id: string;
   name: string;
-  description?: string;
   variables?: PredefinedPromptVariable[];
   template: string;
 }
 
 export interface PredefinedPromptVariable {
   name: string;
+  description?: string;
 }
 
 export function getCoreSystemPrompt(userMemory?: string): string {
