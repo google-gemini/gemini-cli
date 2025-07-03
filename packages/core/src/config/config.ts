@@ -13,7 +13,16 @@ import {
 } from '../core/contentGenerator.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
+
+import { CatTool } from '../tools/cat-tool.js';
+import { CpTool } from '../tools/cp-tool.js';
+import { LsTool } from '../tools/ls-tool.js';
+import { MkdirTool } from '../tools/mkdir-tool.js';
+import { MvTool } from '../tools/mv-tool.js';
+import { RmTool } from '../tools/rm-tool.js';
+import { RmdirTool } from '../tools/rmdir-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
+
 import { GrepTool } from '../tools/grep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
@@ -514,7 +523,16 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   };
 
   registerCoreTool(LSTool, targetDir, config);
+  
   registerCoreTool(ReadFileTool, targetDir, config);
+  registerCoreTool(CatTool, targetDir, config);
+  registerCoreTool(LsTool, targetDir, config);
+  registerCoreTool(MkdirTool, targetDir, config);
+  registerCoreTool(RmTool, targetDir, config);
+  registerCoreTool(RmdirTool, targetDir, config);
+  registerCoreTool(MvTool, targetDir, config);
+  registerCoreTool(CpTool, targetDir, config);
+
   registerCoreTool(GrepTool, targetDir);
   registerCoreTool(GlobTool, targetDir, config);
   registerCoreTool(EditTool, config);
