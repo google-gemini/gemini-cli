@@ -74,8 +74,8 @@ function findCodeRegions(content: string): Array<[number, number]> {
   while ((match = indentedBlockRegex.exec(content)) !== null) {
     regions.push([match.index, match.index + match[0].length]);
   }
-  // Inline code (single backticks, not inside code blocks)
-  const inlineCodeRegex = /`[^`\n]+`/g;
+  // Inline code (any number of backticks, not inside code blocks)
+  const inlineCodeRegex = /(`+)([^`]*?)\1/g;
   while ((match = inlineCodeRegex.exec(content)) !== null) {
     // Only add if not inside a code block
     if (
