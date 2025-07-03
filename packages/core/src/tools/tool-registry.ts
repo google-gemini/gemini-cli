@@ -243,7 +243,7 @@ export class ToolRegistry {
     try {
       // Create a minimal FileDiscoveryService instance for memory discovery
       const fileService = new FileDiscoveryService(this.config.getTargetDir());
-      
+
       // Load hierarchical memory to get all GEMINI.md content
       const { memoryContent } = await loadServerHierarchicalMemory(
         this.config.getTargetDir(),

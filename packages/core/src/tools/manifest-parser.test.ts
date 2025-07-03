@@ -52,10 +52,12 @@ echo "$GEMINI_TOOL_ARGS" | jq -r '.message'
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('echo_tool');
-    expect(result[0].script).toBe('echo "$GEMINI_TOOL_ARGS" | jq -r \'.message\'');
+    expect(result[0].script).toBe(
+      'echo "$GEMINI_TOOL_ARGS" | jq -r \'.message\'',
+    );
     expect(result[0].schema.name).toBe('echo_tool');
     expect(result[0].schema.description).toBe('Echoes a message');
   });
@@ -99,7 +101,7 @@ echo "tool two"
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('tool_one');
     expect(result[1].name).toBe('tool_two');
@@ -107,7 +109,7 @@ echo "tool two"
 
   test('should skip tool with missing sh block', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     const content = `
 ### Tools
 
@@ -127,18 +129,18 @@ Only has JSON, no shell script.
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(0);
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("Skipping tool 'bad_tool'"),
     );
-    
+
     consoleSpy.mockRestore();
   });
 
   test('should skip tool with missing json block', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     const content = `
 ### Tools
 
@@ -151,18 +153,18 @@ echo "hello"
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(0);
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("Skipping tool 'bad_tool'"),
     );
-    
+
     consoleSpy.mockRestore();
   });
 
   test('should skip tool with invalid JSON', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     const content = `
 ### Tools
 
@@ -181,18 +183,18 @@ echo "hello"
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(0);
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to parse JSON schema"),
+      expect.stringContaining('Failed to parse JSON schema'),
     );
-    
+
     consoleSpy.mockRestore();
   });
 
   test('should skip tool with mismatched name in schema', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     const content = `
 ### Tools
 
@@ -214,12 +216,14 @@ echo "hello"
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(0);
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Name in schema ('wrong_name') does not match header name"),
+      expect.stringContaining(
+        "Name in schema ('wrong_name') does not match header name",
+      ),
     );
-    
+
     consoleSpy.mockRestore();
   });
 
@@ -245,7 +249,7 @@ echo "format 1"
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('format_test');
     expect(result[0].script).toBe('echo "format 1"');
@@ -290,11 +294,11 @@ fi
 \`\`\`
 `;
     const result = await ManifestParser.parse(content, 'test.md');
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('complex_tool');
     expect(result[0].script).toContain('#!/bin/bash');
     expect(result[0].script).toContain('GEMINI_TOOL_ARGS');
-    expect(result[0].script).toContain('jq -r \'.file_path\'');
+    expect(result[0].script).toContain("jq -r '.file_path'");
   });
 });

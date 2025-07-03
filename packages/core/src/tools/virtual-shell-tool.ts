@@ -23,11 +23,17 @@ export interface VirtualShellToolParams {
   [key: string]: unknown;
 }
 
-export class VirtualShellTool extends BaseTool<VirtualShellToolParams, ToolResult> {
+export class VirtualShellTool extends BaseTool<
+  VirtualShellToolParams,
+  ToolResult
+> {
   private script: string;
   private whitelist: Set<string> = new Set();
 
-  constructor(definition: VirtualToolDefinition, private readonly config: Config) {
+  constructor(
+    definition: VirtualToolDefinition,
+    private readonly config: Config,
+  ) {
     // Initialize the BaseTool with the schema from the manifest.
     super(
       definition.schema.name || definition.name,
@@ -56,7 +62,7 @@ export class VirtualShellTool extends BaseTool<VirtualShellToolParams, ToolResul
     return null;
   }
 
-  getDescription(params: VirtualShellToolParams): string {
+  getDescription(_params: VirtualShellToolParams): string {
     return `Execute virtual tool: ${this.name}`;
   }
 
@@ -70,7 +76,7 @@ export class VirtualShellTool extends BaseTool<VirtualShellToolParams, ToolResul
     if (this.validateToolParams(params)) {
       return false; // skip confirmation, execute call will fail immediately
     }
-    
+
     // Check if this tool is already whitelisted
     if (this.whitelist.has(this.name)) {
       return false; // already approved and whitelisted
@@ -202,7 +208,7 @@ export class VirtualShellTool extends BaseTool<VirtualShellToolParams, ToolResul
             // Kill the entire process group
             process.kill(-shell.pid, 'SIGTERM');
           }
-        } catch (e) {
+        } catch (_e) {
           // Process might already be dead
         }
       }
@@ -213,7 +219,7 @@ export class VirtualShellTool extends BaseTool<VirtualShellToolParams, ToolResul
     return new Promise<ToolResult>((resolve) => {
       shell.on('close', () => {
         abortSignal.removeEventListener('abort', abortHandler);
-        
+
         // Final output update
         if (updateOutput && output) {
           updateOutput(output);

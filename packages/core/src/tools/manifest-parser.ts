@@ -80,14 +80,20 @@ export class ManifestParser {
     lang: 'sh' | 'json',
   ): string | null {
     // Look for ```lang or ``` lang (with optional space) followed by content until closing ```
-    const regex = new RegExp(`\`\`\`\\s*${lang}\\s*\\n([\\s\\S]*?)\\n\`\`\``, 'i');
+    const regex = new RegExp(
+      `\`\`\`\\s*${lang}\\s*\\n([\\s\\S]*?)\\n\`\`\``,
+      'i',
+    );
     const match = body.match(regex);
     if (match) {
       return match[1].trim();
     }
 
     // Fallback: Look for ```lang without newlines but allowing spaces
-    const fallbackRegex = new RegExp(`\`\`\`\\s*${lang}\\s*([\\s\\S]*?)\`\`\``, 'i');
+    const fallbackRegex = new RegExp(
+      `\`\`\`\\s*${lang}\\s*([\\s\\S]*?)\`\`\``,
+      'i',
+    );
     const fallbackMatch = body.match(fallbackRegex);
     if (fallbackMatch) {
       return fallbackMatch[1].trim();

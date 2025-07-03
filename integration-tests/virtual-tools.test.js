@@ -7,8 +7,6 @@
 import { strict as assert } from 'assert';
 import { test } from 'node:test';
 import { TestRig } from './test-helper.js';
-import path from 'path';
-import fs from 'fs';
 
 test('Virtual Tools - Echo Tool', (t) => {
   const rig = new TestRig();
@@ -55,12 +53,12 @@ echo "$GEMINI_TOOL_ARGS" | jq -r '.message'
 
   // Check that the virtual tool was discovered and executed
   console.log('CLI Result:', result);
-  
+
   // The result should contain evidence that the echo_tool was called
   // and returned the expected message
   assert.ok(
     result.includes('Hello Virtual Tools!') || result.includes('echo_tool'),
-    'Virtual tool was not executed or did not produce expected output'
+    'Virtual tool was not executed or did not produce expected output',
   );
 
   console.log('✅ Virtual echo tool test passed');

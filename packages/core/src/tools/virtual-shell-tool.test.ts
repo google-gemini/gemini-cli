@@ -8,7 +8,10 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VirtualShellTool } from './virtual-shell-tool.js';
 import { VirtualToolDefinition } from './virtual-tool-types.js';
 import { Config } from '../config/config.js';
-import { ToolConfirmationOutcome, ToolExecuteConfirmationDetails } from './tools.js';
+import {
+  ToolConfirmationOutcome,
+  ToolExecuteConfirmationDetails,
+} from './tools.js';
 import { Type } from '@google/genai';
 
 // Mock the spawn function
@@ -75,7 +78,9 @@ describe('VirtualShellTool', () => {
 
     // Missing required parameter
     const invalidParams = {};
-    expect(tool.validateToolParams(invalidParams)).toBe('Missing required parameter: message');
+    expect(tool.validateToolParams(invalidParams)).toBe(
+      'Missing required parameter: message',
+    );
   });
 
   test('should return correct tool description', () => {
@@ -92,7 +97,7 @@ describe('VirtualShellTool', () => {
     const abortSignal = new AbortController().signal;
 
     const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
-    
+
     expect(confirmation).toBeTruthy();
     if (confirmation && confirmation.type === 'exec') {
       const execConfirmation = confirmation as ToolExecuteConfirmationDetails;
@@ -127,7 +132,10 @@ describe('VirtualShellTool', () => {
     const invalidParams = {}; // Missing required parameter
     const abortSignal = new AbortController().signal;
 
-    const confirmation = await tool.shouldConfirmExecute(invalidParams, abortSignal);
+    const confirmation = await tool.shouldConfirmExecute(
+      invalidParams,
+      abortSignal,
+    );
     expect(confirmation).toBe(false);
   });
 
@@ -137,23 +145,27 @@ describe('VirtualShellTool', () => {
     const abortSignal = new AbortController().signal;
 
     const result = await tool.execute(invalidParams, abortSignal);
-    
+
     expect(result.llmContent).toContain("Virtual tool 'test_tool' rejected");
     expect(result.llmContent).toContain('Missing required parameter: message');
-    expect(result.returnDisplay).toContain('Error: Missing required parameter: message');
+    expect(result.returnDisplay).toContain(
+      'Error: Missing required parameter: message',
+    );
   });
 
   test('should return cancelled message if aborted before start', async () => {
     const tool = new VirtualShellTool(mockToolDefinition, mockConfig);
     const params = { message: 'test' };
     const abortController = new AbortController();
-    
+
     // Abort before execution
     abortController.abort();
 
     const result = await tool.execute(params, abortController.signal);
-    
-    expect(result.llmContent).toContain("Virtual tool 'test_tool' was cancelled by user before it could start");
+
+    expect(result.llmContent).toContain(
+      "Virtual tool 'test_tool' was cancelled by user before it could start",
+    );
     expect(result.returnDisplay).toBe('Tool cancelled by user.');
   });
 
@@ -185,7 +197,7 @@ describe('VirtualShellTool', () => {
     };
 
     const tool = new VirtualShellTool(toolDefNoRequired, mockConfig);
-    
+
     // Should not require any parameters
     expect(tool.validateToolParams({})).toBeNull();
     expect(tool.validateToolParams({ extraParam: 'value' })).toBeNull();
@@ -193,7 +205,7 @@ describe('VirtualShellTool', () => {
 
   test('should handle tool definition with no parameter schema', () => {
     const toolDefNoSchema = {
-      name: 'no_schema_tool', 
+      name: 'no_schema_tool',
       script: 'echo "no schema"',
       schema: {
         name: 'no_schema_tool',
@@ -206,7 +218,7 @@ describe('VirtualShellTool', () => {
     };
 
     const tool = new VirtualShellTool(toolDefNoSchema, mockConfig);
-    
+
     // Should not throw and should not require any parameters
     expect(tool.validateToolParams({})).toBeNull();
     expect(tool.validateToolParams({ anyParam: 'value' })).toBeNull();

@@ -17,7 +17,7 @@ Virtual tools are shell scripts paired with JSON schemas that define custom tool
 
 Virtual tools are defined using level-4 headers (`####`) within a `### Tools` section of your `GEMINI.md` file:
 
-```markdown
+````markdown
 # My Project
 
 Project description and instructions here.
@@ -34,6 +34,7 @@ A description of what this tool does.
 MESSAGE=$(echo "$GEMINI_TOOL_ARGS" | jq -r '.message')
 echo "Custom tool says: $MESSAGE"
 ```
+````
 
 ```json
 {
@@ -51,7 +52,8 @@ echo "Custom tool says: $MESSAGE"
   }
 }
 ```
-```
+
+````
 
 ### Tool definition structure
 
@@ -101,7 +103,7 @@ fi
 # Create the file
 echo "$CONTENT" > "$FILENAME"
 echo "Created file: $FILENAME"
-```
+````
 
 ```json
 {
@@ -123,7 +125,8 @@ echo "Created file: $FILENAME"
   }
 }
 ```
-```
+
+````
 
 ## Security considerations
 
@@ -210,7 +213,7 @@ fi
 curl -s -H "Authorization: Bearer $API_KEY" \
      "https://api.myproject.com/$ENDPOINT" | \
      jq '.'
-```
+````
 
 ```json
 {
@@ -228,6 +231,8 @@ curl -s -H "Authorization: Bearer $API_KEY" \
   }
 }
 ```
+
 ```
 
 This example shows how to integrate with external APIs while maintaining security through environment variables and proper error handling.
+```
