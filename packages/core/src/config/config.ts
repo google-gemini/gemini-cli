@@ -43,6 +43,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { FilePermissionRule, FilePermissionService } from '../services/filePermissionService.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -130,10 +131,13 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  filePermissions?: FilePermissionRule[]; // New parameter
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private readonly filePermissions: FilePermissionRule[] | undefined;
+  private filePermissionService!: FilePermissionService; // Will be initialized
   private readonly sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -211,9 +215,19 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.filePermissions = params.filePermissions; // Store the rules
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
+    }
+
+    // Initialize FilePermissionService
+    // This needs to happen after essential parts of Config are ready,
+    // especially targetDir.
+    this.filePermissionService = new FilePermissionService(this);
+
+    if (this.telemetrySettings.enabled) {
+      initializeTelemetry(this);
     }
 
     if (this.telemetrySettings.enabled) {
@@ -451,6 +465,14 @@ export class Config {
       await this.gitService.initialize();
     }
     return this.gitService;
+  }
+
+  public getFilePermissionRules(): FilePermissionRule[] | undefined {
+    return this.filePermissions;
+  }
+
+  public getFilePermissionService(): FilePermissionService {
+    return this.filePermissionService;
   }
 }
 
