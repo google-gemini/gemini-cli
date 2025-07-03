@@ -12,11 +12,19 @@ export interface CustomSlashCommand {
 
 export async function loadCustomSlashCommands(): Promise<CustomSlashCommand[]> {
   const commandDirs = [
-    path.join(process.cwd(), '.gemini', 'commands'),
-    path.join(process.env.HOME || '', '.gemini', 'commands'),
+    {
+      path: path.join(process.cwd(), '.gemini', 'commands'),
+      prefix: 'project:',
+    },
+    {
+      path: path.join(process.env.HOME || '', '.gemini', 'commands'),
+      prefix: 'user:',
+    },
   ];
+
   const commands: CustomSlashCommand[] = [];
-  for (const dir of commandDirs) {
+
+  for (const { path: dir, prefix } of commandDirs) {
     try {
       const files = await fs.readdir(dir);
       for (const file of files) {
@@ -30,7 +38,7 @@ export async function loadCustomSlashCommands(): Promise<CustomSlashCommand[]> {
             body = match[2];
           }
           commands.push({
-            name: `project:${file.replace(/\.md$/, '')}`,
+            name: `${prefix}${file.replace(/\.md$/, '')}`,
             description: meta['description'] || '',
             allowedTools: meta['allowed-tools'],
             template: body,
@@ -45,5 +53,6 @@ export async function loadCustomSlashCommands(): Promise<CustomSlashCommand[]> {
       console.error(`Could not load custom commands from ${dir}:`, e);
     }
   }
+
   return commands;
 }
