@@ -25,7 +25,8 @@ esbuild
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },
     banner: {
-      js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+      js: `#!/usr/bin/env node --max-old-space-size=8192
+import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },
   })
   .catch(() => process.exit(1));
