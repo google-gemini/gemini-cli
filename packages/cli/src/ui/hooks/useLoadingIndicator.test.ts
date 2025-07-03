@@ -16,10 +16,16 @@ import {
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    let seed = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      seed += 0.1;
+      return seed;
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers(); // Restore real timers after each test
+    vi.restoreAllMocks();
     act(() => vi.runOnlyPendingTimers);
   });
 
