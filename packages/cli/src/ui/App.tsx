@@ -706,6 +706,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <LearningDiscoveryDialog
               isOpen={showLearningDiscovery}
               onClose={() => setShowLearningDiscovery(false)}
+              config={config}
             />
           ) : (
             <>

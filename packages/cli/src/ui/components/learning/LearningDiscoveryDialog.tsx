@@ -12,12 +12,15 @@ import { QuestionDisplay } from './QuestionDisplay.js';
 import { OptionSelector } from './OptionSelector.js';
 import { LoadingIndicator } from '../LoadingIndicator.js';
 import { LearningPathDisplay } from './LearningPathDisplay.js';
+import { Config } from '@google/gemini-cli-core';
 
 export interface LearningDiscoveryDialogProps {
   /** ダイアログが開いているかどうか */
   isOpen: boolean;
   /** ダイアログを閉じるコールバック */
   onClose: () => void;
+  /** Configオブジェクト */
+  config: Config;
 }
 
 /**
@@ -27,6 +30,7 @@ export interface LearningDiscoveryDialogProps {
 export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = ({
   isOpen,
   onClose,
+  config,
 }) => {
   const {
     state,
@@ -36,7 +40,7 @@ export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = (
     endLearningSession,
     clearError,
     currentQuestion,
-  } = useLearningDiscovery();
+  } = useLearningDiscovery({ config });
 
   // ダイアログが開かれた時に学習セッションを開始
   useEffect(() => {
@@ -108,23 +112,55 @@ export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = (
 
       {/* メインコンテンツ */}
       <Box flexDirection="column" flexGrow={1}>
-        {state.phase === 'discovery' && currentQuestion && (
+        {/* 質問表示：深堀りフェーズと理解度評価フェーズの両方で表示 */}
+        {(state.phase === 'discovery' || state.phase === 'assessment') && currentQuestion && (
           <>
             <QuestionDisplay question={currentQuestion} />
+            
+            {/* 理解度評価フェーズの追加情報 */}
+            {state.phase === 'assessment' && (
+              <Box marginBottom={1}>
+                <Text color={Colors.AccentYellow}>💡 理解度評価問題</Text>
+                <Text dimColor>
+                  以下の問題に答えて、現在の理解度を確認しましょう。
+                </Text>
+              </Box>
+            )}
             
             {!uiState.isGeneratingQuestion && (
               <OptionSelector
                 options={currentQuestion.suggestedOptions}
                 onSelect={handleAnswerSelection}
-                allowCustomInput={true}
-                customInputPlaceholder="その他（自由入力）"
+                allowCustomInput={state.phase === 'discovery'} // 理解度評価では自由入力を無効化
+                customInputPlaceholder={state.phase === 'discovery' ? "その他（自由入力）" : undefined}
               />
+            )}
+            
+            {/* 即時フィードバック表示（理解度評価フェーズのみ） */}
+            {state.phase === 'assessment' && currentQuestion.feedback && uiState.isShowingFeedback && (
+              <Box 
+                marginTop={1} 
+                borderStyle="single" 
+                borderColor={currentQuestion.feedback.type === 'correct' ? Colors.AccentGreen : Colors.AccentRed}
+                padding={1}
+              >
+                <Text color={currentQuestion.feedback.type === 'correct' ? Colors.AccentGreen : Colors.AccentRed}>
+                  {currentQuestion.feedback.type === 'correct' ? '✅' : '❌'} {currentQuestion.feedback.message}
+                </Text>
+                {currentQuestion.feedback.explanation && (
+                  <Box marginTop={1}>
+                    <Text dimColor>
+                      💡 {currentQuestion.feedback.explanation}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
             )}
             
             {uiState.isGeneratingQuestion && (
               <Box marginTop={1}>
                 <LoadingIndicator 
-                  currentLoadingPhrase="次の質問を生成中..." 
+                  currentLoadingPhrase={state.phase === 'discovery' ? "次の質問を生成中..." : "次の評価問題を生成中..."} 
                   elapsedTime={0}
                 />
               </Box>
@@ -132,6 +168,7 @@ export const LearningDiscoveryDialog: React.FC<LearningDiscoveryDialogProps> = (
           </>
         )}
 
+        {/* ラーニングパス生成フェーズ */}
         {state.phase === 'path-generation' && (
           <Box marginTop={1}>
             <LoadingIndicator 

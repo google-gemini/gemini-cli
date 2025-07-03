@@ -5,6 +5,9 @@
  */
 
 import { BaseTool } from '../tools.js';
+import { Config } from '../../config/config.js';
+import { getErrorMessage } from '../../utils/errors.js';
+import { SchemaUnion } from '@google/genai';
 
 /**
  * 質問生成のためのパラメータ
@@ -60,7 +63,7 @@ export interface QuestionGenerationToolResult {
 
 /**
  * AI質問生成ツール
- * Phase 2: Gemini APIを使用した動的質問生成
+ * Phase 3: 実際のGemini APIを使用した動的質問生成
  */
 export class QuestionGeneratorTool extends BaseTool<
   QuestionGenerationParams,
@@ -68,7 +71,7 @@ export class QuestionGeneratorTool extends BaseTool<
 > {
   static readonly Name = 'generate_learning_question';
 
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       QuestionGeneratorTool.Name,
       '学習用質問生成',
@@ -120,16 +123,57 @@ export class QuestionGeneratorTool extends BaseTool<
     );
   }
 
+  /**
+   * AI応答のためのJSON Schema定義
+   */
+  private get responseSchema(): SchemaUnion {
+    return {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: '生成された質問文',
+        },
+        suggestedOptions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '選択肢（最大4つ）',
+          maxItems: 4,
+        },
+        type: {
+          type: 'string',
+          enum: ['discovery', 'assessment', 'open-ended'],
+          description: '質問タイプ',
+        },
+        correctAnswer: {
+          type: 'string',
+          description: '正解（評価問題の場合のみ）',
+        },
+        explanation: {
+          type: 'string',
+          description: '正解の解説（評価問題の場合のみ）',
+        },
+        isInformationSufficient: {
+          type: 'boolean',
+          description: 'AIが判断する情報収集の十分性（深堀りフェーズの場合のみ）',
+        },
+        suggestedNextPhase: {
+          type: 'string',
+          enum: ['assessment', 'path-generation'],
+          description: '次のフェーズへの移行提案',
+        },
+      },
+      required: ['question', 'suggestedOptions', 'type'],
+    };
+  }
+
   async execute(
     params: QuestionGenerationParams,
     signal?: AbortSignal
   ): Promise<QuestionGenerationToolResult> {
     try {
-      const prompt = this.buildQuestionGenerationPrompt(params);
-      
-      // Note: この実装では、実際のLLM呼び出しはGeminiChatクラス経由で行います
-      // ここでは、プロンプトを構築して返すのみです
-      const questionData = this.parseQuestionResponse(prompt, params);
+      // Phase 3: 実際のGemini API統合
+      const questionData = await this.generateQuestionWithGeminiAPI(params, signal);
       
       return {
         llmContent: `Generated question: ${questionData.question}`,
@@ -137,7 +181,54 @@ export class QuestionGeneratorTool extends BaseTool<
         questionData,
       };
     } catch (error) {
-      throw new Error(`Failed to generate question: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMessage = `Failed to generate question: ${getErrorMessage(error)}`;
+      console.error(errorMessage, error);
+      
+      // フォールバック: 基本的な質問を生成
+      const fallbackQuestion = this.generateFallbackQuestion(params);
+      
+      return {
+        llmContent: `Fallback question: ${fallbackQuestion.question}`,
+        returnDisplay: `Question: ${fallbackQuestion.question}\nOptions: ${fallbackQuestion.suggestedOptions.join(', ')}`,
+        questionData: fallbackQuestion,
+      };
+    }
+  }
+
+  /**
+   * 実際のGemini APIを使用して質問を生成
+   */
+  private async generateQuestionWithGeminiAPI(
+    params: QuestionGenerationParams,
+    signal?: AbortSignal
+  ): Promise<QuestionGenerationResult> {
+    const geminiClient = this.config.getGeminiClient();
+    const prompt = this.buildQuestionGenerationPrompt(params);
+    
+    // AbortSignalのチェック
+    if (signal?.aborted) {
+      throw new Error('Operation was aborted');
+    }
+
+    try {
+      // generateJson を使用してJSONレスポンスを取得
+      const response = await geminiClient.generateJson(
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        this.responseSchema,
+        signal || new AbortController().signal
+      );
+
+      // AbortSignalの再チェック
+      if (signal?.aborted) {
+        throw new Error('Operation was aborted');
+      }
+
+      // AI応答を解析して結果オブジェクトを生成
+      return this.parseQuestionResponse(response, params);
+    } catch (error) {
+      // エラーをログに記録して再スロー
+      console.error('Error calling Gemini API for question generation:', error);
+      throw error;
     }
   }
 
@@ -232,17 +323,69 @@ ${subject}分野の理解度を評価する問題を生成してください：
 
   /**
    * AIの応答を解析して結果オブジェクトを生成
-   * Phase 2では、実際のLLM呼び出し結果を解析します
+   * Phase 3: 実際のLLM応答を解析
    */
   private parseQuestionResponse(
-    prompt: string,
+    aiResponse: any,
     params: QuestionGenerationParams
   ): QuestionGenerationResult {
-    // Phase 2: 実際のAI統合のためのプレースホルダー
-    // この関数は、LLMからの応答を受け取って解析する実装になります
-    
-    // 一時的なフォールバック（実際のAI統合前）
-    return this.generateFallbackQuestion(params);
+    // AI応答の基本的な検証
+    if (!aiResponse || typeof aiResponse !== 'object') {
+      throw new Error('Invalid AI response: response is not an object');
+    }
+
+    const { question, suggestedOptions, type, correctAnswer, explanation, isInformationSufficient, suggestedNextPhase } = aiResponse;
+
+    // 必須フィールドの検証
+    if (!question || typeof question !== 'string') {
+      throw new Error('Invalid AI response: missing or invalid question');
+    }
+
+    if (!Array.isArray(suggestedOptions) || suggestedOptions.length === 0) {
+      throw new Error('Invalid AI response: missing or invalid suggestedOptions');
+    }
+
+    if (!type || !['discovery', 'assessment', 'open-ended'].includes(type)) {
+      throw new Error('Invalid AI response: missing or invalid type');
+    }
+
+    // 評価問題の場合の追加検証
+    if (type === 'assessment') {
+      if (!correctAnswer || typeof correctAnswer !== 'string') {
+        throw new Error('Invalid AI response: assessment questions must have a correctAnswer');
+      }
+
+      // 正解が選択肢に含まれているかチェック
+      if (!suggestedOptions.includes(correctAnswer)) {
+        throw new Error('Invalid AI response: correctAnswer must be one of the suggestedOptions');
+      }
+    }
+
+    // 結果オブジェクトを構築
+    const result: QuestionGenerationResult = {
+      question: question.trim(),
+      suggestedOptions: suggestedOptions.map((option: any) => String(option).trim()),
+      type: type as QuestionGenerationResult['type'],
+    };
+
+    // オプションフィールドを追加
+    if (correctAnswer && type === 'assessment') {
+      result.correctAnswer = correctAnswer.trim();
+    }
+
+    if (explanation && type === 'assessment') {
+      result.explanation = explanation.trim();
+    }
+
+    if (typeof isInformationSufficient === 'boolean' && params.phase === 'discovery') {
+      result.isInformationSufficient = isInformationSufficient;
+    }
+
+    if (suggestedNextPhase && ['assessment', 'path-generation'].includes(suggestedNextPhase)) {
+      result.suggestedNextPhase = suggestedNextPhase as 'assessment' | 'path-generation';
+    }
+
+    return result;
   }
 
   /**

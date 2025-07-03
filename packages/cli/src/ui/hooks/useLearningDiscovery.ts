@@ -18,11 +18,11 @@ import {
   QuestionFeedback,
   FeedbackType,
 } from '../types/learning.js';
-import { QuestionGeneratorTool } from '@google/gemini-cli-core';
+import { QuestionGeneratorTool, Config } from '@google/gemini-cli-core';
 
 export interface UseLearningDiscoveryProps {
-  /** Gemini APIクライアント */
-  geminiClient?: any; // TODO: 適切な型定義に置き換え
+  /** Configオブジェクト */
+  config?: Config;
 }
 
 export interface UseLearningDiscoveryReturn {
@@ -76,31 +76,42 @@ export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLear
   const stateRef = useRef<LearningDiscoveryState | null>(null);
   stateRef.current = state;
 
-  // 質問生成ツール
-  const questionGeneratorTool = useRef(new QuestionGeneratorTool());
+  // 質問生成ツールの初期化
+  const questionGeneratorTool = useRef<QuestionGeneratorTool | null>(null);
+  
+  // Configが利用可能な場合にツールを初期化
+  if (props?.config && !questionGeneratorTool.current) {
+    questionGeneratorTool.current = new QuestionGeneratorTool(props.config);
+  }
 
   // AI統合用の質問生成
   const generateQuestionWithAI = useCallback(async (params: any): Promise<LearningQuestion> => {
     try {
-      // Phase 2: 実際のAI統合
-      // 現在はフォールバック実装を使用
-      const result = await questionGeneratorTool.current.getQuestionData(params);
-      
-      const newQuestion: LearningQuestion = {
-        id: uuidv4(),
-        type: result.type as QuestionType,
-        question: result.question,
-        suggestedOptions: result.suggestedOptions,
-        correctAnswer: result.correctAnswer,
-      };
+      // Phase 3: 実際のAI統合 or フォールバック
+      if (questionGeneratorTool.current) {
+        // 実際のAIツールを使用
+        const result = await questionGeneratorTool.current.getQuestionData(params);
+        
+        const newQuestion: LearningQuestion = {
+          id: uuidv4(),
+          type: result.type as QuestionType,
+          question: result.question,
+          suggestedOptions: result.suggestedOptions,
+          correctAnswer: result.correctAnswer,
+        };
 
-      return newQuestion;
+        return newQuestion;
+      } else {
+        // Configがない場合はフォールバックを使用
+        console.warn('Config not provided, using fallback question generation');
+        return generateFallbackQuestion(params);
+      }
     } catch (error) {
       console.error('Failed to generate question with AI:', error);
-      // フォールバック: 基本的な質問を生成
+      // エラー時はフォールバックを使用
       return generateFallbackQuestion(params);
     }
-  }, []);
+  }, [props?.config]);
 
   // フォールバック質問生成
   const generateFallbackQuestion = useCallback((params: any): LearningQuestion => {
@@ -243,13 +254,20 @@ export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLear
 
     if (!currentQuestion) return;
 
-    // 回答を記録
+    // Phase 3: 即時フィードバック生成（assessmentフェーズのみ）
+    let feedback: QuestionFeedback | undefined = undefined;
+    if (currentQuestion.type === 'assessment') {
+      feedback = generateImmediateFeedback(currentQuestion, answer) || undefined;
+    }
+
+    // 回答を記録（フィードバックも含めて）
     const updatedQuestion: LearningQuestion = {
       ...currentQuestion,
       userResponse: answer,
       selectedOptionIndex,
       customInput,
       answeredAt: new Date(),
+      feedback, // フィードバックを追加
     };
 
     setState(prev => {
@@ -264,19 +282,11 @@ export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLear
       };
     });
 
-    // Phase 2: 即時フィードバック実装
-    if (currentQuestion.type === 'assessment') {
-      // 評価問題の場合は即座にフィードバックを生成・表示
-      const feedback = generateImmediateFeedback(currentQuestion, answer);
-      if (feedback) {
-        // 質問にフィードバックを追加
-        updatedQuestion.feedback = feedback;
-        
-        // フィードバックを表示
-        setTimeout(() => {
-          showFeedback(feedback);
-        }, 100);
-      }
+    // フィードバック表示（assessmentフェーズのみ）
+    if (feedback) {
+      setTimeout(() => {
+        showFeedback(feedback);
+      }, 100);
     }
 
     // 次の質問を生成
@@ -336,9 +346,7 @@ export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLear
         currentLevel: 'beginner' as const, // TODO: 動的に判定
       };
 
-      const nextQuestion = await generateQuestionWithAI(params);
-
-      // AIが十分な情報が集まったと判断した場合
+      // Phase 3: フェーズ遷移を事前にチェックしてから質問生成
       if (params.phase === 'discovery' && previousQuestions.length >= 3) {
         // 理解度評価フェーズに移行するかチェック
         const shouldMoveToAssessment = await checkShouldMoveToAssessment(currentState);
@@ -373,6 +381,9 @@ export function useLearningDiscovery(props?: UseLearningDiscoveryProps): UseLear
           return;
         }
       }
+      
+      // 通常の質問生成
+      const nextQuestion = await generateQuestionWithAI(params);
 
       // 理解度評価フェーズで十分な評価が完了した場合
       if (params.phase === 'assessment' && previousQuestions.filter(q => q.type === 'assessment').length >= 2) {
