@@ -22,7 +22,6 @@ This project follows a structured release process to ensure that all packages ar
 
 For most all changes, simply patching the minor version is acceptable. We can and should release frequently; the more often we release the easier it is to tell what change broke something. Developeres are encouraged to push a release as described below after their branch merges. I also think I'm open to doing the release publishing steps as a part of an existing PR, though this could have more churn if others are also releasing and version numbers change frequently.
 
-
 ## How To Release
 
 Releasing a new version is as simple as creating and pushing a new Git tag. The tag must follow semantic versioning and be prefixed with `v`, for example `v0.2.0` or `v1.0.0-alpha.1`. From the branch you want to release from, run the following commands:
