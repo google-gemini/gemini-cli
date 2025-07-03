@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GroundingMetadata } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseTool,
@@ -255,9 +254,7 @@ ${textContent}
 
       let responseText = getResponseText(response) || '';
       const urlContextMeta = response.candidates?.[0]?.urlContextMetadata;
-      const groundingMetadata = response.candidates?.[0]?.groundingMetadata as
-        | GroundingMetadata
-        | undefined;
+      const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
       const sources = groundingMetadata?.groundingChunks as
         | GroundingChunkItem[]
         | undefined;

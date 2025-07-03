@@ -9,14 +9,7 @@ import { loadEnvironment } from './config.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
   loadEnvironment();
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
-    return null;
-  }
-
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE) {
-    if (!process.env.GOOGLE_CLOUD_PROJECT) {
-      return 'GOOGLE_CLOUD_PROJECT environment variable not found. Add that to your .env and try again, no reload needed!';
-    }
+  if (authMethod === AuthType.LOGIN_WITH_GOOGLE) {
     return null;
   }
 

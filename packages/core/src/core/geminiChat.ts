@@ -72,10 +72,6 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history contains an invalid role.
  */
 function validateHistory(history: Content[]) {
-  // Empty history is valid.
-  if (history.length === 0) {
-    return;
-  }
   for (const content of history) {
     if (content.role !== 'user' && content.role !== 'model') {
       throw new Error(`Role must be user or model, but got ${content.role}.`);
@@ -87,9 +83,9 @@ function validateHistory(history: Content[]) {
  * Extracts the curated (valid) history from a comprehensive history.
  *
  * @remarks
- * The model may sometimes generate invalid or empty contents(e.g., due to safty
+ * The model may sometimes generate invalid or empty contents(e.g., due to safety
  * filters or recitation). Extracting valid turns from the history
- * ensures that subsequent requests could be accpeted by the model.
+ * ensures that subsequent requests could be accepted by the model.
  */
 function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
@@ -138,7 +134,6 @@ export class GeminiChat {
   constructor(
     private readonly config: Config,
     private readonly contentGenerator: ContentGenerator,
-    private readonly model: string,
     private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
   ) {
@@ -168,7 +163,12 @@ export class GeminiChat {
   ): Promise<void> {
     logApiResponse(
       this.config,
-      new ApiResponseEvent(this.model, durationMs, usageMetadata, responseText),
+      new ApiResponseEvent(
+        this.config.getModel(),
+        durationMs,
+        usageMetadata,
+        responseText,
+      ),
     );
   }
 
@@ -178,7 +178,12 @@ export class GeminiChat {
 
     logApiError(
       this.config,
-      new ApiErrorEvent(this.model, errorMessage, durationMs, errorType),
+      new ApiErrorEvent(
+        this.config.getModel(),
+        errorMessage,
+        durationMs,
+        errorType,
+      ),
     );
   }
 
@@ -188,14 +193,11 @@ export class GeminiChat {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (
-      authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL &&
-      authType !== AuthType.LOGIN_WITH_GOOGLE_ENTERPRISE
-    ) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -247,7 +249,7 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
     let response: GenerateContentResponse;
@@ -255,12 +257,23 @@ export class GeminiChat {
     try {
       const apiCall = () =>
         this.contentGenerator.generateContent({
-          model: this.model,
+          model: this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
 
-      response = await retryWithBackoff(apiCall);
+      response = await retryWithBackoff(apiCall, {
+        shouldRetry: (error: Error) => {
+          if (error && error.message) {
+            if (error.message.includes('429')) return true;
+            if (error.message.match(/5\d{2}/)) return true;
+          }
+          return false;
+        },
+        onPersistent429: async (authType?: string) =>
+          await this.handleFlashFallback(authType),
+        authType: this.config.getContentGeneratorConfig()?.authType,
+      });
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
         durationMs,
@@ -329,14 +342,14 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
 
     try {
       const apiCall = () =>
         this.contentGenerator.generateContentStream({
-          model: this.model,
+          model: this.config.getModel(),
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
@@ -525,7 +538,7 @@ export class GeminiChat {
       automaticFunctionCallingHistory.length > 0
     ) {
       this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory!),
+        ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
       this.history.push(userInput);
