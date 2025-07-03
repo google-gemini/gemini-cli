@@ -64,96 +64,71 @@ run_shell_command(command="npm run dev &", description="Start development server
 
 You can restrict the commands that can be executed by the `run_shell_command` tool by using the `coreTools` and `excludeTools` settings in your configuration file.
 
-- `coreTools`: If you want to restrict the `run_shell_command` tool to a specific set of commands, you can add entries to the `coreTools` list in the format `ShellTool(<command>)`. For example, `"coreTools": ["ShellTool(ls -l)"]` will only allow the `ls -l` command to be executed. If you include `ShellTool` as a general entry in the `coreTools` list, it will act as a wildcard and allow any command to be executed, even if you have other specific commands in the list.
-- `excludeTools`: If you want to block specific commands, you can add entries to the `excludeTools` list in the format `ShellTool(<command>)`. For example, `"excludeTools": ["ShellTool(rm -rf /)"]` will block the `rm -rf /` command.
+- `coreTools`: To restrict `run_shell_command` to a specific set of commands, add entries to the `coreTools` list in the format `run_shell_command(<command>)`. For example, `"coreTools": ["run_shell_command(git)"]` will only allow `git` commands. Including the generic `run_shell_command` acts as a wildcard, allowing any command not explicitly blocked.
+- `excludeTools`: To block specific commands, add entries to the `excludeTools` list in the format `run_shell_command(<command>)`. For example, `"excludeTools": ["run_shell_command(rm)"]` will block `rm` commands.
+
+The validation logic is designed to be secure and flexible:
+
+1.  **Command Chaining Disabled**: The tool automatically splits commands chained with `&&`, `||`, or `;` and validates each part separately. If any part of the chain is disallowed, the entire command is blocked.
+2.  **Prefix Matching**: The tool uses prefix matching. For example, if you allow `git`, you can run `git status` or `git log`.
+3.  **Blocklist Precedence**: The `excludeTools` list is always checked first. If a command matches a blocked prefix, it will be denied, even if it also matches an allowed prefix in `coreTools`.
 
 ### Command Restriction Examples
 
-Here are some examples of how to use the `coreTools` and `excludeTools` settings to control which commands can be executed.
+**Allow only specific command prefixes**
 
-**Allow only specific commands**
-
-To allow only `ls -l` and `git status`, and block all other commands:
+To allow only `git` and `npm` commands, and block all others:
 
 ```json
 {
-  "coreTools": ["ShellTool(ls -l)", "ShellTool(git status)"]
+  "coreTools": ["run_shell_command(git)", "run_shell_command(npm)"]
 }
 ```
 
-- `ls -l`: Allowed
 - `git status`: Allowed
-- `npm install`: Blocked
+- `npm install`: Allowed
+- `ls -l`: Blocked
 
-**Block specific commands**
+**Block specific command prefixes**
 
-To block `rm -rf /` and `npm install`, and allow all other commands:
+To block `rm` and allow all other commands:
 
 ```json
 {
-  "excludeTools": ["ShellTool(rm -rf /)", "ShellTool(npm install)"]
+  "coreTools": ["run_shell_command"],
+  "excludeTools": ["run_shell_command(rm)"]
 }
 ```
 
 - `rm -rf /`: Blocked
-- `npm install`: Blocked
-- `ls -l`: Allowed
+- `git status`: Allowed
+- `npm install`: Allowed
 
-**Allow all commands**
+**Blocklist takes precedence**
 
-To allow any command to be executed, you can use the `ShellTool` wildcard in `coreTools`:
+If a command prefix is in both `coreTools` and `excludeTools`, it will be blocked.
 
 ```json
 {
-  "coreTools": ["ShellTool"]
+  "coreTools": ["run_shell_command(git)"],
+  "excludeTools": ["run_shell_command(git push)"]
 }
 ```
 
-- `ls -l`: Allowed
-- `npm install`: Allowed
-- `any other command`: Allowed
-
-**Wildcard with specific allowed commands**
-
-If you include the `ShellTool` wildcard along with specific commands, the wildcard takes precedence, and all commands are allowed.
-
-```json
-{
-  "coreTools": ["ShellTool", "ShellTool(ls -l)"]
-}
-```
-
-- `ls -l`: Allowed
-- `npm install`: Allowed
-- `any other command`: Allowed
-
-**Wildcard with a blocklist**
-
-You can use the `ShellTool` wildcard to allow all commands, while still blocking specific commands using `excludeTools`.
-
-```json
-{
-  "coreTools": ["ShellTool"],
-  "excludeTools": ["ShellTool(rm -rf /)"]
-}
-```
-
-- `rm -rf /`: Blocked
-- `ls -l`: Allowed
-- `npm install`: Allowed
+- `git push origin main`: Blocked
+- `git status`: Allowed
 
 **Block all shell commands**
 
-To block all shell commands, you can add the `ShellTool` wildcard to `excludeTools`:
+To block all shell commands, add the `run_shell_command` wildcard to `excludeTools`:
 
 ```json
 {
-  "excludeTools": ["ShellTool"]
+  "excludeTools": ["run_shell_command"]
 }
 ```
 
 - `ls -l`: Blocked
-- `npm install`: Blocked
 - `any other command`: Blocked
 
 ## Security Note for `excludeTools`

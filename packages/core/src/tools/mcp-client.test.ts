@@ -21,6 +21,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { parse, ParseEntry } from 'shell-quote';
 
 // Mock dependencies
@@ -63,6 +64,16 @@ vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
     return this;
   });
   return { SSEClientTransport: MockedSSETransport };
+});
+
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
+  const MockedStreamableHTTPTransport = vi.fn().mockImplementation(function (
+    this: any,
+  ) {
+    this.close = vi.fn().mockResolvedValue(undefined); // Add mock close method
+    return this;
+  });
+  return { StreamableHTTPClientTransport: MockedStreamableHTTPTransport };
 });
 
 const mockToolRegistryInstance = {
@@ -126,6 +137,15 @@ describe('discoverMcpTools', () => {
     vi.mocked(SSEClientTransport).mockClear();
     // Ensure the SSEClientTransport mock constructor returns an object with a close method
     vi.mocked(SSEClientTransport).mockImplementation(function (this: any) {
+      this.close = vi.fn().mockResolvedValue(undefined);
+      return this;
+    });
+
+    vi.mocked(StreamableHTTPClientTransport).mockClear();
+    // Ensure the StreamableHTTPClientTransport mock constructor returns an object with a close method
+    vi.mocked(StreamableHTTPClientTransport).mockImplementation(function (
+      this: any,
+    ) {
       this.close = vi.fn().mockResolvedValue(undefined);
       return this;
     });
@@ -265,6 +285,100 @@ describe('discoverMcpTools', () => {
     const registeredTool = mockToolRegistry.registerTool.mock
       .calls[0][0] as DiscoveredMCPTool;
     expect(registeredTool.name).toBe('tool-sse');
+  });
+
+  it('should discover tools via mcpServers config (streamable http)', async () => {
+    const serverConfig: MCPServerConfig = {
+      httpUrl: 'http://localhost:3000/mcp',
+    };
+    mockConfig.getMcpServers.mockReturnValue({ 'http-server': serverConfig });
+
+    const mockTool = {
+      name: 'tool-http',
+      description: 'desc-http',
+      inputSchema: { type: 'object' as const, properties: {} },
+    };
+    vi.mocked(Client.prototype.listTools).mockResolvedValue({
+      tools: [mockTool],
+    });
+
+    mockToolRegistry.getToolsByServer.mockReturnValueOnce([
+      expect.any(DiscoveredMCPTool),
+    ]);
+
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+    );
+
+    expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+      new URL(serverConfig.httpUrl!),
+      {},
+    );
+    expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+      expect.any(DiscoveredMCPTool),
+    );
+    const registeredTool = mockToolRegistry.registerTool.mock
+      .calls[0][0] as DiscoveredMCPTool;
+    expect(registeredTool.name).toBe('tool-http');
+  });
+
+  describe('StreamableHTTPClientTransport headers', () => {
+    const setupHttpTest = async (headers?: Record<string, string>) => {
+      const serverConfig: MCPServerConfig = {
+        httpUrl: 'http://localhost:3000/mcp',
+        ...(headers && { headers }),
+      };
+      const serverName = headers
+        ? 'http-server-with-headers'
+        : 'http-server-no-headers';
+      const toolName = headers ? 'tool-http-headers' : 'tool-http-no-headers';
+
+      mockConfig.getMcpServers.mockReturnValue({ [serverName]: serverConfig });
+
+      const mockTool = {
+        name: toolName,
+        description: `desc-${toolName}`,
+        inputSchema: { type: 'object' as const, properties: {} },
+      };
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({
+        tools: [mockTool],
+      });
+      mockToolRegistry.getToolsByServer.mockReturnValueOnce([
+        expect.any(DiscoveredMCPTool),
+      ]);
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      );
+
+      return { serverConfig };
+    };
+
+    it('should pass headers when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+        'X-Custom-Header': 'custom-value',
+      };
+      const { serverConfig } = await setupHttpTest(headers);
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.httpUrl!),
+        { requestInit: { headers } },
+      );
+    });
+
+    it('should work without headers (backwards compatibility)', async () => {
+      const { serverConfig } = await setupHttpTest();
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.httpUrl!),
+        {},
+      );
+    });
   });
 
   it('should prefix tool names if multiple MCP servers are configured', async () => {

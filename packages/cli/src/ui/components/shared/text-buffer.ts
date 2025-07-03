@@ -420,6 +420,7 @@ export function useTextBuffer({
   const [undoStack, setUndoStack] = useState<UndoHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<UndoHistoryEntry[]>([]);
   const historyLimit = 100;
+  const [opQueue, setOpQueue] = useState<UpdateOperation[]>([]);
 
   const [clipboard, setClipboard] = useState<string | null>(null);
   const [selectionAnchor, setSelectionAnchor] = useState<
@@ -526,148 +527,110 @@ export function useTextBuffer({
     return _restoreState(state);
   }, [redoStack, lines, cursorRow, cursorCol, _restoreState]);
 
-  const insertStr = useCallback(
-    (str: string): boolean => {
-      dbg('insertStr', { str, beforeCursor: [cursorRow, cursorCol] });
-      if (str === '') return false;
+  const applyOperations = useCallback((ops: UpdateOperation[]) => {
+    if (ops.length === 0) return;
+    setOpQueue((prev) => [...prev, ...ops]);
+  }, []);
 
-      pushUndo();
-      let normalised = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      normalised = stripUnsafeCharacters(normalised);
+  useEffect(() => {
+    if (opQueue.length === 0) return;
 
-      const parts = normalised.split('\n');
-
-      const newLines = [...lines];
-      const lineContent = currentLine(cursorRow);
-      const before = cpSlice(lineContent, 0, cursorCol);
-      const after = cpSlice(lineContent, cursorCol);
-      newLines[cursorRow] = before + parts[0];
-
-      if (parts.length > 1) {
-        // Adjusted condition for inserting multiple lines
-        const remainingParts = parts.slice(1);
-        const lastPartOriginal = remainingParts.pop() ?? '';
-        newLines.splice(cursorRow + 1, 0, ...remainingParts);
-        newLines.splice(
-          cursorRow + parts.length - 1,
-          0,
-          lastPartOriginal + after,
-        );
-        setCursorRow(cursorRow + parts.length - 1);
-        setCursorCol(cpLen(lastPartOriginal));
-      } else {
-        setCursorCol(cpLen(before) + cpLen(parts[0]));
-      }
-      setLines(newLines);
-      setPreferredCol(null);
-      return true;
-    },
-    [pushUndo, cursorRow, cursorCol, lines, currentLine, setPreferredCol],
-  );
-
-  const applyOperations = useCallback(
-    (ops: UpdateOperation[]) => {
-      if (ops.length === 0) return;
-
-      const expandedOps: UpdateOperation[] = [];
-      for (const op of ops) {
-        if (op.type === 'insert') {
-          let currentText = '';
-          for (const char of toCodePoints(op.payload)) {
-            if (char.codePointAt(0) === 127) {
-              // \x7f
-              if (currentText.length > 0) {
-                expandedOps.push({ type: 'insert', payload: currentText });
-                currentText = '';
-              }
-              expandedOps.push({ type: 'backspace' });
-            } else {
-              currentText += char;
+    const expandedOps: UpdateOperation[] = [];
+    for (const op of opQueue) {
+      if (op.type === 'insert') {
+        let currentText = '';
+        for (const char of toCodePoints(op.payload)) {
+          if (char.codePointAt(0) === 127) {
+            // \x7f
+            if (currentText.length > 0) {
+              expandedOps.push({ type: 'insert', payload: currentText });
+              currentText = '';
             }
-          }
-          if (currentText.length > 0) {
-            expandedOps.push({ type: 'insert', payload: currentText });
-          }
-        } else {
-          expandedOps.push(op);
-        }
-      }
-
-      if (expandedOps.length === 0) {
-        return;
-      }
-
-      pushUndo(); // Snapshot before applying batch of updates
-
-      const newLines = [...lines];
-      let newCursorRow = cursorRow;
-      let newCursorCol = cursorCol;
-
-      const currentLine = (r: number) => newLines[r] ?? '';
-
-      for (const op of expandedOps) {
-        if (op.type === 'insert') {
-          const str = stripUnsafeCharacters(
-            op.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-          );
-          const parts = str.split('\n');
-          const lineContent = currentLine(newCursorRow);
-          const before = cpSlice(lineContent, 0, newCursorCol);
-          const after = cpSlice(lineContent, newCursorCol);
-
-          if (parts.length > 1) {
-            newLines[newCursorRow] = before + parts[0];
-            const remainingParts = parts.slice(1);
-            const lastPartOriginal = remainingParts.pop() ?? '';
-            newLines.splice(newCursorRow + 1, 0, ...remainingParts);
-            newLines.splice(
-              newCursorRow + parts.length - 1,
-              0,
-              lastPartOriginal + after,
-            );
-            newCursorRow = newCursorRow + parts.length - 1;
-            newCursorCol = cpLen(lastPartOriginal);
+            expandedOps.push({ type: 'backspace' });
           } else {
-            newLines[newCursorRow] = before + parts[0] + after;
-
-            newCursorCol = cpLen(before) + cpLen(parts[0]);
-          }
-        } else if (op.type === 'backspace') {
-          if (newCursorCol === 0 && newCursorRow === 0) continue;
-
-          if (newCursorCol > 0) {
-            const lineContent = currentLine(newCursorRow);
-            newLines[newCursorRow] =
-              cpSlice(lineContent, 0, newCursorCol - 1) +
-              cpSlice(lineContent, newCursorCol);
-            newCursorCol--;
-          } else if (newCursorRow > 0) {
-            const prevLineContent = currentLine(newCursorRow - 1);
-            const currentLineContentVal = currentLine(newCursorRow);
-            const newCol = cpLen(prevLineContent);
-            newLines[newCursorRow - 1] =
-              prevLineContent + currentLineContentVal;
-            newLines.splice(newCursorRow, 1);
-            newCursorRow--;
-            newCursorCol = newCol;
+            currentText += char;
           }
         }
+        if (currentText.length > 0) {
+          expandedOps.push({ type: 'insert', payload: currentText });
+        }
+      } else {
+        expandedOps.push(op);
       }
+    }
 
-      setLines(newLines);
-      setCursorRow(newCursorRow);
-      setCursorCol(newCursorCol);
-      setPreferredCol(null);
-    },
-    [lines, cursorRow, cursorCol, pushUndo, setPreferredCol],
-  );
+    if (expandedOps.length === 0) {
+      setOpQueue([]); // Clear queue even if ops were no-ops
+      return;
+    }
+
+    pushUndo(); // Snapshot before applying batch of updates
+
+    const newLines = [...lines];
+    let newCursorRow = cursorRow;
+    let newCursorCol = cursorCol;
+
+    const currentLine = (r: number) => newLines[r] ?? '';
+
+    for (const op of expandedOps) {
+      if (op.type === 'insert') {
+        const str = stripUnsafeCharacters(
+          op.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
+        );
+        const parts = str.split('\n');
+        const lineContent = currentLine(newCursorRow);
+        const before = cpSlice(lineContent, 0, newCursorCol);
+        const after = cpSlice(lineContent, newCursorCol);
+
+        if (parts.length > 1) {
+          newLines[newCursorRow] = before + parts[0];
+          const remainingParts = parts.slice(1);
+          const lastPartOriginal = remainingParts.pop() ?? '';
+          newLines.splice(newCursorRow + 1, 0, ...remainingParts);
+          newLines.splice(
+            newCursorRow + parts.length - 1,
+            0,
+            lastPartOriginal + after,
+          );
+          newCursorRow = newCursorRow + parts.length - 1;
+          newCursorCol = cpLen(lastPartOriginal);
+        } else {
+          newLines[newCursorRow] = before + parts[0] + after;
+
+          newCursorCol = cpLen(before) + cpLen(parts[0]);
+        }
+      } else if (op.type === 'backspace') {
+        if (newCursorCol === 0 && newCursorRow === 0) continue;
+
+        if (newCursorCol > 0) {
+          const lineContent = currentLine(newCursorRow);
+          newLines[newCursorRow] =
+            cpSlice(lineContent, 0, newCursorCol - 1) +
+            cpSlice(lineContent, newCursorCol);
+          newCursorCol--;
+        } else if (newCursorRow > 0) {
+          const prevLineContent = currentLine(newCursorRow - 1);
+          const currentLineContentVal = currentLine(newCursorRow);
+          const newCol = cpLen(prevLineContent);
+          newLines[newCursorRow - 1] = prevLineContent + currentLineContentVal;
+          newLines.splice(newCursorRow, 1);
+          newCursorRow--;
+          newCursorCol = newCol;
+        }
+      }
+    }
+
+    setLines(newLines);
+    setCursorRow(newCursorRow);
+    setCursorCol(newCursorCol);
+    setPreferredCol(null);
+
+    // Clear the queue after processing
+    setOpQueue((prev) => prev.slice(opQueue.length));
+  }, [opQueue, lines, cursorRow, cursorCol, pushUndo, setPreferredCol]);
 
   const insert = useCallback(
     (ch: string): void => {
-      if (/[\n\r]/.test(ch)) {
-        insertStr(ch);
-        return;
-      }
       dbg('insert', { ch, beforeCursor: [cursorRow, cursorCol] });
 
       ch = stripUnsafeCharacters(ch);
@@ -694,7 +657,7 @@ export function useTextBuffer({
       }
       applyOperations([{ type: 'insert', payload: ch }]);
     },
-    [applyOperations, cursorRow, cursorCol, isValidPath, insertStr],
+    [applyOperations, cursorRow, cursorCol, isValidPath],
   );
 
   const newline = useCallback((): void => {
@@ -1397,8 +1360,9 @@ export function useTextBuffer({
     }, [selectionAnchor, cursorRow, cursorCol, currentLine, setClipboard]),
     paste: useCallback(() => {
       if (clipboard === null) return false;
-      return insertStr(clipboard);
-    }, [clipboard, insertStr]),
+      applyOperations([{ type: 'insert', payload: clipboard }]);
+      return true;
+    }, [clipboard, applyOperations]),
     startSelection: useCallback(
       () => setSelectionAnchor([cursorRow, cursorCol]),
       [cursorRow, cursorCol, setSelectionAnchor],
