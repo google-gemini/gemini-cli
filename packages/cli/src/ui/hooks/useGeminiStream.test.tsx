@@ -446,8 +446,12 @@ describe('useGeminiStream', () => {
         endTime: Date.now(),
       } as TrackedCompletedToolCall,
       {
-        request: { callId: 'call2', name: 'tool2', args: {},           turn_id: 'turn-id-1',
-      },
+        request: {
+          callId: 'call2',
+          name: 'tool2',
+          args: {},
+          turn_id: 'turn-id-1',
+        },
         status: 'executing',
         responseSubmittedToGemini: false,
         tool: {
@@ -485,7 +489,6 @@ describe('useGeminiStream', () => {
           args: {},
           isClientInitiated: false,
           turn_id: 'turn-id-2',
-
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -733,7 +736,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
-           turn_id: 'turn-id-4',
+          turn_id: 'turn-id-4',
         },
         status: 'executing',
         responseSubmittedToGemini: false,
@@ -825,7 +828,7 @@ describe('useGeminiStream', () => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
         expect.any(AbortSignal),
-        'turn-id-4'
+        'turn-id-4',
       );
     });
 

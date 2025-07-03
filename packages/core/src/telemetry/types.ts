@@ -192,7 +192,6 @@ export class ApiResponseEvent {
   response_text?: string;
   turn_id: string;
 
-
   constructor(
     model: string,
     duration_ms: number,

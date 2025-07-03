@@ -174,7 +174,11 @@ export class GeminiChat {
     );
   }
 
-  private _logApiError(durationMs: number, error: unknown, turn_id: string): void {
+  private _logApiError(
+    durationMs: number,
+    error: unknown,
+    turn_id: string,
+  ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
 
@@ -249,8 +253,6 @@ export class GeminiChat {
     params: SendMessageParameters,
     turn_id: string,
   ): Promise<GenerateContentResponse> {
-    console.log('############################ SendMessage TurnId:', turn_id);
-    
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
@@ -347,12 +349,6 @@ export class GeminiChat {
     params: SendMessageParameters,
     turn_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    
-    console.log(
-      '############################ SendMessageStream TurnId:',
-      turn_id,
-    );
-    
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);

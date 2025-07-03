@@ -398,7 +398,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat("turn-id-2");
+      const result = await client.tryCompressChat('turn-id-2');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -424,7 +424,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat("turn-id-3");
+      const result = await client.tryCompressChat('turn-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -455,7 +455,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat("turn-id-1", true); // force = true
+      const result = await client.tryCompressChat('turn-id-1', true); // force = true
       const newChat = client.getChat();
 
       expect(mockSendMessage).toHaveBeenCalled();
