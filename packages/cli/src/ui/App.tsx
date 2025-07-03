@@ -577,6 +577,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
+        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
+        {updateMessage && <UpdateNotification message={updateMessage} />}
+
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -594,7 +597,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <Box flexDirection="column" key="header">
               <Header terminalWidth={terminalWidth} />
               {!settings.merged.hideTips && <Tips config={config} />}
-              {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
