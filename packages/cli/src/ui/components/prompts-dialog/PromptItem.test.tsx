@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PredefinedPrompt } from '@google/gemini-cli-core';
+import {
+  PredefinedPrompt,
+  PredefinedPromptVariable,
+} from '@google/gemini-cli-core';
 import { render } from 'ink-testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PromptItem } from './PromptItem.js';
@@ -51,41 +54,20 @@ describe('PromptItem', () => {
   });
 
   const createPrompt = (
+    id: string,
     name: string,
     template: string,
-    description?: string,
-    variables?: Array<{ name: string; type: string; required?: boolean }>,
+    variables?: PredefinedPromptVariable[],
   ): PredefinedPrompt => ({
+    id,
     name,
     template,
-    description,
     variables,
   });
 
-  it('should render prompt name and description', () => {
-    const prompt = createPrompt(
-      'Test Prompt',
-      'Hello {{name}}!',
-      'A test prompt',
-      [{ name: 'name', type: 'string', required: true }],
-    );
-
-    const { lastFrame } = render(
-      <PromptItem
-        prompt={prompt}
-        onSubmit={mockOnSubmit}
-        setErrorMessage={mockSetErrorMessage}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Test Prompt');
-    expect(output).toContain('A test prompt');
-  });
-
-  it('should render prompt without description', () => {
-    const prompt = createPrompt('Simple Prompt', 'Simple template', undefined, [
-      { name: 'test', type: 'string', required: true },
+  it('should render prompt name', () => {
+    const prompt = createPrompt('id', 'Test Prompt', 'Hello {{name}}!', [
+      { name: 'name' },
     ]);
 
     const { lastFrame } = render(
@@ -97,12 +79,11 @@ describe('PromptItem', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Simple Prompt');
-    expect(output).not.toContain('A test prompt');
+    expect(output).toContain('Test Prompt');
   });
 
   it('should render prompt with no variables and complete immediately', async () => {
-    const prompt = createPrompt('No Variables', 'Static template');
+    const prompt = createPrompt('id', 'No Variables', 'Static template');
 
     const { lastFrame } = render(
       <PromptItem
@@ -123,12 +104,9 @@ describe('PromptItem', () => {
     const { renderTemplate } = await import('../../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
-    const prompt = createPrompt(
-      'Single Variable',
-      'Hello {{name}}!',
-      undefined,
-      [{ name: 'name', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Single Variable', 'Hello {{name}}!', [
+      { name: 'name' },
+    ]);
 
     render(
       <PromptItem
@@ -160,14 +138,10 @@ describe('PromptItem', () => {
     );
 
     const prompt = createPrompt(
+      'id',
       'Multi Variable',
       'class {{name}}{{type}} extends {{base}} {}',
-      undefined,
-      [
-        { name: 'name', type: 'string', required: true },
-        { name: 'type', type: 'string', required: true },
-        { name: 'base', type: 'string', required: true },
-      ],
+      [{ name: 'name' }, { name: 'type' }, { name: 'base' }],
     );
 
     render(
@@ -205,12 +179,9 @@ describe('PromptItem', () => {
   });
 
   it('should reject empty input and show error', async () => {
-    const prompt = createPrompt(
-      'Required Input',
-      'Hello {{name}}!',
-      undefined,
-      [{ name: 'name', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Required Input', 'Hello {{name}}!', [
+      { name: 'name' },
+    ]);
 
     render(
       <PromptItem
@@ -232,12 +203,9 @@ describe('PromptItem', () => {
   });
 
   it('should reject whitespace-only input and show error', async () => {
-    const prompt = createPrompt(
-      'Required Input',
-      'Hello {{name}}!',
-      undefined,
-      [{ name: 'name', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Required Input', 'Hello {{name}}!', [
+      { name: 'name' },
+    ]);
 
     render(
       <PromptItem
@@ -262,8 +230,8 @@ describe('PromptItem', () => {
     const { renderTemplate } = await import('../../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
-    const prompt = createPrompt('Trim Test', 'Hello {{name}}!', undefined, [
-      { name: 'name', type: 'string', required: true },
+    const prompt = createPrompt('id', 'Trim Test', 'Hello {{name}}!', [
+      { name: 'name' },
     ]);
 
     render(
@@ -293,12 +261,9 @@ describe('PromptItem', () => {
       throw new Error('Template rendering failed');
     });
 
-    const prompt = createPrompt(
-      'Error Test',
-      'Invalid {{template}}',
-      undefined,
-      [{ name: 'template', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Error Test', 'Invalid {{template}}', [
+      { name: 'template' },
+    ]);
 
     render(
       <PromptItem
@@ -327,6 +292,7 @@ describe('PromptItem', () => {
 
   it('should handle prompt with undefined variables', async () => {
     const prompt: PredefinedPrompt = {
+      id: 'test',
       name: 'Undefined Variables',
       template: 'Static content',
       variables: undefined,
@@ -351,12 +317,9 @@ describe('PromptItem', () => {
     const { renderTemplate } = await import('../../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Complete template');
 
-    const prompt = createPrompt(
-      'Completion Test',
-      'Hello {{name}}!',
-      undefined,
-      [{ name: 'name', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Completion Test', 'Hello {{name}}!', [
+      { name: 'name' },
+    ]);
 
     const { lastFrame } = render(
       <PromptItem
@@ -381,12 +344,9 @@ describe('PromptItem', () => {
     const { renderTemplate } = await import('../../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello ValidName!');
 
-    const prompt = createPrompt(
-      'Error Clear Test',
-      'Hello {{name}}!',
-      undefined,
-      [{ name: 'name', type: 'string', required: true }],
-    );
+    const prompt = createPrompt('id', 'Error Clear Test', 'Hello {{name}}!', [
+      { name: 'name' },
+    ]);
 
     render(
       <PromptItem
@@ -415,13 +375,10 @@ describe('PromptItem', () => {
 
   it('should display variables that are not yet reached', async () => {
     const prompt = createPrompt(
+      'id',
       'Sequential Test',
       'Hello {{first}} {{second}}!',
-      undefined,
-      [
-        { name: 'first', type: 'string', required: true },
-        { name: 'second', type: 'string', required: true },
-      ],
+      [{ name: 'first' }, { name: 'second' }],
     );
 
     const { lastFrame } = render(
@@ -434,7 +391,7 @@ describe('PromptItem', () => {
 
     // Should only show first input, not second
     const output = lastFrame();
-    expect(output).toContain('Enter first:');
-    expect(output).not.toContain('Enter second:');
+    expect(output).toContain('first:');
+    expect(output).not.toContain('second:');
   });
 });

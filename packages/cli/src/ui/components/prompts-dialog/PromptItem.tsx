@@ -101,7 +101,7 @@ export function PromptItem({ prompt, onSubmit, setErrorMessage }: Props) {
       return (
         <Box marginTop={1} key={variable.name}>
           <Box marginRight={1}>
-            <Text>Enter {variable.name}:</Text>
+            <Text>{variable.description ?? variable.name}:</Text>
           </Box>
 
           <UncontrolledTextInput
@@ -129,12 +129,6 @@ export function PromptItem({ prompt, onSubmit, setErrorMessage }: Props) {
         <Text bold color="cyan">
           {prompt.name}
         </Text>
-
-        {prompt.description && (
-          <Box marginTop={1}>
-            <Text color={Colors.Gray}>{prompt.description}</Text>
-          </Box>
-        )}
 
         <Box flexDirection="column" marginTop={1}>
           {variables.map(renderVariable)}
