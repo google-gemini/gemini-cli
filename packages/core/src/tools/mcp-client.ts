@@ -275,7 +275,7 @@ async function connectAndDiscover(
         const stderrStr = data.toString();
         // Filter out verbose INFO logs from some MCP servers
         if (!stderrStr.includes('] INFO')) {
-          console.debug(`MCP STDERR (${mcpServerName}):`, stderrStr);
+          console.error(`MCP STDERR (${mcpServerName}):`, stderrStr);
         }
       }
     });
