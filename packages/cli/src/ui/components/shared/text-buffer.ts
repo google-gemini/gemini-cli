@@ -961,6 +961,7 @@ export function useTextBuffer({
   setRawMode,
   onChange,
   isValidPath,
+  shellModeActive = false,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -1029,7 +1030,7 @@ export function useTextBuffer({
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop) {
+      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
         let potentialPath = ch;
         if (
           potentialPath.length > 2 &&
@@ -1061,7 +1062,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath],
+    [isValidPath, shellModeActive],
   );
 
   const newline = useCallback((): void => {
