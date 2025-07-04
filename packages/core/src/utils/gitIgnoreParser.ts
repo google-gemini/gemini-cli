@@ -70,6 +70,11 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       normalizedPath = normalizedPath.substring(2);
     }
 
+    // Additional safety check: ensure normalized path is not root or empty
+    if (normalizedPath === '' || normalizedPath === '/' || normalizedPath === '.') {
+      return false;
+    }
+
     return this.ig.ignores(normalizedPath);
   }
 
