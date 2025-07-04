@@ -197,6 +197,20 @@ export async function loadCliConfig(
         )
       : extensions;
 
+  if (argv.extensions) {
+    const activeNames = new Set(
+      activeExtensions.map((e) => e.config.name.toLowerCase()),
+    );
+    for (const extension of extensions) {
+      const status = activeNames.has(extension.config.name.toLowerCase())
+        ? 'Activated'
+        : 'Disabled';
+      console.log(
+        `${status} extension: ${extension.config.name} (version: ${extension.config.version})`,
+      );
+    }
+  }
+
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
