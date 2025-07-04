@@ -42,7 +42,7 @@ export function toFriendlyError(error: unknown): unknown {
         case 401:
           return new UnauthorizedError(data.error.message);
         case 403:
-          // It's import to pass the message here since it might
+          // It's important to pass the message here since it might
           // explain the cause like "the cloud project you're
           // using doesn't have code assist enabled".
           return new ForbiddenError(data.error.message);
