@@ -53,6 +53,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  resetToolApprovals: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -126,6 +127,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'c',
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
+      default: false,
+    })
+    .option('reset-tool-approvals', {
+      type: 'boolean',
+      description: 'Resets all tool auto-approvals.',
       default: false,
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -215,6 +221,8 @@ export async function loadCliConfig(
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    autoApprovedTools: settings.autoApprovedTools,
+    resetToolApprovals: argv.resetToolApprovals || false,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
     accessibility: settings.accessibility,

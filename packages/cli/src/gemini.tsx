@@ -102,6 +102,12 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  if (config.getResetToolApprovals()) {
+    await settings.setValue(SettingScope.User, 'autoApprovedTools', []);
+    process.stderr.write('Successfully reset all tool auto-approvals.\n');
+    process.exit(0);
+  }
+
   // set default fallback to gemini api key
   // this has to go after load cli because thats where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {

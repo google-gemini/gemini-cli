@@ -114,6 +114,7 @@ export interface ConfigParameters {
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
+  autoApprovedTools?: string[];
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
@@ -130,6 +131,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  resetToolApprovals?: boolean;
 }
 
 export class Config {
@@ -170,6 +172,8 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
+  private readonly resetToolApprovals: boolean;
+  private readonly autoApprovedTools: string[];
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -189,6 +193,7 @@ export class Config {
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
+    this.autoApprovedTools = params.autoApprovedTools ?? [];
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
@@ -207,10 +212,10 @@ export class Config {
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
-    this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.resetToolApprovals = params.resetToolApprovals ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -443,6 +448,10 @@ export class Config {
 
   getExtensionContextFilePaths(): string[] {
     return this.extensionContextFilePaths;
+  }
+
+  getResetToolApprovals(): boolean {
+    return this.resetToolApprovals;
   }
 
   async getGitService(): Promise<GitService> {

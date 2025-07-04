@@ -592,23 +592,25 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('LoadedSettings class', () => {
-    it('setValue should update the correct scope and recompute merged settings', () => {
+    it('setValue should update the correct scope and recompute merged settings', async () => {
       (mockFsExistsSync as Mock).mockReturnValue(false);
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+      vi.mocked(fs.promises.writeFile).mockImplementation(() =>
+        Promise.resolve(),
+      );
       // mkdirSync is mocked in beforeEach to return undefined, which is fine for void usage
 
-      loadedSettings.setValue(SettingScope.User, 'theme', 'matrix');
+      await loadedSettings.setValue(SettingScope.User, 'theme', 'matrix');
       expect(loadedSettings.user.settings.theme).toBe('matrix');
       expect(loadedSettings.merged.theme).toBe('matrix');
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
         USER_SETTINGS_PATH,
         JSON.stringify({ theme: 'matrix' }, null, 2),
         'utf-8',
       );
 
-      loadedSettings.setValue(
+      await loadedSettings.setValue(
         SettingScope.Workspace,
         'contextFileName',
         'MY_AGENTS.md',
@@ -618,14 +620,14 @@ describe('Settings Loading and Merging', () => {
       );
       expect(loadedSettings.merged.contextFileName).toBe('MY_AGENTS.md');
       expect(loadedSettings.merged.theme).toBe('matrix'); // User setting should still be there
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
         MOCK_WORKSPACE_SETTINGS_PATH,
         JSON.stringify({ contextFileName: 'MY_AGENTS.md' }, null, 2),
         'utf-8',
       );
 
       // Workspace theme overrides user theme
-      loadedSettings.setValue(SettingScope.Workspace, 'theme', 'ocean');
+      await loadedSettings.setValue(SettingScope.Workspace, 'theme', 'ocean');
 
       expect(loadedSettings.workspace.settings.theme).toBe('ocean');
       expect(loadedSettings.merged.theme).toBe('ocean');
