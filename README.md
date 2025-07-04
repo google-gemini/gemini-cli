@@ -49,12 +49,9 @@ The Gemini API provides a free tier with [100 requests per day](https://ai.googl
    export GEMINI_API_KEY="YOUR_API_KEY"
    ```
 
-   Or set the environment variable to `~/.env` file:
+   Alternatively, to make the variable persistent across sessions, add it to a `~/.env` file in your home directory:
    ```bash
    GEMINI_API_KEY="YOUR_API_KEY"
-   ```
-
-4. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
