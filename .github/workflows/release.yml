@@ -102,8 +102,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json packages/*/package.json
-          git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
-          git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+          if ! git diff-index --quiet HEAD --; then
+            echo "Changes detected, creating commit."
+            git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
+            git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+          else
+            echo "No version changes to commit."
+          fi
 
       - name: Create GitHub Release and Tag
         if: '!inputs.dry_run'
