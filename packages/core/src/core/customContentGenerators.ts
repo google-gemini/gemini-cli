@@ -19,6 +19,7 @@ import {
   PartUnion,
   ContentEmbedding,
 } from '@google/genai';
+
 import { ContentGenerator, ContentGeneratorConfig } from './contentGenerator.js';
 import { fetchWithTimeout } from '../utils/fetch.js';
 
@@ -28,181 +29,24 @@ import { fetchWithTimeout } from '../utils/fetch.js';
 function normalizeContents(contents: any): Content[] {
   if (!contents) return [];
 
-  // If it's already an array of Content objects
   if (Array.isArray(contents)) {
     return contents.filter((item: any) => item && typeof item === 'object' && 'parts' in item);
   }
 
-  // If it's a single Content object
   if (typeof contents === 'object' && 'parts' in contents) {
     return [contents];
   }
 
-  // If it's a string or PartUnion, convert to Content
   if (typeof contents === 'string') {
     return [{ parts: [{ text: contents }], role: 'user' }];
   }
 
-  // If it's a Part object
   if (typeof contents === 'object' && ('text' in contents || 'inlineData' in contents)) {
     return [{ parts: [contents], role: 'user' }];
   }
 
   return [];
 }
-
-export class AzureContentGenerator implements ContentGenerator {
-  constructor(private config: ContentGeneratorConfig) {
-    // Set default model if no model is provided
-    this.config.model = this.config.model || 'gpt-4o';
-  }
-  async generateContent(request: GenerateContentParameters): Promise<GenerateContentResponse> {
-    const azureUrl = `${this.config.baseUrl}/openai/deployments/${request.model || this.config.model}/chat/completions?api-version=${this.config.apiVersion}`;
-    const contents = normalizeContents(request.contents);
-
-    const requestBody = {
-      messages: contents.map((content) => ({
-        role: content.role === 'model' ? 'assistant' : content.role,
-        content: content.parts?.map(part => ('text' in part ? part.text : '')).join(' ') || '',
-      })),
-      temperature: request.config?.temperature || 0.7,
-      max_tokens: request.config?.maxOutputTokens || 2048,
-    };
-
-    const response = await fetch(azureUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': this.config.apiKey || '',
-        ...this.config.customHeaders,
-      },
-      body: JSON.stringify(requestBody),
-      signal: this.config.timeout ? AbortSignal.timeout(this.config.timeout) : undefined,
-    });
-
-    if (!response.ok) {
-      const errorMsg = await response.text();
-      throw new Error(`Azure API Error: ${response.status} - ${errorMsg}`);
-    }
-
-    const data = await response.json();
-    return {
-      candidates: [
-        {
-          content: { parts: [{ text: data.choices[0].message.content }], role: 'model' },
-          index: 0,
-          finishReason: data.choices[0].finish_reason || 'STOP',
-        },
-      ],
-      text: data.choices[0].message.content,
-      data,
-      functionCalls: [],
-      executableCode: undefined,
-      codeExecutionResult: undefined,
-    };
-  }
-  async generateContentStream(
-    request: GenerateContentParameters
-  ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const self = this;
-
-    return (async function* () {
-      const azureUrl = `${self.config.baseUrl}/openai/deployments/${request.model || self.config.model}/chat/completions?api-version=${self.config.apiVersion}`;
-      const contents = normalizeContents(request.contents);
-
-      const requestBody = {
-        messages: contents.map((content) => ({
-          role: content.role === 'model' ? 'assistant' : content.role,
-          content: content.parts?.map(part => ('text' in part ? part.text : '')).join(' ') || '',
-        })),
-        temperature: request.config?.temperature || 0.7,
-        max_tokens: request.config?.maxOutputTokens || 2048,
-        stream: true, // Enable streaming
-      };
-
-      const response = await fetch(azureUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'api-key': self.config.apiKey || '',
-          ...self.config.customHeaders,
-        },
-        body: JSON.stringify(requestBody),
-        signal: self.config.timeout ? AbortSignal.timeout(self.config.timeout) : undefined,
-      });
-
-      if (!response.ok) {
-        const errorMsg = await response.text();
-        throw new Error(`Azure API Streaming Error: ${response.status} - ${errorMsg}, URL ${azureUrl}`);
-      }
-
-      if (!response.body) {
-        throw new Error('Streaming response body is empty!');
-      }
-
-      const decoder = new TextDecoder();
-      const reader = response.body.getReader();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // If the line is incomplete, buffer it for the next read.
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') {
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices[0]?.delta?.content ?? '';
-                // Yield the streaming response as an incremental GenerateContentResponse
-                yield {
-                  candidates: [
-                    {
-                      content: { parts: [{ text: content }], role: 'model' },
-                      index: 0,
-                      finishReason: parsed.choices[0]?.finish_reason || 'STOP',
-                    },
-                  ],
-                  functionCalls: [],
-                  text: content,
-                  data: undefined,
-                  executableCode: undefined,
-                  codeExecutionResult: undefined,
-                };
-              } catch (e) {
-                console.error('Failed to parse streaming response:', e);
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    })();
-  }
-
-  async countTokens(request: CountTokensParameters): Promise<CountTokensResponse> {
-    const contents = normalizeContents(request.contents);
-    const text = contents.map((c) => c.parts?.map((p) => ('text' in p ? p.text : '')).join(' ') || '').join(' ');
-    return { totalTokens: Math.ceil(text.length / 4) }; // Rough approximation
-  }
-
-  async embedContent(): Promise<EmbedContentResponse> {
-    throw new Error('AzureContentGenerator does not support embeddings.');
-  }
-}
-
 /**
  * Generic HTTP-based content generator for OpenAI-compatible APIs
  */
@@ -365,7 +209,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     };
   }
 
-  private convertToOpenAIFormat(request: GenerateContentParameters): any {
+  protected convertToOpenAIFormat(request: GenerateContentParameters): any {
     const contents = normalizeContents(request.contents);
     let messages = contents.map((content: Content) => ({
       role: content.role === 'model' ? 'assistant' : content.role,
@@ -426,7 +270,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     return openAIRequest;
   }
 
-  private convertFromOpenAIFormat(
+  protected convertFromOpenAIFormat(
     data: any,
     isStream = false,
     toolCallAccumulator?: Map<string, { id: string; name: string; arguments: string }>,
@@ -447,20 +291,14 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
 
     if (message?.tool_calls && Array.isArray(message.tool_calls)) {
       for (const toolCall of message.tool_calls) {
-
         if ((toolCall.type === 'function' || isStream) && toolCall.function) {
           if (isStream && toolCallAccumulator && indexToIdMap) {
-            // Handle streaming tool calls - accumulate arguments
             const index = toolCall.index || 0;
-
-            // If this chunk has an ID, store the mapping
             if (toolCall.id) {
               indexToIdMap.set(index, toolCall.id);
             }
 
-            // Get the actual call ID from the mapping or use the current ID
-            const callId = indexToIdMap.get(index) || toolCall.id || `call_${index} `;
-
+            const callId = indexToIdMap.get(index) || toolCall.id || `call_${index}`;
             if (!toolCallAccumulator.has(callId)) {
               toolCallAccumulator.set(callId, {
                 id: callId,
@@ -476,11 +314,8 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
             if (toolCall.function.arguments) {
               accumulated.arguments += toolCall.function.arguments;
             }
-
-            // Don't yield function calls during streaming - wait for completion
             continue;
           } else {
-            // Handle non-streaming tool calls
             try {
               const args = typeof toolCall.function.arguments === 'string'
                 ? JSON.parse(toolCall.function.arguments)
@@ -492,8 +327,6 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
                 args: args,
               });
             } catch (e) {
-              // Failed to parse tool call arguments - this can happen with malformed JSON
-              // Include the tool call with empty args if parsing fails
               functionCalls.push({
                 id: toolCall.id,
                 name: toolCall.function.name,
@@ -505,7 +338,6 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
       }
     }
 
-    // For streaming, only return response if there's text content
     if (isStream && !text && functionCalls.length === 0) {
       return null;
     }
@@ -602,7 +434,100 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
 
 
 }
+export class AzureContentGenerator extends OpenAICompatibleContentGenerator {
+  constructor(private azureConfig: ContentGeneratorConfig) {
+    super(azureConfig);
+    this.azureConfig.model = this.azureConfig.model || 'gpt-4o';
+  }
 
+  /**
+   * Streams content responses from Azure OpenAI API.
+   */
+  async generateContentStream(
+    request: GenerateContentParameters
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const { openAIRequest, endpoint } = this.convertToAzureFormat(request);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': this.azureConfig.apiKey || '',
+        ...this.azureConfig.customHeaders,
+      },
+      body: JSON.stringify({ ...openAIRequest, stream: true }),
+      signal: this.azureConfig.timeout ? AbortSignal.timeout(this.azureConfig.timeout) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorMsg = await response.text();
+      throw new Error(`Azure API Streaming Error: ${response.status} - ${errorMsg}`);
+    }
+
+    if (!response.body) {
+      throw new Error('Streaming response body is empty!');
+    }
+
+    // Bind "this" for class context
+    const self = this;
+
+    const generator = async function* () {
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Retain unfinished line in the buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') {
+                return; // End the generator loop
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+
+                // Use "self" to call the class method for processing
+                const response = self.convertFromOpenAIFormat(parsed, true);
+                if (response) {
+                  yield response;
+                }
+              } catch (e) {
+                console.error('Failed to parse streaming response:', e);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    };
+
+    return generator();
+  }
+
+  /**
+   * Converts the `GenerateContentParameters` into Azure-specific request format.
+   */
+  private convertToAzureFormat(request: GenerateContentParameters): { openAIRequest: any; endpoint: string } {
+    const openAIRequest = this.convertToOpenAIFormat(request);
+
+    // Azure-specific endpoint format
+    const modelDeployment = request.model || this.azureConfig.model; // Deployment name
+    const apiVersion = this.azureConfig.apiVersion || '2025-01-01-preview';
+    const endpoint = `${this.azureConfig.baseUrl}/openai/deployments/${modelDeployment}/chat/completions?api-version=${apiVersion}`;
+
+    return { openAIRequest, endpoint };
+  }
+}
 /**
  * Anthropic Claude API content generator
  */
