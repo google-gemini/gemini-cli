@@ -428,7 +428,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
-          turn_id: 'turn-id-1',
+          prompt_id: 'prompt-id-1',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -451,7 +451,7 @@ describe('useGeminiStream', () => {
           callId: 'call2',
           name: 'tool2',
           args: {},
-          turn_id: 'turn-id-1',
+          prompt_id: 'prompt-id-1',
         },
         status: 'executing',
         responseSubmittedToGemini: false,
@@ -489,7 +489,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
-          turn_id: 'turn-id-2',
+          prompt_id: 'prompt-id-2',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -501,7 +501,7 @@ describe('useGeminiStream', () => {
           name: 'tool2',
           args: {},
           isClientInitiated: false,
-          turn_id: 'turn-id-2',
+          prompt_id: 'prompt-id-2',
         },
         status: 'error',
         responseSubmittedToGemini: false,
@@ -554,7 +554,7 @@ describe('useGeminiStream', () => {
     expect(mockSendMessageStream).toHaveBeenCalledWith(
       expectedMergedResponse,
       expect.any(AbortSignal),
-      'turn-id-2',
+      'prompt-id-2',
     );
   });
 
@@ -566,7 +566,7 @@ describe('useGeminiStream', () => {
           name: 'testTool',
           args: {},
           isClientInitiated: false,
-          turn_id: 'turn-id-3',
+          prompt_id: 'prompt-id-3',
         },
         status: 'cancelled',
         response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
@@ -737,7 +737,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
-          turn_id: 'turn-id-4',
+          prompt_id: 'prompt-id-4',
         },
         status: 'executing',
         responseSubmittedToGemini: false,
@@ -829,7 +829,7 @@ describe('useGeminiStream', () => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
         expect.any(AbortSignal),
-        'turn-id-4',
+        'prompt-id-4',
       );
     });
 
@@ -998,7 +998,7 @@ describe('useGeminiStream', () => {
           name: clientToolRequest.toolName,
           args: clientToolRequest.toolArgs,
           isClientInitiated: true,
-          turn_id: 'turn-id-5',
+          prompt_id: 'prompt-id-5',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -1074,7 +1074,7 @@ describe('useGeminiStream', () => {
           name: 'save_memory',
           args: { fact: 'test' },
           isClientInitiated: true,
-          turn_id: 'turn-id-6',
+          prompt_id: 'prompt-id-6',
         },
         status: 'success',
         responseSubmittedToGemini: false,

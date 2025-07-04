@@ -55,7 +55,7 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
     };
-    turn = new Turn(mockChatInstance as unknown as GeminiChat, 'turn-id-1');
+    turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);
     mockSendMessageStream.mockResolvedValue((async function* () {})());
   });
@@ -97,7 +97,7 @@ describe('Turn', () => {
           message: reqParts,
           config: { abortSignal: expect.any(AbortSignal) },
         },
-        'turn-id-1',
+        'prompt-id-1',
       );
 
       expect(events).toEqual([

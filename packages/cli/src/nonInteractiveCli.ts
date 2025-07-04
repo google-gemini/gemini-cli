@@ -61,7 +61,7 @@ export async function runNonInteractive(
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
-  const turn_id = Math.random().toString(16).slice(2);
+  const prompt_id = Math.random().toString(16).slice(2);
 
   try {
     while (true) {
@@ -77,7 +77,7 @@ export async function runNonInteractive(
             ],
           },
         },
-        turn_id,
+        prompt_id,
       );
 
       for await (const resp of responseStream) {
@@ -104,7 +104,7 @@ export async function runNonInteractive(
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
             isClientInitiated: false,
-            turn_id,
+            prompt_id,
           };
 
           const toolResponse = await executeToolCall(

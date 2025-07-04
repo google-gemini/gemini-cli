@@ -203,7 +203,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
-      turn_id: string,
+      prompt_id: string,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -243,7 +243,7 @@ export const useGeminiStream = (
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
-              turn_id: turn_id,
+              prompt_id: prompt_id,
             };
             scheduleToolCalls([toolCallRequest], abortSignal);
           }
@@ -492,7 +492,7 @@ export const useGeminiStream = (
     async (
       query: PartListUnion,
       options?: { isContinuation: boolean },
-      turn_id?: string,
+      prompt_id?: string,
     ) => {
       if (
         (streamingState === StreamingState.Responding ||
@@ -508,15 +508,15 @@ export const useGeminiStream = (
       const abortSignal = abortControllerRef.current.signal;
       turnCancelledRef.current = false;
 
-      if (!turn_id) {
-        turn_id = config.getSessionId() + '########' + getTurnCount();
+      if (!prompt_id) {
+        prompt_id = config.getSessionId() + '########' + getTurnCount();
       }
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
         abortSignal,
-        turn_id!,
+        prompt_id!,
       );
 
       if (!shouldProceed || queryToSend === null) {
@@ -534,7 +534,7 @@ export const useGeminiStream = (
         const stream = geminiClient.sendMessageStream(
           queryToSend,
           abortSignal,
-          turn_id!,
+          prompt_id!,
         );
         const processingStatus = await processGeminiStreamEvents(
           stream,
@@ -687,7 +687,9 @@ export const useGeminiStream = (
         (toolCall) => toolCall.request.callId,
       );
 
-      const turn_ids = geminiTools.map((toolCall) => toolCall.request.turn_id);
+      const prompt_ids = geminiTools.map(
+        (toolCall) => toolCall.request.prompt_id,
+      );
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
       submitQuery(
@@ -695,7 +697,7 @@ export const useGeminiStream = (
         {
           isContinuation: true,
         },
-        turn_ids[0],
+        prompt_ids[0],
       );
     },
     [

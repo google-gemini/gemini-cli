@@ -1265,7 +1265,7 @@ describe('useSlashCommandProcessor', () => {
     it('should call tryCompressChat(true)', async () => {
       const hook = getProcessorHook();
       mockTryCompressChat.mockImplementationOnce(
-        async (turn_id?: string, force?: boolean) => {
+        async (prompt_id?: string, force?: boolean) => {
           expect(force).toBe(true);
           await act(async () => {
             hook.rerender();
@@ -1293,7 +1293,7 @@ describe('useSlashCommandProcessor', () => {
       });
       expect(hook.result.current.pendingHistoryItems).toEqual([]);
       expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(
-        'Turn Id not set',
+        'Prompt Id not set',
         true,
       );
       expect(mockAddItem).toHaveBeenNthCalledWith(

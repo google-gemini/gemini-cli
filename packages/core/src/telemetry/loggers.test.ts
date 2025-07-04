@@ -201,7 +201,7 @@ describe('loggers', () => {
       const event = new ApiResponseEvent(
         'test-model',
         100,
-        'turn-id-1',
+        'prompt-id-1',
         usageData,
         'test-response',
       );
@@ -225,7 +225,7 @@ describe('loggers', () => {
           tool_token_count: 2,
           total_token_count: 0,
           response_text: 'test-response',
-          turn_id: 'turn-id-1',
+          prompt_id: 'prompt-id-1',
         },
       });
 
@@ -262,7 +262,7 @@ describe('loggers', () => {
       const event = new ApiResponseEvent(
         'test-model',
         100,
-        'turn-id-1',
+        'prompt-id-1',
         usageData,
         'test-response',
         'test-error',
@@ -397,7 +397,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
-          turn_id: 'turn-id-1',
+          prompt_id: 'prompt-id-1',
         },
         response: {
           callId: 'test-call-id',
@@ -431,7 +431,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           decision: ToolCallDecision.ACCEPT,
-          turn_id: 'turn-id-1',
+          prompt_id: 'prompt-id-1',
         },
       });
 
@@ -460,7 +460,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
-          turn_id: 'turn-id-2',
+          prompt_id: 'prompt-id-2',
         },
         response: {
           callId: 'test-call-id',
@@ -493,7 +493,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: false,
           decision: ToolCallDecision.REJECT,
-          turn_id: 'turn-id-2',
+          prompt_id: 'prompt-id-2',
         },
       });
 
@@ -523,7 +523,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
-          turn_id: 'turn-id-3',
+          prompt_id: 'prompt-id-3',
         },
         response: {
           callId: 'test-call-id',
@@ -557,7 +557,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           decision: ToolCallDecision.MODIFY,
-          turn_id: 'turn-id-3',
+          prompt_id: 'prompt-id-3',
         },
       });
 
@@ -587,7 +587,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
-          turn_id: 'turn-id-4',
+          prompt_id: 'prompt-id-4',
         },
         response: {
           callId: 'test-call-id',
@@ -619,7 +619,7 @@ describe('loggers', () => {
           ),
           duration_ms: 100,
           success: true,
-          turn_id: 'turn-id-4',
+          prompt_id: 'prompt-id-4',
         },
       });
 
@@ -649,7 +649,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
-          turn_id: 'turn-id-5',
+          prompt_id: 'prompt-id-5',
         },
         response: {
           callId: 'test-call-id',
@@ -687,7 +687,7 @@ describe('loggers', () => {
           'error.message': 'test-error',
           error_type: 'test-error-type',
           'error.type': 'test-error-type',
-          turn_id: 'turn-id-5',
+          prompt_id: 'prompt-id-5',
         },
       });
 

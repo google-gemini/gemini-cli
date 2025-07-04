@@ -64,7 +64,7 @@ export interface ToolCallRequestInfo {
   name: string;
   args: Record<string, unknown>;
   isClientInitiated: boolean;
-  turn_id: string;
+  prompt_id: string;
 }
 
 export interface ToolCallResponseInfo {
@@ -146,7 +146,7 @@ export class Turn {
 
   constructor(
     private readonly chat: GeminiChat,
-    private readonly turn_id: string,
+    private readonly prompt_id: string,
   ) {
     this.pendingToolCalls = [];
     this.debugResponses = [];
@@ -164,7 +164,7 @@ export class Turn {
             abortSignal: signal,
           },
         },
-        this.turn_id,
+        this.prompt_id,
       );
 
       for await (const resp of responseStream) {
@@ -259,7 +259,7 @@ export class Turn {
       name,
       args,
       isClientInitiated: false,
-      turn_id: this.turn_id,
+      prompt_id: this.prompt_id,
     };
 
     this.pendingToolCalls.push(toolCallRequest);
