@@ -313,6 +313,56 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables [checkpointing](./commands.md#checkpointing-commands).
 - **`--version`**:
   - Displays the version of the CLI.
+- **`--ollama-host <url>`**:
+  - Specifies the host address of your Ollama instance (e.g., `http://localhost:11434`).
+- **`--ollama-model <model_name>`**:
+  - Specifies the name of the Ollama model to use (e.g., `llama2`, `codellama`).
+
+## Using Local LLMs with Ollama
+
+Gemini CLI supports using local language models served by [Ollama](https://ollama.ai/). This allows you to run models on your own hardware for privacy, offline use, or experimentation with custom models.
+
+To use Ollama with Gemini CLI:
+
+1.  **Install and Run Ollama:** Ensure Ollama is installed and running on your system. You can download it from [ollama.ai](https://ollama.ai/).
+2.  **Download a Model:** Pull the model you want to use with Ollama:
+    ```bash
+    ollama pull llama2
+    ```
+    Replace `llama2` with your desired model (e.g., `codellama`, `mistral`).
+3.  **Configure Gemini CLI:**
+    You can configure Gemini CLI to use your Ollama instance via command-line arguments or environment variables.
+
+    - **Command-Line Arguments:**
+      - Use the `--ollama-host` argument to specify the URL of your Ollama server (default is usually `http://localhost:11434`).
+      - Use the `--ollama-model` argument to specify the model name you downloaded in Ollama.
+      - You will also need to specify a general `--model` argument. The exact value for `--model` when using Ollama might be a generic identifier like `ollama` or might need to match/relate to `--ollama-model` depending on the specific integration details. Refer to the latest CLI behavior or examples for the precise `--model` value required.
+
+      **Example:**
+      ```bash
+      gemini --model ollama --ollama-host http://localhost:11434 --ollama-model llama2 "Your prompt here"
+      ```
+
+    - **Environment Variables (Conceptual - check if directly supported):**
+      While direct environment variables like `OLLAMA_HOST` or `OLLAMA_MODEL` might not be implemented in the same way as `GEMINI_API_KEY`, you can typically achieve a similar effect by setting your desired Ollama model and host as defaults in your shell profile if you frequently use the same Ollama setup, and then just pass the `--model ollama` (or equivalent) flag.
+
+      Alternatively, you could create shell aliases or wrapper scripts:
+      ```bash
+      # Example alias in .bashrc or .zshrc
+      alias gemini-ollama="gemini --model ollama --ollama-host http://localhost:11434 --ollama-model llama2"
+
+      # Then run:
+      gemini-ollama "Your prompt here"
+      ```
+
+    - **Settings File (Conceptual - check if directly supported):**
+      Similarly, while `settings.json` might not have direct top-level keys for `ollamaHost` and `ollamaModel` that are automatically picked up without corresponding command-line flags, you would typically use command-line flags to activate Ollama usage.
+
+**Important Considerations:**
+
+- **Model Compatibility:** The features and performance will depend on the specific Ollama model you are using.
+- **Resource Usage:** Running LLMs locally can be resource-intensive (CPU, GPU, RAM). Ensure your system meets the requirements for the models you intend to use.
+- **Tool Functionality:** The availability and behavior of tools when using Ollama models might differ compared to using Gemini API models, as some tools might rely on specific model capabilities or external services. The placeholder `OllamaClient` in the initial integration will need to be fully implemented to make actual calls to the Ollama API.
 
 ## Context Files (Hierarchical Instructional Context)
 

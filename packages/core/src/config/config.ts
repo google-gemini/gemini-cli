@@ -129,6 +129,8 @@ export interface ConfigParameters {
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
   model: string;
+  ollamaHost?: string; // Add Ollama host
+  ollamaModel?: string; // Add Ollama model
   extensionContextFilePaths?: string[];
 }
 
@@ -167,6 +169,8 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
+  private readonly ollamaHost: string | undefined;
+  private readonly ollamaModel: string | undefined;
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
@@ -210,6 +214,8 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.ollamaHost = params.ollamaHost;
+    this.ollamaModel = params.ollamaModel;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
 
     if (params.contextFileName) {
@@ -451,6 +457,14 @@ export class Config {
       await this.gitService.initialize();
     }
     return this.gitService;
+  }
+
+  getOllamaHost(): string | undefined {
+    return this.ollamaHost;
+  }
+
+  getOllamaModel(): string | undefined {
+    return this.ollamaModel;
   }
 }
 

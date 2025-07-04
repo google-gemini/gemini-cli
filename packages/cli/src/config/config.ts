@@ -53,6 +53,8 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  ollamaHost: string | undefined;
+  ollamaModel: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -127,6 +129,14 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
       default: false,
+    })
+    .option('ollama-host', {
+      type: 'string',
+      description: 'Ollama host address (e.g., http://localhost:11434)',
+    })
+    .option('ollama-model', {
+      type: 'string',
+      description: 'Ollama model name to use',
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -245,6 +255,8 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
+    ollamaHost: argv.ollamaHost,
+    ollamaModel: argv.ollamaModel,
     extensionContextFilePaths,
   });
 }

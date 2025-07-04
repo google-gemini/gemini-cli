@@ -64,6 +64,22 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
 
+### Ollama Local Model Options
+
+If you are using a local [Ollama](https://ollama.ai/) model, the following command-line options are available:
+
+- **`--ollama-host <url>`**
+  - **Description:** Specifies the host address of your Ollama instance.
+  - **Example:** `gemini --ollama-host http://localhost:11434`
+  - **Default:** If not provided, the CLI might attempt to connect to a default Ollama address (this behavior could vary).
+
+- **`--ollama-model <model_name>`**
+  - **Description:** Specifies the name of the Ollama model you want to use (e.g., `llama2`, `codellama`).
+  - **Example:** `gemini --ollama-model codellama`
+  - **Default:** You must specify a model if using Ollama.
+
+**Note:** To use Ollama, you typically also need to specify an appropriate `--model` option that corresponds to your Ollama setup (the exact value might depend on how the integration expects the model to be identified, potentially just a generic indicator if `--ollama-model` is the primary way to specify the Ollama model). Ensure your Ollama server is running and the desired model is downloaded.
+
 - [**`/theme`**](./themes.md)
   - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 

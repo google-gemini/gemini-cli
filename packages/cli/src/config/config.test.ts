@@ -89,6 +89,24 @@ describe('loadCliConfig', () => {
     const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
   });
+
+  it('should correctly parse and set ollamaHost and ollamaModel from CLI arguments', async () => {
+    const ollamaHost = 'http://my-ollama:11434';
+    const ollamaModel = 'codellama';
+    process.argv = ['node', 'script.js', '--ollama-host', ollamaHost, '--ollama-model', ollamaModel];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getOllamaHost()).toBe(ollamaHost);
+    expect(config.getOllamaModel()).toBe(ollamaModel);
+  });
+
+  it('should leave ollamaHost and ollamaModel undefined if not provided in CLI arguments', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getOllamaHost()).toBeUndefined();
+    expect(config.getOllamaModel()).toBeUndefined();
+  });
 });
 
 describe('loadCliConfig telemetry', () => {

@@ -38,6 +38,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  OLLAMA = 'ollama',
 }
 
 export type ContentGeneratorConfig = {
@@ -45,6 +46,7 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  ollamaHost?: string; // Add Ollama host
 };
 
 export async function createContentGeneratorConfig(
@@ -67,6 +69,12 @@ export async function createContentGeneratorConfig(
 
   // if we are using google auth nothing else to validate for now
   if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+    return contentGeneratorConfig;
+  }
+
+  // Handle Ollama separately as it's local and doesn't need API keys
+  if (authType === AuthType.OLLAMA) {
+    // TODO: Potentially validate ollamaHost if provided
     return contentGeneratorConfig;
   }
 
@@ -130,7 +138,95 @@ export async function createContentGenerator(
     return googleGenAI.models;
   }
 
+  if (config.authType === AuthType.OLLAMA) {
+    return new OllamaClient(config);
+  }
+
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );
+}
+
+class OllamaClient implements ContentGenerator {
+  private client: GoogleGenAI; // Placeholder, replace with actual Ollama client
+  private model: string;
+
+  constructor(private config: ContentGeneratorConfig) {
+    // TODO: Initialize Ollama client with config.ollamaHost
+    this.client = new GoogleGenAI({ apiKey: 'unused' }); // Replace with actual Ollama client initialization
+    this.model = config.model;
+  }
+
+  async generateContent(
+    request: GenerateContentParameters,
+  ): Promise<GenerateContentResponse> {
+    // TODO: Implement Ollama API call
+    console.log('OllamaClient.generateContent called with:', request);
+    // Placeholder implementation
+    return {
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'Response from Ollama' }],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+          tokenCount: 0,
+        },
+      ],
+      promptFeedback: {
+        blockReason: 'OTHER',
+      },
+    };
+  }
+
+  async generateContentStream(
+    request: GenerateContentParameters,
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // TODO: Implement Ollama API call
+    console.log('OllamaClient.generateContentStream called with:', request);
+    // Placeholder implementation
+    async function* stream() {
+      yield {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Response from Ollama stream' }],
+              role: 'model',
+            },
+            finishReason: 'STOP',
+            index: 0,
+            tokenCount: 0,
+          },
+        ],
+        promptFeedback: {
+          blockReason: 'OTHER',
+        },
+      };
+    }
+    return stream();
+  }
+
+  async countTokens(
+    request: CountTokensParameters,
+  ): Promise<CountTokensResponse> {
+    // TODO: Implement Ollama API call if available, otherwise estimate
+    console.log('OllamaClient.countTokens called with:', request);
+    // Placeholder implementation
+    return {
+      totalTokens: 0,
+    };
+  }
+
+  async embedContent(
+    request: EmbedContentParameters,
+  ): Promise<EmbedContentResponse> {
+    // TODO: Implement Ollama API call if available
+    console.log('OllamaClient.embedContent called with:', request);
+    // Placeholder implementation
+    return {
+      embeddings: [],
+    };
+  }
 }

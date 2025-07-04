@@ -270,4 +270,24 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
   });
+
+  // Ollama specific tests
+  it('should return undefined for ollamaHost and ollamaModel by default', () => {
+    const config = new Config({ ...baseParams });
+    expect(config.getOllamaHost()).toBeUndefined();
+    expect(config.getOllamaModel()).toBeUndefined();
+  });
+
+  it('should return configured ollamaHost and ollamaModel', () => {
+    const ollamaSettings = {
+      ollamaHost: 'http://localhost:11434',
+      ollamaModel: 'llama2',
+    };
+    const config = new Config({
+      ...baseParams,
+      ...ollamaSettings,
+    });
+    expect(config.getOllamaHost()).toBe(ollamaSettings.ollamaHost);
+    expect(config.getOllamaModel()).toBe(ollamaSettings.ollamaModel);
+  });
 });
