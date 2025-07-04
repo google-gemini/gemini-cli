@@ -2,7 +2,10 @@
   "name": "@google/gemini-cli",
   "version": "0.1.9",
   "description": "Gemini CLI",
-  "repository": "google-gemini/gemini-cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -16,20 +19,16 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
-    "prerelease:version": "node ../../scripts/bind_package_version.js",
-    "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build",
-    "prepublishOnly": "node ../../scripts/prepublish.js"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "gemini-cli-sandbox"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "*",
+    "@google/gemini-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
