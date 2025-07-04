@@ -184,4 +184,68 @@ describe('InputPrompt', () => {
     expect(props.onSubmit).toHaveBeenCalledWith('some text');
     unmount();
   });
+
+  describe('Autocomplete behavior', () => {
+    beforeEach(() => {
+      // Mock completion behavior
+      mockCompletion.showSuggestions = true;
+      mockCompletion.suggestions = [
+        { label: 'suggestion1', value: 'suggestion1', description: 'First suggestion' },
+        { label: 'suggestion2', value: 'suggestion2', description: 'Second suggestion' },
+      ];
+      mockCompletion.activeSuggestionIndex = 0;
+    });
+
+    it('should complete without submitting when tab is pressed for slash commands', async () => {
+      props.buffer.setText('/test');
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\t'); // Tab
+      await wait();
+
+      // Should not submit for slash commands on tab
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should complete and submit when enter is pressed for slash commands', async () => {
+      props.buffer.setText('/test');
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\r'); // Enter
+      await wait();
+
+      // Should submit for slash commands on enter
+      expect(props.onSubmit).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should complete and submit when tab is pressed for @ commands', async () => {
+      props.buffer.setText('hello @test');
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\t'); // Tab
+      await wait();
+
+      // Should submit for @ commands on tab (original behavior)
+      expect(props.onSubmit).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should complete and submit when enter is pressed for @ commands', async () => {
+      props.buffer.setText('hello @test');
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\r'); // Enter
+      await wait();
+
+      // Should submit for @ commands on enter
+      expect(props.onSubmit).toHaveBeenCalled();
+      unmount();
+    });
+  });
 });
