@@ -233,7 +233,7 @@ Permission issues or other file system errors are handled gracefully with approp
 
 ## Code Region Detection
 
-> **Note:** The import processor uses the `marked` library to detect code blocks and inline code spans, ensuring that `@` imports inside these regions are properly ignored. This provides robust handling of nested code blocks and complex Markdown structures that would be difficult to parse with regex alone. The system uses `marked.lexer()` as the primary method with regex fallback for edge cases where `codespan` tokens might not be detected.
+> **Note:** The import processor uses the `marked` library to detect code blocks and inline code spans, ensuring that `@` imports inside these regions are properly ignored. This provides robust handling of nested code blocks and complex Markdown structures that would be difficult to parse with regex alone. The system uses `marked.lexer()` as the primary method, with a robust, GFM-compliant regex fallback for edge cases where `codespan` tokens might not be detected (e.g., nested or escaped backticks).
 
 ---
 
@@ -263,6 +263,15 @@ Validates import paths to ensure they are safe and within allowed directories.
 - `allowedDirectories` (string[]): Array of allowed directory paths
 
 **Returns:** boolean - Whether the import path is valid
+
+### `findProjectRoot(startDir)`
+
+Finds the project root by searching for a `.git` directory upwards from the given start directory. Now implemented as an **async** function using non-blocking file system APIs to avoid blocking the Node.js event loop.
+
+**Parameters:**
+- `startDir` (string): The directory to start searching from
+
+**Returns:** Promise<string> - The project root directory (or the start directory if no `.git` is found)
 
 ---
 

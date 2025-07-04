@@ -8,8 +8,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { marked } from 'marked';
 
-import * as fsSync from 'fs';
-
 // Simple console logger for import processing
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,12 +31,17 @@ interface ImportState {
 }
 
 // Helper to find the project root (looks for .git directory)
-function findProjectRoot(startDir: string): string {
+async function findProjectRoot(startDir: string): Promise<string> {
   let currentDir = path.resolve(startDir);
   while (true) {
     const gitPath = path.join(currentDir, '.git');
-    if (fsSync.existsSync(gitPath)) {
-      return currentDir;
+    try {
+      const stats = await fs.stat(gitPath);
+      if (stats.isDirectory()) {
+        return currentDir;
+      }
+    } catch {
+      // .git not found, continue to parent
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
@@ -86,8 +89,10 @@ function findCodeRegions(content: string): Array<[number, number]> {
       return regionContent.includes('`') && !regionContent.includes('```');
     })
   ) {
-    // Find inline code spans with regex as fallback
-    const inlineCodeRegex = /`([^`]+)`/g;
+    // Improved regex for inline code: handles escaped/nested backticks
+    // Matches code spans with 1 or more backticks, not inside triple backticks
+    // See: https://github.github.com/gfm/#code-span
+    const inlineCodeRegex = /(`+)([^`]|[^`][\s\S]*?[^`])\1/g;
     let match: RegExpExecArray | null;
     while ((match = inlineCodeRegex.exec(content)) !== null) {
       // Check if this region is not already covered by a code block
