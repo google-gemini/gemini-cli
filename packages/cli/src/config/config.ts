@@ -8,6 +8,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import {
+  logger,
   Config,
   loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -19,25 +20,6 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
-
-import { Extension } from './extension.js';
-import { getCliVersion } from '../utils/version.js';
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
-import { loadSandboxConfig } from './sandboxConfig.js';
-
-// Simple console logger for now - replace with actual logger if available
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR]', ...args),
-};
 
 interface CliArgs {
   model: string | undefined;

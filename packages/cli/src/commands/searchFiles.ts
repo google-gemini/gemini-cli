@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
@@ -14,7 +15,7 @@ export async function searchFiles(
   searchTerm: string,
   searchContent: string,
 ): Promise<void> {
-  console.log(
+  logger.info(
     chalk.green('// Pyrmethus conjures the File Searcher with Gemini’s aid!'),
   );
 
@@ -22,20 +23,20 @@ export async function searchFiles(
     'Search files in TypeScript.',
   );
   if (suggestion)
-    console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   const targetPath = dirPath || '/data/data/com.termux/files/home';
   if (!fs.existsSync(targetPath)) {
-    console.log(chalk.red(`The path '${targetPath}' eludes the ether!`));
+    logger.error(chalk.red(`The path '${targetPath}' eludes the ether!`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${targetPath}' not found.`,
     );
-    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
 
   try {
-    console.log(
+    logger.info(
       chalk.cyan(`// Searching '${targetPath}' for '${searchTerm}'...`),
     );
     const results: string[] = [];
@@ -47,7 +48,8 @@ export async function searchFiles(
           await searchDir(fullPath);
         } else if (entry.name.includes(searchTerm)) {
           results.push(`[FILE] ${fullPath}`);
-        } else if (searchContent.toLowerCase() === 'yes') {
+        }
+ else if (searchContent.toLowerCase() === 'yes') {
           const content = await fs.readFile(fullPath, 'utf-8');
           if (content.includes(searchTerm))
             results.push(`[CONTENT] ${fullPath}`);
@@ -55,8 +57,8 @@ export async function searchFiles(
       }
     };
     await searchDir(targetPath);
-    console.log(chalk.yellow(results.join('\n') || 'No matches found.'));
-    console.log(
+    logger.info(chalk.yellow(results.join('\n') || 'No matches found.'));
+    logger.info(
       chalk.green(
         `Success! Found ${results.length} matches in '${targetPath}'.`,
       ),
@@ -66,10 +68,11 @@ export async function searchFiles(
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    console.log(chalk.red(`The spirits falter: ${errorMessage}`));
+    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );
-    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
+

@@ -1,8 +1,15 @@
 #!/usr/bin/env node
+
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // Pyrmethus, the Termux Coding Wizard, forges a script to cycle API keys.
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 // Chromatic constants for enchanted logging, using ANSI escape codes for JS
 const NG = '\x1b[32m\x1b[1m'; // Bright Green

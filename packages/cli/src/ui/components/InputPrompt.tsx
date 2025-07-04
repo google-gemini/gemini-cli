@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { logger } from '@google/gemini-cli-core';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -291,7 +292,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         process.env['TEXTBUFFER_DEBUG'] === '1' ||
         process.env['TEXTBUFFER_DEBUG'] === 'true'
       ) {
-        console.log('[InputPromptCombined] event', { key });
+        logger.debug('[InputPromptCombined] event', { key });
       }
 
       // Ctrl+Enter for newline, Enter for submit
@@ -453,4 +454,4 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       )}
     </>
   );
-};
+}

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
 export async function fileInfo(filePath: string): Promise<void> {
-  console.log(
+  logger.info(
     chalk.green('// Pyrmethus conjures the File Inspector with Gemini’s aid!'),
   );
 
@@ -17,19 +18,19 @@ export async function fileInfo(filePath: string): Promise<void> {
     'Get file metadata in TypeScript.',
   );
   if (suggestion)
-    console.log(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   if (!fs.existsSync(filePath)) {
-    console.log(chalk.red(`The path '${filePath}' eludes the ether!`));
+    logger.error(chalk.red(`The path '${filePath}' eludes the ether!`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${filePath}' not found.`,
     );
-    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
 
   try {
-    console.log(chalk.cyan(`// Inspecting '${filePath}'...`));
+    logger.info(chalk.cyan(`// Inspecting '${filePath}'...`));
     const stats = await fs.lstat(filePath);
     const info = [
       `Path: ${filePath}`,
@@ -38,17 +39,18 @@ export async function fileInfo(filePath: string): Promise<void> {
       `Permissions: ${stats.mode.toString(8)}`,
       `Last Modified: ${stats.mtime.toISOString()}`,
     ].join('\n');
-    console.log(chalk.yellow(info));
-    console.log(chalk.green(`Success! Metadata retrieved for '${filePath}'.`));
+    logger.info(chalk.yellow(info));
+    logger.info(chalk.green(`Success! Metadata retrieved for '${filePath}'.`));
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    console.log(chalk.red(`The spirits falter: ${errorMessage}`));
+    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );
-    if (debug) console.log(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
+

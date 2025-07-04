@@ -5,6 +5,7 @@
  */
 
 import {
+  logger,
   Config,
   ToolCallRequestInfo,
   executeToolCall,
@@ -78,7 +79,7 @@ export async function runNonInteractive(
 
       for await (const resp of responseStream) {
         if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
+          logger.error('Operation cancelled.');
           return;
         }
         const textPart = getResponseText(resp);
@@ -113,7 +114,7 @@ export async function runNonInteractive(
             const isToolNotFound = toolResponse.error.message.includes(
               'not found in registry',
             );
-            console.error(
+            logger.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
             if (!isToolNotFound) {
@@ -141,7 +142,7 @@ export async function runNonInteractive(
       }
     }
   } catch (error) {
-    console.error(
+    logger.error(
       parseAndFormatApiError(
         error,
         config.getContentGeneratorConfig().authType,

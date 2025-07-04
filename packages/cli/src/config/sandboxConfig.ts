@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SandboxConfig } from '@google/gemini-cli-core';
+import { logger, SandboxConfig } from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
 import { getPackageJson } from '../utils/package.js';
@@ -51,7 +51,7 @@ function getSandboxCommand(
 
   if (typeof sandbox === 'string' && sandbox) {
     if (!isSandboxCommand(sandbox)) {
-      console.error(
+      logger.error(
         `ERROR: invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
           ', ',
         )}`,
@@ -62,7 +62,7 @@ function getSandboxCommand(
     if (commandExists.sync(sandbox)) {
       return sandbox;
     }
-    console.error(
+    logger.error(
       `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
     );
     process.exit(1);
@@ -80,7 +80,7 @@ function getSandboxCommand(
 
   // throw an error if user requested sandbox but no command was found
   if (sandbox === true) {
-    console.error(
+    logger.error(
       'ERROR: GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
         'install docker or podman or specify command in GEMINI_SANDBOX',
     );
