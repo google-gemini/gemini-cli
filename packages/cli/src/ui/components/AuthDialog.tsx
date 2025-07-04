@@ -33,12 +33,19 @@ export function AuthDialog({
   ];
 
   let initialAuthIndex = items.findIndex(
-    (item) => item.value === settings.merged.selectedAuthType,
-  );
+    (item) => {
+      if ( settings.merged.selectedAuthType ) {
 
-  if (initialAuthIndex === -1) {
-    initialAuthIndex = process.env.GEMINI_API_KEY ? 1 : 0;
-  }
+        return item.value === settings.merged.selectedAuthType
+      }
+
+      if (process.env.GEMINI_API_KEY) {
+        return item.value === AuthType.USE_GEMINI;
+      }
+
+       return item.value === AuthType.LOGIN_WITH_GOOGLE;
+    },
+  );
 
   const handleAuthSelect = (authMethod: AuthType) => {
     const error = validateAuthMethod(authMethod);
