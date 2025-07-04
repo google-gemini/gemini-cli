@@ -1,0 +1,68 @@
+name: Scheduled Nightly Release
+
+on:
+  schedule:
+    # Runs every day at midnight UTC.
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  nightly-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'main'
+          fetch-depth: 0 # Fetch all history for git tags
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Preflight Checks
+        run: npm run preflight
+
+      - name: Run Integration Tests (without Docker)
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: npm run test:integration:sandbox:none
+
+      - name: Run Integration Tests (with Docker)
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: npm run test:integration:sandbox:docker
+
+      - name: Configure Git User
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and Push Nightly Tag
+        if: success()
+        run: npm run tag:release:nightly
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Issue on Failure
+        if: failure()
+        run: |
+          gh issue create \
+            --title "Nightly Release Failed on $(date +'%Y-%m-%d')" \
+            --body "The scheduled nightly release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --label "bug,nightly-failure"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
