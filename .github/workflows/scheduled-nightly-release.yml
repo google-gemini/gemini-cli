@@ -15,13 +15,13 @@ jobs:
 
     steps:
       - name: Checkout main branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: 'main'
           fetch-depth: 0 # Fetch all history for git tags
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -33,14 +33,14 @@ jobs:
         run: npm run preflight
 
       - name: Run Integration Tests (without Docker)
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@14672906e672a08bd6eeb15720e9ed3ce869cdd4 # v2
         with:
           max_attempts: 3
           retry_wait_seconds: 30
           command: npm run test:integration:sandbox:none
 
       - name: Run Integration Tests (with Docker)
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@14672906e672a08bd6eeb15720e9ed3ce869cdd4 # v2
         with:
           max_attempts: 3
           retry_wait_seconds: 30
