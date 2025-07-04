@@ -34,143 +34,143 @@ export const Monenoke: Theme = new Theme(
       color: monenokeColors.Foreground,
     },
     'hljs-keyword': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-literal': {
-      color: '#fff2a8',
+      color: monenokeColors.AccentYellow,
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-link': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
     },
     'hljs-function .hljs-keyword': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
     },
     'hljs-subst': {
       color: monenokeColors.Foreground,
     },
     'hljs-string': {
-      color: '#adffc2',
+      color: monenokeColors.AccentGreen,
     },
     'hljs-title': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-name': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-attribute': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
     },
     'hljs-symbol': {
-      color: '#adffc2',
+      color: monenokeColors.AccentGreen,
     },
     'hljs-bullet': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-addition': {
       color: monenokeColors.AccentGreen,
     },
     'hljs-variable': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
     },
     'hljs-template-tag': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-template-variable': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-comment': {
       color: '#a2e2be',
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: '#c0c0c0',
+      color: monenokeColors.Gray,
     },
     'hljs-deletion': {
       color: monenokeColors.AccentRed,
     },
     'hljs-meta': {
-      color: '#a2e2be',
+      color: monenokeColors.Comment,
     },
     'hljs-doctag': {
       fontWeight: 'bold',
     },
     'hljs-strong': {
       fontWeight: 'bold',
-      color: '#feffde',
+      color: monenokeColors.Foreground,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
-      color: '#feffde',
+      color: monenokeColors.Foreground,
     },
     'hljs-number': {
-      color: '#adffc2',
+      color: monenokeColors.AccentGreen,
     },
     'hljs-params': {
-      color: '#fff2a8',
+      color: monenokeColors.AccentYellow,
     },
     'hljs-function': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
     },
     'hljs-storage': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-built_in': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
       fontStyle: 'italic',
     },
     'hljs-class': {
-      color: '#fff2a8',
+      color: monenokeColors.AccentYellow,
     },
     'hljs-property': {
-      color: '#fff2a8',
+      color: monenokeColors.AccentYellow,
     },
     'hljs-method': {
-      color: '#fff2a8',
+      color: monenokeColors.AccentYellow,
     },
     'hljs-title.function': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
     },
     'hljs-punctuation': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-attr': {
-      color: '#8ab9ff',
+      color: monenokeColors.AccentBlue,
     },
     'hljs-selector-class': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-selector-id': {
-      color: '#adffc2',
+      color: monenokeColors.AccentGreen,
     },
     'hljs-tag': {
-      color: '#ff6b70',
+      color: monenokeColors.AccentRed,
     },
     'hljs-code': {
-      color: '#adffc2',
+      color: monenokeColors.AccentGreen,
     },
     'hljs-strong.hljs-emphasis': {
-      color: '#feffde',
+      color: monenokeColors.Foreground,
       fontStyle: 'italic',
       fontWeight: 'bold',
     },
     'hljs-namespace': {
-      color: '#efefef',
+      color: monenokeColors.Foreground,
     },
   },
   monenokeColors,
