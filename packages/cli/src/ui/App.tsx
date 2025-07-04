@@ -265,7 +265,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleSlashCommand,
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
-    // EXPOSE commandContext from the hook
     commandContext,
   } = useSlashCommandProcessor(
     config,
@@ -329,11 +328,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
         );
         if (quitCommand && quitCommand.action) {
-          // Call with the NEW signature. The adapter will handle the rest.
-          // We pass an empty string for args since /quit doesn't have any.
           quitCommand.action(commandContext, '');
         } else {
-          // Fallback just in case, but it shouldn't be needed.
+          // This is unlikely to be needed but added for an additional fallback.
           process.exit(0);
         }
       } else {
@@ -781,7 +778,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
-                  commandContext={commandContext} // <-- Pass the context here
+                  commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                 />

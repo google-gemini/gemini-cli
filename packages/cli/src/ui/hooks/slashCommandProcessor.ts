@@ -224,7 +224,7 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const load = async () => {
       await commandService.loadCommands();
-      setCommandTree(commandService.getCommandTree());
+      setCommandTree(commandService.getCommand());
     };
 
     load();

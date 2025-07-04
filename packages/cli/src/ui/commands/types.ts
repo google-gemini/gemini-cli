@@ -82,6 +82,5 @@ export interface SlashCommand {
     partialArg: string,
   ) => Promise<string[]>;
 
-  // The key to the nested structure, allowing commands to have children.
   subCommands?: SlashCommand[];
 }

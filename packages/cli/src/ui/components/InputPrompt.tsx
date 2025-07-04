@@ -202,15 +202,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
         if (key.name === 'tab') {
-          // if (completion.suggestions.length > 0) {
-          //   const targetIndex =
-          //     completion.activeSuggestionIndex === -1
-          //       ? 0
-          //       : completion.activeSuggestionIndex;
-          //   if (targetIndex < completion.suggestions.length) {
-          //     handleAutocomplete(targetIndex);
-          //   }
-          // }
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -222,22 +213,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           return;
         }
-        // if (key.name === 'return') {
-        //   // If suggestions are showing, Enter's ONLY job is to act like Tab.
-        //   // It accepts the currently highlighted suggestion.
-        //   // It should NOT submit the form.
-        //   if (completion.suggestions.length > 0) {
-        //     const targetIndex =
-        //       completion.activeSuggestionIndex === -1
-        //         ? 0 // Default to the first suggestion if none is active
-        //         : completion.activeSuggestionIndex;
-        //     if (targetIndex < completion.suggestions.length) {
-        //       handleAutocomplete(targetIndex);
-        //     }
-        //   }
-        //   // After autocompleting, we are done. We wait for the user's NEXT Enter press to submit.
-        //   return;
-        // }
       } else {
         // Keybindings when suggestions are not shown
         if (key.ctrl && key.name === 'l') {

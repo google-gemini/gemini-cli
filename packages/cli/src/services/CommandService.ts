@@ -9,9 +9,7 @@ import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 
-// Define the default loader function privately within the module.
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
-  // This could later be expanded to read from files, etc.
   memoryCommand,
   helpCommand,
   clearCommand,
@@ -32,7 +30,7 @@ export class CommandService {
     this.commandTree = await this.commandLoader();
   }
 
-  getCommandTree(): SlashCommand[] {
+  getCommand(): SlashCommand[] {
     return this.commandTree;
   }
 }
