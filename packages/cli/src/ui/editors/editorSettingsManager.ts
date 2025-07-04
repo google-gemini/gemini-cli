@@ -24,6 +24,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   cursor: 'Cursor',
   vim: 'Vim',
   neovim: 'Neovim',
+  trae: 'Trae',
 };
 
 class EditorSettingsManager {
@@ -38,6 +39,7 @@ class EditorSettingsManager {
       'cursor',
       'vim',
       'neovim',
+      'trae',
     ];
     this.availableEditors = [
       {
