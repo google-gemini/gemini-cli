@@ -4,9 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const { mockProcessExit } = vi.hoisted(() => ({
-  mockProcessExit: vi.fn((_code?: number): never => undefined as never),
-}));
+const { mockProcessExit, mockLoggerInstance, MockLogger } = vi.hoisted(() => {
+  const mockProcessExit = vi.fn((_code?: number): never => undefined as never);
+  
+  const mockLoggerInstance = {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    saveCheckpoint: vi.fn().mockResolvedValue(undefined),
+    loadCheckpoint: vi.fn().mockResolvedValue([]),
+    close: vi.fn(),
+  };
+  
+  const MockLogger = vi.fn(() => mockLoggerInstance);
+
+  return { mockProcessExit,mockLoggerInstance, MockLogger };
+});
 
 vi.mock('node:process', () => ({
   default: {
@@ -104,6 +115,12 @@ describe('useSlashCommandProcessor', () => {
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
   const mockUseSessionStats = useSessionStats as Mock;
+  // Chat-specific mocks
+  let mockChat: any;
+  let mockGetChat: ReturnType<typeof vi.fn>;
+  let mockGetHistory: ReturnType<typeof vi.fn>;
+  let mockClearHistory: ReturnType<typeof vi.fn>;
+  let mockAddHistory: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockAddItem = vi.fn();
@@ -118,8 +135,21 @@ describe('useSlashCommandProcessor', () => {
     mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockSetQuittingMessages = vi.fn();
     mockTryCompressChat = vi.fn();
+    // Setup chat-specific mocks
+    mockGetHistory = vi.fn().mockReturnValue([]);
+    mockClearHistory = vi.fn();
+    mockAddHistory = vi.fn();
+
+    mockChat = {
+      getHistory: mockGetHistory,
+      clearHistory: mockClearHistory,
+      addHistory: mockAddHistory,
+    };
+
+    mockGetChat = vi.fn().mockReturnValue(mockChat);
     mockGeminiClient = {
       tryCompressChat: mockTryCompressChat,
+      getChat: mockGetChat,
     } as unknown as GeminiClient;
     mockConfig = {
       getDebugMode: vi.fn(() => false),
@@ -129,6 +159,8 @@ describe('useSlashCommandProcessor', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
+      getSessionId: vi.fn(() => 'test-session-id'),
+      getProjectTempDir: vi.fn(() => '/mock/temp/dir'),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -151,6 +183,13 @@ describe('useSlashCommandProcessor', () => {
     (ShowMemoryCommandModule.createShowMemoryAction as Mock).mockClear();
     mockPerformMemoryRefresh.mockClear();
     process.env = { ...globalThis.process.env };
+
+    // Reset all logger mocks
+    MockLogger.mockClear();
+    mockLoggerInstance.initialize.mockClear();
+    mockLoggerInstance.saveCheckpoint.mockClear();
+    mockLoggerInstance.loadCheckpoint.mockClear();
+    mockLoggerInstance.close.mockClear();
   });
 
   const getProcessorHook = (showToolDescriptions: boolean = false) => {
@@ -802,6 +841,7 @@ describe('useSlashCommandProcessor', () => {
         const actual = await importOriginal();
         return {
           ...actual,
+          Logger: MockLogger,
           MCPServerStatus: {
             CONNECTED: 'connected',
             CONNECTING: 'connecting',
@@ -1303,6 +1343,376 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
+    });
+  });
+
+  describe('/chat save', () => {
+    it('should save conversation with valid tag', async () => {
+      const validTag = 'valid_tag-123';
+      const mockHistory = [{ role: 'user', parts: [{ text: 'Hello' }] }];
+      mockGetHistory.mockReturnValue(mockHistory);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat save ${validTag}`);
+      });
+
+      expect(MockLogger).toHaveBeenCalledWith('test-session-id');
+      expect(mockLoggerInstance.initialize).toHaveBeenCalled();
+      expect(mockLoggerInstance.saveCheckpoint).toHaveBeenCalledWith(
+        mockHistory,
+        validTag,
+      );
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: `/chat save ${validTag}`,
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Conversation checkpoint saved with tag: ${validTag}.`,
+        }),
+        expect.any(Number),
+      );
+
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show error when tag is missing', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat save');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Missing tag\nUsage: /chat save <tag>',
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockLoggerInstance.saveCheckpoint).not.toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show error when tag is empty string', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat save   '); // spaces only
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Missing tag\nUsage: /chat save <tag>',
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockLoggerInstance.saveCheckpoint).not.toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
+    it('should reject tag with invalid characters', async () => {
+      const invalidTags = [
+        'invalid tag', // space
+        'invalid@tag', // special character
+        'invalid#tag', // hash
+        'invalid.tag', // dot
+        'invalid/tag', // slash
+      ];
+
+      const { handleSlashCommand } = getProcessor();
+
+      for (const invalidTag of invalidTags) {
+        let commandResult: SlashCommandActionReturn | boolean = false;
+        await act(async () => {
+          commandResult = await handleSlashCommand(`/chat save ${invalidTag}`);
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: 'Invalid tag. Only letters, numbers, hyphens, and underscores are allowed.',
+          }),
+          expect.any(Number),
+        );
+
+        expect(mockLoggerInstance.saveCheckpoint).not.toHaveBeenCalled();
+        expect(commandResult).toBe(true);
+
+        // Reset mocks for next iteration
+        mockAddItem.mockClear();
+        mockLoggerInstance.saveCheckpoint.mockClear();
+      }
+    });
+
+    it('should accept tag with valid characters', async () => {
+      const validTags = [
+        'validtag',
+        'valid123',
+        'valid_tag',
+        'valid-tag',
+        'VALID_TAG',
+      ];
+
+      const mockHistory = [{ role: 'user', parts: [{ text: 'Hello' }] }];
+      mockGetHistory.mockReturnValue(mockHistory);
+
+      const { handleSlashCommand } = getProcessor();
+
+      for (const validTag of validTags) {
+        let commandResult: SlashCommandActionReturn | boolean = false;
+        await act(async () => {
+          commandResult = await handleSlashCommand(`/chat save ${validTag}`);
+        });
+
+        expect(mockLoggerInstance.saveCheckpoint).toHaveBeenCalledWith(
+          mockHistory,
+          validTag,
+        );
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: `Conversation checkpoint saved with tag: ${validTag}.`,
+          }),
+          expect.any(Number),
+        );
+
+        expect(commandResult).toBe(true);
+
+        // Reset mocks for next iteration
+        mockAddItem.mockClear();
+        mockLoggerInstance.saveCheckpoint.mockClear();
+        mockLoggerInstance.initialize.mockClear();
+        MockLogger.mockClear();
+      }
+    });
+
+    it('should show info when no conversation to save', async () => {
+      const validTag = 'valid_tag';
+      mockGetHistory.mockReturnValue([]); // Empty history
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat save ${validTag}`);
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'No conversation found to save.',
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockLoggerInstance.saveCheckpoint).not.toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show error when no chat client available', async () => {
+      mockGetChat.mockReturnValue(null);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat save valid_tag');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'No chat client available for conversation status.',
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockLoggerInstance.saveCheckpoint).not.toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+  });
+
+  describe('/chat resume', () => {
+    it('should resume conversation with valid tag', async () => {
+      const tag = 'existing_tag';
+      const savedConversation = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+      ];
+      mockLoggerInstance.loadCheckpoint.mockResolvedValue(savedConversation);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat resume ${tag}`);
+      });
+
+      expect(MockLogger).toHaveBeenCalledWith('test-session-id');
+      expect(mockLoggerInstance.initialize).toHaveBeenCalled();
+      expect(mockLoggerInstance.loadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(mockChat.clearHistory).toHaveBeenCalled();
+      expect(mockChat.addHistory).toHaveBeenCalledTimes(2);
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show error when tag is missing for resume command', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat resume');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Missing tag. Usage: /chat resume <tag>',
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockLoggerInstance.loadCheckpoint).not.toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show info when no checkpoint found', async () => {
+      const tag = 'nonexistent_tag';
+      mockLoggerInstance.loadCheckpoint.mockResolvedValue([]);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat resume ${tag}`);
+      });
+
+      expect(mockLoggerInstance.loadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `No saved checkpoint found with tag: ${tag}.`,
+        }),
+        expect.any(Number),
+      );
+
+      expect(commandResult).toBe(true);
+    });
+
+    it('should handle restore alias for resume command', async () => {
+      const tag = 'test_tag';
+      const savedConversation = [
+        { role: 'user', parts: [{ text: 'Test message' }] },
+      ];
+      mockLoggerInstance.loadCheckpoint.mockResolvedValue(savedConversation);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat restore ${tag}`);
+      });
+
+      expect(mockLoggerInstance.loadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(mockChat.clearHistory).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+
+    it('should handle load alias for resume command', async () => {
+      const tag = 'test_tag';
+      const savedConversation = [
+        { role: 'user', parts: [{ text: 'Test message' }] },
+      ];
+      mockLoggerInstance.loadCheckpoint.mockResolvedValue(savedConversation);
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/chat load ${tag}`);
+      });
+
+      expect(mockLoggerInstance.loadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(mockChat.clearHistory).toHaveBeenCalled();
+      expect(commandResult).toBe(true);
+    });
+  });
+
+  describe('/chat list', () => {
+    it('should list available saved conversations', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat list');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('list of saved conversations'),
+        }),
+        expect.any(Number),
+      );
+
+      expect(commandResult).toBe(true);
+    });
+  });
+
+  describe('/chat subcommand validation', () => {
+    it('should show error when no subcommand provided', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Missing command\nUsage: /chat <list|save|resume> <tag>',
+        }),
+        expect.any(Number),
+      );
+
+      expect(commandResult).toBe(true);
+    });
+
+    it('should show error for unknown subcommand', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/chat unknown');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Unknown /chat command: unknown. Available: list, save, resume',
+        }),
+        expect.any(Number),
+      );
+
+      expect(commandResult).toBe(true);
     });
   });
 });
