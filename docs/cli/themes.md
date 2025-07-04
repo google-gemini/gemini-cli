@@ -61,7 +61,7 @@ Selected themes are saved in Gemini CLI's [configuration](./configuration.md) so
 
 ### Monenoke
 
-<img src="../assets/theme-monenoke.png" alt="Monenoke theme" width="600">
+<img src="../assets/theme-monenoke-dark.png" alt="Monenoke theme" width="600">
 
 ## Light Themes
 
