@@ -21,6 +21,7 @@ import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
+import { tokenLimit } from './tokenLimits.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -82,8 +83,7 @@ describe('Gemini Client (client.ts)', () => {
           embedContent: mockEmbedContentFn,
         },
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mock as any;
+      return mock as unknown as GoogleGenAI;
     });
 
     mockChatCreateFn.mockResolvedValue({} as Chat);
@@ -130,14 +130,12 @@ describe('Gemini Client (client.ts)', () => {
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mock as any;
+      return mock as unknown as Config;
     });
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockConfig = new Config({} as any);
+    const mockConfig = new Config({} as never);
     client = new GeminiClient(mockConfig);
     await client.initialize(contentGeneratorConfig);
   });
@@ -364,6 +362,114 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('tryCompressChat', () => {
+    const mockCountTokens = vi.fn();
+    const mockSendMessage = vi.fn();
+
+    beforeEach(() => {
+      vi.mock('./tokenLimits', () => ({
+        tokenLimit: vi.fn(),
+      }));
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: mockCountTokens,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Mock the chat's sendMessage method
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi
+          .fn()
+          .mockReturnValue([
+            { role: 'user', parts: [{ text: '...history...' }] },
+          ]),
+        addHistory: vi.fn(),
+        sendMessage: mockSendMessage,
+      };
+      client['chat'] = mockChat as GeminiChat;
+    });
+
+    it('should not trigger summarization if token count is below threshold', async () => {
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      mockCountTokens.mockResolvedValue({
+        totalTokens: MOCKED_TOKEN_LIMIT * 0.699, // TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat();
+      const newChat = client.getChat();
+
+      expect(tokenLimit).toHaveBeenCalled();
+      expect(result).toBeNull();
+      expect(newChat).toBe(initialChat);
+    });
+
+    it('should trigger summarization if token count is at threshold', async () => {
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const originalTokenCount = 1000 * 0.7;
+      const newTokenCount = 100;
+
+      mockCountTokens
+        .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
+        .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
+
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat();
+      const newChat = client.getChat();
+
+      expect(tokenLimit).toHaveBeenCalled();
+      expect(mockSendMessage).toHaveBeenCalled();
+
+      // Assert that summarization happened and returned the correct stats
+      expect(result).toEqual({
+        originalTokenCount,
+        newTokenCount,
+      });
+
+      // Assert that the chat was reset
+      expect(newChat).not.toBe(initialChat);
+    });
+
+    it('should always trigger summarization when force is true, regardless of token count', async () => {
+      const originalTokenCount = 10; // Well below threshold
+      const newTokenCount = 5;
+
+      mockCountTokens
+        .mockResolvedValueOnce({ totalTokens: originalTokenCount })
+        .mockResolvedValueOnce({ totalTokens: newTokenCount });
+
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      const initialChat = client.getChat();
+      const result = await client.tryCompressChat(true); // force = true
+      const newChat = client.getChat();
+
+      expect(mockSendMessage).toHaveBeenCalled();
+
+      expect(result).toEqual({
+        originalTokenCount,
+        newTokenCount,
+      });
+
+      // Assert that the chat was reset
+      expect(newChat).not.toBe(initialChat);
+    });
+  });
+
   describe('sendMessageStream', () => {
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange
@@ -401,6 +507,294 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert
       expect(finalResult).toBeInstanceOf(Turn);
+    });
+
+    it('should stop infinite loop after MAX_TURNS when nextSpeaker always returns model', async () => {
+      // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+      mockCheckNextSpeaker.mockResolvedValue({
+        next_speaker: 'model',
+        reasoning: 'Test case - always continue',
+      });
+
+      // Mock Turn to have no pending tool calls (which would allow nextSpeaker check)
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Continue...' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Use a signal that never gets aborted
+      const abortController = new AbortController();
+      const signal = abortController.signal;
+
+      // Act - Start the stream that should loop
+      const stream = client.sendMessageStream(
+        [{ text: 'Start conversation' }],
+        signal,
+      );
+
+      // Count how many stream events we get
+      let eventCount = 0;
+      let finalResult: Turn | undefined;
+
+      // Consume the stream and count iterations
+      while (true) {
+        const result = await stream.next();
+        if (result.done) {
+          finalResult = result.value;
+          break;
+        }
+        eventCount++;
+
+        // Safety check to prevent actual infinite loop in test
+        if (eventCount > 200) {
+          abortController.abort();
+          throw new Error(
+            'Test exceeded expected event limit - possible actual infinite loop',
+          );
+        }
+      }
+
+      // Assert
+      expect(finalResult).toBeInstanceOf(Turn);
+
+      // Debug: Check how many times checkNextSpeaker was called
+      const callCount = mockCheckNextSpeaker.mock.calls.length;
+
+      // If infinite loop protection is working, checkNextSpeaker should be called many times
+      // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
+      // we expect it to be called multiple times before hitting the limit
+      expect(mockCheckNextSpeaker).toHaveBeenCalled();
+
+      // The test should demonstrate that the infinite loop protection works:
+      // - If checkNextSpeaker is called many times (close to MAX_TURNS), it shows the loop was happening
+      // - If it's only called once, the recursive behavior might not be triggered
+      if (callCount === 0) {
+        throw new Error(
+          'checkNextSpeaker was never called - the recursive condition was not met',
+        );
+      } else if (callCount === 1) {
+        // This might be expected behavior if the turn has pending tool calls or other conditions prevent recursion
+        console.log(
+          'checkNextSpeaker called only once - no infinite loop occurred',
+        );
+      } else {
+        console.log(
+          `checkNextSpeaker called ${callCount} times - infinite loop protection worked`,
+        );
+        // If called multiple times, we expect it to be stopped before MAX_TURNS
+        expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
+      }
+
+      // The stream should produce events and eventually terminate
+      expect(eventCount).toBeGreaterThanOrEqual(1);
+      expect(eventCount).toBeLessThan(200); // Should not exceed our safety limit
+    });
+
+    it('should respect MAX_TURNS limit even when turns parameter is set to a large value', async () => {
+      // This test verifies that the infinite loop protection works even when
+      // someone tries to bypass it by calling with a very large turns value
+
+      // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+      mockCheckNextSpeaker.mockResolvedValue({
+        next_speaker: 'model',
+        reasoning: 'Test case - always continue',
+      });
+
+      // Mock Turn to have no pending tool calls (which would allow nextSpeaker check)
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Continue...' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Use a signal that never gets aborted
+      const abortController = new AbortController();
+      const signal = abortController.signal;
+
+      // Act - Start the stream with an extremely high turns value
+      // This simulates a case where the turns protection is bypassed
+      const stream = client.sendMessageStream(
+        [{ text: 'Start conversation' }],
+        signal,
+        Number.MAX_SAFE_INTEGER, // Bypass the MAX_TURNS protection
+      );
+
+      // Count how many stream events we get
+      let eventCount = 0;
+      const maxTestIterations = 1000; // Higher limit to show the loop continues
+
+      // Consume the stream and count iterations
+      try {
+        while (true) {
+          const result = await stream.next();
+          if (result.done) {
+            break;
+          }
+          eventCount++;
+
+          // This test should hit this limit, demonstrating the infinite loop
+          if (eventCount > maxTestIterations) {
+            abortController.abort();
+            // This is the expected behavior - we hit the infinite loop
+            break;
+          }
+        }
+      } catch (error) {
+        // If the test framework times out, that also demonstrates the infinite loop
+        console.error('Test timed out or errored:', error);
+      }
+
+      // Assert that the fix works - the loop should stop at MAX_TURNS
+      const callCount = mockCheckNextSpeaker.mock.calls.length;
+
+      // With the fix: even when turns is set to a very high value,
+      // the loop should stop at MAX_TURNS (100)
+      expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
+      expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
+
+      console.log(
+        `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
+          `${eventCount} events generated (properly bounded by MAX_TURNS)`,
+      );
+    });
+  });
+
+  describe('generateContent', () => {
+    it('should use current model from config for content generation', async () => {
+      const initialModel = client['config'].getModel();
+      const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
+      const currentModel = initialModel + '-changed';
+
+      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      await client.generateContent(contents, {}, new AbortController().signal);
+
+      expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
+        model: initialModel,
+        config: expect.any(Object),
+        contents,
+      });
+      expect(mockGenerateContentFn).toHaveBeenCalledWith({
+        model: currentModel,
+        config: expect.any(Object),
+        contents,
+      });
+    });
+  });
+
+  describe('tryCompressChat', () => {
+    it('should use current model from config for token counting after sendMessage', async () => {
+      const initialModel = client['config'].getModel();
+
+      const mockCountTokens = vi
+        .fn()
+        .mockResolvedValueOnce({ totalTokens: 100000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
+
+      const mockChatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ];
+
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn().mockReturnValue(mockChatHistory),
+        sendMessage: mockSendMessage,
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: mockCountTokens,
+      };
+
+      // mock the model has been changed between calls of `countTokens`
+      const firstCurrentModel = initialModel + '-changed-1';
+      const secondCurrentModel = initialModel + '-changed-2';
+      vi.spyOn(client['config'], 'getModel')
+        .mockReturnValueOnce(firstCurrentModel)
+        .mockReturnValueOnce(secondCurrentModel);
+
+      client['chat'] = mockChat as GeminiChat;
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
+
+      const result = await client.tryCompressChat(true);
+
+      expect(mockCountTokens).toHaveBeenCalledTimes(2);
+      expect(mockCountTokens).toHaveBeenNthCalledWith(1, {
+        model: firstCurrentModel,
+        contents: mockChatHistory,
+      });
+      expect(mockCountTokens).toHaveBeenNthCalledWith(2, {
+        model: secondCurrentModel,
+        contents: expect.any(Array),
+      });
+
+      expect(result).toEqual({
+        originalTokenCount: 100000,
+        newTokenCount: 5000,
+      });
+    });
+  });
+
+  describe('handleFlashFallback', () => {
+    it('should use current model from config when checking for fallback', async () => {
+      const initialModel = client['config'].getModel();
+      const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
+
+      // mock config been changed
+      const currentModel = initialModel + '-changed';
+      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
+
+      const mockFallbackHandler = vi.fn().mockResolvedValue(true);
+      client['config'].flashFallbackHandler = mockFallbackHandler;
+      client['config'].setModel = vi.fn();
+
+      const result = await client['handleFlashFallback'](
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(result).toBe(fallbackModel);
+
+      expect(mockFallbackHandler).toHaveBeenCalledWith(
+        currentModel,
+        fallbackModel,
+      );
     });
   });
 });

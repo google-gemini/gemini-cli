@@ -48,26 +48,26 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
-  private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
   };
   private readonly MAX_TURNS = 100;
+  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config.getSessionId(),
     );
     this.chat = await this.startChat();
   }
@@ -185,7 +185,9 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+      const generateContentConfigWithThinking = isThinkingSupported(
+        this.config.getModel(),
+      )
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -219,7 +221,9 @@ export class GeminiClient {
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!turns) {
+    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
+    const boundedTurns = Math.min(turns, this.MAX_TURNS);
+    if (!boundedTurns) {
       return new Turn(this.getChat());
     }
 
@@ -242,7 +246,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
       }
     }
     return turn;
@@ -341,7 +345,7 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
+    const modelToUse = this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -435,18 +439,24 @@ export class GeminiClient {
       return null;
     }
 
+    const model = this.config.getModel();
+
     let { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        model,
         contents: curatedHistory,
       });
     if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${this.model}.`);
+      console.warn(`Could not determine token count for model ${model}.`);
       originalTokenCount = 0;
     }
 
     // Don't compress if not forced and we are under the limit.
-    if (!force && originalTokenCount < 0.95 * tokenLimit(this.model)) {
+    if (
+      !force &&
+      originalTokenCount <
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(model)
+    ) {
       return null;
     }
 
@@ -471,7 +481,8 @@ export class GeminiClient {
 
     const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        // model might change after calling `sendMessage`, so we get the newest value from config
+        model: this.config.getModel(),
         contents: this.getChat().getHistory(),
       });
     if (newTokenCount === undefined) {
@@ -495,7 +506,7 @@ export class GeminiClient {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -510,7 +521,6 @@ export class GeminiClient {
         const accepted = await fallbackHandler(currentModel, fallbackModel);
         if (accepted) {
           this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
           return fallbackModel;
         }
       } catch (error) {
