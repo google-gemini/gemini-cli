@@ -8,9 +8,13 @@
   "workspaces": [
     "packages/*"
   ],
-  "repository": "google-gemini/gemini-cli",
+  "private": "true",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.8"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "scripts": {
     "generate": "node scripts/generate-git-commit-info.js",
@@ -39,18 +43,17 @@
     "auth": "npm run auth:npm && npm run auth:docker",
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
     "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
-    "build:cli": "npm run build --workspace packages/cli",
-    "build:core": "npm run build --workspace packages/core",
-    "build:packages": "npm run build:core && npm run build:cli",
+    "build:packages": "npm run build --workspaces",
     "build:sandbox:fast": "node scripts/build_sandbox.js --skip-npm-install-build",
-    "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
-    "prepare:packages": "node scripts/prepare-cli-packagejson.js && node scripts/prepare-core-package.js",
+    "prepare:package": "node scripts/prepare-package.js",
     "publish:sandbox": "node scripts/publish-sandbox.js",
     "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
-    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
-    "telemetry": "node scripts/telemetry.js",
-    "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\"",
-    "prepublishOnly": "node scripts/prepublish.js"
+    "publish:release": "npm run prepare:package && npm run build:packages && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
+    "prepublishOnly": "node scripts/check-versions.js && node scripts/prepublish.js",
+    "release:version": "node scripts/version.js",
+    "tag:release:nightly": "TAG_NAME=\"v$(node -p \"require('./package.json').version\")-nightly.$(date -u +%y%m%d).$(git rev-parse --short HEAD)\"; git tag -a $TAG_NAME -m '' && git push origin $TAG_NAME",
+    "check:versions": "node scripts/check-versions.js",
+    "publish:actions-release": "npm run prepare:package && npm run build:packages && npm run publish:npm"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
