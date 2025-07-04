@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
-import chalk from 'chalk';
-import { refactorCode } from '../../packages/core/src/tools/refactor-code.js'; // Adjust path as needed
-import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
-import { edit } from '@google/gemini-cli-core'; // Assuming edit tool is available
+import { Logger, edit } from '@google/gemini-cli-core';
 
 export async function refactorCodeCommand(
   filePath: string,

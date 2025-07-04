@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
+import { Logger, Config } from '@google/gemini-cli-core';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -20,7 +20,6 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
-import { Config } from '@google/gemini-cli-core';
 
 export interface InputPromptProps {
   buffer: TextBuffer;

@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
-import * as fs from 'fs';
-import * as path from 'path';
-import { homedir } from 'os';
 import {
+  Logger,
   MCPServerConfig,
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
 } from '@google/gemini-cli-core';
+import * as fs from 'fs';
+import * as path from 'path';
+import { homedir } from 'os';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';

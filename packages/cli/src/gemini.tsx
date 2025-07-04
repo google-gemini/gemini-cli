@@ -4,7 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
+import {
+  Logger,
+  ApprovalMode,
+  Config,
+  EditTool,
+  ShellTool,
+  WriteFileTool,
+  sessionId,
+  logUserPrompt,
+  AuthType,
+} from '@google/gemini-cli-core';
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
@@ -37,16 +47,6 @@ import { searchFiles } from './commands/searchFiles.js';
 import { fileInfo } from './commands/fileInfo.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
-import {
-  ApprovalMode,
-  Config,
-  EditTool,
-  ShellTool,
-  WriteFileTool,
-  sessionId,
-  logUserPrompt,
-  AuthType,
-} from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 

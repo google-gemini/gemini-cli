@@ -16,6 +16,7 @@
     "declaration": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node", "vitest/globals"],
+    "jsx": "react-jsx",
 
     // --- Type Checking ---
     "noImplicitAny": true,

@@ -26,9 +26,9 @@ const loaders = {
 
 esbuild
   .build({
-    entryPoints: ['packages/cli/index.ts'],
+    entryPoints: ['packages/cli/index.ts', 'ts-tools/highlight_tool.ts'],
     bundle: true,
-    outfile: 'bundle/gemini.js',
+    outdir: 'bundle',
     platform: 'node',
     format: 'esm',
     plugins,

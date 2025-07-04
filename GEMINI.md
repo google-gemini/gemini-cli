@@ -6,11 +6,12 @@ This section summarizes the latest features, enhancements, and fixes to the Gemi
 
 | Tool                              | Description                                                | Updates                                                                      | Example                                                        |
 | --------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `ls` (ReadFolder)                 | Lists files and directories in the current project folder. | Improved performance for large directories with optimized file listing.      | `ls`                                                           |
+| `ls` (ReadFolder)                 | Lists files and directories in the current project folder. | **REFACTORED**: Migrated to a TypeScript-based implementation for consistency. | `ls`                                                           |
 | `read-file` (ReadFile)            | Reads and displays the content of a specified file.        | None                                                                         | `read-file src/index.js`                                       |
 | `read-many-files` (ReadManyFiles) | Reads multiple files matching a glob pattern.              | Added support for git-aware filtering in file reading.                       | `read-many-files *.py`                                         |
 | `glob` (FindFiles)                | Searches for files matching a specified pattern.           | None                                                                         | `glob **/*.json`                                               |
-| `grep` (SearchText)               | Searches for specific text within files.                   | None                                                                         | `grep 'TODO' src/*.js`                                         |
+| `grep` (SearchText)               | Searches for specific text within files.                   | **REFACTORED**: Migrated to a TypeScript-based implementation for consistency. | `grep 'TODO' src/*.js`                                         |
+| `cat`                             | Concatenates and displays the content of files.            | **REFACTORED**: Migrated to a TypeScript-based implementation for consistency. | `cat file.txt`                                                 |
 | `edit` (Edit)                     | Proposes and applies code changes via diffs.               | Fixed pluralization of error messages in EditTool.                           | `edit src/index.js 'Add error handling to fetchData function'` |
 | `write-file` (WriteFile)          | Creates or overwrites a file with specified content.       | None                                                                         | `write-file README.md 'Add project description'`               |
 | `shell` (ShellTool)               | Executes shell commands directly.                          | Added command-specific restrictions for ShellTool.                           | `!npm install express`                                         |
@@ -23,7 +24,10 @@ This section summarizes the latest features, enhancements, and fixes to the Gemi
 | `checkpoint`                      | Restores project files to a previous state.                | Added checkpointing functionality.                                           | `checkpoint`                                                   |
 | `stats`                           | Displays detailed session statistics.                      | Improved stats display with cached token information.                        | `stats`                                                        |
 | `theme`                           | Opens a dialog to change the visual theme.                 | Revamped exit stats display and theme UI.                                    | `theme`                                                        |
-| `refactor-code`                   | Automates code refactoring (e.g., rename symbol).          | **NEW**: Initial implementation for 'rename-symbol' refactoring.             | `refactor-code src/file.ts rename-symbol oldName newName`      |
+| `refactor-code`                   | Automates code refactoring (e.g., rename symbol).          | **ENHANCED**: Now supports `extract-method` for more complex refactoring. | `refactor-code src/file.ts extract-method 10 20 newMethod`     |
+| `git_tool`                        | Provides AI-assisted Git operations.                       | **NEW**: Initial implementation for 'commit-message' generation.             | `git_tool commit-message`                                      |
+| `generate-test`                   | Generates a test file for a given source file.             | **NEW**: Creates a Jest test file based on the source file's content.      | `generate-test src/file.ts`                                    |
+| `generate-docs`                   | Generates Markdown documentation for a given source file.  | **NEW**: Creates a Markdown file documenting the source file.              | `generate-docs src/file.ts`                                    |
 
 ### New Features
 
