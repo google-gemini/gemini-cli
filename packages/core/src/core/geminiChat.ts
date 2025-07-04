@@ -151,9 +151,13 @@ export class GeminiChat {
   private async _logApiRequest(
     contents: Content[],
     model: string,
+    prompt_id: string,
   ): Promise<void> {
     const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(this.config, new ApiRequestEvent(model, requestText));
+    logApiRequest(
+      this.config,
+      new ApiRequestEvent(model, prompt_id, requestText),
+    );
   }
 
   private async _logApiResponse(
@@ -257,7 +261,7 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.config.getModel());
+    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
     let response: GenerateContentResponse;
@@ -352,7 +356,7 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.config.getModel());
+    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
 

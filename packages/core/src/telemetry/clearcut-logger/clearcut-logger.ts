@@ -317,6 +317,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
         value: JSON.stringify(event.model),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));

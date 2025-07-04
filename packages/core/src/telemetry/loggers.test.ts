@@ -299,7 +299,11 @@ describe('loggers', () => {
     } as Config;
 
     it('should log an API request with request_text', () => {
-      const event = new ApiRequestEvent('test-model', 'This is a test request');
+      const event = new ApiRequestEvent(
+        'test-model',
+        'prompt-id-7',
+        'This is a test request',
+      );
 
       logApiRequest(mockConfig, event);
 
@@ -311,12 +315,13 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
           request_text: 'This is a test request',
+          prompt_id: 'prompt-id-7',
         },
       });
     });
 
     it('should log an API request without request_text', () => {
-      const event = new ApiRequestEvent('test-model');
+      const event = new ApiRequestEvent('test-model', 'prompt-id-6');
 
       logApiRequest(mockConfig, event);
 
@@ -327,6 +332,7 @@ describe('loggers', () => {
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
+          prompt_id: 'prompt-id-6',
         },
       });
     });
