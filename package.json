@@ -51,7 +51,7 @@
     "publish:release": "npm run prepare:package && npm run build:packages && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
     "prepublishOnly": "node scripts/check-versions.js && node scripts/prepublish.js",
     "release:version": "node scripts/version.js",
-    "tag:release:nightly": "TAG_NAME=\"v$(node -p \"require('./package.json').version\")-nightly.$(date -u +%y%m%d).$(git rev-parse --short HEAD)\"; git tag -a $TAG_NAME -m '' && git push origin $TAG_NAME",
+    "tag:release:nightly": "node scripts/tag-release.js",
     "check:versions": "node scripts/check-versions.js",
     "publish:actions-release": "npm run prepare:package && npm run build:packages && npm run publish:npm"
   },
