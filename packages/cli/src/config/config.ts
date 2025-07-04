@@ -198,6 +198,26 @@ export async function loadCliConfig(
       : extensions;
 
   if (argv.extensions) {
+    const lowerCaseEnabledExtensions = enabledExtensions.map((e) =>
+      e.toLowerCase(),
+    );
+    if (
+      lowerCaseEnabledExtensions.length === 1 &&
+      lowerCaseEnabledExtensions[0] === 'none'
+    ) {
+      activeExtensions.length = 0;
+    } else {
+      const activeNames = new Set(
+        activeExtensions.map((e) => e.config.name.toLowerCase()),
+      );
+      for (const requestedExtension of lowerCaseEnabledExtensions) {
+        if (!activeNames.has(requestedExtension)) {
+          console.error(`Extension not found: ${requestedExtension}`);
+          process.exit(1);
+        }
+      }
+    }
+
     const activeNames = new Set(
       activeExtensions.map((e) => e.config.name.toLowerCase()),
     );
