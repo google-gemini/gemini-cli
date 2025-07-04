@@ -228,6 +228,14 @@ export async function processSingleFileContent(
       .relative(rootDirectory, filePath)
       .replace(/\\/g, '/');
 
+    if (path.extname(filePath).toLowerCase() === '.svg') {
+      const content = await fs.promises.readFile(filePath, 'utf8');
+      return {
+        llmContent: content,
+        returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
+      };
+    }
+
     switch (fileType) {
       case 'binary': {
         return {
