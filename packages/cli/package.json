@@ -65,7 +65,6 @@
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",
     "@types/yargs": "^17.0.32",
     "ink-testing-library": "^4.0.0",
