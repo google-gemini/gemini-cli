@@ -22,7 +22,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   windsurf: 'Windsurf',
   cursor: 'Cursor',
   vim: 'Vim',
-  editor: 'EDITOR Environment Variable',
+  editor: 'VISUAL/EDITOR Environment Variable',
 };
 
 class EditorSettingsManager {

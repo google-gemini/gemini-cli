@@ -37,21 +37,21 @@ function commandExists(cmd: string): boolean {
   }
 }
 
-const editorCommands: Record<EditorType, { win32: string; default: string }> = {
+const editorCommands: Record<
+  Exclude<EditorType, 'editor'>,
+  { win32: string; default: string }
+> = {
   vscode: { win32: 'code.cmd', default: 'code' },
   windsurf: { win32: 'windsurf', default: 'windsurf' },
   cursor: { win32: 'cursor', default: 'cursor' },
   vim: { win32: 'vim', default: 'vim' },
   zed: { win32: 'zed', default: 'zed' },
-  editor: {
-    win32: process.env.EDITOR || 'notepad',
-    default: process.env.EDITOR || 'vi',
-  },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
   if (editor === 'editor') {
-    const editorCmd = process.env.EDITOR;
+    // Check VISUAL first, then EDITOR (following Unix conventions)
+    const editorCmd = process.env.VISUAL || process.env.EDITOR;
     if (!editorCmd) {
       return false;
     }
@@ -59,7 +59,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
     const command = editorCmd.split(' ')[0];
     return commandExists(command);
   }
-  const commandConfig = editorCommands[editor];
+  const commandConfig = editorCommands[editor as Exclude<EditorType, 'editor'>];
   const command =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
   return commandExists(command);
@@ -99,9 +99,19 @@ export function getDiffCommand(
   if (!isValidEditorType(editor)) {
     return null;
   }
-  const commandConfig = editorCommands[editor];
-  const command =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+
+  let command: string;
+  if (editor === 'editor') {
+    // For editor type, we don't use editorCommands - handle separately
+    command = '';
+  } else {
+    const commandConfig =
+      editorCommands[editor as Exclude<EditorType, 'editor'>];
+    command =
+      process.platform === 'win32'
+        ? commandConfig.win32
+        : commandConfig.default;
+  }
   switch (editor) {
     case 'vscode':
     case 'windsurf':
@@ -137,8 +147,8 @@ export function getDiffCommand(
         ],
       };
     case 'editor': {
-      // Use the EDITOR environment variable with appropriate diff handling
-      const editorCmd = process.env.EDITOR;
+      // Use VISUAL first, then EDITOR environment variable with appropriate diff handling
+      const editorCmd = process.env.VISUAL || process.env.EDITOR;
       if (!editorCmd) {
         return null;
       }
@@ -260,10 +270,10 @@ export async function openDiff(
       }
 
       case 'editor': {
-        // Handle EDITOR environment variable with proper execution strategy
-        const editorCmd = process.env.EDITOR;
+        // Handle VISUAL/EDITOR environment variable with proper execution strategy
+        const editorCmd = process.env.VISUAL || process.env.EDITOR;
         if (!editorCmd) {
-          throw new Error('EDITOR environment variable not set');
+          throw new Error('VISUAL or EDITOR environment variable not set');
         }
         const editorName = editorCmd.split(' ')[0].toLowerCase();
 

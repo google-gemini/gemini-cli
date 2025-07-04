@@ -106,6 +106,7 @@ describe('editor utils', () => {
 
     describe('editor', () => {
       it('should return true if EDITOR environment variable is set and command exists', () => {
+        delete process.env.VISUAL;
         process.env.EDITOR = 'nano';
         (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nano'));
         expect(checkHasEditorType('editor')).toBe(true);
@@ -114,12 +115,34 @@ describe('editor utils', () => {
         });
       });
 
-      it('should return false if EDITOR environment variable is not set', () => {
+      it('should return true if VISUAL environment variable is set and command exists', () => {
+        process.env.VISUAL = 'vim';
+        process.env.EDITOR = 'nano';
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+        expect(checkHasEditorType('editor')).toBe(true);
+        expect(execSync).toHaveBeenCalledWith('command -v vim', {
+          stdio: 'ignore',
+        });
+      });
+
+      it('should prioritize VISUAL over EDITOR', () => {
+        process.env.VISUAL = 'emacs';
+        process.env.EDITOR = 'nano';
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
+        expect(checkHasEditorType('editor')).toBe(true);
+        expect(execSync).toHaveBeenCalledWith('command -v emacs', {
+          stdio: 'ignore',
+        });
+      });
+
+      it('should return false if neither VISUAL nor EDITOR environment variables are set', () => {
+        delete process.env.VISUAL;
         delete process.env.EDITOR;
         expect(checkHasEditorType('editor')).toBe(false);
       });
 
       it('should return false if EDITOR command does not exist', () => {
+        delete process.env.VISUAL;
         process.env.EDITOR = 'nonexistent-editor';
         (execSync as Mock).mockImplementation(() => {
           throw new Error();
@@ -128,10 +151,21 @@ describe('editor utils', () => {
       });
 
       it('should handle EDITOR with arguments', () => {
+        delete process.env.VISUAL;
         process.env.EDITOR = 'nano -w';
         (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nano'));
         expect(checkHasEditorType('editor')).toBe(true);
         expect(execSync).toHaveBeenCalledWith('command -v nano', {
+          stdio: 'ignore',
+        });
+      });
+
+      it('should handle VISUAL with arguments', () => {
+        process.env.VISUAL = 'vim -n';
+        process.env.EDITOR = 'nano';
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+        expect(checkHasEditorType('editor')).toBe(true);
+        expect(execSync).toHaveBeenCalledWith('command -v vim', {
           stdio: 'ignore',
         });
       });
@@ -197,6 +231,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with vim', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'vim';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -224,6 +259,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with nvim', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'nvim';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -251,6 +287,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with emacs', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'emacs';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -260,6 +297,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with helix', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'hx';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -269,6 +307,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with nano (default behavior)', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'nano';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -278,6 +317,7 @@ describe('editor utils', () => {
     });
 
     it('should return the correct command for editor with arguments', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'vim -n';
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toEqual({
@@ -305,10 +345,21 @@ describe('editor utils', () => {
       });
     });
 
-    it('should return null for editor when EDITOR env var is not set', () => {
+    it('should return null for editor when neither VISUAL nor EDITOR env vars are set', () => {
+      delete process.env.VISUAL;
       delete process.env.EDITOR;
       const command = getDiffCommand('old.txt', 'new.txt', 'editor');
       expect(command).toBeNull();
+    });
+
+    it('should prioritize VISUAL over EDITOR in getDiffCommand', () => {
+      process.env.VISUAL = 'emacs';
+      process.env.EDITOR = 'nano';
+      const command = getDiffCommand('old.txt', 'new.txt', 'editor');
+      expect(command).toEqual({
+        command: 'emacs',
+        args: ['old.txt', 'new.txt'],
+      });
     });
 
     it('should return null for an unsupported editor', () => {
@@ -410,6 +461,7 @@ describe('editor utils', () => {
 
     it('should call execSync for terminal-based editor on non-windows', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
+      delete process.env.VISUAL;
       process.env.EDITOR = 'nano';
       await openDiff('old.txt', 'new.txt', 'editor');
       expect(execSync).toHaveBeenCalledTimes(1);
@@ -425,6 +477,7 @@ describe('editor utils', () => {
 
     it('should call execSync for terminal-based editor on windows', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32' });
+      delete process.env.VISUAL;
       process.env.EDITOR = 'notepad';
       await openDiff('old.txt', 'new.txt', 'editor');
       expect(execSync).toHaveBeenCalledTimes(1);
@@ -439,6 +492,7 @@ describe('editor utils', () => {
     });
 
     it('should call spawn for GUI emacs', async () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'emacs';
       const mockSpawn = {
         on: vi.fn((event, cb) => {
@@ -461,6 +515,7 @@ describe('editor utils', () => {
     });
 
     it('should call execSync for terminal emacs', async () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'emacs -nw';
       await openDiff('old.txt', 'new.txt', 'editor');
       expect(execSync).toHaveBeenCalledTimes(1);
@@ -556,22 +611,39 @@ describe('editor utils', () => {
     });
 
     it('should return true for editor when EDITOR is set and command exists', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'nano';
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nano'));
       expect(isEditorAvailable('editor')).toBe(true);
     });
 
-    it('should return false for editor when EDITOR is not set', () => {
+    it('should return true for editor when VISUAL is set and command exists', () => {
+      process.env.VISUAL = 'vim';
+      process.env.EDITOR = 'nano';
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+      expect(isEditorAvailable('editor')).toBe(true);
+    });
+
+    it('should return false for editor when neither VISUAL nor EDITOR are set', () => {
+      delete process.env.VISUAL;
       delete process.env.EDITOR;
       expect(isEditorAvailable('editor')).toBe(false);
     });
 
     it('should return false for editor when EDITOR command does not exist', () => {
+      delete process.env.VISUAL;
       process.env.EDITOR = 'nonexistent-editor';
       (execSync as Mock).mockImplementation(() => {
         throw new Error();
       });
       expect(isEditorAvailable('editor')).toBe(false);
+    });
+
+    it('should prioritize VISUAL over EDITOR in isEditorAvailable', () => {
+      process.env.VISUAL = 'emacs';
+      process.env.EDITOR = 'nonexistent-editor';
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
+      expect(isEditorAvailable('editor')).toBe(true);
     });
   });
 });
