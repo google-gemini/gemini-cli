@@ -6,7 +6,7 @@
 
 import { type ColorsTheme, Theme } from './theme.js';
 
-const monenokeColors: ColorsTheme = {
+const mononokeColors: ColorsTheme = {
   type: 'dark',
   Background: '#1f4240',
   Foreground: '#eeffe1',
@@ -22,156 +22,156 @@ const monenokeColors: ColorsTheme = {
   GradientColors: ['#ffd580', '#8ab9ff'],
 };
 
-export const Monenoke: Theme = new Theme(
-  'Monenoke',
+export const Mononoke: Theme = new Theme(
+  'Mononoke',
   'dark',
   {
     hljs: {
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: monenokeColors.Background,
-      color: monenokeColors.Foreground,
+      background: mononokeColors.Background,
+      color: mononokeColors.Foreground,
     },
     'hljs-keyword': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-selector-tag': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-literal': {
-      color: monenokeColors.AccentYellow,
+      color: mononokeColors.AccentYellow,
       fontWeight: 'bold',
     },
     'hljs-section': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-link': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
     'hljs-function .hljs-keyword': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
     },
     'hljs-subst': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
     'hljs-string': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-title': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
       fontWeight: 'bold',
     },
     'hljs-name': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
       fontWeight: 'bold',
     },
     'hljs-type': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
       fontWeight: 'bold',
     },
     'hljs-attribute': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
     },
     'hljs-symbol': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-bullet': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-addition': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-variable': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
     'hljs-template-tag': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-template-variable': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-comment': {
       color: '#a2e2be',
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: monenokeColors.Gray,
+      color: mononokeColors.Gray,
     },
     'hljs-deletion': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-meta': {
-      color: monenokeColors.Comment,
+      color: mononokeColors.Comment,
     },
     'hljs-doctag': {
       fontWeight: 'bold',
     },
     'hljs-strong': {
       fontWeight: 'bold',
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
     'hljs-number': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-params': {
-      color: monenokeColors.AccentYellow,
+      color: mononokeColors.AccentYellow,
     },
     'hljs-function': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
     },
     'hljs-storage': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-built_in': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
       fontStyle: 'italic',
     },
     'hljs-class': {
-      color: monenokeColors.AccentYellow,
+      color: mononokeColors.AccentYellow,
     },
     'hljs-property': {
-      color: monenokeColors.AccentYellow,
+      color: mononokeColors.AccentYellow,
     },
     'hljs-method': {
-      color: monenokeColors.AccentYellow,
+      color: mononokeColors.AccentYellow,
     },
     'hljs-title.function': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
     },
     'hljs-punctuation': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-attr': {
-      color: monenokeColors.AccentBlue,
+      color: mononokeColors.AccentBlue,
     },
     'hljs-selector-class': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-selector-id': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-tag': {
-      color: monenokeColors.AccentRed,
+      color: mononokeColors.AccentRed,
     },
     'hljs-code': {
-      color: monenokeColors.AccentGreen,
+      color: mononokeColors.AccentGreen,
     },
     'hljs-strong.hljs-emphasis': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
       fontStyle: 'italic',
       fontWeight: 'bold',
     },
     'hljs-namespace': {
-      color: monenokeColors.Foreground,
+      color: mononokeColors.Foreground,
     },
   },
-  monenokeColors,
+  mononokeColors,
 );
