@@ -96,6 +96,13 @@ export class WriteFileTool
     this.client = this.config.getGeminiClient();
   }
 
+  /**
+   * Checks if a given path is within the root directory bounds.
+   * This security check prevents writing files outside the designated root directory.
+   *
+   * @param pathToCheck The absolute path to validate
+   * @returns True if the path is within the root directory, false otherwise
+   */
   private isWithinRoot(pathToCheck: string): boolean {
     const normalizedPath = path.normalize(pathToCheck);
     const normalizedRoot = path.normalize(this.config.getTargetDir());
