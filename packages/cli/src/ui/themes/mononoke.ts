@@ -95,7 +95,7 @@ export const Mononoke: Theme = new Theme(
       color: mononokeColors.AccentRed,
     },
     'hljs-comment': {
-      color: '#a2e2be',
+      color: mononokeColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
