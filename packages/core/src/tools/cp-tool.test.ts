@@ -59,13 +59,16 @@ describe('CpTool', () => {
       write: jest.fn(),
     };
 
-    (fs.copyFile as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+    (fs.copyFile as jest.Mock).mockRejectedValue(
+      new Error('Permission denied'),
+    );
 
     const result = await tool.run(invocation, stream);
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Error copying file from /test.txt to /test2.txt: Permission denied',
+      message:
+        'Error copying file from /test.txt to /test2.txt: Permission denied',
     });
   });
 });

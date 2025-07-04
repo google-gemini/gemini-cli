@@ -5,11 +5,7 @@
  */
 
 import { promises as fs } from 'fs';
-import {
-  Tool,
-  ToolInvocation,
-  ToolOutput,
-} from '@google/gemini-cli';
+import { Tool, ToolInvocation, ToolOutput } from '@google/gemini-cli';
 
 export class MkdirTool implements Tool {
   name = 'mkdir';

@@ -1,5 +1,3 @@
-
-
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { checkFilePermission } from './check_file_permission';
@@ -8,7 +6,7 @@ export async function awkFile(
   filePath: string,
   pattern: string,
   action: (line: string) => string,
-  config: any
+  config: any,
 ): Promise<string> {
   await checkFilePermission(filePath, 'write', config);
   const resolvedPath = path.resolve(filePath);
@@ -26,5 +24,3 @@ export async function awkFile(
   await fs.writeFile(resolvedPath, result.join('\n'), 'utf-8');
   return `Processed ${filePath} with awk`;
 }
-
-

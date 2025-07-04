@@ -14,7 +14,7 @@ export async function writeFromTemplate(
   filePath: string,
   templateName: string,
   substitutions: { [key: string]: string },
-  config: unknown
+  config: unknown,
 ): Promise<string> {
   if (!(await checkFilePermission(filePath, 'write', config))) {
     throw new Error(`Write access denied for ${filePath}`);
@@ -23,7 +23,7 @@ export async function writeFromTemplate(
   const template = templates[templateName] || '';
   const content = Object.entries(substitutions).reduce(
     (acc, [key, value]) => acc.replace(`\${${key}}`, value),
-    template
+    template,
   );
 
   const resolvedPath = resolve(filePath);

@@ -1,4 +1,3 @@
-
 import * as ts from 'typescript';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -9,7 +8,7 @@ export async function replaceMethodAst(
   className: string,
   methodName: string,
   newMethodCode: string,
-  config: any
+  config: any,
 ): Promise<string> {
   await checkFilePermission(filePath, 'write', config);
   const resolvedPath = path.resolve(filePath);
@@ -18,7 +17,7 @@ export async function replaceMethodAst(
     resolvedPath,
     data,
     ts.ScriptTarget.Latest,
-    true
+    true,
   );
   let classFound = false;
   let methodFound = false;
@@ -41,7 +40,7 @@ export async function replaceMethodAst(
                 'temp.ts',
                 newMethodCode,
                 ts.ScriptTarget.Latest,
-                true
+                true,
               ).statements[0];
               if (ts.isFunctionDeclaration(newMethod)) {
                 return ts.factory.createMethodDeclaration(
@@ -53,7 +52,7 @@ export async function replaceMethodAst(
                   newMethod.typeParameters,
                   newMethod.parameters,
                   newMethod.type,
-                  newMethod.body
+                  newMethod.body,
                 );
               }
             }
@@ -66,7 +65,7 @@ export async function replaceMethodAst(
             node.name,
             node.typeParameters,
             node.heritageClauses,
-            newMembers
+            newMembers,
           );
         }
         return ts.visitEachChild(node, visit, context);
@@ -87,4 +86,3 @@ export async function replaceMethodAst(
   await fs.writeFile(resolvedPath, newCode, 'utf-8');
   return `Replaced method '${methodName}' in class '${className}' using AST`;
 }
-

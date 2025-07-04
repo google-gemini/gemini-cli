@@ -1,4 +1,3 @@
-
 import { promises as fs } from 'fs';
 import { resolve } from 'path';
 import { exec } from 'child_process';
@@ -8,7 +7,7 @@ export async function watchFile(
   filePath: string,
   command: string,
   interval: number,
-  config: unknown
+  config: unknown,
 ): Promise<void> {
   if (!(await checkFilePermission(filePath, 'read', config))) {
     throw new Error(`Read access denied for ${filePath}`);

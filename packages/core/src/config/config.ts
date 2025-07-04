@@ -523,7 +523,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   };
 
   registerCoreTool(LSTool, targetDir, config);
-  
+
   registerCoreTool(ReadFileTool, targetDir, config);
   registerCoreTool(CatTool, targetDir, config);
   registerCoreTool(LsTool, targetDir, config);

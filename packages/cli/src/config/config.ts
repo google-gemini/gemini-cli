@@ -129,7 +129,7 @@ export async function loadHierarchicalGeminiMemory(
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
-    logger.debug(
+    new Logger().debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
     );
   }

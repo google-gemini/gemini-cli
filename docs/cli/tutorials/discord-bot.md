@@ -34,7 +34,9 @@ Create a file named `index.js` and add the following code:
 const { Client, Intents } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+const client = new Client({
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+});
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 client.on('ready', () => {

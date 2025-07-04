@@ -65,7 +65,9 @@ describe('LsTool', () => {
       write: jest.fn(),
     };
 
-    (fs.readdir as jest.Mock).mockRejectedValue(new Error('Directory not found'));
+    (fs.readdir as jest.Mock).mockRejectedValue(
+      new Error('Directory not found'),
+    );
 
     const result = await tool.run(invocation, stream);
 
@@ -75,4 +77,3 @@ describe('LsTool', () => {
     });
   });
 });
-

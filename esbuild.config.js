@@ -36,6 +36,18 @@ esbuild
     define: {
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },
+    external: [
+      'escalade/sync',
+      'yoga-layout',
+      'diff',
+      'selderee',
+      'ecdsa-sig-formatter',
+      './cjs/react-is.production.min.js',
+      './route',
+      './lib/source-map-generator',
+      './lib/source-map-consumer',
+      './lib/source-node',
+    ],
     banner: {
       js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },

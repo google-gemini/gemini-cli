@@ -4,14 +4,14 @@ This guide provides solutions to common issues and debugging tips.
 
 ## Troubleshooting Overview
 
-| Issue | Solution |
-| --- | --- |
-| Authentication errors | Check your account type and API key. |
-| `EADDRINUSE` error | Stop the process that is using the port. |
-| Command not found | Check your installation and PATH. |
+| Issue                    | Solution                                    |
+| ------------------------ | ------------------------------------------- |
+| Authentication errors    | Check your account type and API key.        |
+| `EADDRINUSE` error       | Stop the process that is using the port.    |
+| Command not found        | Check your installation and PATH.           |
 | `MODULE_NOT_FOUND` error | Install dependencies and build the project. |
-| Permission errors | Check your sandbox configuration. |
-| CLI not interactive | Unset `CI_` environment variables. |
+| Permission errors        | Check your sandbox configuration.           |
+| CLI not interactive      | Unset `CI_` environment variables.          |
 
 ## Authentication
 

@@ -244,6 +244,27 @@ export async function main() {
         fileInfo(argv.filePath as string).catch(new Logger().error);
       },
     )
+    .command(
+      'refactor <filePath>',
+      'Suggests code refactorings for a given file or directory.',
+      (yargs) => {
+        yargs.positional('filePath', {
+          describe: 'Absolute path to the file or directory to refactor.',
+          type: 'string',
+        });
+      },
+      async (argv) => {
+        const refactorTool = new RefactorTool(); // Instantiate the new tool
+        try {
+          const result = await refactorTool.call({
+            filePath: argv.filePath as string,
+          });
+          new Logger().info(result);
+        } catch (error) {
+          new Logger().error(`Error during refactoring: ${error}`);
+        }
+      },
+    )
     .demandCommand(1, 'You need to specify a command.')
     .help().argv;
 

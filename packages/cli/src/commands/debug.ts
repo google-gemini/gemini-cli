@@ -31,12 +31,16 @@ export async function debugCode(
   }
 
   if (!code) {
-    new Logger().error(chalk.red('The ether requires code or a valid file path!'));
+    new Logger().error(
+      chalk.red('The ether requires code or a valid file path!'),
+    );
     return;
   }
 
   try {
-    new Logger().info(chalk.cyan(`// Analyzing code: ${code.substring(0, 50)}...`));
+    new Logger().info(
+      chalk.cyan(`// Analyzing code: ${code.substring(0, 50)}...`),
+    );
     // Simulate Gemini API debug response
     const debugOutput = errorMsg
       ? `Debugging error: ${errorMsg}\nSuggestion: Check syntax and variable declarations.`

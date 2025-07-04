@@ -1,5 +1,3 @@
-
-
 import { promises as fs } from 'fs';
 import { resolve } from 'path';
 import { checkFilePermission } from '../services/filePermissionService';
@@ -12,7 +10,7 @@ export async function writeDryRun(
   filePath: string,
   content: string,
   dryRun: boolean,
-  config: DryRunConfig
+  config: DryRunConfig,
 ): Promise<string> {
   if (!(await checkFilePermission(filePath, 'write', config))) {
     throw new Error(`Write access denied for ${filePath}`);
@@ -27,4 +25,3 @@ export async function writeDryRun(
   await fs.writeFile(resolvedPath, content, 'utf-8');
   return `Wrote content to ${resolvedPath}`;
 }
-

@@ -4,10 +4,10 @@ This document provides a guide to sandboxing in the Gemini CLI, including prereq
 
 ## Sandbox Overview
 
-| Method | Platform | Description |
-| --- | --- | --- |
-| macOS Seatbelt | macOS | Lightweight, built-in sandboxing using `sandbox-exec`. |
-| Container-based | All | Cross-platform sandboxing with complete process isolation. |
+| Method          | Platform | Description                                                |
+| --------------- | -------- | ---------------------------------------------------------- |
+| macOS Seatbelt  | macOS    | Lightweight, built-in sandboxing using `sandbox-exec`.     |
+| Container-based | All      | Cross-platform sandboxing with complete process isolation. |
 
 ## Prerequisites
 

@@ -5,15 +5,12 @@
  */
 
 import { promises as fs } from 'fs';
-import {
-  Tool,
-  ToolInvocation,
-  ToolOutput,
-} from '@google/gemini-cli';
+import { Tool, ToolInvocation, ToolOutput } from '@google/gemini-cli';
 
 export class CatTool implements Tool {
   name = 'cat';
-  description = 'Reads the contents of one or more files and returns them as a single string.';
+  description =
+    'Reads the contents of one or more files and returns them as a single string.';
 
   async run(invocation: ToolInvocation): Promise<ToolOutput> {
     if (!invocation.files || invocation.files.length === 0) {
@@ -33,7 +30,7 @@ export class CatTool implements Tool {
             message: `Error reading file ${file}: ${error.message}`,
           };
         }
-      })
+      }),
     );
 
     return {
@@ -42,4 +39,3 @@ export class CatTool implements Tool {
     };
   }
 }
-

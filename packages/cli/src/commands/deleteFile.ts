@@ -24,7 +24,9 @@ export async function deleteFile(
     new Logger().info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   if (!fs.existsSync(pathToDelete)) {
-    new Logger().error(chalk.red(`The path '${pathToDelete}' eludes the ether!`));
+    new Logger().error(
+      chalk.red(`The path '${pathToDelete}' eludes the ether!`),
+    );
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${pathToDelete}' not found.`,
     );
@@ -38,9 +40,13 @@ export async function deleteFile(
   }
 
   try {
-    new Logger().info(chalk.cyan(`// Banishing '${pathToDelete}' from the realm...`));
+    new Logger().info(
+      chalk.cyan(`// Banishing '${pathToDelete}' from the realm...`),
+    );
     await fs.remove(pathToDelete);
-    new Logger().info(chalk.green(`Success! '${pathToDelete}' has been banished.`));
+    new Logger().info(
+      chalk.green(`Success! '${pathToDelete}' has been banished.`),
+    );
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {

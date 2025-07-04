@@ -23,6 +23,7 @@ This section summarizes the latest features, enhancements, and fixes to the Gemi
 | `checkpoint`                      | Restores project files to a previous state.                | Added checkpointing functionality.                                           | `checkpoint`                                                   |
 | `stats`                           | Displays detailed session statistics.                      | Improved stats display with cached token information.                        | `stats`                                                        |
 | `theme`                           | Opens a dialog to change the visual theme.                 | Revamped exit stats display and theme UI.                                    | `theme`                                                        |
+| `refactor-code`                   | Automates code refactoring (e.g., rename symbol).          | **NEW**: Initial implementation for 'rename-symbol' refactoring.             | `refactor-code src/file.ts rename-symbol oldName newName`      |
 
 ### New Features
 
@@ -45,7 +46,7 @@ Expansions to the capabilities of read, write, edit, and other tools, addressing
 | 17  | Version control integration     | Automatically commit changes made by the write tool to Git.                                  | Integrate with `libgit2` to perform commits after write operations with configurable commit messages.                        |
 | 18  | Diff-based editing              | Allow applying diffs or patches for precise file modifications.                              | Add a diff parser to the edit tool to apply patch files or inline diffs.                                                     |
 | 19  | Merge conflict resolution       | Assist in resolving merge conflicts by suggesting resolutions.                               | Use AI to analyze merge conflicts and propose resolutions via the edit tool.                                                 |
-| 20  | Code refactoring suggestions    | Provide suggestions for refactoring, like renaming variables or extracting methods.          | Integrate an AST parser to analyze code and suggest refactorings during edit operations.                                     |
+| 20  | Code refactoring suggestions    | Provide suggestions for refactoring, like renaming variables or extracting methods.          | **ENHANCED**: Now partially implemented via `refactor-code` tool.                                                            |
 | 21  | Interactive editing mode        | Offer step-by-step AI-suggested changes for user approval.                                   | Add an interactive CLI mode with prompts for accepting/rejecting changes.                                                    |
 | 22  | Undo/redo functionality         | Keep a history of changes for undo/redo functionality.                                       | Store changes in a session history and provide commands to undo/redo them.                                                   |
 

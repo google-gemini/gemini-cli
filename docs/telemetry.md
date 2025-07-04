@@ -8,11 +8,11 @@ Gemini CLI's telemetry system is built on the **[OpenTelemetry] (OTEL)** standar
 
 ## Telemetry Overview
 
-| Feature | Description |
-| --- | --- |
-| Traces | Detailed records of the execution path of a request. |
-| Metrics | Numerical measurements of behavior over time. |
-| Logs | Timestamped records of specific events. |
+| Feature | Description                                          |
+| ------- | ---------------------------------------------------- |
+| Traces  | Detailed records of the execution path of a request. |
+| Metrics | Numerical measurements of behavior over time.        |
+| Logs    | Timestamped records of specific events.              |
 
 ## Enabling telemetry
 

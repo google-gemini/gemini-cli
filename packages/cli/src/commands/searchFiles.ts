@@ -48,8 +48,7 @@ export async function searchFiles(
           await searchDir(fullPath);
         } else if (entry.name.includes(searchTerm)) {
           results.push(`[FILE] ${fullPath}`);
-        }
- else if (searchContent.toLowerCase() === 'yes') {
+        } else if (searchContent.toLowerCase() === 'yes') {
           const content = await fs.readFile(fullPath, 'utf-8');
           if (content.includes(searchTerm))
             results.push(`[CONTENT] ${fullPath}`);
@@ -75,4 +74,3 @@ export async function searchFiles(
     if (debug) new Logger().info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
-

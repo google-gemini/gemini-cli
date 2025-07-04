@@ -65,7 +65,8 @@ describe('MvTool', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Error moving file from /test.txt to /test2.txt: Permission denied',
+      message:
+        'Error moving file from /test.txt to /test2.txt: Permission denied',
     });
   });
 });

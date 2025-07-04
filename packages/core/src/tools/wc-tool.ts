@@ -4,7 +4,7 @@ import { checkFilePermission } from '../services/filePermissionService';
 
 export async function wcFile(
   filePath: string,
-  config: unknown
+  config: unknown,
 ): Promise<string> {
   if (!(await checkFilePermission(filePath, 'read', config))) {
     throw new Error(`Read access denied for ${filePath}`);

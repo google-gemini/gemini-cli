@@ -4,12 +4,12 @@ This document describes how to run Gemini CLI and explains the deployment archit
 
 ## Deployment Overview
 
-| Method | Description | Use Case |
-| --- | --- | --- |
-| Standard installation | Install Gemini CLI globally using `npm`. | Recommended for most users. |
-| Sandbox | Run Gemini CLI in a Docker container. | For security and isolation. |
-| From source | Run Gemini CLI directly from the source code. | Recommended for contributors. |
-| From GitHub | Run the latest commit of Gemini CLI from GitHub. | For testing new features. |
+| Method                | Description                                      | Use Case                      |
+| --------------------- | ------------------------------------------------ | ----------------------------- |
+| Standard installation | Install Gemini CLI globally using `npm`.         | Recommended for most users.   |
+| Sandbox               | Run Gemini CLI in a Docker container.            | For security and isolation.   |
+| From source           | Run Gemini CLI directly from the source code.    | Recommended for contributors. |
+| From GitHub           | Run the latest commit of Gemini CLI from GitHub. | For testing new features.     |
 
 ## Running Gemini CLI
 

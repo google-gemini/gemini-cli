@@ -40,7 +40,9 @@ export async function fileInfo(filePath: string): Promise<void> {
       `Last Modified: ${stats.mtime.toISOString()}`,
     ].join('\n');
     new Logger().info(chalk.yellow(info));
-    new Logger().info(chalk.green(`Success! Metadata retrieved for '${filePath}'.`));
+    new Logger().info(
+      chalk.green(`Success! Metadata retrieved for '${filePath}'.`),
+    );
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {
@@ -53,4 +55,3 @@ export async function fileInfo(filePath: string): Promise<void> {
     if (debug) new Logger().info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
-

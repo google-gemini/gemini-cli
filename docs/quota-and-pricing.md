@@ -6,14 +6,14 @@ This article outlines the specific quotas and pricing applicable to the Gemini C
 
 ## Quota and Pricing Overview
 
-| Authentication Method | Quota | Cost |
-| --- | --- | --- |
-| Log in with Google (Free Tier) | 60 requests/minute, 1000 requests/day | Free |
-| Gemini API Key (Unpaid) | 10 requests/minute, 250 requests/day | Free |
-| Gemini API Key (Paid) | Varies by pricing tier | Varies by pricing tier |
-| Log in with Google (Workspace/Licensed) | Varies by tier | Fixed price subscription |
-| Vertex AI (Express Mode) | Variable | Based on usage |
-| Vertex AI (Regular Mode) | Dynamic shared quota | Based on usage |
+| Authentication Method                   | Quota                                 | Cost                     |
+| --------------------------------------- | ------------------------------------- | ------------------------ |
+| Log in with Google (Free Tier)          | 60 requests/minute, 1000 requests/day | Free                     |
+| Gemini API Key (Unpaid)                 | 10 requests/minute, 250 requests/day  | Free                     |
+| Gemini API Key (Paid)                   | Varies by pricing tier                | Varies by pricing tier   |
+| Log in with Google (Workspace/Licensed) | Varies by tier                        | Fixed price subscription |
+| Vertex AI (Express Mode)                | Variable                              | Based on usage           |
+| Vertex AI (Regular Mode)                | Dynamic shared quota                  | Based on usage           |
 
 ## 1. Log in with Google (Gemini Code Assist Free Tier)
 
