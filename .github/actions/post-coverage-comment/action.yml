@@ -1,7 +1,6 @@
 name: 'Post Coverage Comment Action'
 description: 'Prepares and posts a code coverage comment to a PR.'
 
-
 inputs:
   cli_json_file:
     description: 'Path to CLI coverage-summary.json'
