@@ -18,7 +18,7 @@ import {
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
 import { getInstallationId } from '../../utils/user_id.js';
-import { getObfuscatedGoogleAccountId } from '../../utils/user_id.js';
+import { getGoogleAccountId } from '../../utils/user_id.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -70,7 +70,6 @@ export class ClearcutLogger {
       console_type: 'GEMINI_CLI',
       application: 102,
       event_name: name,
-      obfuscated_google_account_id: getObfuscatedGoogleAccountId(),
       client_install_id: getInstallationId(),
       event_metadata: [data] as object[],
     };
@@ -81,15 +80,20 @@ export class ClearcutLogger {
       return;
     }
 
-    this.flushToClearcut();
+    // Fire and forget - don't await
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
-  flushToClearcut(): Promise<LogResponse> {
+  async flushToClearcut(): Promise<LogResponse> {
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = [...this.events];
     this.events.length = 0;
+
+    const googleAccountId = await getGoogleAccountId();
 
     return new Promise<Buffer>((resolve, reject) => {
       const request = [
@@ -97,6 +101,12 @@ export class ClearcutLogger {
           log_source_name: 'CONCORD',
           request_time_ms: Date.now(),
           log_event: eventsToSend,
+          // Add UserInfo with the raw Gaia ID
+          user_info: googleAccountId
+            ? {
+                UserID: googleAccountId,
+              }
+            : undefined,
         },
       ];
       const body = JSON.stringify(request);
@@ -244,7 +254,9 @@ export class ClearcutLogger {
     ];
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     // Flush start event immediately
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing start session event to Clearcut:', error);
+    });
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
@@ -256,7 +268,9 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
@@ -288,7 +302,9 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(tool_call_event_name, data));
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
@@ -300,7 +316,9 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
@@ -349,7 +367,9 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
@@ -373,7 +393,9 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
@@ -386,7 +408,9 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
     // Flush immediately on session end.
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   shutdown() {
