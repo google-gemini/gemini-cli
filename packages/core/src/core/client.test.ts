@@ -398,7 +398,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('turn-id-2');
+      const result = await client.tryCompressChat('prompt-id-2');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -424,7 +424,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('turn-id-3');
+      const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -455,7 +455,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('turn-id-1', true); // force = true
+      const result = await client.tryCompressChat('prompt-id-1', true); // force = true
       const newChat = client.getChat();
 
       expect(mockSendMessage).toHaveBeenCalled();
@@ -493,7 +493,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
-        'turn-id-1',
+        'prompt-id-1',
       );
 
       // Consume the stream manually to get the final return value.
@@ -546,7 +546,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Start conversation' }],
         signal,
-        'turn-id-2',
+        'prompt-id-2',
       );
 
       // Count how many stream events we get
@@ -647,7 +647,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Start conversation' }],
         signal,
-        'turn-id-3',
+        'prompt-id-3',
         Number.MAX_SAFE_INTEGER, // Bypass the MAX_TURNS protection
       );
 

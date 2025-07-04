@@ -115,7 +115,7 @@ export class ToolCallEvent {
   decision?: ToolCallDecision;
   error?: string;
   error_type?: string;
-  turn_id: string;
+  prompt_id: string;
 
   constructor(call: CompletedToolCall) {
     this['event.name'] = 'tool_call';
@@ -129,7 +129,7 @@ export class ToolCallEvent {
       : undefined;
     this.error = call.response.error?.message;
     this.error_type = call.response.error?.name;
-    this.turn_id = call.request.turn_id;
+    this.prompt_id = call.request.prompt_id;
   }
 }
 
@@ -155,13 +155,13 @@ export class ApiErrorEvent {
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
-  turn_id: string;
+  prompt_id: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
-    turn_id: string,
+    prompt_id: string,
     error_type?: string,
     status_code?: number | string,
   ) {
@@ -172,7 +172,7 @@ export class ApiErrorEvent {
     this.error_type = error_type;
     this.status_code = status_code;
     this.duration_ms = duration_ms;
-    this.turn_id = turn_id;
+    this.prompt_id = prompt_id;
   }
 }
 
@@ -190,12 +190,12 @@ export class ApiResponseEvent {
   tool_token_count: number;
   total_token_count: number;
   response_text?: string;
-  turn_id: string;
+  prompt_id: string;
 
   constructor(
     model: string,
     duration_ms: number,
-    turn_id: string,
+    prompt_id: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
     error?: string,
@@ -213,7 +213,7 @@ export class ApiResponseEvent {
     this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
     this.error = error;
-    this.turn_id = turn_id;
+    this.prompt_id = prompt_id;
   }
 }
 

@@ -158,7 +158,7 @@ export class GeminiChat {
 
   private async _logApiResponse(
     durationMs: number,
-    turn_id: string,
+    prompt_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
   ): Promise<void> {
@@ -167,7 +167,7 @@ export class GeminiChat {
       new ApiResponseEvent(
         this.config.getModel(),
         durationMs,
-        turn_id,
+        prompt_id,
         usageMetadata,
         responseText,
       ),
@@ -177,7 +177,7 @@ export class GeminiChat {
   private _logApiError(
     durationMs: number,
     error: unknown,
-    turn_id: string,
+    prompt_id: string,
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
@@ -188,7 +188,7 @@ export class GeminiChat {
         this.config.getModel(),
         errorMessage,
         durationMs,
-        turn_id,
+        prompt_id,
         errorType,
       ),
     );
@@ -251,7 +251,7 @@ export class GeminiChat {
    */
   async sendMessage(
     params: SendMessageParameters,
-    turn_id: string,
+    prompt_id: string,
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -285,7 +285,7 @@ export class GeminiChat {
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
         durationMs,
-        turn_id,
+        prompt_id,
         response.usageMetadata,
         getStructuredResponse(response),
       );
@@ -317,7 +317,7 @@ export class GeminiChat {
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, turn_id);
+      this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -347,7 +347,7 @@ export class GeminiChat {
    */
   async sendMessageStream(
     params: SendMessageParameters,
-    turn_id: string,
+    prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -393,12 +393,12 @@ export class GeminiChat {
         streamResponse,
         userContent,
         startTime,
-        turn_id,
+        prompt_id,
       );
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, turn_id);
+      this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -470,7 +470,7 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,
     startTime: number,
-    turn_id: string,
+    prompt_id: string,
   ) {
     const outputContent: Content[] = [];
     const chunks: GenerateContentResponse[] = [];
@@ -494,7 +494,7 @@ export class GeminiChat {
     } catch (error) {
       errorOccurred = true;
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, turn_id);
+      this._logApiError(durationMs, error, prompt_id);
       throw error;
     }
 
@@ -509,7 +509,7 @@ export class GeminiChat {
       const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
-        turn_id,
+        prompt_id,
         this.getFinalUsageMetadata(chunks),
         fullText,
       );

@@ -219,20 +219,20 @@ export class GeminiClient {
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
-    turn_id: string,
+    prompt_id: string,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
-      return new Turn(this.getChat(), turn_id);
+      return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat(turn_id);
+    const compressed = await this.tryCompressChat(prompt_id);
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat(), turn_id);
+    const turn = new Turn(this.getChat(), prompt_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       yield event;
@@ -250,7 +250,7 @@ export class GeminiClient {
         yield* this.sendMessageStream(
           nextRequest,
           signal,
-          turn_id,
+          prompt_id,
           boundedTurns - 1,
         );
       }
@@ -436,7 +436,7 @@ export class GeminiClient {
   }
 
   async tryCompressChat(
-    turn_id: string,
+    prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
     const curatedHistory = this.getChat().getHistory(true);
@@ -476,7 +476,7 @@ export class GeminiClient {
           systemInstruction: { text: getCompressionPrompt() },
         },
       },
-      turn_id,
+      prompt_id,
     );
     this.chat = await this.startChat([
       {
