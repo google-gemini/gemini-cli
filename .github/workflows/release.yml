@@ -64,8 +64,8 @@ jobs:
           echo "Initial RELEASE_TAG: ${RELEASE_TAG}"
 
           # Validate that the tag starts with 'v' and follows semver
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
-            echo "Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease"
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Error: Version must be in the format vX.Y.Z, vX.Y.Z-prerelease, or vX.Y.Z+buildmeta"
             exit 1
           fi
 
