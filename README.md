@@ -52,6 +52,7 @@ The Gemini API provides a free tier with [100 requests per day](https://ai.googl
    Alternatively, to make the variable persistent across sessions, add it to a `~/.env` file in your home directory:
    ```bash
    GEMINI_API_KEY="YOUR_API_KEY"
+   ```
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
