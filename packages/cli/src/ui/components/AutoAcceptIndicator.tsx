@@ -23,8 +23,8 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = Colors.AccentGreen;
-      textContent = 'accepting edits';
-      subText = ' (shift + tab to toggle)';
+      textContent = 'Auto-applying edits';
+      subText = ' (shift + tab to disable)';
       break;
     case ApprovalMode.YOLO:
       textColor = Colors.AccentRed;
