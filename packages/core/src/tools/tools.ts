@@ -236,7 +236,7 @@ export type ToolCallConfirmationDetails =
   | ToolMcpConfirmationDetails
   | ToolInfoConfirmationDetails;
 
-export enum ToolConfirmationOutcome {
+export const enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
   ProceedAlwaysServer = 'proceed_always_server',

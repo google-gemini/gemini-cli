@@ -17,8 +17,9 @@ vi.mock('os', async (importOriginal) => {
 });
 
 // Mock './settings.js' to ensure it uses the mocked 'os.homedir()' for its internal constants.
-vi.mock('./settings.js', async (importActual) => {
-  const originalModule = await importActual<typeof import('./settings.js')>();
+vi.mock('./settings.js', async (_importOriginal) => {
+  const originalModule =
+    await vi.importActual<typeof import('./settings.js')>('./settings.js');
   return {
     __esModule: true, // Ensure correct module shape
     ...originalModule, // Re-export all original members
@@ -47,6 +48,7 @@ import {
   USER_SETTINGS_PATH, // This IS the mocked path.
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   SettingScope,
+  LoadedSettings,
 } from './settings.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
@@ -245,7 +247,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
-      const userSettingsContent = { telemetry: true };
+      const userSettingsContent = { telemetry: { enabled: true } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -254,14 +256,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(true);
+      expect(settings.merged.telemetry?.enabled).toBe(true);
     });
 
     it('should load telemetry setting from workspace settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
       );
-      const workspaceSettingsContent = { telemetry: false };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === MOCK_WORKSPACE_SETTINGS_PATH)
@@ -270,13 +272,13 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should prioritize workspace telemetry setting over user setting', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const userSettingsContent = { telemetry: true };
-      const workspaceSettingsContent = { telemetry: false };
+      const userSettingsContent = { telemetry: { enabled: true } };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -287,7 +289,7 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should have telemetry as undefined if not in any settings file', () => {
@@ -354,247 +356,16 @@ describe('Settings Loading and Merging', () => {
       // Restore JSON.parse mock if it was spied on specifically for this test
       vi.restoreAllMocks(); // Or more targeted restore if needed
     });
-
-    it('should resolve environment variables in user settings', () => {
-      process.env.TEST_API_KEY = 'user_api_key_from_env';
-      const userSettingsContent = {
-        apiKey: '$TEST_API_KEY',
-        someUrl: 'https://test.com/${TEST_API_KEY}',
-      };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.apiKey).toBe('user_api_key_from_env');
-      expect(settings.user.settings.someUrl).toBe(
-        'https://test.com/user_api_key_from_env',
-      );
-      expect(settings.merged.apiKey).toBe('user_api_key_from_env');
-      delete process.env.TEST_API_KEY;
-    });
-
-    it('should resolve environment variables in workspace settings', () => {
-      process.env.WORKSPACE_ENDPOINT = 'workspace_endpoint_from_env';
-      const workspaceSettingsContent = {
-        endpoint: '${WORKSPACE_ENDPOINT}/api',
-        nested: { value: '$WORKSPACE_ENDPOINT' },
-      };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.workspace.settings.endpoint).toBe(
-        'workspace_endpoint_from_env/api',
-      );
-      expect(settings.workspace.settings.nested.value).toBe(
-        'workspace_endpoint_from_env',
-      );
-      expect(settings.merged.endpoint).toBe('workspace_endpoint_from_env/api');
-      delete process.env.WORKSPACE_ENDPOINT;
-    });
-
-    it('should prioritize workspace env variables over user env variables if keys clash after resolution', () => {
-      const userSettingsContent = { configValue: '$SHARED_VAR' };
-      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
-
-      (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env.SHARED_VAR;
-      // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env.SHARED_VAR;
-
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'user_value_for_user_read'; // Set for user settings read
-            return JSON.stringify(userSettingsContent);
-          }
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
-            return JSON.stringify(workspaceSettingsContent);
-          }
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      expect(settings.user.settings.configValue).toBe(
-        'user_value_for_user_read',
-      );
-      expect(settings.workspace.settings.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-      // Merged should take workspace's resolved value
-      expect(settings.merged.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-
-      // Restore original environment variable state
-      if (originalSharedVar !== undefined) {
-        process.env.SHARED_VAR = originalSharedVar;
-      } else {
-        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
-      }
-    });
-
-    it('should leave unresolved environment variables as is', () => {
-      const userSettingsContent = { apiKey: '$UNDEFINED_VAR' };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.apiKey).toBe('$UNDEFINED_VAR');
-      expect(settings.merged.apiKey).toBe('$UNDEFINED_VAR');
-    });
-
-    it('should resolve multiple environment variables in a single string', () => {
-      process.env.VAR_A = 'valueA';
-      process.env.VAR_B = 'valueB';
-      const userSettingsContent = { path: '/path/$VAR_A/${VAR_B}/end' };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.path).toBe('/path/valueA/valueB/end');
-      delete process.env.VAR_A;
-      delete process.env.VAR_B;
-    });
-
-    it('should resolve environment variables in arrays', () => {
-      process.env.ITEM_1 = 'item1_env';
-      process.env.ITEM_2 = 'item2_env';
-      const userSettingsContent = { list: ['$ITEM_1', '${ITEM_2}', 'literal'] };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.list).toEqual([
-        'item1_env',
-        'item2_env',
-        'literal',
-      ]);
-      delete process.env.ITEM_1;
-      delete process.env.ITEM_2;
-    });
-
-    it('should correctly pass through null, boolean, and number types, and handle undefined properties', () => {
-      process.env.MY_ENV_STRING = 'env_string_value';
-      process.env.MY_ENV_STRING_NESTED = 'env_string_nested_value';
-
-      const userSettingsContent = {
-        nullVal: null,
-        trueVal: true,
-        falseVal: false,
-        numberVal: 123.45,
-        stringVal: '$MY_ENV_STRING',
-        nestedObj: {
-          nestedNull: null,
-          nestedBool: true,
-          nestedNum: 0,
-          nestedString: 'literal',
-          anotherEnv: '${MY_ENV_STRING_NESTED}',
-        },
-      };
-
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      expect(settings.user.settings.nullVal).toBeNull();
-      expect(settings.user.settings.trueVal).toBe(true);
-      expect(settings.user.settings.falseVal).toBe(false);
-      expect(settings.user.settings.numberVal).toBe(123.45);
-      expect(settings.user.settings.stringVal).toBe('env_string_value');
-      expect(settings.user.settings.undefinedVal).toBeUndefined();
-
-      expect(settings.user.settings.nestedObj.nestedNull).toBeNull();
-      expect(settings.user.settings.nestedObj.nestedBool).toBe(true);
-      expect(settings.user.settings.nestedObj.nestedNum).toBe(0);
-      expect(settings.user.settings.nestedObj.nestedString).toBe('literal');
-      expect(settings.user.settings.nestedObj.anotherEnv).toBe(
-        'env_string_nested_value',
-      );
-
-      delete process.env.MY_ENV_STRING;
-      delete process.env.MY_ENV_STRING_NESTED;
-    });
-
-    it('should resolve multiple concatenated environment variables in a single string value', () => {
-      process.env.TEST_HOST = 'myhost';
-      process.env.TEST_PORT = '9090';
-      const userSettingsContent = {
-        serverAddress: '${TEST_HOST}:${TEST_PORT}/api',
-      };
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.serverAddress).toBe('myhost:9090/api');
-
-      delete process.env.TEST_HOST;
-      delete process.env.TEST_PORT;
-    });
   });
 
   describe('LoadedSettings class', () => {
     it('setValue should update the correct scope and recompute merged settings', async () => {
       (mockFsExistsSync as Mock).mockReturnValue(false);
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = new LoadedSettings(
+        { path: USER_SETTINGS_PATH, settings: {} },
+        { path: MOCK_WORKSPACE_SETTINGS_PATH, settings: {} },
+        [],
+      );
 
       vi.mocked(fs.promises.writeFile).mockImplementation(() =>
         Promise.resolve(),

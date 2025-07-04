@@ -18,7 +18,8 @@ import {
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { ContentGenerator, AuthType } from './contentGenerator.js';
+import { ContentGenerator } from './contentGenerator.js';
+import { AuthType } from '../config/config.js';
 import { Config } from '../config/config.js';
 import {
   logApiRequest,

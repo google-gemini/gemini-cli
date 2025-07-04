@@ -188,7 +188,7 @@ export const ToolConfirmationMessage: React.FC<
         {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
             <Text>URLs to fetch:</Text>
-            {infoProps.urls.map((url) => (
+            {infoProps.urls.map((url: string) => (
               <Text key={url}> - {url}</Text>
             ))}
           </Box>

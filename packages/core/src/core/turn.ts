@@ -73,11 +73,6 @@ export interface ToolCallResponseInfo {
   error: Error | undefined;
 }
 
-export interface ServerToolCallConfirmationDetails {
-  request: ToolCallRequestInfo;
-  details: ToolCallConfirmationDetails;
-}
-
 export type ThoughtSummary = {
   subject: string;
   description: string;
@@ -102,6 +97,11 @@ export type ServerGeminiToolCallResponseEvent = {
   type: GeminiEventType.ToolCallResponse;
   value: ToolCallResponseInfo;
 };
+
+export interface ServerToolCallConfirmationDetails {
+  request: ToolCallRequestInfo;
+  details: ToolCallConfirmationDetails;
+}
 
 export type ServerGeminiToolCallConfirmationEvent = {
   type: GeminiEventType.ToolCallConfirmation;

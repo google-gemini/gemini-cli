@@ -10,10 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import {
-  USER_SETTINGS_DIR,
-  SETTINGS_DIRECTORY_NAME,
-} from '../config/settings.js';
+
 import { promisify } from 'util';
 import { SandboxConfig } from '@google/gemini-cli-core';
 
@@ -151,10 +148,7 @@ function entrypoint(workdir: string): string[] {
     shellCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`);
   }
 
-  const projectSandboxBashrc = path.join(
-    SETTINGS_DIRECTORY_NAME,
-    'sandbox.bashrc',
-  );
+  const projectSandboxBashrc = path.join('.gemini', 'sandbox.bashrc');
   if (fs.existsSync(projectSandboxBashrc)) {
     shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
@@ -195,10 +189,7 @@ export async function start_sandbox(
       .pathname;
     // if profile name is not recognized, then look for file under project settings directory
     if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-      profileFile = path.join(
-        SETTINGS_DIRECTORY_NAME,
-        `sandbox-macos-${profile}.sb`,
-      );
+      profileFile = path.join('.gemini', `sandbox-macos-${profile}.sb`);
     }
     if (!fs.existsSync(profileFile)) {
       console.error(
@@ -304,10 +295,7 @@ export async function start_sandbox(
   // determine full path for gemini-cli to distinguish linked vs installed setting
   const gcPath = fs.realpathSync(process.argv[1]);
 
-  const projectSandboxDockerfile = path.join(
-    SETTINGS_DIRECTORY_NAME,
-    'sandbox.Dockerfile',
-  );
+  const projectSandboxDockerfile = path.join('.gemini', 'sandbox.Dockerfile');
   const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
   const image = config.image;
@@ -376,10 +364,8 @@ export async function start_sandbox(
 
   // mount user settings directory inside container, after creating if missing
   // note user/home changes inside sandbox and we mount at BOTH paths for consistency
-  const userSettingsDirOnHost = USER_SETTINGS_DIR;
-  const userSettingsDirInSandbox = getContainerPath(
-    `/home/node/${SETTINGS_DIRECTORY_NAME}`,
-  );
+  const userSettingsDirOnHost = path.join(os.homedir(), '.gemini');
+  const userSettingsDirInSandbox = getContainerPath(`/home/node/.gemini`);
   if (!fs.existsSync(userSettingsDirOnHost)) {
     fs.mkdirSync(userSettingsDirOnHost);
   }
@@ -561,10 +547,7 @@ export async function start_sandbox(
   if (
     process.env.VIRTUAL_ENV?.toLowerCase().startsWith(workdir.toLowerCase())
   ) {
-    const sandboxVenvPath = path.resolve(
-      SETTINGS_DIRECTORY_NAME,
-      'sandbox.venv',
-    );
+    const sandboxVenvPath = path.resolve('.gemini', 'sandbox.venv');
     if (!fs.existsSync(sandboxVenvPath)) {
       fs.mkdirSync(sandboxVenvPath, { recursive: true });
     }

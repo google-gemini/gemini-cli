@@ -4,41 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { ToolMessage, ToolMessageProps } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
-import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-vi.mock('./DiffRenderer.js', () => ({
-  DiffRenderer: function MockDiffRenderer({
-    diffContent,
-  }: {
-    diffContent: string;
-  }) {
-    return <Text>MockDiff:{diffContent}</Text>;
-  },
-}));
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
-  },
-}));
 
 // Helper to render with context
 const renderWithContext = (

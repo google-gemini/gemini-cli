@@ -31,18 +31,17 @@ vi.mock('./gitUtils.js');
 import * as path from 'path';
 
 // Helper to create Dirent-like objects for mocking fs.readdir
-const createDirent = (name: string, type: 'file' | 'dir'): FSDirent => ({
-  name,
-  isFile: () => type === 'file',
-  isDirectory: () => type === 'dir',
-  isBlockDevice: () => false,
-  isCharacterDevice: () => false,
-  isSymbolicLink: () => false,
-  isFIFO: () => false,
-  isSocket: () => false,
-  path: '',
-  parentPath: '',
-});
+const createDirent = (name: string, type: 'file' | 'dir'): FSDirent =>
+  ({
+    name,
+    isFile: () => type === 'file',
+    isDirectory: () => type === 'dir',
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isSymbolicLink: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+  }) as any as FSDirent;
 
 describe('getFolderStructure', () => {
   beforeEach(() => {

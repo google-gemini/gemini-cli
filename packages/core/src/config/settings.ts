@@ -9,14 +9,12 @@ import * as path from 'path';
 import { homedir } from 'os';
 import {
   MCPServerConfig,
-  getErrorMessage,
   BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-} from '@google/gemini-cli-core';
+  TelemetryTarget,
+} from './config.js';
+import { getErrorMessage } from '../utils/errors.js';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { AuthType } from './config.js';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -33,6 +31,13 @@ export interface CheckpointingSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+}
+
+export interface TelemetrySettings {
+  enabled?: boolean;
+  target?: TelemetryTarget;
+  otlpEndpoint?: string;
+  logPrompts?: boolean;
 }
 
 export interface Settings {
@@ -121,11 +126,11 @@ export class LoadedSettings {
   async setValue(
     scope: SettingScope,
     key: keyof Settings,
-    value: string | string[] | Record<string, MCPServerConfig> | undefined,
+    value: Settings[keyof Settings],
   ): Promise<void> {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
-    settingsFile.settings[key] = value;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (settingsFile.settings as any)[key] = value;
     this._merged = this.computeMergedSettings();
     await saveSettings(settingsFile);
   }
@@ -190,12 +195,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         stripJsonComments(userContent),
       ) as Settings;
       userSettings = resolveEnvVarsInObject(parsedUserSettings);
-      // Support legacy theme names
-      if (userSettings.theme && userSettings.theme === 'VS') {
-        userSettings.theme = DefaultLight.name;
-      } else if (userSettings.theme && userSettings.theme === 'VS2015') {
-        userSettings.theme = DefaultDark.name;
-      }
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -218,14 +217,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         stripJsonComments(projectContent),
       ) as Settings;
       workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
-        workspaceSettings.theme = DefaultLight.name;
-      } else if (
-        workspaceSettings.theme &&
-        workspaceSettings.theme === 'VS2015'
-      ) {
-        workspaceSettings.theme = DefaultDark.name;
-      }
     }
   } catch (error: unknown) {
     settingsErrors.push({

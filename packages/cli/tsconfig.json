@@ -2,17 +2,19 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
+    "rootDir": "src",
     "jsx": "react-jsx",
-    "lib": ["DOM", "DOM.Iterable", "ES2020"],
-    "types": ["node", "vitest/globals"]
+    "jsxImportSource": "react",
+    "baseUrl": ".",
+    "paths": {
+      "@google/gemini-cli-core": ["../core/src/index.ts"]
+    }
   },
-  "include": [
-    "index.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json",
-    "./package.json"
-  ],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
-  "references": [{ "path": "../core" }]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"],
+  "references": [
+    {
+      "path": "../core"
+    }
+  ]
 }

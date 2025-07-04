@@ -11,7 +11,7 @@ import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { LoadedSettings, SettingScope } from '@google/gemini-cli-core';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */

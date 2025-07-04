@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import { LoadedSettings, SettingScope } from '@google/gemini-cli-core'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
 

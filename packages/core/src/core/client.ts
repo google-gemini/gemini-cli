@@ -31,8 +31,8 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
+import { AuthType } from '../config/config.js';
 import {
-  AuthType,
   ContentGenerator,
   ContentGeneratorConfig,
   createContentGenerator,

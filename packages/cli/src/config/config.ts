@@ -10,6 +10,7 @@ import process from 'node:process';
 import {
   Config,
   loadServerHierarchicalMemory,
+  Settings,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -19,7 +20,6 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
 
 import { Extension } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -279,7 +279,7 @@ function mergeExcludeTools(
   settings: Settings,
   extensions: Extension[],
 ): string[] {
-  const allExcludeTools = new Set(settings.excludeTools || []);
+  const allExcludeTools = new Set<string>(settings.excludeTools || []);
   for (const extension of extensions) {
     for (const tool of extension.config.excludeTools || []) {
       allExcludeTools.add(tool);

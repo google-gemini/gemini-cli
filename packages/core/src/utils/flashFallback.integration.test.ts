@@ -15,7 +15,7 @@ import {
 } from './testUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType } from '../config/config.js';
 
 describe('Flash Fallback Integration', () => {
   let config: Config;

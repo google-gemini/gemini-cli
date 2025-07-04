@@ -8,7 +8,7 @@ import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType } from '../config/config.js';
 
 export enum ToolCallDecision {
   ACCEPT = 'accept',

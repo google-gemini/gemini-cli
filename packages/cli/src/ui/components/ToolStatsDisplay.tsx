@@ -56,7 +56,7 @@ export const ToolStatsDisplay: React.FC = () => {
   const { stats } = useSessionStats();
   const { tools } = stats.metrics;
   const activeTools = Object.entries(tools.byName).filter(
-    ([, metrics]) => metrics.count > 0,
+    ([, metrics]: [string, ToolCallStats]) => metrics.count > 0,
   );
 
   if (activeTools.length === 0) {
@@ -72,8 +72,11 @@ export const ToolStatsDisplay: React.FC = () => {
     );
   }
 
-  const totalDecisions = Object.values(tools.byName).reduce(
-    (acc, tool) => {
+  const totalDecisions = activeTools.reduce(
+    (
+      acc: { accept: number; reject: number; modify: number },
+      [, tool]: [string, ToolCallStats],
+    ) => {
       acc.accept += tool.decisions.accept;
       acc.reject += tool.decisions.reject;
       acc.modify += tool.decisions.modify;
@@ -131,9 +134,11 @@ export const ToolStatsDisplay: React.FC = () => {
         width="100%"
       />
 
+      {/* I've renamed stats to toolStats to avoid shadowing the stats variable from the useSessionStats hook and removed the unnecessary as ToolCallStats cast.
+      This makes the code slightly cleaner and relies on the compiler's excellent type inference. */}
       {/* Tool Rows */}
-      {activeTools.map(([name, stats]) => (
-        <StatRow key={name} name={name} stats={stats as ToolCallStats} />
+      {activeTools.map(([name, toolStats]) => (
+        <StatRow key={name} name={name} stats={toolStats} />
       ))}
 
       <Box height={1} />

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/// <reference types="vitest/globals" />
+
 import { render } from 'ink-testing-library';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 

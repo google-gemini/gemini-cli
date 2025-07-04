@@ -4,20 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ToolCallRequestInfo, ToolCallResponseInfo } from '../core/turn.js';
 import {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolConfirmationOutcome,
   Tool,
   ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
   ToolResult,
-  ToolRegistry,
-  ApprovalMode,
-  EditorType,
-  Config,
-  logToolCall,
-  ToolCallEvent,
-} from '../index.js';
+} from '../tools/tools.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { ApprovalMode, Config } from '../config/config.js';
+import { EditorType } from '../utils/editor.js';
+import { logToolCall, ToolCallEvent } from '../telemetry/index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import {
@@ -219,6 +216,7 @@ interface CoreToolSchedulerOptions {
   approvalMode?: ApprovalMode;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
+  onToolAutoApproved?: (toolName: string) => Promise<void>;
 }
 
 export class CoreToolScheduler {
@@ -230,6 +228,7 @@ export class CoreToolScheduler {
   private approvalMode: ApprovalMode;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private onToolAutoApproved?: (toolName: string) => Promise<void>;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -239,6 +238,7 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.onToolAutoApproved = options.onToolAutoApproved;
   }
 
   private setStatusInternal(
@@ -282,7 +282,8 @@ export class CoreToolScheduler {
 
       // currentCall is a non-terminal state here and should have startTime and tool.
       const existingStartTime = currentCall.startTime;
-      const toolInstance = currentCall.tool;
+      const toolInstance = (currentCall as Exclude<ToolCall, ErroredToolCall>)
+        .tool;
 
       const outcome = currentCall.outcome;
 
@@ -443,7 +444,10 @@ export class CoreToolScheduler {
 
       const { request: reqInfo, tool: toolInstance } = toolCall;
       try {
-        if (this.approvalMode === ApprovalMode.YOLO) {
+        if (
+          this.approvalMode === ApprovalMode.YOLO ||
+          this.config.getAutoApprovedTools().includes(toolInstance.name)
+        ) {
           this.setStatusInternal(reqInfo.callId, 'scheduled');
         } else {
           const confirmationDetails = await toolInstance.shouldConfirmExecute(
@@ -497,17 +501,15 @@ export class CoreToolScheduler {
       (c) => c.request.callId === callId && c.status === 'awaiting_approval',
     );
 
-    if (toolCall && toolCall.status === 'awaiting_approval') {
+    if (toolCall) {
+      // Always call the original onConfirm provided by the tool
       await originalOnConfirm(outcome);
-    }
 
-    this.toolCalls = this.toolCalls.map((call) => {
-      if (call.request.callId !== callId) return call;
-      return {
-        ...call,
-        outcome,
-      };
-    });
+      // Add the chosen outcome to the toolCall object for logging/metrics
+      this.toolCalls = this.toolCalls.map((call) =>
+        call.request.callId !== callId ? call : { ...call, outcome },
+      );
+    }
 
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       this.setStatusInternal(
@@ -515,36 +517,50 @@ export class CoreToolScheduler {
         'cancelled',
         'User did not allow tool call',
       );
-    } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
-      const waitingToolCall = toolCall as WaitingToolCall;
-      if (isModifiableTool(waitingToolCall.tool)) {
-        const modifyContext = waitingToolCall.tool.getModifyContext(signal);
-        const editorType = this.getPreferredEditor();
-        if (!editorType) {
-          return;
+    } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+      if (this.onToolAutoApproved && toolCall?.status === 'awaiting_approval') {
+        const confirmationDetails = toolCall.confirmationDetails;
+        if (
+          confirmationDetails.type === 'exec' &&
+          confirmationDetails.rootCommand
+        ) {
+          await this.onToolAutoApproved(confirmationDetails.rootCommand);
         }
+      }
+      this.setStatusInternal(callId, 'scheduled');
+    } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
+      if (toolCall?.status === 'awaiting_approval') {
+        const waitingToolCall = toolCall as WaitingToolCall;
+        if (isModifiableTool(waitingToolCall.tool)) {
+          const modifyContext = waitingToolCall.tool.getModifyContext(signal);
+          const editorType = this.getPreferredEditor();
+          if (!editorType) {
+            return;
+          }
 
-        this.setStatusInternal(callId, 'awaiting_approval', {
-          ...waitingToolCall.confirmationDetails,
-          isModifying: true,
-        } as ToolCallConfirmationDetails);
+          this.setStatusInternal(callId, 'awaiting_approval', {
+            ...waitingToolCall.confirmationDetails,
+            isModifying: true,
+          } as ToolCallConfirmationDetails);
 
-        const { updatedParams, updatedDiff } = await modifyWithEditor<
-          typeof waitingToolCall.request.args
-        >(
-          waitingToolCall.request.args,
-          modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
-          editorType,
-          signal,
-        );
-        this.setArgsInternal(callId, updatedParams);
-        this.setStatusInternal(callId, 'awaiting_approval', {
-          ...waitingToolCall.confirmationDetails,
-          fileDiff: updatedDiff,
-          isModifying: false,
-        } as ToolCallConfirmationDetails);
+          const { updatedParams, updatedDiff } = await modifyWithEditor<
+            typeof waitingToolCall.request.args
+          >(
+            waitingToolCall.request.args,
+            modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
+            editorType,
+            signal,
+          );
+          this.setArgsInternal(callId, updatedParams);
+          this.setStatusInternal(callId, 'awaiting_approval', {
+            ...waitingToolCall.confirmationDetails,
+            fileDiff: updatedDiff,
+            isModifying: false,
+          } as ToolCallConfirmationDetails);
+        }
       }
     } else {
+      // This handles ProceedOnce
       this.setStatusInternal(callId, 'scheduled');
     }
     this.attemptExecutionOfScheduledCalls(signal);
@@ -641,7 +657,10 @@ export class CoreToolScheduler {
       this.toolCalls = [];
 
       for (const call of completedCalls) {
-        logToolCall(this.config, new ToolCallEvent(call));
+        // Only log tool calls that have a 'tool' property (i.e., not ErroredToolCall)
+        if ('tool' in call) {
+          logToolCall(this.config, new ToolCallEvent(call));
+        }
       }
 
       if (this.onAllToolCallsComplete) {

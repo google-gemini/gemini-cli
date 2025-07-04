@@ -11,7 +11,7 @@ import {
   LoadedSettings,
   SettingsFile,
   loadSettings,
-} from './config/settings.js';
+} from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -20,15 +20,6 @@ class MockProcessExitError extends Error {
     this.name = 'MockProcessExitError';
   }
 }
-
-// Mock dependencies
-vi.mock('./config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./config/settings.js')>();
-  return {
-    ...actual,
-    loadSettings: vi.fn(),
-  };
-});
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({

@@ -49,7 +49,7 @@ export const ModelStatsDisplay: React.FC = () => {
   const { stats } = useSessionStats();
   const { models } = stats.metrics;
   const activeModels = Object.entries(models).filter(
-    ([, metrics]) => metrics.api.totalRequests > 0,
+    ([, metrics]: [string, ModelMetrics]) => metrics.api.totalRequests > 0,
   );
 
   if (activeModels.length === 0) {
@@ -69,14 +69,16 @@ export const ModelStatsDisplay: React.FC = () => {
 
   const getModelValues = (
     getter: (metrics: ModelMetrics) => string | React.ReactElement,
-  ) => activeModels.map(([, metrics]) => getter(metrics));
+  ) => activeModels.map(([, metrics]) => getter(metrics as ModelMetrics));
 
   const hasThoughts = activeModels.some(
-    ([, metrics]) => metrics.tokens.thoughts > 0,
+    ([, metrics]) => (metrics as ModelMetrics).tokens.thoughts > 0,
   );
-  const hasTool = activeModels.some(([, metrics]) => metrics.tokens.tool > 0);
+  const hasTool = activeModels.some(
+    ([, metrics]) => (metrics as ModelMetrics).tokens.tool > 0,
+  );
   const hasCached = activeModels.some(
-    ([, metrics]) => metrics.tokens.cached > 0,
+    ([, metrics]) => (metrics as ModelMetrics).tokens.cached > 0,
   );
 
   return (

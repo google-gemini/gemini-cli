@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { createContentGenerator, AuthType } from './contentGenerator.js';
+import { createContentGenerator } from './contentGenerator.js';
+import { AuthType } from '../config/config.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 

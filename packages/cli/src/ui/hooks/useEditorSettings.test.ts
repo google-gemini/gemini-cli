@@ -16,7 +16,7 @@ import {
 import { act } from 'react';
 import { renderHook } from '@testing-library/react';
 import { useEditorSettings } from './useEditorSettings.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { LoadedSettings, SettingScope } from '@google/gemini-cli-core';
 import { MessageType, type HistoryItem } from '../types.js';
 import {
   type EditorType,

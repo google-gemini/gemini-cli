@@ -13,9 +13,9 @@ import {
   GoogleGenAI,
 } from '@google/genai';
 import { GeminiClient } from './client.js';
-import { AuthType, ContentGenerator } from './contentGenerator.js';
+import { AuthType, Config } from '../config/config.js';
+import { ContentGenerator } from '../core/contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
-import { Config } from '../config/config.js';
 import { Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';

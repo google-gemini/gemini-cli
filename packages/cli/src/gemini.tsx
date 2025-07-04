@@ -14,29 +14,29 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
-import {
-  LoadedSettings,
-  loadSettings,
-  SettingScope,
-  USER_SETTINGS_PATH,
-} from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
-import {
-  ApprovalMode,
-  Config,
-  EditTool,
-  ShellTool,
-  WriteFileTool,
-  sessionId,
-  logUserPrompt,
-  AuthType,
-} from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import {
+  AuthType,
+  Config,
+  LoadedSettings,
+  SettingScope,
+  loadSettings,
+  logUserPrompt,
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  USER_SETTINGS_PATH,
+  ApprovalMode,
+} from '@google/gemini-cli-core';
+import { v4 as uuidv4 } from 'uuid';
+
+const sessionId = uuidv4();
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -176,12 +176,25 @@ export async function main() {
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
     setWindowTitle(basename(workspaceRoot), settings);
+    const onToolAutoApproved = async (toolName: string) => {
+      const currentAutoApprovedTools =
+        settings.user.settings.autoApprovedTools || [];
+      if (!currentAutoApprovedTools.includes(toolName)) {
+        const newAutoApprovedTools = [...currentAutoApprovedTools, toolName];
+        await settings.setValue(
+          SettingScope.User,
+          'autoApprovedTools',
+          newAutoApprovedTools,
+        );
+      }
+    };
     render(
       <React.StrictMode>
         <AppWrapper
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}
+          onToolAutoApproved={onToolAutoApproved}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },

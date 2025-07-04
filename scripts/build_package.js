@@ -33,5 +33,8 @@ execSync('tsc --build', { stdio: 'inherit' });
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 
 // touch dist/.last_build
-writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
+writeFileSync(
+  join(process.cwd(), 'dist', '.last_build'),
+  new Date().toISOString(),
+);
 process.exit(0);

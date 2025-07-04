@@ -14,8 +14,10 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
+  LoadedSettings,
+  SettingsFile,
+  Settings,
 } from '@google/gemini-cli-core';
-import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { Tips } from './components/Tips.js';
 

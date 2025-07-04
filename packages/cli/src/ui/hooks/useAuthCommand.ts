@@ -5,12 +5,13 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   Config,
   clearCachedCredentialFile,
   getErrorMessage,
+  LoadedSettings,
+  SettingScope,
 } from '@google/gemini-cli-core';
 
 export const useAuthCommand = (
