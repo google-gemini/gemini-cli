@@ -42,25 +42,47 @@ jobs:
           END_DATE=$(date -u +'%Y-%m-%d')
           echo "⏳ Generating report for contributions from $START_DATE to $END_DATE..."
 
-          declare -A author_is_googler
+          declare -A author_is_googler_cache # Renamed for clarity
+          api_errors_googler_check=0
+
           check_googler_status() {
               local author=$1
-              if [[ "$author" == *"[bot]" ]]; then
-                  author_is_googler[$author]=1
-                  return 1
-              fi
-              if [[ -v "author_is_googler[$author]" ]]; then
-                  return ${author_is_googler[$author]}
+              if [[ -z "$author" || "$author" == "null" ]]; then
+                  return 1 # Invalid author, treat as non-Googler
               fi
 
-              if gh api "orgs/googlers/members/$author" --silent 2>/dev/null; then
-                  echo "🧑‍💻 $author is a Googler."
-                  author_is_googler[$author]=0
-              else
-                  echo "🌍 $author is a community contributor."
-                  author_is_googler[$author]=1
+              if [[ "$author" == *"[bot]" ]]; then
+                  # Bots are generally not considered Googlers or community in this context,
+                  # or are counted as community. Current logic counts them as community.
+                  # Let's explicitly state they are treated as community for counting.
+                  echo "🤖 $author is a bot, counted as community."
+                  author_is_googler_cache[$author]=1 # 1 for non-Googler/community
+                  return 1
               fi
-              return ${author_is_googler[$author]}
+
+              # Check cache first
+              if [[ -v "author_is_googler_cache[$author]" ]]; then
+                  return ${author_is_googler_cache[$author]}
+              fi
+
+              # Attempt to check org membership.
+              # Note: This check relies on public membership in 'googlers' org or specific token permissions.
+              # The current job token likely lacks org read permissions, so this may misclassify Googlers.
+              http_status_code=$(gh api "orgs/googlers/members/$author" --silent -w "%{http_code}" -o /dev/null)
+              api_exit_code=$?
+
+              if [ "$api_exit_code" -eq 0 ] && [ "$http_status_code" -eq 204 ]; then # 204 No Content: membership confirmed and public
+                  echo "🧑‍💻 $author is likely a Googler (public membership)."
+                  author_is_googler_cache[$author]=0 # 0 for Googler
+              elif [ "$http_status_code" -eq 404 ]; then # 404 Not Found: not a member OR private membership
+                  echo "🌍 $author is a community contributor (or Googler with private org membership)."
+                  author_is_googler_cache[$author]=1 # 1 for non-Googler/community
+              else # Other errors (e.g., 403 Forbidden due to token permissions, rate limits, etc.)
+                  echo "⚠️ Could not definitively determine Googler status for $author due to API error (HTTP: $http_status_code, gh exit: $api_exit_code). Assuming community contributor."
+                  ((api_errors_googler_check++))
+                  author_is_googler_cache[$author]=1 # Default to community
+              fi
+              return ${author_is_googler_cache[$author]}
           }
 
           googler_issues=0
@@ -68,27 +90,33 @@ jobs:
           googler_prs=0
           non_googler_prs=0
 
-          echo "🔎 Fetching issues and pull requests..."
-          ITEMS_JSON=$(gh search issues --repo "$REPO" "created:>$START_DATE" --json author,isPullRequest --limit 1000)
+          echo "🔎 Fetching issues and pull requests (limit 1000)..."
+          # Note: gh search issues has an implicit limit (around 1000 items). For more, direct API pagination would be needed.
+          # For a weekly report, 1000 should generally be sufficient.
+          ITEMS_JSON=$(gh search issues --repo "$REPO" "created:>$START_DATE" --json author,isPullRequest,number --limit 1000)
 
-          for row in $(echo "${ITEMS_JSON}" | jq -r '.[] | @base64'); do
+          echo "${ITEMS_JSON}" | jq -r '.[] | @base64' | while IFS= read -r row_base64; do
               _jq() {
-                  echo ${row} | base64 --decode | jq -r ${1}
+                  echo "${row_base64}" | base64 --decode | jq -r "${1}"
               }
-              author=$(_jq '.author.login')
+              author_data=$(_jq '.author') # author can be null for deleted users
+              if [[ "$author_data" == "null" || -z "$author_data" ]]; then
+                login="ghost" # Assign a placeholder for deleted users
+              else
+                login=$(_jq '.author.login')
+              fi
               is_pr=$(_jq '.isPullRequest')
 
-              if [[ -z "$author" || "$author" == "null" ]]; then
-                continue
-              fi
+              check_googler_status "$login"
+              is_googler_result=$?
 
-              if check_googler_status "$author"; then
+              if [[ "$is_googler_result" -eq 0 ]]; then # 0 means is_googler
                   if [[ "$is_pr" == "true" ]]; then
                       ((googler_prs++))
                   else
                       ((googler_issues++))
                   fi
-              else
+              else # 1 means non_googler / community
                   if [[ "$is_pr" == "true" ]]; then
                       ((non_googler_prs++))
                   else
@@ -99,11 +127,12 @@ jobs:
 
           googler_discussions=0
           non_googler_discussions=0
+          all_discussion_nodes_json="[]" # Initialize as empty JSON array
 
-          echo "🗣️ Fetching discussions..."
-          DISCUSSION_QUERY='''
-          query($q: String!) {
-            search(query: $q, type: DISCUSSION, first: 100) {
+          echo "🗣️ Fetching discussions (with pagination)..."
+          discussion_query_template='
+          query($q: String!, $first: Int!, $after: String) {
+            search(query: $q, type: DISCUSSION, first: $first, after: $after) {
               nodes {
                 ... on Discussion {
                   author {
@@ -111,21 +140,67 @@ jobs:
                   }
                 }
               }
-            }
-          }'''
-          DISCUSSIONS_JSON=$(gh api graphql -f q="repo:$REPO created:>$START_DATE" -f query="$DISCUSSION_QUERY")
-
-          for row in $(echo "${DISCUSSIONS_JSON}" | jq -r '.data.search.nodes[] | @base64'); do
-              _jq() {
-                  echo ${row} | base64 --decode | jq -r ${1}
+              pageInfo {
+                hasNextPage
+                endCursor
               }
-              author=$(_jq '.author.login')
+            }
+          }'
 
-              if [[ -z "$author" || "$author" == "null" ]]; then
-                continue
+          cursor=""
+          has_next_page=true
+          page_num=1
+
+          while $has_next_page; do
+            echo "Fetching discussions page $page_num..."
+            query_vars=$(jq -n --arg q "repo:$REPO created:>$START_DATE" --argjson first 100 --argjson after "$cursor" '{q:$q, first:$first, after:$after}')
+
+            API_RESPONSE=$(gh api graphql -f query="$discussion_query_template" -f variables="$query_vars")
+            api_exit_code=$?
+
+            if [ $api_exit_code -ne 0 ]; then
+                echo "Error fetching discussions (page $page_num). GraphQL API call failed. Exit code: $api_exit_code"
+                echo "Response: $API_RESPONSE"
+                # Decide if to break or continue with partial data. For now, break.
+                break
+            fi
+
+            page_nodes=$(echo "$API_RESPONSE" | jq '.data.search.nodes')
+            all_discussion_nodes_json=$(echo "$all_discussion_nodes_json" "$page_nodes" | jq -s 'add') # Merge arrays
+
+            current_page_info=$(echo "$API_RESPONSE" | jq '.data.search.pageInfo')
+            has_next_page=$(echo "$current_page_info" | jq '.hasNextPage')
+            new_cursor=$(echo "$current_page_info" | jq -r '.endCursor')
+
+            if [[ "$new_cursor" == "null" || "$new_cursor" == "$cursor" ]]; then # Safety break for no new cursor
+                has_next_page=false
+            fi
+            cursor=$new_cursor
+            ((page_num++))
+
+            # Safety break for too many pages, adjust as needed
+            if [ "$page_num" -gt 50 ]; then
+                echo "Warning: Exceeded 50 pages of discussions. Stopping."
+                break
+            fi
+          done
+
+          echo "Processing $(echo "$all_discussion_nodes_json" | jq 'length') discussions..."
+          echo "$all_discussion_nodes_json" | jq -r '.[] | @base64' | while IFS= read -r row_base64; do
+              _jq() {
+                  echo "${row_base64}" | base64 --decode | jq -r "${1}"
+              }
+              author_data=$(_jq '.author')
+              if [[ "$author_data" == "null" || -z "$author_data" ]]; then
+                login="ghost"
+              else
+                login=$(_jq '.author.login')
               fi
 
-              if check_googler_status "$author"; then
+              check_googler_status "$login"
+              is_googler_result=$?
+
+              if [[ "$is_googler_result" -eq 0 ]]; then
                   ((googler_discussions++))
               else
                   ((non_googler_discussions++))
@@ -138,6 +213,13 @@ jobs:
           TOTAL_PRS=$((googler_prs + non_googler_prs))
           TOTAL_DISCUSSIONS=$((googler_discussions + non_googler_discussions))
 
+          googler_classification_note=""
+          if [ "$api_errors_googler_check" -gt 0 ]; then
+              googler_classification_note="_Note: Googler classification encountered $api_errors_googler_check API errors and may be inaccurate. This check relies on public organization membership or specific token permissions not typically available to this workflow._"
+          else
+              googler_classification_note="_Note: Googler classification relies on public organization membership or specific token permissions. It may not capture all internal contributions if membership is private._"
+          fi
+
           REPORT_BODY=$(cat <<EOF
           ### 💖 Community Contribution Report
 
@@ -148,6 +230,8 @@ jobs:
           | **Issues** | $googler_issues | $non_googler_issues | **$TOTAL_ISSUES** |
           | **Pull Requests** | $googler_prs | $non_googler_prs | **$TOTAL_PRS** |
           | **Discussions** | $googler_discussions | $non_googler_discussions | **$TOTAL_DISCUSSIONS** |
+
+          ${googler_classification_note}
 
           _This report was generated automatically by a GitHub Action._
           EOF
@@ -166,7 +250,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
         with:
-          version: 0.1.8-rc.0
+          version: 0.1.9
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
           OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}

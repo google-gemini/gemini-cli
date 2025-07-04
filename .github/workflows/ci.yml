@@ -97,7 +97,7 @@ jobs:
           name: Test Results (Node ${{ matrix.node-version }})
           path: packages/*/junit.xml
           reporter: java-junit
-          fail-on-error: 'false'
+          fail-on-error: 'true'
 
       - name: Upload Test Results Artifact (for forks)
         if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
