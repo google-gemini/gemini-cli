@@ -43,7 +43,7 @@ export function isWithinRoot(
   // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
     normalizedRootDirectory === path.sep ||
-    normalizedRootDirectory.endsWith(path.sep)
+      normalizedRootDirectory.endsWith(path.sep)
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
@@ -229,6 +229,13 @@ export async function processSingleFileContent(
       .replace(/\\/g, '/');
 
     if (path.extname(filePath).toLowerCase() === '.svg') {
+      const SVG_MAX_SIZE_BYTES = 1 * 1024 * 1024;
+      if (stats.size > SVG_MAX_SIZE_BYTES) {
+        return {
+          llmContent: `Cannot display content of SVG file larger than 1MB: ${relativePathForDisplay}`,
+          returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
+        };
+      }
       const content = await fs.promises.readFile(filePath, 'utf8');
       return {
         llmContent: content,
