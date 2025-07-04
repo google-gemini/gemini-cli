@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { marked } from 'marked';
 
 import * as fsSync from 'fs';
 
@@ -60,32 +61,45 @@ function hasMessage(err: unknown): err is { message: string } {
   );
 }
 
-// Helper to find all code block and inline code regions
+// Helper to find all code block and inline code regions using marked
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
-  // Fenced code blocks (``` or ~~~, any number of backticks/tilde)
-  const codeBlockRegex = /(^|\n)([`~]{3,})([\s\S]*?)(\2)(?=\n|$)/g;
-  let match: RegExpExecArray | null;
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    regions.push([match.index, match.index + match[0].length]);
-  }
-  // Indented code blocks (4 spaces or 1 tab at line start)
-  const indentedBlockRegex = /(^|\n)(( {4})|\t)[^\n]*(\n(( {4})|\t)[^\n]*)+/g;
-  while ((match = indentedBlockRegex.exec(content)) !== null) {
-    regions.push([match.index, match.index + match[0].length]);
-  }
-  // Inline code (any number of backticks, not inside code blocks)
-  const inlineCodeRegex = /(`+)([^`]*?)\1/g;
-  while ((match = inlineCodeRegex.exec(content)) !== null) {
-    // Only add if not inside a code block
-    if (
-      !regions.some(
-        ([start, end]) => match!.index >= start && match!.index < end,
-      )
-    ) {
-      regions.push([match.index, match.index + match[0].length]);
+  const tokens = marked.lexer(content);
+
+  // First, find all code blocks and codespans from marked tokens
+  for (const token of tokens) {
+    if (token.type === 'code' || token.type === 'codespan') {
+      let start = 0;
+      while (start < content.length) {
+        const idx = content.indexOf(token.raw, start);
+        if (idx === -1) break;
+        regions.push([idx, idx + token.raw.length]);
+        start = idx + token.raw.length;
+      }
     }
   }
+
+  // If no codespans were found by marked, use regex as fallback for inline code
+  if (
+    !regions.some(([start, end]) => {
+      const regionContent = content.substring(start, end);
+      return regionContent.includes('`') && !regionContent.includes('```');
+    })
+  ) {
+    // Find inline code spans with regex as fallback
+    const inlineCodeRegex = /`([^`]+)`/g;
+    let match: RegExpExecArray | null;
+    while ((match = inlineCodeRegex.exec(content)) !== null) {
+      // Check if this region is not already covered by a code block
+      const isInsideCodeBlock = regions.some(
+        ([start, end]) => match!.index >= start && match!.index < end,
+      );
+      if (!isInsideCodeBlock) {
+        regions.push([match.index, match.index + match[0].length]);
+      }
+    }
+  }
+
   return regions;
 }
 

@@ -231,9 +231,9 @@ If a referenced file doesn't exist, the import will fail gracefully with an erro
 
 Permission issues or other file system errors are handled gracefully with appropriate error messages.
 
-## Import Regex Robustness
+## Code Region Detection
 
-> **Note:** The import processor uses the regex `/(?<!\S)@([./]?[^\s\n]+)/g` to detect imports. This ensures that only @ imports preceded by whitespace or at the start of a line are matched, preventing accidental matches such as email addresses (e.g., user@example.com).
+> **Note:** The import processor uses the `marked` library to detect code blocks and inline code spans, ensuring that `@` imports inside these regions are properly ignored. This provides robust handling of nested code blocks and complex Markdown structures that would be difficult to parse with regex alone. The system uses `marked.lexer()` as the primary method with regex fallback for edge cases where `codespan` tokens might not be detected.
 
 ---
 
