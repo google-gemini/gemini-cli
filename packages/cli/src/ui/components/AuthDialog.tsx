@@ -24,7 +24,7 @@ export function AuthDialog({
   initialErrorMessage,
 }: AuthDialogProps): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    initialErrorMessage || null,
+    initialErrorMessage ? initialErrorMessage : process.env.GEMINI_API_KEY ? 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.' : null,
   );
   const items = [
     { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
@@ -37,7 +37,7 @@ export function AuthDialog({
   );
 
   if (initialAuthIndex === -1) {
-    initialAuthIndex = 0;
+    initialAuthIndex = process.env.GEMINI_API_KEY ? 1 : 0;
   }
 
   const handleAuthSelect = (authMethod: AuthType) => {
@@ -71,13 +71,18 @@ export function AuthDialog({
       padding={1}
       width="100%"
     >
-      <Text bold>Select Auth Method</Text>
-      <RadioButtonSelect
-        items={items}
-        initialIndex={initialAuthIndex}
-        onSelect={handleAuthSelect}
-        isFocused={true}
-      />
+      <Text bold>Get started</Text>
+      <Box marginTop={1}>
+        <Text>How would you like to authenticate for this project?</Text>
+      </Box>
+      <Box marginTop={1}>
+        <RadioButtonSelect
+          items={items}
+          initialIndex={initialAuthIndex}
+          onSelect={handleAuthSelect}
+          isFocused={true}
+        />
+      </Box>
       {errorMessage && (
         <Box marginTop={1}>
           <Text color={Colors.AccentRed}>{errorMessage}</Text>
