@@ -17,8 +17,8 @@ const monenokeColors: ColorsTheme = {
   AccentGreen: '#d8eb9a',
   AccentYellow: '#ffd580',
   AccentRed: '#ffc44c',
-  Comment: '#a2e2be88',
-  Gray: '#a2e2be88',
+  Comment: '#a2e2be',
+  Gray: '#a2e2be',
   GradientColors: ['#ffd580', '#8ab9ff'],
 };
 
@@ -95,7 +95,7 @@ export const Monenoke: Theme = new Theme(
       color: '#ff6b70',
     },
     'hljs-comment': {
-      color: '#a2e2be88',
+      color: '#a2e2be',
       fontStyle: 'italic',
     },
     'hljs-quote': {
@@ -105,7 +105,7 @@ export const Monenoke: Theme = new Theme(
       color: monenokeColors.AccentRed,
     },
     'hljs-meta': {
-      color: '#a2e2be88',
+      color: '#a2e2be',
     },
     'hljs-doctag': {
       fontWeight: 'bold',
