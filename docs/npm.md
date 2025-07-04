@@ -34,6 +34,33 @@ git tag v0.2.0 <optional sha>
 git push origin v0.2.0
 ```
 
+## Nightly Releases
+
+In addition to manual releases, this project has an automated nightly release process to provide the latest "bleeding edge" version for testing and development.
+
+### Process
+
+Every night at midnight UTC, the [Scheduled Nightly Release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/scheduled-nightly-release.yml) runs automatically. It performs the following steps:
+
+1.  Checks out the latest code from the `main` branch.
+2.  Installs all dependencies.
+3.  Runs the full suite of `preflight` checks (linting, type-checking, etc.).
+4.  Runs the integration tests, both with and without Docker. The tests are automatically retried up to three times to handle any flakiness.
+5.  If all checks and tests succeed, it runs the `npm run tag:release:nightly` script. This script creates and pushes a new annotated Git tag with the format `v<version>+nightly.<ddmmyy>.<sha>`.
+6.  Pushing this tag triggers the main [release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml), which publishes the package to npm with the `nightly` tag.
+
+### Failure Handling
+
+If any step in the nightly workflow fails, it will automatically create a new issue in the repository with the labels `bug` and `nightly-failure`. The issue will contain a link to the failed workflow run for easy debugging.
+
+### How to Use the Nightly Build
+
+To install the latest nightly build, use the `@nightly` tag:
+
+```bash
+npm install -g @google/gemini-cli@nightly
+```
+
 The high-level process is:
 
 1.  Ensure your local branch `main` or `release-xxx` if hotfixing a previous release is up-to-date with the remote repository.
