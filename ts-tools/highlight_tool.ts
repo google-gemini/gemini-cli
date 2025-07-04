@@ -1,25 +1,11 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { highlight } from 'cli-highlight';
-import { checkFilePermission } from './check_file_permission';
+import fs from 'fs';
 
-export function highlightFile(filePath: string, config: any): Promise<string> {
-  return new Promise((resolve, reject) => {
-    checkFilePermission(filePath, 'read', config)
-      .then(() => {
-        const resolvedPath = path.resolve(filePath);
-        fs.readFile(resolvedPath, 'utf-8', (err, data) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(
-              highlight(data, {
-                language: path.extname(resolvedPath).substring(1),
-              }),
-            );
-          }
-        });
-      })
-      .catch(reject);
-  });
-}
+const code = fs.readFileSync(process.argv[2], 'utf-8');
+
+const highlightedCode = highlight(code, {
+  language: process.argv[3],
+  ignoreIllegals: true,
+});
+
+console.log(highlightedCode);
