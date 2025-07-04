@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core';
+import { Logger } from '@google/gemini-cli-core';
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
@@ -60,7 +60,7 @@ function getNodeMemoryArgs(config: Config): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (config.getDebugMode()) {
-    logger.debug(
+    new Logger().debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
@@ -71,7 +71,7 @@ function getNodeMemoryArgs(config: Config): string[] {
 
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (config.getDebugMode()) {
-      logger.debug(
+      new Logger().debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
@@ -105,8 +105,8 @@ export async function main() {
       if (!process.env.NO_COLOR) {
         errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
       }
-      logger.error(errorMessage);
-      logger.error(`Please fix ${error.path} and try again.`);
+      new Logger().error(errorMessage);
+      new Logger().error(`Please fix ${error.path} and try again.`);
     }
     process.exit(1);
   }
@@ -126,7 +126,7 @@ export async function main() {
         });
       },
       (argv) => {
-        generateCode(argv.prompt as string).catch(logger.error);
+        generateCode(argv.prompt as string).catch(new Logger().error);
       },
     )
     .command(
@@ -146,7 +146,7 @@ export async function main() {
       },
       (argv) => {
         debugCode(argv.codeOrPath as string, argv.errorMsg as string).catch(
-          logger.error,
+          new Logger().error,
         );
       },
     )
@@ -160,7 +160,7 @@ export async function main() {
         });
       },
       (argv) => {
-        explainCode(argv.codeOrPath as string).catch(logger.error);
+        explainCode(argv.codeOrPath as string).catch(new Logger().error);
       },
     )
     .command(
@@ -179,7 +179,7 @@ export async function main() {
       },
       (argv) => {
         listFiles(argv.dirPath as string, argv.filter as string).catch(
-          logger.error,
+          new Logger().error,
         );
       },
     )
@@ -199,7 +199,7 @@ export async function main() {
       },
       (argv) => {
         deleteFile(argv.pathToDelete as string, argv.confirm as string).catch(
-          logger.error,
+          new Logger().error,
         );
       },
     )
@@ -228,7 +228,7 @@ export async function main() {
           argv.dirPath as string,
           argv.searchTerm as string,
           argv.searchContent as string,
-        ).catch(logger.error);
+        ).catch(new Logger().error);
       },
     )
     .command(
@@ -241,7 +241,7 @@ export async function main() {
         });
       },
       (argv) => {
-        fileInfo(argv.filePath as string).catch(logger.error);
+        fileInfo(argv.filePath as string).catch(new Logger().error);
       },
     )
     .demandCommand(1, 'You need to specify a command.')
@@ -279,7 +279,7 @@ export async function main() {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in App.tsx will handle opening the dialog.
-      logger.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
+      new Logger().warn(`Warning: Theme "${settings.merged.theme}" not found.`);
     }
   }
 
@@ -300,7 +300,7 @@ export async function main() {
           }
           await config.refreshAuth(settings.merged.selectedAuthType);
         } catch (err) {
-          logger.error('Error authenticating:', err);
+          new Logger().error('Error authenticating:', err);
           process.exit(1);
         }
       }
@@ -339,7 +339,7 @@ export async function main() {
     input += await readStdin();
   }
   if (!input) {
-    logger.error('No input provided via stdin.');
+    new Logger().error('No input provided via stdin.');
     process.exit(1);
   }
 
@@ -374,13 +374,13 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
 // --- Global Unhandled Rejection Handler ---
 process.on('unhandledRejection', (reason, _promise) => {
   // Log other unexpected unhandled rejections as critical errors
-  logger.error('=========================================');
-  logger.error('CRITICAL: Unhandled Promise Rejection!');
-  logger.error('=========================================');
-  logger.error('Reason:', reason);
-  logger.error('Stack trace may follow:');
+  new Logger().error('=========================================');
+  new Logger().error('CRITICAL: Unhandled Promise Rejection!');
+  new Logger().error('=========================================');
+  new Logger().error('Reason:', reason);
+  new Logger().error('Stack trace may follow:');
   if (!(reason instanceof Error)) {
-    logger.error(reason);
+    new Logger().error(reason);
   }
   // Exit for genuinely unhandled errors
   process.exit(1);
@@ -430,7 +430,7 @@ async function validateNonInterActiveAuth(
   // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
   // still expect that exists
   if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    logger.error(
+    new Logger().error(
       `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
     );
     process.exit(1);
@@ -439,7 +439,7 @@ async function validateNonInterActiveAuth(
   selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
   const err = validateAuthMethod(selectedAuthType);
   if (err != null) {
-    logger.error(err);
+    new Logger().error(err);
     process.exit(1);
   }
 

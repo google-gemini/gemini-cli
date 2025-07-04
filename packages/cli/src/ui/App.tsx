@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core';
+import { Logger } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Box,
@@ -206,7 +206,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         Date.now(),
       );
       if (config.getDebugMode()) {
-        logger.debug(
+        new Logger().debug(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,
         );
       }
@@ -219,7 +219,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         },
         Date.now(),
       );
-      logger.error('Error refreshing memory:', error);
+      new Logger().error('Error refreshing memory:', error);
     }
   }, [config, addItem]);
 
@@ -480,7 +480,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleClearScreen = useCallback(() => {
     clearItems();
     clearConsoleMessagesState();
-    logger.clear();
+    new Logger().clear();
     refreshStatic();
   }, [clearItems, clearConsoleMessagesState, refreshStatic]);
 

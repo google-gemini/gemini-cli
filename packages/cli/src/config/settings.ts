@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core';
+import { Logger } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
@@ -274,6 +274,6 @@ export function saveSettings(settingsFile: SettingsFile): void {
       'utf-8',
     );
   } catch (error) {
-    logger.error('Error saving user settings file:', error);
+    new Logger().error('Error saving user settings file:', error);
   }
 }

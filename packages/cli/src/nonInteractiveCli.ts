@@ -5,7 +5,7 @@
  */
 
 import {
-  logger,
+  Logger,
   Config,
   ToolCallRequestInfo,
   executeToolCall,

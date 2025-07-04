@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core';
+import { Logger } from '@google/gemini-cli-core';
 import { useEffect } from 'react';
 import util from 'util';
 import { ConsoleMessageItem } from '../types.js';
@@ -19,10 +19,10 @@ export const useConsolePatcher = ({
   debugMode,
 }: UseConsolePatcherParams): void => {
   useEffect(() => {
-    const originalConsoleLog = logger.info;
-    const originalConsoleWarn = logger.warn;
-    const originalConsoleError = logger.error;
-    const originalConsoleDebug = logger.debug;
+    const originalConsoleLog = new Logger().info;
+    const originalConsoleWarn = new Logger().warn;
+    const originalConsoleError = new Logger().error;
+    const originalConsoleDebug = new Logger().debug;
 
     const formatArgs = (args: unknown[]): string => util.format(...args);
 
@@ -46,16 +46,16 @@ export const useConsolePatcher = ({
         }
       };
 
-    logger.info = patchConsoleMethod('log', originalConsoleLog);
-    logger.warn = patchConsoleMethod('warn', originalConsoleWarn);
-    logger.error = patchConsoleMethod('error', originalConsoleError);
-    logger.debug = patchConsoleMethod('debug', originalConsoleDebug);
+    new Logger().info = patchConsoleMethod('log', originalConsoleLog);
+    new Logger().warn = patchConsoleMethod('warn', originalConsoleWarn);
+    new Logger().error = patchConsoleMethod('error', originalConsoleError);
+    new Logger().debug = patchConsoleMethod('debug', originalConsoleDebug);
 
     return () => {
-      logger.info = originalConsoleLog;
-      logger.warn = originalConsoleWarn;
-      logger.error = originalConsoleError;
-      logger.debug = originalConsoleDebug;
+      new Logger().info = originalConsoleLog;
+      new Logger().warn = originalConsoleWarn;
+      new Logger().error = originalConsoleError;
+      new Logger().debug = originalConsoleDebug;
     };
   }, [onNewMessage, debugMode]);
 };
