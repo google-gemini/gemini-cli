@@ -89,6 +89,15 @@ Process Group PGID: Process group started or \`(none)\``,
     return description;
   }
 
+  /**
+   * Extracts the root command from a given shell command string.
+   * This is used to identify the base command for permission checks.
+   *
+   * @param command The shell command string to parse
+   * @returns The root command name, or undefined if it cannot be determined
+   * @example getCommandRoot("ls -la /tmp") returns "ls"
+   * @example getCommandRoot("git status && npm test") returns "git"
+   */
   getCommandRoot(command: string): string | undefined {
     return command
       .trim() // remove leading and trailing whitespace
@@ -98,6 +107,13 @@ Process Group PGID: Process group started or \`(none)\``,
       .pop(); // take last part and return command root (or undefined if previous line was empty)
   }
 
+  /**
+   * Determines whether a given shell command is allowed to execute based on
+   * the tool's configuration including allowlists and blocklists.
+   *
+   * @param command The shell command string to validate
+   * @returns True if the command is allowed to execute, false otherwise
+   */
   isCommandAllowed(command: string): boolean {
     // 0. Disallow command substitution
     if (command.includes('$(') || command.includes('`')) {
