@@ -398,7 +398,7 @@ export async function openDiff(
       const commandString = `${diffCommand.command} ${diffCommand.args
         .map((arg) =>
           // Quote arguments that contain spaces for shell execution, especially important on Linux/macOS
-          process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '\"')}"`,
+          process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '"')}"`,
         )
         .join(' ')}`;
 

@@ -2,6 +2,17 @@
 
 This guide provides solutions to common issues and debugging tips.
 
+## Troubleshooting Overview
+
+| Issue | Solution |
+| --- | --- |
+| Authentication errors | Check your account type and API key. |
+| `EADDRINUSE` error | Stop the process that is using the port. |
+| Command not found | Check your installation and PATH. |
+| `MODULE_NOT_FOUND` error | Install dependencies and build the project. |
+| Permission errors | Check your sandbox configuration. |
+| CLI not interactive | Unset `CI_` environment variables. |
+
 ## Authentication
 
 - **Error: `Failed to login. Message: Request contains an invalid argument`**
@@ -74,3 +85,17 @@ This guide provides solutions to common issues and debugging tips.
   - Always run `npm run preflight` before committing code. This can catch many common issues related to formatting, linting, and type errors.
 
 If you encounter an issue not covered here, consider searching the project's issue tracker on GitHub or reporting a new issue with detailed information.
+
+## Reporting a Bug
+
+If you have found a bug that is not listed in this guide, please report it by creating an issue in the [GitHub repository](https://github.com/google-gemini/gemini-cli/issues).
+
+When reporting a bug, please include the following information:
+
+- A clear and concise description of the bug.
+- The steps to reproduce the bug.
+- The expected behavior.
+- The actual behavior.
+- The version of Gemini CLI that you are using.
+- Your operating system.
+- Any relevant logs or screenshots.

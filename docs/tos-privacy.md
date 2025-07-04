@@ -4,6 +4,16 @@ Gemini CLI is an open-source tool that lets you interact with Google's powerful 
 
 This article outlines the specific terms and privacy policies applicable for different auth methods.
 
+## Terms of Service and Privacy Notice Overview
+
+| Authentication Method | Terms of Service | Privacy Notice |
+| --- | --- | --- |
+| Log in with Google (Free Tier) | [Google Terms of Service](https://policies.google.com/terms?hl=en-US) | [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals) |
+| Gemini API Key (Unpaid) | [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms) | [Google Privacy Policy](https://policies.google.com/privacy) |
+| Gemini API Key (Paid) | [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms) | [Google Privacy Policy](https://policies.google.com/privacy) |
+| Log in with Google (Workspace/Licensed) | [Google Cloud Platform Terms of Service](https://cloud.google.com/terms) | [Gemini Code Assist Privacy Notices](https://developers.google.com/gemini-code-assist/resources/privacy-notices) |
+| Vertex AI | [Google Cloud Platform Service Terms](https://cloud.google.com/terms/service-terms/) | [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice) |
+
 ## 1. Login with Google (Gemini Code Assist for [individuals](https://developers.google.com/gemini-code-assist/docs/overview#supported-features-gca))
 
 For users who authenticate using their Google account to access Gemini Code Assist for individuals:
@@ -56,3 +66,15 @@ The "Usage Statistics" setting is the single control for all optional data colle
 - **Auth methods 3 & 4:** This setting only controls the collection of anonymous telemetry. Your prompts and answers are never collected, regardless of this setting.
 
 You can disable Usage Statistics for any account type by following the instructions in the [Usage Statistics Configuration](./cli/configuration.md#usage-statistics) documentation.
+
+## Data Collection
+
+The following table summarizes the data that is collected for each authentication method:
+
+| Authentication Method | Prompts and Answers | Telemetry |
+| --- | --- | --- |
+| Log in with Google (Free Tier) | Yes | Yes |
+| Gemini API Key (Unpaid) | Yes | Yes |
+| Gemini API Key (Paid) | No | Yes |
+| Log in with Google (Workspace/Licensed) | No | Yes |
+| Vertex AI | No | Yes |

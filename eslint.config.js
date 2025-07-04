@@ -21,8 +21,26 @@ const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // --- ---
 
+// --- Code Quality ---
+const codeQualityRules = {
+  'no-console': 'warn',
+  'no-alert': 'error',
+  'no-empty': 'warn',
+  'no-extra-semi': 'warn',
+  'no-irregular-whitespace': 'warn',
+  'no-unreachable': 'warn',
+};
+
 // Determine the monorepo root (assuming eslint.config.js is at the root)
 const projectRoot = __dirname;
+
+// --- Security ---
+const securityRules = {
+  'no-eval': 'error',
+  'no-implied-eval': 'error',
+  'no-script-url': 'error',
+  'no-with': 'error',
+};
 
 export default tseslint.config(
   {
@@ -78,6 +96,8 @@ export default tseslint.config(
       },
     },
     rules: {
+      ...codeQualityRules,
+      ...securityRules,
       // General Best Practice Rules (subset adapted for flat config)
       '@typescript-eslint/array-type': ['error', { default: 'array-simple' }],
       'arrow-body-style': ['error', 'as-needed'],

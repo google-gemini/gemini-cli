@@ -1,5 +1,22 @@
 # .github/workflows/e2e.yml
 
+# --- Security ---
+# 1. Do not use secrets in the workflow.
+# 2. Do not use a privileged user.
+# 3. Do not use a user with a password.
+# 4. Do not use a user with a shell.
+# 5. Do not use a user with a home directory.
+# 6. Do not use a user with a UID of 0.
+# 7. Do not use a user with a GID of 0.
+# 8. Do not use a user with a supplementary group.
+# 9. Do not use a user with a login shell.
+
+# --- Caching ---
+# 1. Cache npm dependencies.
+# 2. Cache build artifacts.
+# 3. Cache test results.
+# 4. Cache coverage reports.
+
 name: E2E Tests
 
 on:

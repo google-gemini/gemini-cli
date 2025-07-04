@@ -1,17 +1,21 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import { promises as fs } from 'fs';
 import {
   Tool,
   ToolInvocation,
   ToolOutput,
-  ToolStream,
-} from '../../../../core/src/core/tool.js';
+} from '@google/gemini-cli';
 
 export class CpTool implements Tool {
   name = 'cp';
   description = 'Copies a file.';
 
-  async run(invocation: ToolInvocation, stream: ToolStream): Promise<ToolOutput> {
+  async run(invocation: ToolInvocation): Promise<ToolOutput> {
     if (!invocation.files || invocation.files.length < 2) {
       return {
         type: 'error',

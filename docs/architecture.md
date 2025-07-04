@@ -2,6 +2,20 @@
 
 This document provides a high-level overview of the Gemini CLI's architecture.
 
+## Architecture Diagram
+
+```
++-----------------+      +-----------------+      +-----------------+
+|   packages/cli  |----->|  packages/core  |<---->|   Gemini API    |
++-----------------+      +-----------------+      +-----------------+
+        ^                      |
+        |                      |
+        v                      v
++-----------------+      +-----------------+
+|      User       |      |      Tools      |
++-----------------+      +-----------------+
+```
+
 ## Core components
 
 The Gemini CLI is primarily composed of two main packages, along with a suite of tools that can be used by the system in the course of handling command-line input:
@@ -52,3 +66,21 @@ A typical interaction with the Gemini CLI follows this flow:
 - **Modularity:** Separating the CLI (frontend) from the Core (backend) allows for independent development and potential future extensions (e.g., different frontends for the same backend).
 - **Extensibility:** The tool system is designed to be extensible, allowing new capabilities to be added.
 - **User experience:** The CLI focuses on providing a rich and interactive terminal experience.
+
+## Data Flow
+
+The following diagram illustrates the data flow between the different components of the Gemini CLI:
+
+```
+[User] -> (1) packages/cli -> (2) packages/core -> (3) Gemini API
+  ^                                                        |
+  |                                                        v
+  +--------------------(6)--------------------(5)---- [Tool] <-(4)
+```
+
+1.  The user enters a prompt in the `packages/cli`.
+2.  The `packages/cli` sends the prompt to the `packages/core`.
+3.  The `packages/core` sends the prompt to the Gemini API.
+4.  The Gemini API requests to use a tool.
+5.  The `packages/core` executes the tool and sends the result back to the Gemini API.
+6.  The Gemini API sends the final response to the `packages/cli`, which displays it to the user.

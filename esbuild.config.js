@@ -14,6 +14,16 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
 
+const plugins = [];
+
+const loaders = {
+  '.ts': 'ts',
+  '.tsx': 'tsx',
+  '.js': 'js',
+  '.jsx': 'jsx',
+  '.json': 'json',
+};
+
 esbuild
   .build({
     entryPoints: ['packages/cli/index.ts'],
@@ -21,6 +31,8 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
+    plugins,
+    loader: loaders,
     define: {
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },

@@ -6,6 +6,14 @@ Gemini CLI's telemetry system is built on the **[OpenTelemetry] (OTEL)** standar
 
 [OpenTelemetry]: https://opentelemetry.io/
 
+## Telemetry Overview
+
+| Feature | Description |
+| --- | --- |
+| Traces | Detailed records of the execution path of a request. |
+| Metrics | Numerical measurements of behavior over time. |
+| Logs | Timestamped records of specific events. |
+
 ## Enabling telemetry
 
 You can enable telemetry in multiple ways. Configuration is primarily managed via the [`.gemini/settings.json` file](./cli/configuration.md) and environment variables, but CLI flags can override these settings for a specific session.
@@ -229,3 +237,9 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
+
+## Data Privacy
+
+By default, telemetry does not log the content of user prompts. You can enable prompt logging by setting the `telemetry.logPrompts` option to `true` in your `settings.json` file.
+
+For more information on data privacy, see the [Terms of Service and Privacy Notice](./tos-privacy.md).

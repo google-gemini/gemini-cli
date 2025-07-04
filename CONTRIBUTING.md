@@ -1,5 +1,41 @@
 # How to Contribute
 
+- [How to Contribute](#how-to-contribute)
+  - [Before you begin](#before-you-begin)
+    - [Sign our Contributor License Agreement](#sign-our-contributor-license-agreement)
+    - [Review our Community Guidelines](#review-our-community-guidelines)
+  - [Contribution Process](#contribution-process)
+    - [Code Reviews](#code-reviews)
+    - [Pull Request Guidelines](#pull-request-guidelines)
+      - [1. Link to an Existing Issue](#1-link-to-an-existing-issue)
+      - [2. Keep It Small and Focused](#2-keep-it-small-and-focused)
+      - [3. Use Draft PRs for Work in Progress](#3-use-draft-prs-for-work-in-progress)
+      - [4. Ensure All Checks Pass](#4-ensure-all-checks-pass)
+      - [5. Update Documentation](#5-update-documentation)
+      - [6. Write Clear Commit Messages and a Good PR Description](#6-write-clear-commit-messages-and-a-good-pr-description)
+  - [Forking](#forking)
+  - [Development Setup and Workflow](#development-setup-and-workflow)
+    - [Setting Up the Development Environment](#setting-up-the-development-environment)
+    - [Build Process](#build-process)
+    - [Enabling Sandboxing](#enabling-sandboxing)
+    - [Running](#running)
+    - [Running Tests](#running-tests)
+      - [Unit Tests](#unit-tests)
+      - [Integration Tests](#integration-tests)
+    - [Linting and Preflight Checks](#linting-and-preflight-checks)
+      - [Formatting](#formatting)
+      - [Linting](#linting)
+    - [Coding Conventions](#coding-conventions)
+    - [Project Structure](#project-structure)
+  - [Debugging](#debugging)
+    - [VS Code:](#vs-code)
+    - [React DevTools](#react-devtools)
+  - [Sandboxing](#sandboxing)
+    - [MacOS Seatbelt](#macos-seatbelt)
+    - [Container-based Sandboxing (All Platforms)](#container-based-sandboxing-all-platforms)
+      - [Proxied Networking](#proxied-networking)
+  - [Manual Publish](#manual-publish)
+
 We would love to accept your patches and contributions to this project.
 
 ## Before you begin
@@ -22,6 +58,14 @@ sign a new one.
 
 This project follows [Google's Open Source Community
 Guidelines](https://opensource.google/conduct/).
+
+### Code of Conduct
+
+This project has adopted the [Google Open Source Code of Conduct](https://opensource.google/conduct/).
+All contributors are expected to follow these guidelines when participating in the project community.
+This includes but is not limited to: pull requests, issues, and comments.
+We are committed to providing a welcoming and inclusive environment for everyone.
+Please report any violations of the code of conduct to the project maintainers.
 
 ## Contribution Process
 
@@ -76,9 +120,19 @@ In the PR description, explain the "why" behind your changes and link to the rel
 
 ## Forking
 
-If you are forking the repository you will be able to run the Built, Test and Integration test workflows. However in order to make the integration tests run you'll need to add a [GitHub Repository Secret](<[url](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository)>) with a value of `GEMINI_API_KEY` and set that to a valid API key that you have available. Your key and secret are private to your repo; no one without access can see your key and you cannot see any secrets related to this repo.
+If you are forking the repository, you will be able to run the Build, Test, and Integration Test workflows. However, to run the integration tests, you will need to add a GitHub secret to your forked repository:
 
-Additionally you will need to click on the `Actions` tab and enable workflows for your repository, you'll find it's the large blue button in the center of the screen.
+1.  **Create a Gemini API Key:** If you don't have one, create a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+2.  **Add the Secret to Your Fork:**
+    - In your forked repository on GitHub, go to **Settings > Secrets and variables > Actions**.
+    - Click **New repository secret**.
+    - For the **Name**, enter `GEMINI_API_KEY`.
+    - For the **Value**, paste your Gemini API key.
+    - Click **Add secret**.
+
+Your key and secret are private to your repository; no one without access can see your key, and you cannot see any secrets related to this repository.
+
+Additionally, you will need to click on the **Actions** tab and enable workflows for your repository. You'll find it's the large blue button in the center of the screen.
 
 ## Development Setup and Workflow
 

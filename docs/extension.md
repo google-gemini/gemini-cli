@@ -2,6 +2,15 @@
 
 Gemini CLI supports extensions that can be used to configure and extend its functionality.
 
+## Creating an Extension
+
+To create an extension, you need to create a directory in one of the following locations:
+
+- `<workspace>/.gemini/extensions`
+- `<home>/.gemini/extensions`
+
+The directory must contain a `gemini-extension.json` file.
+
 ## How it works
 
 On startup, Gemini CLI looks for extensions in two locations:
@@ -40,3 +49,54 @@ The `gemini-extension.json` file contains the configuration for the extension. T
 - `excludeTools`: An array of tool names to exclude from the model. You can also specify command-specific restrictions for tools that support it, like the `run_shell_command` tool. For example, `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf` command.
 
 When Gemini CLI starts, it loads all the extensions and merges their configurations. If there are any conflicts, the workspace configuration takes precedence.
+
+## Example Extension
+
+This example shows how to create an extension that adds a custom tool to Gemini CLI.
+
+### 1. Create the extension directory
+
+Create a directory named `my-extension` in `<workspace>/.gemini/extensions`.
+
+### 2. Create the extension configuration file
+
+Create a file named `gemini-extension.json` in the `my-extension` directory with the following content:
+
+```json
+{
+  "name": "my-extension",
+  "version": "1.0.0",
+  "mcpServers": {
+    "my-server": {
+      "command": "node my-server.js"
+    }
+  }
+}
+```
+
+### 3. Create the MCP server
+
+Create a file named `my-server.js` in the `my-extension` directory with the following content:
+
+```javascript
+const { McpServer } = require('@google/gemini-cli-core');
+
+const server = new McpServer();
+
+server.addTool({
+  name: 'my-tool',
+  description: 'A custom tool that returns "Hello, World!"',
+  run: () => {
+    return {
+      type: 'text',
+      content: 'Hello, World!',
+    };
+  },
+});
+
+server.start();
+```
+
+### 4. Run Gemini CLI
+
+Start Gemini CLI in your workspace. The `my-tool` tool will be available in the list of tools.

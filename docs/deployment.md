@@ -2,6 +2,15 @@
 
 This document describes how to run Gemini CLI and explains the deployment architecture that Gemini CLI uses.
 
+## Deployment Overview
+
+| Method | Description | Use Case |
+| --- | --- | --- |
+| Standard installation | Install Gemini CLI globally using `npm`. | Recommended for most users. |
+| Sandbox | Run Gemini CLI in a Docker container. | For security and isolation. |
+| From source | Run Gemini CLI directly from the source code. | Recommended for contributors. |
+| From GitHub | Run the latest commit of Gemini CLI from GitHub. | For testing new features. |
+
 ## Running Gemini CLI
 
 There are several ways to run Gemini CLI. The option you choose depends on how you intend to use Gemini CLI.
@@ -114,3 +123,14 @@ A unified script, `npm run publish:release`, orchestrates the release process. T
 3.  Build and tag the `gemini-cli-sandbox` Docker image.
 4.  Push the Docker image to the container registry.
 5.  Publish the NPM packages to the artifact registry.
+
+## Deployment Details
+
+For more detailed information on the deployment process, see the following files:
+
+- `scripts/build.js`: The build script for the NPM packages.
+- `scripts/build_sandbox.js`: The build script for the Docker sandbox image.
+- `scripts/publish-sandbox.js`: The script for publishing the Docker sandbox image.
+- `scripts/prepublish.js`: The script that is run before publishing the NPM packages.
+- `esbuild.config.js`: The configuration file for `esbuild`.
+- `Dockerfile`: The Dockerfile for the sandbox image.

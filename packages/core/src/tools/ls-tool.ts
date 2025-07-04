@@ -1,19 +1,21 @@
-
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import { promises as fs } from 'fs';
 import {
   Tool,
   ToolInvocation,
   ToolOutput,
-  ToolStream,
-} from '../../../../core/src/core/tool.js';
-import * as path from 'path';
+} from '@google/gemini-cli';
 
 export class LsTool implements Tool {
   name = 'ls';
   description = 'Lists the contents of a directory.';
 
-  async run(invocation: ToolInvocation, stream: ToolStream): Promise<ToolOutput> {
+  async run(invocation: ToolInvocation): Promise<ToolOutput> {
     if (!invocation.files || invocation.files.length === 0) {
       return {
         type: 'error',

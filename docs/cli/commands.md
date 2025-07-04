@@ -2,6 +2,29 @@
 
 Gemini CLI supports several built-in commands to help you manage your session, customize the interface, and control its behavior. These commands are prefixed with a forward slash (`/`), an at symbol (`@`), or an exclamation mark (`!`).
 
+## Command Overview
+
+| Command | Description |
+| --- | --- |
+| `/bug` | File an issue about Gemini CLI. |
+| `/chat` | Save and resume conversation history. |
+| `/clear` | Clear the terminal screen. |
+| `/compress` | Replace the entire chat context with a summary. |
+| `/editor` | Open a dialog for selecting supported editors. |
+| `/help` | Display help information. |
+| `/mcp` | List configured Model Context Protocol (MCP) servers. |
+| `/memory` | Manage the AI's instructional context. |
+| `/restore` | Restore the project files to a previous state. |
+| `/stats` | Display detailed session statistics. |
+| `/theme` | Open a dialog that lets you change the visual theme. |
+| `/auth` | Open a dialog that lets you change the authentication method. |
+| `/about` | Show version info. |
+| `/tools` | Display a list of available tools. |
+| `/quit` | Exit Gemini CLI. |
+| `@<path>` | Inject the content of a file or directory into your prompt. |
+| `!<command>` | Execute a shell command. |
+| `!` | Toggle shell mode. |
+
 ## Slash commands (`/`)
 
 Slash commands provide meta-level control over the CLI itself.
@@ -130,3 +153,8 @@ The `!` prefix lets you interact with your system's shell directly from within G
       - When exited, the UI reverts to its standard appearance and normal Gemini CLI behavior resumes.
 
 - **Caution for all `!` usage:** Commands you execute in shell mode have the same permissions and impact as if you ran them directly in your terminal.
+
+## Command Reference
+
+For a complete list of all available commands and their options, you can use the `/help` command in the Gemini CLI.
+

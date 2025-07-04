@@ -2,6 +2,16 @@
 
 This document provides information about the integration testing framework used in this project.
 
+## Test Scenarios
+
+The integration tests cover the following scenarios:
+
+- **File system operations:** Creating, reading, updating, and deleting files and directories.
+- **Tool execution:** Running tools and verifying their output.
+- **User input:** Handling user input and verifying the CLI's response.
+- **Error handling:** Verifying that the CLI handles errors gracefully.
+- **Sandboxing:** Verifying that the CLI works correctly in different sandboxing environments.
+
 ## Overview
 
 The integration tests are designed to validate the end-to-end functionality of the Gemini CLI. They execute the built binary in a controlled environment and verify that it behaves as expected when interacting with the file system.
@@ -139,3 +149,13 @@ The workflow runs the tests in different sandboxing environments to ensure Gemin
 - `sandbox:none`: Runs the tests without any sandboxing.
 - `sandbox:docker`: Runs the tests in a Docker container.
 - `sandbox:podman`: Runs the tests in a Podman container.
+
+## Best Practices
+
+When writing integration tests, please follow these best practices:
+
+- **Keep tests small and focused:** Each test should focus on a single scenario.
+- **Use descriptive test names:** The test name should clearly describe the scenario being tested.
+- **Clean up after each test:** Each test should clean up any files or directories that it creates.
+- **Use the `--keep-output` flag for debugging:** This will preserve the temporary files created during a test run, which can be useful for debugging.
+- **Use the `--verbose` flag for more detailed output:** This will stream the real-time output from the `gemini` command to the console.

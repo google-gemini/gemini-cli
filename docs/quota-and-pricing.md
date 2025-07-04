@@ -4,6 +4,17 @@ Your Gemini CLI quotas and pricing depends on the type of account you use to aut
 
 This article outlines the specific quotas and pricing applicable to the Gemini CLI when using different authentication methods.
 
+## Quota and Pricing Overview
+
+| Authentication Method | Quota | Cost |
+| --- | --- | --- |
+| Log in with Google (Free Tier) | 60 requests/minute, 1000 requests/day | Free |
+| Gemini API Key (Unpaid) | 10 requests/minute, 250 requests/day | Free |
+| Gemini API Key (Paid) | Varies by pricing tier | Varies by pricing tier |
+| Log in with Google (Workspace/Licensed) | Varies by tier | Fixed price subscription |
+| Vertex AI (Express Mode) | Variable | Based on usage |
+| Vertex AI (Regular Mode) | Dynamic shared quota | Based on usage |
+
 ## 1. Log in with Google (Gemini Code Assist Free Tier)
 
 For users who authenticate by using their Google account to access Gemini Code Assist for individuals:
@@ -68,3 +79,17 @@ If you are using the standard Vertex AI service:
 ## 7. Google One and Ultra plans, Gemini for Workspace plans
 
 These plans currently apply only to the use of Gemini web-based products provided by Google-based experiences (for example, the Gemini web app or the Flow video editor). These plans do not apply to the API usage which powers the Gemini CLI. Supporting these plans is under active consideration for future support.
+
+## Frequently Asked Questions
+
+**Q: How can I check my current usage?**
+
+A: You can use the `/stats` command in the Gemini CLI to view your current session's usage statistics.
+
+**Q: What happens if I exceed my quota?**
+
+A: If you exceed your quota, you will receive an error message from the Gemini API. You will need to wait until your quota resets before you can make more requests.
+
+**Q: Can I increase my quota?**
+
+A: Yes, you can increase your quota by upgrading to a paid plan. See the [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits) for more information.

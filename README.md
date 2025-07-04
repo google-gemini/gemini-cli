@@ -20,58 +20,65 @@ With the Gemini CLI you can:
 ## Quickstart
 
 1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+2. **Run the CLI:**
 
+   To run the CLI without installing, use `npx`:
    ```bash
    npx https://github.com/google-gemini/gemini-cli
    ```
 
-   Or install it with:
-
+   Alternatively, you can install it globally:
    ```bash
    npm install -g @google/gemini-cli
    gemini
    ```
-
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
-
-You are now ready to use the Gemini CLI!
-
-### Use a Gemini API key:
-
-The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
-
-1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
-
-   ```bash
-   export GEMINI_API_KEY="YOUR_API_KEY"
-   ```
-
-3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
-
-For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+3. **Authentication:**
+   - The first time you run the CLI, you will be prompted to authenticate with your Google account.
+   - Alternatively, you can create an API key in [Google AI Studio](https://aistudio.google.com/apikey) and set it as an environment variable:
+     ```bash
+     export GEMINI_API_KEY="YOUR_API_KEY"
+     ```
+   - For more authentication options, see the [authentication guide](./docs/cli/authentication.md).
 
 ## Examples
 
-Once the CLI is running, you can start interacting with Gemini from your shell.
-
-You can start a project from a new directory:
-
+### Start a new project
 ```sh
 cd new-project/
 gemini
 > Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
-Or work with an existing project:
-
+### Work with an existing project
 ```sh
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
+```
+
+### Explore a new codebase
+```text
+> Describe the main pieces of this system's architecture.
+> What security mechanisms are in place?
+```
+
+### Work with your existing code
+```text
+> Implement a first draft for GitHub issue #123.
+> Help me migrate this codebase to the latest version of Java. Start with a plan.
+```
+
+### Automate your workflows
+```text
+> Make me a slide deck showing the git history from the last 7 days, grouped by feature and team member.
+> Make a full-screen web app for a wall display to show our most interacted-with GitHub issues.
+```
+
+### Interact with your system
+```text
+> Convert all the images in this directory to png, and rename them to use dates from the exif data.
+> Organise my PDF invoices by month of expenditure.
 ```
 
 ### Next steps
@@ -80,58 +87,7 @@ gemini
 - Explore the available **[CLI Commands](./docs/cli/commands.md)**.
 - If you encounter any issues, review the **[Troubleshooting guide](./docs/troubleshooting.md)**.
 - For more comprehensive documentation, see the [full documentation](./docs/index.md).
-- Take a look at some [popular tasks](#popular-tasks) for more inspiration.
 
-### Troubleshooting
-
-Head over to the [troubleshooting](docs/troubleshooting.md) guide if you're
-having issues.
-
-## Popular tasks
-
-### Explore a new codebase
-
-Start by `cd`ing into an existing or newly-cloned repository and running `gemini`.
-
-```text
-> Describe the main pieces of this system's architecture.
-```
-
-```text
-> What security mechanisms are in place?
-```
-
-### Work with your existing code
-
-```text
-> Implement a first draft for GitHub issue #123.
-```
-
-```text
-> Help me migrate this codebase to the latest version of Java. Start with a plan.
-```
-
-### Automate your workflows
-
-Use MCP servers to integrate your local system tools with your enterprise collaboration suite.
-
-```text
-> Make me a slide deck showing the git history from the last 7 days, grouped by feature and team member.
-```
-
-```text
-> Make a full-screen web app for a wall display to show our most interacted-with GitHub issues.
-```
-
-### Interact with your system
-
-```text
-> Convert all the images in this directory to png, and rename them to use dates from the exif data.
-```
-
-```text
-> Organise my PDF invoices by month of expenditure.
-```
 
 ### Uninstall
 

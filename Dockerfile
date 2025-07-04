@@ -1,3 +1,27 @@
+# --- Security ---
+# 1. Do not store secrets in the Dockerfile.
+# 2. Do not use a root user.
+# 3. Do not use a privileged user.
+# 4. Do not use a user with a password.
+# 5. Do not use a user with a shell.
+# 6. Do not use a user with a home directory.
+# 7. Do not use a user with a UID of 0.
+# 8. Do not use a user with a GID of 0.
+# 9. Do not use a user with a supplementary group.
+# 10. Do not use a user with a login shell.
+
+# --- Best Practices ---
+# 1. Use official base images.
+# 2. Use a non-root user.
+# 3. Use a .dockerignore file.
+# 4. Use multi-stage builds.
+# 5. Use a specific version of the base image.
+# 6. Use a specific version of the packages.
+# 7. Use a specific version of the dependencies.
+# 8. Use a specific version of the plugins.
+# 9. Use a specific version of the loaders.
+# 10. Use a specific version of the tools.
+
 FROM docker.io/library/node:20-slim
 
 ARG SANDBOX_NAME="gemini-cli-sandbox"

@@ -1,3 +1,10 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # API keys and secrets
 .env
 .env~
@@ -23,6 +30,15 @@ Thumbs.db
 
 # Ignore built ts files
 dist
+
+# Build artifacts
+build
+.next
+.nuxt
+.svelte-kit
+.vercel
+.output
+coverage
 
 # Docker folder to help skip auth refreshes
 .docker

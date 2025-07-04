@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    // --- Compiler Options ---
+    "target": "es2022",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2023"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -10,10 +15,18 @@
     "incremental": true,
     "declaration": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["ES2023"],
-    "module": "NodeNext",
-    "moduleResolution": "nodenext",
-    "target": "es2022",
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+
+    // --- Type Checking ---
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   }
 }

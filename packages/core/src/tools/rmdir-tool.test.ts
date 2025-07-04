@@ -1,6 +1,11 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import { RmdirTool } from './rmdir-tool.js';
-import { ToolInvocation } from '../../../../core/src/core/tool.js';
+import { ToolInvocation } from '@google/gemini-cli';
 import { promises as fs } from 'fs';
 import { jest } from '@jest/globals';
 

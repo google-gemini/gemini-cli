@@ -2,6 +2,13 @@
 
 This document provides a guide to sandboxing in the Gemini CLI, including prerequisites, quickstart, and configuration.
 
+## Sandbox Overview
+
+| Method | Platform | Description |
+| --- | --- | --- |
+| macOS Seatbelt | macOS | Lightweight, built-in sandboxing using `sandbox-exec`. |
+| Container-based | All | Cross-platform sandboxing with complete process isolation. |
+
 ## Prerequisites
 
 Before using sandboxing, you need to install and set up the Gemini CLI:
@@ -131,3 +138,29 @@ gemini -s -p "run shell command: mount | grep workspace"
 - [Configuration](./cli/configuration.md): Full configuration options.
 - [Commands](./cli/commands.md): Available commands.
 - [Troubleshooting](./troubleshooting.md): General troubleshooting.
+
+## Use Cases
+
+### Safely executing untrusted code
+
+When you need to execute code from an untrusted source, you can use the sandbox to prevent it from accessing your file system or making network requests.
+
+```bash
+gemini -s -p "run this Python script: @untrusted.py"
+```
+
+### Testing code in a clean environment
+
+When you need to test code in a clean environment, you can use the sandbox to create a temporary container with only the necessary dependencies installed.
+
+```bash
+gemini -s -p "run the tests for this project"
+```
+
+### Reproducing bugs
+
+When you need to reproduce a bug, you can use the sandbox to create a consistent environment that matches the one where the bug was reported.
+
+```bash
+gemini -s -p "run the steps to reproduce bug #123"
+```
