@@ -78,7 +78,7 @@ Pushing a new tag will trigger the [release workflow](https://github.com/google-
 - Create a new GitHub release with generated release notes.
 - Create a new branch `release/vX.Y.Z` containing the version bump in the `package.json` files.
 
-We also run a Gooogle cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main relase file once service account permissions are sorted out.
+We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
 
 ### 2. Monitor the Release Workflow
 
