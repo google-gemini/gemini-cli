@@ -756,7 +756,7 @@ describe('Gemini Client (client.ts)', () => {
       client['contentGenerator'] = mockGenerator as ContentGenerator;
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);
 
-      const result = await client.tryCompressChat(true);
+      const result = await client.tryCompressChat('prompt-id-4', true);
 
       expect(mockCountTokens).toHaveBeenCalledTimes(2);
       expect(mockCountTokens).toHaveBeenNthCalledWith(1, {

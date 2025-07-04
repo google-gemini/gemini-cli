@@ -137,12 +137,14 @@ export class ApiRequestEvent {
   'event.name': 'api_request';
   'event.timestamp': string; // ISO 8601
   model: string;
+  prompt_id: string;
   request_text?: string;
 
-  constructor(model: string, request_text?: string) {
+  constructor(model: string, prompt_id: string, request_text?: string) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
+    this.prompt_id = prompt_id;
     this.request_text = request_text;
   }
 }
