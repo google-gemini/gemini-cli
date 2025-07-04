@@ -166,7 +166,8 @@ export const Monenoke: Theme = new Theme(
     },
     'hljs-strong.hljs-emphasis': {
       color: '#feffde',
-      fontStyle: 'italic bold',
+      fontStyle: 'italic',
+      fontWeight: 'bold',
     },
     'hljs-namespace': {
       color: '#efefef',
