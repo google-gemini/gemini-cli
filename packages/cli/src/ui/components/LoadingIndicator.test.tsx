@@ -63,7 +63,7 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Loading...');
-    expect(output).toContain('(esc to cancel, 5s)');
+    expect(output).toContain('(esc to cancel, 5.0s)');
   });
 
   it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
@@ -79,7 +79,7 @@ describe('<LoadingIndicator />', () => {
     expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
-    expect(output).not.toContain(', 10s');
+    expect(output).not.toContain(', 10.0s');
   });
 
   it('should display the currentLoadingPhrase correctly', () => {
@@ -103,7 +103,7 @@ describe('<LoadingIndicator />', () => {
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
-    expect(lastFrame()).toContain('(esc to cancel, 8s)');
+    expect(lastFrame()).toContain('(esc to cancel, 8.0s)');
   });
 
   it('should render rightContent when provided', () => {
@@ -134,7 +134,7 @@ describe('<LoadingIndicator />', () => {
     let output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Now Responding');
-    expect(output).toContain('(esc to cancel, 2s)');
+    expect(output).toContain('(esc to cancel, 2.0s)');
 
     // Transition to WaitingForConfirmation
     rerender(
@@ -149,7 +149,7 @@ describe('<LoadingIndicator />', () => {
     expect(output).toContain('⠏');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
-    expect(output).not.toContain(', 15s');
+    expect(output).not.toContain(', 15.0s');
 
     // Transition back to Idle
     rerender(
