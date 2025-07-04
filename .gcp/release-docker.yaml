@@ -24,18 +24,18 @@ steps:
     args:
       - -c
       - |
-        IMAGE_TAG="$SHORT_SHA" # Default to SHA
+        FINAL_TAG="$SHORT_SHA" # Default to SHA
         if [[ "$TAG_NAME" == *"-nightly"* ]]; then
           echo "Nightly release detected."
-          IMAGE_TAG="${TAG_NAME#v}"
+          FINAL_TAG="${TAG_NAME#v}"
         elif [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           echo "Official release detected."
-          IMAGE_TAG="${TAG_NAME#v}"
+          FINAL_TAG="${TAG_NAME#v}"
         else
           echo "Development/RC release detected. Using commit SHA as tag."
         fi
-        echo "Determined image tag: $IMAGE_TAG"
-        echo "$IMAGE_TAG" > /workspace/image_tag.txt
+        echo "Determined image tag: $FINAL_TAG"
+        echo "$FINAL_TAG" > /workspace/image_tag.txt
 
   # Step 7: Build sandbox container image
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
