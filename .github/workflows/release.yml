@@ -72,8 +72,6 @@ jobs:
           RELEASE_VERSION="${RELEASE_TAG#v}"
           if [[ $RELEASE_VERSION == *-* ]]; then
             NPM_TAG=$(echo $RELEASE_VERSION | cut -d'-' -f2 | cut -d'.' -f1)
-          elif [[ $RELEASE_VERSION == *+* ]]; then
-            NPM_TAG=$(echo $RELEASE_VERSION | cut -d'+' -f2 | cut -d'.' -f1)
           else
             NPM_TAG="latest"
           fi
@@ -102,25 +100,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json packages/*/package.json
-          if ! git diff-index --quiet HEAD --; then
-            echo "Changes detected, creating commit."
-            git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
-            git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
-          else
-            echo "No version changes to commit."
-          fi
-
-      - name: Create GitHub Release and Tag
-        if: '!inputs.dry_run'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_BRANCH: ${{ steps.release_branch.outputs.BRANCH_NAME }}
-        run: |
-          gh release create ${{ steps.version.outputs.RELEASE_TAG }} \
-            bundle/gemini.js \
-            --target "$RELEASE_BRANCH" \
-            --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
-            --generate-notes
+          git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
+          git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
 
       - name: Build and Prepare Packages
         run: |
@@ -140,9 +121,21 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
 
       - name: Install latest core package
-        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.RELEASE_VERSION }} --workspace=@google/gemini-cli --save-exact
+        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.NPM_TAG }} --workspace=@google/gemini-cli --save-exact
 
       - name: Publish @google/gemini-cli
         run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
+
+      - name: Create GitHub Release and Tag
+        if: '!inputs.dry_run'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCH: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        run: |
+          gh release create ${{ steps.version.outputs.RELEASE_TAG }} \
+            bundle/gemini.js \
+            --target "$RELEASE_BRANCH" \
+            --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
+            --generate-notes
