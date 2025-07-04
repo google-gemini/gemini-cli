@@ -72,6 +72,8 @@ jobs:
           RELEASE_VERSION="${RELEASE_TAG#v}"
           if [[ $RELEASE_VERSION == *-* ]]; then
             NPM_TAG=$(echo $RELEASE_VERSION | cut -d'-' -f2 | cut -d'.' -f1)
+          elif [[ $RELEASE_VERSION == *+* ]]; then
+            NPM_TAG=$(echo $RELEASE_VERSION | cut -d'+' -f2 | cut -d'.' -f1)
           else
             NPM_TAG="latest"
           fi
