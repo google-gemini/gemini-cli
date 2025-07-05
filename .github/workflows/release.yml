@@ -25,6 +25,11 @@ on:
         required: false
         type: boolean
         default: false
+      force_skip_tests:
+        description: 'If true, skip the "Run Tests" step. This is only applicable for nightly releases.'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -84,6 +89,7 @@ jobs:
           MANUAL_VERSION: ${{ inputs.version }}
 
       - name: Run Tests
+        if: github.event.inputs.force_skip_tests != 'true'
         run: |
           npm run preflight
           npm run test:integration:sandbox:none
