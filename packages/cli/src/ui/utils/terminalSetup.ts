@@ -12,7 +12,6 @@
  *
  * Supported terminals:
  * - Kitty: Configures ~/.config/kitty/kitty.conf
- * - Alacritty: Configures ~/.config/alacritty/alacritty.toml (or .yml)
  * - Ghostty: Configures ~/.config/ghostty/config
  * - URxvt: Configures ~/.Xresources
  * - VS Code: Configures keybindings.json
@@ -39,7 +38,6 @@ export interface TerminalSetupResult {
 
 type SupportedTerminal =
   | 'kitty'
-  | 'alacritty'
   | 'ghostty'
   | 'urxvt'
   | 'vscode'
@@ -57,13 +55,12 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   // Check TERM_PROGRAM
   if (termProgram) {
     const termLower = termProgram.toLowerCase().replace(/\.app$/, '');
-    if (['kitty', 'alacritty', 'ghostty'].includes(termLower)) {
+    if (['kitty', 'ghostty'].includes(termLower)) {
       return termLower as SupportedTerminal;
     }
   }
 
   // Check specific env vars
-  if (process.env.ALACRITTY_WINDOW_ID) return 'alacritty';
   if (process.env.TERM === 'xterm-kitty') return 'kitty';
   if (
     process.env.TERM?.startsWith('rxvt-unicode') ||
@@ -74,19 +71,20 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
     return 'foot';
 
   // Check parent process name
-  try {
-    const { stdout } = await execAsync('ps -o comm= -p $PPID');
-    const parentName = stdout.trim();
+  if (os.platform() !== 'win32') {
+    try {
+      const { stdout } = await execAsync('ps -o comm= -p $PPID');
+      const parentName = stdout.trim();
 
-    if (parentName.includes('kitty')) return 'kitty';
-    if (parentName.includes('alacritty')) return 'alacritty';
-    if (parentName.includes('ghostty')) return 'ghostty';
-    if (parentName.includes('urxvt') || parentName.includes('rxvt-unicode'))
-      return 'urxvt';
-    if (parentName.includes('foot')) return 'foot';
-  } catch (error) {
-    // Continue detection even if process check fails
-    console.debug('Parent process detection failed:', error);
+      if (parentName.includes('kitty')) return 'kitty';
+      if (parentName.includes('ghostty')) return 'ghostty';
+      if (parentName.includes('urxvt') || parentName.includes('rxvt-unicode'))
+        return 'urxvt';
+      if (parentName.includes('foot')) return 'foot';
+    } catch (error) {
+      // Continue detection even if process check fails
+      console.debug('Parent process detection failed:', error);
+    }
   }
 
   return null;
@@ -154,101 +152,6 @@ async function configureKitty(): Promise<TerminalSetupResult> {
     return {
       success: false,
       message: `Failed to configure Kitty.\nFile: ${configFile}\nError: ${error}`,
-    };
-  }
-}
-
-async function configureAlacritty(): Promise<TerminalSetupResult> {
-  const configDir = path.join(os.homedir(), '.config', 'alacritty');
-  const tomlFile = path.join(configDir, 'alacritty.toml');
-  const ymlFile = path.join(configDir, 'alacritty.yml');
-
-  try {
-    await fs.mkdir(configDir, { recursive: true });
-
-    // Check which config file exists
-    let configFile = tomlFile;
-    let isToml = true;
-
-    try {
-      await fs.access(tomlFile);
-    } catch {
-      try {
-        await fs.access(ymlFile);
-        configFile = ymlFile;
-        isToml = false;
-      } catch {
-        // Neither exists, use TOML
-      }
-    }
-
-    let content = '';
-    try {
-      content = await fs.readFile(configFile, 'utf8');
-      await backupFile(configFile);
-    } catch {
-      // Expected case: File doesn't exist yet (first-time setup)
-      // We intentionally ignore this error and proceed with empty content
-      // The file will be created below with our keybindings
-    }
-
-    if (isToml) {
-      const tomlBindings = `
-# Gemini CLI keybindings
-[[keyboard.bindings]]
-key = "Return"
-mods = "Shift"
-chars = "\\u001b[13;2u"
-
-[[keyboard.bindings]]
-key = "Return"
-mods = "Control"
-chars = "\\u001b[13;5u"
-`;
-
-      if (
-        !content.includes('\\u001b[13;2u') ||
-        !content.includes('\\u001b[13;5u')
-      ) {
-        content += '\n' + tomlBindings;
-        await fs.writeFile(configFile, content);
-        return {
-          success: true,
-          message: `Added Shift+Enter and Ctrl+Enter keybindings to Alacritty.\nModified: ${configFile}`,
-          requiresRestart: true,
-        };
-      }
-    } else {
-      // YAML format
-      const yamlBindings = `
-# Gemini CLI keybindings
-key_bindings:
-  - { key: Return, mods: Shift, chars: "\\x1b[13;2u" }
-  - { key: Return, mods: Control, chars: "\\x1b[13;5u" }
-`;
-
-      if (
-        !content.includes('\\x1b[13;2u') ||
-        !content.includes('\\x1b[13;5u')
-      ) {
-        content += '\n' + yamlBindings;
-        await fs.writeFile(configFile, content);
-        return {
-          success: true,
-          message: `Added Shift+Enter and Ctrl+Enter keybindings to Alacritty.\nModified: ${configFile}`,
-          requiresRestart: true,
-        };
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Alacritty keybindings already configured.',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to configure Alacritty.\nFile: ${tomlFile} or ${ymlFile}\nError: ${error}`,
     };
   }
 }
@@ -498,15 +401,13 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     return {
       success: false,
       message:
-        'Could not detect terminal type. Supported terminals: Kitty, Alacritty, Ghostty, URxvt, VS Code, and Foot.',
+        'Could not detect terminal type. Supported terminals: Kitty, Ghostty, URxvt, VS Code, and Foot.',
     };
   }
 
   switch (terminal) {
     case 'kitty':
       return configureKitty();
-    case 'alacritty':
-      return configureAlacritty();
     case 'ghostty':
       return configureGhostty();
     case 'urxvt':
