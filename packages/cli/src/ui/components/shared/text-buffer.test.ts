@@ -439,6 +439,60 @@ describe('useTextBuffer', () => {
     });
   });
 
+  describe('Shell Mode Behavior', () => {
+    it('should not prepend @ to valid file paths when shellModeActive is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => true,
+          shellModeActive: true,
+        }),
+      );
+      const filePath = '/path/to/a/valid/file.txt';
+      act(() => result.current.insert(filePath));
+      expect(getBufferState(result).text).toBe(filePath); // No @ prefix
+    });
+
+    it('should not prepend @ to quoted paths when shellModeActive is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => true,
+          shellModeActive: true,
+        }),
+      );
+      const quotedFilePath = "'/path/to/a/valid/file.txt'";
+      act(() => result.current.insert(quotedFilePath));
+      expect(getBufferState(result).text).toBe(quotedFilePath); // No @ prefix, keeps quotes
+    });
+
+    it('should behave normally with invalid paths when shellModeActive is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          shellModeActive: true,
+        }),
+      );
+      const notAPath = 'this is just some text';
+      act(() => result.current.insert(notAPath));
+      expect(getBufferState(result).text).toBe(notAPath);
+    });
+
+    it('should behave normally with short text when shellModeActive is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => true,
+          shellModeActive: true,
+        }),
+      );
+      const shortText = 'ls';
+      act(() => result.current.insert(shortText));
+      expect(getBufferState(result).text).toBe(shortText); // No @ prefix for short text
+    });
+  });
+
   describe('Cursor Movement', () => {
     it('move: left/right should work within and across visual lines (due to wrapping)', () => {
       // Text: "long line1next line2" (20 chars)
@@ -722,6 +776,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: 'h',
         }),
       );
@@ -731,6 +786,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: 'i',
         }),
       );
@@ -747,6 +803,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\r',
         }),
       );
@@ -768,6 +825,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x7f',
         }),
       );
@@ -863,6 +921,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x1b[D',
         }),
       ); // cursor [0,1]
@@ -873,6 +932,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x1b[C',
         }),
       ); // cursor [0,2]
@@ -887,10 +947,11 @@ describe('useTextBuffer', () => {
       // Simulate pasting by calling handleInput with a string longer than 1 char
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: textWithAnsi,
         }),
       );
@@ -907,6 +968,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: true,
+          paste: false,
           sequence: '\r',
         }),
       ); // Simulates Shift+Enter in VSCode terminal
@@ -1096,10 +1158,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const textWithAnsi = '\x1B[31mHello\x1B[0m';
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: textWithAnsi,
         }),
       );
@@ -1113,10 +1176,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const textWithControlChars = 'H\x07e\x08l\x0Bl\x0Co'; // BELL, BACKSPACE, VT, FF
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: textWithControlChars,
         }),
       );
@@ -1130,10 +1194,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const textWithMixed = '\u001B[4mH\u001B[0mello';
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: textWithMixed,
         }),
       );
@@ -1147,10 +1212,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const validText = 'Hello World\nThis is a test.';
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: validText,
         }),
       );
@@ -1164,10 +1230,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const pastedText = '\u001B[4mPasted\u001B[4m Text';
       act(() =>
         result.current.handleInput({
-          name: undefined,
+          name: '',
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: pastedText,
         }),
       );
