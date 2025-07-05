@@ -166,7 +166,6 @@ export async function main() {
   }
   let input = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
-
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
     setWindowTitle(basename(workspaceRoot), settings);

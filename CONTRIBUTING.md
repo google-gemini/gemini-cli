@@ -88,7 +88,7 @@ This section guides contributors on how to build, modify, and understand the dev
 
 **Prerequisites:**
 
-1. Install [Node 18+](https://nodejs.org/en/download)
+1. Install [Node 20+](https://nodejs.org/en/download)
 2. Git
 
 ### Build Process
