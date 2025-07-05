@@ -37,6 +37,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -169,6 +170,9 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
+    // Detect and enable Kitty keyboard protocol once at startup
+    await detectAndEnableKittyProtocol();
+
     setWindowTitle(basename(workspaceRoot), settings);
     render(
       <React.StrictMode>

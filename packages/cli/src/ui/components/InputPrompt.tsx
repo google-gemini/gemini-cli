@@ -9,14 +9,16 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
+import { TextBuffer, NEWLINE_INPUT_SEQUENCES } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import process from 'node:process';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import { Key } from '../hooks/useKeypress.js';
+import { useEnhancedKeypress } from '../hooks/useEnhancedKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 import { Config } from '@google/gemini-cli-core';
@@ -51,6 +53,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const completion = useCompletion(
     buffer.text,
@@ -294,21 +297,49 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         console.log('[InputPromptCombined] event', { key });
       }
 
-      // Ctrl+Enter for newline, Enter for submit
+      const { sequence: input } = key;
+      // Handle Enter key variants
       if (key.name === 'return') {
         const [row, col] = buffer.cursor;
         const line = buffer.lines[row];
         const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-        if (key.ctrl || key.meta || charBefore === '\\' || key.paste) {
-          // Ctrl+Enter or escaped newline
-          if (charBefore === '\\') {
-            buffer.backspace();
+
+        // With Kitty protocol, we can detect Shift+Enter and Ctrl+Enter directly
+        if (kittyProtocolStatus.enabled) {
+          if (key.shift || key.ctrl || charBefore === '\\' || key.paste) {
+            // Shift+Enter, Ctrl+Enter, or escaped newline for multiline
+            if (charBefore === '\\') {
+              buffer.backspace();
+            }
+            buffer.newline();
+          } else {
+            // Plain Enter for submit
+            if (query.trim()) {
+              handleSubmitAndClear(query);
+            }
           }
-          buffer.newline();
         } else {
-          // Enter for submit
-          if (query.trim()) {
-            handleSubmitAndClear(query);
+          // Fallback for terminals without Kitty protocol
+          // Check for special sequences that indicate modified Enter
+          if (
+            key.ctrl ||
+            key.meta ||
+            charBefore === '\\' ||
+            key.paste ||
+            NEWLINE_INPUT_SEQUENCES.includes(input || '') ||
+            input === '\x1b[13;2u' || // Shift+Enter from terminal setup
+            input === '\x1b[13;5u' // Ctrl+Enter from terminal setup
+          ) {
+            // Multiline input
+            if (charBefore === '\\') {
+              buffer.backspace();
+            }
+            buffer.newline();
+          } else {
+            // Plain Enter for submit
+            if (query.trim()) {
+              handleSubmitAndClear(query);
+            }
           }
         }
         return;
@@ -368,10 +399,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
+      kittyProtocolStatus.enabled,
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  // Always use enhanced keypress - it will handle both Kitty protocol and standard input
+  useEnhancedKeypress(handleInput, {
+    isActive: focus,
+    kittyProtocolEnabled: kittyProtocolStatus.enabled,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
