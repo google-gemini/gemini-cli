@@ -118,9 +118,17 @@ export class ClearcutLogger {
       };
       const bufs: Buffer[] = [];
       const req = https.request(options, (res) => {
-        res.on('data', (buf) => bufs.push(buf));
+        res.on('data', (buf) => bufs.push(Buffer.from(buf)));
         res.on('end', () => {
           resolve(Buffer.concat(bufs));
+        });
+        res.on('error', (e) => {
+          if (this.config?.getDebugMode()) {
+            console.log('Clearcut response stream error: ', e);
+          }
+          // Add the events back to the front of the queue to be retried.
+          this.events.unshift(...eventsToSend);
+          reject(e);
         });
       });
       req.on('error', (e) => {
