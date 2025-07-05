@@ -67,6 +67,24 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
 
+- **`/terminal-setup`**
+  - **Description:** Automatically detects and configures your terminal emulator to work with gemini-cli.
+  - **Action:**
+    - Detects your current terminal emulator
+    - For supported terminals, automatically adds the necessary keybinding configuration
+    - Creates backups of configuration files before modifying them
+    - Reports success or failure with appropriate instructions
+  - **Supported Terminals:**
+    - **Kitty** - Adds keybindings to `~/.config/kitty/kitty.conf`
+    - **Alacritty** - Adds keybindings to `~/.config/alacritty/alacritty.toml` or `.yml`
+    - **Ghostty** - Adds keybindings to `~/.config/ghostty/config`
+    - **URxvt** - Adds keybindings to `~/.Xresources` (requires `xrdb -merge ~/.Xresources`)
+    - **VS Code** - Adds keybindings to VS Code's `keybindings.json`
+    - **Foot** - Works out of the box, no configuration needed
+  - **Notes:**
+    - Most terminals require a restart after configuration
+    - VS Code requires restarting the entire application, not just the terminal
+
 - [**`/theme`**](./themes.md)
   - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 
