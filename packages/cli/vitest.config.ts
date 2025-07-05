@@ -15,6 +15,9 @@ export default defineConfig({
     globals: true,
     reporters: ['default', 'junit'],
     silent: true,
+    env: {
+      NODE_NO_WARNINGS: '1',
+    },
     outputFile: {
       junit: 'junit.xml',
     },

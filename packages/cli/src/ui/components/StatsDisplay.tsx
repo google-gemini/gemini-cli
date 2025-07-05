@@ -126,7 +126,8 @@ const ModelUsageTable: React.FC<{
         <Box flexDirection="column" marginTop={1}>
           <Text>
             <Text color={Colors.AccentGreen}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString('en-US')} ({cacheEfficiency.toFixed(1)}
+            {totalCachedTokens.toLocaleString('en-US')} (
+            {cacheEfficiency.toFixed(1)}
             %) of input tokens were served from the cache, reducing costs.
           </Text>
           <Box height={1} />

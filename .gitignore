@@ -2,6 +2,8 @@
 .env
 .env~
 
+package-lock.json
+
 # gemini-cli settings
 .gemini/
 !gemini/config.yaml
