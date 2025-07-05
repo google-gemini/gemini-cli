@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isBinary } from './textUtils';
+import { isBinary, toCodePoints } from './textUtils.js';
 
 describe('textUtils', () => {
   describe('isBinary', () => {
@@ -36,6 +36,19 @@ describe('textUtils', () => {
         Buffer.from([0x00]),
       ]);
       expect(isBinary(longBufferWithNullByteAtEnd, 512)).toBe(false);
+    });
+  });
+
+  describe('toCodePoints', () => {
+    it('should correctly split a string into code points', () => {
+      expect(toCodePoints('abc')).toEqual(['a', 'b', 'c']);
+    });
+
+    it('should handle emoji and surrogate pairs correctly', () => {
+      // Emoji with surrogate pairs
+      expect(toCodePoints('😀')).toHaveLength(1);
+      // Family emoji is composed of multiple code points
+      expect(toCodePoints('👨‍👩‍👧‍👦')).toHaveLength(1);
     });
   });
 });
