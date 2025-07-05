@@ -168,14 +168,16 @@ function calculateVisualLayout(
   logicalToVisualMap: Array<Array<[number, number]>>; // For each logical line, an array of [visualLineIndex, startColInLogical]
   visualToLogicalMap: Array<[number, number]>; // For each visual line, its [logicalLineIndex, startColInLogical]
 } {
+  const lines = logicalLines ?? [];
   const visualLines: string[] = [];
   const logicalToVisualMap: Array<Array<[number, number]>> = [];
   const visualToLogicalMap: Array<[number, number]> = [];
   let currentVisualCursor: [number, number] = [0, 0];
 
-  logicalLines.forEach((logLine, logIndex) => {
+  lines.forEach((logLine, logIndex) => {
+    const safeLogLine = typeof logLine === 'string' ? logLine : '';
     logicalToVisualMap[logIndex] = [];
-    if (logLine.length === 0) {
+    if (safeLogLine.length === 0) {
       // Handle empty logical line
       logicalToVisualMap[logIndex].push([visualLines.length, 0]);
       visualToLogicalMap.push([logIndex, 0]);
@@ -186,7 +188,7 @@ function calculateVisualLayout(
     } else {
       // Non-empty logical line
       let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
-      const codePointsInLogLine = toCodePoints(logLine);
+      const codePointsInLogLine = toCodePoints(safeLogLine);
 
       while (currentPosInLogLine < codePointsInLogLine.length) {
         let currentChunk = '';
@@ -343,8 +345,8 @@ function calculateVisualLayout(
 
   // If the entire logical text was empty, ensure there's one empty visual line.
   if (
-    logicalLines.length === 0 ||
-    (logicalLines.length === 1 && logicalLines[0] === '')
+    lines.length === 0 ||
+    (lines.length === 1 && (lines[0] ?? '') === '')
   ) {
     if (visualLines.length === 0) {
       visualLines.push('');
@@ -357,8 +359,8 @@ function calculateVisualLayout(
   // Handle cursor at the very end of the text (after all processing)
   // This case might be covered by the loop end condition now, but kept for safety.
   else if (
-    logicalCursor[0] === logicalLines.length - 1 &&
-    logicalCursor[1] === cpLen(logicalLines[logicalLines.length - 1]) &&
+    logicalCursor[0] === lines.length - 1 &&
+    logicalCursor[1] === cpLen(lines[lines.length - 1] ?? '') &&
     visualLines.length > 0
   ) {
     const lastVisLineIdx = visualLines.length - 1;
