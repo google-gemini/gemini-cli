@@ -31,6 +31,18 @@ function getNightlyTagName() {
 }
 
 function createAndPushTag(tagName, isSigned, isDryRun) {
+  // Check if the tag already exists
+  try {
+    execSync(`git rev-parse ${tagName}`, { stdio: 'pipe' });
+    console.log(`Tag ${tagName} already exists.`);
+    if (isDryRun) {
+      process.stdout.write(tagName);
+    }
+    return;
+  } catch (error) {
+    // An error means the tag doesn't exist, so we can proceed.
+  }
+
   const command = isSigned
     ? `git tag -s -a ${tagName} -m ''`
     : `git tag ${tagName}`;
