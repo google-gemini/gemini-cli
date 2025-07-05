@@ -9,13 +9,13 @@ import * as os from 'os';
 
 type WarningCheck = {
   id: string;
-  check: (workspaceRoot?: string) => Promise<string | null>; // Returns null if no warning
+  check: (workspaceRoot: string) => Promise<string | null>; // Returns null if no warning
 };
 
 // Individual warning checks
 const homeDirectoryCheck: WarningCheck = {
   id: 'home-directory',
-  check: async (workspaceRoot = process.cwd()) => {
+  check: async (workspaceRoot: string) => {
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
@@ -37,10 +37,10 @@ const WARNING_CHECKS: readonly WarningCheck[] = [homeDirectoryCheck];
 
 // Main function
 export async function getUserStartupWarnings(
-  workspaceRoot?: string,
+  workspaceRoot: string,
 ): Promise<string[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map((check) => check.check(workspaceRoot)),
   );
-  return results.filter((msg): msg is string => msg !== null);
+  return results.filter((msg) => msg !== null);
 }

@@ -168,7 +168,7 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings()),
+    ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
