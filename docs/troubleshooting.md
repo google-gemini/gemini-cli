@@ -53,6 +53,13 @@ This guide provides solutions to common issues and debugging tips.
   - **Cause:** The `is-in-ci` package checks for the presence of `CI`, `CONTINUOUS_INTEGRATION`, or any environment variable with a `CI_` prefix. When any of these are found, it signals that the environment is non-interactive, which prevents the CLI from starting in its interactive mode.
   - **Solution:** If the `CI_` prefixed variable is not needed for the CLI to function, you can temporarily unset it for the command. e.g., `env -u CI_TOKEN gemini`
 
+- **Issue: Shift+Enter or Ctrl+Enter not working for multiline input**
+  - **Cause:** Most terminal emulators do not send a unique key event for Shift+Enter or Ctrl+Enter, making it impossible for the CLI to distinguish these from a regular Enter key press.
+  - **Solution:**
+    1. Compose your message in a text editor, copy, and paste it into the CLI. Newlines will be preserved.
+    2. (Advanced) Some terminals allow you to remap Shift+Enter to send a unique escape sequence. If you do this, you can configure Gemini CLI to treat that sequence as a new line. See your terminal's documentation for key remapping instructions.
+    3. There is currently no robust, cross-platform way to support Shift+Enter or Ctrl+Enter for new lines in terminal CLIs.
+
 ## Debugging Tips
 
 - **CLI debugging:**
