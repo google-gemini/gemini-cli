@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      actions: write
 
     steps:
       - name: Checkout main branch
@@ -57,11 +58,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Create and Push Nightly Tag
+      - name: Trigger Release Workflow
         if: success()
-        run: npm run tag:release:nightly
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the next version number without creating the tag
+          NEXT_VERSION=$(npm run tag:release:nightly -- --dry-run)
+
+          # Trigger the release workflow
+          gh workflow run release.yml \
+            -f version="$NEXT_VERSION" \
+            -f ref="${{ github.ref_name }}" \
+            -f dry_run=false
 
       - name: Create Issue on Failure
         if: failure()
@@ -71,4 +80,4 @@ jobs:
             --body "The scheduled nightly release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --label "type: bug,nightly-failure"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_RELEASES }}
