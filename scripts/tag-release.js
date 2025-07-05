@@ -30,29 +30,30 @@ function getNightlyTagName() {
   return `v${version}-nightly.${date}.${sha}`;
 }
 
-function createAndPushTag(tagName, isSigned) {
+function createAndPushTag(tagName, isSigned, isDryRun) {
   const command = isSigned
     ? `git tag -s -a ${tagName} -m ''`
     : `git tag ${tagName}`;
 
-  try {
-    console.log(`Executing: ${command}`);
-    execSync(command, { stdio: 'inherit' });
-    console.log(`Successfully created tag: ${tagName}`);
+  if (isDryRun) {
+    // In a dry run, we just print the tag name and exit.
+    process.stdout.write(tagName);
+    return;
+  }
 
-    console.log(`Pushing tag to origin...`);
-    execSync(`git push origin ${tagName}`, { stdio: 'inherit' });
-    console.log(`Successfully pushed tag: ${tagName}`);
+  try {
+    execSync(command, { stdio: 'pipe' });
+    execSync(`git push origin ${tagName}`, { stdio: 'pipe' });
+    console.log(`Successfully created and pushed tag: ${tagName}`);
   } catch (error) {
     console.error(`Failed to create or push tag: ${tagName}`);
-    console.error(error);
+    console.error(error.stderr.toString());
     process.exit(1);
   }
 }
 
 const tagName = getNightlyTagName();
-// In GitHub Actions, the CI variable is set to true.
-// We will create a signed commit if not in a CI environment.
 const shouldSign = !process.env.CI;
+const isDryRun = process.argv.includes('--dry-run');
 
-createAndPushTag(tagName, shouldSign);
+createAndPushTag(tagName, shouldSign, isDryRun);
