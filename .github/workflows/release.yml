@@ -1,14 +1,14 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  schedule:
+    # Runs every day at midnight UTC for the nightly release.
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       version:
         description: 'The version to release (e.g., v0.1.11). Required for manual patch releases.'
-        required: true
+        required: false # Not required for scheduled runs
         type: string
       ref:
         description: 'The branch or ref to release from.'
@@ -24,18 +24,23 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment:
+      name: production-release
+      url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.RELEASE_TAG }}
     if: github.repository == 'google-gemini/gemini-cli'
     permissions:
       contents: write
       packages: write
       id-token: write
+      issues: write # For creating issues on failure
+    outputs:
+      RELEASE_TAG: ${{ steps.version.outputs.RELEASE_TAG }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # For manual runs, checkout the specified ref (e.g., main). For tag pushes, checkout the tag itself.
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -47,17 +52,30 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Run Tests (Nightly Only)
+        if: github.event_name == 'schedule'
+        run: |
+          npm run preflight
+          npm run test:integration:sandbox:none
+          npm run test:integration:sandbox:docker
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
       - name: Get the version
         id: version
         run: |
           echo "Workflow triggered by: ${{ github.event_name }}"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "Input ref: ${{ inputs.ref }}"
-            echo "Input version: ${{ inputs.version }}"
-            RELEASE_TAG=${{ inputs.version }}
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "Calculating next nightly version..."
+            RELEASE_TAG=$(npm run tag:release:nightly -- --dry-run)
           else
-            echo "Triggering ref: ${{ github.ref }}"
-            RELEASE_TAG=${GITHUB_REF_NAME}
+            echo "Using manual version: ${{ inputs.version }}"
+            RELEASE_TAG=${{ inputs.version }}
+          fi
+
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo "Error: Version could not be determined."
+            exit 1
           fi
 
           echo "---"
@@ -84,6 +102,11 @@ jobs:
           echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
           echo "NPM_TAG=${NPM_TAG}" >> $GITHUB_OUTPUT
 
+      - name: Configure Git User
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Create and switch to a release branch
         id: release_branch
         run: |
@@ -97,8 +120,6 @@ jobs:
 
       - name: Commit package versions
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json packages/*/package.json
           git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
           git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
@@ -139,3 +160,13 @@ jobs:
             --target "$RELEASE_BRANCH" \
             --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
             --generate-notes
+
+      - name: Create Issue on Failure (Nightly Only)
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          gh issue create \
+            --title "Nightly Release Failed on $(date +'%Y-%m-%d')" \
+            --body "The scheduled nightly release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --label "type: bug,nightly-failure"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
