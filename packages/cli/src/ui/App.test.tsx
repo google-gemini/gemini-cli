@@ -17,6 +17,7 @@ import {
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
+import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -172,6 +173,10 @@ vi.mock('../config/config.js', async (importOriginal) => {
       .mockResolvedValue({ memoryContent: '', fileCount: 0 }),
   };
 });
+
+vi.mock('./components/Tips.js', () => ({
+  Tips: vi.fn(() => null),
+}));
 
 describe('App UI', () => {
   let mockConfig: MockServerConfig;
@@ -377,6 +382,34 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain('Using 2 MCP servers');
+  });
+
+  it('should display Tips component by default', async () => {
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).toHaveBeenCalled();
+  });
+
+  it('should not display Tips component when hideTips is true', async () => {
+    mockSettings = createMockSettings({
+      hideTips: true,
+    });
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).not.toHaveBeenCalled();
   });
 
   describe('when no theme is set', () => {

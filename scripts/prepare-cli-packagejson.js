@@ -46,12 +46,6 @@ if (!cliPackageJson.config) {
 }
 cliPackageJson.config.sandboxImageUri = containerImageUri;
 
-// Remove 'prepublishOnly' from scripts if it exists
-if (cliPackageJson.scripts && cliPackageJson.scripts.prepublishOnly) {
-  delete cliPackageJson.scripts.prepublishOnly;
-  console.log('Removed prepublishOnly script from packages/cli/package.json');
-}
-
 fs.writeFileSync(
   cliPackageJsonPath,
   JSON.stringify(cliPackageJson, null, 2) + '\n',
@@ -72,5 +66,17 @@ try {
   console.log('Copied root README.md to packages/cli/');
 } catch (err) {
   console.error('Error copying README.md:', err);
+  process.exit(1);
+}
+
+// Copy README.md to packages/cli
+const rootLicensePath = path.resolve(__dirname, '../LICENSE');
+const cliLicensePath = path.resolve(__dirname, '../packages/cli/LICENSE');
+
+try {
+  fs.copyFileSync(rootLicensePath, cliLicensePath);
+  console.log('Copied root LICENSE to packages/cli/');
+} catch (err) {
+  console.error('Error copying LICENSE:', err);
   process.exit(1);
 }

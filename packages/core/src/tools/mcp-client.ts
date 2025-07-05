@@ -7,7 +7,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -159,6 +162,16 @@ export async function discoverMcpTools(
   }
 }
 
+/**
+ * Connects to an MCP server and discovers available tools, registering them with the tool registry.
+ * This function handles the complete lifecycle of connecting to a server, discovering tools,
+ * and cleaning up resources if no tools are found.
+ *
+ * @param mcpServerName The name identifier for this MCP server
+ * @param mcpServerConfig Configuration object containing connection details
+ * @param toolRegistry The registry to register discovered tools with
+ * @returns Promise that resolves when discovery is complete
+ */
 async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
@@ -169,8 +182,17 @@ async function connectAndDiscover(
 
   let transport;
   if (mcpServerConfig.httpUrl) {
+    const transportOptions: StreamableHTTPClientTransportOptions = {};
+
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+
     transport = new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.httpUrl),
+      transportOptions,
     );
   } else if (mcpServerConfig.url) {
     transport = new SSEClientTransport(new URL(mcpServerConfig.url));
@@ -222,10 +244,11 @@ async function connectAndDiscover(
     const safeConfig = {
       command: mcpServerConfig.command,
       url: mcpServerConfig.url,
+      httpUrl: mcpServerConfig.httpUrl,
       cwd: mcpServerConfig.cwd,
       timeout: mcpServerConfig.timeout,
       trust: mcpServerConfig.trust,
-      // Exclude args and env which may contain sensitive data
+      // Exclude args, env, and headers which may contain sensitive data
     };
 
     let errorString =
@@ -304,7 +327,7 @@ async function connectAndDiscover(
           toolNameForModel.slice(0, 28) + '___' + toolNameForModel.slice(-32);
       }
 
-      sanatizeParameters(funcDecl.parameters);
+      sanitizeParameters(funcDecl.parameters);
 
       // Ensure parameters is a valid JSON schema object, default to empty if not.
       const parameterSchema: Record<string, unknown> =
@@ -362,7 +385,14 @@ async function connectAndDiscover(
   }
 }
 
-export function sanatizeParameters(schema?: Schema) {
+/**
+ * Sanitizes a JSON schema object to ensure compatibility with Vertex AI.
+ * This function recursively processes the schema to remove problematic properties
+ * that can cause issues with the Gemini API.
+ *
+ * @param schema The JSON schema object to sanitize (modified in-place)
+ */
+export function sanitizeParameters(schema?: Schema) {
   if (!schema) {
     return;
   }
@@ -370,15 +400,15 @@ export function sanatizeParameters(schema?: Schema) {
     // Vertex AI gets confused if both anyOf and default are set.
     schema.default = undefined;
     for (const item of schema.anyOf) {
-      sanatizeParameters(item);
+      sanitizeParameters(item);
     }
   }
   if (schema.items) {
-    sanatizeParameters(schema.items);
+    sanitizeParameters(schema.items);
   }
   if (schema.properties) {
     for (const item of Object.values(schema.properties)) {
-      sanatizeParameters(item);
+      sanitizeParameters(item);
     }
   }
 }

@@ -34,10 +34,7 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
 } from '../telemetry/types.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-} from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -75,10 +72,6 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history contains an invalid role.
  */
 function validateHistory(history: Content[]) {
-  // Empty history is valid.
-  if (history.length === 0) {
-    return;
-  }
   for (const content of history) {
     if (content.role !== 'user' && content.role !== 'model') {
       throw new Error(`Role must be user or model, but got ${content.role}.`);
@@ -200,7 +193,7 @@ export class GeminiChat {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
     }
 
@@ -349,20 +342,14 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-
-    const model = await this._selectModel(
-      requestContents,
-      params.config?.abortSignal ?? new AbortController().signal,
-    );
-
-    this._logApiRequest(requestContents, model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
 
     try {
       const apiCall = () =>
         this.contentGenerator.generateContentStream({
-          model,
+          model: this.config.getModel(),
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
@@ -403,82 +390,6 @@ export class GeminiChat {
       this._logApiError(durationMs, error);
       this.sendPromise = Promise.resolve();
       throw error;
-    }
-  }
-
-  /**
-   * Selects the model to use for the request.
-   *
-   * This is a placeholder for now.
-   */
-  private async _selectModel(
-    history: Content[],
-    signal: AbortSignal,
-  ): Promise<string> {
-    const currentModel = this.config.getModel();
-    if (currentModel === DEFAULT_GEMINI_FLASH_MODEL) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    }
-
-    if (
-      history.length < 5 &&
-      this.config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI
-    ) {
-      // There's currently a bug where for Gemini API key usage if we try and use flash as one of the first
-      // requests in our sequence that it will return an empty token.
-      return DEFAULT_GEMINI_MODEL;
-    }
-
-    const flashIndicator = 'flash';
-    const proIndicator = 'pro';
-    const modelChoicePrompt = `You are a super-intelligent router that decides which model to use for a given request. You have two models to choose from: "${flashIndicator}" and "${proIndicator}". "${flashIndicator}" is a smaller and faster model that is good for simple or well defined requests. "${proIndicator}" is a larger and slower model that is good for complex or undefined requests.
-
-Based on the user request, which model should be used? Respond with a JSON object that contains a single field, \`model\`, whose value is the name of the model to be used.
-
-For example, if you think "${flashIndicator}" should be used, respond with: { "model": "${flashIndicator}" }`;
-    const modelChoiceContent: Content[] = [
-      {
-        role: 'user',
-        parts: [{ text: modelChoicePrompt }],
-      },
-    ];
-
-    const client = this.config.getGeminiClient();
-    try {
-      const choice = await client.generateJson(
-        [...history, ...modelChoiceContent],
-        {
-          type: 'object',
-          properties: {
-            model: {
-              type: 'string',
-              enum: [flashIndicator, proIndicator],
-            },
-          },
-          required: ['model'],
-        },
-        signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
-        {
-          temperature: 0,
-          maxOutputTokens: 25,
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-        },
-      );
-
-      switch (choice.model) {
-        case flashIndicator:
-          return DEFAULT_GEMINI_FLASH_MODEL;
-        case proIndicator:
-          return DEFAULT_GEMINI_MODEL;
-        default:
-          return currentModel;
-      }
-    } catch (_e) {
-      // If the model selection fails, just use the default flash model.
-      return DEFAULT_GEMINI_FLASH_MODEL;
     }
   }
 
@@ -627,7 +538,7 @@ For example, if you think "${flashIndicator}" should be used, respond with: { "m
       automaticFunctionCallingHistory.length > 0
     ) {
       this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory!),
+        ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
       this.history.push(userInput);

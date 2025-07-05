@@ -1,21 +1,20 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.5",
-  "description": "Gemini CLI Server",
+  "version": "0.1.9",
+  "description": "Gemini CLI Core",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/src/index.js",
     "build": "node ../../scripts/build_package.js",
-    "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
-    "prerelease:version": "node ../../scripts/bind_package_version.js",
-    "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist"
@@ -32,7 +31,8 @@
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
     "diff": "^7.0.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
+    "gaxios": "^6.1.1",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
