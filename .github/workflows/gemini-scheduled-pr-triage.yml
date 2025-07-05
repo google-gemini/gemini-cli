@@ -7,6 +7,7 @@ on:
 
 jobs:
   audit-prs:
+    if: github.repository == 'google-gemini/gemini-cli'
     timeout-minutes: 15
     permissions:
       contents: read
