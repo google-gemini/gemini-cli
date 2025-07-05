@@ -90,6 +90,10 @@ export class GeminiClient {
     return this.chat;
   }
 
+  getChatSafe(): GeminiChat | undefined {
+    return this.chat;
+  }
+
   async getHistory(): Promise<Content[]> {
     return this.getChat().getHistory();
   }

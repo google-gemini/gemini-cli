@@ -136,6 +136,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+  const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -541,6 +542,31 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     }
     return getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
+
+  useEffect(() => {
+    const prompt = config.getQuestion();
+    if (
+      prompt &&
+      !initialPromptSubmitted.current &&
+      !isAuthenticating &&
+      !isAuthDialogOpen &&
+      !isThemeDialogOpen &&
+      !isEditorDialogOpen &&
+      !showPrivacyNotice &&
+      config.getGeminiClient()?.getChatSafe?.()
+    ) {
+      submitQuery(prompt);
+      initialPromptSubmitted.current = true;
+    }
+  }, [
+    submitQuery,
+    isAuthenticating,
+    isAuthDialogOpen,
+    isThemeDialogOpen,
+    isEditorDialogOpen,
+    showPrivacyNotice,
+    config,
+  ]);
 
   if (quittingMessages) {
     return (

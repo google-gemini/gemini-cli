@@ -53,6 +53,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  interactive: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -126,6 +127,13 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'c',
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
+      default: false,
+    })
+    .option('interactive', {
+      alias: 'i',
+      type: 'boolean',
+      description:
+        'Forces an interactive session. When used with --prompt, executes the prompt before starting the session.',
       default: false,
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -245,6 +253,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
+    interactive: argv.interactive!,
     extensionContextFilePaths,
   });
 }

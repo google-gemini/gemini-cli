@@ -102,6 +102,13 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  if (config.getInteractive() && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --interactive flag is not supported when piping input from stdin.',
+    );
+    process.exit(1);
+  }
+
   // set default fallback to gemini api key
   // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
@@ -167,8 +174,11 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
 
+  const shouldBeInteractive =
+    config.getInteractive() || (process.stdin.isTTY && input?.length === 0);
+
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (process.stdin.isTTY && input?.length === 0) {
+  if (shouldBeInteractive) {
     setWindowTitle(basename(workspaceRoot), settings);
     render(
       <React.StrictMode>

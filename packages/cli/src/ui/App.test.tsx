@@ -14,9 +14,13 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
+  GeminiClient,
+  GeminiChat,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -67,6 +71,7 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getGeminiClient: Mock<() => GeminiClient | undefined>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -123,7 +128,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
-        getProjectRoot: vi.fn(() => opts.projectRoot),
+        getProjectRoot: vi.fn(() => opts.targetDir),
         getGeminiClient: vi.fn(() => ({})),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
@@ -202,6 +207,7 @@ describe('App UI', () => {
   beforeEach(() => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
+      question: 'hello world',
       embeddingModel: 'test-embedding-model',
       sandbox: undefined,
       targetDir: '/test/dir',
@@ -456,6 +462,38 @@ describe('App UI', () => {
         'Theme configuration unavailable due to NO_COLOR env variable.',
       );
       expect(lastFrame()).not.toContain('Select Theme');
+    });
+  });
+
+  describe('with initial input', () => {
+    it('should call submitQuery with the initial input', async () => {
+      const mockSubmitQuery = vi.fn();
+
+      // Mock the useGeminiStream hook to return our mock submitQuery
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: mockSubmitQuery,
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      mockConfig.getGeminiClient.mockReturnValue({
+        getChatSafe: vi.fn(() => ({}) as unknown as GeminiChat),
+      } as unknown as GeminiClient);
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Wait for useEffect to run
+      await Promise.resolve();
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith('hello world');
     });
   });
 });
