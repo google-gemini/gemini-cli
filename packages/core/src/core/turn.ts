@@ -203,6 +203,41 @@ export class Turn {
             yield event;
           }
         }
+
+        if (resp.usageMetadata) {
+          this.lastUsageMetadata =
+            resp.usageMetadata as GenerateContentResponseUsageMetadata;
+        }
+
+        // Check if response was truncated or stopped for various reasons
+        const finishReason = resp.candidates?.[0]?.finishReason;
+        
+        const finishReasonMessages: Record<string, string> = {
+          'MAX_TOKENS': '\n\n⚠️  Response truncated due to token limits.',
+          'SAFETY': '\n\n⚠️  Response stopped due to safety reasons.',
+          'RECITATION': '\n\n⚠️  Response stopped due to recitation policy.',
+          'LANGUAGE': '\n\n⚠️  Response stopped due to unsupported language.',
+          'BLOCKLIST': '\n\n⚠️  Response stopped due to forbidden terms.',
+          'PROHIBITED_CONTENT': '\n\n⚠️  Response stopped due to prohibited content.',
+          'SPII': '\n\n⚠️  Response stopped due to sensitive personally identifiable information.',
+          'OTHER': '\n\n⚠️  Response stopped for other reasons.',
+        };
+        
+        if (finishReason && finishReasonMessages[finishReason]) {
+          yield {
+            type: GeminiEventType.Content,
+            value: finishReasonMessages[finishReason],
+          };
+        }
+      }
+
+      if (this.lastUsageMetadata) {
+        const durationMs = Date.now() - startTime;
+        yield {
+          type: GeminiEventType.UsageMetadata,
+          value: { ...this.lastUsageMetadata, apiTimeMs: durationMs },
+        };
+      }
       }
     } catch (e) {
       const error = toFriendlyError(e);
