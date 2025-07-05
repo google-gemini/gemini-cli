@@ -47,18 +47,13 @@ jobs:
             Steps:
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Review the issue title and body provided in the environment variables.
-            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
-            4. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
-            5. If the issue has a "status/need-triage" label, remove it after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/need-triage"`
+            3. Find similar issues by comparing the title and body, with preference towards exact matches in error messages, and create categories possible duplicate issues. For each group of duplicates, select one superceding issue (with preference for the oldest similar issue, unless a newer one is much better specified).
+            4. For each duplicate issue that is *not* the superceding issue, do two things: 1) Add a label for "status/likely-duplicate" `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "status/likely-duplicate"` 2) Add a comment to the issue explaining that "This issue is likely a duplicate of [superceding issue link], and has been labeled as such. Please explain why this issue is distinct from the superceding issue, and we will manually review.
+            5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
+            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+            7. If the issue has a "status/need-triage" label, remove it after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/need-triage"`
 
             Guidelines:
             - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
             - Triage only the current issue.
-            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
-
-            Guidelines:
-            - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
-            - Triage only the current issue.
-            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
+            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content
