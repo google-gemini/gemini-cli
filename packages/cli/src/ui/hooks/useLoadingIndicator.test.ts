@@ -44,7 +44,7 @@ describe('useLoadingIndicator', () => {
     const initialPhrase = result.current.currentLoadingPhrase;
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 1);
     });
 
     // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
