@@ -72,6 +72,8 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useFallbackDialog } from './hooks/useFallbackDialog.js';
+import { FallbackConfirmationDialog } from './components/FallbackConfirmationDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -132,6 +134,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+
+  const {
+    isFallbackDialogOpen,
+    fallbackModel,
+    requestFallbackConfirmation,
+    handleFallbackSelection,
+  } = useFallbackDialog();
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -240,26 +249,33 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   // Set up Flash fallback handler
   useEffect(() => {
-    const flashFallbackHandler = async (
+    const strategy = config.getModelFallbackStrategy();
+
+    const handler = (
       currentModel: string,
       fallbackModel: string,
     ): Promise<boolean> => {
-      // Add message to UI history
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: `⚡ Slow response times detected. Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
+      if (strategy === 'ask') {
+        return requestFallbackConfirmation(fallbackModel);
+      } else if (strategy === 'auto') {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `⚡ Slow response times detected. Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
 ⚡ To avoid this you can either upgrade to Standard tier. See: https://goo.gle/set-up-gemini-code-assist
 ⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
 ⚡ You can switch authentication methods by typing /auth`,
-        },
-        Date.now(),
-      );
-      return true; // Always accept the fallback
+          },
+          Date.now(),
+        );
+        return Promise.resolve(true);
+      }
+      // For 'never', resolve false.
+      return Promise.resolve(false);
     };
 
-    config.setFlashFallbackHandler(flashFallbackHandler);
-  }, [config, addItem]);
+    config.setFlashFallbackHandler(handler);
+  }, [config, requestFallbackConfirmation, addItem]);
 
   const {
     handleSlashCommand,
@@ -691,6 +707,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 onExit={exitEditorDialog}
               />
             </Box>
+          ) : isFallbackDialogOpen && fallbackModel ? (
+            <FallbackConfirmationDialog
+              currentModel={currentModel}
+              fallbackModel={fallbackModel}
+              onSelect={handleFallbackSelection}
+            />
           ) : showPrivacyNotice ? (
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}

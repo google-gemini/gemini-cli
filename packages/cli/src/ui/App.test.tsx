@@ -67,6 +67,7 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getModelFallbackStrategy: Mock<() => 'auto' | 'ask' | 'never'>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -128,6 +129,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
+        getModelFallbackStrategy: vi.fn(() => 'auto'),
       };
     });
   return {
