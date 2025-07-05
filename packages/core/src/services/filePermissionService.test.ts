@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { minimatch } from 'minimatch';
 import { mock, MockProxy } from 'vitest-mock-extended';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as path from 'node:path';
