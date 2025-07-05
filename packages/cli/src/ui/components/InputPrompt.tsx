@@ -239,6 +239,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
+      // Ctrl+C (Clear input)
+      if (key.ctrl && input === 'c') {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        }
+        return;
+      }
       // Ctrl+L (Clear Screen)
       if (key.ctrl && key.name === 'l') {
         onClearScreen();
