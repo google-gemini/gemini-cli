@@ -177,7 +177,7 @@ export async function ensureCorrectEdit(
         return result;
       }
     } else {
-      // Unescaping old_string resulted in > 1 occurrences
+      // Unescaping old_string resulted in > 1 occurrence
       const result: CorrectedEditResult = {
         params: { ...originalParams },
         occurrences, // This will be > 1
