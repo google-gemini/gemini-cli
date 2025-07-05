@@ -17,6 +17,7 @@ import {
   Part,
   FunctionCall,
   GenerateContentResponse,
+  PartListUnion,
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
@@ -64,12 +65,12 @@ export async function runNonInteractive(
   const abortController = new AbortController();
   
   // Process @file commands if present
-  let processedInput: string | any = input;
+  let processedInput: string | PartListUnion = input;
   if (isAtCommand(input)) {
     const atCommandResult = await handleAtCommand({
       query: input,
       config,
-      addItem: () => Date.now(), // Non-interactive mode doesn't need history, return timestamp as ID
+      addItem: (..._args: any[]) => Date.now(), // Non-interactive mode doesn't need history, return timestamp as ID
       onDebugMessage: () => {}, // Non-interactive mode doesn't need debug messages
       messageId: Date.now(),
       signal: abortController.signal,
@@ -80,7 +81,17 @@ export async function runNonInteractive(
     }
   }
   
-  let currentMessages: Content[] = [{ role: 'user', parts: typeof processedInput === 'string' ? [{ text: processedInput }] : processedInput }];
+  // Convert processedInput to Part[]
+  let parts: Part[];
+  if (typeof processedInput === 'string') {
+    parts = [{ text: processedInput }];
+  } else if (Array.isArray(processedInput)) {
+    parts = processedInput.map(p => typeof p === 'string' ? { text: p } : p);
+  } else {
+    parts = [typeof processedInput === 'string' ? { text: processedInput } : processedInput];
+  }
+  
+  let currentMessages: Content[] = [{ role: 'user', parts }];
 
   try {
     while (true) {
