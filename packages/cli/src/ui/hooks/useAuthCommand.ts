@@ -29,23 +29,24 @@ export const useAuthCommand = (
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   useEffect(() => {
-    const authFlow = async () => {
-      const authType = settings.merged.selectedAuthType;
-      if (isAuthDialogOpen || !authType) {
-        return;
-      }
+  const authFlow = async () => {
+    if (isAuthDialogOpen) {
+      return; // Only check if the auth dialog is open.
+    }
 
-      try {
-        setIsAuthenticating(true);
-        await config.refreshAuth(authType);
-        console.log(`Authenticated via "${authType}".`);
-      } catch (e) {
-        setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
-        openAuthDialog();
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
+    try {
+      setIsAuthenticating(true); // selectedAuthType is not nullable now
+      await performAuthFlow(
+        settings.merged.selectedAuthType,
+        config,
+      );
+    } catch (e) {
+      setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
+      openAuthDialog();
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
     void authFlow();
   }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);

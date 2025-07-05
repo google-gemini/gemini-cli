@@ -18,6 +18,7 @@ import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 
+
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
@@ -37,7 +38,7 @@ export interface AccessibilitySettings {
 
 export interface Settings {
   theme?: string;
-  selectedAuthType?: AuthType;
+  selectedAuthType: AuthType; // Remove the "?" so it's required
   sandbox?: boolean | string;
   coreTools?: string[];
   excludeTools?: string[];
@@ -177,8 +178,8 @@ function resolveEnvVarsInObject<T>(obj: T): T {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
-  let userSettings: Settings = {};
-  let workspaceSettings: Settings = {};
+  let userSettings: Settings = {selectedAuthType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL};
+  let workspaceSettings: Settings = {selectedAuthType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL};
   const settingsErrors: SettingsError[] = [];
 
   // Load user settings
