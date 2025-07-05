@@ -22,10 +22,15 @@ import {
   type EditorType,
 } from './editor.js';
 import { execSync, spawn } from 'child_process';
+import * as fs from 'fs';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
+}));
+
+vi.mock('fs', () => ({
+  existsSync: vi.fn(),
 }));
 
 const originalPlatform = process.platform;
@@ -351,9 +356,11 @@ describe('editor utils', () => {
     });
 
     it('should return false for vscode when not installed and not in sandbox mode', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
       (execSync as Mock).mockImplementation(() => {
         throw new Error();
       });
+      (fs.existsSync as unknown as Mock).mockReturnValue(false);
       expect(isEditorAvailable('vscode')).toBe(false);
     });
 
