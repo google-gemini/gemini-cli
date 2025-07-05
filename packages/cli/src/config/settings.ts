@@ -54,6 +54,7 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  autoApprovedTools?: string[];
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -117,16 +118,16 @@ export class LoadedSettings {
     }
   }
 
-  setValue(
+  async setValue(
     scope: SettingScope,
     key: keyof Settings,
-    value: string | Record<string, MCPServerConfig> | undefined,
-  ): void {
+    value: string | string[] | Record<string, MCPServerConfig> | undefined,
+  ): Promise<void> {
     const settingsFile = this.forScope(scope);
     // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile);
+    await saveSettings(settingsFile);
   }
 }
 
@@ -246,7 +247,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   );
 }
 
-export function saveSettings(settingsFile: SettingsFile): void {
+export async function saveSettings(settingsFile: SettingsFile): Promise<void> {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -254,12 +255,14 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       settingsFile.path,
       JSON.stringify(settingsFile.settings, null, 2),
       'utf-8',
     );
   } catch (error) {
-    console.error('Error saving user settings file:', error);
+    const errorMessage = `Error saving user settings file: ${error instanceof Error ? error.message : String(error)}`;
+    process.stderr.write(errorMessage + '\n');
+    throw new Error(errorMessage);
   }
 }
