@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig } from './config/config.js';
+import { loadCliConfig, getCliArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -199,11 +199,15 @@ export async function main() {
     prompt_length: input.length,
   });
 
+  // Get CLI arguments to check for auth-type
+  const cliArgs = await getCliArguments();
+
   // Non-interactive mode handled by runNonInteractive
   const nonInteractiveConfig = await loadNonInteractiveConfig(
     config,
     extensions,
     settings,
+    cliArgs['auth-type'],
   );
 
   await runNonInteractive(nonInteractiveConfig, input);
@@ -239,6 +243,7 @@ async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
+  cliAuthType?: string,
 ) {
   let finalConfig = config;
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
@@ -268,24 +273,36 @@ async function loadNonInteractiveConfig(
   return await validateNonInterActiveAuth(
     settings.merged.selectedAuthType,
     finalConfig,
+    cliAuthType,
   );
 }
 
 async function validateNonInterActiveAuth(
   selectedAuthType: AuthType | undefined,
   nonInteractiveConfig: Config,
+  cliAuthType?: string,
 ) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
-    process.exit(1);
+  // Use CLI auth-type if provided, otherwise fall back to settings or environment
+  if (cliAuthType) {
+    selectedAuthType = cliAuthType as AuthType;
+  } else if (!selectedAuthType) {
+    // Check for various API keys to auto-detect auth type
+    if (process.env.GEMINI_API_KEY) {
+      selectedAuthType = AuthType.USE_GEMINI;
+    } else if (process.env.OPENAI_API_KEY) {
+      selectedAuthType = AuthType.USE_OPENAI_COMPATIBLE;
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      selectedAuthType = AuthType.USE_ANTHROPIC;
+    } else if (process.env.CUSTOM_BASE_URL) {
+      selectedAuthType = AuthType.USE_LOCAL_LLM;
+    } else {
+        console.error(
+          `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
+        );
+      process.exit(1);
+    }
   }
 
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
   const err = validateAuthMethod(selectedAuthType);
   if (err != null) {
     console.error(err);

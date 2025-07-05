@@ -236,7 +236,12 @@ export class GeminiClient {
     for await (const event of resultStream) {
       yield event;
     }
-    if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+    
+    //TODO: this is temporary solution avoid the JSON formatting error for custom providers
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    const isCustomProvider = authType === 'openai-compatible' || authType === 'anthropic' || authType === 'local-llm';
+
+    if (!turn.pendingToolCalls.length && signal && !signal.aborted && !isCustomProvider) {
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this,

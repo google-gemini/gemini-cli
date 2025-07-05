@@ -260,6 +260,29 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Required for using Vertex AI in non-express mode.
   - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
+
+### Custom Model Provider Environment Variables
+
+- **`OPENAI_API_KEY`**:
+  - Your OpenAI API key for using OpenAI models or OpenAI-compatible APIs.
+  - Required when using `--auth-type openai-compatible`.
+  - Example: `export OPENAI_API_KEY="sk-your-openai-key"`
+- **`ANTHROPIC_API_KEY`**:
+  - Your Anthropic API key for using Claude models.
+  - Required when using `--auth-type anthropic`.
+  - Example: `export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key"`
+- **`LOCAL_LLM_API_KEY`**:
+  - API key for local LLM endpoints (can be dummy value for most local setups).
+  - Used with `--auth-type local-llm`.
+  - Example: `export LOCAL_LLM_API_KEY="dummy-key"`
+- **`CUSTOM_BASE_URL`**:
+  - Custom base URL for API endpoints.
+  - Used to point to local LLM servers or alternative API endpoints.
+  - Example: `export CUSTOM_BASE_URL="http://localhost:11434/v1"`
+- **`CUSTOM_TIMEOUT`**:
+  - Request timeout in milliseconds for API calls.
+  - Useful for local LLMs that may take longer to respond.
+  - Example: `export CUSTOM_TIMEOUT="60000"`
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
