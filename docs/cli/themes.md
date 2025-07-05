@@ -10,12 +10,16 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
   - `ANSI`
   - `Atom One`
   - `Ayu`
+  - `Catppuccin Frappé`
+  - `Catppuccin Macchiato`
+  - `Catppuccin Mocha`
   - `Default`
   - `Dracula`
   - `GitHub`
 - **Light Themes:**
   - `ANSI Light`
   - `Ayu Light`
+  - `Catppuccin Latte`
   - `Default Light`
   - `GitHub Light`
   - `Google Code`
