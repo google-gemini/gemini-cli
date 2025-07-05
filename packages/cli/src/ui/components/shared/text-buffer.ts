@@ -23,8 +23,6 @@ export const NEWLINE_INPUT_SEQUENCES = [
   '[13;5u', // ctrl-enter kitty (needs-setup)
   '[27;2;13~', // shift-enter foot (no-setup)
   '[27;5;13~', // ctrl-enter foot (no-setup)
-  '\x1b[13;2u', // shift-enter alacritty (needs-setup)
-  '\x1b[13;5u', // ctrl-enter alacritty (needs-setup)
 ];
 
 export type Direction =
