@@ -138,7 +138,7 @@ export function getDiffCommand(
 /**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.
- * GUI-based editors requires args such as "--wait" to block parent process.
+ * GUI-based editors require args such as "--wait" to block parent process.
  */
 export async function openDiff(
   oldPath: string,
