@@ -56,7 +56,10 @@ export class TestRig {
 
     if (typeof promptOrOptions === 'string') {
       command += ` --prompt "${promptOrOptions}"`;
-    } else if (typeof promptOrOptions === 'object' && promptOrOptions !== null) {
+    } else if (
+      typeof promptOrOptions === 'object' &&
+      promptOrOptions !== null
+    ) {
       if (promptOrOptions.prompt) {
         command += ` --prompt "${promptOrOptions.prompt}"`;
       }
