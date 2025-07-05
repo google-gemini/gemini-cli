@@ -285,7 +285,7 @@ export const useShellCommandProcessor = (
               historyItemType = 'error';
               finalOutput = `${result.error.message}\n${finalOutput}`;
             } else if (result.aborted) {
-              finalOutput = `Command was cancelled.\n${finalOutput}`;
+              finalOutput = `Command was canceled.\n${finalOutput}`;
             } else if (result.signal) {
               historyItemType = 'error';
               finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
