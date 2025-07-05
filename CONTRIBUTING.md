@@ -1,240 +1,232 @@
-# How to Contribute
+# 如何贡献
 
-We would love to accept your patches and contributions to this project.
+我们非常欢迎您为这个项目提供补丁和贡献。
 
-## Before you begin
+## 开始之前
 
-### Sign our Contributor License Agreement
+### 签署贡献者许可协议
 
-Contributions to this project must be accompanied by a
-[Contributor License Agreement](https://cla.developers.google.com/about) (CLA).
-You (or your employer) retain the copyright to your contribution; this simply
-gives us permission to use and redistribute your contributions as part of the
-project.
+对本项目的贡献必须附有[贡献者许可协议](https://cla.developers.google.com/about) (CLA)。
+您（或您的雇主）保留对您贡献的版权；这只是给予我们使用和重新分发您贡献的权限，作为项目的一部分。
 
-If you or your current employer have already signed the Google CLA (even if it
-was for a different project), you probably don't need to do it again.
+如果您或您当前的雇主已经签署了Google CLA（即使是为不同的项目），您可能不需要再次签署。
 
-Visit <https://cla.developers.google.com/> to see your current agreements or to
-sign a new one.
+访问 <https://cla.developers.google.com/> 查看您当前的协议或签署新协议。
 
-### Review our Community Guidelines
+### 审查我们的社区准则
 
-This project follows [Google's Open Source Community
-Guidelines](https://opensource.google/conduct/).
+本项目遵循[Google开源社区准则](https://opensource.google/conduct/)。
 
-## Contribution Process
+## 贡献流程
 
-### Code Reviews
+### 代码审查
 
-All submissions, including submissions by project members, require review. We
-use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
-for this purpose.
+所有提交，包括项目成员的提交，都需要审查。我们使用[GitHub拉取请求](https://docs.github.com/articles/about-pull-requests)来实现这一目的。
 
-### Pull Request Guidelines
+### 拉取请求指南
 
-To help us review and merge your PRs quickly, please follow these guidelines. PRs that do not meet these standards may be closed.
+为了帮助我们快速审查和合并您的PR，请遵循以下指南。不符合这些标准的PR可能会被关闭。
 
-#### 1. Link to an Existing Issue
+#### 1. 链接到现有问题
 
-All PRs should be linked to an existing issue in our tracker. This ensures that every change has been discussed and is aligned with the project's goals before any code is written.
+所有PR都应该链接到我们跟踪器中的现有问题。这确保每个更改在编写任何代码之前都经过讨论并与项目目标保持一致。
 
-- **For bug fixes:** The PR should be linked to the bug report issue.
-- **For features:** The PR should be linked to the feature request or proposal issue that has been approved by a maintainer.
+- **对于错误修复：** PR应该链接到错误报告问题。
+- **对于功能：** PR应该链接到已获得维护者批准的功能请求或提案问题。
 
-If an issue for your change doesn't exist, please **open one first** and wait for feedback before you start coding.
+如果您的更改没有相应的问题，请**先创建一个**并在开始编码之前等待反馈。
 
-#### 2. Keep It Small and Focused
+#### 2. 保持小而专注
 
-We favor small, atomic PRs that address a single issue or add a single, self-contained feature.
+我们倾向于小的、原子性的PR，它们解决单个问题或添加单个、自包含的功能。
 
-- **Do:** Create a PR that fixes one specific bug or adds one specific feature.
-- **Don't:** Bundle multiple unrelated changes (e.g., a bug fix, a new feature, and a refactor) into a single PR.
+- **要做：** 创建一个修复特定错误或添加特定功能的PR。
+- **不要做：** 将多个不相关的更改（例如，错误修复、新功能和重构）捆绑到一个PR中。
 
-Large changes should be broken down into a series of smaller, logical PRs that can be reviewed and merged independently.
+大型更改应该分解为一系列较小的、逻辑性的PR，可以独立审查和合并。
 
-#### 3. Use Draft PRs for Work in Progress
+#### 3. 对工作进行中的内容使用草稿PR
 
-If you'd like to get early feedback on your work, please use GitHub's **Draft Pull Request** feature. This signals to the maintainers that the PR is not yet ready for a formal review but is open for discussion and initial feedback.
+如果您想获得工作的早期反馈，请使用GitHub的**草稿拉取请求**功能。这向维护者表明PR尚未准备好进行正式审查，但可以进行讨论和初步反馈。
 
-#### 4. Ensure All Checks Pass
+#### 4. 确保所有检查通过
 
-Before submitting your PR, ensure that all automated checks are passing by running `npm run preflight`. This command runs all tests, linting, and other style checks.
+在提交PR之前，通过运行`npm run preflight`确保所有自动化检查都通过。此命令运行所有测试、代码检查和样式检查。
 
-#### 5. Update Documentation
+#### 5. 更新文档
 
-If your PR introduces a user-facing change (e.g., a new command, a modified flag, or a change in behavior), you must also update the relevant documentation in the `/docs` directory.
+如果您的PR引入了面向用户的更改（例如，新命令、修改的标志或行为更改），您还必须更新`/docs`目录中的相关文档。
 
-#### 6. Write Clear Commit Messages and a Good PR Description
+#### 6. 编写清晰的提交消息和良好的PR描述
 
-Your PR should have a clear, descriptive title and a detailed description of the changes. Follow the [Conventional Commits](https://www.conventionalcommits.org/) standard for your commit messages.
+您的PR应该有清晰、描述性的标题和更改的详细描述。遵循[约定式提交](https://www.conventionalcommits.org/)标准来编写提交消息。
 
-- **Good PR Title:** `feat(cli): Add --json flag to 'config get' command`
-- **Bad PR Title:** `Made some changes`
+- **好的PR标题：** `feat(cli): 为'config get'命令添加--json标志`
+- **不好的PR标题：** `做了一些更改`
 
-In the PR description, explain the "why" behind your changes and link to the relevant issue (e.g., `Fixes #123`).
+在PR描述中，解释更改背后的"原因"并链接到相关问题（例如，`修复 #123`）。
 
-## Forking
+## 分叉
 
-If you are forking the repository you will be able to run the Built, Test and Integration test workflows. However in order to make the integration tests run you'll need to add a [GitHub Repository Secret](<[url](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository)>) with a value of `GEMINI_API_KEY` and set that to a valid API key that you have available. Your key and secret are private to your repo; no one without access can see your key and you cannot see any secrets related to this repo.
+如果您要分叉仓库，您将能够运行构建、测试和集成测试工作流。但是，为了使集成测试运行，您需要添加一个[GitHub仓库密钥](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository)，值为`GEMINI_API_KEY`，并将其设置为您可用的有效API密钥。您的密钥和密钥对您的仓库是私有的；没有访问权限的人无法看到您的密钥，您也无法看到与此仓库相关的任何密钥。
 
-Additionally you will need to click on the `Actions` tab and enable workflows for your repository, you'll find it's the large blue button in the center of the screen.
+此外，您需要点击`Actions`选项卡并为您的仓库启用工作流，您会在屏幕中央找到大的蓝色按钮。
 
-## Development Setup and Workflow
+## 开发设置和工作流
 
-This section guides contributors on how to build, modify, and understand the development setup of this project.
+本节指导贡献者如何构建、修改和理解本项目的开发设置。
 
-### Setting Up the Development Environment
+### 设置开发环境
 
-**Prerequisites:**
+**先决条件：**
 
-1. Install [Node 18+](https://nodejs.org/en/download)
+1. 安装 [Node 18+](https://nodejs.org/en/download)
 2. Git
 
-### Build Process
+### 构建过程
 
-To clone the repository:
+克隆仓库：
 
 ```bash
-git clone https://github.com/google-gemini/gemini-cli.git # Or your fork's URL
+git clone https://github.com/google-gemini/gemini-cli.git # 或您的分叉URL
 cd gemini-cli
 ```
 
-To install dependencies defined in `package.json` as well as root dependencies:
+安装`package.json`中定义的依赖项以及根依赖项：
 
 ```bash
 npm install
 ```
 
-To build the entire project (all packages):
+构建整个项目（所有包）：
 
 ```bash
 npm run build
 ```
 
-This command typically compiles TypeScript to JavaScript, bundles assets, and prepares the packages for execution. Refer to `scripts/build.js` and `package.json` scripts for more details on what happens during the build.
+此命令通常将TypeScript编译为JavaScript，打包资源，并准备包以供执行。有关构建过程中发生什么的更多详细信息，请参阅`scripts/build.js`和`package.json`脚本。
 
-### Enabling Sandboxing
+### 启用沙箱
 
-Container-based [sandboxing](#sandboxing) is highly recommended and requires, at a minimum, setting `GEMINI_SANDBOX=true` in your `~/.env` and ensuring a container engine (e.g. `docker` or `podman`) is available. See [Sandboxing](#sandboxing) for details.
+强烈建议使用基于容器的[沙箱](#沙箱)，至少需要在您的`~/.env`中设置`GEMINI_SANDBOX=true`并确保容器引擎（例如`docker`或`podman`）可用。有关详细信息，请参阅[沙箱](#沙箱)。
 
-To build both the `gemini` CLI utility and the sandbox container, run `build:all` from the root directory:
+要构建`gemini` CLI实用程序和沙箱容器，请从根目录运行`build:all`：
 
 ```bash
 npm run build:all
 ```
 
-To skip building the sandbox container, you can use `npm run build` instead.
+要跳过构建沙箱容器，您可以使用`npm run build`。
 
-### Running
+### 运行
 
-To start the Gemini CLI from the source code (after building), run the following command from the root directory:
+要从源代码启动Gemini CLI（构建后），请从根目录运行以下命令：
 
 ```bash
 npm start
 ```
 
-If you’d like to run the source build outside of the gemini-cli folder you can utilize `npm link path/to/gemini-cli/packages/cli` (see: [docs](https://docs.npmjs.com/cli/v9/commands/npm-link)) or `alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`
+如果您想在gemini-cli文件夹之外运行源代码构建，可以使用`npm link path/to/gemini-cli/packages/cli`（请参阅：[文档](https://docs.npmjs.com/cli/v9/commands/npm-link)）或`alias gemini="node path/to/gemini-cli/packages/cli"`来使用`gemini`运行
 
-### Running Tests
+### 运行测试
 
-This project contains two types of tests: unit tests and integration tests.
+本项目包含两种类型的测试：单元测试和集成测试。
 
-#### Unit Tests
+#### 单元测试
 
-To execute the unit test suite for the project:
+要执行项目的单元测试套件：
 
 ```bash
 npm run test
 ```
 
-This will run tests located in the `packages/core` and `packages/cli` directories. Ensure tests pass before submitting any changes. For a more comprehensive check, it is recommended to run `npm run preflight`.
+这将运行位于`packages/core`和`packages/cli`目录中的测试。在提交任何更改之前确保测试通过。对于更全面的检查，建议运行`npm run preflight`。
 
-#### Integration Tests
+#### 集成测试
 
-The integration tests are designed to validate the end-to-end functionality of the Gemini CLI. They are not run as part of the default `npm run test` command.
+集成测试旨在验证Gemini CLI的端到端功能。它们不作为默认`npm run test`命令的一部分运行。
 
-To run the integration tests, use the following command:
+要运行集成测试，请使用以下命令：
 
 ```bash
 npm run test:e2e
 ```
 
-For more detailed information on the integration testing framework, please see the [Integration Tests documentation](./docs/integration-tests.md).
+有关集成测试框架的更详细信息，请参阅[集成测试文档](./docs/integration-tests.md)。
 
-### Linting and Preflight Checks
+### 代码检查和预检
 
-To ensure code quality and formatting consistency, run the preflight check:
+为了确保代码质量和格式一致性，运行预检：
 
 ```bash
 npm run preflight
 ```
 
-This command will run ESLint, Prettier, all tests, and other checks as defined in the project's `package.json`.
+此命令将运行ESLint、Prettier、所有测试以及项目中`package.json`定义的其他检查。
 
-_ProTip_
+_专业提示_
 
-after cloning create a git precommit hook file to ensure your commits are always clean.
+克隆后创建一个git预提交钩子文件，以确保您的提交始终是干净的。
 
 ```bash
 echo "
-# Run npm build and check for errors
+# 运行npm构建并检查错误
 if ! npm run preflight; then
-  echo "npm build failed. Commit aborted."
+  echo "npm构建失败。提交已中止。"
   exit 1
 fi
 " > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
-#### Formatting
+#### 格式化
 
-To separately format the code in this project by running the following command from the root directory:
+要单独格式化此项目中的代码，请从根目录运行以下命令：
 
 ```bash
 npm run format
 ```
 
-This command uses Prettier to format the code according to the project's style guidelines.
+此命令使用Prettier根据项目的样式指南格式化代码。
 
-#### Linting
+#### 代码检查
 
-To separately lint the code in this project, run the following command from the root directory:
+要单独检查此项目中的代码，请从根目录运行以下命令：
 
 ```bash
 npm run lint
 ```
 
-### Coding Conventions
+### 编码约定
 
-- Please adhere to the coding style, patterns, and conventions used throughout the existing codebase.
-- Consult [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md) (typically found in the project root) for specific instructions related to AI-assisted development, including conventions for React, comments, and Git usage.
-- **Imports:** Pay special attention to import paths. The project uses `eslint-rules/no-relative-cross-package-imports.js` to enforce restrictions on relative imports between packages.
+- 请遵循整个现有代码库中使用的编码风格、模式和约定。
+- 查阅[GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)（通常在项目根目录中找到）以获取与AI辅助开发相关的具体说明，包括React、注释和Git使用的约定。
+- **导入：** 特别注意导入路径。项目使用`eslint-rules/no-relative-cross-package-imports.js`来强制执行包之间相对导入的限制。
 
-### Project Structure
+### 项目结构
 
-- `packages/`: Contains the individual sub-packages of the project.
-  - `cli/`: The command-line interface.
-  - `server/`: The backend server that the CLI interacts with.
-- `docs/`: Contains all project documentation.
-- `scripts/`: Utility scripts for building, testing, and development tasks.
+- `packages/`: 包含项目的各个子包。
+  - `cli/`: 命令行界面。
+  - `server/`: CLI与之交互的后端服务器。
+- `docs/`: 包含所有项目文档。
+- `scripts/`: 用于构建、测试和开发任务的实用脚本。
 
-For more detailed architecture, see `docs/architecture.md`.
+有关更详细的架构，请参阅`docs/architecture.md`。
 
-## Debugging
+## 调试
 
 ### VS Code:
 
-0.  Run the CLI to interactively debug in VS Code with `F5`
-1.  Start the CLI in debug mode from the root directory:
+0.  运行CLI以在VS Code中交互式调试，按`F5`
+1.  从根目录以调试模式启动CLI：
     ```bash
     npm run debug
     ```
-    This command runs `node --inspect-brk dist/gemini.js` within the `packages/cli` directory, pausing execution until a debugger attaches. You can then open `chrome://inspect` in your Chrome browser to connect to the debugger.
-2.  In VS Code, use the "Attach" launch configuration (found in `.vscode/launch.json`).
+    此命令在`packages/cli`目录中运行`node --inspect-brk dist/gemini.js`，暂停执行直到调试器附加。然后您可以在Chrome浏览器中打开`chrome://inspect`来连接到调试器。
+2.  在VS Code中，使用"附加"启动配置（在`.vscode/launch.json`中找到）。
 
-Alternatively, you can use the "Launch Program" configuration in VS Code if you prefer to launch the currently open file directly, but 'F5' is generally recommended.
+或者，如果您更喜欢直接启动当前打开的文件，可以在VS Code中使用"启动程序"配置，但通常推荐使用'F5'。
 
-To hit a breakpoint inside the sandbox container run:
+要在沙箱容器内命中断点，请运行：
 
 ```bash
 DEBUG=1 gemini
@@ -242,51 +234,51 @@ DEBUG=1 gemini
 
 ### React DevTools
 
-To debug the CLI's React-based UI, you can use React DevTools. Ink, the library used for the CLI's interface, is compatible with React DevTools version 4.x.
+要调试CLI的基于React的UI，您可以使用React DevTools。Ink（用于CLI界面的库）与React DevTools 4.x版本兼容。
 
-1.  **Start the Gemini CLI in development mode:**
+1.  **以开发模式启动Gemini CLI：**
 
     ```bash
     DEV=true npm start
     ```
 
-2.  **Install and run React DevTools version 4.28.5 (or the latest compatible 4.x version):**
+2.  **安装并运行React DevTools 4.28.5版本（或最新的兼容4.x版本）：**
 
-    You can either install it globally:
+    您可以全局安装：
 
     ```bash
     npm install -g react-devtools@4.28.5
     react-devtools
     ```
 
-    Or run it directly using npx:
+    或使用npx直接运行：
 
     ```bash
     npx react-devtools@4.28.5
     ```
 
-    Your running CLI application should then connect to React DevTools.
+    然后您运行的CLI应用程序应该连接到React DevTools。
     ![](/docs/assets/connected_devtools.png)
 
-## Sandboxing
+## 沙箱
 
 ### MacOS Seatbelt
 
-On MacOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `permissive-open` profile (see `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) that restricts writes to the project folder but otherwise allows all other operations and outbound network traffic ("open") by default. You can switch to a `restrictive-closed` profile (see `.../sandbox-macos-strict.sb`) that declines all operations and outbound network traffic ("closed") by default by setting `SEATBELT_PROFILE=restrictive-closed` in your environment or `.env` file. Available built-in profiles are `{permissive,restrictive}-{open,closed,proxied}` (see below for proxied networking). You can also switch to a custom profile `SEATBELT_PROFILE=<profile>` if you also create a file `.gemini/sandbox-macos-<profile>.sb` under your project settings directory `.gemini`.
+在MacOS上，`gemini`在`permissive-open`配置文件下使用Seatbelt（`sandbox-exec`）（请参阅`packages/cli/src/utils/sandbox-macos-permissive-open.sb`），它限制对项目文件夹的写入，但默认允许所有其他操作和出站网络流量（"开放"）。您可以通过在环境或`.env`文件中设置`SEATBELT_PROFILE=restrictive-closed`来切换到`restrictive-closed`配置文件（请参阅`.../sandbox-macos-strict.sb`），该配置文件默认拒绝所有操作和出站网络流量（"关闭"）。可用的内置配置文件是`{permissive,restrictive}-{open,closed,proxied}`（有关代理网络，请参阅下文）。如果您还在项目设置目录`.gemini`下创建文件`.gemini/sandbox-macos-<profile>.sb`，您也可以切换到自定义配置文件`SEATBELT_PROFILE=<profile>`。
 
-### Container-based Sandboxing (All Platforms)
+### 基于容器的沙箱（所有平台）
 
-For stronger container-based sandboxing on MacOS or other platforms, you can set `GEMINI_SANDBOX=true|docker|podman|<command>` in your environment or `.env` file. The specified command (or if `true` then either `docker` or `podman`) must be installed on the host machine. Once enabled, `npm run build:all` will build a minimal container ("sandbox") image and `npm start` will launch inside a fresh instance of that container. The first build can take 20-30s (mostly due to downloading of the base image) but after that both build and start overhead should be minimal. Default builds (`npm run build`) will not rebuild the sandbox.
+为了在MacOS或其他平台上进行更强的基于容器的沙箱，您可以在环境或`.env`文件中设置`GEMINI_SANDBOX=true|docker|podman|<command>`。指定的命令（或者如果`true`则是`docker`或`podman`）必须安装在主机机器上。启用后，`npm run build:all`将构建一个最小的容器（"沙箱"）镜像，`npm start`将在该容器的新实例中启动。第一次构建可能需要20-30秒（主要是由于下载基础镜像），但之后构建和启动开销应该是最小的。默认构建（`npm run build`）不会重新构建沙箱。
 
-Container-based sandboxing mounts the project directory (and system temp directory) with read-write access and is started/stopped/removed automatically as you start/stop Gemini CLI. Files created within the sandbox should be automatically mapped to your user/group on host machine. You can easily specify additional mounts, ports, or environment variables by setting `SANDBOX_{MOUNTS,PORTS,ENV}` as needed. You can also fully customize the sandbox for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or `.gemini/sandbox.bashrc` under your project settings directory (`.gemini`) and running `gemini` with `BUILD_SANDBOX=1` to trigger building of your custom sandbox.
+基于容器的沙箱挂载项目目录（和系统临时目录）具有读写访问权限，并在您启动/停止Gemini CLI时自动启动/停止/删除。在沙箱内创建的文件应该自动映射到主机机器上的用户/组。您可以通过设置`SANDBOX_{MOUNTS,PORTS,ENV}`来轻松指定额外的挂载、端口或环境变量。您还可以通过在项目设置目录（`.gemini`）下创建文件`.gemini/sandbox.Dockerfile`和/或`.gemini/sandbox.bashrc`并使用`BUILD_SANDBOX=1`运行`gemini`来完全自定义项目的沙箱，以触发构建您的自定义沙箱。
 
-#### Proxied Networking
+#### 代理网络
 
-All sandboxing methods, including MacOS Seatbelt using `*-proxied` profiles, support restricting outbound network traffic through a custom proxy server that can be specified as `GEMINI_SANDBOX_PROXY_COMMAND=<command>`, where `<command>` must start a proxy server that listens on `:::8877` for relevant requests. See `scripts/example-proxy.js` for a minimal proxy that only allows `HTTPS` connections to `example.com:443` (e.g. `curl https://example.com`) and declines all other requests. The proxy is started and stopped automatically alongside the sandbox.
+所有沙箱方法，包括使用`*-proxied`配置文件的MacOS Seatbelt，都支持通过可以指定为`GEMINI_SANDBOX_PROXY_COMMAND=<command>`的自定义代理服务器限制出站网络流量，其中`<command>`必须启动一个在`:::8877`上监听相关请求的代理服务器。请参阅`scripts/example-proxy.js`了解一个最小代理，它只允许到`example.com:443`的`HTTPS`连接（例如`curl https://example.com`）并拒绝所有其他请求。代理与沙箱一起自动启动和停止。
 
-## Manual Publish
+## 手动发布
 
-We publish an artifact for each commit to our internal registry. But if you need to manually cut a local build, then run the following commands:
+我们为每个提交发布一个工件到我们的内部注册表。但如果您需要手动创建本地构建，请运行以下命令：
 
 ```
 npm run clean
