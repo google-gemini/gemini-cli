@@ -159,140 +159,137 @@ export class ToolRegistry {
         // Keep manually registered tools
       }
     }
-    // discover tools using discovery command, if configured
-    const discoveryCmd = this.config.getToolDiscoveryCommand();
-    if (discoveryCmd) {
-      try {
-        const cmdParts = parse(discoveryCmd);
-        if (cmdParts.length === 0) {
-          throw new Error(
-            'Tool discovery command is empty or contains only whitespace.',
-          );
-        }
-        if (cmdParts.some((part) => typeof part !== 'string')) {
-          throw new Error(
-            `Tool discovery command contains shell operators which are not supported. Please wrap complex commands in 'sh -c "..."'.`,
-          );
-        }
-        const proc = spawn(
-          cmdParts[0] as string,
-          cmdParts.slice(1) as string[],
-        );
-        let stdout = '';
-        const stdoutDecoder = new StringDecoder('utf8');
-        let stderr = '';
-        const stderrDecoder = new StringDecoder('utf8');
-        let sizeLimitExceeded = false;
-        const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
-        const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
 
-        let stdoutByteLength = 0;
-        let stderrByteLength = 0;
+    await this.discoverAndRegisterToolsFromCommand();
 
-        proc.stdout.on('data', (data) => {
-          if (sizeLimitExceeded) return;
-          if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
-            sizeLimitExceeded = true;
-            proc.kill();
-            return;
-          }
-          stdoutByteLength += data.length;
-          stdout += stdoutDecoder.write(data);
-        });
-
-        proc.stderr.on('data', (data) => {
-          if (sizeLimitExceeded) return;
-          if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
-            sizeLimitExceeded = true;
-            proc.kill();
-            return;
-          }
-          stderrByteLength += data.length;
-          stderr += stderrDecoder.write(data);
-        });
-
-        await new Promise<void>((resolve, reject) => {
-          proc.on('error', reject);
-          proc.on('close', (code) => {
-            stdout += stdoutDecoder.end();
-            stderr += stderrDecoder.end();
-
-            if (sizeLimitExceeded) {
-              return reject(
-                new Error(
-                  `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
-                ),
-              );
-            }
-
-            if (code !== 0) {
-              console.error(`Command failed with code ${code}`);
-              console.error(stderr);
-              return reject(
-                new Error(
-                  `Tool discovery command failed with exit code ${code}`,
-                ),
-              );
-            }
-            resolve();
-          });
-        });
-
-        // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
-        const functions: FunctionDeclaration[] = [];
-        const discoveredItems = JSON.parse(stdout.trim());
-
-        if (!Array.isArray(discoveredItems)) {
-          throw new Error(
-            'Tool discovery command did not return a JSON array of tools.',
-          );
-        }
-
-        for (const tool of discoveredItems) {
-          if (tool && typeof tool === 'object') {
-            if (Array.isArray(tool['function_declarations'])) {
-              functions.push(...tool['function_declarations']);
-            } else if (Array.isArray(tool['functionDeclarations'])) {
-              functions.push(...tool['functionDeclarations']);
-            } else if (tool['name']) {
-              functions.push(tool as FunctionDeclaration);
-            }
-          }
-        }
-        // register each function as a tool
-        for (const func of functions) {
-          if (!func.name) {
-            console.warn('Discovered a tool with no name. Skipping.');
-            continue;
-          }
-          // Sanitize the parameters before registering the tool.
-          const parameters =
-            func.parameters &&
-            typeof func.parameters === 'object' &&
-            !Array.isArray(func.parameters)
-              ? (func.parameters as Schema)
-              : {};
-          sanitizeParameters(parameters);
-          this.registerTool(
-            new DiscoveredTool(
-              this.config,
-              func.name,
-              func.description ?? '',
-              parameters as Record<string, unknown>,
-            ),
-          );
-        }
-      } catch (e) {
-        console.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
-        throw e;
-      }
-    }
     // discover tools using MCP servers, if configured
     await discoverMcpTools(
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
     );
+  }
+
+  private async discoverAndRegisterToolsFromCommand(): Promise<void> {
+    const discoveryCmd = this.config.getToolDiscoveryCommand();
+    if (!discoveryCmd) {
+      return;
+    }
+
+    try {
+      const cmdParts = parse(discoveryCmd);
+      if (cmdParts.length === 0) {
+        throw new Error(
+          'Tool discovery command is empty or contains only whitespace.',
+        );
+      }
+      const proc = spawn(cmdParts[0] as string, cmdParts.slice(1) as string[]);
+      let stdout = '';
+      const stdoutDecoder = new StringDecoder('utf8');
+      let stderr = '';
+      const stderrDecoder = new StringDecoder('utf8');
+      let sizeLimitExceeded = false;
+      const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
+      const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+      let stdoutByteLength = 0;
+      let stderrByteLength = 0;
+
+      proc.stdout.on('data', (data) => {
+        if (sizeLimitExceeded) return;
+        if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
+          sizeLimitExceeded = true;
+          proc.kill();
+          return;
+        }
+        stdoutByteLength += data.length;
+        stdout += stdoutDecoder.write(data);
+      });
+
+      proc.stderr.on('data', (data) => {
+        if (sizeLimitExceeded) return;
+        if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
+          sizeLimitExceeded = true;
+          proc.kill();
+          return;
+        }
+        stderrByteLength += data.length;
+        stderr += stderrDecoder.write(data);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        proc.on('error', reject);
+        proc.on('close', (code) => {
+          stdout += stdoutDecoder.end();
+          stderr += stderrDecoder.end();
+
+          if (sizeLimitExceeded) {
+            return reject(
+              new Error(
+                `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
+              ),
+            );
+          }
+
+          if (code !== 0) {
+            console.error(`Command failed with code ${code}`);
+            console.error(stderr);
+            return reject(
+              new Error(`Tool discovery command failed with exit code ${code}`),
+            );
+          }
+          resolve();
+        });
+      });
+
+      // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
+      const functions: FunctionDeclaration[] = [];
+      const discoveredItems = JSON.parse(stdout.trim());
+
+      if (!discoveredItems || !Array.isArray(discoveredItems)) {
+        throw new Error(
+          'Tool discovery command did not return a JSON array of tools.',
+        );
+      }
+
+      for (const tool of discoveredItems) {
+        if (tool && typeof tool === 'object') {
+          if (Array.isArray(tool['function_declarations'])) {
+            functions.push(...tool['function_declarations']);
+          } else if (Array.isArray(tool['functionDeclarations'])) {
+            functions.push(...tool['functionDeclarations']);
+          } else if (tool['name']) {
+            functions.push(tool as FunctionDeclaration);
+          }
+        }
+      }
+      // register each function as a tool
+      for (const func of functions) {
+        if (!func.name) {
+          console.warn('Discovered a tool with no name. Skipping.');
+          continue;
+        }
+        // Sanitize the parameters before registering the tool.
+        const parameters =
+          func.parameters &&
+          typeof func.parameters === 'object' &&
+          !Array.isArray(func.parameters)
+            ? (func.parameters as Schema)
+            : {};
+        sanitizeParameters(parameters);
+        this.registerTool(
+          new DiscoveredTool(
+            this.config,
+            func.name,
+            func.description ?? '',
+            parameters as Record<string, unknown>,
+          ),
+        );
+      }
+    } catch (e) {
+      console.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
+      throw e;
+    }
   }
 
   /**

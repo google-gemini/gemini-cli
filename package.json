@@ -88,7 +88,5 @@
     "typescript-eslint": "^8.30.1",
     "yargs": "^17.7.2"
   },
-  "dependencies": {
-    "shell-quote": "^1.8.3"
-  }
+  "dependencies": {}
 }
