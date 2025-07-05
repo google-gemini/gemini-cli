@@ -18,21 +18,18 @@ This package is not bundled. When it is published, it is published as a standard
 
 This project follows a structured release process to ensure that all packages are versioned and published correctly. The process is designed to be as automated as possible.
 
-## Current Theory
-
-For most all changes, simply patching the minor version is acceptable. We can and should release frequently; the more often we release the easier it is to tell what change broke something. Developeres are encouraged to push a release as described below after their branch merges. I also think I'm open to doing the release publishing steps as a part of an existing PR, though this could have more churn if others are also releasing and version numbers change frequently.
-
 ## How To Release
 
-Releasing a new version is as simple as creating and pushing a new Git tag. The tag must follow semantic versioning and be prefixed with `v`, for example `v0.2.0` or `v1.0.0-alpha.1`. From the branch you want to release from, run the following commands:
+Releases are managed through the [release.yml](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml) GitHub Actions workflow. To perform a manual release for a patch or hotfix:
 
-```bash
-# Create the new tag (e.g., v0.2.0)
-# Optional use git log to find an older commit sha to tag
-git tag v0.2.0 <optional sha>
-# Push the tag to the remote repository to trigger the release
-git push origin v0.2.0
-```
+1.  Navigate to the **Actions** tab of the repository.
+2.  Select the **Release** workflow from the list.
+3.  Click the **Run workflow** dropdown button.
+4.  Fill in the required inputs:
+    - **Version**: The exact version to release (e.g., `v0.2.1`).
+    - **Ref**: The branch or commit SHA to release from (defaults to `main`).
+    - **Dry Run**: Leave as `true` to test the workflow without publishing, or set to `false` to perform a live release.
+5.  Click **Run workflow**.
 
 ## Nightly Releases
 
@@ -40,14 +37,14 @@ In addition to manual releases, this project has an automated nightly release pr
 
 ### Process
 
-Every night at midnight UTC, the [Scheduled Nightly Release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/scheduled-nightly-release.yml) runs automatically. It performs the following steps:
+Every night at midnight UTC, the [Release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml) runs automatically on a schedule. It performs the following steps:
 
 1.  Checks out the latest code from the `main` branch.
 2.  Installs all dependencies.
-3.  Runs the full suite of `preflight` checks (linting, type-checking, etc.).
-4.  Runs the integration tests, both with and without Docker. The tests are automatically retried up to three times to handle any flakiness.
-5.  If all checks and tests succeed, it runs the `npm run tag:release:nightly` script. This script creates and pushes a new annotated Git tag with the format `v<version>+nightly.<ddmmyy>.<sha>`.
-6.  Pushing this tag triggers the main [release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml), which publishes the package to npm with the `nightly` tag.
+3.  Runs the full suite of `preflight` checks and integration tests.
+4.  If all tests succeed, it calculates the next nightly version number (e.g., `v0.2.1-nightly.20230101`).
+5.  It then builds and publishes the packages to npm with the `nightly` dist-tag.
+6.  Finally, it creates a GitHub Release for the nightly version.
 
 ### Failure Handling
 
@@ -61,32 +58,11 @@ To install the latest nightly build, use the `@nightly` tag:
 npm install -g @google/gemini-cli@nightly
 ```
 
-The high-level process is:
-
-1.  Ensure your local branch `main` or `release-xxx` if hotfixing a previous release is up-to-date with the remote repository.
-1.  Decide on the new version number based on the changes since the last release.
-1.  _Optionally_ `git log` to find the sha of the commit you want to push if not latest
-1.  _Optionally_ run [integration tests](integration-tests.md) locally to increase confidence in the release.
-1.  Create a new Git tag with the desired version number.
-1.  Push the tag to the `google-gemini/gemini-cli` repository.
-1.  The push will trigger the release workflow, which automates the rest of the process.
-1.  Once the workflow is complete, it will have created a `release/vX.Y.Z` branch with the version bumps. Create a pull request from this branch to merge the version changes back into `main`.
-
-Pushing a new tag will trigger the [release workflow](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml), which will automatically:
-
-- Build and publish the packages to the npm registry.
-- Create a new GitHub release with generated release notes.
-- Create a new branch `release/vX.Y.Z` containing the version bump in the `package.json` files.
-
 We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
-
-### 2. Monitor the Release Workflow
-
-You can monitor the progress of the release workflow in the [GitHub Actions tab](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml). If the workflow fails, you will need to investigate the cause of the failure, fix the issue, and then create a new tag to trigger a new release.
 
 ### After the Release
 
-After the workflow has successfully completed, you should:
+After the workflow has successfully completed, you can monitor its progress in the [GitHub Actions tab](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml). Once complete, you should:
 
 1.  Go to the [pull requests page](https://github.com/google-gemini/gemini-cli/pulls) of the repository.
 2.  Create a new pull request from the `release/vX.Y.Z` branch to `main`.
