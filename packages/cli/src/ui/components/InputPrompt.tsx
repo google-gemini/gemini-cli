@@ -122,7 +122,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const base = query.substring(0, slashIndex + 1);
 
         const command = slashCommands.find((cmd) => cmd.name === commandName);
-        // Make sure completion isn't the original command when command.completigion hasn't happened yet.
+        // Make sure completion isn't the original command when command.completion hasn't happened yet.
         if (command && command.completion && suggestion !== commandName) {
           const newValue = `${base}${commandName} ${suggestion}`;
           if (newValue === query) {
