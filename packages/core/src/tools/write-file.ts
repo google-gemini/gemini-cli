@@ -367,6 +367,7 @@ export class WriteFileTool
     if (fileExists) {
       // This implies originalContent is available
       const { params: correctedParams } = await ensureCorrectEdit(
+        filePath,
         originalContent,
         {
           old_string: originalContent, // Treat entire current content as old_string
