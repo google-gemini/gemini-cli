@@ -311,6 +311,9 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
   - Enables [checkpointing](./commands.md#checkpointing-commands).
+- **`--proxy`**:
+  - Sets the proxy for the CLI.
+  - Example: `--proxy http://localhost:7890`.
 - **`--version`**:
   - Displays the version of the CLI.
 

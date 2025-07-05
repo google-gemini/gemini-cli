@@ -45,12 +45,16 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  proxy?: string | undefined;
 };
 
 export async function createContentGeneratorConfig(
   model: string | undefined,
   authType: AuthType | undefined,
-  config?: { getModel?: () => string },
+  config?: {
+    getModel?: () => string;
+    getProxy: () => string | undefined;
+  },
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
@@ -63,6 +67,7 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
     authType,
+    proxy: config?.getProxy(),
   };
 
   // if we are using google auth nothing else to validate for now
@@ -75,6 +80,7 @@ export async function createContentGeneratorConfig(
     contentGeneratorConfig.model = await getEffectiveModel(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
+      contentGeneratorConfig.proxy,
     );
 
     return contentGeneratorConfig;
@@ -91,6 +97,7 @@ export async function createContentGeneratorConfig(
     contentGeneratorConfig.model = await getEffectiveModel(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
+      contentGeneratorConfig.proxy,
     );
 
     return contentGeneratorConfig;
@@ -114,6 +121,7 @@ export async function createContentGenerator(
       httpOptions,
       config.authType,
       sessionId,
+      config.proxy,
     );
   }
 
