@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -15,7 +15,9 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import { Key } from '../hooks/useKeypress.js';
+import { useEnhancedKeypress } from '../hooks/useEnhancedKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -58,6 +60,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const prevKeyRef = useRef<Key | null>(null);
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
@@ -285,6 +289,36 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Check if this is the special backslash+return sequence
+      const isPrevBackslash =
+        prevKeyRef.current &&
+        prevKeyRef.current.sequence === '\\' &&
+        prevKeyRef.current.name === undefined &&
+        !prevKeyRef.current.ctrl &&
+        !prevKeyRef.current.meta &&
+        !prevKeyRef.current.shift &&
+        !prevKeyRef.current.paste;
+
+      const isCurrentReturn =
+        key.name === 'return' &&
+        key.sequence === '\r' &&
+        !key.ctrl &&
+        !key.meta &&
+        !key.paste;
+
+      // Handle the \+Enter sequence BEFORE it reaches the buffer
+      if (isPrevBackslash && isCurrentReturn) {
+        // Remove the backslash that was just inserted
+        buffer.backspace();
+        // Insert a newline instead of processing normally
+        buffer.newline();
+        prevKeyRef.current = null; // Reset
+        return;
+      }
+
+      // Store current key for next iteration
+      prevKeyRef.current = key;
+
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -392,6 +426,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (charBefore === '\\') {
             buffer.backspace();
             buffer.newline();
+          } else if (NEWLINE_INPUT_SEQUENCES.includes(key.sequence)) {
+            buffer.newline();
           } else {
             handleSubmitAndClear(buffer.text);
           }
@@ -464,10 +500,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellHistory,
       handleClipboardImage,
       resetCompletionState,
+      kittyProtocolStatus.enabled,
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  // Always use enhanced keypress - it will handle both Kitty protocol and standard input
+  useEnhancedKeypress(handleInput, {
+    isActive: focus,
+    kittyProtocolEnabled: kittyProtocolStatus.enabled,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
