@@ -14,7 +14,8 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import { discoverMcpTools, sanitizeParameters } from './mcp-client.js';
+import { discoverMcpTools } from './mcp-client.js';
+import { sanitizeParameters } from './tool-registry.js';
 import { Schema, Type } from '@google/genai';
 import { Config, MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -85,9 +86,14 @@ const mockToolRegistryInstance = {
   getFunctionDeclarations: vi.fn().mockReturnValue([]),
   discoverTools: vi.fn().mockResolvedValue(undefined),
 };
-vi.mock('./tool-registry.js', () => ({
-  ToolRegistry: vi.fn(() => mockToolRegistryInstance),
-}));
+vi.mock('./tool-registry.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    ToolRegistry: vi.fn(() => mockToolRegistryInstance),
+    sanitizeParameters: (actual as any).sanitizeParameters,
+  };
+});
 
 describe('discoverMcpTools', () => {
   let mockConfig: Mocked<Config>;

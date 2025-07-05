@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration } from '@google/genai';
+import { FunctionDeclaration, Schema, Type } from '@google/genai';
 import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn, execSync } from 'node:child_process';
@@ -160,27 +160,55 @@ export class ToolRegistry {
     // discover tools using discovery command, if configured
     const discoveryCmd = this.config.getToolDiscoveryCommand();
     if (discoveryCmd) {
-      // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
-      const functions: FunctionDeclaration[] = [];
-      for (const tool of JSON.parse(execSync(discoveryCmd).toString().trim())) {
-        if (tool['function_declarations']) {
-          functions.push(...tool['function_declarations']);
-        } else if (tool['functionDeclarations']) {
-          functions.push(...tool['functionDeclarations']);
-        } else if (tool['name']) {
-          functions.push(tool);
-        }
-      }
-      // register each function as a tool
-      for (const func of functions) {
-        this.registerTool(
-          new DiscoveredTool(
-            this.config,
-            func.name!,
-            func.description!,
-            func.parameters! as Record<string, unknown>,
-          ),
+      try {
+        // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
+        const functions: FunctionDeclaration[] = [];
+        const discoveredItems = JSON.parse(
+          execSync(discoveryCmd).toString().trim(),
         );
+
+        if (!Array.isArray(discoveredItems)) {
+          throw new Error(
+            'Tool discovery command did not return a JSON array of tools.',
+          );
+        }
+
+        for (const tool of discoveredItems) {
+          if (tool && typeof tool === 'object') {
+            if (Array.isArray(tool['function_declarations'])) {
+              functions.push(...tool['function_declarations']);
+            } else if (Array.isArray(tool['functionDeclarations'])) {
+              functions.push(...tool['functionDeclarations']);
+            } else if (tool['name']) {
+              functions.push(tool as FunctionDeclaration);
+            }
+          }
+        }
+        // register each function as a tool
+        for (const func of functions) {
+          if (!func.name) {
+            console.warn('Discovered a tool with no name. Skipping.');
+            continue;
+          }
+          // Sanitize the parameters before registering the tool.
+          const parameters =
+            func.parameters &&
+            typeof func.parameters === 'object' &&
+            !Array.isArray(func.parameters)
+              ? (func.parameters as Schema)
+              : {};
+          sanitizeParameters(parameters);
+          this.registerTool(
+            new DiscoveredTool(
+              this.config,
+              func.name,
+              func.description ?? '',
+              parameters as Record<string, unknown>,
+            ),
+          );
+        }
+      } catch (e) {
+        console.warn(`Tool discovery command "${discoveryCmd}" failed:`, e);
       }
     }
     // discover tools using MCP servers, if configured
@@ -230,5 +258,59 @@ export class ToolRegistry {
    */
   getTool(name: string): Tool | undefined {
     return this.tools.get(name);
+  }
+}
+
+/**
+ * Sanitizes a schema object in-place to ensure compatibility with the Gemini API.
+ *
+ * NOTE: This function mutates the passed schema object.
+ *
+ * It performs the following actions:
+ * - Removes the `default` property when `anyOf` is present.
+ * - Removes unsupported `format` values from string properties, keeping only 'enum' and 'date-time'.
+ * - Recursively sanitizes nested schemas within `anyOf`, `items`, and `properties`.
+ * - Handles circular references within the schema to prevent infinite loops.
+ *
+ * @param schema The schema object to sanitize. It will be modified directly.
+ * @param visited A set used internally to track visited schema objects during recursion.
+ */
+export function sanitizeParameters(
+  schema?: Schema,
+  visited = new Set<Schema>(),
+) {
+  if (!schema || visited.has(schema)) {
+    return;
+  }
+  visited.add(schema);
+
+  if (schema.anyOf) {
+    // Vertex AI gets confused if both anyOf and default are set.
+    schema.default = undefined;
+    for (const item of schema.anyOf) {
+      if (typeof item !== 'boolean') {
+        sanitizeParameters(item, visited);
+      }
+    }
+  }
+  if (schema.items && typeof schema.items !== 'boolean') {
+    sanitizeParameters(schema.items, visited);
+  }
+  if (schema.properties) {
+    for (const item of Object.values(schema.properties)) {
+      if (typeof item !== 'boolean') {
+        sanitizeParameters(item, visited);
+      }
+    }
+  }
+  // Vertex AI only supports 'enum' and 'date-time' for STRING format.
+  if (schema.type === Type.STRING) {
+    if (
+      schema.format &&
+      schema.format !== 'enum' &&
+      schema.format !== 'date-time'
+    ) {
+      schema.format = undefined;
+    }
   }
 }
