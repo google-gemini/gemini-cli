@@ -45,7 +45,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}
+          ref: ${{ github.event.inputs.ref || 'main' }}
           fetch-depth: 0
 
       - name: Set booleans for simplified logic
