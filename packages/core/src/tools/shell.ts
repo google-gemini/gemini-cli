@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { Config } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import {
   BaseTool,
   ToolResult,
@@ -19,6 +19,7 @@ import {
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
+import { analyzeSafety } from '../safety/index.js';
 
 export interface ShellToolParams {
   command: string;
@@ -197,9 +198,19 @@ Process Group PGID: Process group started or \`(none)\``,
   }
 
   validateToolParams(params: ShellToolParams): string | null {
+    // First check safety level
+    const safetyLevel = analyzeSafety(params.command);
+
+    // Block dangerous commands immediately
+    if (safetyLevel === 'dangerous') {
+      return `Command blocked: ${params.command}\nReason: Marked as *dangerous* by safety analyzer.`;
+    }
+
+    // Check basic command allowance (existing logic)
     if (!this.isCommandAllowed(params.command)) {
       return `Command is not allowed: ${params.command}`;
     }
+
     if (
       !SchemaValidator.validate(
         this.parameterSchema as Record<string, unknown>,
@@ -236,10 +247,51 @@ Process Group PGID: Process group started or \`(none)\``,
     if (this.validateToolParams(params)) {
       return false; // skip confirmation, execute call will fail immediately
     }
-    const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
+
+    const rootCommand = this.getCommandRoot(params.command)!;
     if (this.whitelist.has(rootCommand)) {
       return false; // already approved and whitelisted
     }
+
+    // Analyze safety level
+    const safetyLevel = analyzeSafety(params.command);
+    const approvalMode = this.config.getApprovalMode();
+
+    // Handle commands requiring approval
+    if (safetyLevel === 'requires-approval') {
+      if (approvalMode === ApprovalMode.YOLO) {
+        console.log(
+          `[AUTO-APPROVED] Command requires approval, but YOLO mode is enabled: ${params.command}`,
+        );
+        return false; // auto-approve in YOLO mode
+      }
+
+      // Show confirmation for requires-approval commands
+      const confirmationDetails: ToolExecuteConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command - Requires Approval',
+        command: params.command,
+        rootCommand,
+        onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+            this.whitelist.add(rootCommand);
+          }
+        },
+      };
+      return confirmationDetails;
+    }
+
+    // Handle safe commands
+    if (safetyLevel === 'safe') {
+      console.log(`[SAFE] Command marked safe: ${params.command}`);
+      return false;
+      // Auto-approve safe commands in YOLO mode
+      if (approvalMode === ApprovalMode.YOLO) {
+        return false;
+      }
+    }
+
+    // Default confirmation for non-YOLO modes or unknown safety levels
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
@@ -260,6 +312,7 @@ Process Group PGID: Process group started or \`(none)\``,
     updateOutput?: (chunk: string) => void,
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
+
     if (validationError) {
       return {
         llmContent: [
