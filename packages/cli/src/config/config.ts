@@ -41,6 +41,7 @@ const logger = {
 
 interface CliArgs {
   model: string | undefined;
+  'force-model': boolean | undefined;
   sandbox: boolean | string | undefined;
   'sandbox-image': string | undefined;
   debug: boolean | undefined;
@@ -62,6 +63,11 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: `Model`,
       default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+    })
+    .option('force-model', {
+      type: 'boolean',
+      description: 'Force the use of the specified model and prevent automatic switching',
+      default: false,
     })
     .option('prompt', {
       alias: 'p',
@@ -245,6 +251,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
+    forceModel: argv['force-model'] || false,
     extensionContextFilePaths,
   });
 }
