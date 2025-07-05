@@ -72,7 +72,7 @@ jobs:
           echo "Workflow triggered by: ${{ github.event_name }}"
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.nightly_dry_run }}" == "true" ]]; then
             echo "Calculating next nightly version..."
-            RELEASE_TAG=$(npm run tag:release:nightly -- --dry-run)
+            RELEASE_TAG=$(node scripts/tag-release.js --dry-run)
           elif [[ -n "${{ inputs.version }}" ]]; then
             echo "Using manual version: ${{ inputs.version }}"
             RELEASE_TAG=${{ inputs.version }}
