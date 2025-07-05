@@ -31,6 +31,10 @@ export interface CheckpointingSettings {
   enabled?: boolean;
 }
 
+export interface AutoChatSettings {
+  enabled?: boolean;
+}
+
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
@@ -53,6 +57,7 @@ export interface Settings {
   preferredEditor?: string;
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
+  autoChat?: AutoChatSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
 
   // Git-aware file filtering settings

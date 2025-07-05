@@ -98,9 +98,11 @@ vi.mock('./useStateAndRef.js', () => ({
   }),
 }));
 
+const mockSaveCheckpoint = vi.fn();
 vi.mock('./useLogger.js', () => ({
   useLogger: vi.fn().mockReturnValue({
     logMessage: vi.fn().mockResolvedValue(undefined),
+    saveCheckpoint: mockSaveCheckpoint,
   }),
 }));
 
