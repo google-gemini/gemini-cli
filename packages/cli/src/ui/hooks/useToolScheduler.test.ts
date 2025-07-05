@@ -833,7 +833,7 @@ describe('mapToDisplay', () => {
       }
     | {
         response: ToolCallResponseInfo;
-        tool?: undefined;
+        tool: undefined;
         confirmationDetails?: ToolCallConfirmationDetails;
       }
     | {
