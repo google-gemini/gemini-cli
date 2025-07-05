@@ -28,9 +28,10 @@ jobs:
   e2e-test:
     name: E2E Test - ${{ matrix.sandbox }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
-        sandbox: [sandbox:none, sandbox:docker]
+        sandbox: [sandbox:none, sandbox:docker, sandbox:podman]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

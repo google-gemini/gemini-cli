@@ -42,63 +42,28 @@ jobs:
           END_DATE=$(date -u +'%Y-%m-%d')
           echo "⏳ Generating report for contributions from $START_DATE to $END_DATE..."
 
-          declare -A author_is_googler
-          check_googler_status() {
-              local author=$1
-              if [[ "$author" == *"[bot]" ]]; then
-                  author_is_googler[$author]=1
-                  return 1
-              fi
-              if [[ -v "author_is_googler[$author]" ]]; then
-                  return ${author_is_googler[$author]}
-              fi
+          
 
-              if gh api "orgs/googlers/members/$author" --silent 2>/dev/null; then
-                  echo "🧑‍💻 $author is a Googler."
-                  author_is_googler[$author]=0
-              else
-                  echo "🌍 $author is a community contributor."
-                  author_is_googler[$author]=1
-              fi
-              return ${author_is_googler[$author]}
-          }
-
-          googler_issues=0
-          non_googler_issues=0
-          googler_prs=0
-          non_googler_prs=0
+          total_issues=0
+          total_prs=0
 
           echo "🔎 Fetching issues and pull requests..."
-          ITEMS_JSON=$(gh search issues --repo "$REPO" "created:>$START_DATE" --json author,isPullRequest --limit 1000)
+          ITEMS_JSON=$(gh search issues --repo "$REPO" "created:>$START_DATE" --json isPullRequest --limit 1000)
 
           for row in $(echo "${ITEMS_JSON}" | jq -r '.[] | @base64'); do
               _jq() {
                   echo ${row} | base64 --decode | jq -r ${1}
               }
-              author=$(_jq '.author.login')
               is_pr=$(_jq '.isPullRequest')
 
-              if [[ -z "$author" || "$author" == "null" ]]; then
-                continue
-              fi
-
-              if check_googler_status "$author"; then
-                  if [[ "$is_pr" == "true" ]]; then
-                      ((googler_prs++))
-                  else
-                      ((googler_issues++))
-                  fi
+              if [[ "$is_pr" == "true" ]]; then
+                  ((total_prs++))
               else
-                  if [[ "$is_pr" == "true" ]]; then
-                      ((non_googler_prs++))
-                  else
-                      ((non_googler_issues++))
-                  fi
+                  ((total_issues++))
               fi
           done
 
-          googler_discussions=0
-          non_googler_discussions=0
+          total_discussions=0
 
           echo "🗣️ Fetching discussions..."
           DISCUSSION_QUERY='''
@@ -115,39 +80,22 @@ jobs:
           }'''
           DISCUSSIONS_JSON=$(gh api graphql -f q="repo:$REPO created:>$START_DATE" -f query="$DISCUSSION_QUERY")
 
-          for row in $(echo "${DISCUSSIONS_JSON}" | jq -r '.data.search.nodes[] | @base64'); do
-              _jq() {
-                  echo ${row} | base64 --decode | jq -r ${1}
-              }
-              author=$(_jq '.author.login')
-
-              if [[ -z "$author" || "$author" == "null" ]]; then
-                continue
-              fi
-
-              if check_googler_status "$author"; then
-                  ((googler_discussions++))
-              else
-                  ((non_googler_discussions++))
-              fi
-          done
+          # Count discussions directly from the JSON output
+          total_discussions=$(echo "${DISCUSSIONS_JSON}" | jq '.data.search.nodes | length')
 
           echo "✍️ Generating report content..."
           REPORT_TITLE="Community Contribution Report: $START_DATE to $END_DATE"
-          TOTAL_ISSUES=$((googler_issues + non_googler_issues))
-          TOTAL_PRS=$((googler_prs + non_googler_prs))
-          TOTAL_DISCUSSIONS=$((googler_discussions + non_googler_discussions))
 
           REPORT_BODY=$(cat <<EOF
           ### 💖 Community Contribution Report
 
           **Period:** $START_DATE to $END_DATE
 
-          | Category | Googlers | Community | Total |
-          |---|---:|---:|---:|
-          | **Issues** | $googler_issues | $non_googler_issues | **$TOTAL_ISSUES** |
-          | **Pull Requests** | $googler_prs | $non_googler_prs | **$TOTAL_PRS** |
-          | **Discussions** | $googler_discussions | $non_googler_discussions | **$TOTAL_DISCUSSIONS** |
+          | Category | Total |
+          |---|---:|
+          | **Issues** | $total_issues |
+          | **Pull Requests** | $total_prs |
+          | **Discussions** | $total_discussions |
 
           _This report was generated automatically by a GitHub Action._
           EOF
