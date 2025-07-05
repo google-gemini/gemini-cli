@@ -255,6 +255,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Ctrl+Home (Start of text)
+      if (key.ctrl && key.name === 'home') {
+        buffer.moveToOffset(0);
+        return;
+      }
+
+      // Ctrl+End (End of text)
+      if (key.ctrl && key.name === 'end') {
+        buffer.moveToOffset(cpLen(buffer.text));
+        return;
+      }
+
+      // Page Up
+      if (key.name === 'pageup') {
+        buffer.move('pageup');
+        return;
+      }
+
+      // Page Down
+      if (key.name === 'pagedown') {
+        buffer.move('pagedown');
+        return;
+      }
+
       // Core text editing from MultilineTextEditor's useInput
       if (key.ctrl && key.name === 'k') {
         buffer.killLineRight();

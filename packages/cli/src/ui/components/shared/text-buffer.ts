@@ -22,7 +22,9 @@ export type Direction =
   | 'wordLeft'
   | 'wordRight'
   | 'home'
-  | 'end';
+  | 'end'
+  | 'pageup'
+  | 'pagedown';
 
 // Simple helper for word‑wise ops.
 function isWordChar(ch: string | undefined): boolean {
@@ -385,6 +387,7 @@ interface TextBufferState {
   clipboard: string | null;
   selectionAnchor: [number, number] | null;
   viewportWidth: number;
+  viewportHeight: number;
 }
 
 const historyLimit = 100;
@@ -608,6 +611,31 @@ export function textBufferReducer(
         case 'end':
           newPreferredCol = null;
           newVisualCol = currentVisLineLen;
+          break;
+        case 'pageup':
+          if (newVisualRow > 0) {
+            if (newPreferredCol === null) newPreferredCol = newVisualCol;
+            newVisualRow = Math.max(0, newVisualRow - state.viewportHeight);
+            newVisualCol = clamp(
+              newPreferredCol,
+              0,
+              cpLen(visualLines[newVisualRow] ?? ''),
+            );
+          }
+          break;
+        case 'pagedown':
+          if (newVisualRow < visualLines.length - 1) {
+            if (newPreferredCol === null) newPreferredCol = newVisualCol;
+            newVisualRow = Math.min(
+              visualLines.length - 1,
+              newVisualRow + state.viewportHeight,
+            );
+            newVisualCol = clamp(
+              newPreferredCol,
+              0,
+              cpLen(visualLines[newVisualRow] ?? ''),
+            );
+          }
           break;
         case 'wordLeft': {
           const { cursorRow, cursorCol, lines } = state;
@@ -977,8 +1005,9 @@ export function useTextBuffer({
       clipboard: null,
       selectionAnchor: null,
       viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
     };
-  }, [initialText, initialCursorOffset, viewport.width]);
+  }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
   const [state, dispatch] = useReducer(textBufferReducer, initialState);
   const { lines, cursorRow, cursorCol, preferredCol, selectionAnchor } = state;
@@ -1185,6 +1214,8 @@ export function useTextBuffer({
       else if (key.ctrl && key.name === 'a') move('home');
       else if (key.name === 'end') move('end');
       else if (key.ctrl && key.name === 'e') move('end');
+      else if (key.name === 'pageup') move('pageup');
+      else if (key.name === 'pagedown') move('pagedown');
       else if (key.ctrl && key.name === 'w') deleteWordLeft();
       else if (
         (key.meta || key.ctrl) &&
