@@ -15,7 +15,9 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import { Key } from '../hooks/useKeypress.js';
+import { useEnhancedKeypress } from '../hooks/useEnhancedKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -58,6 +60,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
+
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
@@ -418,10 +422,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellHistory,
       handleClipboardImage,
       resetCompletionState,
+      kittyProtocolStatus.enabled,
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  // Always use enhanced keypress - it will handle both Kitty protocol and standard input
+  useEnhancedKeypress(handleInput, {
+    isActive: focus,
+    kittyProtocolEnabled: kittyProtocolStatus.enabled,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
