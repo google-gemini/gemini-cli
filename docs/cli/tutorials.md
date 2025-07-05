@@ -13,7 +13,7 @@ This tutorial demonstrates how to set up a MCP server, using the [GitHub MCP ser
 
 Before you begin, ensure you have the following installed and configured:
 
-- **Docker:** Install and run [Docker].
+- **Docker:** Install and run [Docker]. This is required for the local MCP server.
 - **GitHub Personal Access Token (PAT):** Create a new [classic] or [fine-grained] PAT with the necessary scopes.
 
 [Docker]: https://www.docker.com/
@@ -25,6 +25,26 @@ Before you begin, ensure you have the following installed and configured:
 #### Configure the MCP server in `settings.json`
 
 In your project's root directory, create or open the [`.gemini/settings.json` file](./configuration.md). Within the file, add the `mcpServers` configuration block, which provides instructions for how to launch the GitHub MCP server.
+
+Remote MCP server:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "httpUrl": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer <GITHUB_PERSONAL_ACCESS_TOKEN>"
+      }
+    }
+  }
+}
+```
+
+> [!CAUTION]
+> You will need to hardcode your GitHub PAT in place of `<GITHUB_PERSONAL_ACCESS_TOKEN>`. Take great care to ensure the PAT is not exposed to the public.
+
+Local MCP server:
 
 ```json
 {
@@ -52,7 +72,7 @@ In your project's root directory, create or open the [`.gemini/settings.json` fi
 > [!CAUTION]
 > Using a broadly scoped personal access token that has access to personal and private repositories can lead to information from the private repository being leaked into the public repository. We recommend using a fine-grained access token that doesn't share access to both public and private repositories.
 
-Use an environment variable to store your GitHub PAT:
+For the local MCP server, use an environment variable to store your GitHub PAT:
 
 ```bash
 GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourActualGitHubTokenHere"
