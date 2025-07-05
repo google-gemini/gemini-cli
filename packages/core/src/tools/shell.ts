@@ -29,6 +29,16 @@ import { spawn } from 'child_process';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
+const DANGEROUS_COMMAND_PATTERNS = [
+  /^git\s+checkout\b/,
+  /^git\s+reset\b/,
+  /^git\s+clean\b/,
+  /^rm\b/,
+  /^mv\b/,
+  /^dd\b/,
+  // Add more as needed
+];
+
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'run_shell_command';
   private whitelist: Set<string> = new Set();
@@ -229,6 +239,12 @@ Process Group PGID: Process group started or \`(none)\``,
     return null;
   }
 
+  isDangerousCommand(command: string): boolean {
+    return DANGEROUS_COMMAND_PATTERNS.some((pattern) =>
+      pattern.test(command.trim()),
+    );
+  }
+
   async shouldConfirmExecute(
     params: ShellToolParams,
     _abortSignal: AbortSignal,
@@ -237,6 +253,17 @@ Process Group PGID: Process group started or \`(none)\``,
       return false; // skip confirmation, execute call will fail immediately
     }
     const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
+
+    if (this.isDangerousCommand(params.command)) {
+      return {
+        type: 'exec',
+        title: 'Dangerous Command Confirmation',
+        command: params.command,
+        rootCommand,
+        onConfirm: async (_outcome) => {},
+      };
+    }
+
     if (this.whitelist.has(rootCommand)) {
       return false; // already approved and whitelisted
     }
