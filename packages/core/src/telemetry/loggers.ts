@@ -12,6 +12,7 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_MODEL_FALLBACK,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   SERVICE_NAME,
@@ -20,6 +21,7 @@ import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  ModelFallbackEvent,
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
@@ -262,4 +264,26 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     'thought',
   );
   recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
+}
+
+export function logModelFallback(
+  config: Config,
+  event: ModelFallbackEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logModelFallbackEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MODEL_FALLBACK,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Model fallback because of ${event.reason}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }
