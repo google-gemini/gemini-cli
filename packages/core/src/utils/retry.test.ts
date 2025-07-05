@@ -87,6 +87,7 @@ describe('retryWithBackoff', () => {
     // 2. IMPORTANT: Attach the rejection expectation to the promise *immediately*.
     //    This ensures a 'catch' handler is present before the promise can reject.
     //    The result is a new promise that resolves when the assertion is met.
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise = expect(promise).rejects.toThrow(
       'Simulated error attempt 3',
     );
@@ -131,7 +132,7 @@ describe('retryWithBackoff', () => {
 
     // Attach the rejection expectation *before* running timers
     const assertionPromise =
-      expect(promise).rejects.toThrow('Too Many Requests');
+      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
 
     // Run timers to trigger retries and eventual rejection
     await vi.runAllTimersAsync();
@@ -199,6 +200,7 @@ describe('retryWithBackoff', () => {
     // We expect rejections as mockFn fails 5 times
     const promise1 = runRetry();
     // Attach the rejection expectation *before* running timers
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise1 = expect(promise1).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the first runRetry
     await assertionPromise1;
@@ -213,6 +215,7 @@ describe('retryWithBackoff', () => {
 
     const promise2 = runRetry();
     // Attach the rejection expectation *before* running timers
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise2 = expect(promise2).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the second runRetry
     await assertionPromise2;

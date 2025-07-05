@@ -99,30 +99,30 @@ describe('Server Config (config.ts)', () => {
   });
 
   // i can't get vi mocking to import in core. only in cli. can't fix it now.
-  // describe('refreshAuth', () => {
-  //   it('should refresh auth and update config', async () => {
-  //     const config = new Config(baseParams);
-  //     const newModel = 'gemini-ultra';
-  //     const authType = AuthType.USE_GEMINI;
-  //     const mockContentConfig = {
-  //       model: newModel,
-  //       apiKey: 'test-key',
-  //     };
+  describe.skip('refreshAuth', () => {
+    it('should refresh auth and update config', async () => {
+      const config = new Config(baseParams);
+      const newModel = 'gemini-ultra';
+      const authType = AuthType.USE_GEMINI;
+      const mockContentConfig = {
+        model: newModel,
+        apiKey: 'test-key',
+      };
 
-  //     (createContentGeneratorConfig as vi.Mock).mockResolvedValue(
-  //       mockContentConfig,
-  //     );
+      (createContentGeneratorConfig as vi.Mock).mockResolvedValue(
+        mockContentConfig,
+      );
 
-  //     await config.refreshAuth(authType);
+      await config.refreshAuth(authType);
 
-  //     expect(createContentGeneratorConfig).toHaveBeenCalledWith(
-  //       newModel,
-  //       authType,
-  //     );
-  //     expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
-  //     expect(GeminiClient).toHaveBeenCalledWith(config);
-  //   });
-  // });
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        newModel,
+        authType,
+      );
+      expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+  });
 
   it('Config constructor should store userMemory correctly', () => {
     const config = new Config(baseParams);

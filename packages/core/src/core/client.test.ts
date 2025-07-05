@@ -152,8 +152,8 @@ describe('Gemini Client (client.ts)', () => {
   // For future debugging, ensure that the `this.client` in `GeminiClient` (which is an
   // instance of the mocked GoogleGenerativeAI) correctly has its `chats.create` method
   // pointing to `mockChatCreateFn`.
-  // it('startChat should call getCoreSystemPrompt with userMemory and pass to chats.create', async () => { ... });
-  // it('startChat should call getCoreSystemPrompt with empty string if userMemory is empty', async () => { ... });
+  it.todo('startChat should call getCoreSystemPrompt with userMemory and pass to chats.create', async () => {});
+  it.todo('startChat should call getCoreSystemPrompt with empty string if userMemory is empty', async () => {});
 
   // NOTE: The following tests for generateJson were removed due to persistent issues with
   // the @google/genai mock, similar to the startChat tests. The mockGenerateContentFn
@@ -161,8 +161,8 @@ describe('Gemini Client (client.ts)', () => {
   // was not preventing an actual API call (leading to API key errors).
   // For future debugging, ensure `this.client.models.generateContent` in `GeminiClient` correctly
   // uses the `mockGenerateContentFn`.
-  // it('generateJson should call getCoreSystemPrompt with userMemory and pass to generateContent', async () => { ... });
-  // it('generateJson should call getCoreSystemPrompt with empty string if userMemory is empty', async () => { ... });
+  it.todo('generateJson should call getCoreSystemPrompt with userMemory and pass to generateContent', async () => {});
+  it.todo('generateJson should call getCoreSystemPrompt with empty string if userMemory is empty', async () => {});
 
   describe('generateEmbedding', () => {
     const texts = ['hello world', 'goodbye world'];
@@ -281,6 +281,33 @@ describe('Gemini Client (client.ts)', () => {
           temperature: 0.5,
           topP: 1,
         },
+        contents,
+      });
+    });
+
+    it('should use current model from config for content generation', async () => {
+      const initialModel = client['config'].getModel();
+      const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
+      const currentModel = initialModel + '-changed';
+
+      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      await client.generateContent(contents, {}, new AbortController().signal);
+
+      expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
+        model: initialModel,
+        config: expect.any(Object),
+        contents,
+      });
+      expect(mockGenerateContentFn).toHaveBeenCalledWith({
+        model: currentModel,
+        config: expect.any(Object),
         contents,
       });
     });
@@ -468,7 +495,61 @@ describe('Gemini Client (client.ts)', () => {
       // Assert that the chat was reset
       expect(newChat).not.toBe(initialChat);
     });
+
+    it('should use current model from config for token counting after sendMessage', async () => {
+      const initialModel = client['config'].getModel();
+
+      const mockCountTokens = vi
+        .fn()
+        .mockResolvedValueOnce({ totalTokens: 100000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
+
+      const mockChatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ];
+
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn().mockReturnValue(mockChatHistory),
+        sendMessage: mockSendMessage,
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: mockCountTokens,
+      };
+
+      // mock the model has been changed between calls of `countTokens`
+      const firstCurrentModel = initialModel + '-changed-1';
+      const secondCurrentModel = initialModel + '-changed-2';
+      vi.spyOn(client['config'], 'getModel')
+        .mockReturnValueOnce(firstCurrentModel)
+        .mockReturnValueOnce(secondCurrentModel);
+
+      client['chat'] = mockChat as GeminiChat;
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
+
+      const result = await client.tryCompressChat(true);
+
+      expect(mockCountTokens).toHaveBeenCalledTimes(2);
+      expect(mockCountTokens).toHaveBeenNthCalledWith(1, {
+        model: firstCurrentModel,
+        contents: mockChatHistory,
+      });
+      expect(mockCountTokens).toHaveBeenNthCalledWith(2, {
+        model: secondCurrentModel,
+        contents: expect.any(Array),
+      });
+
+      expect(result).toEqual({
+        originalTokenCount: 100000,
+        newTokenCount: 5000,
+      });
+    });
   });
+
 
   describe('sendMessageStream', () => {
     it('should return the turn instance after the stream is complete', async () => {
@@ -685,90 +766,6 @@ describe('Gemini Client (client.ts)', () => {
         `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
           `${eventCount} events generated (properly bounded by MAX_TURNS)`,
       );
-    });
-  });
-
-  describe('generateContent', () => {
-    it('should use current model from config for content generation', async () => {
-      const initialModel = client['config'].getModel();
-      const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
-      const currentModel = initialModel + '-changed';
-
-      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
-      await client.generateContent(contents, {}, new AbortController().signal);
-
-      expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
-        model: initialModel,
-        config: expect.any(Object),
-        contents,
-      });
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: currentModel,
-        config: expect.any(Object),
-        contents,
-      });
-    });
-  });
-
-  describe('tryCompressChat', () => {
-    it('should use current model from config for token counting after sendMessage', async () => {
-      const initialModel = client['config'].getModel();
-
-      const mockCountTokens = vi
-        .fn()
-        .mockResolvedValueOnce({ totalTokens: 100000 })
-        .mockResolvedValueOnce({ totalTokens: 5000 });
-
-      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
-
-      const mockChatHistory = [
-        { role: 'user', parts: [{ text: 'Long conversation' }] },
-        { role: 'model', parts: [{ text: 'Long response' }] },
-      ];
-
-      const mockChat: Partial<GeminiChat> = {
-        getHistory: vi.fn().mockReturnValue(mockChatHistory),
-        sendMessage: mockSendMessage,
-      };
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: mockCountTokens,
-      };
-
-      // mock the model has been changed between calls of `countTokens`
-      const firstCurrentModel = initialModel + '-changed-1';
-      const secondCurrentModel = initialModel + '-changed-2';
-      vi.spyOn(client['config'], 'getModel')
-        .mockReturnValueOnce(firstCurrentModel)
-        .mockReturnValueOnce(secondCurrentModel);
-
-      client['chat'] = mockChat as GeminiChat;
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
-
-      const result = await client.tryCompressChat(true);
-
-      expect(mockCountTokens).toHaveBeenCalledTimes(2);
-      expect(mockCountTokens).toHaveBeenNthCalledWith(1, {
-        model: firstCurrentModel,
-        contents: mockChatHistory,
-      });
-      expect(mockCountTokens).toHaveBeenNthCalledWith(2, {
-        model: secondCurrentModel,
-        contents: expect.any(Array),
-      });
-
-      expect(result).toEqual({
-        originalTokenCount: 100000,
-        newTokenCount: 5000,
-      });
     });
   });
 
