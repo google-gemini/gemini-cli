@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger, MCPServerConfig } from '@google/gemini-cli-core';
+import { MCPServerConfig } from '@google/gemini-cli-core';
+import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

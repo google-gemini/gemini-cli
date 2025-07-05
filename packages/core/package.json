@@ -54,7 +54,9 @@
     "@types/minimatch": "^5.1.2",
     "@types/ws": "^8.5.10",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^3.1.1",
+    "vitest-mock-extended": "^1.3.1",
+    "@jest/globals": "^29.7.0"
   },
   "engines": {
     "node": ">=18"

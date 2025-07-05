@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core';
+import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';

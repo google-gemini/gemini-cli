@@ -11,6 +11,7 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  logger,
 } from '@google/gemini-cli-core';
 import {
   Content,

@@ -56,9 +56,6 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
-      // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
-      // Add other properties/methods of Config if EditTool uses them
-      // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
       getSandbox: () => false,
@@ -75,6 +72,11 @@ describe('EditTool', () => {
       getGeminiMdFileCount: () => 0,
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+      getFilePermissionRules: vi.fn(() => []),
+      getFilePermissionService: vi.fn(() => ({
+        getRules: vi.fn(() => []),
+        canPerformOperation: vi.fn(() => true),
+      })),
     } as unknown as Config;
 
     // Reset mocks before each test

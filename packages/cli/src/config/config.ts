@@ -12,7 +12,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import dotenv from 'dotenv';
 import {
-  logger,
   Config,
   loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -25,9 +24,9 @@ import {
   TelemetryTarget,
   Settings,
   Extension,
-  loadSandboxConfig,
-  getCliVersion,
 } from '@google/gemini-cli-core';
+import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { loadSandboxConfig, getCliVersion } from '@google/gemini-cli-core/dist/src/config/config.js';
 
 interface CliArgs {
   model: string | undefined;

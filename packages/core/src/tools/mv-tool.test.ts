@@ -7,7 +7,7 @@
 import { MvTool } from './mv-tool.js';
 import { ToolInvocation } from '@google/gemini-cli';
 import { promises as fs } from 'fs';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 jest.mock('fs', () => ({
   promises: {

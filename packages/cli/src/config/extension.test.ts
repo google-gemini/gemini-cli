@@ -13,6 +13,20 @@ import {
   EXTENSIONS_DIRECTORY_NAME,
   loadExtensions,
 } from './extension.js';
+import { logger } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    logger: {
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();

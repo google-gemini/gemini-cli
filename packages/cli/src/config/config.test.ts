@@ -43,6 +43,14 @@ vi.mock('@google/gemini-cli-core', async () => {
           fileCount: extensionPaths?.length || 0,
         }),
     ),
+    getCliVersion: vi.fn(() => Promise.resolve('test-version')),
+    logger: {
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    },
+    loadSandboxConfig: vi.fn(() => Promise.resolve({})),
   };
 });
 

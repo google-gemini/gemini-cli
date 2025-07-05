@@ -76,6 +76,11 @@ const mockConfigInternal = {
       registerTool: vi.fn(),
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
+  getFilePermissionRules: vi.fn(() => []),
+  getFilePermissionService: vi.fn(() => ({
+    getRules: vi.fn(() => []),
+    canPerformOperation: vi.fn(() => true),
+  })),
 };
 const mockConfig = mockConfigInternal as unknown as Config;
 // --- END MOCKS ---
