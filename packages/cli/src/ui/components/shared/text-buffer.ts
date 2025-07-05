@@ -19,10 +19,6 @@ export const NEWLINE_INPUT_SEQUENCES = [
   '\n',
   '\r\n',
   '\\\r', // VSCode terminal represents shift + enter this way
-  '\x1b[13;2u', // shift-enter kitty (needs-setup)
-  '\x1b[13;5u', // ctrl-enter kitty (needs-setup)
-  '[27;2;13~', // shift-enter foot (no-setup)
-  '[27;5;13~', // ctrl-enter foot (no-setup)
 ];
 
 export type Direction =
