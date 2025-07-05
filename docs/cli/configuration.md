@@ -270,6 +270,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/` directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful for troubleshooting.
+- **`DEBUG_SHOW_MCP_LOGS`**:
+  - Set to `true` to display MCP server stderr output. By default, MCP server error logs are hidden unless this is enabled.
+  - Example: `export DEBUG_SHOW_MCP_LOGS=true`
 - **`NO_COLOR`**:
   - Set to any value to disable all color output in the CLI.
 - **`CLI_TITLE`**:
