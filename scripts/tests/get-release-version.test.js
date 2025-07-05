@@ -7,10 +7,19 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getReleaseVersion } from '../get-release-version';
 import { execSync } from 'child_process';
+import * as fs from 'fs';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
 }));
+
+vi.mock('fs', async (importOriginal) => {
+  const mod = await importOriginal();
+  return {
+    ...mod,
+    readFileSync: vi.fn(),
+  };
+});
 
 describe('getReleaseVersion', () => {
   const originalEnv = { ...process.env };
@@ -18,19 +27,26 @@ describe('getReleaseVersion', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
     process.env = originalEnv;
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it('should calculate nightly version when IS_NIGHTLY is true', () => {
     process.env.IS_NIGHTLY = 'true';
-    execSync.mockReturnValue('v0.1.0-nightly.20250705');
+    const knownDate = new Date('2025-07-20T10:00:00.000Z');
+    vi.setSystemTime(knownDate);
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ version: '0.1.0' }),
+    );
+    vi.mocked(execSync).mockReturnValue('abcdef');
     const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v0.1.0-nightly.20250705');
-    expect(releaseVersion).toBe('0.1.0-nightly.20250705');
+    expect(releaseTag).toBe('v0.1.9-nightly.250720.abcdef');
+    expect(releaseVersion).toBe('0.1.9-nightly.250720.abcdef');
     expect(npmTag).toBe('nightly');
   });
 
@@ -74,5 +90,19 @@ describe('getReleaseVersion', () => {
     expect(() => getReleaseVersion()).toThrow(
       'Error: Versions with build metadata (+) are not supported for releases.',
     );
+  });
+});
+
+describe('get-release-version script', () => {
+  it('should print version JSON to stdout when executed directly', () => {
+    const expectedJson = {
+      releaseTag: 'v0.1.0-nightly.20250705',
+      releaseVersion: '0.1.0-nightly.20250705',
+      npmTag: 'nightly',
+    };
+    execSync.mockReturnValue(JSON.stringify(expectedJson));
+
+    const result = execSync('node scripts/get-release-version.js').toString();
+    expect(JSON.parse(result)).toEqual(expectedJson);
   });
 });

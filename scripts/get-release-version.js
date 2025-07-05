@@ -6,6 +6,29 @@
 
 import { execSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+
+function getPackageVersion() {
+  const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  return packageJson.version;
+}
+
+function getShortSha() {
+  return execSync('git rev-parse --short HEAD').toString().trim();
+}
+
+export function getNightlyTagName() {
+  const version = getPackageVersion();
+  const now = new Date();
+  const year = now.getUTCFullYear().toString().slice(-2);
+  const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = now.getUTCDate().toString().padStart(2, '0');
+  const date = `${year}${month}${day}`;
+
+  const sha = getShortSha();
+  return `v${version}-nightly.${date}.${sha}`;
+}
 
 export function getReleaseVersion() {
   const isNightly = process.env.IS_NIGHTLY === 'true';
@@ -15,9 +38,7 @@ export function getReleaseVersion() {
 
   if (isNightly) {
     console.log('Calculating next nightly version...');
-    releaseTag = execSync('node scripts/tag-release.js --dry-run')
-      .toString()
-      .trim();
+    releaseTag = getNightlyTagName();
   } else if (manualVersion) {
     console.log(`Using manual version: ${manualVersion}`);
     releaseTag = manualVersion;
@@ -66,5 +87,3 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     process.exit(1);
   }
 }
-
-
