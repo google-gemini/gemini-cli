@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool } from '../tools.js';
+import { BaseTool, ToolResult } from '../tools.js';
 import { Config } from '../../config/config.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { SchemaUnion } from '@google/genai';
+import { AdaptiveQuestionGenerator } from './adaptiveQuestionGenerator.js';
 
 /**
  * 質問生成のためのパラメータ
@@ -52,11 +54,7 @@ export interface QuestionGenerationResult {
 /**
  * ツール実行結果（ToolResult準拠）
  */
-export interface QuestionGenerationToolResult {
-  /** LLM履歴用のコンテンツ */
-  llmContent: string;
-  /** ユーザー表示用のコンテンツ */
-  returnDisplay: string;
+export interface QuestionGenerationToolResult extends ToolResult {
   /** 生成された質問データ */
   questionData: QuestionGenerationResult;
 }
@@ -70,57 +68,91 @@ export class QuestionGeneratorTool extends BaseTool<
   QuestionGenerationToolResult
 > {
   static readonly Name = 'generate_learning_question';
+  private adaptiveGenerator: AdaptiveQuestionGenerator;
+  private useAdaptiveMode: boolean = true; // 適応的質問生成を優先
 
-  constructor(private readonly config: Config) {
+  constructor(private readonly config: Config, useAdaptiveMode: boolean = true) {
     super(
       QuestionGeneratorTool.Name,
-      '学習用質問生成',
-      'ユーザーの学習状況に応じた質問を動的に生成します',
+      '学習用質問生成（適応的モード対応）',
+      'ユーザーの学習状況に応じた適応的質問を動的に生成します',
       {
-        name: QuestionGeneratorTool.Name,
-        description: 'Generate adaptive learning questions based on user responses and learning phase',
-        parameters: {
-          type: 'object',
-          properties: {
-            phase: {
-              type: 'string',
-              enum: ['discovery', 'assessment'],
-              description: '現在の学習フェーズ',
-            },
-            subject: {
-              type: 'string',
-              description: '学習対象分野',
-            },
-            previousQuestions: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  question: { type: 'string' },
-                  answer: { type: 'string' },
-                  type: { type: 'string', enum: ['discovery', 'assessment', 'open-ended'] },
-                },
-                required: ['question', 'answer', 'type'],
-              },
-              description: 'これまでの質問と回答の履歴',
-            },
-            questionType: {
-              type: 'string',
-              enum: ['discovery', 'assessment', 'open-ended'],
-              description: '生成する質問のタイプ',
-            },
-            currentLevel: {
-              type: 'string',
-              enum: ['beginner', 'intermediate', 'advanced'],
-              description: 'ユーザーの推定理解レベル',
-            },
+        type: 'object',
+        properties: {
+          phase: {
+            type: 'string',
+            enum: ['discovery', 'assessment'],
+            description: '現在の学習フェーズ',
           },
-          required: ['phase', 'subject', 'previousQuestions', 'questionType'],
+          subject: {
+            type: 'string',
+            description: '学習対象分野',
+          },
+          previousQuestions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                question: { type: 'string' },
+                answer: { type: 'string' },
+                type: { type: 'string', enum: ['discovery', 'assessment', 'open-ended'] },
+              },
+              required: ['question', 'answer', 'type'],
+            },
+            description: 'これまでの質問と回答の履歴',
+          },
+          questionType: {
+            type: 'string',
+            enum: ['discovery', 'assessment', 'open-ended'],
+            description: '生成する質問のタイプ',
+          },
+          currentLevel: {
+            type: 'string',
+            enum: ['beginner', 'intermediate', 'advanced'],
+            description: 'ユーザーの推定理解レベル',
+          },
         },
+        required: ['phase', 'subject', 'previousQuestions', 'questionType'],
       },
       true,
       false
     );
+    this.useAdaptiveMode = useAdaptiveMode;
+    this.adaptiveGenerator = new AdaptiveQuestionGenerator(config);
+  }
+
+  validateToolParams(params: QuestionGenerationParams): string | null {
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
+    }
+    
+    if (!params.subject || params.subject.trim() === '') {
+      return 'Subject cannot be empty.';
+    }
+    
+    if (!['discovery', 'assessment'].includes(params.phase)) {
+      return 'Phase must be either "discovery" or "assessment".';
+    }
+    
+    if (!['discovery', 'assessment', 'open-ended'].includes(params.questionType)) {
+      return 'Question type must be "discovery", "assessment", or "open-ended".';
+    }
+    
+    if (!Array.isArray(params.previousQuestions)) {
+      return 'Previous questions must be an array.';
+    }
+    
+    if (params.currentLevel && !['beginner', 'intermediate', 'advanced'].includes(params.currentLevel)) {
+      return 'Current level must be "beginner", "intermediate", or "advanced".';
+    }
+    
+    return null;
   }
 
   /**
@@ -172,25 +204,45 @@ export class QuestionGeneratorTool extends BaseTool<
     signal?: AbortSignal
   ): Promise<QuestionGenerationToolResult> {
     try {
-      // Phase 3: 実際のGemini API統合
-      const questionData = await this.generateQuestionWithGeminiAPI(params, signal);
+      let questionData: QuestionGenerationResult;
+
+      // 適応的質問生成を優先的に使用
+      if (this.useAdaptiveMode) {
+        try {
+          questionData = await this.generateAdaptiveQuestion(params, signal);
+        } catch (adaptiveError) {
+          console.warn('Adaptive question generation failed, falling back to standard method:', adaptiveError);
+          questionData = await this.generateQuestionWithGeminiAPI(params, signal);
+        }
+      } else {
+        // 従来の方法
+        questionData = await this.generateQuestionWithGeminiAPI(params, signal);
+      }
       
       return {
-        llmContent: `Generated question: ${questionData.question}`,
+        llmContent: [{ text: `Generated question: ${questionData.question}` }],
         returnDisplay: `Question: ${questionData.question}\nOptions: ${questionData.suggestedOptions.join(', ')}`,
         questionData,
+        uiComponents: {
+          type: 'question-selector',
+          question: questionData.question,
+          options: questionData.suggestedOptions,
+          allowCustomInput: questionData.type === 'discovery', // 深堀りフェーズのみ自由入力を許可
+          placeholder: questionData.type === 'discovery' ? 'その他（自由入力）' : undefined,
+        },
       };
     } catch (error) {
       const errorMessage = `Failed to generate question: ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
-      
-      // フォールバック: 基本的な質問を生成
-      const fallbackQuestion = this.generateFallbackQuestion(params);
-      
       return {
-        llmContent: `Fallback question: ${fallbackQuestion.question}`,
-        returnDisplay: `Question: ${fallbackQuestion.question}\nOptions: ${fallbackQuestion.suggestedOptions.join(', ')}`,
-        questionData: fallbackQuestion,
+        llmContent: [{ text: `Error: ${errorMessage}` }],
+        returnDisplay: `Error: ${errorMessage}`,
+        questionData: this.generateFallbackQuestion(params),
+        uiComponents: {
+          type: 'question-selector',
+          question: 'エラーが発生しました。基本的な質問を表示します。',
+          options: ['続行する', 'やり直す'],
+          allowCustomInput: false,
+        },
       };
     }
   }
@@ -529,5 +581,134 @@ ${subject}分野の理解度を評価する問題を生成してください：
    */
   getPromptForExternalCall(params: QuestionGenerationParams): string {
     return this.buildQuestionGenerationPrompt(params);
+  }
+
+  /**
+   * 適応的質問生成（新機能）
+   */
+  private async generateAdaptiveQuestion(
+    params: QuestionGenerationParams,
+    signal?: AbortSignal
+  ): Promise<QuestionGenerationResult> {
+    if (signal?.aborted) {
+      throw new Error('Operation was aborted');
+    }
+
+    // 従来のパラメータを適応的形式に変換
+    const adaptiveAnswers = params.previousQuestions.map((q, index) => ({
+      questionId: `legacy_${index}`,
+      selectedValue: q.answer,
+      responseTime: 45, // デフォルト値
+      answeredAt: new Date()
+    }));
+
+    try {
+      if (params.phase === 'discovery') {
+        // 深堀りフェーズでは適応的発見質問を生成
+        const adaptiveParams = {
+          subject: params.subject,
+          previousAnswers: adaptiveAnswers,
+          userProfile: this.createDefaultUserProfile(),
+          diversityMode: adaptiveAnswers.length >= 2 // 2問目以降は多様性を重視
+        };
+
+        const adaptiveQuestion = await this.adaptiveGenerator.generateAdaptiveDiscoveryQuestion(adaptiveParams);
+        return this.convertAdaptiveToLegacy(adaptiveQuestion);
+
+      } else if (params.phase === 'assessment') {
+        // 理解度評価フェーズでは適応的評価問題を生成
+        const config = {
+          minItems: 2,
+          maxItems: 5,
+          maxStandardError: 0.5,
+          difficultyRange: ['beginner', 'advanced'] as [any, any],
+          itemSelectionMethod: 'maximum-information' as const,
+          abilityEstimationMethod: 'maximum-likelihood' as const
+        };
+
+        const adaptiveQuestion = await this.adaptiveGenerator.generateAdaptiveAssessmentQuestion(
+          params.subject,
+          adaptiveAnswers,
+          config
+        );
+        return this.convertAdaptiveToLegacy(adaptiveQuestion);
+      }
+
+      throw new Error(`Unsupported phase: ${params.phase}`);
+
+    } catch (error) {
+      console.error('Adaptive question generation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 適応的質問を従来形式に変換
+   */
+  private convertAdaptiveToLegacy(adaptiveQuestion: any): QuestionGenerationResult {
+    return {
+      question: adaptiveQuestion.question,
+      suggestedOptions: adaptiveQuestion.options.map((opt: any) => opt.label),
+      type: this.mapAdaptiveTypeToLegacy(adaptiveQuestion.type),
+      correctAnswer: adaptiveQuestion.correctAnswer,
+      explanation: adaptiveQuestion.explanation,
+      isInformationSufficient: false, // 適応的システムで判定
+      suggestedNextPhase: undefined,
+    };
+  }
+
+  /**
+   * 適応的問題タイプを従来形式にマッピング
+   */
+  private mapAdaptiveTypeToLegacy(adaptiveType: string): 'discovery' | 'assessment' | 'open-ended' {
+    switch (adaptiveType) {
+      case 'multiple-choice':
+      case 'scenario-based':
+        return 'assessment';
+      case 'self-assessment':
+      case 'text-comprehension':
+      case 'adaptive-discovery':
+        return 'discovery';
+      case 'open-ended':
+        return 'open-ended';
+      default:
+        return 'discovery';
+    }
+  }
+
+  /**
+   * デフォルトユーザープロファイルの作成
+   */
+  private createDefaultUserProfile(): any {
+    return {
+      motivationLevel: 0.7,
+      learningStyle: {
+        theoretical: 0.5,
+        practical: 0.5,
+        visual: 0.5,
+        collaborative: 0.5,
+      },
+      timeConstraints: {
+        hasDeadline: false,
+        urgencyLevel: 0.5,
+        availableTime: 10,
+      },
+      interests: [],
+      knowledgeDomains: [],
+    };
+  }
+
+  /**
+   * 適応モードの切り替え
+   */
+  setAdaptiveMode(enabled: boolean): void {
+    this.useAdaptiveMode = enabled;
+  }
+
+  /**
+   * 適応的質問生成器への直接アクセス
+   */
+  getAdaptiveGenerator(): AdaptiveQuestionGenerator {
+    return this.adaptiveGenerator;
   }
 }

@@ -15,6 +15,7 @@ import {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
+  ToolUIComponents,
 } from '../tools/tools.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -70,6 +71,7 @@ export interface ToolCallResponseInfo {
   responseParts: PartListUnion;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
+  uiComponents?: ToolUIComponents; // UIコンポーネント情報
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -180,11 +182,11 @@ export class Turn {
           // Thought always has a bold "subject" part enclosed in double asterisks
           // (e.g., **Subject**). The rest of the string is considered the description.
           const rawText = thoughtPart.text ?? '';
-          const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
+          const subjectStringMatches = rawText.match(/\*\*([\s\S]*?)\*\*/);
           const subject = subjectStringMatches
             ? subjectStringMatches[1].trim()
             : '';
-          const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
+          const description = rawText.replace(/\*\*([\s\S]*?)\*\*/, '').trim();
           const thought: ThoughtSummary = {
             subject,
             description,

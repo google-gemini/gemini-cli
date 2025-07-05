@@ -19,6 +19,7 @@ interface ToolGroupMessageProps {
   terminalWidth: number;
   config?: Config;
   isFocused?: boolean;
+  onQuestionSelect?: (answer: string, optionIndex?: number) => void;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -28,6 +29,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   terminalWidth,
   config,
   isFocused = true,
+  onQuestionSelect,
 }) => {
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
@@ -92,6 +94,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 confirmationDetails={tool.confirmationDetails}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
                 terminalWidth={innerWidth}
+                uiComponents={tool.uiComponents}
+                onQuestionSelect={onQuestionSelect}
                 emphasis={
                   isConfirming
                     ? 'high'

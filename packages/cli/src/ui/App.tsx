@@ -72,7 +72,6 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
-import { LearningDiscoveryDialog } from './components/learning/LearningDiscoveryDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -133,15 +132,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
-  const [showLearningDiscovery, setShowLearningDiscovery] = useState<boolean>(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
 
-  const openLearningDiscovery = useCallback(() => {
-    setShowLearningDiscovery(true);
-  }, []);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -290,7 +285,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
-    openLearningDiscovery,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -443,6 +437,15 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     [submitQuery],
   );
 
+  // 教育ツールの質問選択処理
+  const handleQuestionSelect = useCallback(
+    (answer: string, optionIndex?: number) => {
+      // 選択された回答をエージェントに送信
+      submitQuery(answer);
+    },
+    [submitQuery],
+  );
+
   const logger = useLogger();
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
@@ -562,6 +565,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             item={item}
             isPending={false}
             config={config}
+            onQuestionSelect={handleQuestionSelect}
           />
         ))}
       </Box>
@@ -602,6 +606,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 item={h}
                 isPending={false}
                 config={config}
+                onQuestionSelect={handleQuestionSelect}
               />
             )),
           ]}
@@ -623,6 +628,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
+                onQuestionSelect={handleQuestionSelect}
               />
             ))}
             <ShowMoreLines constrainHeight={constrainHeight} />
@@ -700,12 +706,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           ) : showPrivacyNotice ? (
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}
-              config={config}
-            />
-          ) : showLearningDiscovery ? (
-            <LearningDiscoveryDialog
-              isOpen={showLearningDiscovery}
-              onClose={() => setShowLearningDiscovery(false)}
               config={config}
             />
           ) : (

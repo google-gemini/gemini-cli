@@ -7,6 +7,7 @@
 import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
+  ToolUIComponents,
 } from '@google/gemini-cli-core';
 import { CumulativeStats } from './contexts/SessionContext.js';
 
@@ -51,6 +52,7 @@ export interface IndividualToolCallDisplay {
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
+  uiComponents?: ToolUIComponents; // UIコンポーネント情報
 }
 
 export interface CompressionProps {

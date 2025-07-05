@@ -250,6 +250,7 @@ export function mapToDisplay(
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: trackedCall.response.resultDisplay,
             confirmationDetails: undefined,
+            uiComponents: trackedCall.response.uiComponents, // UIコンポーネント情報を追加
           };
         case 'error':
           return {

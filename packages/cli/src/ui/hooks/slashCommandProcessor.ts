@@ -77,7 +77,6 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
-  openLearningDiscovery: () => void,
 ) => {
   const session = useSessionStats();
   const gitService = useMemo(() => {
@@ -888,9 +887,10 @@ export const useSlashCommandProcessor = (
         name: 'new',
         description: '新しい分野の学習を開始します（Sensei-AI）',
         action: (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Opening learning discovery dialog.');
-          openLearningDiscovery();
-          return;
+          onDebugMessage('Starting new learning session');
+          return {
+            message: '新しい分野の学習を始めたいです。どの分野について学習したいか教えてください。'
+          };
         },
       },
     ];
@@ -1041,7 +1041,6 @@ export const useSlashCommandProcessor = (
     pendingCompressionItemRef,
     setPendingCompressionItem,
     openPrivacyNotice,
-    openLearningDiscovery,
   ]);
 
   const handleSlashCommand = useCallback(

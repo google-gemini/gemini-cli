@@ -51,6 +51,8 @@ export * from './tools/write-file.js';
 
 // Export educational tools
 export * from './tools/educational/questionGenerator.js';
+export * from './tools/educational/adaptiveQuestionGenerator.js';
+export * from './tools/educational/roadmapGenerator.js';
 export * from './tools/web-fetch.js';
 export * from './tools/memoryTool.js';
 export * from './tools/shell.js';

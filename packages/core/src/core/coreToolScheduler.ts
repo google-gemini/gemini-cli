@@ -621,6 +621,7 @@ export class CoreToolScheduler {
               responseParts: response,
               resultDisplay: toolResult.returnDisplay,
               error: undefined,
+              uiComponents: toolResult.uiComponents, // UIコンポーネント情報を追加
             };
             this.setStatusInternal(callId, 'success', successResponse);
           })

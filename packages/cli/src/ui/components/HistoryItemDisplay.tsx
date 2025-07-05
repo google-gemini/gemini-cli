@@ -27,6 +27,7 @@ interface HistoryItemDisplayProps {
   isPending: boolean;
   config?: Config;
   isFocused?: boolean;
+  onQuestionSelect?: (answer: string, optionIndex?: number) => void;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -36,6 +37,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isPending,
   config,
   isFocused = true,
+  onQuestionSelect,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -87,6 +89,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         terminalWidth={terminalWidth}
         config={config}
         isFocused={isFocused}
+        onQuestionSelect={onQuestionSelect}
       />
     )}
     {item.type === 'compression' && (
