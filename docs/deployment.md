@@ -43,7 +43,7 @@ For security and isolation, Gemini CLI can be run inside a container. This is th
 - **Using the `--sandbox` flag:**
   If you have Gemini CLI installed locally (using the standard installation described above), you can instruct it to run inside the sandbox container.
   ```bash
-  gemini --sandbox "your prompt here"
+  gemini --sandbox -y -p "your prompt here"
   ```
 
 ---
