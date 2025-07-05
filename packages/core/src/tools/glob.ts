@@ -122,7 +122,11 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   }
 
   /**
-   * Checks if a path is within the root directory.
+   * Checks if a given path is within the root directory bounds.
+   * This security check prevents accessing files outside the designated root directory.
+   *
+   * @param pathToCheck The absolute path to validate
+   * @returns True if the path is within the root directory, false otherwise
    */
   private isWithinRoot(pathToCheck: string): boolean {
     const absolutePathToCheck = path.resolve(pathToCheck);
