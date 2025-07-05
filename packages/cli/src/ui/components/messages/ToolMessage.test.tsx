@@ -118,7 +118,7 @@ describe('<ToolMessage />', () => {
       expect(lastFrame()).toContain('x');
     });
 
-    it('shows paused spiner for Executing status when streamingState is Idle', () => {
+    it('shows paused spinner for Executing status when streamingState is Idle', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Idle,
@@ -128,7 +128,7 @@ describe('<ToolMessage />', () => {
       expect(lastFrame()).not.toContain('✔');
     });
 
-    it('shows paused spiner for Executing status when streamingState is WaitingForConfirmation', () => {
+    it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
