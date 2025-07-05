@@ -29,7 +29,7 @@ import {
   Type,
   Schema,
 } from '@google/genai';
-import { execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 // Use vi.hoisted to define the mock function so it can be used in the vi.mock factory
 const mockDiscoverMcpTools = vi.hoisted(() => vi.fn());
@@ -138,7 +138,6 @@ describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
-  let mockExecSync: ReturnType<typeof vi.mocked<typeof execSync>>;
 
   beforeEach(() => {
     config = new Config(baseConfigParams);
@@ -160,7 +159,6 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
-    mockExecSync = vi.mocked(execSync);
     mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
@@ -237,13 +235,35 @@ describe('ToolRegistry', () => {
         },
       };
 
-      mockExecSync.mockReturnValue(
-        Buffer.from(
-          JSON.stringify([
-            { function_declarations: [unsanitizedToolDeclaration] },
-          ]),
-        ),
-      );
+      const mockSpawn = vi.mocked(spawn);
+      const mockChildProcess = {
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+      };
+      mockSpawn.mockReturnValue(mockChildProcess as any);
+
+      // Simulate stdout data
+      mockChildProcess.stdout.on.mockImplementation((event, callback) => {
+        if (event === 'data') {
+          callback(
+            Buffer.from(
+              JSON.stringify([
+                { function_declarations: [unsanitizedToolDeclaration] },
+              ]),
+            ),
+          );
+        }
+        return mockChildProcess as any;
+      });
+
+      // Simulate process close
+      mockChildProcess.on.mockImplementation((event, callback) => {
+        if (event === 'close') {
+          callback(0);
+        }
+        return mockChildProcess as any;
+      });
 
       await toolRegistry.discoverTools();
 

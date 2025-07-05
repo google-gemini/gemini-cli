@@ -7,9 +7,11 @@
 import { FunctionDeclaration, Schema, Type } from '@google/genai';
 import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import { discoverMcpTools } from './mcp-client.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { parse } from 'shell-quote';
 
 type ToolParams = Record<string, unknown>;
 
@@ -161,11 +163,76 @@ export class ToolRegistry {
     const discoveryCmd = this.config.getToolDiscoveryCommand();
     if (discoveryCmd) {
       try {
+        const cmdParts = parse(discoveryCmd);
+        if (cmdParts.length === 0) {
+          throw new Error(
+            'Tool discovery command is empty or contains only whitespace.',
+          );
+        }
+        if (cmdParts.some((part) => typeof part !== 'string')) {
+          throw new Error(
+            `Tool discovery command contains shell operators which are not supported. Please wrap complex commands in 'sh -c "..."'.`,
+          );
+        }
+        const proc = spawn(
+          cmdParts[0] as string,
+          cmdParts.slice(1) as string[],
+        );
+        let stdout = '';
+        const stdoutDecoder = new StringDecoder('utf8');
+        let stderr = '';
+        const stderrDecoder = new StringDecoder('utf8');
+        let sizeLimitExceeded = false;
+        const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
+        const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+        let stdoutByteLength = 0;
+        let stderrByteLength = 0;
+
+        proc.stdout.on('data', (data) => {
+          if (sizeLimitExceeded) return;
+          if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
+            sizeLimitExceeded = true;
+            proc.kill();
+            return;
+          }
+          stdoutByteLength += data.length;
+          stdout += stdoutDecoder.write(data);
+        });
+
+        proc.stderr.on('data', (data) => {
+          if (sizeLimitExceeded) return;
+          if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
+            sizeLimitExceeded = true;
+            proc.kill();
+            return;
+          }
+          stderrByteLength += data.length;
+          stderr += stderrDecoder.write(data);
+        });
+
+        const exitCode = await new Promise<number | null>((resolve, reject) => {
+          proc.on('error', reject);
+          proc.on('close', resolve);
+        });
+
+        if (sizeLimitExceeded) {
+          throw new Error(
+            `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
+          );
+        }
+
+        if (exitCode !== 0) {
+          console.error(`Command failed with code ${exitCode}`);
+          console.error(stderr);
+          throw new Error(
+            `Tool discovery command failed with exit code ${exitCode}`,
+          );
+        }
+
         // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
         const functions: FunctionDeclaration[] = [];
-        const discoveredItems = JSON.parse(
-          execSync(discoveryCmd).toString().trim(),
-        );
+        const discoveredItems = JSON.parse(stdout.trim());
 
         if (!Array.isArray(discoveredItems)) {
           throw new Error(
@@ -208,7 +275,8 @@ export class ToolRegistry {
           );
         }
       } catch (e) {
-        console.warn(`Tool discovery command "${discoveryCmd}" failed:`, e);
+        console.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
+        throw e;
       }
     }
     // discover tools using MCP servers, if configured
@@ -273,12 +341,17 @@ export class ToolRegistry {
  * - Handles circular references within the schema to prevent infinite loops.
  *
  * @param schema The schema object to sanitize. It will be modified directly.
- * @param visited A set used internally to track visited schema objects during recursion.
  */
-export function sanitizeParameters(
-  schema?: Schema,
-  visited = new Set<Schema>(),
-) {
+export function sanitizeParameters(schema?: Schema) {
+  _sanitizeParameters(schema, new Set<Schema>());
+}
+
+/**
+ * Internal recursive implementation for sanitizeParameters.
+ * @param schema The schema object to sanitize.
+ * @param visited A set used to track visited schema objects during recursion.
+ */
+function _sanitizeParameters(schema: Schema | undefined, visited: Set<Schema>) {
   if (!schema || visited.has(schema)) {
     return;
   }
@@ -289,17 +362,17 @@ export function sanitizeParameters(
     schema.default = undefined;
     for (const item of schema.anyOf) {
       if (typeof item !== 'boolean') {
-        sanitizeParameters(item, visited);
+        _sanitizeParameters(item, visited);
       }
     }
   }
   if (schema.items && typeof schema.items !== 'boolean') {
-    sanitizeParameters(schema.items, visited);
+    _sanitizeParameters(schema.items, visited);
   }
   if (schema.properties) {
     for (const item of Object.values(schema.properties)) {
       if (typeof item !== 'boolean') {
-        sanitizeParameters(item, visited);
+        _sanitizeParameters(item, visited);
       }
     }
   }
