@@ -7,8 +7,12 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import dotenv from 'dotenv';
 import {
-  Logger,
+  logger,
   Config,
   loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -19,6 +23,10 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  Settings,
+  Extension,
+  loadSandboxConfig,
+  getCliVersion,
 } from '@google/gemini-cli-core';
 
 interface CliArgs {
@@ -129,7 +137,7 @@ export async function loadHierarchicalGeminiMemory(
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
-    new Logger().debug(
+    logger.debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
     );
   }
@@ -295,6 +303,6 @@ function findEnvFile(startDir: string): string | null {
 export function loadEnvironment(): void {
   const envFilePath = findEnvFile(process.cwd());
   if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
+    dotenv.config({ path: envFilePath });
   }
 }

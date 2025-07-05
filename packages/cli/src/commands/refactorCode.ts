@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger, edit } from '@google/gemini-cli-core';
+import { logger, edit, MockGeminiAPI } from '@google/gemini-cli-core';
+import chalk from 'chalk';
 
 export async function refactorCodeCommand(
   filePath: string,
@@ -12,7 +13,6 @@ export async function refactorCodeCommand(
   oldName: string,
   newName: string,
 ): Promise<void> {
-  const logger = new Logger();
   logger.info(
     chalk.green('// Pyrmethus conjures the Code Refactorer with Gemini’s aid!'),
   );

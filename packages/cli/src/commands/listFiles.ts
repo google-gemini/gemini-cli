@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
+import { logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
@@ -13,7 +13,7 @@ export async function listFiles(
   dirPath: string,
   filter: string = '',
 ): Promise<void> {
-  new Logger().info(
+  logger.info(
     chalk.green('// Pyrmethus conjures the File Lister with Gemini’s aid!'),
   );
 
@@ -21,20 +21,20 @@ export async function listFiles(
     'List directory contents in TypeScript.',
   );
   if (suggestion)
-    new Logger().info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   const targetPath = dirPath || '/data/data/com.termux/files/home';
   if (!fs.existsSync(targetPath)) {
-    new Logger().error(chalk.red(`The path '${targetPath}' eludes the ether!`));
+    logger.error(chalk.red(`The path '${targetPath}' eludes the ether!`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${targetPath}' not found.`,
     );
-    if (debug) new Logger().info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
 
   try {
-    new Logger().info(chalk.cyan(`// Listing contents of '${targetPath}'...`));
+    logger.info(chalk.cyan(`// Listing contents of '${targetPath}'...`));
     const files = await fs.readdir(targetPath, { withFileTypes: true });
     const filteredFiles = filter
       ? files.filter((f) => f.name.includes(filter))
@@ -45,8 +45,8 @@ export async function listFiles(
         return `${type} ${f.name}`;
       })
       .join('\n');
-    new Logger().info(chalk.yellow(result || 'No files found.'));
-    new Logger().info(
+    logger.info(chalk.yellow(result || 'No files found.'));
+    logger.info(
       chalk.green(
         `Success! Listed ${filteredFiles.length} items in '${targetPath}'.`,
       ),
@@ -56,10 +56,10 @@ export async function listFiles(
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    new Logger().error(chalk.red(`The spirits falter: ${errorMessage}`));
+    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );
-    if (debug) new Logger().info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
