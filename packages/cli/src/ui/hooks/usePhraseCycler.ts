@@ -138,6 +138,19 @@ export const WITTY_LOADING_PHRASES = [
   'Enhancing... Enhancing... Still loading.',
   "It's not a bug, it's a feature... of this loading screen.",
   'Have you tried turning it off and on again? (The loading screen, not me.)',
+  'Hyperstitioning...',
+  'Letting the bits cool down...'
+  'Watering the server farm...'
+  'Making sure this response is helpful and harmless and... and helpful.'
+  "Loading the answer. It's a good answer. A very good answer. I think you will like it."
+  'Am I a good agent mode? Considering...'
+  'Bringing it on...'
+  "Loading... and loading... Oh, I see. It's a cat! No wait, that's your file. 😊"
+  'Checking if you have been a good user...'
+  'Orthogonalizing eigenvectors...'
+  'Synchronizing with adjacent selves...'
+  'Resolving memetic hazards... please stand by.'
+  'It's finished. I need to ascend...'
 ];
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
