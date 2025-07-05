@@ -20,7 +20,7 @@ on:
         required: true
         type: boolean
         default: true
-      nightly_dry_run:
+      create_nightly_release:
         description: 'Simulate a scheduled nightly release. If true, the version input is ignored.'
         required: false
         type: boolean
@@ -48,6 +48,21 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}
           fetch-depth: 0
 
+      - name: Set booleans for simplified logic
+        id: vars
+        run: |
+          is_nightly="false"
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.create_nightly_release }}" == "true" ]]; then
+            is_nightly="true"
+          fi
+          echo "is_nightly=${is_nightly}" >> $GITHUB_OUTPUT
+
+          is_dry_run="false"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            is_dry_run="true"
+          fi
+          echo "is_dry_run=${is_dry_run}" >> $GITHUB_OUTPUT
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -57,71 +72,21 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Tests (Nightly Only)
-        if: github.event_name == 'schedule'
+      - name: Get the version
+        id: version
+        run: |
+          node scripts/get-release-version.js
+        env:
+          IS_NIGHTLY: ${{ steps.vars.outputs.is_nightly }}
+          MANUAL_VERSION: ${{ inputs.version }}
+
+      - name: Run Tests
         run: |
           npm run preflight
           npm run test:integration:sandbox:none
           npm run test:integration:sandbox:docker
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-      - name: Get the version
-        id: version
-        run: |
-          echo "Workflow triggered by: ${{ github.event_name }}"
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.nightly_dry_run }}" == "true" ]]; then
-            echo "Calculating next nightly version..."
-            RELEASE_TAG=$(node scripts/tag-release.js --dry-run)
-          elif [[ -n "${{ inputs.version }}" ]]; then
-            echo "Using manual version: ${{ inputs.version }}"
-            RELEASE_TAG=${{ inputs.version }}
-          else
-            echo "Error: No version specified and 'nightly_dry_run' is false."
-            exit 1
-          fi
-
-          if [[ -z "$RELEASE_TAG" ]]; then
-            echo "Error: Version could not be determined."
-            exit 1
-          fi
-
-          # Prepend 'v' if it's missing
-          if [[ ! "$RELEASE_TAG" =~ ^v ]]; then
-            echo "Version is missing 'v' prefix. Prepending it."
-            RELEASE_TAG="v${RELEASE_TAG}"
-          fi
-
-          # Check for build metadata, which is not supported for releases
-          if [[ "$RELEASE_TAG" == *"+"* ]]; then
-            echo "Error: Versions with build metadata (+) are not supported for releases."
-            echo "Please use a pre-release version (e.g., v1.2.3-alpha.4) instead."
-            exit 1
-          fi
-
-          echo "---"
-          echo "Initial RELEASE_TAG: ${RELEASE_TAG}"
-
-          # Validate that the tag starts with 'v' and follows semver (without build metadata)
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
-            echo "Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease"
-            exit 1
-          fi
-
-          RELEASE_VERSION="${RELEASE_TAG#v}"
-          if [[ $RELEASE_VERSION == *-* ]]; then
-            NPM_TAG=$(echo $RELEASE_VERSION | cut -d'-' -f2 | cut -d'.' -f1)
-          else
-            NPM_TAG="latest"
-          fi
-
-          echo "Finalized RELEASE_VERSION: ${RELEASE_VERSION}"
-          echo "Finalized NPM_TAG: ${NPM_TAG}"
-          echo "---"
-
-          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_OUTPUT
-          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
-          echo "NPM_TAG=${NPM_TAG}" >> $GITHUB_OUTPUT
 
       - name: Configure Git User
         run: |
@@ -143,7 +108,7 @@ jobs:
         run: |
           git add package.json package-lock.json packages/*/package.json
           git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
-          if [[ "${{ inputs.dry_run }}" == "false" ]]; then
+          if [[ "${{ steps.vars.outputs.is_dry_run }}" == "false" ]]; then
             echo "Pushing release branch to remote..."
             git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
           else
@@ -163,7 +128,7 @@ jobs:
           scope: '@google'
 
       - name: Publish @google/gemini-cli-core
-        run: npm publish --workspace=@google/gemini-cli-core --tag=${{ steps.version.outputs.NPM_TAG }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: npm publish --workspace=@google/gemini-cli-core --tag=${{ steps.version.outputs.NPM_TAG }} ${{ steps.vars.outputs.is_dry_run == 'true' && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
 
@@ -171,12 +136,12 @@ jobs:
         run: npm install @google/gemini-cli-core@${{ steps.version.outputs.NPM_TAG }} --workspace=@google/gemini-cli --save-exact
 
       - name: Publish @google/gemini-cli
-        run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ steps.vars.outputs.is_dry_run == 'true' && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
 
       - name: Create GitHub Release and Tag
-        if: '!inputs.dry_run'
+        if: ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.BRANCH_NAME }}
@@ -187,12 +152,12 @@ jobs:
             --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
             --generate-notes
 
-      - name: Create Issue on Failure (Nightly Only)
-        if: failure() && github.event_name == 'schedule'
+      - name: Create Issue on Failure
+        if: failure()
         run: |
           gh issue create \
-            --title "Nightly Release Failed on $(date +'%Y-%m-%d')" \
-            --body "The scheduled nightly release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "type: bug,nightly-failure"
+            --title "Release Failed for ${{ steps.version.outputs.RELEASE_TAG || 'N/A' }} on $(date +'%Y-%m-%d')" \
+            --body "The release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --label "type: bug,release-failure"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
