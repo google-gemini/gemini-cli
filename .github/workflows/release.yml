@@ -52,13 +52,13 @@ jobs:
         id: vars
         run: |
           is_nightly="false"
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.create_nightly_release }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.create_nightly_release }}" == "true" ]]; then
             is_nightly="true"
           fi
           echo "is_nightly=${is_nightly}" >> $GITHUB_OUTPUT
 
           is_dry_run="false"
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             is_dry_run="true"
           fi
           echo "is_dry_run=${is_dry_run}" >> $GITHUB_OUTPUT
