@@ -1,0 +1,165 @@
+name: CI/CD Pipeline (Optimized)
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'README.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  CACHE_KEY: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+jobs:
+  # 并行执行的测试任务
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules
+          */*/node_modules
+        key: ${{ env.CACHE_KEY }}-${{ matrix.node-version }}-${{ matrix.os }}
+        restore-keys: |
+          ${{ env.CACHE_KEY }}-${{ matrix.node-version }}-
+          ${{ env.CACHE_KEY }}-
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      if: matrix.os == 'ubuntu-latest' && matrix.node-version == '18'
+
+  # 构建任务 - 可以与测试并行执行
+  build:
+    runs-on: ubuntu-latest
+    # 移除 needs: test 以允许并行执行
+    outputs:
+      build-id: ${{ steps.build.outputs.build-id }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules
+          */*/node_modules
+        key: ${{ env.CACHE_KEY }}
+        restore-keys: |
+          ${{ env.CACHE_KEY }}-
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      id: build
+      run: |
+        npm run build
+        echo "build-id=$(date +%s)" >> $GITHUB_OUTPUT
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-${{ steps.build.outputs.build-id }}
+        path: dist/
+        retention-days: 7  # 减少保留时间
+
+  # 代码质量检查 - 独立并行执行
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules
+          */*/node_modules
+        key: ${{ env.CACHE_KEY }}
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run type check
+      run: npm run typecheck
+      
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+
+  # 部署任务 - 只在主分支且测试通过后执行
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test, build, quality]  # 等待所有检查完成
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-${{ needs.build.outputs.build-id }}
+        
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production..."
+        # 添加您的部署脚本
+        
+    - name: Notify deployment
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful"
+        else
+          echo "❌ Deployment failed"
+        fi 

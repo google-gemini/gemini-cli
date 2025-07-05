@@ -1,0 +1,361 @@
+# GitHub Actions 最佳实践配置模板
+# 基于性能优化和最佳实践
+
+# 1. Node.js 项目优化模板
+name: Node.js CI/CD (Optimized)
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  CACHE_KEY: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+jobs:
+  # 并行执行的测试任务
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules
+          */*/node_modules
+        key: ${{ env.CACHE_KEY }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      if: matrix.os == 'ubuntu-latest' && matrix.node-version == '18'
+
+  # 构建任务
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      build-id: ${{ steps.build.outputs.build-id }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules
+          */*/node_modules
+        key: ${{ env.CACHE_KEY }}
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      id: build
+      run: |
+        npm run build
+        echo "build-id=$(date +%s)" >> $GITHUB_OUTPUT
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-${{ steps.build.outputs.build-id }}
+        path: dist/
+        retention-days: 7
+
+  # 部署任务
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-${{ needs.build.outputs.build-id }}
+        
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production..."
+        # 添加您的部署脚本
+
+---
+
+# 2. Docker 项目优化模板
+name: Docker Build & Deploy (Optimized)
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+---
+
+# 3. Python 项目优化模板
+name: Python CI/CD (Optimized)
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Run tests
+      run: |
+        pytest --cov=./ --cov-report=xml
+        
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy
+        
+    - name: Run linting
+      run: |
+        flake8 .
+        black --check .
+        isort --check-only .
+        mypy .
+
+---
+
+# 4. 通用优化配置片段
+
+# 缓存配置最佳实践
+cache-config:
+  # Node.js 缓存
+  - name: Cache node_modules
+    uses: actions/cache@v3
+    with:
+      path: |
+        node_modules
+        */*/node_modules
+      key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      restore-keys: |
+        ${{ runner.os }}-node-
+        
+  # Python 缓存
+  - name: Cache pip
+    uses: actions/cache@v3
+    with:
+      path: ~/.cache/pip
+      key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+      restore-keys: |
+        ${{ runner.os }}-pip-
+        
+  # Docker 缓存
+  - name: Cache Docker layers
+    uses: actions/cache@v3
+    with:
+      path: /tmp/.buildx-cache
+      key: ${{ runner.os }}-buildx-${{ github.sha }}
+      restore-keys: |
+        ${{ runner.os }}-buildx-
+
+# 矩阵策略示例
+matrix-strategy:
+  strategy:
+    matrix:
+      node-version: [16, 18, 20]
+      os: [ubuntu-latest, windows-latest, macos-latest]
+    fail-fast: false
+
+# 条件执行示例
+conditional-execution:
+  - name: Only run on main branch
+    if: github.ref == 'refs/heads/main'
+    run: echo "This only runs on main branch"
+    
+  - name: Skip on documentation changes
+    if: "!contains(github.event.head_commit.modified, 'docs/')"
+    run: echo "This skips on doc changes"
+
+# 环境变量最佳实践
+env-best-practices:
+  env:
+    NODE_ENV: production
+    CI: true
+    # 使用 GitHub 上下文
+    GITHUB_SHA: ${{ github.sha }}
+    GITHUB_REF: ${{ github.ref }}
+    # 使用 secrets
+    API_KEY: ${{ secrets.API_KEY }}
+
+# 错误处理和重试
+error-handling:
+  - name: Retry on failure
+    uses: nick-fields/retry@v2
+    with:
+      timeout_minutes: 10
+      max_attempts: 3
+      command: npm run build
+      
+  - name: Continue on error
+    continue-on-error: true
+    run: npm run optional-test
+
+# 性能监控
+performance-monitoring:
+  - name: Build time tracking
+    run: |
+      start_time=$(date +%s)
+      npm run build
+      end_time=$(date +%s)
+      duration=$((end_time - start_time))
+      echo "Build completed in ${duration} seconds"
+      
+  - name: Cache hit rate
+    run: |
+      if [ -d "node_modules" ]; then
+        echo "Cache hit: Dependencies found"
+      else
+        echo "Cache miss: Installing dependencies"
+      fi 
