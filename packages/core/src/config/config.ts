@@ -84,6 +84,8 @@ export class MCPServerConfig {
     readonly trust?: boolean,
     // Metadata
     readonly description?: string,
+    readonly includeTools?: string[],
+    readonly excludeTools?: string[],
   ) {}
 }
 
