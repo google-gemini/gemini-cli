@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
 
@@ -56,34 +56,38 @@ export function isWithinRoot(
 /**
  * Determines if a file is likely binary based on content sampling.
  * @param filePath Path to the file.
- * @returns True if the file appears to be binary.
+ * @returns Promise that resolves to true if the file appears to be binary.
  */
-export function isBinaryFile(filePath: string): boolean {
+export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
-    const fd = fs.openSync(filePath, 'r');
-    // Read up to 4KB or file size, whichever is smaller
-    const fileSize = fs.fstatSync(fd).size;
-    if (fileSize === 0) {
-      // Empty file is not considered binary for content checking
-      fs.closeSync(fd);
-      return false;
-    }
-    const bufferSize = Math.min(4096, fileSize);
-    const buffer = Buffer.alloc(bufferSize);
-    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
-    fs.closeSync(fd);
-
-    if (bytesRead === 0) return false;
-
-    let nonPrintableCount = 0;
-    for (let i = 0; i < bytesRead; i++) {
-      if (buffer[i] === 0) return true; // Null byte is a strong indicator
-      if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) {
-        nonPrintableCount++;
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+      // Read up to 4KB or file size, whichever is smaller
+      const stats = await fileHandle.stat();
+      const fileSize = stats.size;
+      if (fileSize === 0) {
+        // Empty file is not considered binary for content checking
+        return false;
       }
+      const bufferSize = Math.min(4096, fileSize);
+      const buffer = Buffer.alloc(bufferSize);
+      const result = await fileHandle.read(buffer, 0, buffer.length, 0);
+      const bytesRead = result.bytesRead;
+
+      if (bytesRead === 0) return false;
+
+      let nonPrintableCount = 0;
+      for (let i = 0; i < bytesRead; i++) {
+        if (buffer[i] === 0) return true; // Null byte is a strong indicator
+        if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) {
+          nonPrintableCount++;
+        }
+      }
+      // If >30% non-printable characters, consider it binary
+      return nonPrintableCount / bytesRead > 0.3;
+    } finally {
+      await fileHandle.close();
     }
-    // If >30% non-printable characters, consider it binary
-    return nonPrintableCount / bytesRead > 0.3;
   } catch {
     // If any error occurs (e.g. file not found, permissions),
     // treat as not binary here; let higher-level functions handle existence/access errors.
@@ -94,11 +98,11 @@ export function isBinaryFile(filePath: string): boolean {
 /**
  * Detects the type of file based on extension and content.
  * @param filePath Path to the file.
- * @returns 'text', 'image', 'pdf', 'audio', 'video', or 'binary'.
+ * @returns Promise that resolves to 'text', 'image', 'pdf', 'audio', 'video', 'binary' or 'svg'.
  */
-export function detectFileType(
+export async function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' {
+): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
   // The mimetype for "ts" is MPEG transport stream (a video format) but we want
@@ -166,7 +170,7 @@ export function detectFileType(
 
   // Fallback to content-based check if mime type wasn't conclusive for image/pdf
   // and it's not a known binary extension.
-  if (isBinaryFile(filePath)) {
+  if (await isBinaryFile(filePath)) {
     return 'binary';
   }
 
@@ -227,7 +231,7 @@ export async function processSingleFileContent(
       );
     }
 
-    const fileType = detectFileType(filePath);
+    const fileType = await detectFileType(filePath);
     const relativePathForDisplay = path
       .relative(rootDirectory, filePath)
       .replace(/\\/g, '/');
