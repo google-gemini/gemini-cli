@@ -110,7 +110,7 @@ export async function retryWithBackoff<T>(
             continue;
           }
         } catch (fallbackError) {
-          // If fallback fails, continue with original error
+          // If fallback fails, continue with original error and show full details
           console.warn('Fallback to Flash model failed:', fallbackError);
         }
       }
@@ -125,16 +125,18 @@ export async function retryWithBackoff<T>(
 
       if (delayDurationMs > 0) {
         // Respect Retry-After header if present and parsed
-        console.warn(
+        logRetryMessage(
           `Attempt ${attempt} failed with status ${delayErrorStatus ?? 'unknown'}. Retrying after explicit delay of ${delayDurationMs}ms...`,
           error,
+          errorStatus,
+          onPersistent429
         );
         await delay(delayDurationMs);
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
         // Fallback to exponential backoff with jitter
-        logRetryAttempt(attempt, error, errorStatus);
+        logRetryAttempt(attempt, error, errorStatus, onPersistent429);
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
@@ -232,41 +234,66 @@ function getDelayDurationAndStatus(error: unknown): {
 }
 
 /**
+ * Helper function to decide whether to log error details based on error type and fallback availability.
+ */
+function shouldLogErrorDetails(errorStatus: number | undefined, hasFallbackHandler: boolean): boolean {
+  // For 429 errors, suppress details if we have a fallback handler
+  if (errorStatus === 429 && hasFallbackHandler) {
+    return false;
+  }
+  // For all other cases, show details
+  return true;
+}
+
+/**
+ * Logs a retry message, optionally including error details.
+ */
+function logRetryMessage(message: string, error: unknown, errorStatus?: number, fallbackHandler?: unknown): void {
+  const showDetails = shouldLogErrorDetails(errorStatus, !!fallbackHandler);
+  
+  if (errorStatus && errorStatus >= 500) {
+    if (showDetails) {
+      console.error(message, error);
+    } else {
+      console.error(message);
+    }
+  } else {
+    if (showDetails) {
+      console.warn(message, error);
+    } else {
+      console.warn(message);
+    }
+  }
+}
+
+/**
  * Logs a message for a retry attempt when using exponential backoff.
  * @param attempt The current attempt number.
  * @param error The error that caused the retry.
  * @param errorStatus The HTTP status code of the error, if available.
+ * @param fallbackHandler Whether a fallback handler is available.
  */
 function logRetryAttempt(
   attempt: number,
   error: unknown,
   errorStatus?: number,
+  fallbackHandler?: unknown,
 ): void {
   let message = `Attempt ${attempt} failed. Retrying with backoff...`;
   if (errorStatus) {
     message = `Attempt ${attempt} failed with status ${errorStatus}. Retrying with backoff...`;
   }
 
-  if (errorStatus === 429) {
-    console.warn(message, error);
-  } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
-    console.error(message, error);
-  } else if (error instanceof Error) {
-    // Fallback for errors that might not have a status but have a message
+  // Check for errors that might not have a status but have a message
+  if (error instanceof Error && !errorStatus) {
     if (error.message.includes('429')) {
-      console.warn(
-        `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
-        error,
-      );
+      message = `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`;
+      errorStatus = 429; // Treat as 429 for logging purposes
     } else if (error.message.match(/5\d{2}/)) {
-      console.error(
-        `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
-        error,
-      );
-    } else {
-      console.warn(message, error); // Default to warn for other errors
+      message = `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`;
+      errorStatus = 500; // Treat as 5xx for logging purposes
     }
-  } else {
-    console.warn(message, error); // Default to warn if error type is unknown
   }
+
+  logRetryMessage(message, error, errorStatus, fallbackHandler);
 }
