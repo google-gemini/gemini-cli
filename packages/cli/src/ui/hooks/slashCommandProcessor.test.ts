@@ -296,19 +296,9 @@ describe('useSlashCommandProcessor', () => {
   describe('/stats command', () => {
     it('should show detailed session statistics', async () => {
       // Arrange
-      const cumulativeStats = {
-        totalTokenCount: 900,
-        promptTokenCount: 200,
-        candidatesTokenCount: 400,
-        cachedContentTokenCount: 100,
-        turnCount: 1,
-        toolUsePromptTokenCount: 50,
-        thoughtsTokenCount: 150,
-      };
       mockUseSessionStats.mockReturnValue({
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-          cumulative: cumulativeStats,
         },
       });
 
@@ -326,13 +316,50 @@ describe('useSlashCommandProcessor', () => {
         2, // Called after the user message
         expect.objectContaining({
           type: MessageType.STATS,
-          stats: cumulativeStats,
           duration: '1h 2m 3s',
         }),
         expect.any(Number),
       );
 
       vi.useRealTimers();
+    });
+
+    it('should show model-specific statistics when using /stats model', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats model');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.MODEL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show tool-specific statistics when using /stats tools', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats tools');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.TOOL_STATS,
+        }),
+        expect.any(Number),
+      );
     });
   });
 
@@ -598,7 +625,6 @@ describe('useSlashCommandProcessor', () => {
           },
           {
             type: 'quit',
-            stats: expect.any(Object),
             duration: '1h 2m 3s',
             id: expect.any(Number),
           },

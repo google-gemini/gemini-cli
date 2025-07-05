@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EditorType } from '../utils/editor.js';
+import { EditorType, openDiff } from '../utils/editor.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import * as Diff from 'diff';
-import { openDiff } from '../utils/editor.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
 import { Tool } from './tools.js';

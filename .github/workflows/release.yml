@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release (e.g., v0.1.11). Required for manual patch releases.'
+        required: true
+        type: string
+      ref:
+        description: 'The branch or ref to release from.'
+        required: true
+        type: string
+        default: 'main'
+      dry_run:
+        description: 'Whether to run the publish step in dry-run mode.'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.repository == 'google-gemini/gemini-cli'
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # For manual runs, checkout the specified ref (e.g., main). For tag pushes, checkout the tag itself.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Get the version
+        id: version
+        run: |
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Input ref: ${{ inputs.ref }}"
+            echo "Input version: ${{ inputs.version }}"
+            RELEASE_TAG=${{ inputs.version }}
+          else
+            echo "Triggering ref: ${{ github.ref }}"
+            RELEASE_TAG=${GITHUB_REF_NAME}
+          fi
+
+          echo "---"
+          echo "Initial RELEASE_TAG: ${RELEASE_TAG}"
+
+          # Validate that the tag starts with 'v' and follows semver
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Error: Version must be in the format vX.Y.Z, vX.Y.Z-prerelease, or vX.Y.Z+buildmeta"
+            exit 1
+          fi
+
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          if [[ $RELEASE_VERSION == *-* ]]; then
+            NPM_TAG=$(echo $RELEASE_VERSION | cut -d'-' -f2 | cut -d'.' -f1)
+          else
+            NPM_TAG="latest"
+          fi
+
+          echo "Finalized RELEASE_VERSION: ${RELEASE_VERSION}"
+          echo "Finalized NPM_TAG: ${NPM_TAG}"
+          echo "---"
+
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "NPM_TAG=${NPM_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Create and switch to a release branch
+        id: release_branch
+        run: |
+          BRANCH_NAME="release/${{ steps.version.outputs.RELEASE_TAG }}"
+          git switch -c $BRANCH_NAME
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Update package versions
+        run: |
+          npm run release:version ${{ steps.version.outputs.RELEASE_VERSION }}
+
+      - name: Commit package versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json packages/*/package.json
+          git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
+          git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+
+      - name: Build and Prepare Packages
+        run: |
+          npm run build:packages
+          npm run prepare:package
+
+      - name: Configure npm for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: Publish @google/gemini-cli-core
+        run: npm publish --workspace=@google/gemini-cli-core --tag=${{ steps.version.outputs.NPM_TAG }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
+
+      - name: Install latest core package
+        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.NPM_TAG }} --workspace=@google/gemini-cli --save-exact
+
+      - name: Publish @google/gemini-cli
+        run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
+
+      - name: Create GitHub Release and Tag
+        if: '!inputs.dry_run'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCH: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        run: |
+          gh release create ${{ steps.version.outputs.RELEASE_TAG }} \
+            bundle/gemini.js \
+            --target "$RELEASE_BRANCH" \
+            --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
+            --generate-notes
