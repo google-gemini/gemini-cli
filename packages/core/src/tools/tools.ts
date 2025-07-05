@@ -194,6 +194,19 @@ export interface ToolResult {
    * instead of just displaying the returnDisplay content.
    */
   uiComponents?: ToolUIComponents;
+
+  /**
+   * Indicates whether the tool is awaiting user input before completion.
+   * When true, the tool execution remains pending until user input is received.
+   */
+  awaitingUserInput?: boolean;
+
+  /**
+   * Optional callback function to handle user input for interactive tools.
+   * Called when user provides input (e.g., selects an option or enters text).
+   * Should return the final ToolResult after processing the user input.
+   */
+  onUserInput?: (input: string) => Promise<ToolResult>;
 }
 
 export type ToolResultDisplay = string | FileDiff;
@@ -211,6 +224,12 @@ export interface ToolUIComponents {
    * Type of UI component to render
    */
   type: 'question-selector' | 'roadmap-graph';
+  
+  /**
+   * The tool call ID associated with this UI component.
+   * Used to identify which tool should receive the user input.
+   */
+  callId?: string;
   
   /**
    * The main question or prompt to display (for question-selector)

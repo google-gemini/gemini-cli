@@ -1278,7 +1278,29 @@ export function useTextBuffer({
         backspace();
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (input && !key.ctrl && !key.meta) {
-        insert(input);
+        // IME handling: Check if this input would create a duplicate
+        const currentLine = lines[cursorRow] || '';
+        const beforeCursor = cpSlice(currentLine, 0, cursorCol);
+        const afterCursor = cpSlice(currentLine, cursorCol);
+        
+        // Check if the input would duplicate the character immediately before cursor
+        const isMultiByte = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(input);
+        
+        if (isMultiByte && input.length > 1) {
+          // For multi-byte IME input, check if we're not duplicating
+          const trimmedInput = input.trim();
+          if (trimmedInput && !beforeCursor.endsWith(trimmedInput)) {
+            // Clear any partial IME artifacts before inserting
+            const lastChar = beforeCursor.slice(-1);
+            if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(lastChar)) {
+              // If the last character is also multi-byte, we might be replacing it
+              backspace();
+            }
+            insert(trimmedInput);
+          }
+        } else {
+          insert(input);
+        }
       }
 
       const textChanged = text !== beforeText;

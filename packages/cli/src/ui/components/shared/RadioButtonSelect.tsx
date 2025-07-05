@@ -62,6 +62,7 @@ export function RadioButtonSelect<T>({
   isFocused, // This prop indicates if the current RadioButtonSelect group is focused
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   const handleSelect = (item: RadioSelectItem<T>) => {
+    console.log('[DEBUG] RadioButtonSelect.handleSelect called:', { item: item.value });
     onSelect(item.value);
   };
   const handleHighlight = (item: RadioSelectItem<T>) => {

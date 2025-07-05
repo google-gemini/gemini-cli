@@ -230,18 +230,27 @@ export class QuestionGeneratorTool extends BaseTool<
           allowCustomInput: questionData.type === 'discovery', // 深堀りフェーズのみ自由入力を許可
           placeholder: questionData.type === 'discovery' ? 'その他（自由入力）' : undefined,
         },
+        awaitingUserInput: true,
+        onUserInput: async (userAnswer: string) => {
+          return this.handleUserAnswer(userAnswer, questionData, params);
+        },
       };
     } catch (error) {
       const errorMessage = `Failed to generate question: ${getErrorMessage(error)}`;
+      const fallbackQuestionData = this.generateFallbackQuestion(params);
       return {
         llmContent: [{ text: `Error: ${errorMessage}` }],
         returnDisplay: `Error: ${errorMessage}`,
-        questionData: this.generateFallbackQuestion(params),
+        questionData: fallbackQuestionData,
         uiComponents: {
           type: 'question-selector',
           question: 'エラーが発生しました。基本的な質問を表示します。',
           options: ['続行する', 'やり直す'],
           allowCustomInput: false,
+        },
+        awaitingUserInput: true,
+        onUserInput: async (userAnswer: string) => {
+          return this.handleUserAnswer(userAnswer, fallbackQuestionData, params);
         },
       };
     }
@@ -710,5 +719,58 @@ ${subject}分野の理解度を評価する問題を生成してください：
    */
   getAdaptiveGenerator(): AdaptiveQuestionGenerator {
     return this.adaptiveGenerator;
+  }
+
+  /**
+   * ユーザーの回答を処理して最終結果を返す
+   */
+  private async handleUserAnswer(
+    userAnswer: string,
+    questionData: QuestionGenerationResult,
+    originalParams: QuestionGenerationParams
+  ): Promise<QuestionGenerationToolResult> {
+    // 回答の評価とフィードバック生成
+    let feedback = '';
+    let isCorrect = false;
+
+    if (questionData.type === 'assessment' && questionData.correctAnswer) {
+      // 評価問題の場合、正誤判定
+      isCorrect = userAnswer.toLowerCase().trim() === questionData.correctAnswer!.toLowerCase().trim() ||
+                  questionData.suggestedOptions.findIndex(option => 
+                    option.toLowerCase().trim() === userAnswer.toLowerCase().trim()
+                  ) === questionData.suggestedOptions.findIndex(option =>
+                    option.toLowerCase().trim() === questionData.correctAnswer!.toLowerCase().trim()
+                  );
+      
+      feedback = isCorrect 
+        ? `正解です！${questionData.explanation || ''}`
+        : `不正解です。正解は「${questionData.correctAnswer}」です。${questionData.explanation || ''}`;
+    } else {
+      // 発見的質問の場合、回答を記録
+      feedback = `回答「${userAnswer}」を記録しました。`;
+    }
+
+    // 次のステップの提案
+    let nextStepSuggestion = '';
+    if (questionData.isInformationSufficient) {
+      nextStepSuggestion = '\n\n情報収集が十分に完了しました。理解度評価フェーズに進むことをお勧めします。';
+    } else if (originalParams.phase === 'discovery') {
+      nextStepSuggestion = '\n\nさらに詳しい情報を収集するために、追加の質問を生成できます。';
+    }
+
+    const finalResult: QuestionGenerationToolResult = {
+      llmContent: [{ 
+        text: `User answered: "${userAnswer}"\nFeedback: ${feedback}${nextStepSuggestion}` 
+      }],
+      returnDisplay: `回答: ${userAnswer}\n\n${feedback}${nextStepSuggestion}`,
+      questionData: {
+        ...questionData,
+        // ユーザーの回答を記録（拡張）
+        userAnswer,
+        isCorrect: questionData.type === 'assessment' ? isCorrect : undefined,
+      } as QuestionGenerationResult & { userAnswer: string; isCorrect?: boolean },
+    };
+
+    return finalResult;
   }
 }

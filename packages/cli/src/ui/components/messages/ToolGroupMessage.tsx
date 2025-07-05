@@ -96,6 +96,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 terminalWidth={innerWidth}
                 uiComponents={tool.uiComponents}
                 onQuestionSelect={onQuestionSelect}
+                isFocused={isFocused}
                 emphasis={
                   isConfirming
                     ? 'high'

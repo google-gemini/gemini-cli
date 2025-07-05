@@ -11,6 +11,7 @@ import {
   Tool,
   ToolCallConfirmationDetails,
   ToolResult,
+  ToolUIComponents,
   ToolRegistry,
   ApprovalMode,
   EditorType,
@@ -86,7 +87,35 @@ export type WaitingToolCall = {
   outcome?: ToolConfirmationOutcome;
 };
 
+export type AwaitingUserInputToolCall = {
+  status: 'awaiting_user_input';
+  request: ToolCallRequestInfo;
+  tool: Tool;
+  onUserInput: (input: string) => Promise<ToolResult>;
+  uiComponents?: ToolUIComponents;
+  startTime?: number;
+  outcome?: ToolConfirmationOutcome;
+};
+
 export type Status = ToolCall['status'];
+
+/**
+ * Tool call states that indicate the tool has completed execution
+ * and no further processing is required.
+ */
+const TERMINAL_STATES: Status[] = ['success', 'error', 'cancelled'];
+
+/**
+ * Tool call states that indicate the tool is still active and
+ * requires further processing or user interaction.
+ */
+const NON_TERMINAL_STATES: Status[] = [
+  'validating',
+  'scheduled', 
+  'executing',
+  'awaiting_approval',
+  'awaiting_user_input'
+];
 
 export type ToolCall =
   | ValidatingToolCall
@@ -95,7 +124,8 @@ export type ToolCall =
   | SuccessfulToolCall
   | ExecutingToolCall
   | CancelledToolCall
-  | WaitingToolCall;
+  | WaitingToolCall
+  | AwaitingUserInputToolCall;
 
 export type CompletedToolCall =
   | SuccessfulToolCall
@@ -253,6 +283,11 @@ export class CoreToolScheduler {
   ): void;
   private setStatusInternal(
     targetCallId: string,
+    status: 'awaiting_user_input',
+    data: { onUserInput: (input: string) => Promise<ToolResult>; uiComponents?: ToolUIComponents },
+  ): void;
+  private setStatusInternal(
+    targetCallId: string,
     status: 'error',
     response: ToolCallResponseInfo,
   ): void;
@@ -270,6 +305,7 @@ export class CoreToolScheduler {
     newStatus: Status,
     auxiliaryData?: unknown,
   ): void {
+    console.log('[ENTER-DEBUG] setStatusInternal called:', { targetCallId, newStatus });
     this.toolCalls = this.toolCalls.map((currentCall) => {
       if (
         currentCall.request.callId !== targetCallId ||
@@ -333,6 +369,17 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
           } as WaitingToolCall;
+        case 'awaiting_user_input':
+          const awaitingInputData = auxiliaryData as { onUserInput: (input: string) => Promise<ToolResult>; uiComponents?: ToolUIComponents };
+          return {
+            request: currentCall.request,
+            tool: toolInstance,
+            status: 'awaiting_user_input',
+            onUserInput: awaitingInputData.onUserInput,
+            uiComponents: awaitingInputData.uiComponents,
+            startTime: existingStartTime,
+            outcome,
+          } as AwaitingUserInputToolCall;
         case 'scheduled':
           return {
             request: currentCall.request,
@@ -389,7 +436,9 @@ export class CoreToolScheduler {
         }
       }
     });
+    console.log('[ENTER-DEBUG] setStatusInternal calling notifyToolCallsUpdate');
     this.notifyToolCallsUpdate();
+    console.log('[ENTER-DEBUG] setStatusInternal calling checkAndNotifyCompletion');
     this.checkAndNotifyCompletion();
   }
 
@@ -404,9 +453,8 @@ export class CoreToolScheduler {
   }
 
   private isRunning(): boolean {
-    return this.toolCalls.some(
-      (call) =>
-        call.status === 'executing' || call.status === 'awaiting_approval',
+    return this.toolCalls.some((call) =>
+      NON_TERMINAL_STATES.includes(call.status),
     );
   }
 
@@ -566,9 +614,8 @@ export class CoreToolScheduler {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
-        call.status === 'cancelled' ||
-        call.status === 'success' ||
-        call.status === 'error',
+        TERMINAL_STATES.includes(call.status) ||
+        call.status === 'awaiting_user_input',
     );
 
     if (allCallsFinalOrScheduled) {
@@ -610,6 +657,15 @@ export class CoreToolScheduler {
               return;
             }
 
+            // Check if tool is awaiting user input
+            if (toolResult.awaitingUserInput && toolResult.onUserInput) {
+              this.setStatusInternal(callId, 'awaiting_user_input', {
+                onUserInput: toolResult.onUserInput,
+                uiComponents: toolResult.uiComponents,
+              });
+              return;
+            }
+
             const response = convertToFunctionResponse(
               toolName,
               callId,
@@ -641,15 +697,24 @@ export class CoreToolScheduler {
     }
   }
 
+  /**
+   * Checks if all tool calls have reached a terminal state and notifies completion.
+   * Terminal states are: 'success', 'error', 'cancelled'
+   * Non-terminal states that should keep the scheduler active: 
+   * 'awaiting_user_input', 'awaiting_approval', 'executing', 'validating', 'scheduled'
+   */
   private checkAndNotifyCompletion(): void {
-    const allCallsAreTerminal = this.toolCalls.every(
-      (call) =>
-        call.status === 'success' ||
-        call.status === 'error' ||
-        call.status === 'cancelled',
+    console.log('[ENTER-DEBUG] checkAndNotifyCompletion called, current tools:', 
+      this.toolCalls.map(call => ({ callId: call.request.callId, status: call.status })));
+    
+    const allCallsAreTerminal = this.toolCalls.every((call) =>
+      TERMINAL_STATES.includes(call.status),
     );
 
+    console.log('[ENTER-DEBUG] All calls terminal?', allCallsAreTerminal);
+
     if (this.toolCalls.length > 0 && allCallsAreTerminal) {
+      console.log('[ENTER-DEBUG] Clearing toolCalls and notifying completion');
       const completedCalls = [...this.toolCalls] as CompletedToolCall[];
       this.toolCalls = [];
 
@@ -667,6 +732,65 @@ export class CoreToolScheduler {
   private notifyToolCallsUpdate(): void {
     if (this.onToolCallsUpdate) {
       this.onToolCallsUpdate([...this.toolCalls]);
+    }
+  }
+
+  /**
+   * Handle user input for a tool call that is awaiting user input.
+   * This method should only be called when a tool is in 'awaiting_user_input' state.
+   * @param callId The ID of the tool call awaiting user input
+   * @param userInput The input provided by the user
+   */
+  async handleUserInput(callId: string, userInput: string): Promise<void> {
+    console.log('[ENTER-DEBUG] Core.handleUserInput called:', { callId, userInput });
+    
+    const allToolCalls = this.toolCalls.map(call => ({ 
+      callId: call.request.callId, 
+      status: call.status 
+    }));
+    console.log('[ENTER-DEBUG] Current tool states:', allToolCalls);
+    
+    const toolCall = this.toolCalls.find(
+      (call) => call.request.callId === callId && call.status === 'awaiting_user_input',
+    );
+
+    if (!toolCall || toolCall.status !== 'awaiting_user_input') {
+      console.warn(`[ENTER-DEBUG] Tool call ${callId} is not awaiting user input. Found tool:`, 
+        toolCall ? { callId: toolCall.request.callId, status: toolCall.status } : 'NOT_FOUND');
+      throw new Error(`Tool call ${callId} is not awaiting user input. Current status: ${toolCall?.status || 'NOT_FOUND'}`);
+    }
+
+    const awaitingInputCall = toolCall as AwaitingUserInputToolCall;
+    try {
+      console.log('[ENTER-DEBUG] Core.handleUserInput processing user input...');
+      const finalResult = await awaitingInputCall.onUserInput(userInput);
+      console.log('[ENTER-DEBUG] Core.handleUserInput got result, setting to success');
+      
+      const response = convertToFunctionResponse(
+        awaitingInputCall.request.name,
+        callId,
+        finalResult.llmContent,
+      );
+
+      const successResponse: ToolCallResponseInfo = {
+        callId,
+        responseParts: response,
+        resultDisplay: finalResult.returnDisplay,
+        error: undefined,
+        uiComponents: finalResult.uiComponents,
+      };
+      
+      this.setStatusInternal(callId, 'success', successResponse);
+      console.log('[ENTER-DEBUG] Core.handleUserInput completed successfully');
+    } catch (error) {
+      this.setStatusInternal(
+        callId,
+        'error',
+        createErrorResponse(
+          awaitingInputCall.request,
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      );
     }
   }
 }

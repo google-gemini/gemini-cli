@@ -16,7 +16,7 @@ import {
   useInput,
   type Key as InkKeyType,
 } from 'ink';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import { StreamingState, type HistoryItem, MessageType, ToolCallStatus } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -132,6 +132,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [isHandlingUserInput, setIsHandlingUserInput] = useState<boolean>(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -409,6 +410,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    handleUserInput,
+    toolCalls,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -437,13 +440,59 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     [submitQuery],
   );
 
+  // 質問選択UIが表示されているかどうかをチェック
+  const hasAwaitingUserInputTool = toolCalls.some(
+    (tool) => tool.status === 'awaiting_user_input'
+  );
+
   // 教育ツールの質問選択処理
   const handleQuestionSelect = useCallback(
-    (answer: string, optionIndex?: number) => {
-      // 選択された回答をエージェントに送信
-      submitQuery(answer);
+    async (answer: string, optionIndex?: number) => {
+      console.log('[ENTER-DEBUG] App.handleQuestionSelect called:', { answer, isHandlingUserInput });
+      
+      // 重複実行を防ぐ
+      if (isHandlingUserInput) {
+        console.log('[DEBUG] Already handling user input, ignoring this call');
+        return;
+      }
+      
+      setIsHandlingUserInput(true);
+      
+      try {
+        // ユーザー入力を待機しているツールを探す
+        const awaitingInputTool = toolCalls.find(
+          (tool) => tool.status === 'awaiting_user_input'
+        );
+        
+        console.log('[DEBUG] Found awaiting tool:', { 
+          found: !!awaitingInputTool, 
+          callId: awaitingInputTool?.request.callId 
+        });
+        
+        if (awaitingInputTool) {
+          // ツールのhandleUserInputを呼び出す
+          console.log('[DEBUG] Calling handleUserInput:', { 
+            callId: awaitingInputTool.request.callId, 
+            answer 
+          });
+          try {
+            await handleUserInput(awaitingInputTool.request.callId, answer);
+            console.log('[DEBUG] handleUserInput succeeded');
+          } catch (error) {
+            console.error('[DEBUG] handleUserInput failed:', error);
+            // Core側でツールが見つからない場合は通常の入力として処理
+            submitQuery(answer);
+          }
+        } else {
+          // フォールバック: 従来の方法で処理
+          console.log('[DEBUG] Fallback: calling submitQuery:', { answer });
+          submitQuery(answer);
+        }
+      } finally {
+        setIsHandlingUserInput(false);
+      }
     },
-    [submitQuery],
+    [toolCalls, handleUserInput, submitQuery, isHandlingUserInput],
   );
 
   const logger = useLogger();
@@ -485,7 +534,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputActive = streamingState === StreamingState.Idle && !initError && !hasAwaitingUserInputTool;
 
   const handleClearScreen = useCallback(() => {
     clearItems();

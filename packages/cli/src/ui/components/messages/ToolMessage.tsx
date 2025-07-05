@@ -32,6 +32,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
   onQuestionSelect?: (answer: string, optionIndex?: number) => void;
+  isFocused?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -45,6 +46,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   renderOutputAsMarkdown = true,
   uiComponents,
   onQuestionSelect,
+  isFocused = false,
 }) => {
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -133,6 +135,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               }}
               allowCustomInput={uiComponents.allowCustomInput || false}
               customInputPlaceholder={uiComponents.placeholder}
+              isFocused={isFocused && status === ToolCallStatus.AwaitingUserInput}
             />
           </Box>
         </Box>

@@ -109,7 +109,7 @@ export const useGeminiStream = (
     return new GitService(config.getProjectRoot());
   }, [config]);
 
-  const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
+  const [toolCalls, scheduleToolCalls, markToolsAsSubmitted, handleUserInput] =
     useReactToolScheduler(
       async (completedToolCallsFromScheduler) => {
         // This onComplete is called when ALL scheduled tools for a given batch are done.
@@ -802,5 +802,7 @@ export const useGeminiStream = (
     initError,
     pendingHistoryItems,
     thought,
+    handleUserInput,
+    toolCalls, // ツールの状態情報を追加
   };
 };

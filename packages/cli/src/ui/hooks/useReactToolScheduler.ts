@@ -11,6 +11,7 @@ import {
   ScheduledToolCall,
   ValidatingToolCall,
   WaitingToolCall,
+  AwaitingUserInputToolCall,
   CompletedToolCall,
   CancelledToolCall,
   CoreToolScheduler,
@@ -35,6 +36,7 @@ export type ScheduleFn = (
   signal: AbortSignal,
 ) => void;
 export type MarkToolsAsSubmittedFn = (callIds: string[]) => void;
+export type HandleUserInputFn = (callId: string, userInput: string) => Promise<void>;
 
 export type TrackedScheduledToolCall = ScheduledToolCall & {
   responseSubmittedToGemini?: boolean;
@@ -43,6 +45,9 @@ export type TrackedValidatingToolCall = ValidatingToolCall & {
   responseSubmittedToGemini?: boolean;
 };
 export type TrackedWaitingToolCall = WaitingToolCall & {
+  responseSubmittedToGemini?: boolean;
+};
+export type TrackedAwaitingUserInputToolCall = AwaitingUserInputToolCall & {
   responseSubmittedToGemini?: boolean;
 };
 export type TrackedExecutingToolCall = ExecutingToolCall & {
@@ -59,6 +64,7 @@ export type TrackedToolCall =
   | TrackedScheduledToolCall
   | TrackedValidatingToolCall
   | TrackedWaitingToolCall
+  | TrackedAwaitingUserInputToolCall
   | TrackedExecutingToolCall
   | TrackedCompletedToolCall
   | TrackedCancelledToolCall;
@@ -70,7 +76,7 @@ export function useReactToolScheduler(
     React.SetStateAction<HistoryItemWithoutId | null>
   >,
   getPreferredEditor: () => EditorType | undefined,
-): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn] {
+): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn, HandleUserInputFn] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
   >([]);
@@ -174,7 +180,16 @@ export function useReactToolScheduler(
     [],
   );
 
-  return [toolCallsForDisplay, schedule, markToolsAsSubmitted];
+  const handleUserInput: HandleUserInputFn = useCallback(
+    async (callId: string, userInput: string) => {
+      console.log('[ENTER-DEBUG] React.handleUserInput START:', { callId });
+      await scheduler.handleUserInput(callId, userInput);
+      console.log('[ENTER-DEBUG] React.handleUserInput DONE:', { callId });
+    },
+    [scheduler],
+  );
+
+  return [toolCallsForDisplay, schedule, markToolsAsSubmitted, handleUserInput];
 }
 
 /**
@@ -186,6 +201,8 @@ function mapCoreStatusToDisplayStatus(coreStatus: CoreStatus): ToolCallStatus {
       return ToolCallStatus.Executing;
     case 'awaiting_approval':
       return ToolCallStatus.Confirming;
+    case 'awaiting_user_input':
+      return ToolCallStatus.AwaitingUserInput;
     case 'executing':
       return ToolCallStatus.Executing;
     case 'success':
@@ -273,6 +290,14 @@ export function mapToDisplay(
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: undefined,
             confirmationDetails: trackedCall.confirmationDetails,
+          };
+        case 'awaiting_user_input':
+          return {
+            ...baseDisplayProperties,
+            status: mapCoreStatusToDisplayStatus(trackedCall.status),
+            resultDisplay: undefined,
+            confirmationDetails: undefined,
+            uiComponents: (trackedCall as TrackedAwaitingUserInputToolCall).uiComponents,
           };
         case 'executing':
           return {

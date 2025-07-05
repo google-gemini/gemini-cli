@@ -51,6 +51,8 @@ export function useKeypress(
     const rl = readline.createInterface({ input: stdin });
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
+    let isComposing = false;
+    let composingBuffer = '';
 
     const handleKeypress = (_: unknown, key: Key) => {
       if (key.name === 'paste-start') {
@@ -74,7 +76,42 @@ export function useKeypress(
           if (key.name === 'return' && key.sequence === '\x1B\r') {
             key.meta = true;
           }
-          onKeypressRef.current({ ...key, paste: isPaste });
+
+          // IME composition handling
+          if (key.sequence && key.sequence.length > 1 && !key.ctrl && !key.meta && !key.name) {
+            // This might be a multi-byte character (e.g., from IME)
+            const sequence = key.sequence;
+            
+            // Check if this is likely IME input (contains multi-byte characters)
+            const isMultiByte = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(sequence);
+            
+            if (isMultiByte) {
+              // For IME input, we need to handle composition properly
+              if (isComposing) {
+                // If we're already composing, this might be an update
+                composingBuffer = sequence;
+              } else {
+                // Start of composition
+                isComposing = true;
+                composingBuffer = sequence;
+              }
+              
+              // Send the complete composed text
+              onKeypressRef.current({
+                ...key,
+                paste: isPaste,
+                sequence: composingBuffer,
+              });
+              
+              // Reset composition state
+              isComposing = false;
+              composingBuffer = '';
+            } else {
+              onKeypressRef.current({ ...key, paste: isPaste });
+            }
+          } else {
+            onKeypressRef.current({ ...key, paste: isPaste });
+          }
         }
       }
     };

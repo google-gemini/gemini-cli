@@ -22,6 +22,8 @@ export interface OptionSelectorProps {
   customInputPlaceholder?: string;
   /** 無効化フラグ */
   disabled?: boolean;
+  /** フォーカス状態 */
+  isFocused?: boolean;
 }
 
 type SelectionMode = 'options' | 'custom-input';
@@ -36,6 +38,7 @@ export const OptionSelector: React.FC<OptionSelectorProps> = ({
   allowCustomInput = false,
   customInputPlaceholder = 'カスタム入力',
   disabled = false,
+  isFocused = true,
 }) => {
   const [mode, setMode] = useState<SelectionMode>('options');
   const [customInput, setCustomInput] = useState('');
@@ -61,6 +64,7 @@ export const OptionSelector: React.FC<OptionSelectorProps> = ({
 
   // 選択肢選択時の処理
   const handleOptionSelect = useCallback((value: string) => {
+    console.log('[DEBUG] OptionSelector.handleOptionSelect called:', { value, disabled });
     if (disabled) return;
 
     if (value === 'custom') {
@@ -70,6 +74,7 @@ export const OptionSelector: React.FC<OptionSelectorProps> = ({
 
     const index = parseInt(value, 10);
     setSelectedOptionIndex(index);
+    console.log('[DEBUG] OptionSelector calling onSelect:', { answer: options[index], index });
     onSelect(options[index], index);
   }, [options, onSelect, disabled]);
 
@@ -139,7 +144,7 @@ export const OptionSelector: React.FC<OptionSelectorProps> = ({
       <RadioButtonSelect
         items={radioOptions}
         onSelect={handleOptionSelect}
-        isFocused={!disabled}
+        isFocused={isFocused && !disabled}
         initialIndex={0}
       />
 
