@@ -173,12 +173,12 @@ async function configureGhostty(): Promise<TerminalSetupResult> {
 
     let modified = false;
 
-    if (!content.includes('performable:shift+enter=')) {
+    if (!content.includes(shiftEnterLine)) {
       content += '\n# Gemini CLI keybindings\n' + shiftEnterLine + '\n';
       modified = true;
     }
 
-    if (!content.includes('performable:ctrl+enter=')) {
+    if (!content.includes(ctrlEnterLine)) {
       content += ctrlEnterLine + '\n';
       modified = true;
     }
@@ -223,13 +223,13 @@ async function configureUrxvt(): Promise<TerminalSetupResult> {
 
     let modified = false;
 
-    if (!content.includes('URxvt.keysym.S-Return:')) {
+    if (!content.includes(shiftEnterLine)) {
       content +=
         '\n! Gemini CLI keybindings for URxvt\n' + shiftEnterLine + '\n';
       modified = true;
     }
 
-    if (!content.includes('URxvt.keysym.C-Return:')) {
+    if (!content.includes(ctrlEnterLine)) {
       content += ctrlEnterLine + '\n';
       modified = true;
     }
@@ -267,6 +267,15 @@ async function configureVSCode(): Promise<TerminalSetupResult> {
       'Code',
       'User',
     );
+  } else if (platform === 'win32') {
+    if (!process.env.APPDATA) {
+      return {
+        success: false,
+        message:
+          'Could not determine VS Code config path on Windows: APPDATA environment variable is not set.',
+      };
+    }
+    configDir = path.join(process.env.APPDATA, 'Code', 'User');
   } else {
     configDir = path.join(os.homedir(), '.config', 'Code', 'User');
   }
