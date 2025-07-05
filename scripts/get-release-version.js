@@ -37,10 +37,10 @@ export function getReleaseVersion() {
   let releaseTag;
 
   if (isNightly) {
-    console.log('Calculating next nightly version...');
+    console.error('Calculating next nightly version...');
     releaseTag = getNightlyTagName();
   } else if (manualVersion) {
-    console.log(`Using manual version: ${manualVersion}`);
+    console.error(`Using manual version: ${manualVersion}`);
     releaseTag = manualVersion;
   } else {
     throw new Error(
@@ -53,7 +53,7 @@ export function getReleaseVersion() {
   }
 
   if (!releaseTag.startsWith('v')) {
-    console.log("Version is missing 'v' prefix. Prepending it.");
+    console.error("Version is missing 'v' prefix. Prepending it.");
     releaseTag = `v${releaseTag}`;
   }
 
