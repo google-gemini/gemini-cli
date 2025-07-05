@@ -199,10 +199,19 @@ export interface FileDiff {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   fileName: string;
   fileDiff: string;
   isModifying?: boolean;
+}
+
+export interface ToolConfirmationPayload {
+  // used to override `modifiedProposedContent` for modifiable tools in the
+  // inline modify flow
+  newContent: string;
 }
 
 export interface ToolExecuteConfirmationDetails {

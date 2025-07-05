@@ -17,6 +17,7 @@ import {
   Config,
   logToolCall,
   ToolCallEvent,
+  ToolConfirmationPayload,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -25,6 +26,7 @@ import {
   ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
+import * as Diff from 'diff';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -455,12 +457,16 @@ export class CoreToolScheduler {
             const originalOnConfirm = confirmationDetails.onConfirm;
             const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
               ...confirmationDetails,
-              onConfirm: (outcome: ToolConfirmationOutcome) =>
+              onConfirm: (
+                outcome: ToolConfirmationOutcome,
+                payload?: ToolConfirmationPayload,
+              ) =>
                 this.handleConfirmationResponse(
                   reqInfo.callId,
                   originalOnConfirm,
                   outcome,
                   signal,
+                  payload,
                 ),
             };
             this.setStatusInternal(
@@ -492,6 +498,7 @@ export class CoreToolScheduler {
     originalOnConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>,
     outcome: ToolConfirmationOutcome,
     signal: AbortSignal,
+    payload?: ToolConfirmationPayload,
   ): Promise<void> {
     const toolCall = this.toolCalls.find(
       (c) => c.request.callId === callId && c.status === 'awaiting_approval',
@@ -545,9 +552,60 @@ export class CoreToolScheduler {
         } as ToolCallConfirmationDetails);
       }
     } else {
+      // If the client provided new content, apply it before scheduling.
+      if (payload?.newContent && toolCall) {
+        await this._applyInlineModify(
+          toolCall as WaitingToolCall,
+          payload,
+          signal,
+        );
+      }
       this.setStatusInternal(callId, 'scheduled');
     }
     this.attemptExecutionOfScheduledCalls(signal);
+  }
+
+  /**
+   * Applies user-provided content changes to a tool call that is awaiting confirmation.
+   * This method updates the tool's arguments and refreshes the confirmation prompt with a new diff
+   * before the tool is scheduled for execution.
+   * @private
+   */
+  private async _applyInlineModify(
+    toolCall: WaitingToolCall,
+    payload: ToolConfirmationPayload,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (
+      toolCall.confirmationDetails.type !== 'edit' ||
+      !isModifiableTool(toolCall.tool)
+    ) {
+      return;
+    }
+
+    const modifyContext = toolCall.tool.getModifyContext(signal);
+    const currentContent = await modifyContext.getCurrentContent(
+      toolCall.request.args,
+    );
+
+    const updatedParams = modifyContext.createUpdatedParams(
+      currentContent,
+      payload.newContent,
+      toolCall.request.args,
+    );
+    const updatedDiff = Diff.createPatch(
+      modifyContext.getFilePath(toolCall.request.args),
+      currentContent,
+      payload.newContent,
+      'Current',
+      'Proposed',
+    );
+
+    this.setArgsInternal(toolCall.request.callId, updatedParams);
+    this.setStatusInternal(toolCall.request.callId, 'awaiting_approval', {
+      ...toolCall.confirmationDetails,
+      fileDiff: updatedDiff,
+    });
   }
 
   private attemptExecutionOfScheduledCalls(signal: AbortSignal): void {
