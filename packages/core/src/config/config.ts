@@ -65,6 +65,22 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
+export interface GeminiSettings {
+  apiKey?: string;
+}
+
+export interface VertexSettings {
+  apiKey?: string;
+  project?: string; // GoogleGenAIOptions.project
+  location?: string; // GoogleGenAIOptions.location
+  labels?: Record<string, string>; // GenerateContentConfig.labels
+}
+
+export interface AuthSettings {
+  gemini?: GeminiSettings;
+  vertex?: VertexSettings;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -130,6 +146,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  auth?: AuthSettings;
 }
 
 export class Config {
@@ -168,6 +185,7 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
+  private readonly auth: AuthSettings | undefined;
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
 
@@ -211,6 +229,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.auth = params.auth;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -443,6 +462,10 @@ export class Config {
 
   getExtensionContextFilePaths(): string[] {
     return this.extensionContextFilePaths;
+  }
+
+  getAuth(): AuthSettings | undefined {
+    return this.auth;
   }
 
   async getGitService(): Promise<GitService> {

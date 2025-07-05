@@ -52,6 +52,7 @@ export class GeminiClient {
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
+    labels: {},
   };
   private readonly MAX_TURNS = 100;
   private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
@@ -62,6 +63,14 @@ export class GeminiClient {
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+
+    const auth = config.getAuth();
+    const labels = auth?.vertex?.labels || {};
+    const version = process.env.CLI_VERSION || process.version;
+    this.generateContentConfig.labels = {
+      'gemini-cli': version,
+      ...labels,
+    };
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {

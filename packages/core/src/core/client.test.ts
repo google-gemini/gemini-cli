@@ -129,6 +129,7 @@ describe('Gemini Client (client.ts)', () => {
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
+        getAuth: vi.fn().mockReturnValue(undefined),
       };
       return mock as unknown as Config;
     });
@@ -163,6 +164,31 @@ describe('Gemini Client (client.ts)', () => {
   // uses the `mockGenerateContentFn`.
   // it('generateJson should call getCoreSystemPrompt with userMemory and pass to generateContent', async () => { ... });
   // it('generateJson should call getCoreSystemPrompt with empty string if userMemory is empty', async () => { ... });
+
+  describe('generateContentConfig', () => {
+    it('should set labels in generateContentConfig when config provides it', async () => {
+      const MockedConfig = vi.mocked(Config, true);
+      MockedConfig.mockImplementation(() => {
+        const mock = {
+          getModel: vi.fn().mockReturnValue('test-model'),
+          getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+          getProxy: vi.fn().mockReturnValue(undefined),
+          getAuth: vi
+            .fn()
+            .mockReturnValue({ vertex: { labels: { example: 'my-label' } } }),
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return mock as any;
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mockConfig = new Config({} as any);
+      const thisClient = new GeminiClient(mockConfig);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((thisClient as any).generateContentConfig.labels.example).toBe(
+        'my-label',
+      );
+    });
+  });
 
   describe('generateEmbedding', () => {
     const texts = ['hello world', 'goodbye world'];
@@ -280,6 +306,9 @@ describe('Gemini Client (client.ts)', () => {
           systemInstruction: getCoreSystemPrompt(''),
           temperature: 0.5,
           topP: 1,
+          labels: {
+            'gemini-cli': expect.any(String),
+          },
         },
         contents,
       });
@@ -310,6 +339,9 @@ describe('Gemini Client (client.ts)', () => {
           topP: 1,
           responseSchema: schema,
           responseMimeType: 'application/json',
+          labels: {
+            'gemini-cli': expect.any(String),
+          },
         },
         contents,
       });

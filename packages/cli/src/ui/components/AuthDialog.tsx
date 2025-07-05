@@ -41,7 +41,7 @@ export function AuthDialog({
   }
 
   const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethod(authMethod);
+    const error = validateAuthMethod(settings.merged, authMethod);
     if (error) {
       setErrorMessage(error);
     } else {

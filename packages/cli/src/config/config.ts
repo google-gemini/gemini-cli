@@ -61,7 +61,6 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'm',
       type: 'string',
       description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     })
     .option('prompt', {
       alias: 'p',
@@ -244,8 +243,13 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model!,
+    model:
+      argv.model ||
+      settings.model ||
+      process.env.GEMINI_MODEL ||
+      DEFAULT_GEMINI_MODEL,
     extensionContextFilePaths,
+    auth: settings.auth,
   });
 }
 
