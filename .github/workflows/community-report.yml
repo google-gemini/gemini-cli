@@ -13,6 +13,7 @@ on:
 jobs:
   generate-report:
     name: Generate Report 📝
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
