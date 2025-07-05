@@ -12,6 +12,8 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
 
+import Link from 'ink-link';
+
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
   settings: LoadedSettings;
@@ -90,11 +92,9 @@ export function AuthDialog({
         <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={Colors.AccentBlue}>
-          {
-            'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
-          }
-        </Text>
+        <Link url="https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md">
+          https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md
+        </Link>
       </Box>
     </Box>
   );
