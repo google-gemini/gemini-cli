@@ -20,7 +20,7 @@ This project follows a structured release process to ensure that all packages ar
 
 ## Current Theory
 
-For most all changes, simply patching the minor version is acceptable. We can and should release frequently; the more often we release the easier it is to tell what change broke something. Developeres are encouraged to push a release as described below after their branch merges. I also think I'm open to doing the release publishing steps as a part of an existing PR, though this could have more churn if others are also releasing and version numbers change frequently.
+For most all changes, simply patching the minor version is acceptable. We can and should release frequently; the more often we release the easier it is to tell what change broke something. Developers are encouraged to push a release as described below after their branch merges. I also think I'm open to doing the release publishing steps as a part of an existing PR, though this could have more churn if others are also releasing and version numbers change frequently.
 
 ## How To Release
 
@@ -78,7 +78,7 @@ Pushing a new tag will trigger the [release workflow](https://github.com/google-
 - Create a new GitHub release with generated release notes.
 - Create a new branch `release/vX.Y.Z` containing the version bump in the `package.json` files.
 
-We also run a Gooogle cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main relase file once service account permissions are sorted out.
+We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
 
 ### 2. Monitor the Release Workflow
 

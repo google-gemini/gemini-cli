@@ -103,7 +103,7 @@ export async function main() {
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
   // set default fallback to gemini api key
-  // this has to go after load cli because thats where the env is set
+  // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
     settings.setValue(
       SettingScope.User,
@@ -184,7 +184,7 @@ export async function main() {
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !input) {
     input += await readStdin();
   }
   if (!input) {
