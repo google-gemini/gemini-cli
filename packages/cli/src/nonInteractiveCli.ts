@@ -20,6 +20,8 @@ import {
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
+import { isAtCommand } from './ui/utils/commandUtils.js';
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {
@@ -60,7 +62,25 @@ export async function runNonInteractive(
 
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
+  
+  // Process @file commands if present
+  let processedInput: string | any = input;
+  if (isAtCommand(input)) {
+    const atCommandResult = await handleAtCommand({
+      query: input,
+      config,
+      addItem: () => Date.now(), // Non-interactive mode doesn't need history, return timestamp as ID
+      onDebugMessage: () => {}, // Non-interactive mode doesn't need debug messages
+      messageId: Date.now(),
+      signal: abortController.signal,
+    });
+    
+    if (atCommandResult.processedQuery) {
+      processedInput = atCommandResult.processedQuery;
+    }
+  }
+  
+  let currentMessages: Content[] = [{ role: 'user', parts: typeof processedInput === 'string' ? [{ text: processedInput }] : processedInput }];
 
   try {
     while (true) {
