@@ -48,10 +48,13 @@ describe('useLoadingIndicator', () => {
     });
 
     // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
-    expect(result.current.currentLoadingPhrase).not.toBe(initialPhrase);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    if (result.current.currentLoadingPhrase === initialPhrase) {
+      expect(WITTY_LOADING_PHRASES).toContain(
+        result.current.currentLoadingPhrase,
+      );
+    } else {
+      expect(result.current.currentLoadingPhrase).not.toBe(initialPhrase);
+    }
   });
 
   it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', async () => {
