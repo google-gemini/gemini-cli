@@ -27,7 +27,13 @@ import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { loadSandboxConfig } from './sandboxConfig.js';
+import {
+  loadSandboxConfig,
+  SANDBOX_OPTIONS,
+  SANDBOX_LEGACY_OPTIONS,
+  SandboxOption,
+  SandboxLegacyOption,
+} from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -41,8 +47,8 @@ const logger = {
 
 interface CliArgs {
   model: string | undefined;
-  sandbox: boolean | string | undefined;
-  'sandbox-image': string | undefined;
+  sandbox?: Exclude<SandboxOption, SandboxLegacyOption>;
+  'sandbox-image'?: string;
   debug: boolean | undefined;
   prompt: string | undefined;
   all_files: boolean | undefined;
@@ -70,8 +76,13 @@ async function parseArguments(): Promise<CliArgs> {
     })
     .option('sandbox', {
       alias: 's',
-      type: 'boolean',
-      description: 'Run in sandbox?',
+      type: 'string',
+      choices: SANDBOX_OPTIONS.filter(
+        (o): o is Exclude<SandboxOption, SandboxLegacyOption> =>
+          !SANDBOX_LEGACY_OPTIONS.find((lo) => lo === o),
+      ),
+      description:
+        "Set the sandboxing command for tool execution. Use 'auto' to autodetect a supported platform, or specify one directly (e.g., 'docker', 'podman').",
     })
     .option('sandbox-image', {
       type: 'string',
@@ -196,7 +207,12 @@ export async function loadCliConfig(
   const mcpServers = mergeMcpServers(settings, extensions);
   const excludeTools = mergeExcludeTools(settings, extensions);
 
-  const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const sandboxConfig = await loadSandboxConfig(settings, argv).catch(
+    (e: Error) => {
+      console.error(e.message);
+      process.exit(1);
+    },
+  );
 
   return new Config({
     sessionId,

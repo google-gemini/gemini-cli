@@ -84,7 +84,7 @@ const commandExists = (cmd) => {
 };
 
 let command = '';
-if (['1', 'true'].includes(geminiSandbox)) {
+if (['1', 'true', 'auto'].includes(geminiSandbox)) {
   if (commandExists('docker')) {
     command = 'docker';
   } else if (commandExists('podman')) {
@@ -95,7 +95,7 @@ if (['1', 'true'].includes(geminiSandbox)) {
     );
     process.exit(1);
   }
-} else if (geminiSandbox && !['0', 'false'].includes(geminiSandbox)) {
+} else if (geminiSandbox && !['0', 'false', 'none'].includes(geminiSandbox)) {
   if (commandExists(geminiSandbox)) {
     command = geminiSandbox;
   } else {

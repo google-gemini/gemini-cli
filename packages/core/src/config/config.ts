@@ -87,8 +87,17 @@ export class MCPServerConfig {
   ) {}
 }
 
+export const SUPPORTED_SANDBOX_COMMANDS = [
+  'docker',
+  'podman',
+  'sandbox-exec',
+] as const;
+
+export type SupportedSandboxCommand =
+  (typeof SUPPORTED_SANDBOX_COMMANDS)[number];
+
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec';
+  command: SupportedSandboxCommand;
   image: string;
 }
 
