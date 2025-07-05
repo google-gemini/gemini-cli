@@ -38,6 +38,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  USE_COPILOT_AGENT = 'copilot-agent',
 }
 
 export type ContentGeneratorConfig = {

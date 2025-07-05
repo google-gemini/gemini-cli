@@ -35,5 +35,16 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.USE_COPILOT_AGENT) {
+    if (!process.env.COPILOT_AGENT_ENDPOINT) {
+      return 'COPILOT_AGENT_ENDPOINT environment variable not found. Add that to your .env and try again, no reload needed!';
+    }
+    // Optionally check for API key if required
+    // if (!process.env.COPILOT_AGENT_API_KEY) {
+    //   return 'COPILOT_AGENT_API_KEY environment variable not found. Add that to your .env and try again, no reload needed!';
+    // }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 };

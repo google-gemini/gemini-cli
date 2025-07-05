@@ -3,8 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "jsx": "react-jsx",
-    "lib": ["DOM", "DOM.Iterable", "ES2020"],
-    "types": ["node", "vitest/globals"]
+    "lib": ["DOM", "DOM.Iterable", "ES2020", "ES2022.Intl"],
+    "types": ["node", "vitest/globals"],
+    "skipLibCheck": true
   },
   "include": [
     "index.ts",

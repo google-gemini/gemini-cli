@@ -54,6 +54,8 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  copilotAgentEndpoint?: string;
+  copilotAgentApiKey?: string;
 
   // Git-aware file filtering settings
   fileFiltering?: {

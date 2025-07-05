@@ -9,10 +9,11 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "gemini": "dist/index.js",
+    "gemini-copilot-agent": "dist/copilot/cli-copilot-agent.js"
   },
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "build": "node ../../scripts/build_package.js && tsc src/copilot/cli-copilot-agent.ts --outDir dist/copilot --esModuleInterop --module commonjs --target es2020",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
@@ -48,6 +49,7 @@
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
+    "semver": "^7.7.2",
     "shell-quote": "^1.8.2",
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
@@ -59,9 +61,11 @@
     "@babel/runtime": "^7.27.6",
     "@testing-library/react": "^16.3.0",
     "@types/command-exists": "^1.2.3",
-    "@types/diff": "^7.0.2",
+    "@types/diff": "^5.0.7",
     "@types/dotenv": "^6.1.1",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^20.11.24",
+    "@types/node-fetch": "^2.6.12",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@types/semver": "^7.7.0",

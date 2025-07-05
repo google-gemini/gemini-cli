@@ -11,6 +11,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
+import TextInput from 'ink-text-input';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -26,10 +27,17 @@ export function AuthDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialErrorMessage || null,
   );
+  const [copilotEndpoint, setCopilotEndpoint] = useState(
+    settings.merged.copilotAgentEndpoint || '',
+  );
+  const [copilotApiKey, setCopilotApiKey] = useState(
+    settings.merged.copilotAgentApiKey || '',
+  );
   const items = [
     { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
     { label: 'Gemini API Key (AI Studio)', value: AuthType.USE_GEMINI },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'GitHub Copilot Agent', value: AuthType.USE_COPILOT_AGENT },
   ];
 
   let initialAuthIndex = items.findIndex(
@@ -46,6 +54,10 @@ export function AuthDialog({
       setErrorMessage(error);
     } else {
       setErrorMessage(null);
+      if (authMethod === AuthType.USE_COPILOT_AGENT) {
+        settings.setValue(SettingScope.User, 'copilotAgentEndpoint', copilotEndpoint);
+        settings.setValue(SettingScope.User, 'copilotAgentApiKey', copilotApiKey);
+      }
       onSelect(authMethod, SettingScope.User);
     }
   };
@@ -62,6 +74,12 @@ export function AuthDialog({
       onSelect(undefined, SettingScope.User);
     }
   });
+
+  // Show Copilot fields if selected
+  const showCopilotFields = items[initialAuthIndex].value === AuthType.USE_COPILOT_AGENT;
+
+  const handleCopilotEndpointChange = (value: string) => setCopilotEndpoint(value);
+  const handleCopilotApiKeyChange = (value: string) => setCopilotApiKey(value);
 
   return (
     <Box
@@ -96,6 +114,27 @@ export function AuthDialog({
           }
         </Text>
       </Box>
+      {showCopilotFields && (
+        <>
+          <Box marginTop={1} flexDirection="column">
+            <Text>Copilot Agent Endpoint:</Text>
+            <TextInput
+              value={copilotEndpoint}
+              onChange={handleCopilotEndpointChange}
+              placeholder="http://localhost:3000/api/agent"
+            />
+          </Box>
+          <Box marginTop={1} flexDirection="column">
+            <Text>Copilot Agent API Key (optional):</Text>
+            <TextInput
+              value={copilotApiKey}
+              onChange={handleCopilotApiKeyChange}
+              placeholder="sk-..."
+              mask="*"
+            />
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
