@@ -98,8 +98,8 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
-    expect(output).toContain('1,000');
-    expect(output).toContain('25,000');
+    expect(output).toContain('1\u00A0000');
+    expect(output).toContain('25\u00A0000');
     expect(output).toMatchSnapshot();
   });
 

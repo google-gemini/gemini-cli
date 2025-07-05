@@ -1193,13 +1193,14 @@ export function useTextBuffer({
         deleteWordLeft();
       else if ((key.meta || key.ctrl) && key.name === 'delete')
         deleteWordRight();
-      else if (
-        key.name === 'backspace' ||
-        input === '\x7f' ||
-        (key.ctrl && key.name === 'h')
-      )
+      else if (key.name === 'backspace' || (key.ctrl && key.name === 'h'))
         backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
+      else if (
+        key.name === 'delete' ||
+        input === '\x7f' ||
+        (key.ctrl && key.name === 'd')
+      )
+        del();
       else if (input && !key.ctrl && !key.meta) {
         insert(input);
       }
