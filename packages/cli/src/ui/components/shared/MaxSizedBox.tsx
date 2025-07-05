@@ -278,7 +278,10 @@ function visitBoxRow(element: React.ReactNode): Row {
       // Allow the key prop, which is automatically added by React.
       maxExpectedProps += 1;
     }
-    if (boxProps.flexDirection !== 'row') {
+    if (
+      boxProps.flexDirection !== undefined &&
+      boxProps.flexDirection !== 'row'
+    ) {
       debugReportError(
         'MaxSizedBox children must have flexDirection="row".',
         element,
@@ -325,7 +328,7 @@ function visitBoxRow(element: React.ReactNode): Row {
         if (!hasSeenWrapped) {
           row.noWrapSegments.push(segment);
         } else {
-          // put in in the wrapped segment as the row is already stuck in wrapped mode.
+          // put in the wrapped segment as the row is already stuck in wrapped mode.
           row.segments.push(segment);
           debugReportError(
             'Text elements without wrapping cannot appear after elements with wrapping in the same row.',

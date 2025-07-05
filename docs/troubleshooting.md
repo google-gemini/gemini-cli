@@ -10,8 +10,7 @@ This guide provides solutions to common issues and debugging tips.
     tier of the Google Code Assist plan.
   - For Google Cloud accounts, you can work around this by setting
     `GOOGLE_CLOUD_PROJECT` to your project ID.
-  - You can also grab an API key from [AI
-    Studio](http://aistudio.google.com/app/apikey), which also includes a
+  - You can also grab an API key from [AI Studio](https://aistudio.google.com/app/apikey), which also includes a
     separate free tier.
 
 ## Frequently asked questions (FAQs)
@@ -52,7 +51,7 @@ This guide provides solutions to common issues and debugging tips.
 - **CLI is not interactive in "CI" environments**
   - **Issue:** The CLI does not enter interactive mode (no prompt appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`) is set. This is because the `is-in-ci` package, used by the underlying UI framework, detects these variables and assumes a non-interactive CI environment.
   - **Cause:** The `is-in-ci` package checks for the presence of `CI`, `CONTINUOUS_INTEGRATION`, or any environment variable with a `CI_` prefix. When any of these are found, it signals that the environment is non-interactive, which prevents the CLI from starting in its interactive mode.
-  - **Solution:**: If the `CI_` prefixed variable is not needed for the CLI to function, you can temporarily unset it for the command. e.g., `env -u CI_TOKEN gemini`
+  - **Solution:** If the `CI_` prefixed variable is not needed for the CLI to function, you can temporarily unset it for the command. e.g., `env -u CI_TOKEN gemini`
 
 ## Debugging Tips
 
