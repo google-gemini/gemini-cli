@@ -20,6 +20,11 @@ on:
         required: true
         type: boolean
         default: true
+      nightly_dry_run:
+        description: 'Simulate a scheduled nightly release. If true, the version input is ignored.'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -65,12 +70,15 @@ jobs:
         id: version
         run: |
           echo "Workflow triggered by: ${{ github.event_name }}"
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.nightly_dry_run }}" == "true" ]]; then
             echo "Calculating next nightly version..."
             RELEASE_TAG=$(npm run tag:release:nightly -- --dry-run)
-          else
+          elif [[ -n "${{ inputs.version }}" ]]; then
             echo "Using manual version: ${{ inputs.version }}"
             RELEASE_TAG=${{ inputs.version }}
+          else
+            echo "Error: No version specified and 'nightly_dry_run' is false."
+            exit 1
           fi
 
           if [[ -z "$RELEASE_TAG" ]]; then
@@ -78,12 +86,25 @@ jobs:
             exit 1
           fi
 
+          # Prepend 'v' if it's missing
+          if [[ ! "$RELEASE_TAG" =~ ^v ]]; then
+            echo "Version is missing 'v' prefix. Prepending it."
+            RELEASE_TAG="v${RELEASE_TAG}"
+          fi
+
+          # Check for build metadata, which is not supported for releases
+          if [[ "$RELEASE_TAG" == *"+"* ]]; then
+            echo "Error: Versions with build metadata (+) are not supported for releases."
+            echo "Please use a pre-release version (e.g., v1.2.3-alpha.4) instead."
+            exit 1
+          fi
+
           echo "---"
           echo "Initial RELEASE_TAG: ${RELEASE_TAG}"
 
-          # Validate that the tag starts with 'v' and follows semver
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
-            echo "Error: Version must be in the format vX.Y.Z, vX.Y.Z-prerelease, or vX.Y.Z+buildmeta"
+          # Validate that the tag starts with 'v' and follows semver (without build metadata)
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease"
             exit 1
           fi
 
@@ -118,11 +139,16 @@ jobs:
         run: |
           npm run release:version ${{ steps.version.outputs.RELEASE_VERSION }}
 
-      - name: Commit package versions
+      - name: Commit and Conditionally Push package versions
         run: |
           git add package.json package-lock.json packages/*/package.json
           git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
-          git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+          if [[ "${{ inputs.dry_run }}" == "false" ]]; then
+            echo "Pushing release branch to remote..."
+            git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+          else
+            echo "Dry run enabled. Skipping push."
+          fi
 
       - name: Build and Prepare Packages
         run: |
