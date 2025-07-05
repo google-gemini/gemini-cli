@@ -278,3 +278,86 @@ console.log(x);
     });
   });
 });
+describe('Table Rendering Styles', () => {
+  it('should render bold markdown inside table cells', () => {
+    const boldTable = `
+  | Col | Desc          |
+  |-----|---------------|
+  | **Foo** | Bar       |
+  `;
+    const { lastFrame } = render(
+      <MarkdownDisplay text={boldTable} isPending={false} terminalWidth={80} />,
+    );
+    const output = lastFrame();
+    // Markdown symbols should not appear in the rendered output
+    expect(output).not.toContain('**Foo**');
+    // The content should be present (without the markdown symbols)
+    expect(output).toContain('Foo');
+    expect(output).toContain('Bar');
+    // Verify table structure is maintained
+    expect(output).toContain('Col');
+    expect(output).toContain('Desc');
+  });
+
+  it('should render italic markdown inside table cells', () => {
+    const italicTable = `
+  | Col | Desc          |
+  |-----|---------------|
+  | *Foo* | Bar        |
+  `;
+    const { lastFrame } = render(
+      <MarkdownDisplay
+        text={italicTable}
+        isPending={false}
+        terminalWidth={80}
+      />,
+    );
+    const output = lastFrame();
+    // Markdown symbols should not appear in the rendered output
+    expect(output).not.toContain('*Foo*');
+    // The content should be present (without the markdown symbols)
+    expect(output).toContain('Foo');
+    expect(output).toContain('Bar');
+    // Verify table structure is maintained
+    expect(output).toContain('Col');
+    expect(output).toContain('Desc');
+  });
+
+  it('should render multiple markdown formats in table cells', () => {
+    const complexTable = `
+  | Format | Example | Notes |
+  |--------|---------|-------|
+  | **Bold** | *Italic* | \`Code\` |
+  | ~~Strike~~ | [Link](url) | <u>Underline</u> |
+  `;
+    const { lastFrame } = render(
+      <MarkdownDisplay
+        text={complexTable}
+        isPending={false}
+        terminalWidth={100}
+      />,
+    );
+    const output = lastFrame();
+
+    // Verify markdown symbols are not visible in output
+    expect(output).not.toContain('**Bold**');
+    expect(output).not.toContain('*Italic*');
+    expect(output).not.toContain('`Code`');
+    expect(output).not.toContain('~~Strike~~');
+    expect(output).not.toContain('[Link](url)');
+    expect(output).not.toContain('<u>Underline</u>');
+
+    // Verify content is present
+    expect(output).toContain('Bold');
+    expect(output).toContain('Italic');
+    expect(output).toContain('Code');
+    expect(output).toContain('Strike');
+    expect(output).toContain('Link');
+    expect(output).toContain('Underline');
+
+    // Verify table headers
+    expect(output).toContain('Format');
+    expect(output).toContain('Example');
+    expect(output).toContain('Notes');
+  });
+});
