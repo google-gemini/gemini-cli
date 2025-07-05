@@ -11,22 +11,22 @@ on:
         required: false # Not required for scheduled runs
         type: string
       ref:
-        description: 'The branch or ref to release from.'
+        description: 'The branch or ref (full git sha) to release from.'
         required: true
         type: string
         default: 'main'
       dry_run:
-        description: 'Whether to run the publish step in dry-run mode.'
+        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
         type: boolean
         default: true
       create_nightly_release:
-        description: 'Simulate a scheduled nightly release. If true, the version input is ignored.'
+        description: 'Auto apply the nightly release tag, input version is ignored.'
         required: false
         type: boolean
         default: false
       force_skip_tests:
-        description: 'If true, skip the "Run Tests" step. This is only applicable for nightly releases.'
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
         required: false
         type: boolean
         default: false
