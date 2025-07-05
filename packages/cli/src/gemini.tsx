@@ -102,6 +102,14 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  if (config.getListExtensions()) {
+    console.log('Installed extensions:');
+    for (const extension of extensions) {
+      console.log(`- ${extension.config.name}`);
+    }
+    process.exit(0);
+  }
+
   // set default fallback to gemini api key
   // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
