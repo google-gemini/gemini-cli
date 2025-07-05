@@ -86,7 +86,12 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     }
     // If >30% non-printable characters, consider it binary
     return nonPrintableCount / bytesRead > 0.3;
-  } catch {
+  } catch (error) {
+    // Log error for debugging while maintaining existing behavior
+    console.warn(
+      `Failed to check if file is binary: ${filePath}`,
+      error instanceof Error ? error.message : String(error),
+    );
     // If any error occurs (e.g. file not found, permissions),
     // treat as not binary here; let higher-level functions handle existence/access errors.
     return false;
@@ -95,8 +100,12 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     if (fileHandle) {
       try {
         await fileHandle.close();
-      } catch {
-        // Ignore close errors as we're already returning a result
+      } catch (closeError) {
+        // Log close errors for debugging while continuing with cleanup
+        console.warn(
+          `Failed to close file handle for: ${filePath}`,
+          closeError instanceof Error ? closeError.message : String(closeError),
+        );
         // The important thing is that we attempted to clean up
       }
     }
