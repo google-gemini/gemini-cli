@@ -29,4 +29,3 @@ test('should be able to run a shell command via stdin', async (t) => {
 
   assert.ok(result.includes('blah.txt'));
 });
-˝
