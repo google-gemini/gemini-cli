@@ -211,24 +211,32 @@ export class ToolRegistry {
           stderr += stderrDecoder.write(data);
         });
 
-        const exitCode = await new Promise<number | null>((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
           proc.on('error', reject);
-          proc.on('close', resolve);
+          proc.on('close', (code) => {
+            stdout += stdoutDecoder.end();
+            stderr += stderrDecoder.end();
+
+            if (sizeLimitExceeded) {
+              return reject(
+                new Error(
+                  `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
+                ),
+              );
+            }
+
+            if (code !== 0) {
+              console.error(`Command failed with code ${code}`);
+              console.error(stderr);
+              return reject(
+                new Error(
+                  `Tool discovery command failed with exit code ${code}`,
+                ),
+              );
+            }
+            resolve();
+          });
         });
-
-        if (sizeLimitExceeded) {
-          throw new Error(
-            `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
-          );
-        }
-
-        if (exitCode !== 0) {
-          console.error(`Command failed with code ${exitCode}`);
-          console.error(stderr);
-          throw new Error(
-            `Tool discovery command failed with exit code ${exitCode}`,
-          );
-        }
 
         // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
         const functions: FunctionDeclaration[] = [];
