@@ -6,6 +6,10 @@
 
 import { AuthType } from '../core/contentGenerator.js';
 
+export interface HttpError extends Error {
+  status?: number;
+}
+
 export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
