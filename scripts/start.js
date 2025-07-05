@@ -32,7 +32,7 @@ execSync('node ./scripts/check-build-status.js', {
   cwd: root,
 });
 
-const nodeArgs = ['--no-deprecation'];
+const nodeArgs = [];
 let sandboxCommand = undefined;
 try {
   sandboxCommand = execSync('node scripts/sandbox_command.js', {

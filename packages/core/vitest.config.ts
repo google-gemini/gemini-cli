@@ -11,9 +11,6 @@ export default defineConfig({
     reporters: ['default', 'junit'],
     silent: true,
     setupFiles: ['./test-setup.ts'],
-    env: {
-      NODE_NO_WARNINGS: '1',
-    },
     outputFile: {
       junit: 'junit.xml',
     },
