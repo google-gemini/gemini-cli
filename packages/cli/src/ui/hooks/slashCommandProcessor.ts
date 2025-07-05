@@ -67,7 +67,7 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
+  setActiveScreen: (screen: 'chat' | 'help' | 'status') => void,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
@@ -201,7 +201,15 @@ export const useSlashCommandProcessor = (
         description: 'for help on gemini-cli',
         action: (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Opening help.');
-          setShowHelp(true);
+          setActiveScreen('help');
+        },
+      },
+      {
+        name: 'status',
+        description: 'show CLI status and connectivity info',
+        action: (_mainCommand, _subCommand, _args) => {
+          onDebugMessage('Opening status.');
+          setActiveScreen('status');
         },
       },
       {
@@ -240,6 +248,7 @@ export const useSlashCommandProcessor = (
         name: 'theme',
         description: 'change the theme',
         action: (_mainCommand, _subCommand, _args) => {
+          setActiveScreen('chat');
           openThemeDialog();
         },
       },
@@ -247,6 +256,7 @@ export const useSlashCommandProcessor = (
         name: 'auth',
         description: 'change the auth method',
         action: (_mainCommand, _subCommand, _args) => {
+          setActiveScreen('chat');
           openAuthDialog();
         },
       },
@@ -254,6 +264,7 @@ export const useSlashCommandProcessor = (
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => {
+          setActiveScreen('chat');
           openEditorDialog();
         },
       },
@@ -1037,7 +1048,7 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     onDebugMessage,
-    setShowHelp,
+    setActiveScreen,
     refreshStatic,
     openThemeDialog,
     openAuthDialog,

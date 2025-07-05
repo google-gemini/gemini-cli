@@ -78,7 +78,7 @@ export const useGeminiStream = (
   geminiClient: GeminiClient,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
+  setActiveScreen: (screen: 'chat' | 'help' | 'status') => void,
   config: Config,
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
@@ -494,7 +494,7 @@ export const useGeminiStream = (
         return;
 
       const userMessageTimestamp = Date.now();
-      setShowHelp(false);
+      setActiveScreen('chat');
 
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
@@ -550,7 +550,7 @@ export const useGeminiStream = (
     },
     [
       streamingState,
-      setShowHelp,
+      setActiveScreen,
       prepareQueryForGemini,
       processGeminiStreamEvents,
       pendingHistoryItemRef,
