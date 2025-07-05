@@ -176,18 +176,36 @@ export const useSlashCommandProcessor = (
     [addMessage],
   );
 
-  const savedChatTags = useCallback(async () => {
+  const savedChatTags = useCallback(async (m_desc: boolean) => {
     const geminiDir = config?.getProjectTempDir();
     if (!geminiDir) {
       return [];
     }
     try {
+      const file_head = 'checkpoint-';
+      const file_tail = '.json';
       const files = await fs.readdir(geminiDir);
-      return files
-        .filter(
-          (file) => file.startsWith('checkpoint-') && file.endsWith('.json'),
-        )
-        .map((file) => file.replace('checkpoint-', '').replace('.json', ''));
+
+      const chatDetails: Array<{ name: string; mtime: Date }> = [];
+
+      for (const file of files) {
+        if (file.startsWith(file_head) && file.endsWith(file_tail)) {
+          const filePath = path.join(geminiDir, file);
+          const stats = await fs.stat(filePath);
+          chatDetails.push({
+            name: file.slice(file_head.length, -file_tail.length),
+            mtime: stats.mtime,
+          });
+        }
+      }
+
+      chatDetails.sort((a, b) =>
+        m_desc
+          ? b.mtime.getTime() - a.mtime.getTime()
+          : a.mtime.getTime() - b.mtime.getTime()
+      );
+
+      return chatDetails;
     } catch (_err) {
       return [];
     }
@@ -811,15 +829,29 @@ export const useSlashCommandProcessor = (
               refreshStatic();
               return;
             }
-            case 'list':
+            case 'list': {
+              const savedChats = await savedChatTags(false);
+              if (savedChats.length === 0) {
+                addMessage({
+                  type: MessageType.INFO,
+                  content: 'No saved conversations found.',
+                  timestamp: new Date(),
+                });
+                return;
+              }
+
+              let message = 'List of saved conversations:\n\n';
+              for (const chat of savedChats) {
+                message += `  - \u001b[36m${chat.name}\u001b[0m\n`;
+              }
+              message += `\n\u001b[90mNote: Newest last, oldest first\u001b[0m`;
               addMessage({
                 type: MessageType.INFO,
-                content:
-                  'list of saved conversations: ' +
-                  (await savedChatTags()).join(', '),
+                content: message,
                 timestamp: new Date(),
               });
               return;
+            }
             default:
               addMessage({
                 type: MessageType.ERROR,
@@ -830,7 +862,7 @@ export const useSlashCommandProcessor = (
           }
         },
         completion: async () =>
-          (await savedChatTags()).map((tag) => 'resume ' + tag),
+          (await savedChatTags(true)).map((tag) => 'resume ' + tag.name),
       },
       {
         name: 'quit',
