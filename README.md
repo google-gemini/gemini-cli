@@ -74,6 +74,17 @@ gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
 
+### Specifying a Gemini Model
+
+The Gemini CLI allows you to specify which Gemini model to use for your interactions. By default, it uses `gemini-2.5-pro` or `gemini-2.5-flash` depending on the context. You can explicitly set the model using the `--model` or `-m` flag:
+
+```bash
+gemini --model gemini-1.5-pro
+gemini -m gemini-1.5-flash
+```
+
+This is particularly useful if you want to experiment with different model capabilities or manage your API usage across various models.
+
 ### Next steps
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
