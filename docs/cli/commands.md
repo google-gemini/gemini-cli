@@ -80,12 +80,17 @@ Slash commands provide meta-level control over the CLI itself.
     - Creates backups of configuration files before modifying them
     - Reports success or failure with appropriate instructions
   - **Supported Terminals:**
-    - **Kitty** - Adds keybindings to `~/.config/kitty/kitty.conf`
-    - **Alacritty** - Adds keybindings to `~/.config/alacritty/alacritty.toml` or `.yml`
-    - **Ghostty** - Adds keybindings to `~/.config/ghostty/config`
-    - **URxvt** - Adds keybindings to `~/.Xresources` (requires `xrdb -merge ~/.Xresources`)
     - **VS Code** - Adds keybindings to VS Code's `keybindings.json`
-    - **Foot** - Works out of the box, no configuration needed
+    - **Cursor** - Adds keybindings to Cursor's `keybindings.json`
+    - **Windsurf** - Adds keybindings to Windsurf's `keybindings.json`
+  - **Terminals that work out of the box (no setup required):**
+    - **Alacritty**
+    - **Ghostty**
+    - **Foot**
+    - **iTerm2**
+    - **Kitty**
+    - **Rio**
+    - **WezTerm**
   - **Notes:**
     - Most terminals require a restart after configuration
     - VS Code requires restarting the entire application, not just the terminal
