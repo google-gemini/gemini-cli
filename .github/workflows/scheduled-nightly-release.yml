@@ -33,7 +33,9 @@ jobs:
         run: npm run preflight
 
       - name: Run Integration Tests (without Docker)
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -41,7 +43,9 @@ jobs:
           command: npm run test:integration:sandbox:none
 
       - name: Run Integration Tests (with Docker)
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         with:
           timeout_minutes: 10
           max_attempts: 3
