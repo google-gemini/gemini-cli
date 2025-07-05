@@ -57,25 +57,10 @@ export function getReleaseVersion() {
   return { releaseTag, releaseVersion, npmTag };
 }
 
-function writeToGitHubOutput({ releaseTag, releaseVersion, npmTag }) {
-  const githubOutput = process.env.GITHUB_OUTPUT;
-  if (githubOutput) {
-    fs.appendFileSync(githubOutput, `RELEASE_TAG=${releaseTag}\n`);
-    fs.appendFileSync(githubOutput, `RELEASE_VERSION=${releaseVersion}\n`);
-    fs.appendFileSync(githubOutput, `NPM_TAG=${npmTag}\n`);
-  } else {
-    console.log('---');
-    console.log(`Finalized RELEASE_TAG: ${releaseTag}`);
-    console.log(`Finalized RELEASE_VERSION: ${releaseVersion}`);
-    console.log(`Finalized NPM_TAG: ${npmTag}`);
-    console.log('---');
-  }
-}
-
-if (require.main === module) {
+if (process.argv[1] === new URL(import.meta.url).pathname) {
   try {
     const versions = getReleaseVersion();
-    writeToGitHubOutput(versions);
+    console.log(JSON.stringify(versions));
   } catch (error) {
     console.error(error.message);
     process.exit(1);

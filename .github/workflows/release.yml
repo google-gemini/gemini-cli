@@ -75,7 +75,10 @@ jobs:
       - name: Get the version
         id: version
         run: |
-          node scripts/get-release-version.js
+          VERSION_JSON=$(node scripts/get-release-version.js)
+          echo "RELEASE_TAG=$(echo $VERSION_JSON | jq -r .releaseTag)" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=$(echo $VERSION_JSON | jq -r .releaseVersion)" >> $GITHUB_OUTPUT
+          echo "NPM_TAG=$(echo $VERSION_JSON | jq -r .npmTag)" >> $GITHUB_OUTPUT
         env:
           IS_NIGHTLY: ${{ steps.vars.outputs.is_nightly }}
           MANUAL_VERSION: ${{ inputs.version }}
