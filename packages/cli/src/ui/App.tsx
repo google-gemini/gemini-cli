@@ -57,11 +57,12 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
-import { StreamingContext } from './contexts/StreamingContext.js';
 import {
   SessionStatsProvider,
   useSessionStats,
 } from './contexts/SessionContext.js';
+import { SudoProvider } from './contexts/SudoContext.js';
+import { StreamingContext } from './contexts/StreamingContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -82,9 +83,11 @@ interface AppProps {
 }
 
 export const AppWrapper = (props: AppProps) => (
-  <SessionStatsProvider>
-    <App {...props} />
-  </SessionStatsProvider>
+  <SudoProvider>
+    <SessionStatsProvider>
+      <App {...props} />
+    </SessionStatsProvider>
+  </SudoProvider>
 );
 
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {

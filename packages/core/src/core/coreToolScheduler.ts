@@ -17,6 +17,7 @@ import {
   Config,
   logToolCall,
   ToolCallEvent,
+  ToolPasswordConfirmationDetails,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -452,22 +453,48 @@ export class CoreToolScheduler {
           );
 
           if (confirmationDetails) {
-            const originalOnConfirm = confirmationDetails.onConfirm;
-            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-              ...confirmationDetails,
-              onConfirm: (outcome: ToolConfirmationOutcome) =>
-                this.handleConfirmationResponse(
-                  reqInfo.callId,
-                  originalOnConfirm,
-                  outcome,
-                  signal,
-                ),
-            };
-            this.setStatusInternal(
-              reqInfo.callId,
-              'awaiting_approval',
-              wrappedConfirmationDetails,
-            );
+            // ---- START: FIX for password prompt ----
+            if (confirmationDetails.type === 'password') {
+              const passwordConfirmationDetails =
+                confirmationDetails as ToolPasswordConfirmationDetails;
+              const originalOnConfirm = passwordConfirmationDetails.onConfirm;
+              const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+                ...passwordConfirmationDetails,
+                onConfirm: (password: string) =>
+                  this.handlePasswordResponse(
+                    reqInfo.callId,
+                    originalOnConfirm,
+                    password,
+                    signal,
+                  ),
+              };
+              this.setStatusInternal(
+                reqInfo.callId,
+                'awaiting_approval',
+                wrappedConfirmationDetails,
+              );
+            } else {
+              // Handle all other confirmation types
+              const originalOnConfirm = confirmationDetails.onConfirm as (
+                outcome: ToolConfirmationOutcome,
+              ) => Promise<void>;
+              const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+                ...confirmationDetails,
+                onConfirm: (outcome: ToolConfirmationOutcome) =>
+                  this.handleConfirmationResponse(
+                    reqInfo.callId,
+                    originalOnConfirm,
+                    outcome,
+                    signal,
+                  ),
+              };
+              this.setStatusInternal(
+                reqInfo.callId,
+                'awaiting_approval',
+                wrappedConfirmationDetails,
+              );
+            }
+            // ---- END: FIX for password prompt ----
           } else {
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           }
@@ -486,6 +513,34 @@ export class CoreToolScheduler {
     this.attemptExecutionOfScheduledCalls(signal);
     this.checkAndNotifyCompletion();
   }
+
+  // ---- START: NEW method for password prompt ----
+  async handlePasswordResponse(
+    callId: string,
+    originalOnConfirm: (password: string) => Promise<void>,
+    password: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const toolCall = this.toolCalls.find(
+      (c) => c.request.callId === callId && c.status === 'awaiting_approval',
+    );
+
+    if (toolCall && toolCall.status === 'awaiting_approval') {
+      await originalOnConfirm(password);
+    }
+
+    if (signal.aborted) {
+      this.setStatusInternal(
+        callId,
+        'cancelled',
+        'User cancelled during password entry',
+      );
+    } else {
+      this.setStatusInternal(callId, 'scheduled');
+    }
+    this.attemptExecutionOfScheduledCalls(signal);
+  }
+  // ---- END: NEW method for password prompt ----
 
   async handleConfirmationResponse(
     callId: string,
