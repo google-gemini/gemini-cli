@@ -35,6 +35,7 @@ jobs:
       - name: Run Integration Tests (without Docker)
         uses: nick-invision/retry@v2
         with:
+          timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 30
           command: npm run test:integration:sandbox:none
@@ -42,6 +43,7 @@ jobs:
       - name: Run Integration Tests (with Docker)
         uses: nick-invision/retry@v2
         with:
+          timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 30
           command: npm run test:integration:sandbox:docker
@@ -63,6 +65,6 @@ jobs:
           gh issue create \
             --title "Nightly Release Failed on $(date +'%Y-%m-%d')" \
             --body "The scheduled nightly release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "bug,nightly-failure"
+            --label "type: bug,nightly-failure"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
