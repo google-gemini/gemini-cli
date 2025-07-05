@@ -43,6 +43,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { createSecureLogger } from '../utils/secureLogging.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -225,7 +226,8 @@ export class Config {
         new StartSessionEvent(this),
       );
     } else {
-      console.log('Data collection is disabled.');
+      const logger = createSecureLogger(this.debugMode);
+      logger.info('Data collection is disabled.');
     }
   }
 
