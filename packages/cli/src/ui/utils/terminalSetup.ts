@@ -36,12 +36,7 @@ export interface TerminalSetupResult {
   requiresRestart?: boolean;
 }
 
-type SupportedTerminal =
-  | 'kitty'
-  | 'ghostty'
-  | 'urxvt'
-  | 'vscode'
-  | 'foot';
+type SupportedTerminal = 'kitty' | 'ghostty' | 'urxvt' | 'vscode' | 'foot';
 
 // Terminal detection
 async function detectTerminal(): Promise<SupportedTerminal | null> {
