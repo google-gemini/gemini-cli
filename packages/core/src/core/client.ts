@@ -219,19 +219,20 @@ export class GeminiClient {
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
+    prompt_id: string,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
-      return new Turn(this.getChat());
+      return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat();
+    const compressed = await this.tryCompressChat(prompt_id);
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat());
+    const turn = new Turn(this.getChat(), prompt_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       yield event;
@@ -246,7 +247,12 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+        );
       }
     }
     return turn;
@@ -430,6 +436,7 @@ export class GeminiClient {
   }
 
   async tryCompressChat(
+    prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
     const curatedHistory = this.getChat().getHistory(true);
@@ -460,14 +467,17 @@ export class GeminiClient {
       return null;
     }
 
-    const { text: summary } = await this.getChat().sendMessage({
-      message: {
-        text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+    const { text: summary } = await this.getChat().sendMessage(
+      {
+        message: {
+          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+        },
+        config: {
+          systemInstruction: { text: getCompressionPrompt() },
+        },
       },
-      config: {
-        systemInstruction: { text: getCompressionPrompt() },
-      },
-    });
+      prompt_id,
+    );
     this.chat = await this.startChat([
       {
         role: 'user',

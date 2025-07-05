@@ -137,6 +137,9 @@ export enum EventMetadataKey {
 
   // Logs the end of a session.
   GEMINI_CLI_END_SESSION_ID = 34,
+
+  // Logs the Prompt Id
+  GEMINI_CLI_PROMPT_ID = 35,
 }
 
 export function getEventMetadataKey(

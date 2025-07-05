@@ -61,20 +61,24 @@ export async function runNonInteractive(
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
+  const prompt_id = Math.random().toString(16).slice(2);
 
   try {
     while (true) {
       const functionCalls: FunctionCall[] = [];
 
-      const responseStream = await chat.sendMessageStream({
-        message: currentMessages[0]?.parts || [], // Ensure parts are always provided
-        config: {
-          abortSignal: abortController.signal,
-          tools: [
-            { functionDeclarations: toolRegistry.getFunctionDeclarations() },
-          ],
+      const responseStream = await chat.sendMessageStream(
+        {
+          message: currentMessages[0]?.parts || [], // Ensure parts are always provided
+          config: {
+            abortSignal: abortController.signal,
+            tools: [
+              { functionDeclarations: toolRegistry.getFunctionDeclarations() },
+            ],
+          },
         },
-      });
+        prompt_id,
+      );
 
       for await (const resp of responseStream) {
         if (abortController.signal.aborted) {
@@ -100,6 +104,7 @@ export async function runNonInteractive(
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
             isClientInitiated: false,
+            prompt_id,
           };
 
           const toolResponse = await executeToolCall(

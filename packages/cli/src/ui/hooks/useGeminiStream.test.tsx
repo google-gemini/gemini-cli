@@ -110,6 +110,7 @@ vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(() => ({
     startNewTurn: mockStartNewTurn,
     addUsage: mockAddUsage,
+    getTurnCount: vi.fn(() => 5),
   })),
 }));
 
@@ -296,6 +297,10 @@ describe('useGeminiStream', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       addHistory: vi.fn(),
+
+      getSessionId() {
+        return 'test-session-id';
+      },
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -423,6 +428,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -441,7 +447,12 @@ describe('useGeminiStream', () => {
         endTime: Date.now(),
       } as TrackedCompletedToolCall,
       {
-        request: { callId: 'call2', name: 'tool2', args: {} },
+        request: {
+          callId: 'call2',
+          name: 'tool2',
+          args: {},
+          prompt_id: 'prompt-id-1',
+        },
         status: 'executing',
         responseSubmittedToGemini: false,
         tool: {
@@ -478,6 +489,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
+          prompt_id: 'prompt-id-2',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -489,6 +501,7 @@ describe('useGeminiStream', () => {
           name: 'tool2',
           args: {},
           isClientInitiated: false,
+          prompt_id: 'prompt-id-2',
         },
         status: 'error',
         responseSubmittedToGemini: false,
@@ -541,6 +554,7 @@ describe('useGeminiStream', () => {
     expect(mockSendMessageStream).toHaveBeenCalledWith(
       expectedMergedResponse,
       expect.any(AbortSignal),
+      'prompt-id-2',
     );
   });
 
@@ -552,6 +566,7 @@ describe('useGeminiStream', () => {
           name: 'testTool',
           args: {},
           isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
         },
         status: 'cancelled',
         response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
@@ -722,6 +737,7 @@ describe('useGeminiStream', () => {
           name: 'tool1',
           args: {},
           isClientInitiated: false,
+          prompt_id: 'prompt-id-4',
         },
         status: 'executing',
         responseSubmittedToGemini: false,
@@ -813,6 +829,7 @@ describe('useGeminiStream', () => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
         expect.any(AbortSignal),
+        'prompt-id-4',
       );
     });
 
@@ -981,6 +998,7 @@ describe('useGeminiStream', () => {
           name: clientToolRequest.toolName,
           args: clientToolRequest.toolArgs,
           isClientInitiated: true,
+          prompt_id: 'prompt-id-5',
         },
         status: 'success',
         responseSubmittedToGemini: false,
@@ -1056,6 +1074,7 @@ describe('useGeminiStream', () => {
           name: 'save_memory',
           args: { fact: 'test' },
           isClientInitiated: true,
+          prompt_id: 'prompt-id-6',
         },
         status: 'success',
         responseSubmittedToGemini: false,
