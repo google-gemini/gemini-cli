@@ -34,9 +34,10 @@ function createAndPushTag(tagName, isSigned, isDryRun) {
   // Check if the tag already exists
   try {
     execSync(`git rev-parse ${tagName}`, { stdio: 'pipe' });
-    console.log(`Tag ${tagName} already exists.`);
     if (isDryRun) {
       process.stdout.write(tagName);
+    } else {
+      console.log(`Tag ${tagName} already exists.`);
     }
     return;
   } catch (error) {
