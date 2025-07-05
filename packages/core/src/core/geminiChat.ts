@@ -222,6 +222,9 @@ export class GeminiChat {
     return null;
   }
 
+  setSystemInstruction(sysInstr: string) {
+    this.generationConfig.systemInstruction = sysInstr;
+  }
   /**
    * Sends a message to the model and returns the response.
    *

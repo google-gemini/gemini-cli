@@ -43,6 +43,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { CleanDocstringTool } from '../tools/clean-docstring.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -490,6 +491,7 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
 
   registerCoreTool(LSTool, targetDir, config);
   registerCoreTool(ReadFileTool, targetDir, config);
+  registerCoreTool(CleanDocstringTool, targetDir, config);
   registerCoreTool(GrepTool, targetDir);
   registerCoreTool(GlobTool, targetDir, config);
   registerCoreTool(EditTool, config);
