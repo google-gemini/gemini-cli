@@ -16,10 +16,7 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
-import {
-  OpenAICompatibleContentGenerator,
-  AnthropicContentGenerator
-} from './customContentGenerators.js';
+import { createCustomContentGenerator } from '../adapters/index.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -195,19 +192,11 @@ export async function createContentGenerator(
     return googleGenAI.models;
   }
 
-  // OpenAI Compatible APIs (including OpenAI, local LLMs with OpenAI-compatible endpoints)
-  if (config.authType === AuthType.USE_OPENAI_COMPATIBLE) {
-    return new OpenAICompatibleContentGenerator(config);
-  }
-
-  // Anthropic Claude API
-  if (config.authType === AuthType.USE_ANTHROPIC) {
-    return new AnthropicContentGenerator(config);
-  }
-
-  // Local LLM (typically OpenAI-compatible)
-  if (config.authType === AuthType.USE_LOCAL_LLM) {
-    return new OpenAICompatibleContentGenerator(config);
+  // OpenAI Compatible APIs, Anthropic, and Local LLMs
+  if (config.authType === AuthType.USE_OPENAI_COMPATIBLE ||
+      config.authType === AuthType.USE_LOCAL_LLM ||
+      config.authType === AuthType.USE_ANTHROPIC) {
+    return createCustomContentGenerator(config.authType, config);
   }
 
   throw new Error(
