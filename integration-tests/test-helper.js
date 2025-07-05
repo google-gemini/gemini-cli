@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -48,8 +48,16 @@ export class TestRig {
   }
 
   run(prompt, ...args) {
-    const output = execSync(
-      `node "${this.bundlePath}" --yolo --prompt "${prompt}" ${args.join(' ')}`,
+    const cmdArgs = [
+      this.bundlePath,
+      '--yolo',
+      '--prompt',
+      prompt,
+      ...args,
+    ];
+    const output = execFileSync(
+      'node',
+      cmdArgs,
       {
         cwd: this.testDir,
         encoding: 'utf-8',
