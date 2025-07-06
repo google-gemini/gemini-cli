@@ -9,6 +9,7 @@ export * from './nodeLlamaClient.js';
 export * from './modelManager.js';
 export * from './trustContentGenerator.js';
 export * from './performanceMonitor.js';
+export * from './privacyManager.js';
 
 // Trust version and metadata
 // Trust: An Open System for Modern Assurance
