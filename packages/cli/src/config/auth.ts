@@ -36,7 +36,7 @@ export const validateAuthMethod = (authMethod: string): string | null => {
   }
 
   if (authMethod === AuthType.USE_TRUSTOS) {
-    // TrustOS is always available - no external dependencies required
+    // Trust is always available - no external dependencies required
     return null;
   }
 

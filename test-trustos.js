@@ -1,21 +1,21 @@
 /**
- * Test script for TrustOS model management system
+ * Test script for Trust model management system
  */
 
 import { 
-  TrustOSModelManager, 
-  TrustOSConfig, 
+  TrustModelManagerImpl, 
+  TrustConfiguration, 
   AuthType,
   createContentGenerator 
 } from './packages/core/dist/index.js';
 
-async function testTrustOSSystem() {
-  console.log('🔧 Testing TrustOS Model Management System...\n');
+async function testTrustSystem() {
+  console.log('🔧 Testing Trust Model Management System...\n');
 
   try {
-    // Test 1: Initialize TrustOS configuration
-    console.log('1. Initializing TrustOS configuration...');
-    const config = new TrustOSConfig();
+    // Test 1: Initialize Trust configuration
+    console.log('1. Initializing Trust configuration...');
+    const config = new TrustConfiguration();
     await config.initialize();
     console.log(`✅ Config initialized. Models directory: ${config.getModelsDirectory()}`);
     console.log(`   Default model: ${config.getDefaultModel()}`);
@@ -23,7 +23,7 @@ async function testTrustOSSystem() {
 
     // Test 2: Initialize model manager
     console.log('2. Initializing model manager...');
-    const modelManager = new TrustOSModelManager(config.getModelsDirectory());
+    const modelManager = new TrustModelManagerImpl(config.getModelsDirectory());
     await modelManager.initialize();
     console.log('✅ Model manager initialized\n');
 
@@ -45,23 +45,23 @@ async function testTrustOSSystem() {
     console.log(`✅ Recommended for quick tasks (4GB RAM): ${quickModel?.name || 'None'}\n`);
 
     // Test 5: Test content generator creation (without actual model loading)
-    console.log('5. Testing TrustOS content generator creation...');
+    console.log('5. Testing Trust content generator creation...');
     const contentGeneratorConfig = {
       model: 'phi-3.5-mini-instruct',
       authType: AuthType.USE_TRUSTOS,
       trustosModelsDir: config.getModelsDirectory()
     };
     
-    console.log('✅ TrustOS content generator config created');
+    console.log('✅ Trust content generator config created');
     console.log(`   Model: ${contentGeneratorConfig.model}`);
     console.log(`   Auth Type: ${contentGeneratorConfig.authType}`);
     console.log(`   Models Dir: ${contentGeneratorConfig.trustosModelsDir}\n`);
 
-    console.log('🎉 All tests passed! TrustOS system is working correctly.');
+    console.log('🎉 All tests passed! Trust system is working correctly.');
     console.log('\n📝 Next steps:');
     console.log('   - Download actual model files from Hugging Face');
     console.log('   - Test real model loading and inference');
-    console.log('   - Update CLI to use TrustOS by default');
+    console.log('   - Update CLI to use Trust by default');
 
   } catch (error) {
     console.error('❌ Test failed:', error);
@@ -70,4 +70,4 @@ async function testTrustOSSystem() {
 }
 
 // Run the test
-testTrustOSSystem().catch(console.error);
+testTrustSystem().catch(console.error);

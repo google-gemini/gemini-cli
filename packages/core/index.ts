@@ -17,10 +17,12 @@ export {
   TrustConfig,
   GenerationOptions,
   TrustNodeLlamaClient,
-  TrustOSModelManager,
+  TrustModelManagerImpl,
   TrustContentGenerator,
-  TRUSTOS_VERSION,
-  TRUSTOS_CLI_NAME,
-  TRUSTOS_DESCRIPTION
+  TRUST_VERSION,
+  TRUST_CLI_NAME,
+  TRUST_DESCRIPTION,
+  DEFAULT_TRUST_MODEL,
+  globalPerformanceMonitor
 } from './src/trustos/index.js';
 export * from './src/config/trustosConfig.js';

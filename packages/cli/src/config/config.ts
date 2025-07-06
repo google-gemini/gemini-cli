@@ -19,6 +19,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
 } from '@trustos/trust-cli-core';
+import { DEFAULT_TRUST_MODEL } from '@trustos/trust-cli-core';
 import { Settings } from './settings.js';
 
 import { Extension } from './extension.js';
@@ -61,7 +62,7 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'm',
       type: 'string',
       description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+      default: process.env.TRUST_MODEL || DEFAULT_TRUST_MODEL,
     })
     .option('prompt', {
       alias: 'p',

@@ -1,11 +1,22 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
- * TrustOS Model Configuration
+ * Default Trust model for local inference
+ * Trust: An Open System for Modern Assurance
+ */
+export const DEFAULT_TRUST_MODEL = 'qwen2.5-1.5b-instruct';
+
+// Re-export performance monitoring types and utilities
+export type { SystemMetrics, InferenceMetrics, ResourceUsage } from './performanceMonitor.js';
+export { PerformanceMonitor, globalPerformanceMonitor } from './performanceMonitor.js';
+
+/**
+ * Trust Model Configuration
+ * Part of Trust: An Open System for Modern Assurance
  */
 export interface TrustModelConfig {
   name: string;
@@ -16,7 +27,8 @@ export interface TrustModelConfig {
   ramRequirement: string;
   description: string;
   trustScore?: number; // Community trust rating
-  verificationHash?: string; // Model integrity verification
+  verificationHash?: string; // SHA256 hash for model integrity verification
+  expectedSize?: number; // Expected file size in bytes
   parameters?: string; // Model parameter count (e.g., "3B", "7B")
   downloadUrl?: string; // Hugging Face URL for download
 }
@@ -44,7 +56,8 @@ export interface ModelMetrics {
 }
 
 /**
- * TrustOS Model Client Interface
+ * Trust Model Client Interface
+ * Part of Trust: An Open System for Modern Assurance
  */
 export interface TrustModelClient {
   generateText(prompt: string, options?: GenerationOptions): Promise<string>;
@@ -58,7 +71,8 @@ export interface TrustModelClient {
 }
 
 /**
- * TrustOS Model Manager Interface
+ * Trust Model Manager Interface
+ * Part of Trust: An Open System for Modern Assurance
  */
 export interface TrustModelManager {
   listAvailableModels(): TrustModelConfig[];
@@ -72,7 +86,8 @@ export interface TrustModelManager {
 }
 
 /**
- * TrustOS Configuration
+ * Trust Configuration
+ * Part of Trust: An Open System for Modern Assurance
  */
 export interface TrustConfig {
   privacy: {

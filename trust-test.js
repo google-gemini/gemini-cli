@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Simple test CLI for TrustOS
+ * Simple test CLI for Trust
  */
 
 import { 
-  TrustOSConfig,
+  TrustConfiguration,
   TrustContentGenerator,
   AuthType,
   createContentGenerator
@@ -34,7 +34,7 @@ Examples:
   }
 
   try {
-    const config = new TrustOSConfig();
+    const config = new TrustConfiguration();
     await config.initialize();
 
     switch (command) {
@@ -61,8 +61,8 @@ Examples:
 }
 
 async function showModels(config) {
-  const { TrustOSModelManager } = await import('./packages/core/dist/index.js');
-  const modelManager = new TrustOSModelManager(config.getModelsDirectory());
+  const { TrustModelManagerImpl } = await import('./packages/core/dist/index.js');
+  const modelManager = new TrustModelManagerImpl(config.getModelsDirectory());
   await modelManager.initialize();
   
   const models = modelManager.listAvailableModels();
@@ -82,7 +82,7 @@ async function showModels(config) {
 
 async function showConfig(config) {
   const settings = config.get();
-  console.log('\n⚙️  TrustOS Configuration:');
+  console.log('\n⚙️  Trust Configuration:');
   console.log('─'.repeat(40));
   console.log(`Default Model: ${settings.models.default}`);
   console.log(`Models Directory: ${settings.models.directory}`);
@@ -99,8 +99,8 @@ async function showConfig(config) {
 }
 
 async function recommendModel(config, task) {
-  const { TrustOSModelManager } = await import('./packages/core/dist/index.js');
-  const modelManager = new TrustOSModelManager(config.getModelsDirectory());
+  const { TrustModelManagerImpl } = await import('./packages/core/dist/index.js');
+  const modelManager = new TrustModelManagerImpl(config.getModelsDirectory());
   await modelManager.initialize();
   
   const recommended = modelManager.getRecommendedModel(task, 16); // Assume 16GB available
@@ -122,9 +122,9 @@ async function testChat(config, message) {
     return;
   }
 
-  console.log(`\n💬 Testing chat with TrustOS (placeholder mode):`);
+  console.log(`\n💬 Testing chat with Trust (placeholder mode):`);
   console.log(`User: ${message}`);
-  console.log(`Assistant: I'm a placeholder response! The actual model isn't loaded yet, but the TrustOS system is ready. To enable real chat, download a model file and update the system to load it.`);
+  console.log(`Assistant: I'm a placeholder response! The actual model isn't loaded yet, but the Trust system is ready. To enable real chat, download a model file and update the system to load it.`);
   console.log();
   console.log('📝 To enable real chat:');
   console.log('   1. Download a model file (e.g., from Hugging Face)');
