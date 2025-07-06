@@ -6,6 +6,7 @@ on:
 
 jobs:
   triage-issue:
+    if: false # Disable this job
     timeout-minutes: 5
     permissions:
       issues: write

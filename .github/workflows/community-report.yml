@@ -12,6 +12,7 @@ on:
 
 jobs:
   generate-report:
+    if: false # Disable this job
     name: Generate Report 📝
     runs-on: ubuntu-latest
     permissions:

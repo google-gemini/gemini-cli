@@ -33,6 +33,7 @@ on:
 
 jobs:
   release:
+    if: false # Disable this job
     runs-on: ubuntu-latest
     environment:
       name: production-release
