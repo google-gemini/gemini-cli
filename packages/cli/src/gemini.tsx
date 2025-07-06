@@ -83,8 +83,27 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 export async function main() {
-  // Check for model management commands first
+  // Check for specific commands first
   const args = process.argv.slice(2);
+  
+  // Performance monitoring command
+  if (args[0] === 'performance' || args[0] === 'perf') {
+    const { handlePerformanceCommand } = await import('./commands/performanceCommands.js');
+    try {
+      await handlePerformanceCommand({
+        action: (args[1] as 'status' | 'report' | 'watch' | 'optimize') || 'status',
+        verbose: args.includes('--verbose') || args.includes('-v'),
+        watch: args.includes('--watch') || args.includes('-w'),
+        interval: args.includes('--interval') ? parseInt(args[args.indexOf('--interval') + 1]) : 1000
+      });
+      return;
+    } catch (error) {
+      console.error(`❌ Performance command failed: ${error}`);
+      process.exit(1);
+    }
+  }
+  
+  // Model management commands
   if (args[0] === 'model') {
     const { handleModelCommand } = await import('./commands/modelCommands.js');
     

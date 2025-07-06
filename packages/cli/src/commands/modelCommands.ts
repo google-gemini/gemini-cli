@@ -166,38 +166,6 @@ export class ModelCommandHandler {
     }
   }
 
-  private async verifyModel(modelName: string): Promise<void> {
-    const models = this.modelManager.listAvailableModels();
-    const model = models.find(m => m.name === modelName);
-    
-    if (!model) {
-      throw new Error(`Model ${modelName} not found`);
-    }
-    
-    console.log(`\n🔍 Verifying model: ${modelName}`);
-    
-    const isValid = await this.modelManager.verifyModel(model.path);
-    
-    if (isValid) {
-      console.log(`✅ Model ${modelName} is valid`);
-    } else {
-      console.log(`❌ Model ${modelName} verification failed`);
-      console.log('💡 Try downloading the model again');
-    }
-  }
-
-  private async verifyAllModels(): Promise<void> {
-    const models = this.modelManager.listAvailableModels();
-    
-    console.log('\n🔍 Verifying all models...');
-    console.log('─'.repeat(30));
-    
-    for (const model of models) {
-      const isValid = await this.modelManager.verifyModel(model.path);
-      const status = isValid ? '✅' : '❌';
-      console.log(`${status} ${model.name}`);
-    }
-  }
 
   private async deleteModel(modelName: string): Promise<void> {
     console.log(`\n🗑️  Deleting model: ${modelName}`);
@@ -222,6 +190,91 @@ export class ModelCommandHandler {
     const totalMemory = process.memoryUsage().heapTotal;
     // Convert to GB and add some buffer
     return Math.floor(totalMemory / (1024 * 1024 * 1024)) + 8; // Rough estimation
+  }
+  
+  private async verifyModel(modelName: string): Promise<void> {
+    console.log(`\n🔍 Verifying model: ${modelName}`);
+    
+    const models = this.modelManager.listAvailableModels();
+    const model = models.find(m => m.name === modelName);
+    
+    if (!model) {
+      console.error(`❌ Model ${modelName} not found`);
+      return;
+    }
+    
+    // First check if the file exists
+    const exists = await this.modelManager.verifyModel(model.path);
+    if (!exists) {
+      console.log(`❌ Model ${modelName} is not downloaded`);
+      console.log(`💡 Run: trust model download ${modelName}`);
+      return;
+    }
+    
+    // Then verify integrity
+    const integrity = await this.modelManager.verifyModelIntegrity(modelName);
+    
+    if (integrity.valid) {
+      console.log(`✅ ${integrity.message}`);
+      
+      // Show model details
+      const fs = await import('fs/promises');
+      const stats = await fs.stat(model.path);
+      console.log(`📊 File size: ${this.formatFileSize(stats.size)}`);
+      
+      if (model.verificationHash && model.verificationHash !== 'sha256:pending') {
+        console.log(`🔐 SHA256: ${model.verificationHash.substring(0, 20)}...`);
+      }
+    } else {
+      console.log(`❌ ${integrity.message}`);
+      console.log(`⚠️  Model may be corrupted. Consider re-downloading.`);
+    }
+  }
+  
+  private async verifyAllModels(): Promise<void> {
+    console.log('\n🔍 Verifying all models...\n');
+    
+    const models = this.modelManager.listAvailableModels();
+    let downloadedCount = 0;
+    let verifiedCount = 0;
+    
+    for (const model of models) {
+      const exists = await this.modelManager.verifyModel(model.path);
+      
+      if (exists) {
+        downloadedCount++;
+        console.log(`📦 ${model.name}`);
+        
+        const integrity = await this.modelManager.verifyModelIntegrity(model.name);
+        if (integrity.valid) {
+          verifiedCount++;
+          console.log(`   ✅ ${integrity.message}`);
+        } else {
+          console.log(`   ❌ ${integrity.message}`);
+        }
+      } else {
+        console.log(`📦 ${model.name}`);
+        console.log(`   ⬇️  Not downloaded`);
+      }
+      console.log('');
+    }
+    
+    console.log('─'.repeat(60));
+    console.log(`📊 Summary: ${downloadedCount}/${models.length} models downloaded`);
+    console.log(`✅ ${verifiedCount}/${downloadedCount} models verified`);
+  }
+  
+  private formatFileSize(bytes: number): string {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 }
 

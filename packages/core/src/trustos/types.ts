@@ -9,6 +9,10 @@
  */
 export const DEFAULT_TRUSTOS_MODEL = 'qwen2.5-1.5b-instruct';
 
+// Re-export performance monitoring types and utilities
+export type { SystemMetrics, InferenceMetrics, ResourceUsage } from './performanceMonitor.js';
+export { PerformanceMonitor, globalPerformanceMonitor } from './performanceMonitor.js';
+
 /**
  * TrustOS Model Configuration
  */
@@ -21,7 +25,8 @@ export interface TrustModelConfig {
   ramRequirement: string;
   description: string;
   trustScore?: number; // Community trust rating
-  verificationHash?: string; // Model integrity verification
+  verificationHash?: string; // SHA256 hash for model integrity verification
+  expectedSize?: number; // Expected file size in bytes
   parameters?: string; // Model parameter count (e.g., "3B", "7B")
   downloadUrl?: string; // Hugging Face URL for download
 }

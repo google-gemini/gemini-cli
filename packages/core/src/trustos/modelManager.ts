@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { TrustModelConfig, TrustModelManager } from './types.js';
 import { createHash } from 'crypto';
+import { createReadStream } from 'fs';
 import { ModelDownloader, DownloadProgress } from './modelDownloader.js';
 
 export class TrustOSModelManager implements TrustModelManager {
@@ -36,7 +37,9 @@ export class TrustOSModelManager implements TrustModelManager {
         description: 'Fast coding assistance model - 3.8B parameters',
         parameters: '3.8B',
         trustScore: 9.5,
-        downloadUrl: 'https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/blob/main/Phi-3.5-mini-instruct-q4_k_m.gguf'
+        downloadUrl: 'https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/blob/main/Phi-3.5-mini-instruct-q4_k_m.gguf',
+        verificationHash: 'sha256:pending', // Will be computed after first download
+        expectedSize: 2090000000 // ~2GB
       },
       {
         name: 'llama-3.2-3b-instruct',
@@ -48,7 +51,9 @@ export class TrustOSModelManager implements TrustModelManager {
         description: 'Balanced performance model - 3B parameters',
         parameters: '3B',
         trustScore: 9.2,
-        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct-gguf/blob/main/llama-3.2-3b-instruct-q8_0.gguf'
+        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct-gguf/blob/main/llama-3.2-3b-instruct-q8_0.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 3300000000 // ~3.3GB
       },
       {
         name: 'qwen2.5-1.5b-instruct',
@@ -60,7 +65,9 @@ export class TrustOSModelManager implements TrustModelManager {
         description: 'Lightweight model for quick questions - 1.5B parameters',
         parameters: '1.5B',
         trustScore: 8.8,
-        downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-gguf/blob/main/qwen2.5-1.5b-instruct-q8_0.gguf'
+        downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-gguf/blob/main/qwen2.5-1.5b-instruct-q8_0.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 1650000000 // ~1.65GB
       },
       {
         name: 'llama-3.1-8b-instruct',
@@ -72,7 +79,9 @@ export class TrustOSModelManager implements TrustModelManager {
         description: 'High-quality responses - 8B parameters',
         parameters: '8B',
         trustScore: 9.7,
-        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct-gguf/blob/main/llama-3.1-8b-instruct-q8_0.gguf'
+        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct-gguf/blob/main/llama-3.1-8b-instruct-q8_0.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 8800000000 // ~8.8GB
       }
     ];
   }
@@ -167,12 +176,87 @@ export class TrustOSModelManager implements TrustModelManager {
       }
       
       // Basic verification - check if file exists and has some content
-      // In production, this would verify checksums and model integrity
       return stats.size > 0;
       
     } catch (error) {
       // Silently return false for missing files - this is expected for undownloaded models
       return false;
+    }
+  }
+  
+  async computeModelHash(modelPath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = createHash('sha256');
+      const stream = createReadStream(modelPath);
+      
+      stream.on('data', (data) => hash.update(data));
+      stream.on('end', () => resolve(`sha256:${hash.digest('hex')}`));
+      stream.on('error', reject);
+    });
+  }
+  
+  async verifyModelIntegrity(modelName: string): Promise<{ valid: boolean; message: string }> {
+    const model = this.availableModels.find(m => m.name === modelName);
+    if (!model) {
+      return { valid: false, message: `Model ${modelName} not found` };
+    }
+    
+    try {
+      const stats = await fs.stat(model.path);
+      
+      // Check file size if expected size is provided
+      if (model.expectedSize) {
+        const sizeDiff = Math.abs(stats.size - model.expectedSize);
+        const tolerance = model.expectedSize * 0.05; // 5% tolerance
+        
+        if (sizeDiff > tolerance) {
+          return {
+            valid: false,
+            message: `File size mismatch. Expected: ${this.formatBytes(model.expectedSize)}, Actual: ${this.formatBytes(stats.size)}`
+          };
+        }
+      }
+      
+      // Compute hash if verification hash is not 'pending'
+      if (model.verificationHash && model.verificationHash !== 'sha256:pending') {
+        console.log(`Computing SHA256 hash for ${modelName}...`);
+        const computedHash = await this.computeModelHash(model.path);
+        
+        if (computedHash !== model.verificationHash) {
+          return {
+            valid: false,
+            message: `Hash mismatch. Expected: ${model.verificationHash}, Computed: ${computedHash}`
+          };
+        }
+        
+        return { valid: true, message: 'Model integrity verified successfully' };
+      }
+      
+      // If no hash is set or it's pending, compute and save it
+      if (!model.verificationHash || model.verificationHash === 'sha256:pending') {
+        console.log(`Computing and saving hash for ${modelName}...`);
+        const computedHash = await this.computeModelHash(model.path);
+        
+        // Update the model's verification hash
+        const modelIndex = this.availableModels.findIndex(m => m.name === modelName);
+        if (modelIndex !== -1) {
+          this.availableModels[modelIndex].verificationHash = computedHash;
+          await this.saveConfig();
+        }
+        
+        return { 
+          valid: true, 
+          message: `Model hash computed and saved: ${computedHash.substring(0, 16)}...` 
+        };
+      }
+      
+      return { valid: true, message: 'Model file exists and size is valid' };
+      
+    } catch (error) {
+      return { 
+        valid: false, 
+        message: `Error verifying model: ${error instanceof Error ? error.message : String(error)}` 
+      };
     }
   }
 
