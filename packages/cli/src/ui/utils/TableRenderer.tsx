@@ -7,6 +7,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
+import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -23,11 +24,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Calculate column widths
+  // Calculate column widths using actual display width after markdown processing
   const columnWidths = headers.map((header, index) => {
-    const headerWidth = header.length;
+    const headerWidth = getPlainTextLength(header);
     const maxRowWidth = Math.max(
-      ...rows.map((row) => (row[index] || '').length),
+      ...rows.map((row) => getPlainTextLength(row[index] || '')),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
@@ -40,75 +41,96 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     Math.floor(width * scaleFactor),
   );
 
-  const renderCell = (content: string, width: number, isHeader = false) => {
-    // The actual space for content inside the padding
+  // Helper function to render a cell with proper width
+  const renderCell = (content: string, width: number): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
-
+    const displayWidth = getPlainTextLength(content);
+    
     let cellContent = content;
-    if (content.length > contentWidth) {
+    if (displayWidth > contentWidth) {
       if (contentWidth <= 3) {
-        // Not enough space for '...'
-        cellContent = content.substring(0, contentWidth);
+        // Just truncate by character count
+        cellContent = content.substring(0, Math.min(content.length, contentWidth));
       } else {
-        cellContent = content.substring(0, contentWidth - 3) + '...';
+        // Truncate preserving markdown formatting
+        let truncated = content;
+        let currentDisplayWidth = displayWidth;
+        
+        while (currentDisplayWidth > contentWidth - 3 && truncated.length > 0) {
+          truncated = truncated.substring(0, truncated.length - 1);
+          currentDisplayWidth = getPlainTextLength(truncated);
+        }
+        
+        cellContent = truncated + '...';
       }
     }
-
-    // Pad the content to fill the cell
-    const padded = cellContent.padEnd(contentWidth, ' ');
-
-    if (isHeader) {
-      return (
-        <Text bold color={Colors.AccentCyan}>
-          {padded}
-        </Text>
-      );
-    }
-    return <Text>{padded}</Text>;
+    
+    // Calculate exact padding needed
+    const actualDisplayWidth = getPlainTextLength(cellContent);
+    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
+    
+    return (
+      <Text>
+        <RenderInline text={cellContent} />
+        {' '.repeat(paddingNeeded)}
+      </Text>
+    );
   };
 
-  const renderRow = (cells: string[], isHeader = false) => (
-    <Box flexDirection="row">
-      <Text>│ </Text>
-      {cells.map((cell, index) => (
-        <React.Fragment key={index}>
-          {renderCell(cell, adjustedWidths[index] || 0, isHeader)}
-          <Text> │ </Text>
-        </React.Fragment>
-      ))}
-    </Box>
-  );
-
-  const renderSeparator = () => {
-    const separator = adjustedWidths
-      .map((width) => '─'.repeat(Math.max(0, (width || 0) - 2)))
-      .join('─┼─');
-    return <Text>├─{separator}─┤</Text>;
+  // Helper function to render border
+  const renderBorder = (type: 'top' | 'middle' | 'bottom'): React.ReactNode => {
+    const chars = {
+      top: { left: '┌', middle: '┬', right: '┐', horizontal: '─' },
+      middle: { left: '├', middle: '┼', right: '┤', horizontal: '─' },
+      bottom: { left: '└', middle: '┴', right: '┘', horizontal: '─' }
+    };
+    
+    const char = chars[type];
+    const borderParts = adjustedWidths.map(w => char.horizontal.repeat(w));
+    const border = char.left + borderParts.join(char.middle) + char.right;
+    
+    return <Text>{border}</Text>;
   };
 
-  const renderTopBorder = () => {
-    const border = adjustedWidths
-      .map((width) => '─'.repeat(Math.max(0, (width || 0) - 2)))
-      .join('─┬─');
-    return <Text>┌─{border}─┐</Text>;
-  };
-
-  const renderBottomBorder = () => {
-    const border = adjustedWidths
-      .map((width) => '─'.repeat(Math.max(0, (width || 0) - 2)))
-      .join('─┴─');
-    return <Text>└─{border}─┘</Text>;
+  // Helper function to render a table row
+  const renderRow = (cells: string[]): React.ReactNode => {
+    const renderedCells = cells.map((cell, index) => {
+      const width = adjustedWidths[index] || 0;
+      return renderCell(cell || '', width);
+    });
+    
+    return (
+      <Text>
+        │ {renderedCells.map((cell, index) => (
+          <React.Fragment key={index}>
+            {cell}
+            {index < renderedCells.length - 1 ? ' │ ' : ''}
+          </React.Fragment>
+        ))} │
+      </Text>
+    );
   };
 
   return (
     <Box flexDirection="column" marginY={1}>
-      {renderTopBorder()}
-      {renderRow(headers, true)}
-      {renderSeparator()}
+      {/* Top border */}
+      {renderBorder('top')}
+      
+      {/* Header row */}
+      {renderRow(headers)}
+      
+      {/* Middle border */}
+      {renderBorder('middle')}
+      
+      {/* Data rows */}
       {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
+        <React.Fragment key={index}>
+          {renderRow(row)}
+        </React.Fragment>
       ))}
-      {renderBottomBorder()}
+      
+      {/* Bottom border */}
+      {renderBorder('bottom')}
     </Box>
   );
 };
