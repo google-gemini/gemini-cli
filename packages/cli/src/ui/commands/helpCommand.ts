@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand } from './types.js';
+import { OpenDialogActionReturn, SlashCommand } from './types.js';
 
 export const helpCommand: SlashCommand = {
   name: 'help',
   altName: '?',
   description: 'for help on gemini-cli',
-  action: (context, _args) => {
+  action: (context, _args): OpenDialogActionReturn => {
     context.ui.setDebugMessage('Opening help.');
-    context.dialogs.openHelp();
+    return {
+      type: 'dialog',
+      dialog: 'help',
+    };
   },
 };

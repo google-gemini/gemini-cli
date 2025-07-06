@@ -163,23 +163,13 @@ export const useSlashCommandProcessor = (
         logger,
       },
       ui: {
-        history,
         addItem,
         clear: () => {
           clearItems();
           console.clear();
           refreshStatic();
         },
-        setQuittingMessages,
-        pendingHistoryItems,
         setDebugMessage: onDebugMessage,
-      },
-      dialogs: {
-        openTheme: openThemeDialog,
-        openAuth: openAuthDialog,
-        openEditor: openEditorDialog,
-        openPrivacy: openPrivacyNotice,
-        openHelp: () => setShowHelp(true),
       },
       session: {
         stats: session.stats,
@@ -190,17 +180,9 @@ export const useSlashCommandProcessor = (
       settings,
       gitService,
       logger,
-      history,
       addItem,
       clearItems,
       refreshStatic,
-      setQuittingMessages,
-      pendingHistoryItems,
-      openThemeDialog,
-      openAuthDialog,
-      openEditorDialog,
-      openPrivacyNotice,
-      setShowHelp,
       session.stats,
       onDebugMessage,
     ],
@@ -1118,8 +1100,19 @@ export const useSlashCommandProcessor = (
                   Date.now(),
                 );
                 return { type: 'handled' };
+              case 'dialog':
+                switch (result.dialog) {
+                  case 'help':
+                    setShowHelp(true);
+                    return { type: 'handled' };
+                  default: {
+                    const unhandled: never = result.dialog;
+                    throw new Error(
+                      `Unhandled slash command result: ${unhandled}`,
+                    );
+                  }
+                }
               default: {
-                // This ensures exhaustiveness. If a new type is added, the compiler will error.
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
               }
@@ -1186,40 +1179,36 @@ export const useSlashCommandProcessor = (
       });
       return { type: 'handled' };
     },
-    [addItem, commandTree, legacyCommands, commandContext, addMessage],
+    [
+      addItem,
+      setShowHelp,
+      commandTree,
+      legacyCommands,
+      commandContext,
+      addMessage,
+    ],
   );
 
-  // You'll also need to update how `allCommands` is constructed for the Help component
-  // to prevent duplication, since legacyCommands will eventually be empty.
   const allCommands = useMemo(() => {
-    // --- START OF NEW ADAPTER LOGIC ---
     // Adapt legacy commands to the new SlashCommand interface
     const adaptedLegacyCommands: SlashCommand[] = legacyCommands.map(
       (legacyCmd) => ({
         name: legacyCmd.name,
         altName: legacyCmd.altName,
         description: legacyCmd.description,
-        // The action now matches the new interface.
-        // It wraps the old action, providing the arguments it expects.
         action: async (_context: CommandContext, args: string) => {
-          // We need to parse the args string back into the old format
-          // that legacy commands expect (main, sub, rest).
           const parts = args.split(/\s+/);
           const subCommand = parts[0] || undefined;
           const restOfArgs = parts.slice(1).join(' ') || undefined;
 
-          // Note: We use the legacyCmd.name as the main command.
           return legacyCmd.action(legacyCmd.name, subCommand, restOfArgs);
         },
-        // Adapt the completion function as well
         completion: legacyCmd.completion
           ? async (_context: CommandContext, _partialArg: string) =>
-              // The old completion didn't take args, so we just call it.
               legacyCmd.completion!()
           : undefined,
       }),
     );
-    // --- END OF NEW ADAPTER LOGIC ---
 
     const newCommandNames = new Set(commandTree.map((c) => c.name));
     const filteredAdaptedLegacy = adaptedLegacyCommands.filter(

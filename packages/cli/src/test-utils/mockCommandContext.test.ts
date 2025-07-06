@@ -19,22 +19,22 @@ describe('createMockCommandContext', () => {
   });
 
   it('should apply top-level overrides correctly', () => {
-    const mockShowHelp = vi.fn();
+    const mockClear = vi.fn();
     const overrides = {
-      dialogs: {
-        setShowHelp: mockShowHelp,
+      ui: {
+        clear: mockClear,
       },
     };
 
     const context = createMockCommandContext(overrides);
 
     // Call the function to see if the override was used
-    context.dialogs.setShowHelp(true);
+    context.ui.clear();
 
     // Assert that our specific mock was called, not the default
-    expect(mockShowHelp).toHaveBeenCalledWith(true);
+    expect(mockClear).toHaveBeenCalled();
     // And that other defaults are still in place
-    expect(vi.isMockFunction(context.dialogs.openAuth)).toBe(true);
+    expect(vi.isMockFunction(context.ui.addItem)).toBe(true);
   });
 
   it('should apply deeply nested overrides correctly', () => {

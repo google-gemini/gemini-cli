@@ -27,13 +27,16 @@ describe('helpCommand', () => {
     } as unknown as CommandContext;
   });
 
-  it("should call setShowHelp(true) and set a debug message for '/help'", () => {
+  it("should return a dialog action and set a debug message for '/help'", () => {
     if (!helpCommand.action) {
       throw new Error('Help command has no action');
     }
-    helpCommand.action(mockContext, '');
+    const result = helpCommand.action(mockContext, '');
 
-    expect(mockOpenHelp).toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'dialog',
+      dialog: 'help',
+    });
     expect(mockOnDebugMessage).toHaveBeenCalledWith('Opening help.');
   });
 

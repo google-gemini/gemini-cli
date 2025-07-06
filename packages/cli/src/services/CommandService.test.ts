@@ -77,7 +77,7 @@ describe('CommandService', () => {
 
         const loadedTree = commandService.getCommand();
         expect(loadedTree.length).toBe(3);
-        expect(loadedTree).toEqual([memoryCommand, helpCommand, clearCommand]);
+        expect(loadedTree).toEqual([clearCommand, helpCommand, memoryCommand]);
       });
     });
   });

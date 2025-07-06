@@ -41,19 +41,9 @@ export const createMockCommandContext = (
       } as any, // Cast because Logger is a class.
     },
     ui: {
-      history: [],
       addItem: vi.fn(),
       clear: vi.fn(),
-      setQuittingMessages: vi.fn(),
-      pendingHistoryItems: [],
       setDebugMessage: vi.fn(),
-    },
-    dialogs: {
-      openTheme: vi.fn(),
-      openAuth: vi.fn(),
-      openEditor: vi.fn(),
-      openPrivacy: vi.fn(),
-      openHelp: vi.fn(),
     },
     session: {
       stats: {

@@ -6,7 +6,6 @@
 
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
-import { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { SessionStatsState } from '../contexts/SessionContext.js';
 
@@ -21,28 +20,19 @@ export interface CommandContext {
   };
   // UI state and history management
   ui: {
-    /** Current history of the chat. */
-    history: HistoryItem[];
+    // TODO - As more commands are add some additions may be needed or reworked using this new context.
+    // Ex.
+    // history: HistoryItem[];
+    // pendingHistoryItems: HistoryItemWithoutId[];
+
     /** Adds a new item to the history display. */
     addItem: UseHistoryManagerReturn['addItem'];
     /** Clears all history items and the console screen. */
     clear: () => void;
-    /** Provides a list of messages to display upon quitting the application. */
-    setQuittingMessages: (messages: HistoryItem[]) => void;
-    /** Read-only access to history items that are pending but not yet finalized. */
-    pendingHistoryItems: HistoryItemWithoutId[];
     /**
      * Sets the transient debug message displayed in the application footer in debug mode.
      */
     setDebugMessage: (message: string) => void;
-  };
-  // Functions to open dialogs/modals
-  dialogs: {
-    openTheme: () => void;
-    openAuth: () => void;
-    openEditor: () => void;
-    openPrivacy: () => void;
-    openHelp: () => void;
   };
   // Session-specific data
   session: {
@@ -69,7 +59,19 @@ export interface MessageActionReturn {
   content: string;
 }
 
-export type SlashCommandActionReturn = ToolActionReturn | MessageActionReturn;
+/**
+ * The return type for a command action that needs to open a dialog.
+ */
+export interface OpenDialogActionReturn {
+  type: 'dialog';
+  // TODO: Add 'theme' | 'auth' | 'editor' | 'privacy' as migration happens.
+  dialog: 'help';
+}
+
+export type SlashCommandActionReturn =
+  | ToolActionReturn
+  | MessageActionReturn
+  | OpenDialogActionReturn;
 
 // The standardized contract for any command in the system.
 export interface SlashCommand {

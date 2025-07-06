@@ -53,7 +53,6 @@ export const memoryCommand: SlashCommand = {
           Date.now(),
         );
 
-        // Return info for scheduling the tool call
         return {
           type: 'tool',
           toolName: 'save_memory',
