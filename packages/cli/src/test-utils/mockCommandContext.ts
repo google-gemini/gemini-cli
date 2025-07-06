@@ -53,7 +53,7 @@ export const createMockCommandContext = (
       openAuth: vi.fn(),
       openEditor: vi.fn(),
       openPrivacy: vi.fn(),
-      setShowHelp: vi.fn(),
+      openHelp: vi.fn(),
     },
     session: {
       stats: {

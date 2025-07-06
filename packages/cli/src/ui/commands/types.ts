@@ -42,7 +42,7 @@ export interface CommandContext {
     openAuth: () => void;
     openEditor: () => void;
     openPrivacy: () => void;
-    setShowHelp: (show: boolean) => void;
+    openHelp: () => void;
   };
   // Session-specific data
   session: {

@@ -179,7 +179,7 @@ export const useSlashCommandProcessor = (
         openAuth: openAuthDialog,
         openEditor: openEditorDialog,
         openPrivacy: openPrivacyNotice,
-        setShowHelp: (show) => setShowHelp(show),
+        openHelp: () => setShowHelp(true),
       },
       session: {
         stats: session.stats,

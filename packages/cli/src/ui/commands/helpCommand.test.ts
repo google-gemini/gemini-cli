@@ -10,16 +10,16 @@ import { type CommandContext } from './types.js';
 
 describe('helpCommand', () => {
   let mockContext: CommandContext;
-  let mockSetShowHelp: ReturnType<typeof vi.fn>;
+  let mockOpenHelp: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockSetShowHelp = vi.fn();
+    mockOpenHelp = vi.fn();
     mockOnDebugMessage = vi.fn();
 
     mockContext = {
       dialogs: {
-        setShowHelp: mockSetShowHelp,
+        openHelp: mockOpenHelp,
       },
       ui: {
         setDebugMessage: mockOnDebugMessage,
@@ -33,7 +33,7 @@ describe('helpCommand', () => {
     }
     helpCommand.action(mockContext, '');
 
-    expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+    expect(mockOpenHelp).toHaveBeenCalled();
     expect(mockOnDebugMessage).toHaveBeenCalledWith('Opening help.');
   });
 
