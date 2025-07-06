@@ -27,7 +27,7 @@ export async function getCliVersion(): Promise<string> {
   }
   // For development builds, append git short hash if available
   const version = pkgJson?.version || 'unknown';
-  const gitHash = getGitShortCommitHash();
+  const gitHash = await getGitShortCommitHash();
 
   return gitHash ? `${version}-${gitHash}` : version;
 }
