@@ -38,6 +38,16 @@ With the Gemini CLI you can:
 
 You are now ready to use the Gemini CLI!
 
+## Interactive learning
+
+Use the `learning-app.js` script to explore the most important Gemini CLI concepts interactively:
+
+```bash
+node scripts/learning-app.js
+```
+
+Select a topic number from the menu to read a brief summary.
+
 ### Use a Gemini API key:
 
 The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
