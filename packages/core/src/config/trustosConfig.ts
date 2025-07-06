@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,7 +38,7 @@ export const DEFAULT_TRUSTOS_CONFIG: TrustConfig = {
   },
 };
 
-export class TrustOSConfig {
+export class TrustConfiguration {
   private config: TrustConfig;
   private configPath: string;
 
@@ -63,7 +63,7 @@ export class TrustOSConfig {
         await this.save();
       }
     } catch (error) {
-      console.error('Failed to initialize TrustOS config:', error);
+      console.error('Failed to initialize Trust config:', error);
       throw error;
     }
   }
@@ -72,7 +72,7 @@ export class TrustOSConfig {
     try {
       await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.error('Failed to save TrustOS config:', error);
+      console.error('Failed to save Trust config:', error);
       throw error;
     }
   }

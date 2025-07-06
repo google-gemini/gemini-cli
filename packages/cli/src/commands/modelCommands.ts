@@ -1,10 +1,11 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TrustOSModelManager, TrustOSConfig } from '@trustos/trust-cli-core';
+import { TrustModelManagerImpl } from '@trustos/trust-cli-core';
+import { TrustConfiguration } from '@trustos/trust-cli-core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -17,12 +18,12 @@ export interface ModelCommandArgs {
 }
 
 export class ModelCommandHandler {
-  private modelManager: TrustOSModelManager;
-  private config: TrustOSConfig;
+  private modelManager: TrustModelManagerImpl;
+  private config: TrustConfiguration;
 
   constructor() {
-    this.config = new TrustOSConfig();
-    this.modelManager = new TrustOSModelManager();
+    this.config = new TrustConfiguration();
+    this.modelManager = new TrustModelManagerImpl();
   }
 
   async initialize(): Promise<void> {

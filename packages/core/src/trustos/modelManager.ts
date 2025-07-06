@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,7 +12,7 @@ import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
 import { ModelDownloader, DownloadProgress } from './modelDownloader.js';
 
-export class TrustOSModelManager implements TrustModelManager {
+export class TrustModelManagerImpl implements TrustModelManager {
   private modelsDir: string;
   private configFile: string;
   private availableModels: TrustModelConfig[] = [];

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -250,7 +250,7 @@ export class ModelDownloader {
   }
 
   private createPlaceholderContent(model: TrustModelConfig): string {
-    return `# TrustOS Model Placeholder: ${model.name}\n` +
+    return `# Trust Model Placeholder: ${model.name}\n` +
            `# This is a placeholder file created in demo mode.\n` +
            `# In production, this would be the actual GGUF model file.\n` +
            `# Model: ${model.description}\n` +

@@ -153,7 +153,7 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // set default fallback to TrustOS for local-first AI
+  // set default fallback to Trust for local-first AI
   // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType) {
     settings.setValue(
@@ -327,14 +327,14 @@ async function validateNonInterActiveAuth(
   nonInteractiveConfig: Config,
 ) {
   // making a special case for the cli. many headless environments might not have a settings.json set
-  // TrustOS operates locally, so no API key is required for most operations
+  // Trust operates locally, so no API key is required for most operations
   if (!selectedAuthType) {
-    console.log('No authentication method set. Using TrustOS local inference mode.');
+    console.log('No authentication method set. Using Trust local inference mode.');
   }
 
   selectedAuthType = selectedAuthType || AuthType.USE_TRUSTOS;
   
-  // TrustOS authentication is always available for local inference
+  // Trust authentication is always available for local inference
   if (selectedAuthType === AuthType.USE_TRUSTOS) {
     await nonInteractiveConfig.refreshAuth(selectedAuthType);
     return nonInteractiveConfig;

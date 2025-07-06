@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 TrustOS Contributors
+ * Copyright 2025 Trust Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,17 +16,17 @@ import {
 } from '@google/genai';
 import { ContentGenerator } from '../core/contentGenerator.js';
 import { TrustNodeLlamaClient } from './nodeLlamaClient.js';
-import { TrustOSModelManager } from './modelManager.js';
+import { TrustModelManagerImpl } from './modelManager.js';
 import { TrustModelConfig, GenerationOptions } from './types.js';
 
 export class TrustContentGenerator implements ContentGenerator {
   private modelClient: TrustNodeLlamaClient;
-  private modelManager: TrustOSModelManager;
+  private modelManager: TrustModelManagerImpl;
   private isInitialized = false;
 
   constructor(modelsDir?: string) {
     this.modelClient = new TrustNodeLlamaClient();
-    this.modelManager = new TrustOSModelManager(modelsDir);
+    this.modelManager = new TrustModelManagerImpl(modelsDir);
   }
 
   async initialize(): Promise<void> {
