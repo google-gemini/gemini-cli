@@ -310,6 +310,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     stdin,
     setRawMode,
     isValidPath,
+    shellModeActive,
   });
 
   const handleExit = useCallback(
@@ -751,14 +752,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
               {showErrorDetails && (
                 <OverflowProvider>
-                  <DetailedMessagesDisplay
-                    messages={filteredConsoleMessages}
-                    maxHeight={
-                      constrainHeight ? debugConsoleMaxHeight : undefined
-                    }
-                    width={inputWidth}
-                  />
-                  <ShowMoreLines constrainHeight={constrainHeight} />
+                  <Box flexDirection="column">
+                    <DetailedMessagesDisplay
+                      messages={filteredConsoleMessages}
+                      maxHeight={
+                        constrainHeight ? debugConsoleMaxHeight : undefined
+                      }
+                      width={inputWidth}
+                    />
+                    <ShowMoreLines constrainHeight={constrainHeight} />
+                  </Box>
                 </OverflowProvider>
               )}
 

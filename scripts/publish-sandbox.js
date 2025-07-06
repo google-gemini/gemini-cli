@@ -20,32 +20,24 @@
 import { execSync } from 'child_process';
 
 const {
-  SANDBOX_IMAGE_REGISTRY,
-  SANDBOX_IMAGE_NAME,
-  npm_package_version,
+  npm_package_config_sandboxImageUri,
   DOCKER_DRY_RUN,
+  GEMINI_SANDBOX_IMAGE_TAG,
 } = process.env;
 
-if (!SANDBOX_IMAGE_REGISTRY) {
+if (!npm_package_config_sandboxImageUri) {
   console.error(
-    'Error: SANDBOX_IMAGE_REGISTRY environment variable is not set.',
+    'Error: npm_package_config_sandboxImageUri environment variable is not set (should be run via npm).',
   );
   process.exit(1);
 }
 
-if (!SANDBOX_IMAGE_NAME) {
-  console.error('Error: SANDBOX_IMAGE_NAME environment variable is not set.');
-  process.exit(1);
-}
+let imageUri = npm_package_config_sandboxImageUri;
 
-if (!npm_package_version) {
-  console.error(
-    'Error: npm_package_version environment variable is not set (should be run via npm).',
-  );
-  process.exit(1);
+if (GEMINI_SANDBOX_IMAGE_TAG) {
+  const [baseUri] = imageUri.split(':');
+  imageUri = `${baseUri}:${GEMINI_SANDBOX_IMAGE_TAG}`;
 }
-
-const imageUri = `${SANDBOX_IMAGE_REGISTRY}/${SANDBOX_IMAGE_NAME}:${npm_package_version}`;
 
 if (DOCKER_DRY_RUN) {
   console.log(`DRY RUN: Would execute: docker push "${imageUri}"`);
