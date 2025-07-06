@@ -57,7 +57,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
     const openAIRequest = this.convertToOpenAIFormat(request);
-    const url = `${this.config.baseUrl} / chat / completions`;
+    const url = `${this.config.baseUrl}/chat/completions`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -93,7 +93,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
   ): AsyncGenerator<GenerateContentResponse> {
     const openAIRequest = { ...this.convertToOpenAIFormat(request), stream: true };
 
-    const response = await fetch(`${this.config.baseUrl} / chat / completions`, {
+    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     const contents = normalizeContents(request.contents);
     const text = this.extractTextFromContents(contents);
 
-    const response = await fetch(`${this.config.baseUrl} / embeddings`, {
+    const response = await fetch(`${this.config.baseUrl}/ embeddings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -539,7 +539,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const anthropicRequest = this.convertToAnthropicFormat(request);
 
-    const response = await fetch(`${this.config.baseUrl} /v1/messages`, {
+    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -584,7 +584,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       stream: true
     };
 
-    const response = await fetch(`${this.config.baseUrl} /v1/messages`, {
+    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
