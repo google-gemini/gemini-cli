@@ -257,7 +257,7 @@ export class TrustBenchmarkSystem {
       
       const tokensPerSecond = tokenCount / (responseTime / 1000);
       const memoryUsed = endMemory.heapUsed - startMemory.heapUsed;
-      const cpuUsage = afterMetrics.cpuUsage.user - beforeMetrics.cpuUsage.user;
+      const cpuUsage = afterMetrics.cpuUsage - beforeMetrics.cpuUsage;
 
       return {
         testId: test.id,

@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, Newline, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import { TrustModelManagerImpl, TrustConfiguration, globalPerformanceMonitor } from '@trustos/trust-cli-core';
-import { TrustModelConfig } from '../../../../core/src/trustos/types.js';
+import { TrustModelConfig } from '@trustos/trust-cli-core';
 
 interface ModelManagerUIProps {
   onExit: () => void;
@@ -395,7 +395,7 @@ const BenchmarkView: React.FC<{ state: UIState }> = ({ state }) => {
       
       <Box flexDirection="column" marginLeft={2}>
         <Text bold>System Performance:</Text>
-        <Text>CPU Cores: {systemMetrics.cpuCores}</Text>
+        <Text>Platform: {systemMetrics.platform}</Text>
         <Text>Total RAM: {Math.floor(systemMetrics.memoryUsage.total / (1024**3))}GB</Text>
         <Text>Available RAM: {Math.floor(systemMetrics.memoryUsage.available / (1024**3))}GB</Text>
         <Text>Load Average: {systemMetrics.loadAverage[0].toFixed(2)}</Text>

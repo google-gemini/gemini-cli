@@ -142,7 +142,7 @@ export class TrustContextManager {
       } else if (context === '') {
         // If even the first chunk is too large, summarize it
         const summary = this.createChunkSummary(chunk, target);
-        context = this.formatChunkForContext(summary.source, summary.summary);
+        context = this.formatChunkForContext(chunk.source, summary.summary);
         tokenCount = summary.tokenCount;
         break;
       } else {

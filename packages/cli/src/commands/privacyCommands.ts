@@ -15,7 +15,7 @@ export interface PrivacyCommandArgs {
 
 export class PrivacyCommandHandler {
   private config: TrustConfiguration;
-  private privacyManager: PrivacyManager;
+  private privacyManager!: PrivacyManager;
 
   constructor() {
     this.config = new TrustConfiguration();

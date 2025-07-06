@@ -211,9 +211,9 @@ export class TrustGitIntegration {
       }
 
       // Add diff content
-      const diff = this.getStagedDiff() + '\\n' + this.getModifiedDiff();
+      const diff = this.getStagedDiff() + '\n' + this.getModifiedDiff();
       if (diff.trim()) {
-        context += `## Diff\\n\\`\\`\\`diff\\n${diff}\\n\\`\\`\\`\\n\\n`;
+        context += `## Diff\n\`\`\`diff\n${diff}\n\`\`\`\n\n`;
       }
     }
 

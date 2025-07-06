@@ -65,7 +65,7 @@ export class TrustSchemaEnforcement {
     const { prompt, schema, options = {}, maxRetries = 3, validationStrict = true } = request;
     
     // Enhance prompt with schema information
-    const enhancedPrompt = this.createSchemaPrompt(prompt, schema);
+    let enhancedPrompt = this.createSchemaPrompt(prompt, schema);
     
     let lastError = '';
     let rawResponse = '';
