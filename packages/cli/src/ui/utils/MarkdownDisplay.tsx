@@ -53,8 +53,8 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   let codeBlockLang: string | null = null;
   let codeBlockFence = '';
   let inTable = false;
-  let tableRows: string[][] = [];
-  let tableHeaders: string[] = [];
+  let tableRows: React.ReactNode[][] = [];
+  let tableHeaders: React.ReactNode[] = [];
 
   lines.forEach((line, index) => {
     const key = `line-${index}`;
@@ -105,7 +105,9 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         lines[index + 1].match(tableSeparatorRegex)
       ) {
         inTable = true;
-        tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        tableHeaders = tableRowMatch[1].split('|').map((cell) => (
+          <RenderInline text={cell.trim()} />
+        ));
         tableRows = [];
       } else {
         // Not a table, treat as regular text
@@ -121,10 +123,12 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       // Skip separator line - already handled
     } else if (inTable && tableRowMatch) {
       // Add table row
-      const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+      const cells = tableRowMatch[1].split('|').map((cell) => (
+        <RenderInline text={cell.trim()} />
+      ));
       // Ensure row has same column count as headers
       while (cells.length < tableHeaders.length) {
-        cells.push('');
+        cells.push(<RenderInline text="" />);
       }
       if (cells.length > tableHeaders.length) {
         cells.length = tableHeaders.length;
@@ -522,8 +526,8 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
 const RenderListItem = React.memo(RenderListItemInternal);
 
 interface RenderTableProps {
-  headers: string[];
-  rows: string[][];
+  headers: React.ReactNode[];
+  rows: React.ReactNode[][];
   terminalWidth: number;
 }
 

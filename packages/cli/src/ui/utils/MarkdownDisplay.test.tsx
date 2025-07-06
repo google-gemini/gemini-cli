@@ -232,6 +232,75 @@ But there's no separator line
       const { lastFrame } = renderNarrow();
       expect(lastFrame()).not.toBe('');
     });
+
+    it('should render inline formatting in table cells', () => {
+      const tableWithFormatting = `
+| Characteristic | \`execSync\` (Old Way) | \`spawn\` (New Way in PR) |
+|----------------|---------------------|------------------------|
+| **Execution** | Synchronous (blocks everything) | Asynchronous (non-blocking) |
+| **Security** | **Vulnerable to shell injection** | **Safe from shell injection** |
+| *Use Case* | Simple commands with \`small\` output | Long-running processes |
+`;
+
+      const { lastFrame } = render(
+        <MarkdownDisplay
+          text={tableWithFormatting}
+          isPending={false}
+          terminalWidth={120}
+        />,
+      );
+
+      const output = lastFrame();
+      
+      // Should render table structure
+      expect(output).toContain('Characteristic');
+      expect(output).toContain('execSync');
+      expect(output).toContain('spawn');
+      
+      // Should render content without markdown syntax
+      expect(output).toContain('Execution');
+      expect(output).toContain('Security');
+      expect(output).toContain('Use Case');
+      expect(output).toContain('Vulnerable to shell injection');
+      expect(output).toContain('Safe from shell injection');
+      expect(output).toContain('small');
+      
+      // Should NOT contain raw markdown syntax
+      expect(output).not.toContain('**Execution**');
+      expect(output).not.toContain('`execSync`');
+      expect(output).not.toContain('*Use Case*');
+    });
+
+    it('should handle complex nested formatting in tables', () => {
+      const complexTable = `
+| Command | Description | Example |
+|---------|-------------|---------|
+| \`git status\` | Shows **current** repository status | \`git status --short\` |
+| \`npm install\` | Installs *all* dependencies | **\`npm install --save-dev\`** |
+`;
+
+      const { lastFrame } = render(
+        <MarkdownDisplay
+          text={complexTable}
+          isPending={false}
+          terminalWidth={120}
+        />,
+      );
+
+      const output = lastFrame();
+      
+      // Check content is rendered
+      expect(output).toContain('git status');
+      expect(output).toContain('current');
+      expect(output).toContain('npm install');
+      expect(output).toContain('all');
+      expect(output).toContain('npm install --save-dev');
+      
+      // Should NOT contain raw markdown
+      expect(output).not.toContain('**current**');
+      expect(output).not.toContain('*all*');
+      expect(output).not.toContain('**`npm install --save-dev`**');
+    });
   });
 
   describe('Existing Functionality', () => {
