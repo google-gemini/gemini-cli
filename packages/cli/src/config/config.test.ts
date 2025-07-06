@@ -350,3 +350,131 @@ describe('mergeMcpServers', () => {
     expect(settings).toEqual(originalSettings);
   });
 });
+
+describe('mergeExcludeTools', () => {
+  it('should merge excludeTools from settings and extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool3', 'tool4'],
+        },
+        contextFiles: [],
+      },
+      {
+        config: {
+          name: 'ext2',
+          version: '1.0.0',
+          excludeTools: ['tool5'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(5);
+  });
+
+  it('should handle overlapping excludeTools between settings and extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2', 'tool3'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(3);
+  });
+
+  it('should handle overlapping excludeTools between extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2', 'tool3'],
+        },
+        contextFiles: [],
+      },
+      {
+        config: {
+          name: 'ext2',
+          version: '1.0.0',
+          excludeTools: ['tool3', 'tool4'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(4);
+  });
+
+  it('should return an empty array when no excludeTools are specified', async () => {
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual([]);
+  });
+
+  it('should handle settings with excludeTools but no extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(2);
+  });
+
+  it('should handle extensions with excludeTools but no settings', async () => {
+    const settings: Settings = {};
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool1', 'tool2'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(2);
+  });
+
+  it('should not modify the original settings object', async () => {
+    const settings: Settings = { excludeTools: ['tool1'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const originalSettings = JSON.parse(JSON.stringify(settings));
+    await loadCliConfig(settings, extensions, 'test-session');
+    expect(settings).toEqual(originalSettings);
+  });
+});

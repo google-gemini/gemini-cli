@@ -699,7 +699,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'chat',
         description:
-          'Manage conversation history. Usage: /chat <list|save|resume> [tag]',
+          'Manage conversation history. Usage: /chat <list|save|resume> <tag>',
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
@@ -716,19 +716,27 @@ export const useSlashCommandProcessor = (
           if (!subCommand) {
             addMessage({
               type: MessageType.ERROR,
-              content: 'Missing command\nUsage: /chat <list|save|resume> [tag]',
+              content: 'Missing command\nUsage: /chat <list|save|resume> <tag>',
               timestamp: new Date(),
             });
             return;
           }
           switch (subCommand) {
             case 'save': {
+              if (!tag) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: 'Missing tag. Usage: /chat save <tag>',
+                  timestamp: new Date(),
+                });
+                return;
+              }
               const history = chat.getHistory();
               if (history.length > 0) {
                 await logger.saveCheckpoint(chat?.getHistory() || [], tag);
                 addMessage({
                   type: MessageType.INFO,
-                  content: `Conversation checkpoint saved${tag ? ' with tag: ' + tag : ''}.`,
+                  content: `Conversation checkpoint saved with tag: ${tag}.`,
                   timestamp: new Date(),
                 });
               } else {
@@ -743,11 +751,19 @@ export const useSlashCommandProcessor = (
             case 'resume':
             case 'restore':
             case 'load': {
+              if (!tag) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: 'Missing tag. Usage: /chat resume <tag>',
+                  timestamp: new Date(),
+                });
+                return;
+              }
               const conversation = await logger.loadCheckpoint(tag);
               if (conversation.length === 0) {
                 addMessage({
                   type: MessageType.INFO,
-                  content: `No saved checkpoint found${tag ? ' with tag: ' + tag : ''}.`,
+                  content: `No saved checkpoint found with tag: ${tag}.`,
                   timestamp: new Date(),
                 });
                 return;
