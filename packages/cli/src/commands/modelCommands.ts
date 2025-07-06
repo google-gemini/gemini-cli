@@ -141,10 +141,16 @@ export class ModelCommandHandler {
     console.log(`\n🎯 Model Recommendation for "${task}"`);
     console.log('─'.repeat(40));
     
-    const systemRAM = this.getSystemRAM();
-    const effectiveRAMLimit = ramLimit || systemRAM;
+    // Import performance monitor for hardware analysis
+    const { globalPerformanceMonitor } = await import('../../../core/src/trustos/performanceMonitor.js');
+    const optimal = globalPerformanceMonitor.getOptimalModelSettings();
+    const systemMetrics = globalPerformanceMonitor.getSystemMetrics();
     
-    console.log(`System RAM: ${systemRAM}GB | Limit: ${effectiveRAMLimit}GB`);
+    const systemRAM = Math.floor(systemMetrics.memoryUsage.total / (1024 * 1024 * 1024));
+    const availableRAM = Math.floor(systemMetrics.memoryUsage.available / (1024 * 1024 * 1024));
+    const effectiveRAMLimit = ramLimit || optimal.recommendedRAM;
+    
+    console.log(`System RAM: ${systemRAM}GB | Available: ${availableRAM}GB | Limit: ${effectiveRAMLimit}GB`);
     
     const recommended = this.modelManager.getRecommendedModel(task, effectiveRAMLimit);
     
@@ -153,6 +159,23 @@ export class ModelCommandHandler {
       console.log(`📝 ${recommended.description}`);
       console.log(`💾 RAM Required: ${recommended.ramRequirement}`);
       console.log(`⭐ Trust Score: ${recommended.trustScore}/10`);
+      
+      // Show auto-detected optimization info
+      console.log(`\n🔧 Auto-detected settings:`);
+      console.log(`   Expected Performance: ${optimal.estimatedSpeed}`);
+      console.log(`   Optimal Context Size: ${optimal.maxContextSize} tokens`);
+      console.log(`   Recommended Quantization: ${optimal.preferredQuantization}`);
+      
+      // Performance analysis
+      const memoryPercent = (systemMetrics.memoryUsage.used / systemMetrics.memoryUsage.total) * 100;
+      if (memoryPercent > 80) {
+        console.log(`\n⚠️  Warning: High memory usage (${memoryPercent.toFixed(0)}%)`);
+        console.log('   Consider closing other applications before running inference');
+      } else if (memoryPercent < 50) {
+        console.log(`\n🟢 Good: Low memory usage (${memoryPercent.toFixed(0)}%)`);
+        console.log('   System has plenty of resources for larger models');
+      }
+      
       console.log(`\n💡 Run: trust model switch ${recommended.name}`);
       
       const isDownloaded = await this.modelManager.verifyModel(recommended.path);
@@ -161,6 +184,10 @@ export class ModelCommandHandler {
       }
     } else {
       console.log('❌ No suitable model found for your requirements');
+      console.log(`\n🔧 Auto-detected optimal settings:`);
+      console.log(`   RAM Allocation: ${optimal.recommendedRAM}GB`);
+      console.log(`   Context Size: ${optimal.maxContextSize} tokens`);
+      console.log(`   Quantization: ${optimal.preferredQuantization}`);
       console.log('💡 Try increasing RAM limit or choosing a different task type');
       console.log('💡 Available task types: coding, quick, complex, default');
     }
