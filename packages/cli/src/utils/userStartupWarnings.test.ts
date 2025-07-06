@@ -66,6 +66,49 @@ describe('getUserStartupWarnings', () => {
     });
   });
 
+  function setNodeVersion(version: string) {
+    Object.defineProperty(process.versions, 'node', {
+      value: version,
+      configurable: true,
+    });
+  }
+
+  describe('node version check', () => {
+    const originalNodeVersion = process.versions.node;
+
+    afterEach(() => {
+      setNodeVersion(originalNodeVersion);
+    });
+
+    it('should return a warning if Node.js version is less than minMajor', async () => {
+      setNodeVersion('18.17.0');
+      const warnings = await getUserStartupWarnings('');
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Node.js v18.17.0');
+      expect(warnings[0]).toContain('requires Node.js 20 or higher');
+    });
+
+    it('should not return a warning if Node.js version is equal to minMajor', async () => {
+      setNodeVersion('20.0.0');
+      const warnings = await getUserStartupWarnings('');
+      expect(warnings).toEqual([]);
+    });
+
+    it('should not return a warning if Node.js version is greater than minMajor', async () => {
+      setNodeVersion('22.1.0');
+      const warnings = await getUserStartupWarnings('');
+      expect(warnings).toEqual([]);
+    });
+
+    it('should use default minMajor=20 if not provided', async () => {
+      setNodeVersion('18.0.0');
+      const warnings = await getUserStartupWarnings('');
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Node.js v18.0.0');
+      expect(warnings[0]).toContain('requires Node.js 20 or higher');
+    });
+  });
+
   // // Example of how to add a new check:
   // describe('node version check', () => {
   //   // Tests for node version check would go here

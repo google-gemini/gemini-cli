@@ -23,7 +23,6 @@ import {
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
-import { getNodeVersionWarning } from './utils/nodeVersionWarning.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
@@ -170,7 +169,6 @@ export async function main() {
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
-    ...(await getNodeVersionWarning(20)),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
