@@ -18,7 +18,7 @@ import {
   MCPServerStatus,
   getMCPDiscoveryState,
   getMCPServerStatus,
-} from '@google/gemini-cli-core';
+} from '@trustos/trust-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,

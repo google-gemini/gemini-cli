@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthType } from '@trustos/trust-cli-core';
 import { loadEnvironment } from './config.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
@@ -32,6 +32,11 @@ export const validateAuthMethod = (authMethod: string): string | null => {
         'Update your .env and try again, no reload needed!'
       );
     }
+    return null;
+  }
+
+  if (authMethod === AuthType.USE_TRUSTOS) {
+    // TrustOS is always available - no external dependencies required
     return null;
   }
 

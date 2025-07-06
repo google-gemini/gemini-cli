@@ -34,7 +34,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
-} from '@google/gemini-cli-core';
+} from '@trustos/trust-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 
@@ -212,7 +212,7 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    process.stdout.write(`\x1b]2; Trust - ${title} \x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
@@ -285,7 +285,7 @@ async function validateNonInterActiveAuth(
     process.exit(1);
   }
 
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
+  selectedAuthType = selectedAuthType || AuthType.USE_TRUSTOS;
   const err = validateAuthMethod(selectedAuthType);
   if (err != null) {
     console.error(err);

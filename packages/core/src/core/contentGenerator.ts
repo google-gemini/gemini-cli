@@ -38,6 +38,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  USE_TRUSTOS = 'trustos-local',
 }
 
 export type ContentGeneratorConfig = {
@@ -45,6 +46,7 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  trustosModelsDir?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -65,8 +67,8 @@ export async function createContentGeneratorConfig(
     authType,
   };
 
-  // if we are using google auth nothing else to validate for now
-  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+  // if we are using google auth or trustos nothing else to validate for now
+  if (authType === AuthType.LOGIN_WITH_GOOGLE || authType === AuthType.USE_TRUSTOS) {
     return contentGeneratorConfig;
   }
 
@@ -106,9 +108,17 @@ export async function createContentGenerator(
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
     headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
+      'User-Agent': `TrustCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
+  
+  if (config.authType === AuthType.USE_TRUSTOS) {
+    const { TrustContentGenerator } = await import('../trustos/trustContentGenerator.js');
+    const trustGenerator = new TrustContentGenerator(config.trustosModelsDir);
+    await trustGenerator.initialize();
+    return trustGenerator;
+  }
+  
   if (config.authType === AuthType.LOGIN_WITH_GOOGLE) {
     return createCodeAssistContentGenerator(
       httpOptions,

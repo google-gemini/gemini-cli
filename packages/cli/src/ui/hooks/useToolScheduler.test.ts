@@ -24,7 +24,7 @@ import {
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode, // Import from core
-} from '@google/gemini-cli-core';
+} from '@trustos/trust-cli-core';
 import {
   HistoryItemWithoutId,
   ToolCallStatus,
@@ -32,8 +32,8 @@ import {
 } from '../types.js';
 
 // Mocks
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@trustos/trust-cli-core', async () => {
+  const actual = await vi.importActual('@trustos/trust-cli-core');
   return {
     ...actual,
     ToolRegistry: vi.fn(),

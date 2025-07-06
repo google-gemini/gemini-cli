@@ -11,7 +11,7 @@ import {
   Config,
   clearCachedCredentialFile,
   getErrorMessage,
-} from '@google/gemini-cli-core';
+} from '@trustos/trust-cli-core';
 
 export const useAuthCommand = (
   settings: LoadedSettings,

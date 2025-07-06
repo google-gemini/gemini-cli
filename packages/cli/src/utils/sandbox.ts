@@ -15,7 +15,7 @@ import {
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
-import { SandboxConfig } from '@google/gemini-cli-core';
+import { SandboxConfig } from '@trustos/trust-cli-core';
 
 const execAsync = promisify(exec);
 

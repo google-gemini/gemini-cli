@@ -10,3 +10,17 @@ export {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
 } from './src/config/models.js';
+export { 
+  TrustModelConfig,
+  TrustModelClient,
+  TrustModelManager,
+  TrustConfig,
+  GenerationOptions,
+  TrustNodeLlamaClient,
+  TrustOSModelManager,
+  TrustContentGenerator,
+  TRUSTOS_VERSION,
+  TRUSTOS_CLI_NAME,
+  TRUSTOS_DESCRIPTION
+} from './src/trustos/index.js';
+export * from './src/config/trustosConfig.js';

@@ -1,15 +1,15 @@
 {
-  "name": "@google/gemini-cli",
-  "version": "0.1.9",
-  "description": "Gemini CLI",
+  "name": "@trustos/trust-cli-frontend",
+  "version": "0.1.0",
+  "description": "Trust CLI",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/audit-brands/trust-cli.git"
   },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "trust": "dist/index.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -28,7 +28,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "file:../core",
+    "@trustos/trust-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
