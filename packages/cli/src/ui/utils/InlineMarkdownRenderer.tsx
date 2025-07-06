@@ -95,15 +95,6 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
               {codeMatch[2]}
             </Text>
           );
-        } else {
-          renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
-              {fullMatch.slice(
-                INLINE_CODE_MARKER_LENGTH,
-                -INLINE_CODE_MARKER_LENGTH,
-              )}
-            </Text>
-          );
         }
       } else if (
         fullMatch.startsWith('[') &&

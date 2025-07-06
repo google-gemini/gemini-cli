@@ -42,7 +42,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   // Helper function to render a cell with proper width
-  const renderCell = (content: string, width: number): React.ReactNode => {
+  const renderCell = (content: string, width: number, isHeader = false): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
     const displayWidth = getPlainTextLength(content);
     
@@ -52,16 +52,26 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         // Just truncate by character count
         cellContent = content.substring(0, Math.min(content.length, contentWidth));
       } else {
-        // Truncate preserving markdown formatting
-        let truncated = content;
-        let currentDisplayWidth = displayWidth;
+        // Truncate preserving markdown formatting using binary search
+        let left = 0;
+        let right = content.length;
+        let bestTruncated = content;
         
-        while (currentDisplayWidth > contentWidth - 3 && truncated.length > 0) {
-          truncated = truncated.substring(0, truncated.length - 1);
-          currentDisplayWidth = getPlainTextLength(truncated);
+        // Binary search to find the optimal truncation point
+        while (left <= right) {
+          const mid = Math.floor((left + right) / 2);
+          const candidate = content.substring(0, mid);
+          const candidateWidth = getPlainTextLength(candidate);
+          
+          if (candidateWidth <= contentWidth - 3) {
+            bestTruncated = candidate;
+            left = mid + 1;
+          } else {
+            right = mid - 1;
+          }
         }
         
-        cellContent = truncated + '...';
+        cellContent = bestTruncated + '...';
       }
     }
     
@@ -71,7 +81,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     
     return (
       <Text>
-        <RenderInline text={cellContent} />
+        {isHeader ? <Text bold color={Colors.AccentCyan}><RenderInline text={cellContent} /></Text> : <RenderInline text={cellContent} />}
         {' '.repeat(paddingNeeded)}
       </Text>
     );
@@ -93,10 +103,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   };
 
   // Helper function to render a table row
-  const renderRow = (cells: string[]): React.ReactNode => {
+  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width);
+      return renderCell(cell || '', width, isHeader);
     });
     
     return (
@@ -117,7 +127,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       {renderBorder('top')}
       
       {/* Header row */}
-      {renderRow(headers)}
+      {renderRow(headers, true)}
       
       {/* Middle border */}
       {renderBorder('middle')}
