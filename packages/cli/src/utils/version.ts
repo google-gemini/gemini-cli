@@ -7,15 +7,16 @@
 import { exec } from 'child_process';
 import { getPackageJson } from './package.js';
 
-function getGitShortCommitHash(): string | null {
-  try {
-    // Run git command to get short commit hash
-    const stdout = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' });
-    return stdout.trim();
-  } catch {
-    // If git is not available or command fails, return null
-    return null;
-  }
+function getGitShortCommitHash(): Promise<string | null> {
+  return new Promise((resolve) => {
+    exec('git rev-parse --short HEAD', { encoding: 'utf-8' }, (error, stdout) => {
+      if (error) {
+        // If git is not available or command fails, resolve with null.
+        return resolve(null);
+      }
+      return resolve(stdout.trim());
+    });
+  });
 }
 
 export async function getCliVersion(): Promise<string> {
