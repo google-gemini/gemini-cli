@@ -636,20 +636,20 @@ export const useGeminiStream = (
           const responsesToAdd = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
+          const combinedParts: Part[] = [];
           for (const response of responsesToAdd) {
-            let parts: Part[];
             if (Array.isArray(response)) {
-              parts = response;
+              combinedParts.push(...response);
             } else if (typeof response === 'string') {
-              parts = [{ text: response }];
+              combinedParts.push({ text: response });
             } else {
-              parts = [response];
+              combinedParts.push(response);
             }
-            geminiClient.addHistory({
-              role: 'user',
-              parts,
-            });
           }
+          geminiClient.addHistory({
+            role: 'user',
+            parts: combinedParts,
+          });
         }
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
