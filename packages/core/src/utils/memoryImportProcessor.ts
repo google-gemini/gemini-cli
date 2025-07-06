@@ -84,14 +84,27 @@ function hasMessage(err: unknown): err is { message: string } {
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
   const tokens = marked.lexer(content);
-  let searchIndex = 0;
+
+  // Map from raw content to a queue of its start indices in the original content.
+  const rawContentIndices = new Map<string, number[]>();
 
   function walk(token: { type: string; raw: string; tokens?: unknown[] }) {
     if (token.type === 'code' || token.type === 'codespan') {
-      const idx = content.indexOf(token.raw, searchIndex);
-      if (idx !== -1) {
+      if (!rawContentIndices.has(token.raw)) {
+        const indices: number[] = [];
+        let lastIndex = -1;
+        while ((lastIndex = content.indexOf(token.raw, lastIndex + 1)) !== -1) {
+          indices.push(lastIndex);
+        }
+        rawContentIndices.set(token.raw, indices);
+      }
+
+      const indices = rawContentIndices.get(token.raw);
+      if (indices && indices.length > 0) {
+        // Assume tokens are processed in order of appearance.
+        // Dequeue the next available index for this raw content.
+        const idx = indices.shift()!;
         regions.push([idx, idx + token.raw.length]);
-        searchIndex = idx + token.raw.length;
       }
     }
 
