@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * Trivial change: touched for commit.
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -49,9 +45,11 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain('<!-- Imported from: ./test.md -->');
-      expect(result).toContain(importedContent);
-      expect(result).toContain('<!-- End of import from: ./test.md -->');
+      expect(result.content).toContain('<!-- Imported from: ./test.md -->');
+      expect(result.content).toContain(importedContent);
+      expect(result.content).toContain(
+        '<!-- End of import from: ./test.md -->',
+      );
       expect(mockedFs.readFile).toHaveBeenCalledWith(
         path.resolve(basePath, './test.md'),
         'utf-8',
@@ -68,9 +66,11 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain('<!-- Imported from: ./instructions.txt -->');
-      expect(result).toContain(importedContent);
-      expect(result).toContain(
+      expect(result.content).toContain(
+        '<!-- Imported from: ./instructions.txt -->',
+      );
+      expect(result.content).toContain(importedContent);
+      expect(result.content).toContain(
         '<!-- End of import from: ./instructions.txt -->',
       );
       expect(console.warn).not.toHaveBeenCalled();
@@ -99,7 +99,9 @@ describe('memoryImportProcessor', () => {
       const result = await processImports(content, basePath, true, importState);
 
       // The circular import should be detected when processing the nested import
-      expect(result).toContain('<!-- File already processed: ./main.md -->');
+      expect(result.content).toContain(
+        '<!-- File already processed: ./main.md -->',
+      );
     });
 
     it('should handle file not found errors', async () => {
@@ -110,7 +112,7 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain(
+      expect(result.content).toContain(
         '<!-- Import failed: ./nonexistent.md - File not found -->',
       );
       expect(console.error).toHaveBeenCalledWith(
@@ -139,7 +141,7 @@ describe('memoryImportProcessor', () => {
         '[WARN] [ImportProcessor]',
         'Maximum import depth (1) reached. Stopping import processing.',
       );
-      expect(result).toBe(content);
+      expect(result.content).toBe(content);
     });
 
     it('should handle nested imports recursively', async () => {
@@ -155,9 +157,9 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain('<!-- Imported from: ./nested.md -->');
-      expect(result).toContain('<!-- Imported from: ./inner.md -->');
-      expect(result).toContain(innerContent);
+      expect(result.content).toContain('<!-- Imported from: ./nested.md -->');
+      expect(result.content).toContain('<!-- Imported from: ./inner.md -->');
+      expect(result.content).toContain(innerContent);
     });
 
     it('should handle absolute paths in imports', async () => {
@@ -170,7 +172,7 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain(
+      expect(result.content).toContain(
         '<!-- Import failed: /absolute/path/file.md - Path traversal attempt -->',
       );
     });
@@ -188,10 +190,10 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain('<!-- Imported from: ./first.md -->');
-      expect(result).toContain('<!-- Imported from: ./second.md -->');
-      expect(result).toContain(firstContent);
-      expect(result).toContain(secondContent);
+      expect(result.content).toContain('<!-- Imported from: ./first.md -->');
+      expect(result.content).toContain('<!-- Imported from: ./second.md -->');
+      expect(result.content).toContain(firstContent);
+      expect(result.content).toContain(secondContent);
     });
 
     it('should ignore imports inside code blocks', async () => {
@@ -217,15 +219,15 @@ describe('memoryImportProcessor', () => {
         undefined,
         '/test/project',
       );
-      expect(result).toContain(importedContent1);
-      expect(result).toContain(importedContent2);
-      expect(result).toContain('@./should-not-import.md'); // Should remain as-is
+      expect(result.content).toContain(importedContent1);
+      expect(result.content).toContain(importedContent2);
+      expect(result.content).toContain('@./should-not-import.md'); // Should remain as-is
     });
 
     it('should ignore imports inside inline code', async () => {
       const content = [
         'Normal content @./should-import.md',
-        '`inline code with @./should-not-import.md`',
+        '`code with import @./should-not-import.md`',
         'More content @./should-import2.md',
       ].join('\n');
       const basePath = '/test/project/src';
@@ -242,9 +244,45 @@ describe('memoryImportProcessor', () => {
         undefined,
         '/test/project',
       );
-      expect(result).toContain(importedContent1);
-      expect(result).toContain(importedContent2);
-      expect(result).toContain('@./should-not-import.md'); // Should remain as-is
+      expect(result.content).toContain(importedContent1);
+      expect(result.content).toContain(importedContent2);
+    });
+
+    it('should handle nested tokens and non-unique content correctly', async () => {
+      // This test verifies the robust findCodeRegions implementation
+      // that recursively walks the token tree and handles non-unique content
+      const content = [
+        'Normal content @./should-import.md',
+        'Paragraph with `inline code @./should-not-import.md` and more text.',
+        'Another paragraph with the same `inline code @./should-not-import.md` text.',
+        'More content @./should-import2.md',
+      ].join('\n');
+      const basePath = '/test/project/src';
+      const importedContent1 = 'Imported 1';
+      const importedContent2 = 'Imported 2';
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(importedContent1)
+        .mockResolvedValueOnce(importedContent2);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+      );
+
+      // Should process imports outside code regions
+      expect(result.content).toContain(importedContent1);
+      expect(result.content).toContain(importedContent2);
+
+      // Should preserve imports inside inline code (both occurrences)
+      expect(result.content).toContain('`inline code @./should-not-import.md`');
+
+      // Should not have processed the imports inside code regions
+      expect(result.content).not.toContain(
+        '<!-- Imported from: ./should-not-import.md -->',
+      );
     });
 
     it('should allow imports from parent and subdirectories within project root', async () => {
@@ -264,8 +302,8 @@ describe('memoryImportProcessor', () => {
         undefined,
         '/test/project',
       );
-      expect(result).toContain(importedParent);
-      expect(result).toContain(importedSub);
+      expect(result.content).toContain(importedParent);
+      expect(result.content).toContain(importedSub);
     });
 
     it('should reject imports outside project root', async () => {
@@ -278,9 +316,49 @@ describe('memoryImportProcessor', () => {
         undefined,
         '/test/project',
       );
-      expect(result).toContain(
+      expect(result.content).toContain(
         '<!-- Import failed: ../../../etc/passwd - Path traversal attempt -->',
       );
+    });
+
+    it('should build import tree structure', async () => {
+      const content = 'Main content @./nested.md @./simple.md';
+      const basePath = '/test/project/src';
+      const nestedContent = 'Nested @./inner.md content';
+      const simpleContent = 'Simple content';
+      const innerContent = 'Inner content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(nestedContent)
+        .mockResolvedValueOnce(simpleContent)
+        .mockResolvedValueOnce(innerContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result.content).toContain('<!-- Imported from: ./nested.md -->');
+      expect(result.content).toContain('<!-- Imported from: ./simple.md -->');
+      expect(result.content).toContain('<!-- Imported from: ./inner.md -->');
+
+      // Verify import tree structure
+      expect(result.importTree.path).toBe('unknown'); // No currentFile set in test
+      expect(result.importTree.imports).toHaveLength(2);
+
+      // First import: nested.md
+      expect(result.importTree.imports![0].path).toBe(
+        '/test/project/src/nested.md',
+      );
+      expect(result.importTree.imports![0].imports).toHaveLength(1);
+      expect(result.importTree.imports![0].imports![0].path).toBe(
+        '/test/project/src/inner.md',
+      );
+      expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
+
+      // Second import: simple.md
+      expect(result.importTree.imports![1].path).toBe(
+        '/test/project/src/simple.md',
+      );
+      expect(result.importTree.imports![1].imports).toBeUndefined();
     });
   });
 

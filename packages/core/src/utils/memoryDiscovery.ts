@@ -226,16 +226,16 @@ async function readGeminiMdFiles(
       const content = await fs.readFile(filePath, 'utf-8');
 
       // Process imports in the content
-      const processedContent = await processImports(
+      const processedResult = await processImports(
         content,
         path.dirname(filePath),
         debugMode,
       );
 
-      results.push({ filePath, content: processedContent });
+      results.push({ filePath, content: processedResult.content });
       if (debugMode)
         logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
+          `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
         );
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;

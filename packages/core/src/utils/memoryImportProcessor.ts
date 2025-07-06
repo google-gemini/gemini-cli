@@ -30,6 +30,22 @@ interface ImportState {
   currentFile?: string; // Track the current file being processed
 }
 
+/**
+ * Interface representing a file in the import tree
+ */
+export interface MemoryFile {
+  path: string;
+  imports?: MemoryFile[]; // Direct imports, in the order they were imported
+}
+
+/**
+ * Result of processing imports
+ */
+export interface ProcessImportsResult {
+  content: string;
+  importTree: MemoryFile;
+}
+
 // Helper to find the project root (looks for .git directory)
 async function findProjectRoot(startDir: string): Promise<string> {
   let currentDir = path.resolve(startDir);
@@ -68,41 +84,26 @@ function hasMessage(err: unknown): err is { message: string } {
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
   const tokens = marked.lexer(content);
+  let searchIndex = 0;
 
-  // First, find all code blocks and codespans from marked tokens
-  for (const token of tokens) {
+  function walk(token: { type: string; raw: string; tokens?: unknown[] }) {
     if (token.type === 'code' || token.type === 'codespan') {
-      let start = 0;
-      while (start < content.length) {
-        const idx = content.indexOf(token.raw, start);
-        if (idx === -1) break;
+      const idx = content.indexOf(token.raw, searchIndex);
+      if (idx !== -1) {
         regions.push([idx, idx + token.raw.length]);
-        start = idx + token.raw.length;
+        searchIndex = idx + token.raw.length;
+      }
+    }
+
+    if ('tokens' in token && token.tokens) {
+      for (const child of token.tokens) {
+        walk(child as { type: string; raw: string; tokens?: unknown[] });
       }
     }
   }
 
-  // If no codespans were found by marked, use regex as fallback for inline code
-  if (
-    !regions.some(([start, end]) => {
-      const regionContent = content.substring(start, end);
-      return regionContent.includes('`') && !regionContent.includes('```');
-    })
-  ) {
-    // Improved regex for inline code: handles escaped/nested backticks
-    // Matches code spans with 1 or more backticks, not inside triple backticks
-    // See: https://github.github.com/gfm/#code-span
-    const inlineCodeRegex = /(`+)([^`]|[^`][\s\S]*?[^`])\1/g;
-    let match: RegExpExecArray | null;
-    while ((match = inlineCodeRegex.exec(content)) !== null) {
-      // Check if this region is not already covered by a code block
-      const isInsideCodeBlock = regions.some(
-        ([start, end]) => match!.index >= start && match!.index < end,
-      );
-      if (!isInsideCodeBlock) {
-        regions.push([match.index, match.index + match[0].length]);
-      }
-    }
+  for (const token of tokens) {
+    walk(token);
   }
 
   return regions;
@@ -116,7 +117,7 @@ function findCodeRegions(content: string): Array<[number, number]> {
  * @param debugMode - Whether to enable debug logging
  * @param importState - State tracking for circular import prevention
  * @param projectRoot - The project root directory for allowed directories
- * @returns Processed content with imports resolved
+ * @returns Processed content with imports resolved and import tree
  */
 export async function processImports(
   content: string,
@@ -128,7 +129,7 @@ export async function processImports(
     currentDepth: 0,
   },
   projectRoot?: string,
-): Promise<string> {
+): Promise<ProcessImportsResult> {
   if (!projectRoot) {
     projectRoot = await findProjectRoot(basePath);
   }
@@ -139,7 +140,10 @@ export async function processImports(
         `Maximum import depth (${importState.maxDepth}) reached. Stopping import processing.`,
       );
     }
-    return content;
+    return {
+      content,
+      importTree: { path: importState.currentFile || 'unknown' },
+    };
   }
 
   const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
@@ -147,6 +151,8 @@ export async function processImports(
   let result = '';
   let lastIndex = 0;
   let match: RegExpExecArray | null;
+  const imports: MemoryFile[] = [];
+
   while ((match = importRegex.exec(content)) !== null) {
     const idx = match.index;
     // Add content before this match
@@ -186,7 +192,8 @@ export async function processImports(
         newImportState,
         projectRoot,
       );
-      result += `<!-- Imported from: ${importPath} -->\n${imported}\n<!-- End of import from: ${importPath} -->`;
+      result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
+      imports.push(imported.importTree);
     } catch (err: unknown) {
       let message = 'Unknown error';
       if (hasMessage(err)) {
@@ -200,7 +207,14 @@ export async function processImports(
   }
   // Add any remaining content after the last match
   result += content.substring(lastIndex);
-  return result;
+
+  return {
+    content: result,
+    importTree: {
+      path: importState.currentFile || 'unknown',
+      imports: imports.length > 0 ? imports : undefined,
+    },
+  };
 }
 
 export function validateImportPath(

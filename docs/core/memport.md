@@ -1,33 +1,12 @@
 # Memory Import Processor
 
-> **Note:** The Memory Import Processor has evolved to support both modern compatibility with CLAUDE.md and the original GEMINI.md modular import philosophy. This dual-mode approach reflects feedback from the community and the need for interoperability, while honoring the strengths and intentions of the original design. We appreciate the contributions and suggestions that have shaped this feature for all users.
+The Memory Import Processor is a feature that allows you to modularize your GEMINI.md files by importing content from other files using the `@file.md` syntax.
 
-## Import Modes: CLAUDE.md Compatibility vs. Original GEMINI.md
+## Overview
 
-The Memory Import Processor now supports two modes of operation:
+This feature enables you to break down large GEMINI.md files into smaller, more manageable components that can be reused across different contexts. The import processor supports both relative and absolute paths, with built-in safety features to prevent circular imports and ensure file access security.
 
-| Feature                        | CLAUDE.md Compatibility Mode (Current Default) | Original GEMINI.md Mode (Legacy) |
-| ------------------------------ | ---------------------------------------------- | -------------------------------- |
-| File types allowed             | Any file type                                  | Only `.md` (Markdown) files      |
-| Imports in code/inline code    | Ignored                                        | Processed                        |
-| Maximum import depth (default) | 5                                              | 10                               |
-| Motivation                     | Interoperability with CLAUDE.md workflows      | Modular, Markdown-centric usage  |
-
-> **Note:** The CLAUDE.md Compatibility Mode is currently active to ensure interoperability with workflows and files designed for CLAUDE.md. The original GEMINI.md mode is documented below for reference and may be restored or toggled in future releases.
-
----
-
-## CLAUDE.md Compatibility Mode (Current Default)
-
-This mode matches the import semantics of CLAUDE.md for maximum compatibility.
-
-### Key Behaviors
-
-- **Any file type can be imported.** There is no restriction to `.md` files; you may import `.txt`, `.json`, code files, or any other file type.
-- **Imports inside code blocks and inline code are ignored.** Only top-level `@filepath` statements outside of code blocks and inline code are processed as imports.
-- **Maximum import depth is 5** (to prevent infinite recursion).
-
-### Syntax
+## Syntax
 
 Use the `@` symbol followed by the path to the file you want to import:
 
@@ -36,23 +15,6 @@ Use the `@` symbol followed by the path to the file you want to import:
 
 This is the main content.
 
-@./components/instructions.txt
-
-More content here.
-
-@./shared/configuration.json
-```
-
-### Supported Path Formats
-
-- `@./file.md` - Import from the same directory
-- `@../file.txt` - Import from parent directory
-- `@./components/file.json` - Import from subdirectory
-- `@/absolute/path/to/file.py` - Import using absolute path
-
-### Example
-
-```markdown
 @./components/instructions.md
 
 More content here.
@@ -85,83 +47,8 @@ Welcome to my project!
 
 ## Features
 
-@./features/overview.txt
-```
-
-### Safety Features
-
-- Circular import detection
-- File access security (imports only allowed from specified directories)
-- Maximum import depth (default: 5)
-
-### Error Handling
-
-- Missing files: Import fails gracefully with an error comment
-- File access errors: Permission issues or other file system errors are handled gracefully
-
----
-
-## Original GEMINI.md Mode (Legacy)
-
-This mode reflects the original design intent of the GEMINI.md import processor.
-
-### Key Behaviors
-
-- **Only `.md` (Markdown) files can be imported.** Attempting to import files with other extensions (like `.txt`, `.json`, etc.) will result in a warning and the import will fail.
-- **Imports are processed everywhere,** including inside code blocks and inline code.
-- **Maximum import depth is 10** (to prevent infinite recursion).
-
-### Syntax
-
-Use the `@` symbol followed by the path to the markdown file you want to import:
-
-```markdown
-# Main GEMINI.md file
-
-This is the main content.
-
-@./components/instructions.md
-
-More content here.
-
-@./shared/configuration.md
-```
-
-### Supported Path Formats
-
-- `@./file.md` - Import from the same directory
-- `@../file.md` - Import from parent directory
-- `@./components/file.md` - Import from subdirectory
-- `@/absolute/path/to/file.md` - Import using absolute path
-
-### Example
-
-```markdown
-# My GEMINI.md
-
-Welcome to my project!
-
-@./getting-started.md
-
-## Features
-
 @./features/overview.md
 ```
-
-### Error Handling
-
-- **Non-MD File Attempts:**
-  - If you try to import a non-markdown file, you'll see a warning and the import will fail.
-  - Console output:
-    ```
-    [WARN] [ImportProcessor] Import processor only supports .md files. Attempting to import non-md file: ./instructions.txt. This will fail.
-    ```
-- **Missing files:** Import fails gracefully with an error comment
-- **File access errors:** Permission issues or other file system errors are handled gracefully
-
----
-
-@./features/overview.md
 
 ### Nested Imports
 
@@ -205,23 +92,9 @@ The `validateImportPath` function ensures that imports are only allowed from spe
 
 ### Maximum Import Depth
 
-To prevent infinite recursion, there's a configurable maximum import depth (default: 10 levels).
+To prevent infinite recursion, there's a configurable maximum import depth (default: 5 levels).
 
 ## Error Handling
-
-### Non-MD File Attempts
-
-If you try to import a non-markdown file, you'll see a warning:
-
-```markdown
-@./instructions.txt <!-- This will show a warning and fail -->
-```
-
-Console output:
-
-```
-[WARN] [ImportProcessor] Import processor only supports .md files. Attempting to import non-md file: ./instructions.txt. This will fail.
-```
 
 ### Missing Files
 
@@ -233,9 +106,27 @@ Permission issues or other file system errors are handled gracefully with approp
 
 ## Code Region Detection
 
-> **Note:** The import processor uses the `marked` library to detect code blocks and inline code spans, ensuring that `@` imports inside these regions are properly ignored. This provides robust handling of nested code blocks and complex Markdown structures that would be difficult to parse with regex alone. The system uses `marked.lexer()` as the primary method, with a robust, GFM-compliant regex fallback for edge cases where `codespan` tokens might not be detected (e.g., nested or escaped backticks).
+The import processor uses the `marked` library to detect code blocks and inline code spans, ensuring that `@` imports inside these regions are properly ignored. This provides robust handling of nested code blocks and complex Markdown structures.
 
----
+## Import Tree Structure
+
+The processor now returns an import tree that shows the hierarchy of imported files, similar to Claude's `/memory` feature. This helps users debug problems with their GEMINI.md files by showing which files were read and their import relationships.
+
+Example tree structure:
+
+```
+Memory Files
+ L project: GEMINI.md
+            L a.md
+              L b.md
+                L c.md
+              L d.md
+                L e.md
+                  L f.md
+            L included.md
+```
+
+The tree preserves the order that files were imported and shows the complete import chain for debugging purposes.
 
 ## API Reference
 
@@ -250,7 +141,25 @@ Processes import statements in GEMINI.md content.
 - `debugMode` (boolean, optional): Whether to enable debug logging (default: false)
 - `importState` (ImportState, optional): State tracking for circular import prevention
 
-**Returns:** Promise<string> - Processed content with imports resolved
+**Returns:** Promise<ProcessImportsResult> - Object containing processed content and import tree
+
+### `ProcessImportsResult`
+
+```typescript
+interface ProcessImportsResult {
+  content: string; // The processed content with imports resolved
+  importTree: MemoryFile; // Tree structure showing the import hierarchy
+}
+```
+
+### `MemoryFile`
+
+```typescript
+interface MemoryFile {
+  path: string; // The file path
+  imports?: MemoryFile[]; // Direct imports, in the order they were imported
+}
+```
 
 ### `validateImportPath(importPath, basePath, allowedDirectories)`
 
@@ -266,14 +175,13 @@ Validates import paths to ensure they are safe and within allowed directories.
 
 ### `findProjectRoot(startDir)`
 
-Finds the project root by searching for a `.git` directory upwards from the given start directory. Now implemented as an **async** function using non-blocking file system APIs to avoid blocking the Node.js event loop.
+Finds the project root by searching for a `.git` directory upwards from the given start directory. Implemented as an **async** function using non-blocking file system APIs to avoid blocking the Node.js event loop.
 
 **Parameters:**
+
 - `startDir` (string): The directory to start searching from
 
 **Returns:** Promise<string> - The project root directory (or the start directory if no `.git` is found)
-
----
 
 ## Best Practices
 
@@ -287,11 +195,10 @@ Finds the project root by searching for a `.git` directory upwards from the give
 
 ### Common Issues
 
-1. **Import not working**: Check that the file exists and the path is correct (or that it is a `.md` file in legacy mode)
-2. **Import not working**: Check that the file exists and has a `.md` extension
-3. **Circular import warnings**: Review your import structure for circular references
-4. **Permission errors**: Ensure the files are readable and within allowed directories
-5. **Path resolution issues**: Use absolute paths if relative paths aren't resolving correctly
+1. **Import not working**: Check that the file exists and the path is correct
+2. **Circular import warnings**: Review your import structure for circular references
+3. **Permission errors**: Ensure the files are readable and within allowed directories
+4. **Path resolution issues**: Use absolute paths if relative paths aren't resolving correctly
 
 ### Debug Mode
 
