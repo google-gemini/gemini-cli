@@ -142,6 +142,78 @@ Get personalized recommendations for optimal model settings based on your hardwa
 - Best quantization methods
 - Model suggestions for your system
 
+## 🛡️ Privacy & Security Management
+
+Trust CLI offers three privacy modes for different security requirements:
+
+### Privacy Modes
+```bash
+trust privacy list          # View all available privacy modes
+trust privacy status        # Show current privacy configuration
+trust privacy switch strict # Switch to strict privacy mode
+trust privacy info moderate # Get detailed info about moderate mode
+```
+
+**Available Modes:**
+- **Strict**: Maximum privacy - no external connections, mandatory verification
+- **Moderate**: Balanced privacy and functionality - recommended for most users
+- **Open**: Full functionality for development and testing
+
+## 💬 Advanced Chat & Context Management
+
+### Streaming Conversations
+```bash
+trust chat                  # Start interactive chat with streaming
+trust chat --model phi-3.5-mini-instruct  # Use specific model
+```
+
+### Codebase Analysis
+```bash
+trust analyze ./src         # Analyze entire codebase
+trust context --files "*.ts" --importance high  # Add specific files
+```
+
+### Git Integration
+```bash
+trust git status           # Analyze repository status
+trust git review           # AI-powered code review
+trust git suggest-commit   # Generate commit messages
+```
+
+## 🎯 Benchmarking & Testing
+
+### Performance Benchmarks
+```bash
+trust benchmark run        # Run comprehensive benchmark suite
+trust benchmark quick      # Quick performance test
+trust benchmark compare    # Compare multiple models
+```
+
+### Model Testing
+```bash
+trust test model <name>    # Test specific model performance
+trust test inference       # Test inference pipeline
+trust test streaming       # Test streaming capabilities
+```
+
+## 📚 Offline Help System
+
+### Comprehensive Documentation
+```bash
+trust help                 # Main help menu
+trust help models          # Model management help
+trust help performance     # Performance monitoring help
+trust help privacy         # Privacy and security help
+trust help search <query>  # Search help topics
+```
+
+### Interactive UI
+```bash
+trust ui                   # Launch advanced terminal UI
+trust ui models            # Interactive model manager
+trust ui benchmark         # Live benchmarking interface
+```
+
 ## 🤖 Available Models
 
 | Model | Parameters | RAM | Description | Trust Score |
