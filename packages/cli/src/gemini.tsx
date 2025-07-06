@@ -83,6 +83,38 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 export async function main() {
+  // Check for model management commands first
+  const args = process.argv.slice(2);
+  if (args[0] === 'model') {
+    const { handleModelCommand } = await import('./commands/modelCommands.js');
+    
+    const action = args[1];
+    let modelName = args[2];
+    let task = args[2];
+    
+    // For recommend command, the second argument is the task
+    if (action === 'recommend') {
+      task = args[2] || 'default';
+      modelName = args[3]; // For recommend, model name might be optional
+    }
+    
+    const allFlags = args.slice(2);
+    
+    try {
+      await handleModelCommand({
+        action: action as any,
+        modelName,
+        task,
+        ramLimit: allFlags.includes('--ram') ? parseInt(allFlags[allFlags.indexOf('--ram') + 1]) : undefined,
+        verbose: allFlags.includes('--verbose') || allFlags.includes('-v'),
+      });
+      return;
+    } catch (error) {
+      console.error(`❌ Model command failed: ${error}`);
+      process.exit(1);
+    }
+  }
+
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
@@ -102,13 +134,13 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // set default fallback to gemini api key
+  // set default fallback to TrustOS for local-first AI
   // this has to go after load cli because that's where the env is set
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
+  if (!settings.merged.selectedAuthType) {
     settings.setValue(
       SettingScope.User,
       'selectedAuthType',
-      AuthType.USE_GEMINI,
+      AuthType.USE_TRUSTOS,
     );
   }
 
@@ -276,16 +308,18 @@ async function validateNonInterActiveAuth(
   nonInteractiveConfig: Config,
 ) {
   // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
-    process.exit(1);
+  // TrustOS operates locally, so no API key is required for most operations
+  if (!selectedAuthType) {
+    console.log('No authentication method set. Using TrustOS local inference mode.');
   }
 
   selectedAuthType = selectedAuthType || AuthType.USE_TRUSTOS;
+  
+  // TrustOS authentication is always available for local inference
+  if (selectedAuthType === AuthType.USE_TRUSTOS) {
+    await nonInteractiveConfig.refreshAuth(selectedAuthType);
+    return nonInteractiveConfig;
+  }
   const err = validateAuthMethod(selectedAuthType);
   if (err != null) {
     console.error(err);

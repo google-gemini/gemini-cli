@@ -5,6 +5,11 @@
  */
 
 /**
+ * Default TrustOS model for local inference
+ */
+export const DEFAULT_TRUSTOS_MODEL = 'qwen2.5-1.5b-instruct';
+
+/**
  * TrustOS Model Configuration
  */
 export interface TrustModelConfig {

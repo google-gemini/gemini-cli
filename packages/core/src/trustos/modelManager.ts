@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { TrustModelConfig, TrustModelManager } from './types.js';
 import { createHash } from 'crypto';
+import { ModelDownloader, DownloadProgress } from './modelDownloader.js';
 
 export class TrustOSModelManager implements TrustModelManager {
   private modelsDir: string;
@@ -122,30 +123,38 @@ export class TrustOSModelManager implements TrustModelManager {
       throw new Error(`Download URL not available for model ${modelId}`);
     }
 
-    const modelPath = path.join(this.modelsDir, path.basename(model.path));
-    
-    // Check if model already exists
-    try {
-      await fs.access(modelPath);
-      console.log(`Model ${modelId} already exists at ${modelPath}`);
-      return;
-    } catch {
-      // Model doesn't exist, proceed with download
-    }
-
-    console.log(`Downloading model ${modelId} from ${model.downloadUrl}`);
-    console.log(`This may take a while depending on your internet connection...`);
+    const downloader = new ModelDownloader(this.modelsDir);
     
     try {
-      // For now, just create a placeholder file
-      // In a real implementation, this would use fetch or a download library
-      await fs.writeFile(modelPath, `# Placeholder for ${modelId}\n# Download from: ${model.downloadUrl}\n`);
+      console.log(`🚀 Starting download of ${modelId}...`);
       
-      console.log(`Model ${modelId} downloaded successfully to ${modelPath}`);
-      console.log(`Note: This is a placeholder. In production, implement actual download from Hugging Face.`);
+      const finalPath = await downloader.downloadModel(model, (progress) => {
+        const { percentage, speed, eta, downloaded, total } = progress;
+        
+        // Clear previous line and show progress
+        process.stdout.write('\r\x1b[K');
+        process.stdout.write(
+          `📥 ${percentage.toFixed(1)}% | ` +
+          `${ModelDownloader.formatSpeed(speed)} | ` +
+          `ETA: ${ModelDownloader.formatETA(eta)} | ` +
+          `${this.formatBytes(downloaded)}/${this.formatBytes(total)}`
+        );
+      });
+      
+      // Clear progress line
+      process.stdout.write('\r\x1b[K');
+      console.log(`✅ Model ${modelId} downloaded successfully`);
+      console.log(`📁 Location: ${finalPath}`);
+      
+      // Update model path to point to the downloaded file
+      const modelIndex = this.availableModels.findIndex(m => m.name === modelId);
+      if (modelIndex !== -1) {
+        this.availableModels[modelIndex].path = finalPath;
+        await this.saveConfig();
+      }
       
     } catch (error) {
-      console.error(`Failed to download model ${modelId}:`, error);
+      console.error(`\n❌ Failed to download model ${modelId}:`, error);
       throw error;
     }
   }
@@ -162,7 +171,7 @@ export class TrustOSModelManager implements TrustModelManager {
       return stats.size > 0;
       
     } catch (error) {
-      console.error(`Failed to verify model at ${modelPath}:`, error);
+      // Silently return false for missing files - this is expected for undownloaded models
       return false;
     }
   }
@@ -265,5 +274,18 @@ export class TrustOSModelManager implements TrustModelManager {
   private getSystemRAM(): number {
     const totalMemory = os.totalmem();
     return Math.floor(totalMemory / (1024 * 1024 * 1024)); // Convert to GB
+  }
+  
+  private formatBytes(bytes: number): string {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 }
