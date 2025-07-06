@@ -1,0 +1,36 @@
+Trust CLI
+Copyright 2025 Audit Risk Media LLC
+
+This product includes software developed by Google LLC (Gemini CLI)
+Original source: https://github.com/google-gemini/gemini-cli
+Licensed under Apache License 2.0
+
+Modifications made:
+- Replaced Google Gemini API with local GGUF model inference using node-llama-cpp
+- Added Trust framework integration for privacy-focused local-first AI
+- Added comprehensive model management and verification features
+- Added performance monitoring and hardware optimization
+- Added privacy modes with data sanitization and encryption
+- Added MCP (Model Context Protocol) server compatibility for local models
+- Added streaming responses and chat history management
+- Added Git integration and workflow automation
+- Added benchmarking tools and JSON schema enforcement
+- Rebranded as Trust CLI for local-first AI workflows
+- Implemented complete test suite for production readiness
+- Updated copyright notices to Audit Risk Media LLC
+- Maintained Apache 2.0 license while ensuring proper attribution
+
+Original Gemini CLI Copyright Notice:
+Copyright 2025 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

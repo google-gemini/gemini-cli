@@ -9,10 +9,27 @@
     "packages/*"
   ],
   "private": "true",
+  "description": "Privacy-focused, local-first AI command-line interface. A fork of Google's Gemini CLI with local model inference.",
+  "license": "Apache-2.0",
+  "author": "Audit Risk Media LLC",
+  "homepage": "https://github.com/audit-brands/trust-cli#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/audit-brands/trust-cli.git"
   },
+  "bugs": {
+    "url": "https://github.com/audit-brands/trust-cli/issues"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "local-first",
+    "privacy",
+    "gguf",
+    "llama",
+    "local-ai",
+    "gemini-cli-fork"
+  ],
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
@@ -62,7 +79,8 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "devDependencies": {
     "@types/micromatch": "^4.0.9",

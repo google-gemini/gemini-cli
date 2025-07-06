@@ -329,11 +329,26 @@ node test-end-to-end.js
 
 ## 📝 License
 
-Apache 2.0 - See [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🙏 Attribution & Acknowledgments
 
-Trust CLI is a fork of Google's Gemini CLI, transformed into a privacy-focused, local-first tool. We're grateful for the excellent foundation provided by the original project.
+Trust CLI is based on [Google's Gemini CLI](https://github.com/google-gemini/gemini-cli), modified to use local GGUF models instead of cloud APIs for complete privacy and local-first AI workflows.
+
+**Original Work:**
+- **Source**: [Google Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- **Copyright**: 2025 Google LLC
+- **License**: Apache License 2.0
+- **Attribution**: Original Gemini CLI code is Copyright Google LLC
+
+**Derivative Work:**
+- **Trust CLI**: Copyright 2025 Audit Risk Media LLC
+- **Modifications**: Complete replacement of cloud APIs with local model inference, addition of privacy features, model management, performance monitoring, and comprehensive test suite
+- **License**: Apache License 2.0 (same as original)
+
+For detailed attribution and list of modifications, see [NOTICE](NOTICE) file.
+
+We're grateful for the excellent foundation provided by Google's original Gemini CLI project.
 
 ## 🛟 Support
 
