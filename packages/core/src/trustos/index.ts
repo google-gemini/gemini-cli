@@ -10,6 +10,12 @@ export * from './modelManager.js';
 export * from './trustContentGenerator.js';
 export * from './performanceMonitor.js';
 export * from './privacyManager.js';
+export * from './chatSession.js';
+export * from './contextManager.js';
+export * from './gitIntegration.js';
+export * from './helpSystem.js';
+export * from './benchmarkSystem.js';
+export * from './schemaEnforcement.js';
 
 // Trust version and metadata
 // Trust: An Open System for Modern Assurance
