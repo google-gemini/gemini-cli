@@ -28,27 +28,29 @@ describe('getNodeVersionWarning', () => {
 
   it('should return a warning if Node.js version is less than minMajor', () => {
     setNodeVersion('18.17.0');
-    const warning = getNodeVersionWarning(20);
-    expect(warning).toContain('Node.js v18.17.0');
-    expect(warning).toContain('requires Node.js 20 or higher');
+    const warnings = getNodeVersionWarning(20);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('Node.js v18.17.0');
+    expect(warnings[0]).toContain('requires Node.js 20 or higher');
   });
 
   it('should not return a warning if Node.js version is equal to minMajor', () => {
     setNodeVersion('20.0.0');
-    const warning = getNodeVersionWarning(20);
-    expect(warning).toBeNull();
+    const warnings = getNodeVersionWarning(20);
+    expect(warnings).toEqual([]);
   });
 
   it('should not return a warning if Node.js version is greater than minMajor', () => {
     setNodeVersion('22.1.0');
-    const warning = getNodeVersionWarning(20);
-    expect(warning).toBeNull();
+    const warnings = getNodeVersionWarning(20);
+    expect(warnings).toEqual([]);
   });
 
   it('should use default minMajor=20 if not provided', () => {
     setNodeVersion('18.0.0');
-    const warning = getNodeVersionWarning();
-    expect(warning).toContain('Node.js v18.0.0');
-    expect(warning).toContain('requires Node.js 20 or higher');
+    const warnings = getNodeVersionWarning();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('Node.js v18.0.0');
+    expect(warnings[0]).toContain('requires Node.js 20 or higher');
   });
 });
