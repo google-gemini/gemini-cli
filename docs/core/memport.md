@@ -128,6 +128,15 @@ Memory Files
 
 The tree preserves the order that files were imported and shows the complete import chain for debugging purposes.
 
+## Comparison to Claude's `/memory` (`claude.md`) Approach
+
+Claude's `/memory` feature (as seen in `claude.md`) produces a flat, linear document by concatenating all included files, sometimes with simple comments marking file boundaries. It does **not** track or expose the import hierarchy.
+
+**This implementation is inspired by Claude's approach, but adds:**
+- A hierarchical import tree, showing which files were included and in what order.
+- More robust code region detection using the `marked` library.
+- Enhanced debugging and transparency for complex import chains.
+
 ## API Reference
 
 ### `processImports(content, basePath, debugMode?, importState?)`
