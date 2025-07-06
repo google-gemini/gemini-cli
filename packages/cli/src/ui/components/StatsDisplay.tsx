@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import { useSessionStats, ModelMetrics } from '../contexts/SessionContext.js';
@@ -140,9 +141,13 @@ const ModelUsageTable: React.FC<{
 
 interface StatsDisplayProps {
   duration: string;
+  title?: string;
 }
 
-export const StatsDisplay: React.FC<StatsDisplayProps> = ({ duration }) => {
+export const StatsDisplay: React.FC<StatsDisplayProps> = ({
+  duration,
+  title,
+}) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools } = metrics;
@@ -162,6 +167,25 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({ duration }) => {
     agreementThresholds,
   );
 
+  const renderTitle = () => {
+    if (title) {
+      return Colors.GradientColors && Colors.GradientColors.length > 0 ? (
+        <Gradient colors={Colors.GradientColors}>
+          <Text bold>{title}</Text>
+        </Gradient>
+      ) : (
+        <Text bold color={Colors.AccentPurple}>
+          {title}
+        </Text>
+      );
+    }
+    return (
+      <Text bold color={Colors.AccentPurple}>
+        Session Stats
+      </Text>
+    );
+  };
+
   return (
     <Box
       borderStyle="round"
@@ -170,9 +194,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({ duration }) => {
       paddingY={1}
       paddingX={2}
     >
-      <Text bold color={Colors.AccentPurple}>
-        Session Stats
-      </Text>
+      {renderTitle()}
       <Box height={1} />
 
       {tools.totalCalls > 0 && (

@@ -62,20 +62,21 @@ export function getInstallationId(): string {
  * When OAuth is available, returns the user's cached Google Account ID. Otherwise, returns the installation ID.
  * @returns A string ID for the user (Google Account ID if available, otherwise installation ID).
  */
-export function getObfuscatedGoogleAccountId(): string {
+export async function getGoogleAccountId(): Promise<string> {
   // Try to get cached Google Account ID first
   try {
-    // Dynamically import to avoid circular dependencies
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-    const { getCachedGoogleAccountId } = require('../code_assist/oauth2.js');
+    // Dynamic import to avoid circular dependencies
+    const { getCachedGoogleAccountId } = await import(
+      '../code_assist/oauth2.js'
+    );
     const googleAccountId = getCachedGoogleAccountId();
     if (googleAccountId) {
       return googleAccountId;
     }
-  } catch (_error) {
-    // If there's any error accessing Google Account ID, fall back to installation ID
+  } catch (error) {
+    // If there's any error accessing Google Account ID, just return empty string
+    console.debug('Could not get cached Google Account ID:', error);
   }
 
-  // Fall back to installation ID when no Google Account ID is cached or on error
-  return getInstallationId();
+  return '';
 }

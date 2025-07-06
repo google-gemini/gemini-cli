@@ -22,7 +22,7 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -48,26 +48,26 @@ function isThinkingSupported(model: string) {
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
-  private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
   };
   private readonly MAX_TURNS = 100;
+  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config.getSessionId(),
     );
     this.chat = await this.startChat();
   }
@@ -171,7 +171,7 @@ export class GeminiClient {
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    const initialHistory: Content[] = [
+    const history: Content[] = [
       {
         role: 'user',
         parts: envParts,
@@ -180,12 +180,14 @@ export class GeminiClient {
         role: 'model',
         parts: [{ text: 'Got it. Thanks for the context!' }],
       },
+      ...(extraHistory ?? []),
     ];
-    const history = initialHistory.concat(extraHistory ?? []);
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+      const generateContentConfigWithThinking = isThinkingSupported(
+        this.config.getModel(),
+      )
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -219,7 +221,9 @@ export class GeminiClient {
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!turns) {
+    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
+    const boundedTurns = Math.min(turns, this.MAX_TURNS);
+    if (!boundedTurns) {
       return new Turn(this.getChat());
     }
 
@@ -242,7 +246,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
       }
     }
     return turn;
@@ -341,7 +345,7 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
+    const modelToUse = this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -428,74 +432,68 @@ export class GeminiClient {
   async tryCompressChat(
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
-    const history = this.getChat().getHistory(true); // Get curated history
+    const curatedHistory = this.getChat().getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
-    if (history.length === 0) {
+    if (curatedHistory.length === 0) {
       return null;
     }
 
-    const { totalTokens: originalTokenCount } =
+    const model = this.config.getModel();
+
+    let { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: history,
+        model,
+        contents: curatedHistory,
       });
-
-    // If not forced, check if we should compress based on context size.
-    if (!force) {
-      if (originalTokenCount === undefined) {
-        // If token count is undefined, we can't determine if we need to compress.
-        console.warn(
-          `Could not determine token count for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-      const tokenCount = originalTokenCount; // Now guaranteed to be a number
-
-      const limit = tokenLimit(this.model);
-      if (!limit) {
-        // If no limit is defined for the model, we can't compress.
-        console.warn(
-          `No token limit defined for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-
-      if (tokenCount < 0.95 * limit) {
-        return null;
-      }
+    if (originalTokenCount === undefined) {
+      console.warn(`Could not determine token count for model ${model}.`);
+      originalTokenCount = 0;
     }
 
-    const summarizationRequestMessage = {
-      text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
-    };
-    const response = await this.getChat().sendMessage({
-      message: summarizationRequestMessage,
+    // Don't compress if not forced and we are under the limit.
+    if (
+      !force &&
+      originalTokenCount <
+        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(model)
+    ) {
+      return null;
+    }
+
+    const { text: summary } = await this.getChat().sendMessage({
+      message: {
+        text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+      },
+      config: {
+        systemInstruction: { text: getCompressionPrompt() },
+      },
     });
-    const newHistory = [
+    this.chat = await this.startChat([
       {
         role: 'user',
-        parts: [summarizationRequestMessage],
+        parts: [{ text: summary }],
       },
       {
         role: 'model',
-        parts: [{ text: response.text }],
+        parts: [{ text: 'Got it. Thanks for the additional context!' }],
       },
-    ];
-    this.chat = await this.startChat(newHistory);
-    const newTokenCount = (
-      await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: newHistory,
-      })
-    ).totalTokens;
+    ]);
 
-    return originalTokenCount && newTokenCount
-      ? {
-          originalTokenCount,
-          newTokenCount,
-        }
-      : null;
+    const { totalTokens: newTokenCount } =
+      await this.getContentGenerator().countTokens({
+        // model might change after calling `sendMessage`, so we get the newest value from config
+        model: this.config.getModel(),
+        contents: this.getChat().getHistory(),
+      });
+    if (newTokenCount === undefined) {
+      console.warn('Could not determine compressed history token count.');
+      return null;
+    }
+
+    return {
+      originalTokenCount,
+      newTokenCount,
+    };
   }
 
   /**
@@ -504,11 +502,11 @@ export class GeminiClient {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -523,7 +521,6 @@ export class GeminiClient {
         const accepted = await fallbackHandler(currentModel, fallbackModel);
         if (accepted) {
           this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
           return fallbackModel;
         }
       } catch (error) {
