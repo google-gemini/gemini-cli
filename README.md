@@ -130,7 +130,7 @@ Use MCP servers to integrate your local system tools with your enterprise collab
 ```
 
 ```text
-> Organise my PDF invoices by month of expenditure.
+> Organize my PDF invoices by month of expenditure.
 ```
 
 ### Uninstall
