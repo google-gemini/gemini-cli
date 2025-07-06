@@ -143,7 +143,7 @@ export class ModelCommandHandler {
     console.log('─'.repeat(40));
     
     // Import performance monitor for hardware analysis
-    const { globalPerformanceMonitor } = await import('../../../core/src/trustos/performanceMonitor.js');
+    const { globalPerformanceMonitor } = await import('@trustos/trust-cli-core');
     const optimal = globalPerformanceMonitor.getOptimalModelSettings();
     const systemMetrics = globalPerformanceMonitor.getSystemMetrics();
     

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { globalPerformanceMonitor } from '../../../core/src/trustos/performanceMonitor.js';
+import { globalPerformanceMonitor } from '@trustos/trust-cli-core';
 
 export interface PerformanceCommandArgs {
   action: 'status' | 'report' | 'watch' | 'optimize';
@@ -46,7 +46,7 @@ class PerformanceCommandHandler {
       
       console.log('\n🖥️  Quick Overview:');
       console.log(`   Memory Available: ${this.formatBytes(metrics.memoryUsage.available)}`);
-      console.log(`   CPU Cores: ${require('os').cpus().length}`);
+      console.log(`   CPU Cores: ${(await import('os')).default.cpus().length}`);
       console.log(`   Total Inferences: ${stats.totalInferences}`);
       
       if (stats.averageTokensPerSecond > 0) {
@@ -143,7 +143,8 @@ class PerformanceCommandHandler {
       console.log('   🟢 CPU usage is optimal');
     }
     
-    const cpuCores = require('os').cpus().length;
+    const os = await import('os');
+    const cpuCores = os.default.cpus().length;
     if (cpuCores <= 4) {
       console.log('   ⚠️  Limited CPU cores detected');
       console.log('      → Use Q4_K_M quantization for better performance');

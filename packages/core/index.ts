@@ -21,6 +21,8 @@ export {
   TrustContentGenerator,
   TRUST_VERSION,
   TRUST_CLI_NAME,
-  TRUST_DESCRIPTION
+  TRUST_DESCRIPTION,
+  DEFAULT_TRUST_MODEL,
+  globalPerformanceMonitor
 } from './src/trustos/index.js';
 export * from './src/config/trustosConfig.js';

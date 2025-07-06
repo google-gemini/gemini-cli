@@ -19,7 +19,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
 } from '@trustos/trust-cli-core';
-import { DEFAULT_TRUST_MODEL } from '../../../core/src/trustos/types.js';
+import { DEFAULT_TRUST_MODEL } from '@trustos/trust-cli-core';
 import { Settings } from './settings.js';
 
 import { Extension } from './extension.js';
