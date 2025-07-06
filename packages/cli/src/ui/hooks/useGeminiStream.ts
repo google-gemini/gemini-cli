@@ -101,7 +101,8 @@ export const useGeminiStream = (
     recoveryTimeMs: number;
     allowOverride: boolean;
   } | null>(null);
-  const [useManualOverrideNext, setUseManualOverrideNext] = useState<boolean>(false);
+  const [useManualOverrideNext, setUseManualOverrideNext] =
+    useState<boolean>(false);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
@@ -523,7 +524,12 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal, undefined, useManualOverrideNext);
+        const stream = geminiClient.sendMessageStream(
+          queryToSend,
+          abortSignal,
+          undefined,
+          useManualOverrideNext,
+        );
         // Reset manual override flag after use
         if (useManualOverrideNext) {
           setUseManualOverrideNext(false);
@@ -561,11 +567,14 @@ export const useGeminiStream = (
             allowOverride: boolean;
           };
           setCircuitBreakerError(cbError);
-          
+
           addItem(
             {
               type: MessageType.ERROR,
-              text: parseAndFormatApiError(error, config.getContentGeneratorConfig().authType),
+              text: parseAndFormatApiError(
+                error,
+                config.getContentGeneratorConfig().authType,
+              ),
             },
             userMessageTimestamp,
           );
@@ -826,7 +835,9 @@ export const useGeminiStream = (
   const handleCircuitBreakerOverride = useCallback(() => {
     // Manual override bypasses circuit breaker for the next request
     if (circuitBreakerError && circuitBreakerError.allowOverride) {
-      console.log('Circuit breaker manual override activated - next request will bypass circuit breaker');
+      console.log(
+        'Circuit breaker manual override activated - next request will bypass circuit breaker',
+      );
       // Clear the circuit breaker error state and set manual override flag
       setCircuitBreakerError(null);
       setUseManualOverrideNext(true);

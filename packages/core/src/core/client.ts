@@ -283,7 +283,12 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1, isManualOverride);
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          turns - 1,
+          isManualOverride,
+        );
       }
     }
     return turn;
