@@ -22,7 +22,6 @@ export function loadPrompts(workspaceDir: string): PredefinedPrompt[] {
   const seenIds = new Set<string>();
   for (const prompt of allPrompts) {
     if (!seenIds.has(prompt.id)) {
-      console.log(`Loading prompt: ${prompt.id}`);
       uniquePrompts.push(prompt);
       seenIds.add(prompt.id);
     }
@@ -54,22 +53,24 @@ function loadPrompt(promptPath: string): PredefinedPrompt | null {
     const config = parseYaml(content);
 
     if (!config.id) {
-      console.log(`Prompt ${promptPath} is missing required field "id"`);
+      console.error(`Prompt ${promptPath} is missing required field "id"`);
       return null;
     }
 
     if (!config.name) {
-      console.log(`Prompt ${promptPath} is missing required field "name"`);
+      console.error(`Prompt ${promptPath} is missing required field "name"`);
       return null;
     }
 
     if (!config.template) {
-      console.log(`Prompt ${promptPath} is missing required field "template"`);
+      console.error(
+        `Prompt ${promptPath} is missing required field "template"`,
+      );
       return null;
     }
 
     if (config.variables && !Array.isArray(config.variables)) {
-      console.log(`Prompt ${promptPath} variables must be an array`);
+      console.error(`Prompt ${promptPath} variables must be an array`);
       return null;
     }
 
