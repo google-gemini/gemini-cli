@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import { getPackageJson } from './package.js';
 
 function getGitShortCommitHash(): string | null {
