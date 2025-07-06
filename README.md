@@ -1,142 +1,245 @@
-# Gemini CLI
+# Trust CLI
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+**Trust: An Open System for Modern Assurance**
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+A privacy-focused, local-first AI command-line interface that puts you in control of your AI workflows. Trust CLI enables powerful AI interactions entirely on your own hardware - no cloud dependencies, no data leaving your machine.
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+## 🛡️ Key Features
 
-With the Gemini CLI you can:
+- **100% Local Execution** - All AI inference runs on your hardware
+- **Privacy First** - Your data never leaves your machine
+- **Model Management** - Download, verify, and manage GGUF models locally
+- **Performance Monitoring** - Real-time system metrics and optimization
+- **Hardware-Aware** - Automatic optimization based on your system specs
+- **Transparent** - Open source with cryptographic model verification
 
-- Query and edit large codebases in and beyond Gemini's 1M token context window.
-- Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
-- Automate operational tasks, like querying pull requests or handling complex rebases.
-- Use tools and MCP servers to connect new capabilities, including [media generation with Imagen,
-  Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
-- Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
-  tool, built in to Gemini.
+## 🚀 Quick Start
 
-## Quickstart
+### Installation
 
-1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+```bash
+# Clone the repository
+git clone https://github.com/audit-brands/trust-cli.git
+cd trust-cli
 
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Bundle for production use
+npm run bundle
+
+# Run Trust CLI
+node bundle/trust.js
+```
+
+### First Steps
+
+1. **Check available models**
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   trust model list
    ```
 
-   Or install it with:
-
+2. **Download a model** (start with the lightweight one)
    ```bash
-   npm install -g @google/gemini-cli
-   gemini
+   trust model download qwen2.5-1.5b-instruct
    ```
 
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
-
-You are now ready to use the Gemini CLI!
-
-### Use a Gemini API key:
-
-The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
-
-1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
-
+3. **Verify model integrity**
    ```bash
-   export GEMINI_API_KEY="YOUR_API_KEY"
+   trust model verify qwen2.5-1.5b-instruct
    ```
 
-3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
+4. **Switch to the downloaded model**
+   ```bash
+   trust model switch qwen2.5-1.5b-instruct
+   ```
 
-For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+## 📦 Model Management
 
-## Examples
+Trust CLI provides comprehensive model management capabilities:
 
-Once the CLI is running, you can start interacting with Gemini from your shell.
+### List Available Models
+```bash
+trust model list
+```
+Shows all available models with their status, RAM requirements, and trust scores.
 
-You can start a project from a new directory:
+### Download Models
+```bash
+trust model download <model-name>
+```
+Downloads models from Hugging Face with real-time progress tracking:
+- Progress percentage, speed, and ETA
+- Automatic integrity verification
+- Resume support for interrupted downloads
 
-```sh
-cd new-project/
-gemini
-> Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
+### Verify Model Integrity
+```bash
+trust model verify <model-name>
+# or verify all models
+trust model verify
+```
+Performs SHA256 hash verification to ensure model integrity and security.
+
+### Switch Active Model
+```bash
+trust model switch <model-name>
+```
+Changes the active model for inference operations.
+
+### Get Model Recommendations
+```bash
+trust model recommend <task-type>
+```
+Get intelligent model recommendations based on your task and hardware:
+- `coding` - Best models for programming tasks
+- `quick` - Fast models for simple queries  
+- `complex` - High-quality models for detailed work
+- `default` - Balanced general-purpose models
+
+### Delete Models
+```bash
+trust model delete <model-name>
+```
+Remove downloaded models to free up disk space.
+
+## 📊 Performance Monitoring
+
+Trust CLI includes comprehensive performance monitoring tools:
+
+### Quick Status
+```bash
+trust perf status
+```
+Shows current system status including CPU, memory, and heap usage.
+
+### Detailed Report
+```bash
+trust perf report
+```
+Comprehensive system performance report with:
+- System resources (CPU, RAM, load averages)
+- Node.js memory details
+- Inference performance history
+- Hardware specifications
+
+### Real-time Monitoring
+```bash
+trust perf watch
+```
+Live performance monitoring with updates every second. Press Ctrl+C to stop.
+
+### Optimization Suggestions
+```bash
+trust perf optimize
+```
+Get personalized recommendations for optimal model settings based on your hardware:
+- Recommended RAM allocation
+- Optimal context sizes
+- Best quantization methods
+- Model suggestions for your system
+
+## 🤖 Available Models
+
+| Model | Parameters | RAM | Description | Trust Score |
+|-------|------------|-----|-------------|-------------|
+| **qwen2.5-1.5b-instruct** | 1.5B | 2GB | Lightweight model for quick responses | 8.8/10 |
+| **llama-3.2-3b-instruct** | 3B | 8GB | Balanced performance for general use | 9.2/10 |
+| **phi-3.5-mini-instruct** | 3.8B | 4GB | Optimized for coding and technical tasks | 9.5/10 |
+| **llama-3.1-8b-instruct** | 8B | 16GB | High-quality responses for complex tasks | 9.7/10 |
+
+## 🔧 Configuration
+
+Trust CLI stores its configuration and models in `~/.trustcli/`:
+- `models/` - Downloaded model files
+- `models.json` - Model configurations and metadata
+- `config.json` - CLI settings
+
+### Environment Variables
+
+- `TRUST_MODEL` - Override default model selection
+- `TRUST_MODELS_DIR` - Custom models directory location
+
+## 💡 Examples
+
+### Interactive Mode
+Start Trust CLI and have a conversation:
+```bash
+trust
+> How can I optimize this Python function for better performance?
 ```
 
-Or work with an existing project:
-
-```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
-gemini
-> Give me a summary of all of the changes that went in yesterday
+### Direct Prompts
+Run one-off queries:
+```bash
+trust -p "Explain the concept of quantum computing in simple terms"
 ```
 
-### Next steps
-
-- Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
-- Explore the available **[CLI Commands](./docs/cli/commands.md)**.
-- If you encounter any issues, review the **[Troubleshooting guide](./docs/troubleshooting.md)**.
-- For more comprehensive documentation, see the [full documentation](./docs/index.md).
-- Take a look at some [popular tasks](#popular-tasks) for more inspiration.
-
-### Troubleshooting
-
-Head over to the [troubleshooting](docs/troubleshooting.md) guide if you're
-having issues.
-
-## Popular tasks
-
-### Explore a new codebase
-
-Start by `cd`ing into an existing or newly-cloned repository and running `gemini`.
-
-```text
-> Describe the main pieces of this system's architecture.
+### File Analysis
+Analyze code or documents:
+```bash
+trust -p "Review this code for security vulnerabilities" < app.js
 ```
 
-```text
-> What security mechanisms are in place?
+## 🏗️ Architecture
+
+Trust CLI is built on modern, secure foundations:
+
+- **node-llama-cpp** - High-performance C++ inference engine
+- **GGUF Format** - Efficient quantized model format
+- **SHA256 Verification** - Cryptographic integrity checking
+- **TypeScript** - Type-safe, maintainable codebase
+- **React + Ink** - Beautiful terminal UI components
+
+## 🔒 Privacy & Security
+
+Trust CLI is designed with privacy as the top priority:
+
+1. **No Network Calls** - Except for initial model downloads from Hugging Face
+2. **Local Storage Only** - All data stays on your machine
+3. **Cryptographic Verification** - All models are SHA256 verified
+4. **Open Source** - Fully auditable codebase
+5. **No Telemetry** - We don't track anything
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode
+npm start
+
+# Run tests
+npm test
+
+# Run end-to-end tests
+node test-end-to-end.js
 ```
 
-### Work with your existing code
+## 📝 License
 
-```text
-> Implement a first draft for GitHub issue #123.
-```
+Apache 2.0 - See [LICENSE](LICENSE) file for details.
 
-```text
-> Help me migrate this codebase to the latest version of Java. Start with a plan.
-```
+## 🙏 Acknowledgments
 
-### Automate your workflows
+Trust CLI is a fork of Google's Gemini CLI, transformed into a privacy-focused, local-first tool. We're grateful for the excellent foundation provided by the original project.
 
-Use MCP servers to integrate your local system tools with your enterprise collaboration suite.
+## 🛟 Support
 
-```text
-> Make me a slide deck showing the git history from the last 7 days, grouped by feature and team member.
-```
+- **Documentation**: [docs/](docs/)
+- **Issues**: [GitHub Issues](https://github.com/audit-brands/trust-cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/audit-brands/trust-cli/discussions)
 
-```text
-> Make a full-screen web app for a wall display to show our most interacted-with GitHub issues.
-```
+---
 
-### Interact with your system
+**Trust: An Open System for Modern Assurance**
 
-```text
-> Convert all the images in this directory to png, and rename them to use dates from the exif data.
-```
-
-```text
-> Organize my PDF invoices by month of expenditure.
-```
-
-### Uninstall
-
-Head over to the [Uninstall](docs/Uninstall.md) guide for uninstallation instructions.
-
-## Terms of Service and Privacy Notice
-
-For details on the terms of service and privacy notice applicable to your use of Gemini CLI, see the [Terms of Service and Privacy Notice](./docs/tos-privacy.md).
+Built with ❤️ for privacy, transparency, and local-first AI.
