@@ -26,6 +26,15 @@ This guide provides solutions to common issues and debugging tips.
 
 ## Common error messages and solutions
 
+- **Error: `Circuit breaker open for [auth type]. Service will be retested in [X] seconds.`**
+  - **Cause:** The circuit breaker has detected consecutive failures and temporarily blocked requests to prevent infinite loops during rate limiting scenarios.
+  - **Solution:**
+    1. Wait for the automatic recovery timeout to complete and retry.
+    2. If allowed, use manual override to bypass the circuit breaker for urgent requests.
+    3. Check your quota limits and authentication status.
+    4. Consider adjusting circuit breaker configuration if failures persist.
+  - **Manual Override:** If `allowManualOverride` is enabled, you can force a request through when the circuit breaker is open.
+
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
   - **Cause:** Another process is already using the port the MCP server is trying to bind to.
   - **Solution:**
