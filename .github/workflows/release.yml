@@ -33,12 +33,11 @@ on:
 
 jobs:
   release:
-    if: false # Disable this job
     runs-on: ubuntu-latest
     environment:
       name: production-release
       url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.RELEASE_TAG }}
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: github.repository == 'google-gemini/gemini-cli' && false # Disable this job
     permissions:
       contents: write
       packages: write
