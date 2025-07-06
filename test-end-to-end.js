@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * @license
- * Copyright 2025 Trust Contributors
+ * Copyright 2025 Audit Risk Media LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
