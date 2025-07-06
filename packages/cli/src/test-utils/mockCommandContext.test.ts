@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect } from 'vitest';
 import { createMockCommandContext } from './mockCommandContext.js';
-import { CommandContext } from '../ui/commands/types.js';
 
 describe('createMockCommandContext', () => {
   it('should return a valid CommandContext object with default mocks', () => {
@@ -15,8 +14,8 @@ describe('createMockCommandContext', () => {
     // Just a few spot checks to ensure the structure is correct
     // and functions are mocks.
     expect(context).toBeDefined();
-    expect(context.utils.addMessage).toBeInstanceOf(Function);
-    expect(vi.isMockFunction(context.actions.performMemoryRefresh)).toBe(true);
+    expect(context.ui.addItem).toBeInstanceOf(Function);
+    expect(vi.isMockFunction(context.ui.addItem)).toBe(true);
   });
 
   it('should apply top-level overrides correctly', () => {
@@ -45,10 +44,9 @@ describe('createMockCommandContext', () => {
       getModel: () => 'gemini-pro',
     };
 
-    const overrides: Partial<CommandContext> = {
+    const overrides = {
       services: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        config: mockConfig as any, // Cast here since we're not mocking the whole class
+        config: mockConfig,
       },
     };
 

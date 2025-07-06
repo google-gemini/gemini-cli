@@ -25,6 +25,7 @@ import {
   MessageType,
   HistoryItemWithoutId,
   HistoryItem,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -39,7 +40,7 @@ import {
 } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 
-// LEGACY TYPE: This interface is for the old, inline command definitions.
+// This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
 export interface LegacySlashCommand {
   name: string;
@@ -153,9 +154,6 @@ export const useSlashCommandProcessor = (
     [addItem],
   );
 
-  // Construct Command Context
-  // This single, memoized object provides all necessary dependencies to the
-  // new, refactored commands, acting as a dependency injection container.
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
@@ -167,11 +165,14 @@ export const useSlashCommandProcessor = (
       ui: {
         history,
         addItem,
-        clearItems,
-        loadHistory,
-        refreshStatic,
+        clear: () => {
+          clearItems();
+          console.clear();
+          refreshStatic();
+        },
         setQuittingMessages,
         pendingHistoryItems,
+        setDebugMessage: onDebugMessage,
       },
       dialogs: {
         openTheme: openThemeDialog,
@@ -180,17 +181,8 @@ export const useSlashCommandProcessor = (
         openPrivacy: openPrivacyNotice,
         setShowHelp: (show) => setShowHelp(show),
       },
-      actions: {
-        performMemoryRefresh,
-        toggleCorgiMode,
-        setPendingCompression: setPendingCompressionItem,
-      },
       session: {
         stats: session.stats,
-      },
-      utils: {
-        onDebugMessage,
-        addMessage,
       },
     }),
     [
@@ -201,7 +193,6 @@ export const useSlashCommandProcessor = (
       history,
       addItem,
       clearItems,
-      loadHistory,
       refreshStatic,
       setQuittingMessages,
       pendingHistoryItems,
@@ -210,12 +201,8 @@ export const useSlashCommandProcessor = (
       openEditorDialog,
       openPrivacyNotice,
       setShowHelp,
-      performMemoryRefresh,
-      toggleCorgiMode,
-      setPendingCompressionItem,
       session.stats,
       onDebugMessage,
-      addMessage,
     ],
   );
 
@@ -1020,7 +1007,7 @@ export const useSlashCommandProcessor = (
             }
 
             return {
-              shouldScheduleTool: true,
+              type: 'tool',
               toolName: toolCallData.toolCall.name,
               toolArgs: toolCallData.toolCall.args,
             };
@@ -1060,7 +1047,7 @@ export const useSlashCommandProcessor = (
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
-    ): Promise<SlashCommandActionReturn | boolean> => {
+    ): Promise<SlashCommandProcessorResult | false> => {
       if (typeof rawQuery !== 'string') {
         return false;
       }
@@ -1098,28 +1085,49 @@ export const useSlashCommandProcessor = (
           if (foundCommand.subCommands) {
             currentCommands = foundCommand.subCommands;
           } else {
-            // We found a terminal command, stop searching down the tree.
             break;
           }
         } else {
-          // This part is not a known command/subcommand, so stop traversal.
           break;
         }
       }
 
       if (commandToExecute) {
-        // We found a command in the new system.
         const args = parts.slice(pathIndex).join(' ');
 
         if (commandToExecute.action) {
-          // Case 1: The command has an action. Execute it.
           const result = await commandToExecute.action(commandContext, args);
-          if (typeof result === 'object' && result?.shouldScheduleTool) {
-            return result;
+
+          if (result) {
+            switch (result.type) {
+              case 'tool':
+                return {
+                  type: 'schedule_tool',
+                  toolName: result.toolName,
+                  toolArgs: result.toolArgs,
+                };
+              case 'message':
+                addItem(
+                  {
+                    type:
+                      result.messageType === 'error'
+                        ? MessageType.ERROR
+                        : MessageType.INFO,
+                    text: result.content,
+                  },
+                  Date.now(),
+                );
+                return { type: 'handled' };
+              default: {
+                // This ensures exhaustiveness. If a new type is added, the compiler will error.
+                const unhandled: never = result;
+                throw new Error(`Unhandled slash command result: ${unhandled}`);
+              }
+            }
           }
-          return true; // Command was handled.
+
+          return { type: 'handled' };
         } else if (commandToExecute.subCommands) {
-          // Case 2: No action, but has subCommands (e.g. user typed `/memory`). Show help for it.
           const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
             .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
             .join('\n')}`;
@@ -1128,7 +1136,7 @@ export const useSlashCommandProcessor = (
             content: helpText,
             timestamp: new Date(),
           });
-          return true; // Command was handled by showing help.
+          return { type: 'handled' };
         }
       }
 
@@ -1147,13 +1155,27 @@ export const useSlashCommandProcessor = (
             subCommand,
             legacyArgs,
           );
-          if (
-            typeof actionResult === 'object' &&
-            actionResult?.shouldScheduleTool
-          ) {
-            return actionResult;
+
+          if (actionResult?.type === 'tool') {
+            return {
+              type: 'schedule_tool',
+              toolName: actionResult.toolName,
+              toolArgs: actionResult.toolArgs,
+            };
           }
-          return true;
+          if (actionResult?.type === 'message') {
+            addItem(
+              {
+                type:
+                  actionResult.messageType === 'error'
+                    ? MessageType.ERROR
+                    : MessageType.INFO,
+                text: actionResult.content,
+              },
+              Date.now(),
+            );
+          }
+          return { type: 'handled' };
         }
       }
 
@@ -1162,7 +1184,7 @@ export const useSlashCommandProcessor = (
         content: `Unknown command: ${trimmed}`,
         timestamp: new Date(),
       });
-      return true;
+      return { type: 'handled' };
     },
     [addItem, commandTree, legacyCommands, commandContext, addMessage],
   );

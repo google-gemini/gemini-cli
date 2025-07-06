@@ -7,13 +7,13 @@
 import { render } from 'ink-testing-library';
 import { InputPrompt, InputPromptProps } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { Config, Logger } from '@google/gemini-cli-core';
+import { Config } from '@google/gemini-cli-core';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { vi } from 'vitest';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');
@@ -22,62 +22,6 @@ vi.mock('../hooks/useInputHistory.js');
 type MockedUseShellHistory = ReturnType<typeof useShellHistory>;
 type MockedUseCompletion = ReturnType<typeof useCompletion>;
 type MockedUseInputHistory = ReturnType<typeof useInputHistory>;
-
-// You will likely need to create a mock context object.
-// You can create a helper file for this or define it in the test.
-const mockCommandContext: CommandContext = {
-  // fill in the minimal required mock values for the test to run
-  services: {
-    config: null,
-    settings: {
-      merged: {},
-    } as unknown as LoadedSettings,
-    git: undefined,
-    logger: {} as unknown as Logger,
-  },
-  ui: {
-    history: [],
-    addItem: vi.fn(),
-    clearItems: vi.fn(),
-    loadHistory: vi.fn(),
-    refreshStatic: vi.fn(),
-    setQuittingMessages: vi.fn(),
-    pendingHistoryItems: [],
-  },
-  dialogs: {
-    openTheme: vi.fn(),
-    openAuth: vi.fn(),
-    openEditor: vi.fn(),
-    openPrivacy: vi.fn(),
-    setShowHelp: vi.fn(),
-  },
-  actions: {
-    performMemoryRefresh: vi.fn(),
-    toggleCorgiMode: vi.fn(),
-    setPendingCompression: vi.fn(),
-  },
-  session: {
-    stats: {
-      sessionStartTime: new Date(),
-      metrics: {
-        models: {},
-        tools: {
-          totalCalls: 10,
-          totalSuccess: 9,
-          totalFail: 1,
-          totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
-          byName: {},
-        },
-      },
-      lastPromptTokenCount: 0,
-    },
-  },
-  utils: {
-    onDebugMessage: vi.fn(),
-    addMessage: vi.fn(),
-  },
-};
 
 const mockSlashCommands: SlashCommand[] = [
   { name: 'clear', description: 'Clear screen', action: vi.fn() },
@@ -110,6 +54,7 @@ describe('InputPrompt', () => {
   let mockCompletion: MockedUseCompletion;
   let mockInputHistory: MockedUseInputHistory;
   let mockBuffer: TextBuffer;
+  let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCompletion = vi.mocked(useCompletion);
@@ -117,6 +62,8 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    mockCommandContext = createMockCommandContext();
 
     mockBuffer = {
       text: '',

@@ -4,55 +4,75 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { clearCommand } from './clearCommand.js';
 import { type CommandContext } from './types.js';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { GeminiClient } from '@google/gemini-cli-core';
 
 describe('clearCommand', () => {
   let mockContext: CommandContext;
-  let mockClearItems: ReturnType<typeof vi.fn>;
   let mockResetChat: ReturnType<typeof vi.fn>;
-  let mockRefreshStatic: ReturnType<typeof vi.fn>;
-  let mockOnDebugMessage: ReturnType<typeof vi.fn>;
-  let mockConsoleClear: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockClearItems = vi.fn();
     mockResetChat = vi.fn().mockResolvedValue(undefined);
-    mockRefreshStatic = vi.fn();
-    mockOnDebugMessage = vi.fn();
-    mockConsoleClear = vi.spyOn(console, 'clear').mockImplementation(() => {});
 
-    const mockGeminiClient = {
-      resetChat: mockResetChat,
-    } as unknown as GeminiClient;
-
-    mockContext = {
-      ui: {
-        clearItems: mockClearItems,
-        refreshStatic: mockRefreshStatic,
-      },
+    mockContext = createMockCommandContext({
       services: {
         config: {
-          getGeminiClient: () => mockGeminiClient,
+          getGeminiClient: () =>
+            ({
+              resetChat: mockResetChat,
+            }) as unknown as GeminiClient,
         },
       },
-      utils: {
-        onDebugMessage: mockOnDebugMessage,
-      },
-    } as unknown as CommandContext;
+    });
   });
 
-  it('should call clearItems, resetChat, console.clear, and refreshStatic', async () => {
-    await clearCommand.action(mockContext, { mainCommand: 'clear', rest: '' });
+  it('should set debug message, reset chat, and clear UI when config is available', async () => {
+    if (!clearCommand.action) {
+      throw new Error('clearCommand must have an action.');
+    }
 
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+    await clearCommand.action(mockContext, '');
+
+    expect(mockContext.ui.setDebugMessage).toHaveBeenCalledWith(
       'Clearing terminal and resetting chat.',
     );
-    expect(mockClearItems).toHaveBeenCalled();
-    expect(mockResetChat).toHaveBeenCalled();
-    expect(mockConsoleClear).toHaveBeenCalled();
-    expect(mockRefreshStatic).toHaveBeenCalled();
+    expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
+
+    expect(mockResetChat).toHaveBeenCalledTimes(1);
+
+    expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
+
+    // Check the order of operations.
+    const setDebugMessageOrder = (mockContext.ui.setDebugMessage as Mock).mock
+      .invocationCallOrder[0];
+    const resetChatOrder = mockResetChat.mock.invocationCallOrder[0];
+    const clearOrder = (mockContext.ui.clear as Mock).mock
+      .invocationCallOrder[0];
+
+    expect(setDebugMessageOrder).toBeLessThan(resetChatOrder);
+    expect(resetChatOrder).toBeLessThan(clearOrder);
+  });
+
+  it('should not attempt to reset chat if config service is not available', async () => {
+    if (!clearCommand.action) {
+      throw new Error('clearCommand must have an action.');
+    }
+
+    const nullConfigContext = createMockCommandContext({
+      services: {
+        config: null,
+      },
+    });
+
+    await clearCommand.action(nullConfigContext, '');
+
+    expect(nullConfigContext.ui.setDebugMessage).toHaveBeenCalledWith(
+      'Clearing terminal and resetting chat.',
+    );
+    expect(mockResetChat).not.toHaveBeenCalled();
+    expect(nullConfigContext.ui.clear).toHaveBeenCalledTimes(1);
   });
 });

@@ -11,7 +11,7 @@ export const helpCommand: SlashCommand = {
   altName: '?',
   description: 'for help on gemini-cli',
   action: (context, _args) => {
-    context.utils.onDebugMessage('Opening help.');
+    context.ui.setDebugMessage('Opening help.');
     context.dialogs.setShowHelp(true);
   },
 };

@@ -21,14 +21,17 @@ describe('helpCommand', () => {
       dialogs: {
         setShowHelp: mockSetShowHelp,
       },
-      utils: {
-        onDebugMessage: mockOnDebugMessage,
+      ui: {
+        setDebugMessage: mockOnDebugMessage,
       },
     } as unknown as CommandContext;
   });
 
-  it("should call setShowHelp(true) and log a debug message for '/help'", () => {
-    helpCommand.action(mockContext, { mainCommand: 'help', rest: '' });
+  it("should call setShowHelp(true) and set a debug message for '/help'", () => {
+    if (!helpCommand.action) {
+      throw new Error('Help command has no action');
+    }
+    helpCommand.action(mockContext, '');
 
     expect(mockSetShowHelp).toHaveBeenCalledWith(true);
     expect(mockOnDebugMessage).toHaveBeenCalledWith('Opening help.');

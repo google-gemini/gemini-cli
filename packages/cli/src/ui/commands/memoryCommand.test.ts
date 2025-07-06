@@ -4,112 +4,246 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { memoryCommand } from './memoryCommand.js';
-import { type CommandContext } from './types.js';
-import { MessageType } from '../types.js';
-import * as ShowMemoryCommandModule from '../hooks/useShowMemoryCommand.js';
+import { type CommandContext, SlashCommand } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Config } from '@google/gemini-cli-core';
+import { MessageType } from '../types.js';
+import { getErrorMessage } from '@google/gemini-cli-core';
 
-vi.mock('../hooks/useShowMemoryCommand.js', () => ({
-  createShowMemoryAction: vi.fn(() => vi.fn()),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    getErrorMessage: vi.fn((error: unknown) => {
+      if (error instanceof Error) return error.message;
+      return String(error);
+    }),
+  };
+});
 
 describe('memoryCommand', () => {
   let mockContext: CommandContext;
-  let mockAddItem: ReturnType<typeof vi.fn>;
-  let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    // These are the specific mocks we care about for this test suite.
-    // We can create them here to have a reference to them for our assertions.
-    mockAddItem = vi.fn();
-    mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
-
-    mockContext = createMockCommandContext({
-      utils: {
-        addMessage: mockAddItem,
-      },
-      actions: {
-        performMemoryRefresh: mockPerformMemoryRefresh,
-      },
-      services: {
-        config: { getProjectRoot: () => '/test/project' } as unknown as Config,
-      },
-    });
-  });
+  const getSubCommand = (name: 'show' | 'add' | 'refresh'): SlashCommand => {
+    const subCommand = memoryCommand.subCommands?.find(
+      (cmd) => cmd.name === name,
+    );
+    if (!subCommand) {
+      throw new Error(`/memory ${name} command not found.`);
+    }
+    return subCommand;
+  };
 
   describe('/memory show', () => {
-    it('should call the showMemoryAction', async () => {
-      const mockReturnedShowAction = vi.fn();
-      vi.mocked(ShowMemoryCommandModule.createShowMemoryAction).mockReturnValue(
-        mockReturnedShowAction,
-      );
+    let showCommand: SlashCommand;
+    let mockGetUserMemory: Mock;
+    let mockGetGeminiMdFileCount: Mock;
 
-      const showSubCommand = memoryCommand.subCommands?.find(
-        (sc) => sc.name === 'show',
-      );
-      await showSubCommand?.action?.(mockContext, '');
+    beforeEach(() => {
+      showCommand = getSubCommand('show');
 
-      expect(
-        ShowMemoryCommandModule.createShowMemoryAction,
-      ).toHaveBeenCalledWith(
-        mockContext.services.config,
-        mockContext.services.settings,
-        mockContext.utils.addMessage,
+      mockGetUserMemory = vi.fn();
+      mockGetGeminiMdFileCount = vi.fn();
+
+      mockContext = createMockCommandContext({
+        services: {
+          config: {
+            getUserMemory: mockGetUserMemory,
+            getGeminiMdFileCount: mockGetGeminiMdFileCount,
+          },
+        },
+      });
+    });
+
+    it('should display a message if memory is empty', async () => {
+      if (!showCommand.action) throw new Error('Command has no action');
+
+      mockGetUserMemory.mockReturnValue('');
+      mockGetGeminiMdFileCount.mockReturnValue(0);
+
+      await showCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Memory is currently empty.',
+        },
+        expect.any(Number),
       );
-      expect(mockReturnedShowAction).toHaveBeenCalled();
+    });
+
+    it('should display the memory content and file count if it exists', async () => {
+      if (!showCommand.action) throw new Error('Command has no action');
+
+      const memoryContent = 'This is a test memory.';
+
+      mockGetUserMemory.mockReturnValue(memoryContent);
+      mockGetGeminiMdFileCount.mockReturnValue(1);
+
+      await showCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Current memory content from 1 file(s):\n\n---\n${memoryContent}\n---`,
+        },
+        expect.any(Number),
+      );
     });
   });
 
   describe('/memory add', () => {
-    it('should return tool scheduling info on valid input', () => {
-      const fact = 'Remember this fact';
-      const addSubCommand = memoryCommand.subCommands?.find(
-        (sc) => sc.name === 'add',
-      );
-      const commandResult = addSubCommand?.action?.(mockContext, fact);
+    let addCommand: SlashCommand;
 
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
+    beforeEach(() => {
+      addCommand = getSubCommand('add');
+      mockContext = createMockCommandContext();
+    });
+
+    it('should return an error message if no arguments are provided', () => {
+      if (!addCommand.action) throw new Error('Command has no action');
+
+      const result = addCommand.action(mockContext, '  ');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: /memory add <text to remember>',
+      });
+
+      expect(mockContext.ui.addItem).not.toHaveBeenCalled();
+    });
+
+    it('should return a tool action and add an info message when arguments are provided', () => {
+      if (!addCommand.action) throw new Error('Command has no action');
+
+      const fact = 'remember this';
+      const result = addCommand.action(mockContext, `  ${fact}  `);
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
           type: MessageType.INFO,
-          content: `Attempting to save to memory: "${fact}"`,
-        }),
+          text: `Attempting to save to memory: "${fact}"`,
+        },
+        expect.any(Number),
       );
 
-      expect(commandResult).toEqual({
-        shouldScheduleTool: true,
+      expect(result).toEqual({
+        type: 'tool',
         toolName: 'save_memory',
         toolArgs: { fact },
       });
     });
-
-    it('should show usage error if no text is provided', () => {
-      const addSubCommand = memoryCommand.subCommands?.find(
-        (sc) => sc.name === 'add',
-      );
-      const commandResult = addSubCommand?.action?.(mockContext, ' ');
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          content: 'Usage: /memory add <text to remember>',
-        }),
-      );
-      expect(commandResult).toBeUndefined();
-    });
   });
 
   describe('/memory refresh', () => {
-    it('should call performMemoryRefresh', async () => {
-      const refreshSubCommand = memoryCommand.subCommands?.find(
-        (sc) => sc.name === 'refresh',
+    let refreshCommand: SlashCommand;
+    let mockRefreshMemory: Mock;
+
+    beforeEach(() => {
+      refreshCommand = getSubCommand('refresh');
+      mockRefreshMemory = vi.fn();
+      mockContext = createMockCommandContext({
+        services: {
+          config: {
+            refreshMemory: mockRefreshMemory,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        },
+      });
+    });
+
+    it('should display success message when memory is refreshed with content', async () => {
+      if (!refreshCommand.action) throw new Error('Command has no action');
+
+      const refreshResult = {
+        memoryContent: 'new memory content',
+        fileCount: 2,
+      };
+      mockRefreshMemory.mockResolvedValue(refreshResult);
+
+      await refreshCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Refreshing memory from source files...',
+        },
+        expect.any(Number),
       );
-      await refreshSubCommand?.action?.(mockContext, '');
-      expect(mockPerformMemoryRefresh).toHaveBeenCalled();
+
+      expect(mockRefreshMemory).toHaveBeenCalledOnce();
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Memory refreshed successfully. Loaded 18 characters from 2 file(s).',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should display success message when memory is refreshed with no content', async () => {
+      if (!refreshCommand.action) throw new Error('Command has no action');
+
+      const refreshResult = { memoryContent: '', fileCount: 0 };
+      mockRefreshMemory.mockResolvedValue(refreshResult);
+
+      await refreshCommand.action(mockContext, '');
+
+      expect(mockRefreshMemory).toHaveBeenCalledOnce();
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Memory refreshed successfully. No memory content found.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should display an error message if refreshing fails', async () => {
+      if (!refreshCommand.action) throw new Error('Command has no action');
+
+      const error = new Error('Failed to read memory files.');
+      mockRefreshMemory.mockRejectedValue(error);
+
+      await refreshCommand.action(mockContext, '');
+
+      expect(mockRefreshMemory).toHaveBeenCalledOnce();
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Error refreshing memory: ${error.message}`,
+        },
+        expect.any(Number),
+      );
+
+      expect(getErrorMessage).toHaveBeenCalledWith(error);
+    });
+
+    it('should not throw if config service is unavailable', async () => {
+      if (!refreshCommand.action) throw new Error('Command has no action');
+
+      const nullConfigContext = createMockCommandContext({
+        services: { config: null },
+      });
+
+      await expect(
+        refreshCommand.action(nullConfigContext, ''),
+      ).resolves.toBeUndefined();
+
+      expect(nullConfigContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Refreshing memory from source files...',
+        },
+        expect.any(Number),
+      );
+
+      expect(mockRefreshMemory).not.toHaveBeenCalled();
     });
   });
 });

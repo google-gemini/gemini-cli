@@ -43,11 +43,10 @@ export const createMockCommandContext = (
     ui: {
       history: [],
       addItem: vi.fn(),
-      clearItems: vi.fn(),
-      loadHistory: vi.fn(),
-      refreshStatic: vi.fn(),
+      clear: vi.fn(),
       setQuittingMessages: vi.fn(),
       pendingHistoryItems: [],
+      setDebugMessage: vi.fn(),
     },
     dialogs: {
       openTheme: vi.fn(),
@@ -55,11 +54,6 @@ export const createMockCommandContext = (
       openEditor: vi.fn(),
       openPrivacy: vi.fn(),
       setShowHelp: vi.fn(),
-    },
-    actions: {
-      performMemoryRefresh: vi.fn().mockResolvedValue(undefined),
-      toggleCorgiMode: vi.fn(),
-      setPendingCompression: vi.fn(),
     },
     session: {
       stats: {
@@ -78,21 +72,32 @@ export const createMockCommandContext = (
         },
       } as SessionStatsState,
     },
-    utils: {
-      onDebugMessage: vi.fn(),
-      addMessage: vi.fn(),
-    },
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const merge = (target: any, source: any) => {
+  const merge = (target: any, source: any): any => {
+    const output = { ...target };
+
     for (const key in source) {
-      if (source[key] instanceof Object && target && key in target) {
-        Object.assign(source[key], merge(target[key], source[key]));
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const sourceValue = source[key];
+        const targetValue = output[key];
+
+        if (
+          sourceValue &&
+          typeof sourceValue === 'object' &&
+          !Array.isArray(sourceValue) &&
+          targetValue &&
+          typeof targetValue === 'object' &&
+          !Array.isArray(targetValue)
+        ) {
+          output[key] = merge(targetValue, sourceValue);
+        } else {
+          output[key] = sourceValue;
+        }
       }
     }
-    Object.assign(target || {}, source);
-    return target;
+    return output;
   };
 
   return merge(defaultMocks, overrides);
