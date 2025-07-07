@@ -145,18 +145,6 @@ export function filterActiveExtensions(
         }
       }
     }
-
-    const activeNames = new Set(
-      activeExtensions.map((e) => e.config.name.toLowerCase()),
-    );
-    for (const extension of extensions) {
-      const status = activeNames.has(extension.config.name.toLowerCase())
-        ? 'Activated'
-        : 'Disabled';
-      console.log(
-        `${status} extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
-    }
   }
   return activeExtensions;
 }
