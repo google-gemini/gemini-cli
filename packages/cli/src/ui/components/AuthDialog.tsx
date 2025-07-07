@@ -92,7 +92,10 @@ export function AuthDialog({
         <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
       </Box>
       <Box marginTop={1}>
-        <Link url="https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md">
+        <Link
+          url="https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md"
+          fallback={false}
+        >
           https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md
         </Link>
       </Box>
