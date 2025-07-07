@@ -43,7 +43,7 @@ export function isWithinRoot(
   // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
     normalizedRootDirectory === path.sep ||
-      normalizedRootDirectory.endsWith(path.sep)
+    normalizedRootDirectory.endsWith(path.sep)
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
