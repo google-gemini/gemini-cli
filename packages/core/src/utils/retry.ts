@@ -13,6 +13,8 @@ export interface RetryOptions {
   shouldRetry: (error: Error) => boolean;
   onPersistent429?: (authType?: string) => Promise<string | null>;
   authType?: string;
+  circuitBreaker?: CircuitBreaker;
+  isManualOverride?: boolean;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -21,6 +23,183 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxDelayMs: 30000, // 30 seconds
   shouldRetry: defaultShouldRetry,
 };
+
+export interface CircuitBreakerConfig {
+  enabled: boolean;
+  failureThreshold: number;
+  recoveryTimeoutMs: number;
+  maxRecoveryTimeoutMs: number;
+  halfOpenMaxCalls: number;
+  allowManualOverride: boolean;
+}
+
+export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
+  enabled: true,
+  failureThreshold: 3,
+  recoveryTimeoutMs: 60000, // 60 seconds
+  maxRecoveryTimeoutMs: 480000, // 8 minutes
+  halfOpenMaxCalls: 3,
+  allowManualOverride: true,
+};
+
+export enum CircuitBreakerState {
+  CLOSED = 'CLOSED',
+  OPEN = 'OPEN',
+  HALF_OPEN = 'HALF_OPEN',
+}
+
+export class CircuitBreakerOpenError extends Error {
+  constructor(
+    readonly authType: string,
+    readonly recoveryTimeMs: number,
+    readonly allowOverride: boolean = true,
+  ) {
+    super(
+      `Circuit breaker open for ${authType}. Service will be retested in ${Math.ceil(recoveryTimeMs / 1000)} seconds.`,
+    );
+    this.name = 'CircuitBreakerOpenError';
+  }
+}
+
+export class CircuitBreaker {
+  private state: CircuitBreakerState = CircuitBreakerState.CLOSED;
+  private failureCount = 0;
+  private lastFailureTime: Date | null = null;
+  private recoveryTimeoutMs: number;
+  private halfOpenCallsCount = 0;
+  private onStateChangeCallbacks: Array<
+    (state: CircuitBreakerState, authType: string) => void
+  > = [];
+
+  constructor(
+    private readonly authType: string,
+    readonly config: CircuitBreakerConfig = DEFAULT_CIRCUIT_BREAKER_CONFIG,
+  ) {
+    this.recoveryTimeoutMs = config.recoveryTimeoutMs;
+  }
+
+  canExecute(): boolean {
+    if (!this.config.enabled) {
+      return true;
+    }
+
+    if (this.state === CircuitBreakerState.CLOSED) {
+      return true;
+    }
+
+    if (this.state === CircuitBreakerState.OPEN) {
+      if (this.shouldAttemptRecovery()) {
+        this.transitionToHalfOpen();
+        return true;
+      }
+      return false;
+    }
+
+    if (this.state === CircuitBreakerState.HALF_OPEN) {
+      return this.halfOpenCallsCount < this.config.halfOpenMaxCalls;
+    }
+
+    return false;
+  }
+
+  canExecuteWithOverride(): boolean {
+    return true; // Manual override bypasses all checks
+  }
+
+  recordFailure(): void {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    this.failureCount++;
+    this.lastFailureTime = new Date();
+
+    if (this.state === CircuitBreakerState.CLOSED) {
+      if (this.failureCount >= this.config.failureThreshold) {
+        this.transitionToOpen();
+      }
+    } else if (this.state === CircuitBreakerState.HALF_OPEN) {
+      this.transitionToOpen();
+      this.increaseRecoveryTimeout();
+    }
+  }
+
+  recordSuccess(): void {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    this.failureCount = 0;
+    this.recoveryTimeoutMs = this.config.recoveryTimeoutMs; // Reset to initial timeout
+
+    if (this.state !== CircuitBreakerState.CLOSED) {
+      this.transitionToClosed();
+    }
+  }
+
+  getState(): CircuitBreakerState {
+    return this.state;
+  }
+
+  getRecoveryTimeMs(): number {
+    if (this.state !== CircuitBreakerState.OPEN || !this.lastFailureTime) {
+      return 0;
+    }
+    const elapsed = Date.now() - this.lastFailureTime.getTime();
+    return Math.max(0, this.recoveryTimeoutMs - elapsed);
+  }
+
+  onStateChange(
+    callback: (state: CircuitBreakerState, authType: string) => void,
+  ): void {
+    this.onStateChangeCallbacks.push(callback);
+  }
+
+  trackHalfOpenCall(): void {
+    if (this.state === CircuitBreakerState.HALF_OPEN) {
+      this.halfOpenCallsCount++;
+    }
+  }
+
+  private shouldAttemptRecovery(): boolean {
+    if (!this.lastFailureTime) {
+      return true;
+    }
+    const elapsed = Date.now() - this.lastFailureTime.getTime();
+    return elapsed >= this.recoveryTimeoutMs;
+  }
+
+  private transitionToOpen(): void {
+    this.state = CircuitBreakerState.OPEN;
+    this.halfOpenCallsCount = 0;
+    this.notifyStateChange();
+  }
+
+  private transitionToHalfOpen(): void {
+    this.state = CircuitBreakerState.HALF_OPEN;
+    this.halfOpenCallsCount = 0;
+    this.notifyStateChange();
+  }
+
+  private transitionToClosed(): void {
+    this.state = CircuitBreakerState.CLOSED;
+    this.halfOpenCallsCount = 0;
+    this.notifyStateChange();
+  }
+
+  private increaseRecoveryTimeout(): void {
+    this.recoveryTimeoutMs = Math.min(
+      this.config.maxRecoveryTimeoutMs,
+      this.recoveryTimeoutMs * 2,
+    );
+  }
+
+  private notifyStateChange(): void {
+    this.onStateChangeCallbacks.forEach((callback) => {
+      callback(this.state, this.authType);
+    });
+  }
+}
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -70,10 +249,26 @@ export async function retryWithBackoff<T>(
     onPersistent429,
     authType,
     shouldRetry,
+    circuitBreaker,
+    isManualOverride,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...options,
   };
+
+  // Check circuit breaker before starting any retry attempts
+  if (circuitBreaker && !isManualOverride) {
+    if (!circuitBreaker.canExecute()) {
+      const recoveryTimeMs = circuitBreaker.getRecoveryTimeMs();
+      throw new CircuitBreakerOpenError(
+        authType || 'unknown',
+        recoveryTimeMs,
+        circuitBreaker.config.allowManualOverride,
+      );
+    }
+    // Track half-open call attempts
+    circuitBreaker.trackHalfOpenCall();
+  }
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
@@ -82,7 +277,12 @@ export async function retryWithBackoff<T>(
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      return await fn();
+      const result = await fn();
+      // Record success with circuit breaker if request succeeds
+      if (circuitBreaker) {
+        circuitBreaker.recordSuccess();
+      }
+      return result;
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
@@ -102,6 +302,10 @@ export async function retryWithBackoff<T>(
         try {
           const fallbackModel = await onPersistent429(authType);
           if (fallbackModel) {
+            // Flash fallback success resets circuit breaker (per FR2.4)
+            if (circuitBreaker) {
+              circuitBreaker.recordSuccess();
+            }
             // Reset attempt counter and try with new model
             attempt = 0;
             consecutive429Count = 0;
@@ -117,6 +321,10 @@ export async function retryWithBackoff<T>(
 
       // Check if we've exhausted retries or shouldn't retry
       if (attempt >= maxAttempts || !shouldRetry(error as Error)) {
+        // Record failure with circuit breaker if all retries exhausted
+        if (circuitBreaker) {
+          circuitBreaker.recordFailure();
+        }
         throw error;
       }
 

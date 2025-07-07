@@ -151,14 +151,18 @@ export class Turn {
   async *run(
     req: PartListUnion,
     signal: AbortSignal,
+    isManualOverride?: boolean,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
-      const responseStream = await this.chat.sendMessageStream({
-        message: req,
-        config: {
-          abortSignal: signal,
+      const responseStream = await this.chat.sendMessageStream(
+        {
+          message: req,
+          config: {
+            abortSignal: signal,
+          },
         },
-      });
+        isManualOverride,
+      );
 
       for await (const resp of responseStream) {
         if (signal?.aborted) {

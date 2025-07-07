@@ -176,6 +176,28 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "usageStatisticsEnabled": false
     ```
 
+- **`circuitBreaker`** (object):
+  - **Description:** Configures the circuit breaker pattern for resilient rate limiting. Circuit breakers help prevent infinite loops during rate limiting scenarios by temporarily blocking requests after consecutive failures and automatically attempting recovery. Each authentication type (OAuth, API key, Vertex AI) has independent circuit breaker instances.
+  - **Default:** `{"enabled": true, "failureThreshold": 3, "recoveryTimeoutMs": 60000, "maxRecoveryTimeoutMs": 480000, "halfOpenMaxCalls": 3, "allowManualOverride": true}`
+  - **Properties:**
+    - **`enabled`** (boolean): Whether circuit breaker protection is enabled.
+    - **`failureThreshold`** (number): Number of consecutive failures before circuit opens.
+    - **`recoveryTimeoutMs`** (number): Initial recovery timeout in milliseconds (60 seconds).
+    - **`maxRecoveryTimeoutMs`** (number): Maximum recovery timeout in milliseconds (8 minutes).
+    - **`halfOpenMaxCalls`** (number): Maximum test calls allowed during recovery testing.
+    - **`allowManualOverride`** (boolean): Whether users can manually override circuit breaker blocks.
+  - **Example:**
+    ```json
+    "circuitBreaker": {
+      "enabled": true,
+      "failureThreshold": 5,
+      "recoveryTimeoutMs": 30000,
+      "maxRecoveryTimeoutMs": 300000,
+      "halfOpenMaxCalls": 2,
+      "allowManualOverride": true
+    }
+    ```
+
 - **`hideTips`** (boolean):
   - **Description:** Enables or disables helpful tips in the CLI interface.
   - **Default:** `false`
@@ -209,6 +231,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 3,
+    "recoveryTimeoutMs": 60000,
+    "maxRecoveryTimeoutMs": 480000,
+    "halfOpenMaxCalls": 3,
+    "allowManualOverride": true
+  },
   "hideTips": false
 }
 ```

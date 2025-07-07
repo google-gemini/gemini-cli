@@ -92,10 +92,13 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(mockSendMessageStream).toHaveBeenCalledWith({
-        message: reqParts,
-        config: { abortSignal: expect.any(AbortSignal) },
-      });
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        {
+          message: reqParts,
+          config: { abortSignal: expect.any(AbortSignal) },
+        },
+        undefined,
+      );
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Hello' },
