@@ -12,3 +12,4 @@
 // Re-export from adapters for 100% backward compatibility
 export { OpenAICompatibleContentGenerator } from '../adapters/openaiCompatibleContentGenerator.js';
 export { AnthropicContentGenerator } from '../adapters/anthropicContentGenerator.js';
+export { AzureContentGenerator } from '../adapters/azureContentGenerator.js';

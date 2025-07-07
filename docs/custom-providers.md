@@ -48,6 +48,20 @@ export CUSTOM_TIMEOUT="60000"  # Optional, longer timeout for local processing
 gemini --auth-type local-llm "Hello, world!"
 ```
 
+### 4. Azure OpenAI API
+Use Azure OpenAI models.
+
+**Environment Variables:** 
+```bash
+export AZURE_API_KEY="your-azure-api-key"
+export AZURE_ENDPOINT_URL="https://your-azure-region.openai.azure.com"
+export AZURE_API_VERSION="2025-01-01-preview"
+
+**Usage:**
+```bash
+gemini --auth-type azure --model gpt-4o "Hello, Azure!"
+```
+
 ## Configuration Examples
 
 ### Ollama Setup

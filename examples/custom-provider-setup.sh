@@ -48,6 +48,19 @@ case $choice in
         echo "Use with: gemini --auth-type local-llm --model llama2 'Hello world'"
         ;;
     4)
+        echo "Setting up Azure OpenAI..."
+        read -p "Enter your Azure API key: " azure_key
+        read -p "Enter your Azure endpoint (https://<region>.openai.azure.com): " azure_url
+        read -p "Enter the Azure API version (default: 2025-01-01-preview): " azure_api_version
+        azure_api_version=${azure_api_version:-2025-01-01-preview}
+
+        echo "AZURE_API_KEY=$azure_key" >> .env
+        echo "AZURE_ENDPOINT_URL=$azure_url" >> .env
+        echo "AZURE_API_VERSION=$azure_api_version" >> .env
+
+        echo "Setup complete! Use with: gemini --auth-type azure --model gpt-4o 'Hello, Azure!'"
+        ;;
+    5)
         echo "Setting up custom local LLM endpoint..."
         read -p "Enter your local LLM base URL (e.g., http://localhost:8080/v1): " base_url
         read -p "Enter API key (or 'dummy-key' if not needed): " api_key

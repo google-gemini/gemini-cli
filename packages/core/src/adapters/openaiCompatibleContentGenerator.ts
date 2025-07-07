@@ -51,7 +51,7 @@ function normalizeContents(contents: any): Content[] {
  * Generic HTTP-based content generator for OpenAI-compatible APIs
  */
 export class OpenAICompatibleContentGenerator implements ContentGenerator {
-  constructor(private config: ContentGeneratorConfig) {}
+  constructor(protected config: ContentGeneratorConfig) {}
 
   async generateContent(
     request: GenerateContentParameters,
@@ -88,7 +88,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     return this.generateContentStreamInternal(request);
   }
 
-  private async *generateContentStreamInternal(
+  protected async *generateContentStreamInternal(
     request: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const openAIRequest = { ...this.convertToOpenAIFormat(request), stream: true };
@@ -209,7 +209,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     };
   }
 
-  private convertToOpenAIFormat(request: GenerateContentParameters): any {
+  protected convertToOpenAIFormat(request: GenerateContentParameters): any {
     const contents = normalizeContents(request.contents);
     let messages = contents.map((content: Content) => ({
       role: content.role === 'model' ? 'assistant' : content.role,
@@ -270,7 +270,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     return openAIRequest;
   }
 
-  private convertFromOpenAIFormat(
+  protected convertFromOpenAIFormat(
     data: any,
     isStream = false,
     toolCallAccumulator?: Map<string, { id: string; name: string; arguments: string }>,
@@ -380,7 +380,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     };
   }
 
-  private convertAccumulatedToolCallsToGemini(
+  protected convertAccumulatedToolCallsToGemini(
     toolCalls: Array<{ id: string; name: string; arguments: string }>
   ): GenerateContentResponse | null {
     const functionCalls: any[] = [];
@@ -434,7 +434,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     };
   }
 
-  private extractTextFromContents(contents: Content[]): string {
+  protected extractTextFromContents(contents: Content[]): string {
     return contents
       .map(content =>
         content.parts

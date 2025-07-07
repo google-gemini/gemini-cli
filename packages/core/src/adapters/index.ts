@@ -6,6 +6,7 @@
 
 import { OpenAICompatibleContentGenerator } from './openaiCompatibleContentGenerator.js';
 import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
+import { AzureContentGenerator } from './azureContentGenerator.js';
 import { ContentGenerator, ContentGeneratorConfig, AuthType } from '../core/contentGenerator.js';
 
 export function createCustomContentGenerator(authType: AuthType, config: ContentGeneratorConfig): ContentGenerator {
@@ -17,6 +18,8 @@ export function createCustomContentGenerator(authType: AuthType, config: Content
       return new OpenAICompatibleContentGenerator(config);
     case 'anthropic':
       return new AnthropicContentGenerator(config);
+    case 'azure':
+      return new AzureContentGenerator(config);
     default:
       // Check global registry for custom providers
       const GeneratorClass = globalContentGeneratorRegistry.get(authType);
