@@ -98,6 +98,32 @@ export async function main() {
   // Check for specific commands first
   const args = process.argv.slice(2);
   
+  // Authentication command
+  if (args[0] === 'auth') {
+    const { handleAuthCommand } = await import('./commands/authCommands.js');
+    
+    const action = args[1] as 'login' | 'logout' | 'status';
+    if (!action || !['login', 'logout', 'status'].includes(action)) {
+      console.error('Usage: trust auth [login|logout|status]');
+      console.error('  trust auth login --hf-token YOUR_TOKEN');
+      console.error('  trust auth logout');
+      console.error('  trust auth status');
+      process.exit(1);
+    }
+    
+    try {
+      await handleAuthCommand({
+        action,
+        hfToken: args.includes('--hf-token') ? args[args.indexOf('--hf-token') + 1] : undefined,
+        verbose: args.includes('--verbose') || args.includes('-v')
+      });
+      return;
+    } catch (error) {
+      console.error(`❌ Auth command failed: ${error}`);
+      process.exit(1);
+    }
+  }
+  
   // Performance monitoring command
   if (args[0] === 'performance' || args[0] === 'perf') {
     const { handlePerformanceCommand } = await import('./commands/performanceCommands.js');

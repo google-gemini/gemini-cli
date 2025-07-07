@@ -22,9 +22,11 @@ export interface DownloadProgress {
 
 export class ModelDownloader {
   private downloadDir: string;
+  private hfToken?: string;
 
-  constructor(downloadDir: string) {
+  constructor(downloadDir: string, hfToken?: string) {
     this.downloadDir = downloadDir;
+    this.hfToken = hfToken;
   }
 
   async downloadModel(
@@ -95,13 +97,18 @@ export class ModelDownloader {
       const startTime = Date.now();
       let downloaded = 0;
 
-      const options = {
-        headers: {
-          'User-Agent': 'TrustCLI/0.1.0 (https://github.com/audit-brands/trust-cli)',
-          'Accept': '*/*',
-          'Accept-Encoding': 'identity'
-        }
+      const headers: any = {
+        'User-Agent': 'TrustCLI/0.1.0 (https://github.com/audit-brands/trust-cli)',
+        'Accept': '*/*',
+        'Accept-Encoding': 'identity'
       };
+
+      // Add HF token if available
+      if (this.hfToken) {
+        headers['Authorization'] = `Bearer ${this.hfToken}`;
+      }
+
+      const options = { headers };
 
       this.makeRequest(downloadUrl, options, file, tempPath, finalPath, startTime, onProgress, resolve, reject);
     });

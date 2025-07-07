@@ -21,7 +21,7 @@ export { PerformanceMonitor, globalPerformanceMonitor } from './performanceMonit
 export interface TrustModelConfig {
   name: string;
   path: string;
-  type: 'llama' | 'phi' | 'qwen' | 'mistral' | 'gemma';
+  type: 'llama' | 'phi' | 'qwen' | 'mistral' | 'gemma' | 'deepseek';
   quantization: 'Q4_K_M' | 'Q8_0' | 'FP16' | 'Q4_0' | 'Q5_K_M';
   contextSize: number;
   ramRequirement: string;

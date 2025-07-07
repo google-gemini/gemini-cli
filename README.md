@@ -253,12 +253,50 @@ trust ui benchmark         # Live benchmarking interface
 
 ## 🤖 Available Models
 
-| Model | Parameters | RAM | Description | Trust Score |
-|-------|------------|-----|-------------|-------------|
-| **qwen2.5-1.5b-instruct** | 1.5B | 2GB | Lightweight model for quick responses | 8.8/10 |
-| **llama-3.2-3b-instruct** | 3B | 8GB | Balanced performance for general use | 9.2/10 |
-| **phi-3.5-mini-instruct** | 3.8B | 4GB | Optimized for coding and technical tasks | 9.5/10 |
-| **llama-3.1-8b-instruct** | 8B | 16GB | High-quality responses for complex tasks | 9.7/10 |
+| Model | Parameters | RAM | Description | Trust Score | Access |
+|-------|------------|-----|-------------|-------------|---------|
+| **qwen2.5-1.5b-instruct** | 1.5B | 2GB | Lightweight model for quick responses | 8.8/10 | ✅ Public |
+| **llama-3.2-3b-instruct** | 3B | 4GB | Balanced performance for general use | 9.2/10 | ✅ Public |
+| **phi-3.5-mini-instruct** | 3.8B | 3GB | Optimized for coding and technical tasks | 9.5/10 | ✅ Public |
+| **phi-3.5-mini-uncensored** | 3.8B | 3GB | Uncensored model for risk analysis & auditing | 9.3/10 | ✅ Public |
+| **deepseek-r1-distill-7b** | 7.6B | 6GB | Advanced reasoning for complex analysis | 9.6/10 | ✅ Public |
+| **llama-3.1-8b-instruct** | 8B | 8GB | High-quality responses for complex tasks | 9.7/10 | ✅ Public |
+
+### 📥 Downloading Models
+
+**All models** can be downloaded directly without authentication:
+```bash
+trust model download qwen2.5-1.5b-instruct     # 1.7GB - Lightweight & fast
+trust model download llama-3.2-3b-instruct     # 1.9GB - Balanced performance  
+trust model download phi-3.5-mini-instruct     # 2.4GB - Great for coding
+trust model download phi-3.5-mini-uncensored   # 2.4GB - Risk analysis & auditing
+trust model download deepseek-r1-distill-7b    # 4.5GB - Advanced reasoning & analysis
+trust model download llama-3.1-8b-instruct     # 4.9GB - Highest quality
+```
+
+**Model Selection Guide:**
+- **Standard models** (`phi-3.5-mini-instruct`, `llama-*`, `qwen-*`): Best for general development, have safety guardrails
+- **Uncensored model** (`phi-3.5-mini-uncensored`): For auditors & security researchers who need to explore edge cases without content filtering
+- **Reasoning model** (`deepseek-r1-distill-7b`): Excels at complex analysis, step-by-step reasoning, and problem-solving - ideal for auditors working through complex risk scenarios
+
+All models use community GGUF conversions that are publicly accessible.
+
+#### HF Authentication (Future Use)
+
+Trust-cli supports Hugging Face authentication for future gated models:
+
+```bash
+# Set up authentication (for gated models in the future)
+trust auth login --hf-token YOUR_TOKEN
+
+# Check authentication status
+trust auth status
+
+# Remove authentication
+trust auth logout
+```
+
+Currently, all included models are publicly accessible without authentication.
 
 ## 🔧 Configuration
 

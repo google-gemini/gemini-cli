@@ -29,31 +29,45 @@ export class TrustModelManagerImpl implements TrustModelManager {
     this.availableModels = [
       {
         name: 'phi-3.5-mini-instruct',
-        path: 'phi-3.5-mini-instruct-q4_k_m.gguf',
+        path: 'Phi-3.5-mini-instruct-Q4_K_M.gguf',
         type: 'phi',
         quantization: 'Q4_K_M',
         contextSize: 4096,
-        ramRequirement: '4GB',
+        ramRequirement: '3GB',
         description: 'Fast coding assistance model - 3.8B parameters',
         parameters: '3.8B',
         trustScore: 9.5,
-        downloadUrl: 'https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/blob/main/Phi-3.5-mini-instruct-q4_k_m.gguf',
+        downloadUrl: 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
         verificationHash: 'sha256:pending', // Will be computed after first download
-        expectedSize: 2090000000 // ~2GB
+        expectedSize: 2390000000 // ~2.4GB
+      },
+      {
+        name: 'phi-3.5-mini-uncensored',
+        path: 'Phi-3.5-mini-instruct_Uncensored-Q4_K_M.gguf',
+        type: 'phi',
+        quantization: 'Q4_K_M',
+        contextSize: 4096,
+        ramRequirement: '3GB',
+        description: 'Uncensored coding model for risk analysis & auditing - 3.8B parameters',
+        parameters: '3.8B',
+        trustScore: 9.3,
+        downloadUrl: 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF/blob/main/Phi-3.5-mini-instruct_Uncensored-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 2390000000 // ~2.4GB
       },
       {
         name: 'llama-3.2-3b-instruct',
-        path: 'llama-3.2-3b-instruct-q8_0.gguf',
+        path: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
         type: 'llama',
-        quantization: 'Q8_0',
+        quantization: 'Q4_K_M',
         contextSize: 4096,
-        ramRequirement: '8GB',
+        ramRequirement: '4GB',
         description: 'Balanced performance model - 3B parameters',
         parameters: '3B',
         trustScore: 9.2,
-        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct-gguf/blob/main/llama-3.2-3b-instruct-q8_0.gguf',
+        downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/blob/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
         verificationHash: 'sha256:pending',
-        expectedSize: 3300000000 // ~3.3GB
+        expectedSize: 1800000000 // ~1.8GB
       },
       {
         name: 'qwen2.5-1.5b-instruct',
@@ -70,18 +84,32 @@ export class TrustModelManagerImpl implements TrustModelManager {
         expectedSize: 1650000000 // ~1.65GB
       },
       {
-        name: 'llama-3.1-8b-instruct',
-        path: 'llama-3.1-8b-instruct-q8_0.gguf',
-        type: 'llama',
-        quantization: 'Q8_0',
+        name: 'deepseek-r1-distill-7b',
+        path: 'DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf',
+        type: 'deepseek',
+        quantization: 'Q4_K_M',
         contextSize: 4096,
-        ramRequirement: '16GB',
+        ramRequirement: '6GB',
+        description: 'Advanced reasoning model for complex analysis - 7.6B parameters',
+        parameters: '7.6B',
+        trustScore: 9.6,
+        downloadUrl: 'https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF/blob/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 4450000000 // ~4.5GB
+      },
+      {
+        name: 'llama-3.1-8b-instruct',
+        path: 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+        type: 'llama',
+        quantization: 'Q4_K_M',
+        contextSize: 4096,
+        ramRequirement: '8GB',
         description: 'High-quality responses - 8B parameters',
         parameters: '8B',
         trustScore: 9.7,
-        downloadUrl: 'https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct-gguf/blob/main/llama-3.1-8b-instruct-q8_0.gguf',
+        downloadUrl: 'https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/blob/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
         verificationHash: 'sha256:pending',
-        expectedSize: 8800000000 // ~8.8GB
+        expectedSize: 4920000000 // ~4.9GB
       }
     ];
   }
@@ -132,7 +160,10 @@ export class TrustModelManagerImpl implements TrustModelManager {
       throw new Error(`Download URL not available for model ${modelId}`);
     }
 
-    const downloader = new ModelDownloader(this.modelsDir);
+    // Load HF token for authentication
+    const hfToken = await this.getHuggingFaceToken();
+    
+    const downloader = new ModelDownloader(this.modelsDir, hfToken);
     
     try {
       console.log(`🚀 Starting download of ${modelId}...`);
@@ -371,5 +402,16 @@ export class TrustModelManagerImpl implements TrustModelManager {
     }
     
     return `${size.toFixed(1)} ${units[unitIndex]}`;
+  }
+
+  private async getHuggingFaceToken(): Promise<string | undefined> {
+    try {
+      const authConfigPath = path.join(os.homedir(), '.trustcli', 'auth.json');
+      const content = await fs.readFile(authConfigPath, 'utf-8');
+      const config = JSON.parse(content);
+      return config.huggingfaceToken;
+    } catch {
+      return undefined;
+    }
   }
 }
