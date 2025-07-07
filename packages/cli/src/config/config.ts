@@ -48,6 +48,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  importFormat?: 'flat' | 'tree';
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -123,13 +124,25 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('import-format', {
+      type: 'string',
+      choices: ['flat', 'tree'],
+      description:
+        'Format for memory import resolution: "flat" (Claude-style) or "tree" (hierarchical, default)',
+      default: 'tree',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
     .strict().argv;
 
-  return argv;
+  // Ensure importFormat is typed as 'flat' | 'tree'
+  let importFormat: 'flat' | 'tree' = 'tree';
+  if (argv['import-format'] === 'flat') importFormat = 'flat';
+  else if (argv['import-format'] === 'tree') importFormat = 'tree';
+
+  return { ...argv, importFormat };
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -140,10 +153,11 @@ export async function loadHierarchicalGeminiMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
+      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
     );
   }
   // Directly call the server function.
@@ -153,6 +167,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    importFormat,
   );
 }
 
@@ -163,6 +178,7 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
+  const importFormat = argv.importFormat || 'tree';
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -184,6 +200,7 @@ export async function loadCliConfig(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    importFormat,
   );
 
   const mcpServers = mergeMcpServers(settings, extensions);

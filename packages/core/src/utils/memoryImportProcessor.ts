@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { marked } from 'marked';
 
 // Simple console logger for import processing
 const logger = {
@@ -30,14 +31,107 @@ interface ImportState {
 }
 
 /**
+ * Interface representing a file in the import tree
+ */
+export interface MemoryFile {
+  path: string;
+  imports?: MemoryFile[]; // Direct imports, in the order they were imported
+}
+
+/**
+ * Result of processing imports
+ */
+export interface ProcessImportsResult {
+  content: string;
+  importTree: MemoryFile;
+}
+
+// Helper to find the project root (looks for .git directory)
+async function findProjectRoot(startDir: string): Promise<string> {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    const gitPath = path.join(currentDir, '.git');
+    try {
+      const stats = await fs.lstat(gitPath);
+      if (stats.isDirectory()) {
+        return currentDir;
+      }
+    } catch {
+      // .git not found, continue to parent
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached filesystem root
+      break;
+    }
+    currentDir = parentDir;
+  }
+  // Fallback to startDir if .git not found
+  return path.resolve(startDir);
+}
+
+// Add a type guard for error objects
+function hasMessage(err: unknown): err is { message: string } {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'message' in err &&
+    typeof (err as { message: unknown }).message === 'string'
+  );
+}
+
+// Helper to find all code block and inline code regions using marked
+function findCodeRegions(content: string): Array<[number, number]> {
+  const regions: Array<[number, number]> = [];
+  const tokens = marked.lexer(content);
+
+  // Map from raw content to a queue of its start indices in the original content.
+  const rawContentIndices = new Map<string, number[]>();
+
+  function walk(token: { type: string; raw: string; tokens?: unknown[] }) {
+    if (token.type === 'code' || token.type === 'codespan') {
+      if (!rawContentIndices.has(token.raw)) {
+        const indices: number[] = [];
+        let lastIndex = -1;
+        while ((lastIndex = content.indexOf(token.raw, lastIndex + 1)) !== -1) {
+          indices.push(lastIndex);
+        }
+        rawContentIndices.set(token.raw, indices);
+      }
+
+      const indices = rawContentIndices.get(token.raw);
+      if (indices && indices.length > 0) {
+        // Assume tokens are processed in order of appearance.
+        // Dequeue the next available index for this raw content.
+        const idx = indices.shift()!;
+        regions.push([idx, idx + token.raw.length]);
+      }
+    }
+
+    if ('tokens' in token && token.tokens) {
+      for (const child of token.tokens) {
+        walk(child as { type: string; raw: string; tokens?: unknown[] });
+      }
+    }
+  }
+
+  for (const token of tokens) {
+    walk(token);
+  }
+
+  return regions;
+}
+
+/**
  * Processes import statements in GEMINI.md content
- * Supports @path/to/file.md syntax for importing content from other files
- *
+ * Supports @path/to/file syntax for importing content from other files
  * @param content - The content to process for imports
  * @param basePath - The directory path where the current file is located
  * @param debugMode - Whether to enable debug logging
  * @param importState - State tracking for circular import prevention
- * @returns Processed content with imports resolved
+ * @param projectRoot - The project root directory for allowed directories
+ * @param importFormat - The format of the import tree
+ * @returns Processed content with imports resolved and import tree
  */
 export async function processImports(
   content: string,
@@ -45,156 +139,166 @@ export async function processImports(
   debugMode: boolean = false,
   importState: ImportState = {
     processedFiles: new Set(),
-    maxDepth: 10,
+    maxDepth: 5,
     currentDepth: 0,
   },
-): Promise<string> {
+  projectRoot?: string,
+  importFormat: 'flat' | 'tree' = 'tree',
+): Promise<ProcessImportsResult> {
+  if (!projectRoot) {
+    projectRoot = await findProjectRoot(basePath);
+  }
+
   if (importState.currentDepth >= importState.maxDepth) {
     if (debugMode) {
       logger.warn(
         `Maximum import depth (${importState.maxDepth}) reached. Stopping import processing.`,
       );
     }
-    return content;
+    return {
+      content,
+      importTree: { path: importState.currentFile || 'unknown' },
+    };
   }
 
-  // Regex to match @path/to/file imports (supports any file extension)
-  // Supports both @path/to/file.md and @./path/to/file.md syntax
-  const importRegex = /@([./]?[^\s\n]+\.[^\s\n]+)/g;
-
-  let processedContent = content;
-  let match: RegExpExecArray | null;
-
-  // Process all imports in the content
-  while ((match = importRegex.exec(content)) !== null) {
-    const importPath = match[1];
-
-    // Validate import path to prevent path traversal attacks
-    if (!validateImportPath(importPath, basePath, [basePath])) {
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - Path traversal attempt -->`,
-      );
-      continue;
-    }
-
-    // Check if the import is for a non-md file and warn
-    if (!importPath.endsWith('.md')) {
-      logger.warn(
-        `Import processor only supports .md files. Attempting to import non-md file: ${importPath}. This will fail.`,
-      );
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - Only .md files are supported -->`,
-      );
-      continue;
-    }
-
-    const fullPath = path.resolve(basePath, importPath);
-
-    if (debugMode) {
-      logger.debug(`Processing import: ${importPath} -> ${fullPath}`);
-    }
-
-    // Check for circular imports - if we're already processing this file
-    if (importState.currentFile === fullPath) {
-      if (debugMode) {
-        logger.warn(`Circular import detected: ${importPath}`);
-      }
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Circular import detected: ${importPath} -->`,
-      );
-      continue;
-    }
-
-    // Check if we've already processed this file in this import chain
-    if (importState.processedFiles.has(fullPath)) {
-      if (debugMode) {
-        logger.warn(`File already processed in this chain: ${importPath}`);
-      }
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- File already processed: ${importPath} -->`,
-      );
-      continue;
-    }
-
-    // Check for potential circular imports by looking at the import chain
-    if (importState.currentFile) {
-      const currentFileDir = path.dirname(importState.currentFile);
-      const potentialCircularPath = path.resolve(currentFileDir, importPath);
-      if (potentialCircularPath === importState.currentFile) {
-        if (debugMode) {
-          logger.warn(`Circular import detected: ${importPath}`);
+  // --- FLAT FORMAT LOGIC ---
+  if (importFormat === 'flat') {
+    // Use a queue to process files in order of first encounter, and a set to avoid duplicates
+    const flatFiles: Array<{ path: string; content: string }> = [];
+    // Helper to recursively process imports
+    async function processFlat(
+      fileContent: string,
+      fileBasePath: string,
+      filePath: string,
+      processedFiles: Set<string>,
+      depth: number,
+    ) {
+      if (processedFiles.has(filePath)) return;
+      processedFiles.add(filePath);
+      // Add this file to the flat list
+      flatFiles.push({ path: filePath, content: fileContent });
+      // Find imports in this file
+      const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
+      const codeRegions = findCodeRegions(fileContent);
+      let match: RegExpExecArray | null;
+      while ((match = importRegex.exec(fileContent)) !== null) {
+        const idx = match.index;
+        if (codeRegions.some(([start, end]) => idx >= start && idx < end)) {
+          continue;
         }
-        // Replace the import with a warning comment
-        processedContent = processedContent.replace(
-          match[0],
-          `<!-- Circular import detected: ${importPath} -->`,
-        );
-        continue;
+        const importPath = match[1];
+        if (
+          !validateImportPath(importPath, fileBasePath, [projectRoot || ''])
+        ) {
+          continue;
+        }
+        const fullPath = path.resolve(fileBasePath, importPath);
+        if (processedFiles.has(fullPath)) continue;
+        try {
+          await fs.access(fullPath);
+          const importedContent = await fs.readFile(fullPath, 'utf-8');
+          await processFlat(
+            importedContent,
+            path.dirname(fullPath),
+            fullPath,
+            processedFiles,
+            depth + 1,
+          );
+        } catch {
+          // Ignore failed imports in flat mode
+        }
       }
     }
+    // Start with the root file (current file)
+    const rootPath = importState.currentFile || path.resolve(basePath);
+    const processedFiles = new Set<string>();
+    await processFlat(content, basePath, rootPath, processedFiles, 0);
+    // Concatenate all unique files in order, Claude-style
+    const flatContent = flatFiles
+      .map(
+        (f) =>
+          `--- File: ${f.path} ---\n${f.content.trim()}\n--- End of File: ${f.path} ---`,
+      )
+      .join('\n\n');
+    return {
+      content: flatContent,
+      importTree: { path: rootPath }, // Tree not meaningful in flat mode
+    };
+  }
 
+  // --- TREE FORMAT LOGIC (existing) ---
+  const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
+  const codeRegions = findCodeRegions(content);
+  let result = '';
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const imports: MemoryFile[] = [];
+
+  while ((match = importRegex.exec(content)) !== null) {
+    const idx = match.index;
+    // Add content before this match
+    result += content.substring(lastIndex, idx);
+    lastIndex = importRegex.lastIndex;
+    // Skip if inside a code region
+    if (codeRegions.some(([start, end]) => idx >= start && idx < end)) {
+      result += match[0];
+      continue;
+    }
+    const importPath = match[1];
+    // Validate import path to prevent path traversal attacks
+    if (!validateImportPath(importPath, basePath, [projectRoot || ''])) {
+      result += `<!-- Import failed: ${importPath} - Path traversal attempt -->`;
+      continue;
+    }
+    const fullPath = path.resolve(basePath, importPath);
+    if (importState.processedFiles.has(fullPath)) {
+      result += `<!-- File already processed: ${importPath} -->`;
+      continue;
+    }
     try {
-      // Check if the file exists
       await fs.access(fullPath);
-
-      // Read the imported file content
-      const importedContent = await fs.readFile(fullPath, 'utf-8');
-
-      if (debugMode) {
-        logger.debug(`Successfully read imported file: ${fullPath}`);
-      }
-
-      // Recursively process imports in the imported content
-      const processedImportedContent = await processImports(
-        importedContent,
+      const fileContent = await fs.readFile(fullPath, 'utf-8');
+      // Mark this file as processed for this import chain
+      const newImportState: ImportState = {
+        ...importState,
+        processedFiles: new Set(importState.processedFiles),
+        currentDepth: importState.currentDepth + 1,
+        currentFile: fullPath,
+      };
+      newImportState.processedFiles.add(fullPath);
+      const imported = await processImports(
+        fileContent,
         path.dirname(fullPath),
         debugMode,
-        {
-          ...importState,
-          processedFiles: new Set([...importState.processedFiles, fullPath]),
-          currentDepth: importState.currentDepth + 1,
-          currentFile: fullPath, // Set the current file being processed
-        },
+        newImportState,
+        projectRoot,
+        importFormat,
       );
-
-      // Replace the import statement with the processed content
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Imported from: ${importPath} -->\n${processedImportedContent}\n<!-- End of import from: ${importPath} -->`,
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (debugMode) {
-        logger.error(`Failed to import ${importPath}: ${errorMessage}`);
+      result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
+      imports.push(imported.importTree);
+    } catch (err: unknown) {
+      let message = 'Unknown error';
+      if (hasMessage(err)) {
+        message = err.message;
+      } else if (typeof err === 'string') {
+        message = err;
       }
-
-      // Replace the import with an error comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - ${errorMessage} -->`,
-      );
+      logger.error(`Failed to import ${importPath}: ${message}`);
+      result += `<!-- Import failed: ${importPath} - ${message} -->`;
     }
   }
+  // Add any remaining content after the last match
+  result += content.substring(lastIndex);
 
-  return processedContent;
+  return {
+    content: result,
+    importTree: {
+      path: importState.currentFile || 'unknown',
+      imports: imports.length > 0 ? imports : undefined,
+    },
+  };
 }
 
-/**
- * Validates import paths to ensure they are safe and within allowed directories
- *
- * @param importPath - The import path to validate
- * @param basePath - The base directory for resolving relative paths
- * @param allowedDirectories - Array of allowed directory paths
- * @returns Whether the import path is valid
- */
 export function validateImportPath(
   importPath: string,
   basePath: string,
@@ -209,6 +313,8 @@ export function validateImportPath(
 
   return allowedDirectories.some((allowedDir) => {
     const normalizedAllowedDir = path.resolve(allowedDir);
-    return resolvedPath.startsWith(normalizedAllowedDir);
+    const isSamePath = resolvedPath === normalizedAllowedDir;
+    const isSubPath = resolvedPath.startsWith(normalizedAllowedDir + path.sep);
+    return isSamePath || isSubPath;
   });
 }

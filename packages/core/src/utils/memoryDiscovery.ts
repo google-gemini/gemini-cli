@@ -41,7 +41,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
   while (true) {
     const gitPath = path.join(currentDir, '.git');
     try {
-      const stats = await fs.stat(gitPath);
+      const stats = await fs.lstat(gitPath);
       if (stats.isDirectory()) {
         return currentDir;
       }
@@ -219,6 +219,7 @@ async function getGeminiMdFilePathsInternal(
 async function readGeminiMdFiles(
   filePaths: string[],
   debugMode: boolean,
+  importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<GeminiFileContent[]> {
   const results: GeminiFileContent[] = [];
   for (const filePath of filePaths) {
@@ -226,16 +227,19 @@ async function readGeminiMdFiles(
       const content = await fs.readFile(filePath, 'utf-8');
 
       // Process imports in the content
-      const processedContent = await processImports(
+      const processedResult = await processImports(
         content,
         path.dirname(filePath),
         debugMode,
+        undefined,
+        undefined,
+        importFormat,
       );
 
-      results.push({ filePath, content: processedContent });
+      results.push({ filePath, content: processedResult.content });
       if (debugMode)
         logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
+          `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
         );
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
@@ -282,10 +286,11 @@ export async function loadServerHierarchicalMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
-      `Loading server hierarchical memory for CWD: ${currentWorkingDirectory}`,
+      `Loading server hierarchical memory for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
     );
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
@@ -301,7 +306,11 @@ export async function loadServerHierarchicalMemory(
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
     return { memoryContent: '', fileCount: 0 };
   }
-  const contentsWithPaths = await readGeminiMdFiles(filePaths, debugMode);
+  const contentsWithPaths = await readGeminiMdFiles(
+    filePaths,
+    debugMode,
+    importFormat,
+  );
   // Pass CWD for relative path display in concatenated content
   const combinedInstructions = concatenateInstructions(
     contentsWithPaths,

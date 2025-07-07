@@ -296,6 +296,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         '/path/to/ext3/context1.md',
         '/path/to/ext3/context2.md',
       ],
+      'tree',
     );
   });
 
