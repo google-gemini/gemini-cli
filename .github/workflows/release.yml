@@ -168,6 +168,6 @@ jobs:
           gh issue create \
             --title "Release Failed for ${{ steps.version.outputs.RELEASE_TAG || 'N/A' }} on $(date +'%Y-%m-%d')" \
             --body "The release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "type: bug,release-failure"
+            --label "kind/bug,release-failure"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

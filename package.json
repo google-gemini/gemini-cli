@@ -30,7 +30,7 @@
     "test:integration:sandbox:none": "GEMINI_SANDBOX=false node integration-tests/run-tests.js",
     "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker node integration-tests/run-tests.js",
     "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman node integration-tests/run-tests.js",
-    "test:scripts": "vitest --config ./scripts/tests/vitest.config.ts",
+    "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
     "start": "node scripts/start.js",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",

@@ -21,10 +21,14 @@
       "type": "node",
       "request": "launch",
       "name": "Launch E2E",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "test:e2e", "read_many_files"],
+      "program": "${workspaceFolder}/integration-tests/run-tests.js",
+      "args": ["--verbose", "--keep-output", "list_directory"],
       "skipFiles": ["<node_internals>/**"],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "GEMINI_SANDBOX": "false"
+      }
     },
     {
       "name": "Attach",

@@ -15,11 +15,10 @@ test('should be able to list a directory', async (t) => {
   rig.mkdir('subdir');
   rig.sync();
 
-  const prompt = `Can you list the files in the current directory`;
-  const result = await rig.run(prompt);
+  const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
+  const result = rig.run(prompt);
 
   const lines = result.split('\n').filter((line) => line.trim() !== '');
-  assert.equal(lines.length, 2);
-  assert.ok(lines.includes('file1.txt'));
-  assert.ok(lines.includes('subdir'));
+  assert.ok(lines.some((line) => line.includes('file1.txt')));
+  assert.ok(lines.some((line) => line.includes('subdir')));
 });

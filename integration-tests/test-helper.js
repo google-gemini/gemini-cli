@@ -72,7 +72,7 @@ export class TestRig {
 
     const output = execSync(command, execOptions);
 
-    if (env.KEEP_OUTPUT === 'true') {
+    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
       const testId = `${env.TEST_FILE_NAME.replace(
         '.test.js',
         '',
@@ -87,7 +87,7 @@ export class TestRig {
 
   readFile(fileName) {
     const content = readFileSync(join(this.testDir, fileName), 'utf-8');
-    if (env.KEEP_OUTPUT === 'true') {
+    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
       const testId = `${env.TEST_FILE_NAME.replace(
         '.test.js',
         '',
