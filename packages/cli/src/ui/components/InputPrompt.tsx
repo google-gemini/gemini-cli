@@ -228,14 +228,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Ctrl+A (Home)
-      if (key.ctrl && key.name === 'a') {
-        buffer.move('home');
+      if ((key.ctrl && key.name === 'a') || key.name === 'home') {
         buffer.moveToOffset(0);
         return;
       }
       // Ctrl+E (End)
-      if (key.ctrl && key.name === 'e') {
-        buffer.move('end');
+      if ((key.ctrl && key.name === 'e') || key.name === 'end') {
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
