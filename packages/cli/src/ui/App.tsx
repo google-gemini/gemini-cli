@@ -279,7 +279,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
     setQuittingMessages,

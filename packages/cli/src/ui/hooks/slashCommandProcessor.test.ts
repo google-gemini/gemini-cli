@@ -108,7 +108,6 @@ describe('useSlashCommandProcessor', () => {
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
-  let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
   let mockGeminiClient: GeminiClient;
@@ -140,7 +139,6 @@ describe('useSlashCommandProcessor', () => {
     mockOpenThemeDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
     mockOpenEditorDialog = vi.fn();
-    mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockSetQuittingMessages = vi.fn();
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
@@ -175,7 +173,6 @@ describe('useSlashCommandProcessor', () => {
     (open as Mock).mockClear();
     mockProcessExit.mockClear();
     (ShowMemoryCommandModule.createShowMemoryAction as Mock).mockClear();
-    mockPerformMemoryRefresh.mockClear();
     process.env = { ...globalThis.process.env };
   });
 
@@ -199,7 +196,6 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockOpenAuthDialog,
         mockOpenEditorDialog,
-        mockPerformMemoryRefresh,
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
@@ -310,7 +306,6 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
