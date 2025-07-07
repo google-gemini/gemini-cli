@@ -63,7 +63,7 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Loading...');
-    expect(output).toContain('(esc to cancel, 5.0s)');
+    expect(output).toContain('(esc to cancel, 5s)');
   });
 
   it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
@@ -79,7 +79,7 @@ describe('<LoadingIndicator />', () => {
     expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
-    expect(output).not.toContain(', 10.0s');
+    expect(output).not.toContain(', 10s');
   });
 
   it('should display the currentLoadingPhrase correctly', () => {
@@ -97,13 +97,25 @@ describe('<LoadingIndicator />', () => {
   it('should display the elapsedTime correctly when Responding', () => {
     const props = {
       currentLoadingPhrase: 'Working...',
-      elapsedTime: 8,
+      elapsedTime: 60,
     };
     const { lastFrame } = renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
-    expect(lastFrame()).toContain('(esc to cancel, 8.0s)');
+    expect(lastFrame()).toContain('(esc to cancel, 1m)');
+  });
+
+  it('should display the elapsedTime correctly in human-readable format', () => {
+    const props = {
+      currentLoadingPhrase: 'Working...',
+      elapsedTime: 125,
+    };
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).toContain('(esc to cancel, 2m 5s)');
   });
 
   it('should render rightContent when provided', () => {
@@ -134,7 +146,7 @@ describe('<LoadingIndicator />', () => {
     let output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Now Responding');
-    expect(output).toContain('(esc to cancel, 2.0s)');
+    expect(output).toContain('(esc to cancel, 2s)');
 
     // Transition to WaitingForConfirmation
     rerender(
@@ -149,7 +161,7 @@ describe('<LoadingIndicator />', () => {
     expect(output).toContain('⠏');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
-    expect(output).not.toContain(', 15.0s');
+    expect(output).not.toContain(', 15s');
 
     // Transition back to Idle
     rerender(
