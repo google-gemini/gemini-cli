@@ -200,20 +200,24 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     - **`gemini`** (object): Gemini-specific authentication settings.
       - **`apiKey`** (string): Your API key for the Gemini API.
     - **`vertex`** (object): Vertex AI-specific authentication settings.
-      - **`apiKey`** (string): Your Google Cloud API key.
-      - **`project`** (string): Your Google Cloud Project ID.
-      - **`location`** (string): Your Google Cloud Project Location (e.g., us-central1).
+      - **`apiKey`** (string): Google Cloud API key. Required for using Vertex AI in express mode.
+      - **`project`** (string): Google Cloud Project ID. Required for using Vertex AI in non-express mode.
+      - **`location`** (string): Google Cloud Project Location (e.g., us-central1). Required for using Vertex AI in non-express mode.
+      - **`labels`** (object):  Optional. The [labels](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/projects.locations.endpoints/generateContent#body.request_body.FIELDS.labels) with user-defined metadata for the Vertex AI API requests.
   - **Example:**
-    ```json
-    "selectedAuthType": "oauth", // oauth, gemini, vertex
+    ```jsonc
+    "selectedAuthType": "oauth", // oauth, gemini, or vertex
     "auth": {
-      // for gemini
+      // for 'gemini'
       "gemini": {
         "apiKey": "YOUR_GEMINI_API_KEY"
       },
-      // for vertex
+      // for 'vertex' (express mode)
       "vertex": {
-        "apiKey": "YOUR_GOOGLE_API_KEY",
+        "apiKey": "YOUR_GOOGLE_API_KEY"
+      },
+      // for 'vertex' (non-express mode)
+      "vertex": {
         "project": "YOUR_GCP_PROJECT",
         "location": "VERTEX_AI_LOCATION"
       }
