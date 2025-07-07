@@ -19,7 +19,7 @@ With the Gemini CLI you can:
 
 ## Quickstart
 
-1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
+1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
@@ -130,7 +130,7 @@ Use MCP servers to integrate your local system tools with your enterprise collab
 ```
 
 ```text
-> Organise my PDF invoices by month of expenditure.
+> Organize my PDF invoices by month of expenditure.
 ```
 
 ### Uninstall

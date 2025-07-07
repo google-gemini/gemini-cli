@@ -88,8 +88,10 @@ This section guides contributors on how to build, modify, and understand the dev
 
 **Prerequisites:**
 
-1. Install [Node 18+](https://nodejs.org/en/download)
-2. Git
+1.  **Node.js**:
+    - **Development:** Please use Node.js `~20.19.0`. This specific version is required due to an upstream development dependency issue. You can use a tool like [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
+    - **Production:** For running the CLI in a production environment, any version of Node.js `>=20` is acceptable.
+2.  **Git**
 
 ### Build Process
 
@@ -134,7 +136,7 @@ To start the Gemini CLI from the source code (after building), run the following
 npm start
 ```
 
-If you’d like to run the source build outside of the gemini-cli folder you can utilize `npm link path/to/gemini-cli/packages/cli` (see: [docs](https://docs.npmjs.com/cli/v9/commands/npm-link)) or `alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`
+If you'd like to run the source build outside of the gemini-cli folder you can utilize `npm link path/to/gemini-cli/packages/cli` (see: [docs](https://docs.npmjs.com/cli/v9/commands/npm-link)) or `alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`
 
 ### Running Tests
 
