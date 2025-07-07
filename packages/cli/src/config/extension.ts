@@ -114,3 +114,49 @@ function getContextFileNames(config: ExtensionConfig): string[] {
   }
   return config.contextFileName;
 }
+
+export function filterActiveExtensions(
+  extensions: Extension[],
+  enabledExtensions: string[],
+): Extension[] {
+  const lowerCaseEnabledExtensions = enabledExtensions.map((e) =>
+    e.toLowerCase(),
+  );
+  const activeExtensions =
+    enabledExtensions.length > 0
+      ? extensions.filter((e) =>
+          lowerCaseEnabledExtensions.includes(e.config.name.toLowerCase()),
+        )
+      : extensions;
+
+  if (enabledExtensions.length > 0) {
+    if (
+      lowerCaseEnabledExtensions.length === 1 &&
+      lowerCaseEnabledExtensions[0] === 'none'
+    ) {
+      activeExtensions.length = 0;
+    } else {
+      const activeNames = new Set(
+        activeExtensions.map((e) => e.config.name.toLowerCase()),
+      );
+      for (const requestedExtension of lowerCaseEnabledExtensions) {
+        if (!activeNames.has(requestedExtension)) {
+          throw new Error(`Extension not found: ${requestedExtension}`);
+        }
+      }
+    }
+
+    const activeNames = new Set(
+      activeExtensions.map((e) => e.config.name.toLowerCase()),
+    );
+    for (const extension of extensions) {
+      const status = activeNames.has(extension.config.name.toLowerCase())
+        ? 'Activated'
+        : 'Disabled';
+      console.log(
+        `${status} extension: ${extension.config.name} (version: ${extension.config.version})`,
+      );
+    }
+  }
+  return activeExtensions;
+}

@@ -20,7 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension } from './extension.js';
+import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
@@ -188,47 +188,14 @@ export async function loadCliConfig(
   const debugMode = argv.debug || false;
 
   const enabledExtensions =
-    argv.extensions?.split(',').map((e) => e.trim().toLowerCase()) || [];
+    argv.extensions?.split(',').map((e) => e.trim()) || [];
 
-  const activeExtensions =
-    enabledExtensions.length > 0
-      ? extensions.filter((e) =>
-          enabledExtensions.includes(e.config.name.toLowerCase()),
-        )
-      : extensions;
-
-  if (argv.extensions) {
-    const lowerCaseEnabledExtensions = enabledExtensions.map((e) =>
-      e.toLowerCase(),
-    );
-    if (
-      lowerCaseEnabledExtensions.length === 1 &&
-      lowerCaseEnabledExtensions[0] === 'none'
-    ) {
-      activeExtensions.length = 0;
-    } else {
-      const activeNames = new Set(
-        activeExtensions.map((e) => e.config.name.toLowerCase()),
-      );
-      for (const requestedExtension of lowerCaseEnabledExtensions) {
-        if (!activeNames.has(requestedExtension)) {
-          console.error(`Extension not found: ${requestedExtension}`);
-          process.exit(1);
-        }
-      }
-    }
-
-    const activeNames = new Set(
-      activeExtensions.map((e) => e.config.name.toLowerCase()),
-    );
-    for (const extension of extensions) {
-      const status = activeNames.has(extension.config.name.toLowerCase())
-        ? 'Activated'
-        : 'Disabled';
-      console.log(
-        `${status} extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
-    }
+  let activeExtensions;
+  try {
+    activeExtensions = filterActiveExtensions(extensions, enabledExtensions);
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(1);
   }
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
