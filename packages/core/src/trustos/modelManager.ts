@@ -67,7 +67,7 @@ export class TrustModelManagerImpl implements TrustModelManager {
         trustScore: 9.2,
         downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/blob/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
         verificationHash: 'sha256:pending',
-        expectedSize: 1800000000 // ~1.8GB
+        expectedSize: 1900000000 // ~1.9GB
       },
       {
         name: 'qwen2.5-1.5b-instruct',
