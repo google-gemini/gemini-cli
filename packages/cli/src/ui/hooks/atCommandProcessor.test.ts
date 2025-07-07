@@ -583,7 +583,8 @@ describe('handleAtCommand', () => {
 
       // Mock the file discovery service to report this file as git-ignored
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
-        (path: string, options?: any) => path === gitIgnoredFile && options?.respectGitIgnore !== false,
+        (path: string, options?: any) =>
+          path === gitIgnoredFile && options?.respectGitIgnore !== false,
       );
 
       const result = await handleAtCommand({
@@ -655,7 +656,8 @@ describe('handleAtCommand', () => {
       const fileContent = '# Project README';
 
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
-        (path: string, options?: any) => path === gitIgnoredFile && options?.respectGitIgnore !== false,
+        (path: string, options?: any) =>
+          path === gitIgnoredFile && options?.respectGitIgnore !== false,
       );
       mockReadManyFilesExecute.mockResolvedValue({
         llmContent: [`--- ${validFile} ---\n\n${fileContent}\n\n`],

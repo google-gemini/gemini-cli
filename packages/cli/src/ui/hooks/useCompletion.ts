@@ -218,7 +218,10 @@ export function useCompletion(
       startDir: string,
       searchPrefix: string,
       fileDiscovery: FileDiscoveryService | null,
-      filterOptions: { respectGitIgnore?: boolean; respectGeminiIgnore?: boolean },
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       currentRelativePath = '',
       depth = 0,
       maxDepth = 10, // Limit recursion depth
@@ -247,7 +250,10 @@ export function useCompletion(
           }
 
           // Check if this entry should be ignored by filtering options
-          if (fileDiscovery && fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)) {
+          if (
+            fileDiscovery &&
+            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
+          ) {
             continue;
           }
 
@@ -289,7 +295,10 @@ export function useCompletion(
     const findFilesWithGlob = async (
       searchPrefix: string,
       fileDiscoveryService: FileDiscoveryService,
-      filterOptions: { respectGitIgnore?: boolean; respectGeminiIgnore?: boolean },
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       maxResults = 50,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
@@ -309,7 +318,10 @@ export function useCompletion(
         })
         .filter((s) => {
           if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(s.label, filterOptions); // relative path
+            return !fileDiscoveryService.shouldIgnoreFile(
+              s.label,
+              filterOptions,
+            ); // relative path
           }
           return true;
         })
