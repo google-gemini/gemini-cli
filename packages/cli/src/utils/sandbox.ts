@@ -187,7 +187,7 @@ export async function start_sandbox(
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
-      console.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
+      console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
       process.exit(1);
     }
     const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
