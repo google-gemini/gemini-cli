@@ -30,6 +30,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
@@ -451,6 +452,20 @@ export class Config {
       await this.gitService.initialize();
     }
     return this.gitService;
+  }
+
+  async refreshMemory(): Promise<{ memoryContent: string; fileCount: number }> {
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      this.getWorkingDir(),
+      this.getDebugMode(),
+      this.getFileService(),
+      this.getExtensionContextFilePaths(),
+    );
+
+    this.setUserMemory(memoryContent);
+    this.setGeminiMdFileCount(fileCount);
+
+    return { memoryContent, fileCount };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
