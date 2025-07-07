@@ -48,7 +48,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
-  allowed_mcp_server_names: string | undefined;
+  'allowed-mcp-server-names': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -124,7 +124,7 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
-    .option('allowed_mcp_server_names', {
+    .option('allowed-mcp-server-names', {
       type: 'string',
       description: 'Allowed MCP server names',
     })
@@ -194,9 +194,9 @@ export async function loadCliConfig(
   let mcpServers = mergeMcpServers(settings, extensions);
   const excludeTools = mergeExcludeTools(settings, extensions);
 
-  if (argv.allowed_mcp_server_names) {
+  if (argv['allowed-mcp-server-names']) {
     const allowedNames = new Set(
-      argv.allowed_mcp_server_names.split(',').filter(Boolean),
+      argv['allowed-mcp-server-names'].split(',').filter(Boolean),
     );
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
