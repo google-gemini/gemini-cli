@@ -479,7 +479,7 @@ describe('mergeExcludeTools', () => {
   });
 });
 
-describe('loadCliConfig with allowed_mcp_server_names', () => {
+describe('loadCliConfig with allowed-mcp-server-names', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
@@ -513,7 +513,7 @@ describe('loadCliConfig with allowed_mcp_server_names', () => {
     process.argv = [
       'node',
       'script.js',
-      '--allowed_mcp_server_names',
+      '--allowed-mcp-server-names',
       'server1',
     ];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
@@ -526,7 +526,7 @@ describe('loadCliConfig with allowed_mcp_server_names', () => {
     process.argv = [
       'node',
       'script.js',
-      '--allowed_mcp_server_names',
+      '--allowed-mcp-server-names',
       'server1,server3',
     ];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
@@ -540,7 +540,7 @@ describe('loadCliConfig with allowed_mcp_server_names', () => {
     process.argv = [
       'node',
       'script.js',
-      '--allowed_mcp_server_names',
+      '--allowed-mcp-server-names',
       'server1,server4',
     ];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
@@ -550,7 +550,7 @@ describe('loadCliConfig with allowed_mcp_server_names', () => {
   });
 
   it('should allow all MCP servers if the flag is an empty string', async () => {
-    process.argv = ['node', 'script.js', '--allowed_mcp_server_names', ''];
+    process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
     expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
   });
