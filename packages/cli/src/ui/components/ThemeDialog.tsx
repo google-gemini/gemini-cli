@@ -146,7 +146,7 @@ export function ThemeDialog({
   }
 
   // Don't focus the scope selection if it is hidden due to height constraints.
-  const currenFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
+  const currentFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
 
   // Vertical space taken by elements other than the two code blocks in the preview pane.
   // Includes "Preview" title, borders, and margin between blocks.
@@ -179,8 +179,8 @@ export function ThemeDialog({
       <Box flexDirection="row">
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={currenFocusedSection === 'theme'} wrap="truncate">
-            {currenFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
+            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
@@ -189,21 +189,21 @@ export function ThemeDialog({
             initialIndex={initialThemeIndex}
             onSelect={handleThemeSelect}
             onHighlight={onHighlight}
-            isFocused={currenFocusedSection === 'theme'}
+            isFocused={currentFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
-              <Text bold={currenFocusedSection === 'scope'} wrap="truncate">
-                {currenFocusedSection === 'scope' ? '> ' : '  '}Apply To
+              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
+                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
                 initialIndex={0} // Default to User Settings
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
-                isFocused={currenFocusedSection === 'scope'}
+                isFocused={currentFocusedSection === 'scope'}
               />
             </Box>
           )}
