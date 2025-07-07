@@ -18,6 +18,7 @@ export class TrustNodeLlamaClient implements TrustModelClient {
   private model: any = null;
   private context: any = null;
   private currentModelConfig: TrustModelConfig | null = null;
+  private reusableSession: LlamaChatSession | null = null;
   private metrics: ModelMetrics = {
     tokensPerSecond: 0,
     memoryUsage: 0,
@@ -71,6 +72,10 @@ export class TrustNodeLlamaClient implements TrustModelClient {
 
   async unloadModel(): Promise<void> {
     try {
+      if (this.reusableSession) {
+        await this.reusableSession.dispose();
+        this.reusableSession = null;
+      }
       if (this.context) {
         await this.context.dispose();
         this.context = null;
@@ -95,9 +100,18 @@ export class TrustNodeLlamaClient implements TrustModelClient {
       throw new Error('Model not loaded');
     }
     
-    return new LlamaChatSession({
+    // Try reusing existing session first
+    if (this.reusableSession) {
+      console.log('🔄 Reusing existing chat session...');
+      return this.reusableSession;
+    }
+    
+    console.log('🆕 Creating new chat session...');
+    this.reusableSession = new LlamaChatSession({
       contextSequence: this.context.getSequence()
     });
+    
+    return this.reusableSession;
   }
 
   async generateText(prompt: string, options?: GenerationOptions): Promise<string> {
@@ -106,10 +120,9 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     }
 
     const startTime = Date.now();
-    let session: LlamaChatSession | null = null;
     
     try {
-      session = await this.createChatSession();
+      const session = await this.createChatSession();
       const response = await session.prompt(prompt, {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
@@ -124,15 +137,6 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     } catch (error) {
       console.error('Error generating text:', error);
       throw new Error(`Text generation failed: ${error}`);
-    } finally {
-      // Properly dispose of the session to free the sequence
-      if (session) {
-        try {
-          await session.dispose();
-        } catch (disposeError) {
-          console.warn('Warning: Failed to dispose chat session:', disposeError);
-        }
-      }
     }
   }
 
@@ -143,10 +147,9 @@ export class TrustNodeLlamaClient implements TrustModelClient {
 
     const startTime = Date.now();
     let totalTokens = 0;
-    let session: LlamaChatSession | null = null;
     
     try {
-      session = await this.createChatSession();
+      const session = await this.createChatSession();
       const response = await session.prompt(prompt, {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
@@ -165,15 +168,6 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     } catch (error) {
       console.error('Error generating stream:', error);
       throw new Error(`Stream generation failed: ${error}`);
-    } finally {
-      // Properly dispose of the session to free the sequence
-      if (session) {
-        try {
-          await session.dispose();
-        } catch (disposeError) {
-          console.warn('Warning: Failed to dispose chat session:', disposeError);
-        }
-      }
     }
   }
 
