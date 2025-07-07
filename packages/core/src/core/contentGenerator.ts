@@ -57,7 +57,7 @@ export async function createContentGeneratorConfig(
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
 
-  // Use runtime model from config if available; otherwise, fallback to parameter or default
+  // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = model || DEFAULT_GEMINI_MODEL;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
