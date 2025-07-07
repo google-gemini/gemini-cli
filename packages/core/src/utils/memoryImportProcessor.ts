@@ -130,6 +130,7 @@ function findCodeRegions(content: string): Array<[number, number]> {
  * @param debugMode - Whether to enable debug logging
  * @param importState - State tracking for circular import prevention
  * @param projectRoot - The project root directory for allowed directories
+ * @param importFormat - The format of the import tree
  * @returns Processed content with imports resolved and import tree
  */
 export async function processImports(
@@ -142,6 +143,7 @@ export async function processImports(
     currentDepth: 0,
   },
   projectRoot?: string,
+  importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<ProcessImportsResult> {
   if (!projectRoot) {
     projectRoot = await findProjectRoot(basePath);
@@ -159,6 +161,72 @@ export async function processImports(
     };
   }
 
+  // --- FLAT FORMAT LOGIC ---
+  if (importFormat === 'flat') {
+    // Use a queue to process files in order of first encounter, and a set to avoid duplicates
+    const flatFiles: Array<{ path: string; content: string }> = [];
+    // Helper to recursively process imports
+    async function processFlat(
+      fileContent: string,
+      fileBasePath: string,
+      filePath: string,
+      processedFiles: Set<string>,
+      depth: number,
+    ) {
+      if (processedFiles.has(filePath)) return;
+      processedFiles.add(filePath);
+      // Add this file to the flat list
+      flatFiles.push({ path: filePath, content: fileContent });
+      // Find imports in this file
+      const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
+      const codeRegions = findCodeRegions(fileContent);
+      let match: RegExpExecArray | null;
+      while ((match = importRegex.exec(fileContent)) !== null) {
+        const idx = match.index;
+        if (codeRegions.some(([start, end]) => idx >= start && idx < end)) {
+          continue;
+        }
+        const importPath = match[1];
+        if (
+          !validateImportPath(importPath, fileBasePath, [projectRoot || ''])
+        ) {
+          continue;
+        }
+        const fullPath = path.resolve(fileBasePath, importPath);
+        if (processedFiles.has(fullPath)) continue;
+        try {
+          await fs.access(fullPath);
+          const importedContent = await fs.readFile(fullPath, 'utf-8');
+          await processFlat(
+            importedContent,
+            path.dirname(fullPath),
+            fullPath,
+            processedFiles,
+            depth + 1,
+          );
+        } catch {
+          // Ignore failed imports in flat mode
+        }
+      }
+    }
+    // Start with the root file (current file)
+    const rootPath = importState.currentFile || path.resolve(basePath);
+    const processedFiles = new Set<string>();
+    await processFlat(content, basePath, rootPath, processedFiles, 0);
+    // Concatenate all unique files in order, Claude-style
+    const flatContent = flatFiles
+      .map(
+        (f) =>
+          `--- File: ${f.path} ---\n${f.content.trim()}\n--- End of File: ${f.path} ---`,
+      )
+      .join('\n\n');
+    return {
+      content: flatContent,
+      importTree: { path: rootPath }, // Tree not meaningful in flat mode
+    };
+  }
+
+  // --- TREE FORMAT LOGIC (existing) ---
   const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
   const codeRegions = findCodeRegions(content);
   let result = '';
@@ -204,6 +272,7 @@ export async function processImports(
         debugMode,
         newImportState,
         projectRoot,
+        importFormat,
       );
       result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
       imports.push(imported.importTree);

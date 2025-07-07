@@ -360,6 +360,102 @@ describe('memoryImportProcessor', () => {
       );
       expect(result.importTree.imports![1].imports).toBeUndefined();
     });
+
+    it('should produce flat output in Claude-style with unique files in order', async () => {
+      const content = 'Main @./nested.md content @./simple.md';
+      const basePath = '/test/project/src';
+      const nestedContent = 'Nested @./inner.md content';
+      const simpleContent = 'Simple content';
+      const innerContent = 'Inner content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(nestedContent)
+        .mockResolvedValueOnce(simpleContent)
+        .mockResolvedValueOnce(innerContent);
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+        'flat',
+      );
+
+      // Should contain all files, each only once, in order of first encounter
+      expect(result.content).toContain('--- File: /test/project/src ---');
+      expect(result.content).toContain(
+        '--- File: /test/project/src/nested.md ---',
+      );
+      expect(result.content).toContain(
+        '--- File: /test/project/src/simple.md ---',
+      );
+      expect(result.content).toContain(
+        '--- File: /test/project/src/inner.md ---',
+      );
+      // Should not contain duplicate file blocks
+      expect(result.content.match(/--- File:/g)?.length).toBe(4);
+      // Should contain the content of each file
+      expect(result.content).toContain(
+        'Main @./nested.md content @./simple.md',
+      );
+      expect(result.content).toContain('Nested @./inner.md content');
+      expect(result.content).toContain('Simple content');
+      expect(result.content).toContain('Inner content');
+      // Should use Claude-style markers
+      expect(result.content).toContain(
+        '--- End of File: /test/project/src/inner.md ---',
+      );
+    });
+
+    it('should not duplicate files in flat output if imported multiple times', async () => {
+      const content = 'Main @./dup.md again @./dup.md';
+      const basePath = '/test/project/src';
+      const dupContent = 'Duplicated content';
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(dupContent);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+        'flat',
+      );
+      // Only one file block for dup.md
+      expect(
+        result.content.match(/--- File: \/test\/project\/src\/dup.md ---/g)
+          ?.length,
+      ).toBe(1);
+      expect(result.content).toContain('Duplicated content');
+    });
+
+    it('should handle nested imports in flat output', async () => {
+      const content = 'Root @./a.md';
+      const basePath = '/test/project/src';
+      const aContent = 'A @./b.md';
+      const bContent = 'B content';
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile
+        .mockResolvedValueOnce(aContent)
+        .mockResolvedValueOnce(bContent);
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        '/test/project',
+        'flat',
+      );
+      // Should contain all files in order: root, a.md, b.md
+      expect(result.content).toMatch(
+        /--- File: \/test\/project\/src ---[\s\S]*--- File: \/test\/project\/src\/a.md ---[\s\S]*--- File: \/test\/project\/src\/b.md ---/,
+      );
+      expect(result.content).toContain('Root @./a.md');
+      expect(result.content).toContain('A @./b.md');
+      expect(result.content).toContain('B content');
+    });
   });
 
   describe('validateImportPath', () => {

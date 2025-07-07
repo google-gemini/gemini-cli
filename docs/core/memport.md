@@ -110,7 +110,7 @@ The import processor uses the `marked` library to detect code blocks and inline 
 
 ## Import Tree Structure
 
-The processor now returns an import tree that shows the hierarchy of imported files, similar to Claude's `/memory` feature. This helps users debug problems with their GEMINI.md files by showing which files were read and their import relationships.
+The processor returns an import tree that shows the hierarchy of imported files, similar to Claude's `/memory` feature. This helps users debug problems with their GEMINI.md files by showing which files were read and their import relationships.
 
 Example tree structure:
 
@@ -128,14 +128,11 @@ Memory Files
 
 The tree preserves the order that files were imported and shows the complete import chain for debugging purposes.
 
-## Comparison to Claude's `/memory` (`claude.md`) Approach
+## Comparison to Claude Code's `/memory` (`claude.md`) Approach
 
-Claude's `/memory` feature (as seen in `claude.md`) produces a flat, linear document by concatenating all included files, sometimes with simple comments marking file boundaries. It does **not** track or expose the import hierarchy.
+Claude Code's `/memory` feature (as seen in `claude.md`) produces a flat, linear document by concatenating all included files, always marking file boundaries with clear comments and path names. It does not explicitly present the import hierarchy, but the LLM receives all file contents and paths, which is sufficient for reconstructing the hierarchy if needed.
 
-**This implementation is inspired by Claude's approach, but adds:**
-- A hierarchical import tree, showing which files were included and in what order.
-- More robust code region detection using the `marked` library.
-- Enhanced debugging and transparency for complex import chains.
+Note: The import tree is mainly for clarity during development and has limited relevance to LLM consumption.
 
 ## API Reference
 
