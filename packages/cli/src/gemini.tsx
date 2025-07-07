@@ -115,15 +115,7 @@ export async function main() {
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  // Initialize centralized FileDiscoveryService
-  config.getFileService();
-  if (config.getCheckpointingEnabled()) {
-    try {
-      await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
-    }
-  }
+  await config.initialize();
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -133,12 +125,11 @@ export async function main() {
     }
   }
 
-  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
-    ? getNodeMemoryArgs(config)
-    : [];
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
+    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+      ? getNodeMemoryArgs(config)
+      : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (settings.merged.selectedAuthType) {
