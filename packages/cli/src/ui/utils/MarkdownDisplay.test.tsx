@@ -232,6 +232,53 @@ But there's no separator line
       const { lastFrame } = renderNarrow();
       expect(lastFrame()).not.toBe('');
     });
+
+    it('should handle inline markdown in tables', () => {
+      // Test content from MarkdownDisplay.demo.tsx
+      const testContent = `
+# execSync vs spawn
+
+| Characteristic | \`execSync\` (Old Way) | \`spawn\` (New Way in PR) |
+|----------------|------------------------|---------------------------|
+| **Execution** | Synchronous (blocks everything) | Asynchronous (non-blocking) |
+| **I/O Handling** | Buffers entire output in memory | Streams data in chunks (memory efficient) |
+| **Security** | **Vulnerable to shell injection** | **Safe from shell injection** |
+| **Use Case** | Simple, quick commands with small, trusted... | Long-running processes, large I/O, and especially for running user-configur... |
+
+`;
+
+      const { lastFrame } = render(
+        <MarkdownDisplay
+          text={testContent}
+          isPending={false}
+          terminalWidth={120}
+        />,
+      );
+
+      const output = lastFrame();
+
+      // Check header
+      expect(output).toContain('execSync vs spawn');
+
+      // Check table headers - handle possible truncation
+      expect(output).toMatch(/Cha(racteristic)?/); // Match "Cha" or "Characteristic"
+      expect(output).toContain('execSync');
+      expect(output).toContain('spawn');
+
+      // Check table content - test keywords rather than full sentences
+      expect(output).toMatch(/Exe(cution)?/); // Match "Exe" or "Execution"
+      expect(output).toContain('Synchronous');
+      expect(output).toContain('Asynchronous');
+      expect(output).toMatch(/I\/O|Handling/); // Match "I/O" or "Handling"
+      expect(output).toContain('Buffers');
+      expect(output).toContain('Streams');
+      expect(output).toMatch(/Sec(urity)?/); // Match "Sec" or "Security"
+      expect(output).toContain('Vulnerable');
+      expect(output).toContain('Safe');
+      expect(output).toMatch(/Use|Case/); // Match "Use" or "Case"
+      expect(output).toContain('Simple');
+      expect(output).toContain('Long-running');
+    });
   });
 
   describe('Existing Functionality', () => {
