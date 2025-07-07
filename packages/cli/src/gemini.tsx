@@ -16,7 +16,6 @@ import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
-  loadEnvironment,
   loadSettings,
   SettingScope,
   USER_SETTINGS_PATH,
@@ -85,7 +84,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 export async function main() {
-  loadEnvironment();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 

@@ -215,6 +215,7 @@ export function loadEnvironment(): void {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
+  loadEnvironment();
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
