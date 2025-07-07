@@ -566,6 +566,83 @@ describe('Settings Loading and Merging', () => {
       delete process.env.MY_ENV_STRING_NESTED;
     });
 
+    it('should add an error if user settings contain invalid keys', () => {
+      const userSettingsContent = {
+        theme: 'dark',
+        invalidKey: 'someValue',
+        anotherInvalidKey: true,
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors.length).toBe(1);
+      expect(settings.errors[0].path).toBe(USER_SETTINGS_PATH);
+      expect(settings.errors[0].message).toContain('invalidKey');
+      expect(settings.errors[0].message).toContain('anotherInvalidKey');
+    });
+
+    it('should add an error if workspace settings contain invalid keys', () => {
+      const workspaceSettingsContent = {
+        sandbox: true,
+        badKey: 'foo',
+        worseKey: 123,
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors.length).toBe(1);
+      expect(settings.errors[0].path).toBe(MOCK_WORKSPACE_SETTINGS_PATH);
+      expect(settings.errors[0].message).toContain('badKey');
+      expect(settings.errors[0].message).toContain('worseKey');
+    });
+
+    it('should add errors for both user and workspace settings if both have invalid keys', () => {
+      const userSettingsContent = { invalidUserKey: 'a' };
+      const workspaceSettingsContent = { invalidWorkspaceKey: 'b' };
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors.length).toBe(2);
+      const userError = settings.errors.find(
+        (e) => e.path === USER_SETTINGS_PATH,
+      );
+      const workspaceError = settings.errors.find(
+        (e) => e.path === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      expect(userError?.message).toContain('invalidUserKey');
+      expect(workspaceError?.message).toContain('invalidWorkspaceKey');
+    });
+
     it('should resolve multiple concatenated environment variables in a single string value', () => {
       process.env.TEST_HOST = 'myhost';
       process.env.TEST_PORT = '9090';
