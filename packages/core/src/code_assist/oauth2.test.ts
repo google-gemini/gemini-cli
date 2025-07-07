@@ -214,16 +214,14 @@ describe('oauth2', () => {
       expect(mockGetAccessToken).toHaveBeenCalled();
     });
 
-    it('should cache the credentials after fetching them via ADC', async () => {
+    it('should not cache the credentials after fetching them via ADC', async () => {
       const newCredentials = { refresh_token: 'new-adc-token' };
       mockComputeClient.credentials = newCredentials;
+      mockGetAccessToken.mockResolvedValue({ token: 'new-adc-token' });
 
       await getOauthClient();
 
-      expect(fs.promises.writeFile).toHaveBeenCalledWith(
-        '/user/home/.gemini/oauth_creds.json',
-        JSON.stringify(newCredentials, null, 2),
-      );
+      expect(fs.promises.writeFile).not.toHaveBeenCalled();
     });
 
     it('should return the Compute client on successful ADC authentication', async () => {
@@ -236,7 +234,7 @@ describe('oauth2', () => {
       mockGetAccessToken.mockRejectedValue(testError);
 
       await expect(getOauthClient()).rejects.toThrow(
-        'Could not authenticate with Application Default Credentials. Please ensure you are in a properly configured environment. Error: ADC Failed',
+        'Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
       );
     });
   });

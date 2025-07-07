@@ -82,14 +82,11 @@ export async function getOauthClient(): Promise<OAuth2Client> {
   }
 
   // In Google Cloud Shell, we can use Application Default Credentials (ADC)
-  // provided via its metadata server to authenticate non-interactively using 
+  // provided via its metadata server to authenticate non-interactively using
   // the identity of the user logged into Cloud Shell.
   if (process.env.CLOUD_SHELL === 'true') {
     try {
-      // If no cached credentials, use ADC.
-      console.log(
-        'Attempting to authenticate via GCP VM\'s Application Default Credentials.',
-      );
+      console.log("Attempting to authenticate via Cloud Shell VM's ADC.");
       const computeClient = new Compute({
         // We can leave this empty, since the metadata server will provide
         // the service account email.
@@ -101,7 +98,7 @@ export async function getOauthClient(): Promise<OAuth2Client> {
       return computeClient;
     } catch (e) {
       throw new Error(
-        `Could not authenticate with Application Default Credentials. Please ensure you are in a properly configured environment. Error: ${getErrorMessage(
+        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
           e,
         )}`,
       );
