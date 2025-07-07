@@ -307,26 +307,25 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should submit the current text on Enter, even if suggestions are active', async () => {
+  it('should autocomplete on Enter when suggestions are active, without submitting', async () => {
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'memory', value: 'memory' }],
       activeSuggestionIndex: 0,
     });
-    props.buffer.setText('/mem'); // The current text is '/mem'
+    props.buffer.setText('/mem');
 
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\r'); // Press Enter
+    stdin.write('\r');
     await wait();
 
-    // Enter's job is to submit, NOT to autocomplete.
-    expect(props.buffer.setText).not.toHaveBeenCalledWith('/memory ');
+    // The app should autocomplete the text, NOT submit.
+    expect(props.buffer.setText).toHaveBeenCalledWith('/memory ');
 
-    // It should submit exactly what was in the buffer.
-    expect(props.onSubmit).toHaveBeenCalledWith('/mem');
+    expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -367,6 +366,44 @@ describe('InputPrompt', () => {
     stdin.write('\r'); // Press Enter
     await wait();
 
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should submit directly on Enter when a complete leaf command is typed', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: false,
+    });
+    props.buffer.setText('/clear');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).toHaveBeenCalledWith('/clear');
+    expect(props.buffer.setText).not.toHaveBeenCalledWith('/clear ');
+    unmount();
+  });
+
+  it('should autocomplete an @-path on Enter without submitting', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'index.ts', value: 'index.ts' }],
+      activeSuggestionIndex: 0,
+    });
+    props.buffer.setText('@src/components/');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });

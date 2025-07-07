@@ -13,7 +13,6 @@ import { TextBuffer } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
-import process from 'node:process';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
@@ -184,12 +183,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (!focus) {
         return;
       }
-      const query = buffer.text;
 
-      if (key.sequence === '!' && query === '' && !completion.showSuggestions) {
+      if (
+        key.sequence === '!' &&
+        buffer.text === '' &&
+        !completion.showSuggestions
+      ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
-        return true;
+        return;
+      }
+
+      if (key.name === 'escape') {
+        if (shellModeActive) {
+          setShellModeActive(false);
+          return;
+        }
+
+        if (completion.showSuggestions) {
+          completion.resetCompletionState();
+          return;
+        }
+      }
+
+      if (key.ctrl && key.name === 'l') {
+        onClearScreen();
+        return;
       }
 
       if (completion.showSuggestions) {
@@ -201,11 +220,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.navigateDown();
           return;
         }
-        if (key.name === 'tab') {
+
+        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
-                ? 0 // Default to the first suggestion if none is active
+                ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
               handleAutocomplete(targetIndex);
@@ -214,58 +234,71 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
       } else {
-        // Keybindings when suggestions are not shown
-        if (key.ctrl && key.name === 'l') {
-          onClearScreen();
-          return;
-        }
-        if (key.ctrl && key.name === 'p') {
-          inputHistory.navigateUp();
-          return;
-        }
-        if (key.ctrl && key.name === 'n') {
-          inputHistory.navigateDown();
-          return;
-        }
-        if (key.name === 'escape') {
-          if (shellModeActive) {
-            setShellModeActive(false);
+        if (!shellModeActive) {
+          if (key.ctrl && key.name === 'p') {
+            inputHistory.navigateUp();
             return;
           }
-          completion.resetCompletionState();
+          if (key.ctrl && key.name === 'n') {
+            inputHistory.navigateDown();
+            return;
+          }
+          // Handle arrow-up/down for history on single-line or at edges
+          if (
+            key.name === 'up' &&
+            (buffer.allVisualLines.length === 1 ||
+              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+          ) {
+            inputHistory.navigateUp();
+            return;
+          }
+          if (
+            key.name === 'down' &&
+            (buffer.allVisualLines.length === 1 ||
+              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+          ) {
+            inputHistory.navigateDown();
+            return;
+          }
+        } else {
+          // Shell History Navigation
+          if (key.name === 'up') {
+            const prevCommand = shellHistory.getPreviousCommand();
+            if (prevCommand !== null) buffer.setText(prevCommand);
+            return;
+          }
+          if (key.name === 'down') {
+            const nextCommand = shellHistory.getNextCommand();
+            if (nextCommand !== null) buffer.setText(nextCommand);
+            return;
+          }
+        }
+
+        if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+          if (buffer.text.trim()) {
+            handleSubmitAndClear(buffer.text);
+          }
           return;
         }
       }
 
-      // Ctrl+A (Home)
-      if (key.ctrl && key.name === 'a') {
-        buffer.move('home');
-        buffer.moveToOffset(0);
-        return;
-      }
-      // Ctrl+E (End)
-      if (key.ctrl && key.name === 'e') {
-        buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
-        return;
-      }
-      // Ctrl+L (Clear Screen)
-      if (key.ctrl && key.name === 'l') {
-        onClearScreen();
-        return;
-      }
-      // Ctrl+P (History Up)
-      if (key.ctrl && key.name === 'p' && !completion.showSuggestions) {
-        inputHistory.navigateUp();
-        return;
-      }
-      // Ctrl+N (History Down)
-      if (key.ctrl && key.name === 'n' && !completion.showSuggestions) {
-        inputHistory.navigateDown();
+      // Newline insertion
+      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+        buffer.newline();
         return;
       }
 
-      // Core text editing from MultilineTextEditor's useInput
+      // Ctrl+A (Home) / Ctrl+E (End)
+      if (key.ctrl && key.name === 'a') {
+        buffer.move('home');
+        return;
+      }
+      if (key.ctrl && key.name === 'e') {
+        buffer.move('end');
+        return;
+      }
+
+      // Kill line commands
       if (key.ctrl && key.name === 'k') {
         buffer.killLineRight();
         return;
@@ -274,97 +307,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.killLineLeft();
         return;
       }
-      const isCtrlX =
-        (key.ctrl && (key.name === 'x' || key.sequence === '\x18')) ||
-        key.sequence === '\x18';
-      const isCtrlEFromEditor =
-        (key.ctrl && (key.name === 'e' || key.sequence === '\x05')) ||
-        key.sequence === '\x05' ||
-        (!key.ctrl &&
-          key.name === 'e' &&
-          key.sequence.length === 1 &&
-          key.sequence.charCodeAt(0) === 5);
 
-      if (isCtrlX || isCtrlEFromEditor) {
-        if (isCtrlEFromEditor && !(key.ctrl && key.name === 'e')) {
-          // Avoid double handling Ctrl+E
-          buffer.openInExternalEditor();
-          return;
-        }
-        if (isCtrlX) {
-          buffer.openInExternalEditor();
-          return;
-        }
-      }
-
-      if (
-        process.env['TEXTBUFFER_DEBUG'] === '1' ||
-        process.env['TEXTBUFFER_DEBUG'] === 'true'
-      ) {
-        console.log('[InputPromptCombined] event', { key });
-      }
-
-      // Ctrl+Enter for newline, Enter for submit
-      if (key.name === 'return') {
-        const [row, col] = buffer.cursor;
-        const line = buffer.lines[row];
-        const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-        if (key.ctrl || key.meta || charBefore === '\\' || key.paste) {
-          // Ctrl+Enter or escaped newline
-          if (charBefore === '\\') {
-            buffer.backspace();
-          }
-          buffer.newline();
-        } else {
-          // Enter for submit
-          if (query.trim()) {
-            handleSubmitAndClear(query);
-          }
-        }
+      // External editor
+      const isCtrlX = key.ctrl && (key.name === 'x' || key.sequence === '\x18');
+      if (isCtrlX) {
+        buffer.openInExternalEditor();
         return;
       }
 
-      // Standard arrow navigation within the buffer
-      if (key.name === 'up' && !completion.showSuggestions) {
-        if (shellModeActive) {
-          const prevCommand = shellHistory.getPreviousCommand();
-          if (prevCommand !== null) {
-            buffer.setText(prevCommand);
-          }
-          return;
-        }
-        if (
-          (buffer.allVisualLines.length === 1 || // Always navigate for single line
-            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0)) &&
-          inputHistory.navigateUp
-        ) {
-          inputHistory.navigateUp();
-        } else {
-          buffer.move('up');
-        }
-        return;
-      }
-      if (key.name === 'down' && !completion.showSuggestions) {
-        if (shellModeActive) {
-          const nextCommand = shellHistory.getNextCommand();
-          if (nextCommand !== null) {
-            buffer.setText(nextCommand);
-          }
-          return;
-        }
-        if (
-          (buffer.allVisualLines.length === 1 || // Always navigate for single line
-            buffer.visualCursor[0] === buffer.allVisualLines.length - 1) &&
-          inputHistory.navigateDown
-        ) {
-          inputHistory.navigateDown();
-        } else {
-          buffer.move('down');
-        }
-        return;
-      }
-
-      // Fallback to buffer's default input handling
+      // Fallback to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [

@@ -126,6 +126,7 @@ export function useCompletion(
 
     const trimmedQuery = query.trimStart(); // Trim leading whitespace
 
+    // TODO - try the newest version from the chat to see if this works.
     if (trimmedQuery.startsWith('/')) {
       const fullPath = trimmedQuery.substring(1);
       const hasTrailingSpace = trimmedQuery.endsWith(' ');
@@ -210,25 +211,35 @@ export function useCompletion(
         return;
       }
 
-      // CASE B: Command/Sub-command Completion
+      // Command/Sub-command Completion
       const commandsToSearch = currentLevel || [];
       if (commandsToSearch.length > 0) {
-        const suggestions = commandsToSearch
-          .filter(
-            (cmd) =>
-              cmd.description &&
-              (cmd.name.startsWith(partial) ||
-                cmd.altName?.startsWith(partial)),
-          )
-          .map((cmd) => ({
-            label: cmd.name,
-            value: cmd.name,
-            description: cmd.description,
-          }));
+        let potentialSuggestions = commandsToSearch.filter(
+          (cmd) =>
+            cmd.description &&
+            (cmd.name.startsWith(partial) || cmd.altName?.startsWith(partial)),
+        );
 
-        setSuggestions(suggestions);
-        setShowSuggestions(suggestions.length > 0);
-        setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
+        // If a user's input is an exact match and it is a leaf command,
+        // enter should submit immediately.
+        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
+          const perfectMatch = potentialSuggestions.find(
+            (s) => s.name === partial,
+          );
+          if (perfectMatch && !perfectMatch.subCommands) {
+            potentialSuggestions = [];
+          }
+        }
+
+        const finalSuggestions = potentialSuggestions.map((cmd) => ({
+          label: cmd.name,
+          value: cmd.name,
+          description: cmd.description,
+        }));
+
+        setSuggestions(finalSuggestions);
+        setShowSuggestions(finalSuggestions.length > 0);
+        setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
         setIsLoadingSuggestions(false);
         return;
       }
