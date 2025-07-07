@@ -183,8 +183,7 @@ This is the most critical stage where files are moved and transformed into their
 `bundle` folder is created at the project root to house the final package contents.
 
 1.  The `package.json` is Transformed:
-    - What happens: The package.json from packages/cli/ is read, modified, and written into the root `bundle`/ directory. The
-      script scripts/prepare-cli-packagejson.js is responsible for this.
+    - What happens: The package.json from packages/cli/ is read, modified, and written into the root `bundle`/ directory.
     - File movement: packages/cli/package.json -> (in-memory transformation) -> `bundle`/package.json
     - Why: The final package.json must be different from the one used in development. Key changes include:
       - Removing devDependencies.
