@@ -1,0 +1,12 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Validate commit message for conventional commits
+commit_message=$(cat "$1")
+
+if ! echo "$commit_message" | grep -Eq "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert): .+"; then
+  echo "$(tput setaf 1)Error: Invalid commit message format.$(tput sgr0)"
+  echo "$(tput setaf 3)Commit messages must follow Conventional Commits specification (e.g., 'feat: Add new feature', 'fix: Resolve bug').$(tput sgr0)"
+  echo "$(tput setaf 3)Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.$(tput sgr0)"
+  exit 1
+fi

@@ -7,6 +7,7 @@
 import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
 import chalk from 'chalk';
 import fs from 'fs-extra';
+import path from 'path'; // Import path module
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
 export async function listFiles(
@@ -36,19 +37,33 @@ export async function listFiles(
   try {
     logger.info(chalk.cyan(`// Listing contents of '${targetPath}'...`));
     const files = await fs.readdir(targetPath, { withFileTypes: true });
-    const filteredFiles = filter
-      ? files.filter((f) => f.name.includes(filter))
-      : files;
-    const result = filteredFiles
-      .map((f) => {
+
+    const fileDetailsPromises = files.map(async (f) => {
+      const fullPath = path.join(targetPath, f.name);
+      try {
+        const stats = await fs.stat(fullPath);
         const type = f.isDirectory() ? '[DIR]' : '[FILE]';
-        return `${type} ${f.name}`;
-      })
-      .join('\n');
+        const size = f.isDirectory() ? '' : ` (${formatBytes(stats.size)})`;
+        const mtime = ` (${stats.mtime.toISOString().slice(0, 16).replace('T', ' ')})`; // Format modification time
+        return `${type} ${f.name}${size}${mtime}`;
+      } catch (statError) {
+        // If stat fails (e.g., permission denied), still list the file name
+        const type = f.isDirectory() ? '[DIR]' : '[FILE]';
+        return `${type} ${f.name} (Error getting info)`;
+      }
+    });
+
+    const fileDetails = await Promise.all(fileDetailsPromises);
+
+    const filteredDetails = filter
+      ? fileDetails.filter((detail) => detail.includes(filter))
+      : fileDetails;
+
+    const result = filteredDetails.join('\n');
     logger.info(chalk.yellow(result || 'No files found.'));
     logger.info(
       chalk.green(
-        `Success! Listed ${filteredFiles.length} items in '${targetPath}'.`,
+        `Success! Listed ${filteredDetails.length} items in '${targetPath}'.`,
       ),
     );
   } catch (error: unknown) {
@@ -62,4 +77,14 @@ export async function listFiles(
     );
     if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
+}
+
+// Helper function to format bytes into human-readable format
+function formatBytes(bytes: number, decimals: number = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }

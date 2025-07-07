@@ -66,6 +66,8 @@
     "readline-sync": "^1.4.10"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@types/archiver": "^6.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/micromatch": "^4.0.9",
