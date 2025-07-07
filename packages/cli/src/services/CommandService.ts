@@ -16,7 +16,7 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
 ];
 
 export class CommandService {
-  private commandTree: SlashCommand[] = [];
+  private commands: SlashCommand[] = [];
 
   constructor(
     private commandLoader: () => Promise<SlashCommand[]> = loadBuiltInCommands,
@@ -27,10 +27,10 @@ export class CommandService {
   async loadCommands(): Promise<void> {
     // For now, we only load the built-in commands.
     // File-based and remote commands will be added later.
-    this.commandTree = await this.commandLoader();
+    this.commands = await this.commandLoader();
   }
 
-  getCommand(): SlashCommand[] {
-    return this.commandTree;
+  getCommands(): SlashCommand[] {
+    return this.commands;
   }
 }

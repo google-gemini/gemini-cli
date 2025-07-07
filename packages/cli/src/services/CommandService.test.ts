@@ -31,7 +31,7 @@ describe('CommandService', () => {
     });
 
     it('should initialize with an empty command tree', () => {
-      const tree = commandService.getCommand();
+      const tree = commandService.getCommands();
       expect(tree).toBeInstanceOf(Array);
       expect(tree.length).toBe(0);
     });
@@ -39,11 +39,11 @@ describe('CommandService', () => {
     describe('loadCommands', () => {
       it('should load the built-in commands into the command tree', async () => {
         // Pre-condition check
-        expect(commandService.getCommand().length).toBe(0);
+        expect(commandService.getCommands().length).toBe(0);
 
         // Action
         await commandService.loadCommands();
-        const tree = commandService.getCommand();
+        const tree = commandService.getCommands();
 
         // Post-condition assertions
         expect(tree.length).toBe(3);
@@ -57,11 +57,11 @@ describe('CommandService', () => {
       it('should overwrite any existing commands when called again', async () => {
         // Load once
         await commandService.loadCommands();
-        expect(commandService.getCommand().length).toBe(3);
+        expect(commandService.getCommands().length).toBe(3);
 
         // Load again
         await commandService.loadCommands();
-        const tree = commandService.getCommand();
+        const tree = commandService.getCommands();
 
         // Should not append, but overwrite
         expect(tree.length).toBe(3);
@@ -70,12 +70,12 @@ describe('CommandService', () => {
 
     describe('getCommandTree', () => {
       it('should return the current command tree', async () => {
-        const initialTree = commandService.getCommand();
+        const initialTree = commandService.getCommands();
         expect(initialTree).toEqual([]);
 
         await commandService.loadCommands();
 
-        const loadedTree = commandService.getCommand();
+        const loadedTree = commandService.getCommands();
         expect(loadedTree.length).toBe(3);
         expect(loadedTree).toEqual([clearCommand, helpCommand, memoryCommand]);
       });
@@ -96,7 +96,7 @@ describe('CommandService', () => {
       // Act: Instantiate the service WITH the injected loader function.
       const commandService = new CommandService(mockLoader);
       await commandService.loadCommands();
-      const tree = commandService.getCommand();
+      const tree = commandService.getCommands();
 
       // Assert: The tree should contain ONLY our injected commands.
       expect(mockLoader).toHaveBeenCalled(); // Verify our mock loader was actually called.

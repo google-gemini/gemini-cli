@@ -79,7 +79,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
-  const [commandTree, setCommandTree] = useState<SlashCommand[]>([]);
+  const [commands, setCommands] = useState<SlashCommand[]>([]);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -192,7 +192,7 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const load = async () => {
       await commandService.loadCommands();
-      setCommandTree(commandService.getCommand());
+      setCommands(commandService.getCommands());
     };
 
     load();
@@ -1051,7 +1051,7 @@ export const useSlashCommandProcessor = (
 
       // --- Start of New Tree Traversal Logic ---
 
-      let currentCommands = commandTree;
+      let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
       let pathIndex = 0;
 
@@ -1181,7 +1181,7 @@ export const useSlashCommandProcessor = (
     [
       addItem,
       setShowHelp,
-      commandTree,
+      commands,
       legacyCommands,
       commandContext,
       addMessage,
@@ -1209,13 +1209,13 @@ export const useSlashCommandProcessor = (
       }),
     );
 
-    const newCommandNames = new Set(commandTree.map((c) => c.name));
+    const newCommandNames = new Set(commands.map((c) => c.name));
     const filteredAdaptedLegacy = adaptedLegacyCommands.filter(
       (c) => !newCommandNames.has(c.name),
     );
 
-    return [...commandTree, ...filteredAdaptedLegacy];
-  }, [commandTree, legacyCommands]);
+    return [...commands, ...filteredAdaptedLegacy];
+  }, [commands, legacyCommands]);
 
   return {
     handleSlashCommand,

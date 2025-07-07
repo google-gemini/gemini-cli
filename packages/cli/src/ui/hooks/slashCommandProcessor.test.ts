@@ -126,7 +126,7 @@ describe('useSlashCommandProcessor', () => {
       () =>
         ({
           loadCommands: vi.fn().mockResolvedValue(undefined),
-          getCommand: vi.fn().mockReturnValue([]), // Return an empty array by default
+          getCommands: vi.fn().mockReturnValue([]), // Return an empty array by default
         }) as unknown as CommandService,
     );
 
