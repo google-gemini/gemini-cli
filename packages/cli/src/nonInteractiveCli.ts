@@ -63,7 +63,7 @@ export async function runNonInteractive(
 
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
-  
+
   // Process @file commands if present
   let processedInput: string | PartListUnion = input;
   if (isAtCommand(input)) {
@@ -75,22 +75,28 @@ export async function runNonInteractive(
       messageId: Date.now(),
       signal: abortController.signal,
     });
-    
+
     if (atCommandResult.processedQuery) {
       processedInput = atCommandResult.processedQuery;
     }
   }
-  
+
   // Convert processedInput to Part[]
   let parts: Part[];
   if (typeof processedInput === 'string') {
     parts = [{ text: processedInput }];
   } else if (Array.isArray(processedInput)) {
-    parts = processedInput.map(p => typeof p === 'string' ? { text: p } : p);
+    parts = processedInput.map((p) =>
+      typeof p === 'string' ? { text: p } : p,
+    );
   } else {
-    parts = [typeof processedInput === 'string' ? { text: processedInput } : processedInput];
+    parts = [
+      typeof processedInput === 'string'
+        ? { text: processedInput }
+        : processedInput,
+    ];
   }
-  
+
   let currentMessages: Content[] = [{ role: 'user', parts }];
 
   try {
