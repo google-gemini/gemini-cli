@@ -10,24 +10,15 @@ import { type CommandContext } from './types.js';
 
 describe('helpCommand', () => {
   let mockContext: CommandContext;
-  let mockOpenHelp: ReturnType<typeof vi.fn>;
-  let mockOnDebugMessage: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockOpenHelp = vi.fn();
-    mockOnDebugMessage = vi.fn();
-
-    mockContext = {
-      dialogs: {
-        openHelp: mockOpenHelp,
-      },
-      ui: {
-        setDebugMessage: mockOnDebugMessage,
-      },
-    } as unknown as CommandContext;
+    mockContext = {} as unknown as CommandContext;
   });
 
-  it("should return a dialog action and set a debug message for '/help'", () => {
+  it("should return a dialog action and log a debug message for '/help'", () => {
+    const consoleDebugSpy = vi
+      .spyOn(console, 'debug')
+      .mockImplementation(() => {});
     if (!helpCommand.action) {
       throw new Error('Help command has no action');
     }
@@ -37,7 +28,7 @@ describe('helpCommand', () => {
       type: 'dialog',
       dialog: 'help',
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith('Opening help.');
+    expect(consoleDebugSpy).toHaveBeenCalledWith('Opening help UI ...');
   });
 
   it("should also be triggered by its alternative name '?'", () => {
