@@ -106,9 +106,10 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     }
 
     const startTime = Date.now();
+    let session: LlamaChatSession | null = null;
     
     try {
-      const session = await this.createChatSession();
+      session = await this.createChatSession();
       const response = await session.prompt(prompt, {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
@@ -123,6 +124,15 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     } catch (error) {
       console.error('Error generating text:', error);
       throw new Error(`Text generation failed: ${error}`);
+    } finally {
+      // Properly dispose of the session to free the sequence
+      if (session) {
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          console.warn('Warning: Failed to dispose chat session:', disposeError);
+        }
+      }
     }
   }
 
@@ -133,9 +143,10 @@ export class TrustNodeLlamaClient implements TrustModelClient {
 
     const startTime = Date.now();
     let totalTokens = 0;
+    let session: LlamaChatSession | null = null;
     
     try {
-      const session = await this.createChatSession();
+      session = await this.createChatSession();
       const response = await session.prompt(prompt, {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
@@ -154,6 +165,15 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     } catch (error) {
       console.error('Error generating stream:', error);
       throw new Error(`Stream generation failed: ${error}`);
+    } finally {
+      // Properly dispose of the session to free the sequence
+      if (session) {
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          console.warn('Warning: Failed to dispose chat session:', disposeError);
+        }
+      }
     }
   }
 
