@@ -5,7 +5,7 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment } from './config.js';
+import { loadEnvironment } from './settings.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
   loadEnvironment();
