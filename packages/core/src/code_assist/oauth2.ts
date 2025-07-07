@@ -14,6 +14,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as os from 'os';
 import { getErrorMessage } from '../utils/errors.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -54,7 +55,9 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(): Promise<OAuth2Client> {
+export async function getOauthClient(
+  authType: AuthType,
+): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
@@ -78,13 +81,14 @@ export async function getOauthClient(): Promise<OAuth2Client> {
         // Non-fatal, continue with existing auth.
       }
     }
+    console.log('Loaded cached credentials.');
     return client;
   }
 
   // In Google Cloud Shell, we can use Application Default Credentials (ADC)
   // provided via its metadata server to authenticate non-interactively using
   // the identity of the user logged into Cloud Shell.
-  if (process.env.CLOUD_SHELL === 'true') {
+  if (authType === AuthType.CLOUD_SHELL) {
     try {
       console.log("Attempting to authenticate via Cloud Shell VM's ADC.");
       const computeClient = new Compute({

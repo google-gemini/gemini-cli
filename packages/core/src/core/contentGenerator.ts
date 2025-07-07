@@ -67,7 +67,10 @@ export async function createContentGeneratorConfig(
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
-  if (authType === AuthType.LOGIN_WITH_GOOGLE || authType === AuthType.CLOUD_SHELL) {
+  if (
+    authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.CLOUD_SHELL
+  ) {
     return contentGeneratorConfig;
   }
 
