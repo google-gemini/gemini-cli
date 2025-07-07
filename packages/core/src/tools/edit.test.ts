@@ -38,21 +38,19 @@ describe('EditTool', () => {
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
+  let geminiClient: any;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
-    // The client instance that EditTool will use
-    const mockClientInstanceWithGenerateJson = {
+    geminiClient = {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
     mockConfig = {
-      getGeminiClient: vi
-        .fn()
-        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -339,7 +337,7 @@ describe('EditTool', () => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
-          expect(client).toBe((tool as any).client);
+          expect(client).toBe(geminiClient);
           return {
             params: {
               file_path: filePath,

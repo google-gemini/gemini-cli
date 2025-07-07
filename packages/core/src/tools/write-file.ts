@@ -23,7 +23,6 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { GeminiClient } from '../core/client.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
@@ -67,7 +66,6 @@ export class WriteFileTool
   implements ModifiableTool<WriteFileToolParams>
 {
   static readonly Name: string = 'write_file';
-  private readonly client: GeminiClient;
 
   constructor(private readonly config: Config) {
     super(
@@ -92,8 +90,6 @@ export class WriteFileTool
         type: 'object',
       },
     );
-
-    this.client = this.config.getGeminiClient();
   }
 
   /**
@@ -374,7 +370,7 @@ export class WriteFileTool
           new_string: proposedContent,
           file_path: filePath,
         },
-        this.client,
+        this.config.getGeminiClient(),
         abortSignal,
       );
       correctedContent = correctedParams.new_string;
@@ -382,7 +378,7 @@ export class WriteFileTool
       // This implies new file (ENOENT)
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
-        this.client,
+        this.config.getGeminiClient(),
         abortSignal,
       );
     }
