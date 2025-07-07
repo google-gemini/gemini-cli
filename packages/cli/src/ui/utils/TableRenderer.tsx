@@ -42,27 +42,34 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   // Helper function to render a cell with proper width
-  const renderCell = (content: string, width: number, isHeader = false): React.ReactNode => {
+  const renderCell = (
+    content: string,
+    width: number,
+    isHeader = false,
+  ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
     const displayWidth = getPlainTextLength(content);
-    
+
     let cellContent = content;
     if (displayWidth > contentWidth) {
       if (contentWidth <= 3) {
         // Just truncate by character count
-        cellContent = content.substring(0, Math.min(content.length, contentWidth));
+        cellContent = content.substring(
+          0,
+          Math.min(content.length, contentWidth),
+        );
       } else {
         // Truncate preserving markdown formatting using binary search
         let left = 0;
         let right = content.length;
         let bestTruncated = content;
-        
+
         // Binary search to find the optimal truncation point
         while (left <= right) {
           const mid = Math.floor((left + right) / 2);
           const candidate = content.substring(0, mid);
           const candidateWidth = getPlainTextLength(candidate);
-          
+
           if (candidateWidth <= contentWidth - 3) {
             bestTruncated = candidate;
             left = mid + 1;
@@ -70,18 +77,24 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
             right = mid - 1;
           }
         }
-        
+
         cellContent = bestTruncated + '...';
       }
     }
-    
+
     // Calculate exact padding needed
     const actualDisplayWidth = getPlainTextLength(cellContent);
     const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
-    
+
     return (
       <Text>
-        {isHeader ? <Text bold color={Colors.AccentCyan}><RenderInline text={cellContent} /></Text> : <RenderInline text={cellContent} />}
+        {isHeader ? (
+          <Text bold color={Colors.AccentCyan}>
+            <RenderInline text={cellContent} />
+          </Text>
+        ) : (
+          <RenderInline text={cellContent} />
+        )}
         {' '.repeat(paddingNeeded)}
       </Text>
     );
@@ -92,13 +105,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const chars = {
       top: { left: '┌', middle: '┬', right: '┐', horizontal: '─' },
       middle: { left: '├', middle: '┼', right: '┤', horizontal: '─' },
-      bottom: { left: '└', middle: '┴', right: '┘', horizontal: '─' }
+      bottom: { left: '└', middle: '┴', right: '┘', horizontal: '─' },
     };
-    
+
     const char = chars[type];
-    const borderParts = adjustedWidths.map(w => char.horizontal.repeat(w));
+    const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
     const border = char.left + borderParts.join(char.middle) + char.right;
-    
+
     return <Text>{border}</Text>;
   };
 
@@ -108,15 +121,17 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       const width = adjustedWidths[index] || 0;
       return renderCell(cell || '', width, isHeader);
     });
-    
+
     return (
       <Text>
-        │ {renderedCells.map((cell, index) => (
+        │{' '}
+        {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
             {cell}
             {index < renderedCells.length - 1 ? ' │ ' : ''}
           </React.Fragment>
-        ))} │
+        ))}{' '}
+        │
       </Text>
     );
   };
@@ -125,20 +140,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     <Box flexDirection="column" marginY={1}>
       {/* Top border */}
       {renderBorder('top')}
-      
+
       {/* Header row */}
       {renderRow(headers, true)}
-      
+
       {/* Middle border */}
       {renderBorder('middle')}
-      
+
       {/* Data rows */}
       {rows.map((row, index) => (
-        <React.Fragment key={index}>
-          {renderRow(row)}
-        </React.Fragment>
+        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
       ))}
-      
+
       {/* Bottom border */}
       {renderBorder('bottom')}
     </Box>

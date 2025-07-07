@@ -159,4 +159,4 @@ export const getPlainTextLength = (text: string): number => {
     .replace(/<u>(.*?)<\/u>/g, '$1')
     .replace(/\[(.*?)\]\(.*?\)/g, '$1');
   return stringWidth(cleanText);
-}; 
+};

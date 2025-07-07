@@ -256,15 +256,15 @@ But there's no separator line
       );
 
       const output = lastFrame();
-      
+
       // Check header
       expect(output).toContain('execSync vs spawn');
-      
+
       // Check table headers - handle possible truncation
       expect(output).toMatch(/Cha(racteristic)?/); // Match "Cha" or "Characteristic"
       expect(output).toContain('execSync');
       expect(output).toContain('spawn');
-      
+
       // Check table content - test keywords rather than full sentences
       expect(output).toMatch(/Exe(cution)?/); // Match "Exe" or "Execution"
       expect(output).toContain('Synchronous');
