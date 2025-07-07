@@ -26,6 +26,11 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
       source ~/.bashrc
       ```
 
+2.  **Cloud Shell:**
+    - This option is only available when running in a Google Cloud Shell environment.
+    - It automatically uses the credentials of the logged-in user in the Cloud Shell environment.
+    - This is the default authentication method when running in Cloud Shell and no other method is configured.
+
 2.  **<a id="gemini-api-key"></a>Gemini API key:**
     - Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
     - Set the `GEMINI_API_KEY` environment variable. In the following methods, replace `YOUR_GEMINI_API_KEY` with the API key you obtained from Google AI Studio:
