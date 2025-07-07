@@ -29,6 +29,7 @@ interface HistoryItemDisplayProps {
   isPending: boolean;
   config?: Config;
   isFocused?: boolean;
+  viMode: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -38,10 +39,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isPending,
   config,
   isFocused = true,
+  viMode,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
-    {item.type === 'user' && <UserMessage text={item.text} />}
+    {item.type === 'user' && <UserMessage text={item.text} viMode={viMode} />}
     {item.type === 'user_shell' && <UserShellMessage text={item.text} />}
     {item.type === 'gemini' && (
       <GeminiMessage
@@ -49,6 +51,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
         terminalWidth={terminalWidth}
+        viMode={viMode}
       />
     )}
     {item.type === 'gemini_content' && (
@@ -57,6 +60,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
         terminalWidth={terminalWidth}
+        viMode={viMode}
       />
     )}
     {item.type === 'info' && <InfoMessage text={item.text} />}
@@ -83,6 +87,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         terminalWidth={terminalWidth}
         config={config}
         isFocused={isFocused}
+        viMode={viMode}
       />
     )}
     {item.type === 'compression' && (

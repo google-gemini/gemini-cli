@@ -16,6 +16,7 @@ import { useInputHistory } from '../hooks/useInputHistory.js';
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.useFakeTimers();
 
 type MockedUseShellHistory = ReturnType<typeof useShellHistory>;
 type MockedUseCompletion = ReturnType<typeof useCompletion>;
@@ -97,6 +98,7 @@ describe('InputPrompt', () => {
       config: {
         getProjectRoot: () => '/test/project',
         getTargetDir: () => '/test/project/src',
+        getAccessibility: () => ({ viMode: false }),
       } as unknown as Config,
       slashCommands: [],
       shellModeActive: false,
@@ -107,15 +109,13 @@ describe('InputPrompt', () => {
     };
   });
 
-  const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
-
   it('should call shellHistory.getPreviousCommand on up arrow in shell mode', async () => {
     props.shellModeActive = true;
     const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
+    await vi.runAllTimersAsync();
 
     stdin.write('\u001B[A');
-    await wait();
+    await vi.runAllTimersAsync();
 
     expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
     unmount();
@@ -124,10 +124,10 @@ describe('InputPrompt', () => {
   it('should call shellHistory.getNextCommand on down arrow in shell mode', async () => {
     props.shellModeActive = true;
     const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
+    await vi.runAllTimersAsync();
 
     stdin.write('\u001B[B');
-    await wait();
+    await vi.runAllTimersAsync();
 
     expect(mockShellHistory.getNextCommand).toHaveBeenCalled();
     unmount();
@@ -139,10 +139,10 @@ describe('InputPrompt', () => {
       'previous command',
     );
     const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
+    await vi.runAllTimersAsync();
 
     stdin.write('\u001B[A');
-    await wait();
+    await vi.runAllTimersAsync();
 
     expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
     expect(props.buffer.setText).toHaveBeenCalledWith('previous command');
@@ -153,10 +153,10 @@ describe('InputPrompt', () => {
     props.shellModeActive = true;
     props.buffer.setText('ls -l');
     const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
+    await vi.runAllTimersAsync();
 
     stdin.write('\r');
-    await wait();
+    await vi.runAllTimersAsync();
 
     expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith('ls -l');
     expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
@@ -166,14 +166,14 @@ describe('InputPrompt', () => {
   it('should NOT call shell history methods when not in shell mode', async () => {
     props.buffer.setText('some text');
     const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
+    await vi.runAllTimersAsync();
 
     stdin.write('\u001B[A'); // Up arrow
-    await wait();
+    await vi.runAllTimersAsync();
     stdin.write('\u001B[B'); // Down arrow
-    await wait();
+    await vi.runAllTimersAsync();
     stdin.write('\r'); // Enter
-    await wait();
+    await vi.runAllTimersAsync();
 
     expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
     expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();

@@ -381,7 +381,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       <Box
-        borderStyle="round"
+        borderStyle={config.getAccessibility()?.viMode ? undefined : 'round'}
         borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
         paddingX={1}
       >

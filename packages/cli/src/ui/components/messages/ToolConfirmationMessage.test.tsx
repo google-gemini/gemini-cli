@@ -24,6 +24,7 @@ describe('ToolConfirmationMessage', () => {
         confirmationDetails={confirmationDetails}
         availableTerminalHeight={30}
         terminalWidth={80}
+        viMode={false}
       />,
     );
 
@@ -47,6 +48,7 @@ describe('ToolConfirmationMessage', () => {
         confirmationDetails={confirmationDetails}
         availableTerminalHeight={30}
         terminalWidth={80}
+        viMode={false}
       />,
     );
 

@@ -30,7 +30,7 @@ describe('<HistoryItemDisplay />', () => {
       text: 'Hello',
     };
     const { lastFrame } = render(
-      <HistoryItemDisplay {...baseItem} item={item} />,
+      <HistoryItemDisplay {...baseItem} item={item} viMode={false} />,
     );
     expect(lastFrame()).toContain('Hello');
   });
@@ -43,7 +43,7 @@ describe('<HistoryItemDisplay />', () => {
     };
     const { lastFrame } = render(
       <SessionStatsProvider>
-        <HistoryItemDisplay {...baseItem} item={item} />
+        <HistoryItemDisplay {...baseItem} item={item} viMode={false} />
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Stats');
@@ -61,7 +61,7 @@ describe('<HistoryItemDisplay />', () => {
       gcpProject: 'test-project',
     };
     const { lastFrame } = render(
-      <HistoryItemDisplay {...baseItem} item={item} />,
+      <HistoryItemDisplay {...baseItem} item={item} viMode={false} />,
     );
     expect(lastFrame()).toContain('About Gemini CLI');
   });
@@ -73,7 +73,7 @@ describe('<HistoryItemDisplay />', () => {
     };
     const { lastFrame } = render(
       <SessionStatsProvider>
-        <HistoryItemDisplay {...baseItem} item={item} />
+        <HistoryItemDisplay {...baseItem} item={item} viMode={false} />
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain(
@@ -88,7 +88,7 @@ describe('<HistoryItemDisplay />', () => {
     };
     const { lastFrame } = render(
       <SessionStatsProvider>
-        <HistoryItemDisplay {...baseItem} item={item} />
+        <HistoryItemDisplay {...baseItem} item={item} viMode={false} />
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain(
@@ -104,7 +104,7 @@ describe('<HistoryItemDisplay />', () => {
     };
     const { lastFrame } = render(
       <SessionStatsProvider>
-        <HistoryItemDisplay {...baseItem} item={item} />
+        <HistoryItemDisplay {...baseItem} item={item} viMode={false} />
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');

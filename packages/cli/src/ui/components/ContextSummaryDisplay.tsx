@@ -14,6 +14,7 @@ interface ContextSummaryDisplayProps {
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   showToolDescriptions?: boolean;
+  viMode: boolean;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -21,7 +22,11 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   showToolDescriptions,
+  viMode,
 }) => {
+  if (viMode) {
+    return null;
+  }
   const mcpServerCount = Object.keys(mcpServers || {}).length;
 
   if (geminiMdFileCount === 0 && mcpServerCount === 0) {

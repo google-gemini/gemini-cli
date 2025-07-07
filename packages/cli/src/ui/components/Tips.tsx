@@ -11,9 +11,13 @@ import { type Config } from '@google/gemini-cli-core';
 
 interface TipsProps {
   config: Config;
+  viMode: boolean;
 }
 
-export const Tips: React.FC<TipsProps> = ({ config }) => {
+export const Tips: React.FC<TipsProps> = ({ config, viMode }) => {
+  if (viMode) {
+    return null;
+  }
   const geminiMdFileCount = config.getGeminiMdFileCount();
   return (
     <Box flexDirection="column" marginBottom={1}>

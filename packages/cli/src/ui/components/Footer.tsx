@@ -23,6 +23,7 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
+  viMode: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -36,7 +37,11 @@ export const Footer: React.FC<FooterProps> = ({
   showErrorDetails,
   showMemoryUsage,
   promptTokenCount,
+  viMode,
 }) => {
+  if (viMode) {
+    return null;
+  }
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
 

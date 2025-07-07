@@ -13,6 +13,7 @@ interface GeminiMessageContentProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  viMode: boolean;
 }
 
 /*

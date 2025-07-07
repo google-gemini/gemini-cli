@@ -14,6 +14,7 @@ interface GeminiMessageProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  viMode: boolean;
 }
 
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({

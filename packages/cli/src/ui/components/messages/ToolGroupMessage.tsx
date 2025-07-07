@@ -19,6 +19,7 @@ interface ToolGroupMessageProps {
   terminalWidth: number;
   config?: Config;
   isFocused?: boolean;
+  viMode: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -28,6 +29,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   terminalWidth,
   config,
   isFocused = true,
+  viMode,
 }) => {
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
@@ -66,7 +68,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
+      borderStyle={viMode ? undefined : 'round'}
       /*
         This width constraint is highly important and protects us from an Ink rendering bug.
         Since the ToolGroup can typically change rendering states frequently, it can cause
@@ -113,6 +115,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                     availableTerminalHeightPerToolMessage
                   }
                   terminalWidth={innerWidth}
+                  viMode={viMode}
                 />
               )}
           </Box>

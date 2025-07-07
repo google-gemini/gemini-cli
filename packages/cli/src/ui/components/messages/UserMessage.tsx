@@ -10,15 +10,16 @@ import { Colors } from '../../colors.js';
 
 interface UserMessageProps {
   text: string;
+  viMode: boolean;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ text, viMode }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
 
   return (
     <Box
-      borderStyle="round"
+      borderStyle={viMode ? undefined : 'round'}
       borderColor={Colors.Gray}
       flexDirection="row"
       paddingX={2}

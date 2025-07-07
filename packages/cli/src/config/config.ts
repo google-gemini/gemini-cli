@@ -45,6 +45,7 @@ interface CliArgs {
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
+  vi: boolean | undefined;
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
@@ -121,6 +122,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'c',
       type: 'boolean',
       description: 'Enables checkpointing of file edits',
+      default: false,
+    })
+    .option('vi', {
+      type: 'boolean',
+      description: 'Enable VI mode for visually impaired users',
       default: false,
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -210,7 +216,7 @@ export async function loadCliConfig(
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.show_memory_usage || settings.showMemoryUsage || false,
-    accessibility: settings.accessibility,
+    accessibility: { ...(settings.accessibility ?? {}), viMode: argv.vi },
     telemetry: {
       enabled: argv.telemetry ?? settings.telemetry?.enabled,
       target: (argv.telemetryTarget ??

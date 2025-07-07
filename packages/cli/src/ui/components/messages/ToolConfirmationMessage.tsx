@@ -27,6 +27,7 @@ export interface ToolConfirmationMessageProps {
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  viMode: boolean;
 }
 
 export const ToolConfirmationMessage: React.FC<
@@ -36,6 +37,7 @@ export const ToolConfirmationMessage: React.FC<
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
+  viMode,
 }) => {
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
@@ -90,7 +92,7 @@ export const ToolConfirmationMessage: React.FC<
       return (
         <Box
           minWidth="90%"
-          borderStyle="round"
+          borderStyle={viMode ? undefined : 'round'}
           borderColor={Colors.Gray}
           justifyContent="space-around"
           padding={1}

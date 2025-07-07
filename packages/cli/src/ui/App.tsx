@@ -555,6 +555,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             item={item}
             isPending={false}
             config={config}
+            viMode={config.getAccessibility()?.viMode ?? false}
           />
         ))}
       </Box>
@@ -586,8 +587,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header terminalWidth={terminalWidth} />
-              {!settings.merged.hideTips && <Tips config={config} />}
+              <Header
+                terminalWidth={terminalWidth}
+                viMode={config.getAccessibility()?.viMode ?? false}
+              />
+              {!settings.merged.hideTips && (
+                <Tips
+                  config={config}
+                  viMode={config.getAccessibility()?.viMode ?? false}
+                />
+              )}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -597,6 +606,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 item={h}
                 isPending={false}
                 config={config}
+                viMode={config.getAccessibility()?.viMode ?? false}
               />
             )),
           ]}
@@ -618,6 +628,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
+                viMode={config.getAccessibility()?.viMode ?? false}
               />
             ))}
             <ShowMoreLines constrainHeight={constrainHeight} />
@@ -719,7 +730,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 width="100%"
               >
                 <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
+                  {!config.getAccessibility()?.viMode && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
                   {ctrlCPressedOnce ? (
@@ -736,6 +747,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}
                       showToolDescriptions={showToolDescriptions}
+                      viMode={config.getAccessibility()?.viMode ?? false}
                     />
                   )}
                 </Box>
@@ -827,6 +839,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               config.getDebugMode() || config.getShowMemoryUsage()
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
+            viMode={config.getAccessibility()?.viMode ?? false}
           />
         </Box>
       </Box>
