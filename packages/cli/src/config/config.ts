@@ -49,7 +49,7 @@ interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   'allowed-mcp-server-names': string | undefined;
-  extensions: string | undefined;
+  extensions: string[] | undefined;
   'list-extensions': boolean | undefined;
 }
 
@@ -137,9 +137,10 @@ async function parseArguments(): Promise<CliArgs> {
     })
     .option('extensions', {
       alias: 'e',
-      type: 'string',
+      type: 'array',
+      string: true,
       description:
-        'Comma-separated list of extensions to use. If not provided, all extensions are used.',
+        'A list of extensions to use. If not provided, all extensions are used.',
     })
     .option('list-extensions', {
       alias: 'l',
@@ -187,8 +188,7 @@ export async function loadCliConfig(
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
-  const enabledExtensions =
-    argv.extensions?.split(',').map((e) => e.trim()) || [];
+  const enabledExtensions = argv.extensions?.map((e) => e.trim()) || [];
 
   let activeExtensions;
   try {
