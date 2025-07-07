@@ -35,6 +35,7 @@ export interface CheckpointingSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+  viMode?: boolean;
 }
 
 export interface Settings {
