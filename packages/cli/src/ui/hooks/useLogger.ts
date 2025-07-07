@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { sessionId, Logger } from '@trustos/trust-cli-core';
+import { sessionId, Logger } from '@trust-cli/trust-cli-core';
 
 /**
  * Hook to manage the logger instance.

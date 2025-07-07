@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { type Config } from '@trustos/trust-cli-core';
+import { type Config } from '@trust-cli/trust-cli-core';
 
 interface TipsProps {
   config: Config;

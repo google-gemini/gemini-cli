@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getStartupWarnings } from './startupWarnings.js';
 import * as fs from 'fs/promises';
-import { getErrorMessage } from '@trustos/trust-cli-core';
+import { getErrorMessage } from '@trust-cli/trust-cli-core';
 
 vi.mock('fs/promises');
-vi.mock('@trustos/trust-cli-core', async (importOriginal) => {
+vi.mock('@trust-cli/trust-cli-core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,

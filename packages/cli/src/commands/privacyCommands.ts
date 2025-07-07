@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TrustConfiguration } from '@trustos/trust-cli-core';
-import { PrivacyManager, PRIVACY_MODES } from '../../../core/src/trustos/privacyManager.js';
+import { TrustConfiguration } from '@trust-cli/trust-cli-core';
+import { PrivacyManager, PRIVACY_MODES } from '../../../core/src/trust/privacyManager.js';
 
 export interface PrivacyCommandArgs {
   action: 'status' | 'switch' | 'list' | 'info';

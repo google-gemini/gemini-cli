@@ -1,5 +1,5 @@
 {
-  "name": "@trustos/trust-cli-core",
+  "name": "@trust-cli/trust-cli-core",
   "version": "0.1.0",
   "description": "Trust CLI Core",
   "repository": {

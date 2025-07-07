@@ -19,7 +19,7 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { SlashCommand } from '../hooks/slashCommandProcessor.js';
-import { Config } from '@trustos/trust-cli-core';
+import { Config } from '@trust-cli/trust-cli-core';
 
 export interface InputPromptProps {
   buffer: TextBuffer;

@@ -7,13 +7,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { TrustConfig } from '../trustos/types.js';
+import { TrustConfig } from '../trust/types.js';
 
-export const TRUSTOS_CONFIG_DIR = path.join(os.homedir(), '.trustcli');
-export const TRUSTOS_CONFIG_FILE = path.join(TRUSTOS_CONFIG_DIR, 'config.yaml');
-export const TRUSTOS_MODELS_DIR = path.join(TRUSTOS_CONFIG_DIR, 'models');
+export const TRUST_CONFIG_DIR = path.join(os.homedir(), '.trustcli');
+export const TRUST_CONFIG_FILE = path.join(TRUST_CONFIG_DIR, 'config.yaml');
+export const TRUST_MODELS_DIR = path.join(TRUST_CONFIG_DIR, 'models');
 
-export const DEFAULT_TRUSTOS_CONFIG: TrustConfig = {
+export const DEFAULT_TRUST_CONFIG: TrustConfig = {
   privacy: {
     privacyMode: 'strict',
     auditLogging: false,
@@ -21,7 +21,7 @@ export const DEFAULT_TRUSTOS_CONFIG: TrustConfig = {
   },
   models: {
     default: 'phi-3.5-mini-instruct',
-    directory: TRUSTOS_MODELS_DIR,
+    directory: TRUST_MODELS_DIR,
     autoVerify: true,
   },
   inference: {
@@ -43,21 +43,21 @@ export class TrustConfiguration {
   private configPath: string;
 
   constructor(configPath?: string) {
-    this.configPath = configPath || TRUSTOS_CONFIG_FILE;
-    this.config = { ...DEFAULT_TRUSTOS_CONFIG };
+    this.configPath = configPath || TRUST_CONFIG_FILE;
+    this.config = { ...DEFAULT_TRUST_CONFIG };
   }
 
   async initialize(): Promise<void> {
     try {
       // Ensure config directory exists
-      await fs.mkdir(TRUSTOS_CONFIG_DIR, { recursive: true });
-      await fs.mkdir(TRUSTOS_MODELS_DIR, { recursive: true });
+      await fs.mkdir(TRUST_CONFIG_DIR, { recursive: true });
+      await fs.mkdir(TRUST_MODELS_DIR, { recursive: true });
 
       // Load existing config if it exists
       try {
         const configData = await fs.readFile(this.configPath, 'utf-8');
         const loadedConfig = JSON.parse(configData);
-        this.config = { ...DEFAULT_TRUSTOS_CONFIG, ...loadedConfig };
+        this.config = { ...DEFAULT_TRUST_CONFIG, ...loadedConfig };
       } catch (error) {
         // Config file doesn't exist, create it with defaults
         await this.save();

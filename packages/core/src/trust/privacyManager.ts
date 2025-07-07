@@ -5,7 +5,7 @@
  */
 
 import { TrustConfig } from './types.js';
-import { TrustConfiguration } from '../config/trustosConfig.js';
+import { TrustConfiguration } from '../config/trustConfig.js';
 
 /**
  * Privacy Mode Definitions

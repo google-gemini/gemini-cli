@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPServerConfig } from '@trustos/trust-cli-core';
+import { MCPServerConfig } from '@trust-cli/trust-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

@@ -48,14 +48,14 @@ async function testTrustSystem() {
     console.log('5. Testing Trust content generator creation...');
     const contentGeneratorConfig = {
       model: 'phi-3.5-mini-instruct',
-      authType: AuthType.USE_TRUSTOS,
-      trustosModelsDir: config.getModelsDirectory()
+      authType: AuthType.USE_TRUST_LOCAL,
+      trustModelsDir: config.getModelsDirectory()
     };
     
     console.log('✅ Trust content generator config created');
     console.log(`   Model: ${contentGeneratorConfig.model}`);
     console.log(`   Auth Type: ${contentGeneratorConfig.authType}`);
-    console.log(`   Models Dir: ${contentGeneratorConfig.trustosModelsDir}\n`);
+    console.log(`   Models Dir: ${contentGeneratorConfig.trustModelsDir}\n`);
 
     console.log('🎉 All tests passed! Trust system is working correctly.');
     console.log('\n📝 Next steps:');

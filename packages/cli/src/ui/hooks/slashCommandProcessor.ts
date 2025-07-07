@@ -18,7 +18,7 @@ import {
   MCPServerStatus,
   getMCPDiscoveryState,
   getMCPServerStatus,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,

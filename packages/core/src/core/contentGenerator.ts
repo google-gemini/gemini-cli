@@ -46,7 +46,7 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
-  trustosModelsDir?: string;
+  trustModelsDir?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -113,8 +113,8 @@ export async function createContentGenerator(
   };
   
   if (config.authType === AuthType.USE_TRUST_LOCAL) {
-    const { TrustContentGenerator } = await import('../trustos/trustContentGenerator.js');
-    const trustGenerator = new TrustContentGenerator(config.trustosModelsDir);
+    const { TrustContentGenerator } = await import('../trust/trustContentGenerator.js');
+    const trustGenerator = new TrustContentGenerator(config.trustModelsDir);
     await trustGenerator.initialize();
     return trustGenerator;
   }

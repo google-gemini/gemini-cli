@@ -11,7 +11,7 @@ import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   EditorType,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;

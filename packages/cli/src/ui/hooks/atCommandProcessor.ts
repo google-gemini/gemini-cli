@@ -12,7 +12,7 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import {
   HistoryItem,
   IndividualToolCallDisplay,

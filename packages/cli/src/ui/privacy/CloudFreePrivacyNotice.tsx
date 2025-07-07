@@ -8,7 +8,7 @@ import { Box, Newline, Text, useInput } from 'ink';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
 import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
-import { Config } from '@trustos/trust-cli-core';
+import { Config } from '@trust-cli/trust-cli-core';
 import { Colors } from '../colors.js';
 
 interface CloudFreePrivacyNoticeProps {

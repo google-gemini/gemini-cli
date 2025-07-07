@@ -11,7 +11,7 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import {
   Content,
   Part,

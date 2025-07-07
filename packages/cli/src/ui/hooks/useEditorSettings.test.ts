@@ -22,10 +22,10 @@ import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
-vi.mock('@trustos/trust-cli-core', async () => {
-  const actual = await vi.importActual('@trustos/trust-cli-core');
+vi.mock('@trust-cli/trust-cli-core', async () => {
+  const actual = await vi.importActual('@trust-cli/trust-cli-core');
   return {
     ...actual,
     checkHasEditorType: vi.fn(() => true),

@@ -7,7 +7,7 @@
 import { render } from 'ink-testing-library';
 import { InputPrompt, InputPromptProps } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { Config } from '@trustos/trust-cli-core';
+import { Config } from '@trust-cli/trust-cli-core';
 import { vi } from 'vitest';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';

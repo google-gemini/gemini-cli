@@ -5,7 +5,7 @@
  */
 
 import { Message, MessageType } from '../types.js';
-import { Config } from '@trustos/trust-cli-core';
+import { Config } from '@trust-cli/trust-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 
 export function createShowMemoryAction(

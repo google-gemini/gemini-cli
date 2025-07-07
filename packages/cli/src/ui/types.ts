@@ -7,7 +7,7 @@
 import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {

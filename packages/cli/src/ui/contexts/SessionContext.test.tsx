@@ -14,7 +14,7 @@ import {
   SessionMetrics,
 } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
-import { uiTelemetryService } from '@trustos/trust-cli-core';
+import { uiTelemetryService } from '@trust-cli/trust-cli-core';
 
 /**
  * A test harness component that uses the hook and exposes the context value

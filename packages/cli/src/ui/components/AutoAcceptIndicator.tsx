@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { ApprovalMode } from '@trustos/trust-cli-core';
+import { ApprovalMode } from '@trust-cli/trust-cli-core';
 
 interface AutoAcceptIndicatorProps {
   approvalMode: ApprovalMode;

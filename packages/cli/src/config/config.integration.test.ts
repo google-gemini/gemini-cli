@@ -12,7 +12,7 @@ import {
   Config,
   ConfigParameters,
   ContentGeneratorConfig,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
 const TEST_CONTENT_GENERATOR_CONFIG: ContentGeneratorConfig = {
   apiKey: 'test-key',
@@ -21,8 +21,8 @@ const TEST_CONTENT_GENERATOR_CONFIG: ContentGeneratorConfig = {
 };
 
 // Mock file discovery service and tool registry
-vi.mock('@trustos/trust-cli-core', async () => {
-  const actual = await vi.importActual('@trustos/trust-cli-core');
+vi.mock('@trust-cli/trust-cli-core', async () => {
+  const actual = await vi.importActual('@trust-cli/trust-cli-core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn().mockImplementation(() => ({

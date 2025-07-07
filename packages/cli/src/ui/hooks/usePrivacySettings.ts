@@ -6,7 +6,7 @@
 
 import { GaxiosError } from 'gaxios';
 import { useState, useEffect, useCallback } from 'react';
-import { Config, CodeAssistServer, UserTierId } from '@trustos/trust-cli-core';
+import { Config, CodeAssistServer, UserTierId } from '@trust-cli/trust-cli-core';
 
 export interface PrivacyState {
   isLoading: boolean;

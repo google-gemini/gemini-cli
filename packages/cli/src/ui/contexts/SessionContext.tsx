@@ -16,7 +16,7 @@ import {
   uiTelemetryService,
   SessionMetrics,
   ModelMetrics,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
 // --- Interface Definitions ---
 

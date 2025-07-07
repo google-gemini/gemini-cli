@@ -1,5 +1,5 @@
 {
-  "name": "@trustos/trust-cli-frontend",
+  "name": "@trust-cli/trust-cli-frontend",
   "version": "0.1.0",
   "description": "Trust CLI",
   "repository": {
@@ -28,7 +28,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "dependencies": {
-    "@trustos/trust-cli-core": "file:../core",
+    "@trust-cli/trust-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",

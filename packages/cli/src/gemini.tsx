@@ -34,7 +34,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 

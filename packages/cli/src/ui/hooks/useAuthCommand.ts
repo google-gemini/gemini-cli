@@ -11,7 +11,7 @@ import {
   Config,
   clearCachedCredentialFile,
   getErrorMessage,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 
 export const useAuthCommand = (
   settings: LoadedSettings,

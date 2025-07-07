@@ -19,8 +19,8 @@ const MockTrustNodeLlamaClient = vi.mocked(TrustNodeLlamaClient);
 
 describe('TrustContentGenerator', () => {
   let contentGenerator: TrustContentGenerator;
-  let mockModelManager: InstanceType<typeof MockTrustModelManager>;
-  let mockModelClient: InstanceType<typeof MockTrustNodeLlamaClient>;
+  let mockModelManager: any;
+  let mockModelClient: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,16 +35,15 @@ describe('TrustContentGenerator', () => {
       verifyModel: vi.fn(),
       verifyModelIntegrity: vi.fn(),
       deleteModel: vi.fn(),
-    } as any;
+    };
 
     mockModelClient = {
-      initialize: vi.fn(),
       loadModel: vi.fn(),
       isModelLoaded: vi.fn(),
       generateText: vi.fn(),
       generateStream: vi.fn(),
       getMetrics: vi.fn(),
-    } as any;
+    };
 
     MockTrustModelManager.mockImplementation(() => mockModelManager);
     MockTrustNodeLlamaClient.mockImplementation(() => mockModelClient);
@@ -130,6 +129,7 @@ describe('TrustContentGenerator', () => {
 
     it('should generate content from text prompt', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Hello, how are you?' }],
           role: 'user'
@@ -143,12 +143,13 @@ describe('TrustContentGenerator', () => {
 
       expect(mockModelClient.generateText).toHaveBeenCalled();
       expect(result.candidates).toHaveLength(1);
-      expect(result.candidates[0].content.parts[0].text).toBe(mockResponse);
-      expect(result.candidates[0].content.role).toBe('model');
+      expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe(mockResponse);
+      expect(result.candidates?.[0]?.content?.role).toBe('model');
     });
 
     it('should handle conversation history', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [
           {
             parts: [{ text: 'What is 2+2?' }],
@@ -178,6 +179,7 @@ describe('TrustContentGenerator', () => {
 
     it('should handle system instructions', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Hello!' }],
           role: 'user'
@@ -201,6 +203,7 @@ describe('TrustContentGenerator', () => {
       mockModelClient.isModelLoaded.mockReturnValue(false);
 
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Hello!' }],
           role: 'user'
@@ -214,6 +217,7 @@ describe('TrustContentGenerator', () => {
 
     it('should use generation options from config', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Hello!' }],
           role: 'user'
@@ -246,6 +250,7 @@ describe('TrustContentGenerator', () => {
 
     it('should generate streaming content', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Tell me a story' }],
           role: 'user'
@@ -268,12 +273,13 @@ describe('TrustContentGenerator', () => {
 
       expect(chunks).toHaveLength(mockChunks.length);
       chunks.forEach((chunk, index) => {
-        expect(chunk.candidates[0].content.parts[0].text).toBe(mockChunks[index]);
+        expect(chunk.candidates?.[0]?.content?.parts?.[0]?.text).toBe(mockChunks[index]);
       });
     });
 
     it('should handle streaming errors', async () => {
       const request: GenerateContentParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'Hello!' }],
           role: 'user'
@@ -302,6 +308,7 @@ describe('TrustContentGenerator', () => {
 
     it('should estimate token count for simple text', async () => {
       const request: CountTokensParameters = {
+        model: 'test-model',
         contents: [{
           parts: [{ text: 'This is a test message with some words.' }],
           role: 'user'
@@ -316,6 +323,7 @@ describe('TrustContentGenerator', () => {
 
     it('should handle empty content', async () => {
       const request: CountTokensParameters = {
+        model: 'test-model',
         contents: []
       };
 

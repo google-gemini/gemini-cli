@@ -54,7 +54,7 @@ import {
   ApprovalMode,
   isEditorAvailable,
   EditorType,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';

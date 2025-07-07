@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TrustModelManagerImpl } from '@trustos/trust-cli-core';
-import { TrustConfiguration } from '@trustos/trust-cli-core';
+import { TrustModelManagerImpl } from '@trust-cli/trust-cli-core';
+import { TrustConfiguration } from '@trust-cli/trust-cli-core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -143,7 +143,7 @@ export class ModelCommandHandler {
     console.log('─'.repeat(40));
     
     // Import performance monitor for hardware analysis
-    const { globalPerformanceMonitor } = await import('@trustos/trust-cli-core');
+    const { globalPerformanceMonitor } = await import('@trust-cli/trust-cli-core');
     const optimal = globalPerformanceMonitor.getOptimalModelSettings();
     const systemMetrics = globalPerformanceMonitor.getSystemMetrics();
     

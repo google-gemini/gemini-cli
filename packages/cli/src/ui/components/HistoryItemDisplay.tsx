@@ -20,7 +20,7 @@ import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
-import { Config } from '@trustos/trust-cli-core';
+import { Config } from '@trust-cli/trust-cli-core';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;

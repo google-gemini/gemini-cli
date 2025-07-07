@@ -9,13 +9,13 @@ import type { Mocked } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
-import { FileDiscoveryService } from '@trustos/trust-cli-core';
+import { FileDiscoveryService } from '@trust-cli/trust-cli-core';
 import { glob } from 'glob';
 
 // Mock dependencies
 vi.mock('fs/promises');
-vi.mock('@trustos/trust-cli-core', async () => {
-  const actual = await vi.importActual('@trustos/trust-cli-core');
+vi.mock('@trust-cli/trust-cli-core', async () => {
+  const actual = await vi.importActual('@trust-cli/trust-cli-core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn(),

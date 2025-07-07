@@ -24,7 +24,7 @@ import {
   ThoughtSummary,
   UnauthorizedError,
   UserPromptEvent,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
   StreamingState,

@@ -24,5 +24,5 @@ export {
   TRUST_DESCRIPTION,
   DEFAULT_TRUST_MODEL,
   globalPerformanceMonitor
-} from './src/trustos/index.js';
-export * from './src/config/trustosConfig.js';
+} from './src/trust/index.js';
+export * from './src/config/trustConfig.js';

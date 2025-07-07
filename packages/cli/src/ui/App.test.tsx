@@ -14,7 +14,7 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { Tips } from './components/Tips.js';
@@ -69,10 +69,10 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
 }
 
-// Mock @trustos/trust-cli-core and its Config class
-vi.mock('@trustos/trust-cli-core', async (importOriginal) => {
+// Mock @trust-cli/trust-cli-core and its Config class
+vi.mock('@trust-cli/trust-cli-core', async (importOriginal) => {
   const actualCore =
-    await importOriginal<typeof import('@trustos/trust-cli-core')>();
+    await importOriginal<typeof import('@trust-cli/trust-cli-core')>();
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {

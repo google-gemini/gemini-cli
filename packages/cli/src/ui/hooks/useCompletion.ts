@@ -15,7 +15,7 @@ import {
   getErrorMessage,
   Config,
   FileDiscoveryService,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,

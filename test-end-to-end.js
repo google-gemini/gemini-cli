@@ -19,7 +19,7 @@ import {
 } from './packages/core/dist/index.js';
 
 // Import performance monitor and os separately
-import { globalPerformanceMonitor } from './packages/core/dist/src/trustos/performanceMonitor.js';
+import { globalPerformanceMonitor } from './packages/core/dist/src/trust/performanceMonitor.js';
 import os from 'os';
 
 async function testEndToEnd() {

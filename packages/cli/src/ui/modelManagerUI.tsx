@@ -7,8 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, Newline, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import { TrustModelManagerImpl, TrustConfiguration, globalPerformanceMonitor } from '@trustos/trust-cli-core';
-import { TrustModelConfig } from '@trustos/trust-cli-core';
+import { TrustModelManagerImpl, TrustConfiguration, globalPerformanceMonitor } from '@trust-cli/trust-cli-core';
+import { TrustModelConfig } from '@trust-cli/trust-cli-core';
 
 interface ModelManagerUIProps {
   onExit: () => void;

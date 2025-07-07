@@ -20,7 +20,7 @@ Successfully forked Google's Gemini CLI and began transformation into **trust-cl
 - ✅ Built local model client using node-llama-cpp (`nodeLlamaClient.ts`)
 - ✅ Implemented model management system (`modelManager.ts`)
 - ✅ Created TrustOS content generator to replace Gemini API (`trustContentGenerator.ts`)
-- ✅ Developed configuration system with privacy-focused defaults (`trustosConfig.ts`)
+- ✅ Developed configuration system with privacy-focused defaults (`trustConfig.ts`)
 
 ### 4. API Integration
 - ✅ Extended ContentGenerator interface to support TrustOS

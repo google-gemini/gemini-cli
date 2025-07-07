@@ -8,7 +8,7 @@ import { spawn } from 'child_process';
 import { StringDecoder } from 'string_decoder';
 import type { HistoryItemWithoutId } from '../types.js';
 import { useCallback } from 'react';
-import { Config, GeminiClient } from '@trustos/trust-cli-core';
+import { Config, GeminiClient } from '@trust-cli/trust-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';

@@ -68,7 +68,7 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
   GeminiClient,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
@@ -798,7 +798,7 @@ describe('useSlashCommandProcessor', () => {
   describe('/mcp command', () => {
     beforeEach(() => {
       // Mock the core module with getMCPServerStatus and getMCPDiscoveryState
-      vi.mock('@trustos/trust-cli-core', async (importOriginal) => {
+      vi.mock('@trust-cli/trust-cli-core', async (importOriginal) => {
         const actual = await importOriginal();
         return {
           ...actual,

@@ -24,7 +24,7 @@ import {
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode, // Import from core
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import {
   HistoryItemWithoutId,
   ToolCallStatus,
@@ -32,8 +32,8 @@ import {
 } from '../types.js';
 
 // Mocks
-vi.mock('@trustos/trust-cli-core', async () => {
-  const actual = await vi.importActual('@trustos/trust-cli-core');
+vi.mock('@trust-cli/trust-cli-core', async () => {
+  const actual = await vi.importActual('@trust-cli/trust-cli-core');
   return {
     ...actual,
     ToolRegistry: vi.fn(),

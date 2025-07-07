@@ -7,22 +7,15 @@
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { TrustModelManagerImpl } from './modelManager.js';
 import { TrustModelConfig } from './types.js';
-import fs from 'fs/promises';
-import path from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 // Mock dependencies
 vi.mock('fs/promises');
 vi.mock('path');
 vi.mock('./modelDownloader.js');
 
-const mockFs = fs as {
-  access: MockedFunction<typeof fs.access>;
-  readdir: MockedFunction<typeof fs.readdir>;
-  stat: MockedFunction<typeof fs.stat>;
-  writeFile: MockedFunction<typeof fs.writeFile>;
-  readFile: MockedFunction<typeof fs.readFile>;
-  mkdir: MockedFunction<typeof fs.mkdir>;
-};
+const mockFs = fs as any;
 
 describe('TrustModelManager', () => {
   let modelManager: TrustModelManagerImpl;

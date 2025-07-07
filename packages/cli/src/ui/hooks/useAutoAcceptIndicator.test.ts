@@ -20,14 +20,14 @@ import {
   Config,
   Config as ActualConfigType,
   ApprovalMode,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import { useInput, type Key as InkKey } from 'ink';
 
 vi.mock('ink');
 
-vi.mock('@trustos/trust-cli-core', async () => {
+vi.mock('@trust-cli/trust-cli-core', async () => {
   const actualServerModule = (await vi.importActual(
-    '@trustos/trust-cli-core',
+    '@trust-cli/trust-cli-core',
   )) as Record<string, unknown>;
   return {
     ...actualServerModule,

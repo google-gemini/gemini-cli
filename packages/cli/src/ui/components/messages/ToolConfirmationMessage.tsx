@@ -14,7 +14,7 @@ import {
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
   Config,
-} from '@trustos/trust-cli-core';
+} from '@trust-cli/trust-cli-core';
 import {
   RadioButtonSelect,
   RadioSelectItem,

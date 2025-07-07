@@ -14,7 +14,7 @@ import {
 } from '../editors/editorSettingsManager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { EditorType, isEditorAvailable } from '@trustos/trust-cli-core';
+import { EditorType, isEditorAvailable } from '@trust-cli/trust-cli-core';
 
 interface EditorDialogProps {
   onSelect: (editorType: EditorType | undefined, scope: SettingScope) => void;

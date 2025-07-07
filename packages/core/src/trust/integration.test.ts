@@ -9,7 +9,7 @@ import { TrustContentGenerator } from './trustContentGenerator.js';
 import { TrustModelManagerImpl } from './modelManager.js';
 import { PerformanceMonitor } from './performanceMonitor.js';
 import { PrivacyManager } from './privacyManager.js';
-import { PrivacyMode, TrustConfiguration } from './types.js';
+import { TrustConfiguration } from './types.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Mock file system for all components
@@ -30,7 +30,7 @@ vi.mock('os', () => ({
 }));
 
 // Import mocked fs after mocking
-import fs from 'fs/promises';
+import * as fs from 'fs/promises';
 
 const mockFs = fs as any;
 
@@ -57,7 +57,7 @@ describe('Trust CLI Integration Tests', () => {
     contentGenerator = new TrustContentGenerator(testModelsDir);
     modelManager = new TrustModelManagerImpl(testModelsDir);
     performanceMonitor = new PerformanceMonitor();
-    privacyManager = new PrivacyManager(testConfigPath);
+    privacyManager = new PrivacyManager();
   });
 
   afterEach(() => {
@@ -183,13 +183,14 @@ describe('Trust CLI Integration Tests', () => {
       await contentGenerator.initialize();
 
       // Set strict privacy mode
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const sensitiveRequest: GenerateContentParameters = {
         contents: [{
           parts: [{ text: 'My API key is sk-1234567890 and password is secret123' }],
           role: 'user'
-        }]
+        }],
+        model: 'test-model'
       };
 
       // Sanitize the request data
@@ -219,7 +220,7 @@ describe('Trust CLI Integration Tests', () => {
 
     it('should encrypt sensitive model data when required', async () => {
       await privacyManager.initialize();
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const sensitiveModelData = {
         modelPath: '/sensitive/path/model.gguf',
@@ -227,10 +228,10 @@ describe('Trust CLI Integration Tests', () => {
         apiKeys: ['sk-abc123', 'sk-def456']
       };
 
-      const encrypted = privacyManager.encryptData(JSON.stringify(sensitiveModelData));
+      const encrypted = await privacyManager.encryptData(JSON.stringify(sensitiveModelData));
       expect(encrypted).not.toBe(JSON.stringify(sensitiveModelData));
 
-      const decrypted = privacyManager.decryptData(encrypted);
+      const decrypted = await privacyManager.decryptData(encrypted);
       expect(JSON.parse(decrypted)).toEqual(sensitiveModelData);
     });
   });
@@ -243,7 +244,7 @@ describe('Trust CLI Integration Tests', () => {
       await contentGenerator.initialize();
 
       // Set privacy mode
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
 
       // Get system capabilities
       const systemMetrics = performanceMonitor.getSystemMetrics();
@@ -271,6 +272,7 @@ describe('Trust CLI Integration Tests', () => {
             parts: [{ text: 'Write a simple hello world function in Python' }],
             role: 'user'
           }],
+          model: 'test-model',
           config: {
             temperature: 0.7,
             topP: 0.9
@@ -329,8 +331,8 @@ describe('Trust CLI Integration Tests', () => {
       await contentGenerator.initialize();
 
       // Set privacy mode and verify consistency
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
-      expect(privacyManager.getCurrentMode()).toBe(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
+      expect(privacyManager.getCurrentMode()).toBe('strict');
 
       // Switch model and verify consistency
       const models = modelManager.listAvailableModels();
@@ -370,7 +372,7 @@ describe('Trust CLI Integration Tests', () => {
 
     it('should respect privacy settings during MCP operations', async () => {
       await privacyManager.initialize();
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const mcpToolResult = {
         toolName: 'filesystem_read',
@@ -408,18 +410,18 @@ describe('Trust CLI Integration Tests', () => {
     it('should handle configuration persistence across restarts', async () => {
       // Simulate a full configuration setup
       await privacyManager.initialize();
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
       await privacyManager.setDataRetention(30);
 
       // Verify configuration is saved
       expect(mockFs.writeFile).toHaveBeenCalled();
 
       // Simulate restart by creating new instances
-      const newPrivacyManager = new PrivacyManager(testConfigPath);
+      const newPrivacyManager = new PrivacyManager();
       
       // Mock reading the saved configuration
       const savedConfig = {
-        mode: PrivacyMode.MODERATE,
+        mode: 'moderate',
         dataRetention: 30,
         allowTelemetry: false,
         encryptStorage: true,
@@ -431,7 +433,7 @@ describe('Trust CLI Integration Tests', () => {
       
       await newPrivacyManager.initialize();
       
-      expect(newPrivacyManager.getCurrentMode()).toBe(PrivacyMode.MODERATE);
+      expect(newPrivacyManager.getCurrentMode()).toBe('moderate');
       expect(newPrivacyManager.getDataRetentionDays()).toBe(30);
     });
   });

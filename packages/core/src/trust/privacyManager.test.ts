@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { PrivacyManager } from './privacyManager.js';
-import { PrivacyMode } from './types.js';
-import fs from 'fs/promises';
+import type { PrivacyMode } from './types.js';
+import * as fs from 'fs/promises';
 
 // Mock dependencies
 vi.mock('fs/promises');
@@ -19,13 +19,7 @@ vi.mock('crypto', () => ({
   }))
 }));
 
-const mockFs = fs as {
-  writeFile: MockedFunction<typeof fs.writeFile>;
-  readFile: MockedFunction<typeof fs.readFile>;
-  access: MockedFunction<typeof fs.access>;
-  mkdir: MockedFunction<typeof fs.mkdir>;
-  unlink: MockedFunction<typeof fs.unlink>;
-};
+const mockFs = fs as any;
 
 describe('PrivacyManager', () => {
   let privacyManager: PrivacyManager;
@@ -33,7 +27,7 @@ describe('PrivacyManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    privacyManager = new PrivacyManager(testConfigPath);
+    privacyManager = new PrivacyManager();
   });
 
   describe('initialization', () => {
@@ -45,12 +39,12 @@ describe('PrivacyManager', () => {
       await privacyManager.initialize();
 
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.STRICT);
+      expect(mode).toBe('strict');
     });
 
     it('should load existing privacy configuration', async () => {
       const existingConfig = {
-        mode: PrivacyMode.MODERATE,
+        mode: 'moderate',
         dataRetention: 30,
         allowTelemetry: false,
         encryptStorage: true,
@@ -64,7 +58,7 @@ describe('PrivacyManager', () => {
       await privacyManager.initialize();
 
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.MODERATE);
+      expect(mode).toBe('moderate');
     });
 
     it('should create directory if it does not exist', async () => {
@@ -87,10 +81,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should set privacy mode to strict', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.STRICT);
+      expect(mode).toBe('strict');
 
       const config = privacyManager.getPrivacySettings();
       expect(config.allowTelemetry).toBe(false);
@@ -100,10 +94,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should set privacy mode to moderate', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
 
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.MODERATE);
+      expect(mode).toBe('moderate');
 
       const config = privacyManager.getPrivacySettings();
       expect(config.allowTelemetry).toBe(false);
@@ -113,10 +107,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should set privacy mode to open', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
 
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.OPEN);
+      expect(mode).toBe('open');
 
       const config = privacyManager.getPrivacySettings();
       expect(config.allowTelemetry).toBe(true);
@@ -126,12 +120,12 @@ describe('PrivacyManager', () => {
     });
 
     it('should save configuration when mode changes', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
 
       expect(mockFs.writeFile).toHaveBeenCalled();
       const writeCall = mockFs.writeFile.mock.calls[mockFs.writeFile.mock.calls.length - 1];
       const savedConfig = JSON.parse(writeCall[1] as string);
-      expect(savedConfig.mode).toBe(PrivacyMode.MODERATE);
+      expect(savedConfig.mode).toBe('moderate');
     });
   });
 
@@ -144,7 +138,7 @@ describe('PrivacyManager', () => {
     });
 
     it('should sanitize sensitive data in strict mode', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const sensitiveData = {
         userInput: 'My password is secret123',
@@ -162,7 +156,7 @@ describe('PrivacyManager', () => {
     });
 
     it('should preserve data in open mode', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
 
       const data = {
         userInput: 'My password is secret123',
@@ -178,7 +172,7 @@ describe('PrivacyManager', () => {
     });
 
     it('should partially sanitize in moderate mode', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
 
       const data = {
         userInput: 'My password is secret123',
@@ -251,7 +245,7 @@ describe('PrivacyManager', () => {
     });
 
     it('should allow operations in open mode', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
 
       expect(privacyManager.canCollectTelemetry()).toBe(true);
       expect(privacyManager.canShareData()).toBe(true);
@@ -259,7 +253,7 @@ describe('PrivacyManager', () => {
     });
 
     it('should restrict operations in strict mode', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       expect(privacyManager.canCollectTelemetry()).toBe(false);
       expect(privacyManager.canShareData()).toBe(false);
@@ -276,10 +270,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should encrypt sensitive data when encryption is enabled', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const sensitiveData = 'This is sensitive information';
-      const encrypted = privacyManager.encryptData(sensitiveData);
+      const encrypted = await privacyManager.encryptData(sensitiveData);
 
       expect(encrypted).not.toBe(sensitiveData);
       expect(encrypted).toBeDefined();
@@ -287,20 +281,20 @@ describe('PrivacyManager', () => {
     });
 
     it('should decrypt encrypted data', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
 
       const originalData = 'This is sensitive information';
-      const encrypted = privacyManager.encryptData(originalData);
-      const decrypted = privacyManager.decryptData(encrypted);
+      const encrypted = await privacyManager.encryptData(originalData);
+      const decrypted = await privacyManager.decryptData(encrypted);
 
       expect(decrypted).toBe(originalData);
     });
 
     it('should return plain data when encryption is disabled', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
 
       const data = 'This is some data';
-      const result = privacyManager.encryptData(data);
+      const result = await privacyManager.encryptData(data);
 
       expect(result).toBe(data);
     });
@@ -328,10 +322,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should use different retention periods for different modes', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
       const strictRetention = privacyManager.getDataRetentionDays();
 
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
       const openRetention = privacyManager.getDataRetentionDays();
 
       expect(strictRetention).toBeLessThanOrEqual(openRetention);
@@ -364,10 +358,10 @@ describe('PrivacyManager', () => {
     });
 
     it('should show different recommendations for different modes', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.OPEN);
+      await privacyManager.setPrivacyMode('open');
       const openReport = privacyManager.generatePrivacyReport();
 
-      await privacyManager.setPrivacyMode(PrivacyMode.STRICT);
+      await privacyManager.setPrivacyMode('strict');
       const strictReport = privacyManager.generatePrivacyReport();
 
       expect(openReport.recommendations).not.toEqual(strictReport.recommendations);
@@ -390,15 +384,15 @@ describe('PrivacyManager', () => {
 
       // Should fall back to default configuration
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.STRICT);
+      expect(mode).toBe('strict');
     });
 
     it('should handle encryption errors', async () => {
       await privacyManager.initialize();
 
       // Test with invalid data types
-      expect(() => privacyManager.encryptData(null as any)).not.toThrow();
-      expect(() => privacyManager.encryptData(undefined as any)).not.toThrow();
+      await expect(privacyManager.encryptData(null as any)).resolves.not.toThrow();
+      await expect(privacyManager.encryptData(undefined as any)).resolves.not.toThrow();
     });
   });
 
@@ -411,14 +405,14 @@ describe('PrivacyManager', () => {
     });
 
     it('should persist custom privacy settings', async () => {
-      await privacyManager.setPrivacyMode(PrivacyMode.MODERATE);
+      await privacyManager.setPrivacyMode('moderate');
       await privacyManager.setDataRetention(45);
 
       expect(mockFs.writeFile).toHaveBeenCalled();
       const lastCall = mockFs.writeFile.mock.calls[mockFs.writeFile.mock.calls.length - 1];
       const savedConfig = JSON.parse(lastCall[1] as string);
 
-      expect(savedConfig.mode).toBe(PrivacyMode.MODERATE);
+      expect(savedConfig.mode).toBe('moderate');
       expect(savedConfig.dataRetention).toBe(45);
     });
 
@@ -436,7 +430,7 @@ describe('PrivacyManager', () => {
 
       // Should use default values for invalid settings
       const mode = privacyManager.getCurrentMode();
-      expect(mode).toBe(PrivacyMode.STRICT);
+      expect(mode).toBe('strict');
 
       const retention = privacyManager.getDataRetentionDays();
       expect(retention).toBeGreaterThan(0);

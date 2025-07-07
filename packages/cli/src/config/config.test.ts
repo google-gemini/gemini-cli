@@ -9,7 +9,7 @@ import * as os from 'os';
 import { loadCliConfig } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
-import * as ServerConfig from '@trustos/trust-cli-core';
+import * as ServerConfig from '@trust-cli/trust-cli-core';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -29,9 +29,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@trustos/trust-cli-core', async () => {
+vi.mock('@trust-cli/trust-cli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@trustos/trust-cli-core',
+    '@trust-cli/trust-cli-core',
   );
   return {
     ...actualServer,

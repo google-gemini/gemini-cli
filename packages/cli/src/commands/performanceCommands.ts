@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { globalPerformanceMonitor } from '@trustos/trust-cli-core';
+import { globalPerformanceMonitor } from '@trust-cli/trust-cli-core';
 
 export interface PerformanceCommandArgs {
   action: 'status' | 'report' | 'watch' | 'optimize';
