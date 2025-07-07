@@ -7,7 +7,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as https from 'https';
+import * as http from 'http';
 import { createWriteStream } from 'fs';
+import { URL } from 'url';
 import { TrustModelConfig } from './types.js';
 
 export interface DownloadProgress {
@@ -83,72 +85,142 @@ export class ModelDownloader {
     finalPath: string,
     onProgress?: (progress: DownloadProgress) => void
   ): Promise<string> {
-    // For this demo implementation, we'll create a placeholder file
-    // In production, this would use the Hugging Face Hub API or direct download
+    // Convert Hugging Face blob URL to direct download URL
+    const downloadUrl = this.getHuggingFaceDownloadUrl(model.downloadUrl!);
     
-    console.log(`🚧 Demo Mode: Creating placeholder file for ${model.name}`);
-    console.log(`📝 In production, this would download from: ${model.downloadUrl}`);
-    
-    // Simulate download progress
-    const simulatedSize = this.getEstimatedModelSize(model);
-    const chunkSize = 1024 * 1024; // 1MB chunks
-    let downloaded = 0;
-    const startTime = Date.now();
-    
-    // Create placeholder content
-    const placeholderContent = this.createPlaceholderContent(model);
-    
-    // Write in chunks to simulate download
-    const writeStream = createWriteStream(tempPath);
+    console.log(`🚀 Starting download of ${model.name}...`);
     
     return new Promise((resolve, reject) => {
-      const writeChunk = () => {
-        if (downloaded >= simulatedSize) {
-          writeStream.end();
+      const file = createWriteStream(tempPath);
+      const startTime = Date.now();
+      let downloaded = 0;
+
+      const options = {
+        headers: {
+          'User-Agent': 'TrustCLI/0.1.0 (https://github.com/audit-brands/trust-cli)',
+          'Accept': '*/*',
+          'Accept-Encoding': 'identity'
+        }
+      };
+
+      this.makeRequest(downloadUrl, options, file, tempPath, finalPath, startTime, onProgress, resolve, reject);
+    });
+  }
+
+  private makeRequest(
+    url: string,
+    options: any,
+    file: any,
+    tempPath: string,
+    finalPath: string,
+    startTime: number,
+    onProgress?: (progress: DownloadProgress) => void,
+    resolve?: (value: string) => void,
+    reject?: (reason: any) => void
+  ) {
+    const parsedUrl = new URL(url);
+    const client = parsedUrl.protocol === 'https:' ? https : http;
+
+    const request = client.get(url, options, (response) => {
+      // Handle redirects
+      if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
+        const redirectUrl = response.headers.location;
+        if (redirectUrl) {
+          // Handle relative URLs by resolving against the original URL
+          const absoluteRedirectUrl = redirectUrl.startsWith('http') 
+            ? redirectUrl 
+            : new URL(redirectUrl, url).toString();
+          
+          // Make recursive call with redirect URL
+          this.makeRequest(absoluteRedirectUrl, options, file, tempPath, finalPath, startTime, onProgress, resolve, reject);
           return;
         }
-        
-        const remainingSize = simulatedSize - downloaded;
-        const currentChunkSize = Math.min(chunkSize, remainingSize);
-        const chunk = Buffer.alloc(currentChunkSize, placeholderContent);
-        
-        writeStream.write(chunk);
-        downloaded += currentChunkSize;
-        
-        if (onProgress) {
-          const elapsed = (Date.now() - startTime) / 1000;
-          const speed = downloaded / elapsed;
-          const eta = (simulatedSize - downloaded) / speed;
-          
-          onProgress({
-            downloaded,
-            total: simulatedSize,
-            percentage: (downloaded / simulatedSize) * 100,
-            speed,
-            eta
-          });
-        }
-        
-        // Simulate network delay
-        setTimeout(writeChunk, 10);
-      };
-      
-      writeStream.on('error', reject);
-      writeStream.on('finish', async () => {
-        try {
-          // Move temp file to final location
-          await fs.rename(tempPath, finalPath);
-          console.log(`\n✅ Successfully downloaded ${model.name}`);
-          console.log(`📁 Saved to: ${finalPath}`);
-          console.log(`📊 Size: ${this.formatFileSize(downloaded)}`);
-          resolve(finalPath);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      
-      writeChunk();
+      }
+
+      this.handleDownloadResponse(response, file, tempPath, finalPath, startTime, onProgress, resolve, reject);
     });
+
+    request.on('error', (error) => {
+      file.close();
+      fs.unlink(tempPath).catch(() => {}); // Clean up temp file
+      reject?.(error);
+    });
+  }
+
+  private handleDownloadResponse(
+    response: any,
+    file: any,
+    tempPath: string,
+    finalPath: string,
+    startTime: number,
+    onProgress?: (progress: DownloadProgress) => void,
+    resolve?: (value: string) => void,
+    reject?: (reason: any) => void
+  ) {
+    const total = parseInt(response.headers['content-length'] || '0', 10);
+    let downloaded = 0;
+
+    if (response.statusCode !== 200) {
+      file.close();
+      fs.unlink(tempPath).catch(() => {});
+      reject?.(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+      return;
+    }
+
+    response.on('data', (chunk: Buffer) => {
+      downloaded += chunk.length;
+      
+      if (onProgress && total > 0) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const speed = downloaded / elapsed;
+        const eta = (total - downloaded) / speed;
+        
+        onProgress({
+          downloaded,
+          total,
+          percentage: (downloaded / total) * 100,
+          speed,
+          eta
+        });
+      }
+    });
+
+    response.pipe(file);
+
+    file.on('finish', async () => {
+      file.close();
+      try {
+        await fs.rename(tempPath, finalPath);
+        console.log(`\n✅ Successfully downloaded ${finalPath.split('/').pop()}`);
+        console.log(`📁 Location: ${finalPath}`);
+        console.log(`📊 Size: ${this.formatFileSize(downloaded)}`);
+        resolve?.(finalPath);
+      } catch (error) {
+        reject?.(error);
+      }
+    });
+
+    file.on('error', (error: Error) => {
+      fs.unlink(tempPath).catch(() => {});
+      reject?.(error);
+    });
+  }
+
+  private getHuggingFaceDownloadUrl(blobUrl: string): string {
+    // Convert from blob URL to direct download URL
+    // Example: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/blob/main/qwen2.5-1.5b-instruct-q8_0.gguf
+    // To: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q8_0.gguf?download=true
+    
+    if (blobUrl.includes('/blob/')) {
+      return blobUrl.replace('/blob/', '/resolve/') + '?download=true';
+    }
+    
+    // If it's already a resolve URL, just add download parameter
+    if (blobUrl.includes('/resolve/')) {
+      return blobUrl.includes('?') ? blobUrl + '&download=true' : blobUrl + '?download=true';
+    }
+    
+    return blobUrl;
   }
 
   private async downloadFromUrl(
@@ -249,17 +321,6 @@ export class ModelDownloader {
     }
   }
 
-  private createPlaceholderContent(model: TrustModelConfig): string {
-    return `# Trust Model Placeholder: ${model.name}\n` +
-           `# This is a placeholder file created in demo mode.\n` +
-           `# In production, this would be the actual GGUF model file.\n` +
-           `# Model: ${model.description}\n` +
-           `# Type: ${model.type}\n` +
-           `# Quantization: ${model.quantization}\n` +
-           `# Parameters: ${model.parameters}\n` +
-           `# Original URL: ${model.downloadUrl}\n` +
-           `# Trust Score: ${model.trustScore}/10\n\n`;
-  }
 
   private formatFileSize(bytes: number): string {
     const units = ['B', 'KB', 'MB', 'GB'];
