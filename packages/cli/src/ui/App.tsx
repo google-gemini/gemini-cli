@@ -310,6 +310,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     stdin,
     setRawMode,
     isValidPath,
+    shellModeActive,
   });
 
   const handleExit = useCallback(
