@@ -305,6 +305,26 @@ async function connectAndDiscover(
         continue;
       }
 
+      const { includeTools, excludeTools } = mcpServerConfig;
+      const toolName = funcDecl.name;
+
+      let isEnabled = false;
+      if (includeTools === undefined) {
+        isEnabled = true;
+      } else {
+        isEnabled = includeTools.some(
+          (tool) => tool === toolName || tool.startsWith(`${toolName}(`),
+        );
+      }
+
+      if (excludeTools?.includes(toolName)) {
+        isEnabled = false;
+      }
+
+      if (!isEnabled) {
+        continue;
+      }
+
       let toolNameForModel = funcDecl.name;
 
       // Replace invalid characters (based on 400 error message from Gemini API) with underscores
