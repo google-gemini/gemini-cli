@@ -60,7 +60,7 @@ export function getInstallationId(): string {
 /**
  * Retrieves the obfuscated Google Account ID for the currently authenticated user.
  * When OAuth is available, returns the user's cached Google Account ID. Otherwise, returns the installation ID.
- * @returns A string ID for the user (Google Account ID if available, otherwise installation ID).
+ * @returns A string ID for the user (Google Account ID if available; otherwise, installation ID).
  */
 export async function getGoogleAccountId(): Promise<string> {
   // Try to get cached Google Account ID first

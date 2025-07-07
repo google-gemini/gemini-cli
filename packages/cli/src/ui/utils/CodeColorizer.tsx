@@ -50,7 +50,7 @@ function renderHastNode(
     }
 
     // Determine the color to pass down: Use this element's specific color
-    // if found, otherwise, continue passing down the already inherited color.
+    // if found; otherwise, continue passing down the already inherited color.
     const colorToPassDown = elementColor || inheritedColor;
 
     // Recursively render children, passing the determined color down
