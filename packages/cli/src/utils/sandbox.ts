@@ -847,7 +847,7 @@ async function ensureSandboxImageIsPresent(
 
   console.info(`Sandbox image ${image} not found locally.`);
   if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
-    // user needs to build the image themself
+    // user needs to build the image themselves
     return false;
   }
 
