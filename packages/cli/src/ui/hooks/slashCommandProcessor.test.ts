@@ -159,7 +159,7 @@ describe('useSlashCommandProcessor', () => {
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
         cumulative: {
-          turnCount: 0,
+          promptCount: 0,
           promptTokenCount: 0,
           candidatesTokenCount: 0,
           totalTokenCount: 0,

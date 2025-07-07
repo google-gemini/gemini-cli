@@ -95,12 +95,14 @@ export class UserPromptEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
+  prompt_id: string;
   prompt?: string;
 
-  constructor(prompt_length: number, prompt?: string) {
+  constructor(prompt_length: number, prompt_Id: string, prompt?: string) {
     this['event.name'] = 'user_prompt';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_length = prompt_length;
+    this.prompt_id = prompt_Id;
     this.prompt = prompt;
   }
 }

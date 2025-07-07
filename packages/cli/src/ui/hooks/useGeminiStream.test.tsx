@@ -109,13 +109,13 @@ vi.mock('./useLogger.js', () => ({
   }),
 }));
 
-const mockStartNewTurn = vi.fn();
+const mockStartNewPrompt = vi.fn();
 const mockAddUsage = vi.fn();
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(() => ({
-    startNewTurn: mockStartNewTurn,
+    startNewPrompt: mockStartNewPrompt,
     addUsage: mockAddUsage,
-    getTurnCount: vi.fn(() => 5),
+    getPromptCount: vi.fn(() => 5),
   })),
 }));
 
@@ -625,6 +625,7 @@ describe('useGeminiStream', () => {
         name: 'toolA',
         args: {},
         isClientInitiated: false,
+        prompt_id: 'prompt-id-7',
       },
       tool: {
         name: 'toolA',
@@ -648,6 +649,7 @@ describe('useGeminiStream', () => {
         name: 'toolB',
         args: {},
         isClientInitiated: false,
+        prompt_id: 'prompt-id-8',
       },
       tool: {
         name: 'toolB',
