@@ -205,13 +205,13 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - **`location`** (string): Your Google Cloud Project Location (e.g., us-central1).
   - **Example:**
     ```json
-    "selectedAuthType": "oauth-personal", // oauth-personal, gemini-api-key, vertex-ai
+    "selectedAuthType": "oauth", // oauth, gemini, vertex
     "auth": {
-      // for gemini-api-key
+      // for gemini
       "gemini": {
         "apiKey": "YOUR_GEMINI_API_KEY"
       },
-      // for vertex-ai
+      // for vertex
       "vertex": {
         "apiKey": "YOUR_GOOGLE_API_KEY",
         "project": "YOUR_GCP_PROJECT",
