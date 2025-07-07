@@ -217,7 +217,11 @@ export function useCompletion(
     const findFilesRecursively = async (
       startDir: string,
       searchPrefix: string,
-      fileDiscovery: { shouldGitIgnoreFile: (path: string) => boolean } | null,
+      fileDiscovery: FileDiscoveryService | null,
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       currentRelativePath = '',
       depth = 0,
       maxDepth = 10, // Limit recursion depth
@@ -245,10 +249,10 @@ export function useCompletion(
             continue;
           }
 
-          // Check if this entry should be ignored by git-aware filtering
+          // Check if this entry should be ignored by filtering options
           if (
             fileDiscovery &&
-            fileDiscovery.shouldGitIgnoreFile(entryPathFromRoot)
+            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
           ) {
             continue;
           }
@@ -272,6 +276,7 @@ export function useCompletion(
                   path.join(startDir, entry.name),
                   searchPrefix, // Pass original searchPrefix for recursive calls
                   fileDiscovery,
+                  filterOptions,
                   entryPathRelative,
                   depth + 1,
                   maxDepth,
@@ -290,6 +295,10 @@ export function useCompletion(
     const findFilesWithGlob = async (
       searchPrefix: string,
       fileDiscoveryService: FileDiscoveryService,
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       maxResults = 50,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
@@ -309,7 +318,10 @@ export function useCompletion(
         })
         .filter((s) => {
           if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldGitIgnoreFile(s.label); // relative path
+            return !fileDiscoveryService.shouldIgnoreFile(
+              s.label,
+              filterOptions,
+            ); // relative path
           }
           return true;
         })
@@ -325,6 +337,10 @@ export function useCompletion(
       const fileDiscoveryService = config ? config.getFileService() : null;
       const enableRecursiveSearch =
         config?.getEnableRecursiveFileSearch() ?? true;
+      const filterOptions = {
+        respectGitIgnore: config?.getFileFilteringRespectGitIgnore() ?? true,
+        respectGeminiIgnore: true,
+      };
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
@@ -337,12 +353,14 @@ export function useCompletion(
             fetchedSuggestions = await findFilesWithGlob(
               prefix,
               fileDiscoveryService,
+              filterOptions,
             );
           } else {
             fetchedSuggestions = await findFilesRecursively(
               cwd,
               prefix,
               fileDiscoveryService,
+              filterOptions,
             );
           }
         } else {
@@ -367,7 +385,7 @@ export function useCompletion(
             );
             if (
               fileDiscoveryService &&
-              fileDiscoveryService.shouldGitIgnoreFile(relativePath)
+              fileDiscoveryService.shouldIgnoreFile(relativePath, filterOptions)
             ) {
               continue;
             }

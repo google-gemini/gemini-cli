@@ -82,6 +82,11 @@ export class WebSearchTool extends BaseTool<
     );
   }
 
+  /**
+   * Validates the parameters for the WebSearchTool.
+   * @param params The parameters to validate
+   * @returns An error message string if validation fails, null if valid
+   */
   validateParams(params: WebSearchToolParams): string | null {
     const errors = SchemaValidator.validate(this.schema.parameters, params);
     if (errors) {
@@ -102,7 +107,7 @@ export class WebSearchTool extends BaseTool<
     params: WebSearchToolParams,
     signal: AbortSignal,
   ): Promise<WebSearchToolResult> {
-    const validationError = this.validateParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
