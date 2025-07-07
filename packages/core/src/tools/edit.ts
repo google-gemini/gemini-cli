@@ -19,7 +19,6 @@ import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { GeminiClient } from '../core/client.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
@@ -73,15 +72,13 @@ export class EditTool
   implements ModifiableTool<EditToolParams>
 {
   static readonly Name = 'replace';
-  private readonly config: Config;
   private readonly rootDirectory: string;
-  private readonly client: GeminiClient;
 
   /**
    * Creates a new instance of the EditLogic
    * @param rootDirectory Root directory to ground this tool in.
    */
-  constructor(config: Config) {
+  constructor(private readonly config: Config) {
     super(
       EditTool.Name,
       'Edit',
@@ -124,9 +121,7 @@ Expectation for required parameters:
         type: Type.OBJECT,
       },
     );
-    this.config = config;
     this.rootDirectory = path.resolve(this.config.getTargetDir());
-    this.client = config.getGeminiClient();
   }
 
   /**
@@ -235,7 +230,7 @@ Expectation for required parameters:
         params.file_path,
         currentContent,
         params,
-        this.client,
+        this.config.getGeminiClient(),
         abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
