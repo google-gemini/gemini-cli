@@ -159,7 +159,7 @@ export async function main() {
     settings.setValue(
       SettingScope.User,
       'selectedAuthType',
-      AuthType.USE_TRUSTOS,
+      AuthType.USE_TRUST_LOCAL,
     );
   }
 
@@ -332,10 +332,10 @@ async function validateNonInterActiveAuth(
     console.log('No authentication method set. Using Trust local inference mode.');
   }
 
-  selectedAuthType = selectedAuthType || AuthType.USE_TRUSTOS;
+  selectedAuthType = selectedAuthType || AuthType.USE_TRUST_LOCAL;
   
   // Trust authentication is always available for local inference
-  if (selectedAuthType === AuthType.USE_TRUSTOS) {
+  if (selectedAuthType === AuthType.USE_TRUST_LOCAL) {
     await nonInteractiveConfig.refreshAuth(selectedAuthType);
     return nonInteractiveConfig;
   }

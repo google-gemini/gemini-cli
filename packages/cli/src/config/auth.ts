@@ -35,7 +35,7 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
-  if (authMethod === AuthType.USE_TRUSTOS) {
+  if (authMethod === AuthType.USE_TRUST_LOCAL) {
     // Trust is always available - no external dependencies required
     return null;
   }
