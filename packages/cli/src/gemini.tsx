@@ -22,6 +22,7 @@ import {
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
+import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
@@ -103,7 +104,7 @@ export async function main() {
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
   // set default fallback to gemini api key
-  // this has to go after load cli because thats where the env is set
+  // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
     settings.setValue(
       SettingScope.User,
@@ -165,7 +166,10 @@ export async function main() {
     }
   }
   let input = config.getQuestion();
-  const startupWarnings = await getStartupWarnings();
+  const startupWarnings = [
+    ...(await getStartupWarnings()),
+    ...(await getUserStartupWarnings(workspaceRoot)),
+  ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
@@ -184,7 +188,7 @@ export async function main() {
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !input) {
     input += await readStdin();
   }
   if (!input) {
