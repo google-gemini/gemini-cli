@@ -385,6 +385,18 @@ describe('discoverMcpTools', () => {
         {},
       );
     });
+
+    it('should pass oauth token when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+      };
+      const { serverConfig } = await setupHttpTest(headers);
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.httpUrl!),
+        { requestInit: { headers } },
+      );
+    });
   });
 
   it('should prefix tool names if multiple MCP servers are configured', async () => {
