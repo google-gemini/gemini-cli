@@ -9,7 +9,7 @@ import {
   CodeAssistGlobalUserSettingResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
-  LongrunningOperationResponse,
+  LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
@@ -78,8 +78,8 @@ export class CodeAssistServer implements ContentGenerator {
 
   async onboardUser(
     req: OnboardUserRequest,
-  ): Promise<LongrunningOperationResponse> {
-    return await this.requestPost<LongrunningOperationResponse>(
+  ): Promise<LongRunningOperationResponse> {
+    return await this.requestPost<LongRunningOperationResponse>(
       'onboardUser',
       req,
     );
