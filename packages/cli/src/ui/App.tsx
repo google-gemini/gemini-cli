@@ -79,6 +79,8 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
+  initialPrompt?: string;
+  initialPromptSource?: string;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -87,7 +89,7 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initialPromptSource = '' }: AppProps) => {
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -476,6 +478,29 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
+
+  // Handle initial prompt submission - simple approach
+  const [initialPromptSubmitted, setInitialPromptSubmitted] = useState(false);
+  
+  // Submit initial prompt when fully ready - simple check
+  useEffect(() => {
+    if (
+      initialPrompt && 
+      !initialPromptSubmitted && 
+      isInputActive && 
+      !isAuthenticating && 
+      !isAuthDialogOpen && 
+      !authError &&
+      settings.merged.selectedAuthType &&
+      config.getContentGeneratorConfig() // Ensure config is fully initialized
+    ) {
+      if (config.getDebugMode()) {
+        setDebugMessage(`Submitting initial prompt from ${initialPromptSource}`);
+      }
+      setInitialPromptSubmitted(true);
+      handleFinalSubmit(initialPrompt);
+    }
+  }, [initialPrompt, initialPromptSubmitted, isInputActive, isAuthenticating, isAuthDialogOpen, authError, settings.merged.selectedAuthType, config, handleFinalSubmit, initialPromptSource]);
 
   const handleClearScreen = useCallback(() => {
     clearItems();

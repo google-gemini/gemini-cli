@@ -589,6 +589,46 @@ describe('Settings Loading and Merging', () => {
       delete process.env.TEST_HOST;
       delete process.env.TEST_PORT;
     });
+
+    it('should load initialPrompt setting from workspace settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = { initialPrompt: 'startup command' };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.initialPrompt).toBe('startup command');
+    });
+
+    it('should prioritize workspace initialPrompt setting over user setting', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = { initialPrompt: 'user prompt' };
+      const workspaceSettingsContent = { initialPrompt: 'workspace prompt' };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.initialPrompt).toBe('workspace prompt');
+    });
+
+    it('should have initialPrompt as undefined if not in any settings file', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
+      (fs.readFileSync as Mock).mockReturnValue('{}');
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.initialPrompt).toBeUndefined();
+    });
   });
 
   describe('LoadedSettings class', () => {

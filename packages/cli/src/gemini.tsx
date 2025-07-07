@@ -166,9 +166,42 @@ export async function main() {
     }
   }
   let input = config.getQuestion();
-  const startupWarnings = [
+  
+  // Get initial prompt from environment variable or settings with source attribution
+  let initialPrompt = '';
+  let initialPromptSource = '';
+  
+  if (process.env.GEMINI_INITIAL_PROMPT?.trim()) {
+    initialPrompt = process.env.GEMINI_INITIAL_PROMPT.trim();
+    initialPromptSource = 'environment variable';
+  } else if (settings.merged.initialPrompt?.trim()) {
+    initialPrompt = settings.merged.initialPrompt.trim();
+    // Determine if it came from workspace or user settings
+    if (settings.workspace.settings.initialPrompt?.trim()) {
+      initialPromptSource = 'workspace settings';
+    } else {
+      initialPromptSource = 'user settings';
+    }
+  }
+
+  // Validate prompt length and add warning to startup warnings if needed
+  const MIN_INITIAL_PROMPT_LENGTH = 1;
+  let initialPromptWarning = '';
+  if (initialPrompt && initialPrompt.length < MIN_INITIAL_PROMPT_LENGTH) {
+    initialPromptWarning = `Initial prompt from ${initialPromptSource} is too short (${initialPrompt.length} chars). Minimum length is ${MIN_INITIAL_PROMPT_LENGTH} character. Ignoring initial prompt.`;
+    initialPrompt = ''; // Clear the prompt if it's too short
+  }
+
+  // Debug logging - only in debug mode
+  if (config.getDebugMode() && initialPrompt) {
+    console.debug(`Initial prompt loaded from ${initialPromptSource}: "${initialPrompt}"`);
+  }
+
+  // Add any initial prompt warnings to startup warnings
+  const allStartupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
+    ...(initialPromptWarning ? [initialPromptWarning] : []),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
@@ -179,7 +212,9 @@ export async function main() {
         <AppWrapper
           config={config}
           settings={settings}
-          startupWarnings={startupWarnings}
+          startupWarnings={allStartupWarnings}
+          initialPrompt={initialPrompt}
+          initialPromptSource={initialPromptSource}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
