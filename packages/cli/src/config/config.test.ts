@@ -557,9 +557,6 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
 });
 
 describe('loadCliConfig extensions', () => {
-  const originalArgv = process.argv;
-  const originalEnv = { ...process.env };
-
   const mockExtensions: Extension[] = [
     {
       config: { name: 'ext1', version: '1.0.0' },
