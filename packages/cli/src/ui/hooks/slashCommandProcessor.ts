@@ -509,8 +509,10 @@ export const useSlashCommandProcessor = (
 
           let message = 'Active extensions:\n\n';
           for (const ext of activeExtensions) {
-            message += `  - ${ext.name} (v${ext.version})\n`;
+            message += `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m\n`;
           }
+          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
+          message += '\u001b[0m';
 
           addMessage({
             type: MessageType.INFO,
