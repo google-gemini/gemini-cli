@@ -66,7 +66,7 @@ interface CalculatedEdit {
  * Common error messages
  */
 const ErrorMessages = {
- (FILE_NOT_FOUND: 'File not found.',
+FILE_NOT_FOUND: 'File not found.',
   FILE_ALREADY_EXISTS: 'File already exists.',
   STRING_NOT_FOUND: 'Failed to edit, could not find the string to replace.',
   REPLACEMENT_MISMATCH: 'Failed to edit, expected {expected} {term} but found {found}.',
