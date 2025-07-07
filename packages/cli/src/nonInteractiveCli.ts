@@ -17,9 +17,12 @@ import {
   Part,
   FunctionCall,
   GenerateContentResponse,
+  PartListUnion,
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import { isAtCommand } from './ui/utils/commandUtils.js';
+import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {
@@ -62,7 +65,37 @@ export async function runNonInteractive(
 
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
+
+  let queryToSend: PartListUnion | null = input;
+  if (isAtCommand(input)) {
+    const atResult = await handleAtCommand({
+      query: input,
+      config,
+      addItem: () => 0,
+      onDebugMessage: () => {},
+      messageId: Date.now(),
+      signal: abortController.signal,
+    });
+    if (!atResult.shouldProceed) {
+      return;
+    }
+    queryToSend = atResult.processedQuery;
+  }
+
+  if (!queryToSend) {
+    console.error('Error: Query became null after processing.');
+    process.exit(1);
+  }
+
+  let parts: Part[];
+  if (Array.isArray(queryToSend)) {
+    parts = queryToSend.map((p) => (typeof p === 'string' ? { text: p } : p));
+  } else if (typeof queryToSend === 'string') {
+    parts = [{ text: queryToSend }];
+  } else {
+    parts = [queryToSend];
+  }
+  let currentMessages: Content[] = [{ role: 'user', parts }];
 
   try {
     while (true) {

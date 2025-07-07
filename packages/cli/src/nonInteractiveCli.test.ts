@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
+import * as commandUtils from './ui/utils/commandUtils.js';
+import * as atCommandProcessor from './ui/hooks/atCommandProcessor.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async () => {
@@ -22,6 +24,10 @@ vi.mock('@google/gemini-cli-core', async () => {
     executeToolCall: vi.fn(),
   };
 });
+
+// FIX: Mock the local modules directly so we can spy on them.
+vi.mock('./ui/utils/commandUtils.js');
+vi.mock('./ui/hooks/atCommandProcessor.js');
 
 describe('runNonInteractive', () => {
   let mockConfig: Config;
@@ -293,5 +299,84 @@ describe('runNonInteractive', () => {
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
       'Unfortunately the tool does not exist.',
     );
+  });
+
+  describe('@-command processing', () => {
+    it('should process an @-command and send the file content to the model', async () => {
+      // FIX: Spy on the imported module object
+      const mockIsAtCommand = vi.spyOn(commandUtils, 'isAtCommand');
+      const mockHandleAtCommand = vi.spyOn(
+        atCommandProcessor,
+        'handleAtCommand',
+      );
+
+      const userInput = 'Summarize @README.md';
+      const fileContent = 'This is the content of the README file.';
+      const processedQuery = [
+        { text: 'Summarize ' },
+        { text: fileContent },
+      ];
+
+      mockIsAtCommand.mockReturnValue(true);
+      mockHandleAtCommand.mockResolvedValue({
+        processedQuery,
+        shouldProceed: true,
+      });
+
+      const inputStream = (async function* () {
+        yield {
+          candidates: [{ content: { parts: [{ text: 'Summary is...' }] } }],
+        } as GenerateContentResponse;
+      })();
+      mockChat.sendMessageStream.mockResolvedValue(inputStream);
+
+      await runNonInteractive(mockConfig, userInput);
+
+      expect(mockIsAtCommand).toHaveBeenCalledWith(userInput);
+      expect(mockHandleAtCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ query: userInput }),
+      );
+
+      expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: processedQuery,
+        }),
+      );
+
+      expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Summary is...');
+    });
+
+    it('should handle a normal prompt without calling @-command logic', async () => {
+      // FIX: Spy on the imported module object
+      const mockIsAtCommand = vi.spyOn(commandUtils, 'isAtCommand');
+      const mockHandleAtCommand = vi.spyOn(
+        atCommandProcessor,
+        'handleAtCommand',
+      );
+
+      const userInput = 'This is a normal prompt.';
+
+      mockIsAtCommand.mockReturnValue(false);
+
+      const inputStream = (async function* () {
+        yield {
+          candidates: [{ content: { parts: [{ text: 'Normal response' }] } }],
+        } as GenerateContentResponse;
+      })();
+      mockChat.sendMessageStream.mockResolvedValue(inputStream);
+
+      await runNonInteractive(mockConfig, userInput);
+
+      expect(mockIsAtCommand).toHaveBeenCalledWith(userInput);
+      expect(mockHandleAtCommand).not.toHaveBeenCalled();
+
+      expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: [{ text: userInput }],
+        }),
+      );
+
+      expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Normal response');
+    });
   });
 });
