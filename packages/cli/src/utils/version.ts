@@ -29,5 +29,5 @@ export async function getCliVersion(): Promise<string> {
   const version = pkgJson?.version || 'unknown';
   const gitHash = await getGitShortCommitHash();
 
-  return gitHash ? `${version}-${gitHash}` : version;
+  return gitHash ? `${version}+${gitHash}` : version;
 }
