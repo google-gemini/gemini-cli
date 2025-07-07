@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Config } from './config.js';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from './models.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 describe('Flash Model Fallback Configuration', () => {
   let config: Config;
@@ -25,7 +26,7 @@ describe('Flash Model Fallback Configuration', () => {
       config as unknown as { contentGeneratorConfig: unknown }
     ).contentGeneratorConfig = {
       model: DEFAULT_GEMINI_MODEL,
-      authType: 'oauth-personal',
+      authType: AuthType.LOGIN_WITH_GOOGLE,
     };
   });
 

@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 // Define an interface for the error with a status property
 interface HttpError extends Error {
@@ -259,7 +260,7 @@ describe('retryWithBackoff', () => {
           fallbackOccurred = true;
           return await fallbackCallback(authType);
         },
-        authType: 'oauth-personal',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
       });
 
       // Advance all timers to complete retries
@@ -269,7 +270,7 @@ describe('retryWithBackoff', () => {
       await expect(promise).resolves.toBe('success');
 
       // Verify callback was called with correct auth type
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(fallbackCallback).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
 
       // Should retry again after fallback
       expect(mockFn).toHaveBeenCalledTimes(3); // 2 initial attempts + 1 after fallback
@@ -288,7 +289,7 @@ describe('retryWithBackoff', () => {
         maxAttempts: 3,
         initialDelayMs: 100,
         onPersistent429: fallbackCallback,
-        authType: 'gemini-api-key',
+        authType: AuthType.USE_GEMINI,
       });
 
       // Handle the promise properly to avoid unhandled rejections
@@ -324,7 +325,7 @@ describe('retryWithBackoff', () => {
         maxAttempts: 3,
         initialDelayMs: 100,
         onPersistent429: fallbackCallback,
-        authType: 'oauth-personal',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
       });
 
       await vi.runAllTimersAsync();
@@ -346,7 +347,7 @@ describe('retryWithBackoff', () => {
         maxAttempts: 3,
         initialDelayMs: 100,
         onPersistent429: fallbackCallback,
-        authType: 'oauth-personal',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
       });
 
       // Handle the promise properly to avoid unhandled rejections
@@ -357,7 +358,7 @@ describe('retryWithBackoff', () => {
       // Should fail with original error when fallback is rejected
       expect(result).toBeInstanceOf(Error);
       expect(result.message).toBe('Rate limit exceeded');
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(fallbackCallback).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
     });
 
     it('should handle mixed error types (only count consecutive 429s)', async () => {
@@ -390,7 +391,7 @@ describe('retryWithBackoff', () => {
           fallbackOccurred = true;
           return await fallbackCallback(authType);
         },
-        authType: 'oauth-personal',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
       });
 
       await vi.runAllTimersAsync();
@@ -398,7 +399,7 @@ describe('retryWithBackoff', () => {
       await expect(promise).resolves.toBe('success');
 
       // Should trigger fallback after 2 consecutive 429s (attempts 2-3)
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(fallbackCallback).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
     });
   });
 });

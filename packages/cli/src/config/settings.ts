@@ -14,6 +14,7 @@ import {
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
+  AuthSettings,
   AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
@@ -56,6 +57,7 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  model?: string;
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -66,6 +68,9 @@ export interface Settings {
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
   hideTips?: boolean;
+
+  // Auth settings
+  auth?: AuthSettings;
 
   // Add other settings here.
 }
@@ -79,6 +84,7 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+
 export class LoadedSettings {
   constructor(
     user: SettingsFile,

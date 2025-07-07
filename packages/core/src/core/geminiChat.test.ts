@@ -15,6 +15,7 @@ import {
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
+import { AuthType } from './contentGenerator.js';
 
 // Mocks
 const mockModelsModule = {
@@ -38,7 +39,7 @@ describe('GeminiChat', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: () => ({
-        authType: 'oauth-personal',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
         model: 'test-model',
       }),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
