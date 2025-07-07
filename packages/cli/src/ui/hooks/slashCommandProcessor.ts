@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { loadCustomSlashCommands, CustomSlashCommand } from './useCustomSlashCommand.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import {
   Config,
@@ -45,6 +46,7 @@ export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
+  hasSubCommand?: boolean;
   completion?: () => Promise<string[]>;
   action: (
     mainCommand: string,
@@ -77,7 +79,24 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  setPendingShellCommand: (queue: {
+    lines: string[];
+    shellCommands: { index: number; cmd: string }[];
+    cmd: CustomSlashCommand;
+    args: string;
+  }) => void
 ) => {
+  const [customCommands, setCustomCommands] = useState<CustomSlashCommand[]>([]);
+  useEffect(() => {
+    loadCustomSlashCommands()
+      .then(setCustomCommands)
+      .catch(err => {
+        onDebugMessage(
+          `Failed to load custom commands: ${err instanceof Error ? err.message : String(err)}`
+        );
+      });
+  }, []);
+
   const session = useSessionStats();
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
@@ -199,6 +218,7 @@ export const useSlashCommandProcessor = (
         name: 'help',
         altName: '?',
         description: 'for help on gemini-cli',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Opening help.');
           setShowHelp(true);
@@ -207,6 +227,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'docs',
         description: 'open full Gemini CLI documentation in your browser',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           const docsUrl = 'https://goo.gle/gemini-cli-docs';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
@@ -228,6 +249,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'clear',
         description: 'clear the screen and conversation history',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Clearing terminal and resetting chat.');
           clearItems();
@@ -239,6 +261,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'theme',
         description: 'change the theme',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openThemeDialog();
         },
@@ -246,6 +269,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'auth',
         description: 'change the auth method',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openAuthDialog();
         },
@@ -253,6 +277,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'editor',
         description: 'set external editor preference',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openEditorDialog();
         },
@@ -260,6 +285,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'privacy',
         description: 'display the privacy notice',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           openPrivacyNotice();
         },
@@ -268,6 +294,7 @@ export const useSlashCommandProcessor = (
         name: 'stats',
         altName: 'usage',
         description: 'check session stats. Usage: /stats [model|tools]',
+        hasSubCommand: true,
         action: (_mainCommand, subCommand, _args) => {
           if (subCommand === 'model') {
             addMessage({
@@ -297,6 +324,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'mcp',
         description: 'list configured MCP servers and tools',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           // Check if the _subCommand includes a specific flag to control description visibility
           let useShowDescriptions = showToolDescriptions;
@@ -497,6 +525,7 @@ export const useSlashCommandProcessor = (
         name: 'memory',
         description:
           'manage memory. Usage: /memory <show|refresh|add> [text for add]',
+        hasSubCommand: true,
         action: (mainCommand, subCommand, args) => {
           switch (subCommand) {
             case 'show':
@@ -528,6 +557,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'tools',
         description: 'list available Gemini CLI tools',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           // Check if the _subCommand includes a specific flag to control description visibility
           let useShowDescriptions = showToolDescriptions;
@@ -601,6 +631,7 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'corgi',
+        hasSubCommand: true,
         action: (_mainCommand, _subCommand, _args) => {
           toggleCorgiMode();
         },
@@ -608,15 +639,15 @@ export const useSlashCommandProcessor = (
       {
         name: 'about',
         description: 'show version info',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           const osVersion = process.platform;
           let sandboxEnv = 'no sandbox';
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
             sandboxEnv = process.env.SANDBOX;
           } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
+            sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'
+              })`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
           const cliVersion = await getCliVersion();
@@ -637,6 +668,7 @@ export const useSlashCommandProcessor = (
       {
         name: 'bug',
         description: 'submit a bug report',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, args) => {
           let bugDescription = _subCommand || '';
           if (args) {
@@ -649,9 +681,8 @@ export const useSlashCommandProcessor = (
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
             sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
           } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
+            sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'
+              })`;
           }
           const modelVersion = config?.getModel() || 'Unknown';
           const cliVersion = await getCliVersion();
@@ -700,6 +731,7 @@ export const useSlashCommandProcessor = (
         name: 'chat',
         description:
           'Manage conversation history. Usage: /chat <list|save|resume> <tag>',
+        hasSubCommand: true,
         action: async (_mainCommand, subCommand, args) => {
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
@@ -836,6 +868,7 @@ export const useSlashCommandProcessor = (
         name: 'quit',
         altName: 'exit',
         description: 'exit the cli',
+        hasSubCommand: true,
         action: async (mainCommand, _subCommand, _args) => {
           const now = new Date();
           const { sessionStartTime } = session.stats;
@@ -863,6 +896,7 @@ export const useSlashCommandProcessor = (
         name: 'compress',
         altName: 'summarize',
         description: 'Compresses the context by replacing it with a summary.',
+        hasSubCommand: true,
         action: async (_mainCommand, _subCommand, _args) => {
           if (pendingCompressionItemRef.current !== null) {
             addMessage({
@@ -1034,8 +1068,61 @@ export const useSlashCommandProcessor = (
         },
       });
     }
+
+    customCommands.forEach(cmd => {
+      commands.push({
+        name: cmd.name,
+        description: cmd.description,
+        hasSubCommand: false,
+        action: async (_mainCommand, _subCommand, args) => {
+          let prompt = cmd.template.replace(/\$ARGUMENTS/g, args || '');
+
+          const lines = prompt.split('\n');
+          const shellCommands: { index: number; cmd: string }[] = [];
+
+          for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(/^!\s*`([^`]*)`/);
+            if (match) {
+              shellCommands.push({ index: i, cmd: match[1] });
+            }
+            if (shellCommands.length > 0) {
+              setPendingShellCommand({ lines, shellCommands, cmd, args: args || '' });
+              return;
+            }
+            if (lines[i].startsWith('@')) {
+              const filePath = lines[i].slice(1).trim();
+              try {
+                const fileContent = await fs.readFile(filePath, 'utf-8');
+                lines[i] = fileContent;
+              } catch (e) {
+                lines[i] = `[Failed to read file: ${filePath}]`;
+              }
+            }
+          }
+          prompt = lines.join('\n');
+
+          const geminiClient = config?.getGeminiClient?.();
+          if (geminiClient) {
+            const chat = geminiClient.getChat();
+            const response = await chat.sendMessage({ message: { text: prompt } });
+            const aiResponse =
+              (typeof response.text === 'string' && response.text) ||
+              (typeof response.candidates?.[0]?.content === 'string' &&
+                response.candidates[0].content) ||
+              '[Could not extract a valid text response from Gemini]';
+            addMessage({
+              type: MessageType.INFO,
+              content: aiResponse,
+              timestamp: new Date(),
+            });
+          }
+        },
+      });
+    });
+
     return commands;
   }, [
+    customCommands,
     onDebugMessage,
     setShowHelp,
     refreshStatic,
@@ -1081,24 +1168,26 @@ export const useSlashCommandProcessor = (
         );
       }
 
+      let mainCommand: string;
       let subCommand: string | undefined;
       let args: string | undefined;
 
-      const commandToMatch = (() => {
-        if (trimmed.startsWith('?')) {
-          return 'help';
-        }
-        const parts = trimmed.substring(1).trim().split(/\s+/);
-        if (parts.length > 1) {
+      if (trimmed.startsWith('?')) {
+        mainCommand = 'help';
+        args = trimmed.slice(1).trim();
+      } else {
+        const parts = trimmed.slice(1).split(/\s+/);
+        mainCommand = parts[0];
+        const cmdDef = slashCommands.find(
+          cmd => cmd.name === mainCommand || cmd.altName === mainCommand
+        );
+        if (cmdDef?.hasSubCommand) {
           subCommand = parts[1];
-        }
-        if (parts.length > 2) {
           args = parts.slice(2).join(' ');
+        } else {
+          args = parts.slice(1).join(' ');
         }
-        return parts[0];
-      })();
-
-      const mainCommand = commandToMatch;
+      }
 
       for (const cmd of slashCommands) {
         if (mainCommand === cmd.name || mainCommand === cmd.altName) {

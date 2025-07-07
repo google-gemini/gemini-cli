@@ -84,6 +84,43 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
 
+## Custom Slash Commands
+
+You can define your own custom slash commands by placing Markdown (`.md`) files in the `.gemini/commands/` directory (either in your project root or your home directory).
+
+- **YAML frontmatter** (optional) lets you specify metadata such as `description` and `allowed-tools`.
+- Use `$ARGUMENTS` in your template to insert the arguments passed to the command.
+- Use `@<file_path>` to include the content of a file in the prompt.
+
+**Example:**
+
+```markdown
+---
+description: "Translate input to English"
+---
+$ARGUMENTS
+Please translate the above to English.
+```
+
+If you run:
+
+```
+/project:hello こんにちは世界
+```
+
+The prompt sent to Gemini will be:
+
+```
+こんにちは世界
+Please translate the above to English.
+```
+
+**Notes:**
+- Only `.md` files in the commands directory are loaded as custom commands.
+- If the Markdown file does not contain YAML frontmatter, the entire file is used as the template and the description will be empty.
+- If a file or shell command cannot be read or executed, an error message will be inserted in its place in the prompt.
+- Custom commands appear in `/help` and can be used just like built-in slash commands.
+
 ## At commands (`@`)
 
 At commands are used to include the content of files or directories as part of your prompt to Gemini. These commands include git-aware filtering.
