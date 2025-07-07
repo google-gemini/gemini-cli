@@ -118,9 +118,12 @@ async function main() {
     const exitCode = await new Promise((resolve) => {
       child.on('close', (code) => {
         if (outputStream) {
-          outputStream.end();
+          outputStream.end(() => {
+            resolve(code);
+          });
+        } else {
+          resolve(code);
         }
-        resolve(code);
       });
     });
 
