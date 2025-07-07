@@ -134,15 +134,15 @@ export function filterActiveExtensions(
     lowerCaseEnabledExtensions.length === 1 &&
     lowerCaseEnabledExtensions[0] === 'none'
   ) {
-    activeExtensions.length = 0;
-  } else {
-    const activeNames = new Set(
-      activeExtensions.map((e) => e.config.name.toLowerCase()),
-    );
-    for (const requestedExtension of lowerCaseEnabledExtensions) {
-      if (!activeNames.has(requestedExtension)) {
-        throw new Error(`Extension not found: ${requestedExtension}`);
-      }
+    return [];
+  }
+
+  const activeNames = new Set(
+    activeExtensions.map((e) => e.config.name.toLowerCase()),
+  );
+  for (const requestedExtension of lowerCaseEnabledExtensions) {
+    if (!activeNames.has(requestedExtension)) {
+      throw new Error(`Extension not found: ${requestedExtension}`);
     }
   }
   return activeExtensions;
