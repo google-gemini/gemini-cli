@@ -145,7 +145,7 @@ export function unescapePath(filePath: string): string {
  * @returns A SHA256 hash of the project root path.
  */
 export function getProjectHash(projectRoot: string): string {
-  return crypto.createHash('sha256').update(projectRoot).digest('hex');
+  return crypto.createHash('sha256').update(projectRoot).digest('hex').substring(0, 32);
 }
 
 /**
