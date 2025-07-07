@@ -1,5 +1,7 @@
 name: Gemini Scheduled PR Triage 🚀
-
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  
 on:
   schedule:
     - cron: '*/15 * * * *' # Runs every 15 minutes
