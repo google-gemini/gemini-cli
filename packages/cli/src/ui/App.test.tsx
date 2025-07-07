@@ -163,6 +163,13 @@ vi.mock('./hooks/useLogger', () => ({
   })),
 }));
 
+vi.mock('./hooks/useShellHistory', () => ({
+  useShellHistory: vi.fn(() => ({
+    history: [],
+    push: vi.fn(),
+  })),
+}));
+
 vi.mock('../config/config.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
