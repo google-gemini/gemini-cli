@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, loadEnvironment } from './config/config.js';
+import { loadCliConfig } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
+  loadEnvironment,
   loadSettings,
   SettingScope,
   USER_SETTINGS_PATH,
