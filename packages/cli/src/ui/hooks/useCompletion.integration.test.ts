@@ -108,7 +108,6 @@ describe('useCompletion git-aware filtering integration', () => {
       shouldGeminiIgnoreFile: vi.fn(),
       shouldIgnoreFile: vi.fn(),
       filterFiles: vi.fn(),
-      shouldGeminiIgnoreFile: vi.fn(),
       getGeminiIgnorePatterns: vi.fn(),
       projectRoot: '',
       gitIgnoreFilter: null,
