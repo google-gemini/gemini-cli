@@ -27,7 +27,7 @@ interface SessionStatsState {
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
-  turnCount: number;
+  promptCount: number;
 }
 
 export interface ComputedSessionStats {
@@ -48,8 +48,8 @@ export interface ComputedSessionStats {
 // and the functions to update it.
 interface SessionStatsContextValue {
   stats: SessionStatsState;
-  startNewTurn: () => void;
-  getTurnCount: () => number;
+  startNewPrompt: () => void;
+  getPromptCount: () => number;
 }
 
 // --- Context Definition ---
@@ -67,7 +67,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
-    turnCount: 0,
+    promptCount: 0,
   });
 
   useEffect(() => {
@@ -97,24 +97,24 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  const startNewTurn = useCallback(() => {
+  const startNewPrompt = useCallback(() => {
     setStats((prevState) => ({
       ...prevState,
-      turnCount: prevState.turnCount + 1,
+      promptCount: prevState.promptCount + 1,
     }));
   }, []);
 
-  const getTurnCount = useCallback(() => {
-    return stats.turnCount;
-  }, [stats.turnCount]);
+  const getPromptCount = useCallback(() => {
+    return stats.promptCount;
+  }, [stats.promptCount]);
 
   const value = useMemo(
     () => ({
       stats,
-      startNewTurn,
-      getTurnCount,
+      startNewPrompt,
+      getPromptCount,
     }),
-    [stats, startNewTurn, getTurnCount],
+    [stats, startNewPrompt, getPromptCount],
   );
 
   return (

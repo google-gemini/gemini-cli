@@ -207,6 +207,7 @@ describe('CoreToolScheduler with payload', () => {
       name: 'mockModifiableTool',
       args: {},
       isClientInitiated: false,
+      prompt_id: 'prompt-id-2',
     };
 
     await scheduler.schedule([request], abortController.signal);

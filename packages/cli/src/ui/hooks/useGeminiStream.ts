@@ -100,7 +100,7 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
-  const { startNewTurn, getTurnCount } = useSessionStats();
+  const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -221,7 +221,7 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         logUserPrompt(
           config,
-          new UserPromptEvent(trimmedQuery.length, trimmedQuery),
+          new UserPromptEvent(trimmedQuery.length, prompt_id, trimmedQuery),
         );
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
@@ -509,7 +509,7 @@ export const useGeminiStream = (
       turnCancelledRef.current = false;
 
       if (!prompt_id) {
-        prompt_id = config.getSessionId() + '########' + getTurnCount();
+        prompt_id = config.getSessionId() + '########' + getPromptCount();
       }
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
@@ -524,7 +524,7 @@ export const useGeminiStream = (
       }
 
       if (!options?.isContinuation) {
-        startNewTurn();
+        startNewPrompt();
       }
 
       setIsResponding(true);

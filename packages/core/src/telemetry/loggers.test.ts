@@ -127,7 +127,7 @@ describe('loggers', () => {
     } as unknown as Config;
 
     it('should log a user prompt', () => {
-      const event = new UserPromptEvent(11, 'test-prompt');
+      const event = new UserPromptEvent(11, 'prompt-id-8', 'test-prompt');
 
       logUserPrompt(mockConfig, event);
 

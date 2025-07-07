@@ -46,6 +46,7 @@ function getResponseText(response: GenerateContentResponse): string | null {
 export async function runNonInteractive(
   config: Config,
   input: string,
+  prompt_id: string,
 ): Promise<void> {
   // Handle EPIPE errors when the output is piped to a command that closes early.
   process.stdout.on('error', (err: NodeJS.ErrnoException) => {
@@ -61,7 +62,6 @@ export async function runNonInteractive(
   const chat = await geminiClient.getChat();
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
-  const prompt_id = Math.random().toString(16).slice(2);
 
   try {
     while (true) {
