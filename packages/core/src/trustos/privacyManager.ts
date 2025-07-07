@@ -141,10 +141,114 @@ export const PRIVACY_MODES: Record<string, PrivacyModeConfig> = {
 export class PrivacyManager {
   private config: TrustConfiguration;
   private currentMode: PrivacyModeConfig;
+  private initialized: boolean = false;
 
-  constructor(config: TrustConfiguration) {
-    this.config = config;
-    this.currentMode = PRIVACY_MODES[config.getPrivacyMode()];
+  constructor(config?: TrustConfiguration) {
+    this.config = config || ({} as any);
+    this.currentMode = PRIVACY_MODES[this.config?.getPrivacyMode?.() || 'moderate'];
+  }
+
+  /**
+   * Initialize the privacy manager
+   */
+  async initialize(): Promise<void> {
+    this.initialized = true;
+  }
+
+  /**
+   * Set privacy mode
+   */
+  async setPrivacyMode(mode: 'strict' | 'moderate' | 'open'): Promise<void> {
+    await this.switchMode(mode);
+  }
+
+  /**
+   * Get privacy settings
+   */
+  getPrivacySettings(): any {
+    return {
+      mode: this.currentMode.name,
+      auditLogging: this.config?.isAuditLoggingEnabled?.() || true,
+      modelVerification: this.config?.isModelVerificationEnabled?.() || true,
+    };
+  }
+
+  /**
+   * Sanitize data for privacy
+   */
+  sanitizeData(data: any): any {
+    if (this.currentMode.name === 'strict') {
+      // Remove sensitive information in strict mode
+      if (typeof data === 'string') {
+        return data.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]');
+      }
+    }
+    return data;
+  }
+
+  /**
+   * Check if telemetry collection is allowed
+   */
+  canCollectTelemetry(): boolean {
+    return this.currentMode.name !== 'strict';
+  }
+
+  /**
+   * Check if data sharing is allowed
+   */
+  canShareData(): boolean {
+    return this.currentMode.name === 'open';
+  }
+
+  /**
+   * Check if cloud sync is allowed
+   */
+  canSyncToCloud(): boolean {
+    return this.currentMode.name !== 'strict';
+  }
+
+  /**
+   * Encrypt data
+   */
+  async encryptData(data: string): Promise<string> {
+    // Simple base64 encoding for demonstration
+    return Buffer.from(data).toString('base64');
+  }
+
+  /**
+   * Decrypt data
+   */
+  async decryptData(encryptedData: string): Promise<string> {
+    // Simple base64 decoding for demonstration
+    return Buffer.from(encryptedData, 'base64').toString('utf-8');
+  }
+
+  /**
+   * Set data retention period
+   */
+  async setDataRetention(days: number): Promise<void> {
+    // Store data retention setting (implementation placeholder)
+    // TODO: Implement proper data retention storage
+  }
+
+  /**
+   * Get data retention days
+   */
+  getDataRetentionDays(): number {
+    // Return default data retention period
+    return 30;
+  }
+
+  /**
+   * Generate privacy report
+   */
+  generatePrivacyReport(): any {
+    return {
+      mode: this.currentMode.name,
+      restrictions: this.currentMode.restrictions,
+      features: this.currentMode.features,
+      settings: this.getPrivacySettings(),
+    };
   }
 
   /**

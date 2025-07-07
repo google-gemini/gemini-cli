@@ -1,0 +1,411 @@
+
+> @trustos/trust-cli@0.1.0 build
+> node scripts/build.js
+
+
+> @trustos/trust-cli@0.1.0 generate
+> node scripts/generate-git-commit-info.js
+
+
+> @trustos/trust-cli-frontend@0.1.0 build
+> node ../../scripts/build_package.js
+
+../core/src/trustos/integration.test.ts(12,10): error TS2305: Module '"./types.js"' has no exported member 'PrivacyMode'.
+../core/src/trustos/integration.test.ts(20,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ access: MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>; readdir: MockedFunction<{ (path: PathLike, options?: BufferEncoding | (ObjectEncodingOptions & { ...; }) | null | undefined): Promise<...>; (path: PathLike, options: { ...; } | "buffer"): Promise<...>; (path: PathLike, options?: ...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'access' are incompatible.
+    Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is not comparable to type 'MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>'.
+      Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is missing the following properties from type 'Mock<(path: PathLike, mode?: number | undefined) => Promise<void>>': getMockName, mockName, mock, mockClear, and 14 more.
+../core/src/trustos/integration.test.ts(51,41): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+../core/src/trustos/integration.test.ts(173,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(177,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(179,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/integration.test.ts(187,47): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(195,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(199,50): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(203,43): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(212,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(213,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(221,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(224,40): error TS2339: Property 'decryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(232,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(237,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(260,15): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { temperature: number; topP: number; }; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/integration.test.ts(272,49): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(318,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(323,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(363,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(364,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(373,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(383,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(393,46): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(401,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(402,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(403,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(409,52): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+../core/src/trustos/integration.test.ts(423,31): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/integration.test.ts(426,32): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/modelManager.test.ts(18,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ access: MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>; readdir: MockedFunction<{ (path: PathLike, options?: BufferEncoding | (ObjectEncodingOptions & { ...; }) | null | undefined): Promise<...>; (path: PathLike, options: { ...; } | "buffer"): Promise<...>; (path: PathLike, options?: ...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'access' are incompatible.
+    Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is not comparable to type 'MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>'.
+      Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is missing the following properties from type 'Mock<(path: PathLike, mode?: number | undefined) => Promise<void>>': getMockName, mockName, mock, mockClear, and 14 more.
+../core/src/trustos/privacyManager.test.ts(9,10): error TS2305: Module '"./types.js"' has no exported member 'PrivacyMode'.
+../core/src/trustos/privacyManager.test.ts(22,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ writeFile: MockedFunction<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>; readFile: MockedFunction<...>; access: MockedFunction...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'writeFile' are incompatible.
+    Type '(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>' is not comparable to type 'MockedFunction<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>'.
+      Type '(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>' is missing the following properties from type 'Mock<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>': getMockName, mockName, mock, mockClear, and 14 more.
+../core/src/trustos/privacyManager.test.ts(36,41): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+../core/src/trustos/privacyManager.test.ts(45,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(64,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(75,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(86,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(90,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(95,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(103,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(108,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(116,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(121,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(129,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(143,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(147,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(156,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(165,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(173,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(181,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(190,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(210,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(225,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(238,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(242,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(246,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(250,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(254,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(256,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(257,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(258,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(262,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(264,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(265,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(266,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(275,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(279,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(282,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(290,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(293,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(294,40): error TS2339: Property 'decryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(300,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(303,37): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(314,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(318,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(324,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(326,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(331,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(332,46): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(334,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(335,44): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(346,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(350,37): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(361,37): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(367,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(368,41): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(370,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(371,43): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(382,35): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(389,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(397,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(400,35): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(401,35): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(410,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(414,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(415,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(435,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+../core/src/trustos/privacyManager.test.ts(441,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+../core/src/trustos/trustContentGenerator.test.ts(57,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(77,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(78,33): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(110,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(112,10): error TS2339: Property 'mockRejectedValueOnce' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(114,44): error TS2339: Property 'mockReturnValue' does not exist on type '(task: string, ramLimit?: number | undefined) => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(115,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelName: string) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(126,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(127,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+../core/src/trustos/trustContentGenerator.test.ts(132,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(140,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(146,14): error TS18048: 'result.candidates' is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(146,14): error TS2532: Object is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(146,14): error TS2532: Object is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(147,14): error TS18048: 'result.candidates' is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(147,14): error TS2532: Object is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(151,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(169,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(173,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(180,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { systemInstruction: { parts: { text: string; }[]; }; }; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(192,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(196,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(201,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+../core/src/trustos/trustContentGenerator.test.ts(203,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(216,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { temperature: number; topP: number; }; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(227,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(231,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(242,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(243,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+../core/src/trustos/trustContentGenerator.test.ts(248,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(256,38): error TS2339: Property 'mockImplementation' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => AsyncIterable<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(271,16): error TS18048: 'chunk.candidates' is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(271,16): error TS2532: Object is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(271,16): error TS2532: Object is possibly 'undefined'.
+../core/src/trustos/trustContentGenerator.test.ts(276,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(283,38): error TS2339: Property 'mockImplementation' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => AsyncIterable<string>'.
+../core/src/trustos/trustContentGenerator.test.ts(299,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(304,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'CountTokensParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(318,13): error TS2741: Property 'model' is missing in type '{ contents: never[]; }' but required in type 'CountTokensParameters'.
+../core/src/trustos/trustContentGenerator.test.ts(330,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(347,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelName: string) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(348,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(349,33): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(358,38): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelId: string) => Promise<void>'.
+../core/src/trustos/trustContentGenerator.test.ts(380,44): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig[]'.
+../core/src/trustos/trustContentGenerator.test.ts(400,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+../core/src/trustos/trustContentGenerator.test.ts(417,34): error TS2339: Property 'mockReturnValue' does not exist on type '() => ModelMetrics'.
+../core/src/trustos/trustContentGenerator.test.ts(437,44): error TS2339: Property 'mockReturnValue' does not exist on type '(task: string, ramLimit?: number | undefined) => TrustModelConfig | null'.
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: tsc --build
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:892:11)
+    at execSync (node:child_process:964:15)
+    at file:///Users/jontiveros/Documents/Development/Github/trust-cli/scripts/build_package.js:30:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:327:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:663:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5) {
+  status: 2,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 45501,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.1.0
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/jontiveros/Documents/Development/Github/trust-cli/packages/cli
+npm error workspace @trustos/trust-cli-frontend@0.1.0
+npm error location /Users/jontiveros/Documents/Development/Github/trust-cli/packages/cli
+npm error command failed
+npm error command sh -c node ../../scripts/build_package.js
+
+
+> @trustos/trust-cli-core@0.1.0 build
+> node ../../scripts/build_package.js
+
+src/trustos/integration.test.ts(12,10): error TS2305: Module '"./types.js"' has no exported member 'PrivacyMode'.
+src/trustos/integration.test.ts(20,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ access: MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>; readdir: MockedFunction<{ (path: PathLike, options?: BufferEncoding | (ObjectEncodingOptions & { ...; }) | null | undefined): Promise<...>; (path: PathLike, options: { ...; } | "buffer"): Promise<...>; (path: PathLike, options?: ...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'access' are incompatible.
+    Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is not comparable to type 'MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>'.
+      Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is missing the following properties from type 'Mock<(path: PathLike, mode?: number | undefined) => Promise<void>>': getMockName, mockName, mock, mockClear, and 14 more.
+src/trustos/integration.test.ts(51,41): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+src/trustos/integration.test.ts(173,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(177,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(179,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/integration.test.ts(187,47): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(195,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(199,50): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(203,43): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(212,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(213,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(221,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(224,40): error TS2339: Property 'decryptData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(232,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(237,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(260,15): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { temperature: number; topP: number; }; }' but required in type 'GenerateContentParameters'.
+src/trustos/integration.test.ts(272,49): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(318,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(323,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(363,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(364,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(373,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(383,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(393,46): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(401,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(402,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(403,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(409,52): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+src/trustos/integration.test.ts(423,31): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/integration.test.ts(426,32): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/modelManager.test.ts(18,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ access: MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>; readdir: MockedFunction<{ (path: PathLike, options?: BufferEncoding | (ObjectEncodingOptions & { ...; }) | null | undefined): Promise<...>; (path: PathLike, options: { ...; } | "buffer"): Promise<...>; (path: PathLike, options?: ...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'access' are incompatible.
+    Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is not comparable to type 'MockedFunction<(path: PathLike, mode?: number | undefined) => Promise<void>>'.
+      Type '(path: PathLike, mode?: number | undefined) => Promise<void>' is missing the following properties from type 'Mock<(path: PathLike, mode?: number | undefined) => Promise<void>>': getMockName, mockName, mock, mockClear, and 14 more.
+src/trustos/privacyManager.test.ts(9,10): error TS2305: Module '"./types.js"' has no exported member 'PrivacyMode'.
+src/trustos/privacyManager.test.ts(22,16): error TS2352: Conversion of type 'typeof import("fs/promises")' to type '{ writeFile: MockedFunction<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>; readFile: MockedFunction<...>; access: MockedFunction...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'writeFile' are incompatible.
+    Type '(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>' is not comparable to type 'MockedFunction<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>'.
+      Type '(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>' is missing the following properties from type 'Mock<(file: PathLike | FileHandle, data: string | ArrayBufferView<ArrayBufferLike> | Iterable<string | ArrayBufferView<ArrayBufferLike>> | AsyncIterable<...> | Stream, options?: BufferEncoding | ... 2 more ... | undefined) => Promise<...>>': getMockName, mockName, mock, mockClear, and 14 more.
+src/trustos/privacyManager.test.ts(36,41): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TrustConfiguration'.
+src/trustos/privacyManager.test.ts(45,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(64,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(75,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(86,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(90,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(95,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(103,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(108,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(116,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(121,37): error TS2339: Property 'getPrivacySettings' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(129,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(143,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(147,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(156,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(165,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(173,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(181,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(190,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(210,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(225,40): error TS2339: Property 'sanitizeData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(238,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(242,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(246,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(250,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(254,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(256,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(257,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(258,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(262,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(264,29): error TS2339: Property 'canCollectTelemetry' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(265,29): error TS2339: Property 'canShareData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(266,29): error TS2339: Property 'canSyncToCloud' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(275,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(279,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(282,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(290,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(293,40): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(294,40): error TS2339: Property 'decryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(300,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(303,37): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(314,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(318,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(324,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(326,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(331,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(332,46): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(334,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(335,44): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(346,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(350,37): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(361,37): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(367,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(368,41): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(370,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(371,43): error TS2339: Property 'generatePrivacyReport' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(382,35): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(389,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(397,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(400,35): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(401,35): error TS2339: Property 'encryptData' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(410,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(414,28): error TS2339: Property 'setPrivacyMode' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(415,28): error TS2339: Property 'setDataRetention' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(435,28): error TS2339: Property 'initialize' does not exist on type 'PrivacyManager'.
+src/trustos/privacyManager.test.ts(441,40): error TS2339: Property 'getDataRetentionDays' does not exist on type 'PrivacyManager'.
+src/trustos/trustContentGenerator.test.ts(57,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(77,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(78,33): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(110,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(112,10): error TS2339: Property 'mockRejectedValueOnce' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(114,44): error TS2339: Property 'mockReturnValue' does not exist on type '(task: string, ramLimit?: number | undefined) => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(115,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelName: string) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(126,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(127,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+src/trustos/trustContentGenerator.test.ts(132,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(140,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(146,14): error TS18048: 'result.candidates' is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(146,14): error TS2532: Object is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(146,14): error TS2532: Object is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(147,14): error TS18048: 'result.candidates' is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(147,14): error TS2532: Object is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(151,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(169,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(173,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(180,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { systemInstruction: { parts: { text: string; }[]; }; }; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(192,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(196,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(201,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+src/trustos/trustContentGenerator.test.ts(203,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(216,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; config: { temperature: number; topP: number; }; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(227,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(231,53): error TS2339: Property 'mock' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => Promise<string>'.
+src/trustos/trustContentGenerator.test.ts(242,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(243,37): error TS2339: Property 'mockReturnValue' does not exist on type '() => boolean'.
+src/trustos/trustContentGenerator.test.ts(248,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(256,38): error TS2339: Property 'mockImplementation' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => AsyncIterable<string>'.
+src/trustos/trustContentGenerator.test.ts(271,16): error TS18048: 'chunk.candidates' is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(271,16): error TS2532: Object is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(271,16): error TS2532: Object is possibly 'undefined'.
+src/trustos/trustContentGenerator.test.ts(276,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'GenerateContentParameters'.
+src/trustos/trustContentGenerator.test.ts(283,38): error TS2339: Property 'mockImplementation' does not exist on type '(prompt: string, options?: GenerationOptions | undefined) => AsyncIterable<string>'.
+src/trustos/trustContentGenerator.test.ts(299,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(304,13): error TS2741: Property 'model' is missing in type '{ contents: { parts: { text: string; }[]; role: string; }[]; }' but required in type 'CountTokensParameters'.
+src/trustos/trustContentGenerator.test.ts(318,13): error TS2741: Property 'model' is missing in type '{ contents: never[]; }' but required in type 'CountTokensParameters'.
+src/trustos/trustContentGenerator.test.ts(330,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(347,36): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelName: string) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(348,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(349,33): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelPath: string, config?: TrustModelConfig | undefined) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(358,38): error TS2339: Property 'mockResolvedValue' does not exist on type '(modelId: string) => Promise<void>'.
+src/trustos/trustContentGenerator.test.ts(380,44): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig[]'.
+src/trustos/trustContentGenerator.test.ts(400,40): error TS2339: Property 'mockReturnValue' does not exist on type '() => TrustModelConfig | null'.
+src/trustos/trustContentGenerator.test.ts(417,34): error TS2339: Property 'mockReturnValue' does not exist on type '() => ModelMetrics'.
+src/trustos/trustContentGenerator.test.ts(437,44): error TS2339: Property 'mockReturnValue' does not exist on type '(task: string, ramLimit?: number | undefined) => TrustModelConfig | null'.
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: tsc --build
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:892:11)
+    at execSync (node:child_process:964:15)
+    at file:///Users/jontiveros/Documents/Development/Github/trust-cli/scripts/build_package.js:30:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:327:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:663:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 45527,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.1.0
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/jontiveros/Documents/Development/Github/trust-cli/packages/core
+npm error workspace @trustos/trust-cli-core@0.1.0
+npm error location /Users/jontiveros/Documents/Development/Github/trust-cli/packages/core
+npm error command failed
+npm error command sh -c node ../../scripts/build_package.js
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: npm run build --workspaces
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:892:11)
+    at execSync (node:child_process:964:15)
+    at file:///Users/jontiveros/Documents/Development/Github/trust-cli/scripts/build.js:35:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:327:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:663:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 45477,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.1.0

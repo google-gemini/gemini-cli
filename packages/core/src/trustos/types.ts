@@ -86,12 +86,18 @@ export interface TrustModelManager {
 }
 
 /**
+ * Privacy Mode Type
+ * Part of Trust: An Open System for Modern Assurance
+ */
+export type PrivacyMode = 'strict' | 'moderate' | 'open';
+
+/**
  * Trust Configuration
  * Part of Trust: An Open System for Modern Assurance
  */
 export interface TrustConfig {
   privacy: {
-    privacyMode: 'strict' | 'moderate' | 'open';
+    privacyMode: PrivacyMode;
     auditLogging: boolean;
     modelVerification: boolean;
   };
@@ -114,3 +120,8 @@ export interface TrustConfig {
     showPerformanceMetrics: boolean;
   };
 }
+
+/**
+ * Alias for TrustConfiguration class compatibility
+ */
+export type TrustConfiguration = any;

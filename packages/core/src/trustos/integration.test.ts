@@ -9,21 +9,30 @@ import { TrustContentGenerator } from './trustContentGenerator.js';
 import { TrustModelManagerImpl } from './modelManager.js';
 import { PerformanceMonitor } from './performanceMonitor.js';
 import { PrivacyManager } from './privacyManager.js';
-import { PrivacyMode } from './types.js';
+import { PrivacyMode, TrustConfiguration } from './types.js';
 import type { GenerateContentParameters } from '@google/genai';
-import fs from 'fs/promises';
 
 // Mock file system for all components
-vi.mock('fs/promises');
-vi.mock('os');
+vi.mock('fs/promises', () => ({
+  access: vi.fn(),
+  readdir: vi.fn(),
+  writeFile: vi.fn(),
+  readFile: vi.fn(),
+  mkdir: vi.fn(),
+}));
 
-const mockFs = fs as {
-  access: MockedFunction<typeof fs.access>;
-  readdir: MockedFunction<typeof fs.readdir>;
-  writeFile: MockedFunction<typeof fs.writeFile>;
-  readFile: MockedFunction<typeof fs.readFile>;
-  mkdir: MockedFunction<typeof fs.mkdir>;
-};
+vi.mock('os', () => ({
+  cpus: vi.fn(() => [{ model: 'Apple M1' }, { model: 'Apple M1' }]),
+  totalmem: vi.fn(() => 8589934592),
+  freemem: vi.fn(() => 4294967296),
+  platform: vi.fn(() => 'darwin'),
+  arch: vi.fn(() => 'arm64'),
+}));
+
+// Import mocked fs after mocking
+import fs from 'fs/promises';
+
+const mockFs = fs as any;
 
 describe('Trust CLI Integration Tests', () => {
   let contentGenerator: TrustContentGenerator;
