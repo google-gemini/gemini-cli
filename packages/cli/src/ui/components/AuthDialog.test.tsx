@@ -5,11 +5,10 @@
  */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
-
 
 describe('AuthDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,15 +73,10 @@ describe('AuthDialog', () => {
     );
 
     const { lastFrame } = render(
-      <AuthDialog
-        onSelect={() => {}}
-        settings={settings}
-      />,
+      <AuthDialog onSelect={() => {}} settings={settings} />,
     );
 
-    expect(lastFrame()).toContain(
-      'Existing API key detected (GEMINI_API_KEY)',
-    );
+    expect(lastFrame()).toContain('Existing API key detected (GEMINI_API_KEY)');
   });
 
   it('should prevent exiting when no auth method is selected and show error message', async () => {

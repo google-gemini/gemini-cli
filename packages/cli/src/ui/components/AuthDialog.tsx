@@ -24,7 +24,11 @@ export function AuthDialog({
   initialErrorMessage,
 }: AuthDialogProps): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    initialErrorMessage ? initialErrorMessage : process.env.GEMINI_API_KEY ? 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.' : null,
+    initialErrorMessage
+      ? initialErrorMessage
+      : process.env.GEMINI_API_KEY
+        ? 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.'
+        : null,
   );
   const items = [
     { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
@@ -32,20 +36,17 @@ export function AuthDialog({
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
-  let initialAuthIndex = items.findIndex(
-    (item) => {
-      if ( settings.merged.selectedAuthType ) {
+  let initialAuthIndex = items.findIndex((item) => {
+    if (settings.merged.selectedAuthType) {
+      return item.value === settings.merged.selectedAuthType;
+    }
 
-        return item.value === settings.merged.selectedAuthType
-      }
+    if (process.env.GEMINI_API_KEY) {
+      return item.value === AuthType.USE_GEMINI;
+    }
 
-      if (process.env.GEMINI_API_KEY) {
-        return item.value === AuthType.USE_GEMINI;
-      }
-
-       return item.value === AuthType.LOGIN_WITH_GOOGLE;
-    },
-  );
+    return item.value === AuthType.LOGIN_WITH_GOOGLE;
+  });
 
   const handleAuthSelect = (authMethod: AuthType) => {
     const error = validateAuthMethod(authMethod);
