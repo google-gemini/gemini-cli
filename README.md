@@ -37,25 +37,57 @@ node bundle/trust.js
 
 ### First Steps
 
+**IMPORTANT**: All trust commands are run from your **regular terminal** (not from within the trust CLI interface).
+
+Navigate to your trust-cli directory and run commands using the following format:
+
 1. **Check available models**
    ```bash
-   trust model list
+   # From your regular terminal in the trust-cli directory:
+   node bundle/trust.js model list
    ```
 
 2. **Download a model** (start with the lightweight one)
    ```bash
-   trust model download qwen2.5-1.5b-instruct
+   node bundle/trust.js model download qwen2.5-1.5b-instruct
    ```
 
 3. **Verify model integrity**
    ```bash
-   trust model verify qwen2.5-1.5b-instruct
+   node bundle/trust.js model verify qwen2.5-1.5b-instruct
    ```
 
 4. **Switch to the downloaded model**
    ```bash
-   trust model switch qwen2.5-1.5b-instruct
+   node bundle/trust.js model switch qwen2.5-1.5b-instruct
    ```
+
+5. **Start interactive mode** (optional)
+   ```bash
+   node bundle/trust.js
+   ```
+
+### 💡 Create an Alias for Easier Use
+
+To avoid typing `node bundle/trust.js` every time, create an alias:
+
+```bash
+# Option 1: Using full path (recommended for permanent setup)
+# Add this to your ~/.zshrc (macOS) or ~/.bashrc (Linux):
+alias trust="node /full/path/to/your/trust-cli/bundle/trust.js"
+
+# Option 2: Using current directory (works from trust-cli folder)
+# Add this to your ~/.zshrc file:
+alias trust="node $(pwd)/bundle/trust.js"
+
+# Reload your shell configuration:
+source ~/.zshrc  # or source ~/.bashrc
+
+# Now you can run commands simply as:
+trust model list
+trust model download qwen2.5-1.5b-instruct
+trust model recommend coding
+```
 
 ## 📦 Model Management
 
@@ -63,13 +95,15 @@ Trust CLI provides comprehensive model management capabilities:
 
 ### List Available Models
 ```bash
-trust model list
+node bundle/trust.js model list
+# or with alias: trust model list
 ```
 Shows all available models with their status, RAM requirements, and trust scores.
 
 ### Download Models
 ```bash
-trust model download <model-name>
+node bundle/trust.js model download <model-name>
+# or with alias: trust model download <model-name>
 ```
 Downloads models from Hugging Face with real-time progress tracking:
 - Progress percentage, speed, and ETA
@@ -78,21 +112,24 @@ Downloads models from Hugging Face with real-time progress tracking:
 
 ### Verify Model Integrity
 ```bash
-trust model verify <model-name>
-# or verify all models
-trust model verify
+node bundle/trust.js model verify <model-name>
+# or verify all models:
+node bundle/trust.js model verify
+# or with alias: trust model verify
 ```
 Performs SHA256 hash verification to ensure model integrity and security.
 
 ### Switch Active Model
 ```bash
-trust model switch <model-name>
+node bundle/trust.js model switch <model-name>
+# or with alias: trust model switch <model-name>
 ```
 Changes the active model for inference operations.
 
 ### Get Model Recommendations
 ```bash
-trust model recommend <task-type>
+node bundle/trust.js model recommend <task-type>
+# or with alias: trust model recommend <task-type>
 ```
 Get intelligent model recommendations based on your task and hardware:
 - `coding` - Best models for programming tasks
