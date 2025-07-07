@@ -34,7 +34,7 @@ export function AuthDialog({
     ...(process.env.CLOUD_SHELL === 'true'
       ? [
           {
-            label: 'Cloud Shell',
+            label: 'Use Cloud Shell user credentials',
             value: AuthType.CLOUD_SHELL,
           },
         ]
