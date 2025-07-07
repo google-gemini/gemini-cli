@@ -14,13 +14,8 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import {
-  CallableTool,
-  FunctionDeclaration,
-  mcpToTool,
-  Schema,
-} from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
+import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
+import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -162,6 +157,16 @@ export async function discoverMcpTools(
   }
 }
 
+/**
+ * Connects to an MCP server and discovers available tools, registering them with the tool registry.
+ * This function handles the complete lifecycle of connecting to a server, discovering tools,
+ * and cleaning up resources if no tools are found.
+ *
+ * @param mcpServerName The name identifier for this MCP server
+ * @param mcpServerConfig Configuration object containing connection details
+ * @param toolRegistry The registry to register discovered tools with
+ * @returns Promise that resolves when discovery is complete
+ */
 async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
@@ -371,27 +376,6 @@ async function connectAndDiscover(
       await transport.close();
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-    }
-  }
-}
-
-export function sanitizeParameters(schema?: Schema) {
-  if (!schema) {
-    return;
-  }
-  if (schema.anyOf) {
-    // Vertex AI gets confused if both anyOf and default are set.
-    schema.default = undefined;
-    for (const item of schema.anyOf) {
-      sanitizeParameters(item);
-    }
-  }
-  if (schema.items) {
-    sanitizeParameters(schema.items);
-  }
-  if (schema.properties) {
-    for (const item of Object.values(schema.properties)) {
-      sanitizeParameters(item);
     }
   }
 }
