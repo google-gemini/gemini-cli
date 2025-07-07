@@ -25,7 +25,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-// FIX: Mock the local modules directly so we can spy on them.
 vi.mock('./ui/utils/commandUtils.js');
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
@@ -303,7 +302,6 @@ describe('runNonInteractive', () => {
 
   describe('@-command processing', () => {
     it('should process an @-command and send the file content to the model', async () => {
-      // FIX: Spy on the imported module object
       const mockIsAtCommand = vi.spyOn(commandUtils, 'isAtCommand');
       const mockHandleAtCommand = vi.spyOn(
         atCommandProcessor,
@@ -347,7 +345,6 @@ describe('runNonInteractive', () => {
     });
 
     it('should handle a normal prompt without calling @-command logic', async () => {
-      // FIX: Spy on the imported module object
       const mockIsAtCommand = vi.spyOn(commandUtils, 'isAtCommand');
       const mockHandleAtCommand = vi.spyOn(
         atCommandProcessor,
