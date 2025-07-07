@@ -72,6 +72,7 @@ import {
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
+import { CLI_VERSION } from '../../generated/version.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
@@ -505,7 +506,6 @@ describe('useSlashCommandProcessor', () => {
       description?: string,
       sandboxEnvVar?: string,
       seatbeltProfileVar?: string,
-      cliVersion?: string,
     ) => {
       const osVersion = 'test-platform test-node-version';
       let sandboxEnvStr = 'no sandbox';
@@ -519,7 +519,7 @@ describe('useSlashCommandProcessor', () => {
       const memoryUsage = '11.8 MB';
 
       const info = `
-*   **CLI Version:** ${cliVersion}
+*   **CLI Version:** ${CLI_VERSION}
 *   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** ${osVersion}
 *   **Sandbox Environment:** ${sandboxEnvStr}
@@ -536,7 +536,6 @@ describe('useSlashCommandProcessor', () => {
     };
 
     it('should call open with the correct GitHub issue URL and return true', async () => {
-      mockGetCliVersionFn.mockResolvedValue('test-version');
       process.env.SANDBOX = 'gemini-sandbox';
       process.env.SEATBELT_PROFILE = 'test_profile';
       const { handleSlashCommand } = getProcessor();
@@ -545,7 +544,6 @@ describe('useSlashCommandProcessor', () => {
         bugDescription,
         process.env.SANDBOX,
         process.env.SEATBELT_PROFILE,
-        'test-version',
       );
       let commandResult: SlashCommandActionReturn | boolean = false;
       await act(async () => {
@@ -558,7 +556,6 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should use the custom bug command URL from config if available', async () => {
-      process.env.CLI_VERSION = '0.1.0';
       process.env.SANDBOX = 'sandbox-exec';
       process.env.SEATBELT_PROFILE = 'permissive-open';
       const bugCommand = {
@@ -569,12 +566,11 @@ describe('useSlashCommandProcessor', () => {
         ...mockConfig,
         getBugCommand: vi.fn(() => bugCommand),
       } as unknown as Config;
-      process.env.CLI_VERSION = '0.1.0';
 
       const { handleSlashCommand } = getProcessor();
       const bugDescription = 'This is a custom bug';
       const info = `
-*   **CLI Version:** 0.1.0
+*   **CLI Version:** ${CLI_VERSION}
 *   **Git Commit:** ${GIT_COMMIT_INFO}
 *   **Operating System:** test-platform test-node-version
 *   **Sandbox Environment:** sandbox-exec (permissive-open)

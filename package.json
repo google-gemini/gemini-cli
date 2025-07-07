@@ -17,7 +17,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "scripts": {
-    "generate": "node scripts/generate-git-commit-info.js",
+    "generate": "node scripts/generate-git-commit-info.js && node scripts/generate-version-info.js",
     "build": "node scripts/build.js",
     "build:sandbox": "node scripts/build_sandbox.js",
     "build:all": "npm run build && npm run build:sandbox",

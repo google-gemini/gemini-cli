@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getPackageJson } from './package.js';
+import { CLI_VERSION } from '../generated/version.js';
 
-export async function getCliVersion(): Promise<string> {
-  const pkgJson = await getPackageJson();
-  return process.env.CLI_VERSION || pkgJson?.version || 'unknown';
+export function getCliVersion(): string {
+  return CLI_VERSION;
 }

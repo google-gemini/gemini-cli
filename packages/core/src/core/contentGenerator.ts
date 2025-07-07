@@ -16,6 +16,7 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
+import { CLI_VERSION } from '../generated/version.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -103,7 +104,7 @@ export async function createContentGenerator(
   config: ContentGeneratorConfig,
   sessionId?: string,
 ): Promise<ContentGenerator> {
-  const version = process.env.CLI_VERSION || process.version;
+  const version = CLI_VERSION || process.version;
   const httpOptions = {
     headers: {
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
