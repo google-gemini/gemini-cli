@@ -211,9 +211,9 @@ describe('fileUtils', () => {
       expect(await detectFileType('file.jpg')).toBe('image');
     });
 
-    it('should detect svg type by extension', () => {
-      expect(detectFileType('image.svg')).toBe('svg');
-      expect(detectFileType('image.icon.svg')).toBe('svg');
+    it('should detect svg type by extension', async () => {
+      expect(await detectFileType('image.svg')).toBe('svg');
+      expect(await detectFileType('image.icon.svg')).toBe('svg');
     });
 
     it('should detect pdf type by extension', async () => {
