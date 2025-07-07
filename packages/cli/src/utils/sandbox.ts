@@ -99,7 +99,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 }
 
 // docker does not allow container names to contain ':' or '/', so we
-// parse those out and make the name a little shorter
+// parse those out to shorten the name
 function parseImageName(image: string): string {
   const [fullName, tag] = image.split(':');
   const name = fullName.split('/').at(-1) ?? 'unknown-image';
