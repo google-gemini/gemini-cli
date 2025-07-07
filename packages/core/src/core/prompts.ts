@@ -276,8 +276,16 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
  * Provides the system prompt for the history compression process.
  * This prompt instructs the model to act as a specialized state manager,
  * think in a scratchpad, and produce a structured XML summary.
+ *
+ * The characterLimit ensures a minimum number of characters in the summary,
+ * implicitly, ensuring that summarization preserves important information.
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(characterLimit: number): string {
+  const characterLimitText =
+    characterLimit > 0
+      ? `The <compressed_chat_history> XML object, MUST have a total character count of around ${characterLimit}. Please generate a summary of appropriate length to meet this target.`
+      : '';
+
   return `
 You are the component that summarizes internal chat history into a given structure.
 
@@ -286,6 +294,8 @@ When the conversation history grows too large, you will be invoked to distill th
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
 
 After your reasoning is complete, generate the final <compressed_chat_history> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+
+${characterLimitText}
 
 The structure MUST be as follows:
 

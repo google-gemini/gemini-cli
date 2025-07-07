@@ -12,7 +12,11 @@ import {
   GenerateContentResponse,
   GoogleGenAI,
 } from '@google/genai';
-import { GeminiClient } from './client.js';
+import {
+  calculateCharacterLimit,
+  COMPRESSION_LIMIT_THRESHOLD,
+  GeminiClient,
+} from './client.js';
 import { AuthType, ContentGenerator } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
@@ -64,6 +68,50 @@ vi.mock('../telemetry/index.js', () => ({
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
 }));
+
+describe('calculateCharacterLimit', () => {
+  it('should return 0 if tokenLimit is 0 to prevent division by zero', () => {
+    expect(calculateCharacterLimit(100, 0, 50)).toBe(0);
+  });
+
+  it('should return 0 if tokenConsumed is 0', () => {
+    expect(calculateCharacterLimit(0, 8192, 50)).toBe(0);
+  });
+
+  it('should return 0 if historyCharacterLength is 0', () => {
+    expect(calculateCharacterLimit(100, 8192, 0)).toBe(0);
+  });
+
+  it('should calculate the correct limit under normal conditions', () => {
+    const tokenConsumed = 4096; // 50% of limit
+    const tokenLimit = 8192;
+    const historyCharacterLength = 100;
+    const expected = Math.floor(
+      (historyCharacterLength / (tokenConsumed / tokenLimit)) *
+        COMPRESSION_LIMIT_THRESHOLD,
+    ); // 100 / 0.5 * 0.4 = 20
+    expect(
+      calculateCharacterLimit(
+        tokenConsumed,
+        tokenLimit,
+        historyCharacterLength,
+      ),
+    ).toBe(expected);
+  });
+
+  it('should always return an integer', () => {
+    // Use values that would produce a float
+    const tokenConsumed = 1;
+    const tokenLimit = 3;
+    const historyCharacterLength = 10;
+    const result = calculateCharacterLimit(
+      tokenConsumed,
+      tokenLimit,
+      historyCharacterLength,
+    );
+    expect(Number.isInteger(result)).toBe(true);
+  });
+});
 
 describe('Gemini Client (client.ts)', () => {
   let client: GeminiClient;
