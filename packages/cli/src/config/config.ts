@@ -13,7 +13,6 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
@@ -23,10 +22,6 @@ import { Settings } from './settings.js';
 
 import { Extension } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
@@ -53,6 +48,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  'allowed-mcp-server-names': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -128,6 +124,10 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('allowed-mcp-server-names', {
+      type: 'string',
+      description: 'Allowed MCP server names',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -166,8 +166,6 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
 ): Promise<Config> {
-  loadEnvironment();
-
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
@@ -193,8 +191,21 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  const mcpServers = mergeMcpServers(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, extensions);
   const excludeTools = mergeExcludeTools(settings, extensions);
+
+  if (argv['allowed-mcp-server-names']) {
+    const allowedNames = new Set(
+      argv['allowed-mcp-server-names'].split(',').filter(Boolean),
+    );
+    if (allowedNames.size > 0) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+      );
+    } else {
+      mcpServers = {};
+    }
+  }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
@@ -280,61 +291,3 @@ function mergeExcludeTools(
   return [...allExcludeTools];
 }
 
-function findEnvFile(startDir: string): string | null {
-  let currentDir = path.resolve(startDir);
-  while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
-    }
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(os.homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(os.homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
-    }
-    currentDir = parentDir;
-  }
-}
-
-export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
-
-  // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
-  // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
-  // set by the user using "gcloud config set project" we do not want to
-  // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
-  // one of the .env files, we set the Cloud Shell-specific default here.
-  if (process.env.CLOUD_SHELL === 'true') {
-    if (envFilePath && fs.existsSync(envFilePath)) {
-      const envFileContent = fs.readFileSync(envFilePath);
-      const parsedEnv = dotenv.parse(envFileContent);
-      if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
-        // .env file takes precedence in Cloud Shell
-        process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
-      } else {
-        // If not in .env, set to default and override global
-        process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
-      }
-    } else {
-      // If no .env file, set to default and override global
-      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
-    }
-  }
-
-  if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
-  }
-}
