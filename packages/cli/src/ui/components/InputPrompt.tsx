@@ -25,8 +25,8 @@ export interface InputPromptProps {
   onSubmit: (value: string) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
-  config: Config; // Added config for useCompletion
-  slashCommands: SlashCommand[]; // Added slashCommands for useCompletion
+  config: Config;
+  slashCommands: SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;

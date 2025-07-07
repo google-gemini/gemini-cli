@@ -124,9 +124,8 @@ export function useCompletion(
       return;
     }
 
-    const trimmedQuery = query.trimStart(); // Trim leading whitespace
+    const trimmedQuery = query.trimStart();
 
-    // TODO - try the newest version from the chat to see if this works.
     if (trimmedQuery.startsWith('/')) {
       const fullPath = trimmedQuery.substring(1);
       const hasTrailingSpace = trimmedQuery.endsWith(' ');
@@ -144,7 +143,7 @@ export function useCompletion(
         commandPathParts = rawParts.slice(0, -1);
       }
 
-      // --- 1. Traverse the Command Tree using the tentative completed path ---
+      // Traverse the Command Tree using the tentative completed path
       let currentLevel: SlashCommand[] | undefined = slashCommands;
       let leafCommand: SlashCommand | null = null;
 
@@ -167,9 +166,7 @@ export function useCompletion(
         }
       }
 
-      // --- 2. Handle the Ambiguous Case ---
-      // This is the key fix. If we had no trailing space, our "partial" might actually
-      // be a completed parent command. We must check for this.
+      // Handle the Ambiguous Case
       if (!hasTrailingSpace && currentLevel) {
         const exactMatchAsParent = currentLevel.find(
           (cmd) =>
@@ -188,9 +185,9 @@ export function useCompletion(
 
       const depth = commandPathParts.length;
 
-      // --- 3. Provide Suggestions based on the now-corrected context ---
+      // Provide Suggestions based on the now-corrected context
 
-      // CASE A: Argument Completion
+      // Argument Completion
       if (
         leafCommand?.completion &&
         (hasTrailingSpace ||
@@ -249,7 +246,7 @@ export function useCompletion(
       return;
     }
 
-    // --- Handle At Command Completion ---
+    // Handle At Command Completion
     const atIndex = query.lastIndexOf('@');
     if (atIndex === -1) {
       resetCompletionState();
