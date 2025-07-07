@@ -236,6 +236,7 @@ Expectation for required parameters:
     } else if (currentContent !== null) {
       // Editing an existing file
       const correctedEdit = await ensureCorrectEdit(
+        params.file_path,
         currentContent,
         params,
         this.client,

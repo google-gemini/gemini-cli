@@ -13,3 +13,11 @@ export function isFunctionResponse(content: Content): boolean {
     content.parts.every((part) => !!part.functionResponse)
   );
 }
+
+export function isFunctionCall(content: Content): boolean {
+  return (
+    content.role === 'model' &&
+    !!content.parts &&
+    content.parts.every((part) => !!part.functionCall)
+  );
+}
