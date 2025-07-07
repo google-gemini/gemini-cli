@@ -209,7 +209,7 @@ Expectation for required parameters:
       // Creating a new file
       isNewFile = true;
     } else if (!fileExists) {
-      // Trying to edit a non-existent file (and old_string is not empty)
+      // Trying to edit a nonexistent file (and old_string is not empty)
       error = {
         display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
         raw: `File not found: ${params.file_path}`,
