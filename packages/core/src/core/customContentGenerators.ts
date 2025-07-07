@@ -183,7 +183,7 @@ export class OpenAICompatibleContentGenerator implements ContentGenerator {
     const contents = normalizeContents(request.contents);
     const text = this.extractTextFromContents(contents);
 
-    const response = await fetch(`${this.config.baseUrl}/ embeddings`, {
+    const response = await fetch(`${this.config.baseUrl}/embeddings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
