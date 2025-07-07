@@ -311,6 +311,29 @@ function findEnvFile(startDir: string): string | null {
 
 export function loadEnvironment(): void {
   const envFilePath = findEnvFile(process.cwd());
+
+  // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
+  // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
+  // set by the user using "gcloud config set project" we do not want to
+  // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
+  // one of the .env files, we set the Cloud Shell-specific default here.
+  if (process.env.CLOUD_SHELL === 'true') {
+    if (envFilePath && fs.existsSync(envFilePath)) {
+      const envFileContent = fs.readFileSync(envFilePath);
+      const parsedEnv = dotenv.parse(envFileContent);
+      if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+        // .env file takes precedence in Cloud Shell
+        process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+      } else {
+        // If not in .env, set to default and override global
+        process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+      }
+    } else {
+      // If no .env file, set to default and override global
+      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    }
+  }
+
   if (envFilePath) {
     dotenv.config({ path: envFilePath, quiet: true });
   }
