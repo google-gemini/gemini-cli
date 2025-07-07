@@ -17,7 +17,7 @@ jobs:
       contents: read # For checkout
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [20.x, 22.x, 24.x]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        node-version: [20.x] # Should match the build job's matrix
+        node-version: [20.x, 22.x, 24.x] # Should match the build job's matrix
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -124,7 +124,7 @@ jobs:
       pull-requests: write # For commenting
     strategy:
       matrix:
-        node-version: [20.x] # Should match the test job's matrix
+        node-version: [20.x, 22.x, 24.x] # Should match the test job's matrix
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

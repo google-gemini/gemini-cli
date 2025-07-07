@@ -41,7 +41,10 @@ describe('useCompletion git-aware filtering integration', () => {
   beforeEach(() => {
     mockFileDiscoveryService = {
       shouldGitIgnoreFile: vi.fn(),
+      shouldGeminiIgnoreFile: vi.fn(),
+      shouldIgnoreFile: vi.fn(),
       filterFiles: vi.fn(),
+      getGeminiIgnorePatterns: vi.fn(() => []),
     };
 
     mockConfig = {
@@ -67,6 +70,14 @@ describe('useCompletion git-aware filtering integration', () => {
     // Mock git ignore service to ignore certain files
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
       (path: string) => path.includes('dist'),
+    );
+    mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
+      (path: string, options) => {
+        if (options?.respectGitIgnore !== false) {
+          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        }
+        return false;
+      },
     );
 
     const { result } = renderHook(() =>
@@ -101,6 +112,14 @@ describe('useCompletion git-aware filtering integration', () => {
         path.includes('node_modules') ||
         path.includes('dist') ||
         path.includes('.env'),
+    );
+    mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
+      (path: string, options) => {
+        if (options?.respectGitIgnore !== false) {
+          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        }
+        return false;
+      },
     );
 
     const { result } = renderHook(() =>
@@ -152,6 +171,14 @@ describe('useCompletion git-aware filtering integration', () => {
     // Mock git ignore service
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
       (path: string) => path.includes('node_modules') || path.includes('temp'),
+    );
+    mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
+      (path: string, options) => {
+        if (options?.respectGitIgnore !== false) {
+          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        }
+        return false;
+      },
     );
 
     const { result } = renderHook(() =>
@@ -260,6 +287,14 @@ describe('useCompletion git-aware filtering integration', () => {
 
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
       (path: string) => path.includes('.log'),
+    );
+    mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
+      (path: string, options) => {
+        if (options?.respectGitIgnore !== false) {
+          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        }
+        return false;
+      },
     );
 
     const { result } = renderHook(() =>
