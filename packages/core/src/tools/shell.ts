@@ -89,6 +89,15 @@ Process Group PGID: Process group started or \`(none)\``,
     return description;
   }
 
+  /**
+   * Extracts the root command from a given shell command string.
+   * This is used to identify the base command for permission checks.
+   *
+   * @param command The shell command string to parse
+   * @returns The root command name, or undefined if it cannot be determined
+   * @example getCommandRoot("ls -la /tmp") returns "ls"
+   * @example getCommandRoot("git status && npm test") returns "git"
+   */
   getCommandRoot(command: string): string | undefined {
     return command
       .trim() // remove leading and trailing whitespace
@@ -98,10 +107,21 @@ Process Group PGID: Process group started or \`(none)\``,
       .pop(); // take last part and return command root (or undefined if previous line was empty)
   }
 
-  isCommandAllowed(command: string): boolean {
+  /**
+   * Determines whether a given shell command is allowed to execute based on
+   * the tool's configuration including allowlists and blocklists.
+   *
+   * @param command The shell command string to validate
+   * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
+   */
+  isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
     // 0. Disallow command substitution
-    if (command.includes('$(') || command.includes('`')) {
-      return false;
+    if (command.includes('$(')) {
+      return {
+        allowed: false,
+        reason:
+          'Command substitution using $() is not allowed for security reasons',
+      };
     }
 
     const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
@@ -141,7 +161,10 @@ Process Group PGID: Process group started or \`(none)\``,
 
     // 1. Check if the shell tool is globally disabled.
     if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
-      return false;
+      return {
+        allowed: false,
+        reason: 'Shell tool is globally disabled in configuration',
+      };
     }
 
     const blockedCommands = new Set(extractCommands(excludeTools));
@@ -154,35 +177,51 @@ Process Group PGID: Process group started or \`(none)\``,
 
     const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
 
+    const blockedCommandsArr = [...blockedCommands];
+
     for (const cmd of commandsToValidate) {
       // 2. Check if the command is on the blocklist.
-      const isBlocked = [...blockedCommands].some((blocked) =>
+      const isBlocked = blockedCommandsArr.some((blocked) =>
         isPrefixedBy(cmd, blocked),
       );
       if (isBlocked) {
-        return false;
+        return {
+          allowed: false,
+          reason: `Command '${cmd}' is blocked by configuration`,
+        };
       }
 
       // 3. If in strict allow-list mode, check if the command is permitted.
       const isStrictAllowlist =
         hasSpecificAllowedCommands && !isWildcardAllowed;
+      const allowedCommandsArr = [...allowedCommands];
       if (isStrictAllowlist) {
-        const isAllowed = [...allowedCommands].some((allowed) =>
+        const isAllowed = allowedCommandsArr.some((allowed) =>
           isPrefixedBy(cmd, allowed),
         );
         if (!isAllowed) {
-          return false;
+          return {
+            allowed: false,
+            reason: `Command '${cmd}' is not in the allowed commands list`,
+          };
         }
       }
     }
 
     // 4. If all checks pass, the command is allowed.
-    return true;
+    return { allowed: true };
   }
 
   validateToolParams(params: ShellToolParams): string | null {
-    if (!this.isCommandAllowed(params.command)) {
-      return `Command is not allowed: ${params.command}`;
+    const commandCheck = this.isCommandAllowed(params.command);
+    if (!commandCheck.allowed) {
+      if (!commandCheck.reason) {
+        console.error(
+          'Unexpected: isCommandAllowed returned false without a reason',
+        );
+        return `Command is not allowed: ${params.command}`;
+      }
+      return commandCheck.reason;
     }
     if (
       !SchemaValidator.validate(
