@@ -123,13 +123,6 @@ Process Group PGID: Process group started or \`(none)\``,
           'Command substitution using $() is not allowed for security reasons',
       };
     }
-    if (command.includes('`')) {
-      return {
-        allowed: false,
-        reason:
-          'Command substitution using backticks is not allowed for security reasons',
-      };
-    }
 
     const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
 
