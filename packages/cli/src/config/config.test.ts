@@ -478,3 +478,80 @@ describe('mergeExcludeTools', () => {
     expect(settings).toEqual(originalSettings);
   });
 });
+
+describe('loadCliConfig with allowed_mcp_server_names', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  const baseSettings: Settings = {
+    mcpServers: {
+      server1: { url: 'http://localhost:8080' },
+      server2: { url: 'http://localhost:8081' },
+      server3: { url: 'http://localhost:8082' },
+    },
+  };
+
+  it('should allow all MCP servers if the flag is not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
+  });
+
+  it('should allow only the specified MCP server', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed_mcp_server_names',
+      'server1',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
+
+  it('should allow multiple specified MCP servers', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed_mcp_server_names',
+      'server1,server3',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
+
+  it('should handle server names that do not exist', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed_mcp_server_names',
+      'server1,server4',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
+
+  it('should allow all MCP servers if the flag is an empty string', async () => {
+    process.argv = ['node', 'script.js', '--allowed_mcp_server_names', ''];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
+  });
+});
