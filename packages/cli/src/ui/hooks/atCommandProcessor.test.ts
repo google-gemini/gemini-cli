@@ -583,7 +583,7 @@ describe('handleAtCommand', () => {
 
       // Mock the file discovery service to report this file as git-ignored
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
-        (path: string, options?: any) =>
+        (path: string, options?: { respectGitIgnore?: boolean }) =>
           path === gitIgnoredFile && options?.respectGitIgnore !== false,
       );
 
@@ -656,7 +656,7 @@ describe('handleAtCommand', () => {
       const fileContent = '# Project README';
 
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
-        (path: string, options?: any) =>
+        (path: string, options?: { respectGitIgnore?: boolean }) =>
           path === gitIgnoredFile && options?.respectGitIgnore !== false,
       );
       mockReadManyFilesExecute.mockResolvedValue({
