@@ -81,6 +81,74 @@ function hasMessage(err: unknown): err is { message: string } {
 }
 
 // Helper to find all code block and inline code regions using marked
+/**
+ * Finds all import statements in content without using regex
+ * @returns Array of {start, _end, path} objects for each import found
+ */
+function findImports(
+  content: string,
+): Array<{ start: number; _end: number; path: string }> {
+  const imports: Array<{ start: number; _end: number; path: string }> = [];
+  let i = 0;
+  const len = content.length;
+
+  while (i < len) {
+    // Find next @ symbol
+    i = content.indexOf('@', i);
+    if (i === -1) break;
+
+    // Check if it's a word boundary (not part of another word)
+    if (i > 0 && !isWhitespace(content[i - 1])) {
+      i++;
+      continue;
+    }
+
+    // Find the end of the import path (whitespace or newline)
+    let j = i + 1;
+    while (
+      j < len &&
+      !isWhitespace(content[j]) &&
+      content[j] !== '\n' &&
+      content[j] !== '\r'
+    ) {
+      j++;
+    }
+
+    // Extract the path (everything after @)
+    const importPath = content.slice(i + 1, j);
+
+    // Basic validation (starts with ./ or / or letter)
+    if (
+      importPath.length > 0 &&
+      (importPath[0] === '.' ||
+        importPath[0] === '/' ||
+        isLetter(importPath[0]))
+    ) {
+      imports.push({
+        start: i,
+        _end: j,
+        path: importPath,
+      });
+    }
+
+    i = j + 1;
+  }
+
+  return imports;
+}
+
+function isWhitespace(char: string): boolean {
+  return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+}
+
+function isLetter(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 65 && code <= 90) || // A-Z
+    (code >= 97 && code <= 122)
+  ); // a-z
+}
+
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
   const tokens = marked.lexer(content);
@@ -177,16 +245,22 @@ export async function processImports(
       processedFiles.add(filePath);
       // Add this file to the flat list
       flatFiles.push({ path: filePath, content: fileContent });
-      // Find imports in this file
-      const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
+      // Find imports in this file using non-regex approach
       const codeRegions = findCodeRegions(fileContent);
-      let match: RegExpExecArray | null;
-      while ((match = importRegex.exec(fileContent)) !== null) {
-        const idx = match.index;
-        if (codeRegions.some(([start, end]) => idx >= start && idx < end)) {
+      const imports = findImports(fileContent);
+
+      // Process imports in reverse order to handle indices correctly
+      for (let i = imports.length - 1; i >= 0; i--) {
+        const { start, _end, path: importPath } = imports[i];
+        // Skip if inside a code region
+        if (
+          codeRegions.some(
+            ([regionStart, regionEnd]) =>
+              start >= regionStart && start < regionEnd,
+          )
+        ) {
           continue;
         }
-        const importPath = match[1];
         if (
           !validateImportPath(importPath, fileBasePath, [projectRoot || ''])
         ) {
@@ -227,24 +301,22 @@ export async function processImports(
   }
 
   // --- TREE FORMAT LOGIC (existing) ---
-  const importRegex = /(?<!\S)@([./]?[^\s\n]+)/g;
   const codeRegions = findCodeRegions(content);
   let result = '';
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
   const imports: MemoryFile[] = [];
+  const importsList = findImports(content);
 
-  while ((match = importRegex.exec(content)) !== null) {
-    const idx = match.index;
-    // Add content before this match
-    result += content.substring(lastIndex, idx);
-    lastIndex = importRegex.lastIndex;
+  for (const { start, _end, path: importPath } of importsList) {
+    // Add content before this import
+    result += content.substring(lastIndex, start);
+    lastIndex = _end;
+
     // Skip if inside a code region
-    if (codeRegions.some(([start, end]) => idx >= start && idx < end)) {
-      result += match[0];
+    if (codeRegions.some(([s, e]) => start >= s && start < e)) {
+      result += `@${importPath}`;
       continue;
     }
-    const importPath = match[1];
     // Validate import path to prevent path traversal attacks
     if (!validateImportPath(importPath, basePath, [projectRoot || ''])) {
       result += `<!-- Import failed: ${importPath} - Path traversal attempt -->`;
