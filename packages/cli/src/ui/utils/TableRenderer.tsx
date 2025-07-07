@@ -9,8 +9,8 @@ import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
 
 interface TableRendererProps {
-  headers: string[];
-  rows: string[][];
+  headers: React.ReactNode[];
+  rows: React.ReactNode[][];
   terminalWidth: number;
 }
 
@@ -23,11 +23,30 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
+  // Helper function to get text length from React node
+  const getNodeTextLength = (node: React.ReactNode): number => {
+    if (typeof node === 'string') return node.length;
+    if (typeof node === 'number') return String(node).length;
+    if (React.isValidElement(node)) {
+      // Extract text content from React elements
+      const children = (node.props as any).children;
+      if (typeof children === 'string') return children.length;
+      if (Array.isArray(children)) {
+        return children.reduce((sum, child) => sum + getNodeTextLength(child), 0);
+      }
+      return getNodeTextLength(children);
+    }
+    if (Array.isArray(node)) {
+      return node.reduce((sum, child) => sum + getNodeTextLength(child), 0);
+    }
+    return 0;
+  };
+
   // Calculate column widths
   const columnWidths = headers.map((header, index) => {
-    const headerWidth = header.length;
+    const headerWidth = getNodeTextLength(header);
     const maxRowWidth = Math.max(
-      ...rows.map((row) => (row[index] || '').length),
+      ...rows.map((row) => getNodeTextLength(row[index] || '')),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
@@ -40,12 +59,15 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     Math.floor(width * scaleFactor),
   );
 
-  const renderCell = (content: string, width: number, isHeader = false) => {
+  const renderCell = (content: React.ReactNode, width: number, isHeader = false) => {
     // The actual space for content inside the padding
     const contentWidth = Math.max(0, width - 2);
+    const textLength = getNodeTextLength(content);
 
-    let cellContent = content;
-    if (content.length > contentWidth) {
+    let cellContent: React.ReactNode = content;
+    
+    // If content is too long and is a string, truncate it
+    if (textLength > contentWidth && typeof content === 'string') {
       if (contentWidth <= 3) {
         // Not enough space for '...'
         cellContent = content.substring(0, contentWidth);
@@ -54,20 +76,25 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       }
     }
 
-    // Pad the content to fill the cell
-    const padded = cellContent.padEnd(contentWidth, ' ');
+    // Calculate padding needed
+    const paddingNeeded = Math.max(0, contentWidth - textLength);
+    const padding = ' '.repeat(paddingNeeded);
 
     if (isHeader) {
       return (
         <Text bold color={Colors.AccentCyan}>
-          {padded}
+          {cellContent}{padding}
         </Text>
       );
     }
-    return <Text>{padded}</Text>;
+    return (
+      <Text>
+        {cellContent}{padding}
+      </Text>
+    );
   };
 
-  const renderRow = (cells: string[], isHeader = false) => (
+  const renderRow = (cells: React.ReactNode[], isHeader = false) => (
     <Box flexDirection="row">
       <Text>│ </Text>
       {cells.map((cell, index) => (
