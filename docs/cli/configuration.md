@@ -185,6 +185,18 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`modelFallbackStrategy`** (string):
+  - **Description:** Controls the behavior when the defaulte "pro" model is rate-limited (HTTP 429 error). This allows the CLI to temporarily switch to a faster fallback model (e.g., from a Pro model to Flash) for the remainder of the session, preventing workflow interruptions.
+  - **Default:** `"auto"`
+  - **Values:**
+    - `"auto"`: Automatically switches to the fallback model and displays an informational message explaining the change.
+    - `"ask"`: Displays an interactive prompt asking for your confirmation before switching to the fallback model.
+    - `"never"`: Disables the model fallback feature entirely. Errors from the primary model will be displayed directly without attempting a fallback.
+  - **Example:**
+    ```json
+    "modelFallbackStrategy": "ask"
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -209,7 +221,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false
+  "hideTips": false,
+  "modelFallbackStrategy": "auto"
 }
 ```
 

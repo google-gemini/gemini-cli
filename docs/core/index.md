@@ -38,9 +38,9 @@ You can find the token limits for each model in the [Google AI documentation](ht
 
 ## Model fallback
 
-Gemini CLI includes a model fallback mechanism to ensure that you can continue to use the CLI even if the default "pro" model is rate-limited.
+To ensure that you can continue to use the CLI even if the default "pro" model is rate-limited, Gemini CLI will automatically fall back to the "flash" model for the remainder of the session.
 
-If you are using the default "pro" model and the CLI detects that you are being rate-limited, it automatically switches to the "flash" model for the current session. This allows you to continue working without interruption.
+This default behavior can be adjusted via the `modelFallbackStrategy` setting. For more details, see the [`modelFallbackStrategy` setting](../cli/configuration.md#modelfallbackstrategy) in the CLI Configuration documentation.
 
 ## File discovery service
 

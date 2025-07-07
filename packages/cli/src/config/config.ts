@@ -257,6 +257,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    modelFallbackStrategy: settings.modelFallbackStrategy || 'auto',
   });
 }
 
