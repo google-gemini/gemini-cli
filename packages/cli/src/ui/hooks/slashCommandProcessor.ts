@@ -33,6 +33,8 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import { terminalSetup } from '../utils/terminalSetup.js';
+import { isKittyProtocolSupported } from '../utils/kittyProtocolDetector.js';
 
 export interface SlashCommandActionReturn {
   shouldScheduleTool?: boolean;
@@ -603,6 +605,52 @@ export const useSlashCommandProcessor = (
         name: 'corgi',
         action: (_mainCommand, _subCommand, _args) => {
           toggleCorgiMode();
+        },
+      },
+      {
+        name: 'terminal-setup',
+        description:
+          'configure terminal for Shift+Enter and Ctrl+Enter support',
+        action: async (_mainCommand, _subCommand, _args) => {
+          // Check if Kitty keyboard protocol is already supported
+          if (isKittyProtocolSupported()) {
+            addMessage({
+              type: MessageType.INFO,
+              content:
+                'Your terminal supports the Kitty keyboard protocol!\n\n' +
+                'Shift+Enter and Ctrl+Enter are already working - no configuration needed.\n' +
+                'The protocol is automatically enabled when you use Gemini CLI.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          // Terminal doesn't support Kitty protocol, proceed with setup
+          addMessage({
+            type: MessageType.INFO,
+            content: 'Configuring terminal for enhanced keyboard support...',
+            timestamp: new Date(),
+          });
+
+          const result = await terminalSetup();
+
+          if (result.success) {
+            addMessage({
+              type: MessageType.INFO,
+              content:
+                result.message +
+                (result.requiresRestart
+                  ? '\n\nPlease restart your terminal for changes to take effect.'
+                  : ''),
+              timestamp: new Date(),
+            });
+          } else {
+            addMessage({
+              type: MessageType.ERROR,
+              content: result.message,
+              timestamp: new Date(),
+            });
+          }
         },
       },
       {
