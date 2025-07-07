@@ -38,6 +38,8 @@ import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
+import { StatusDisplay } from './components/StatusDisplay.js';
+import { useStatusCheck } from './hooks/useStatusCheck.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
@@ -112,7 +114,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
-  const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [activeScreen, setActiveScreen] = useState<'chat' | 'help' | 'status'>(
+    'chat',
+  );
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -136,6 +140,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+
+  const statusInfo = useStatusCheck(
+    config,
+    settings,
+    activeScreen === 'status',
+  );
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -273,7 +283,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     clearItems,
     loadHistory,
     refreshStatic,
-    setShowHelp,
+    setActiveScreen,
     setDebugMessage,
     openThemeDialog,
     openAuthDialog,
@@ -412,7 +422,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     config.getGeminiClient(),
     history,
     addItem,
-    setShowHelp,
+    setActiveScreen,
     config,
     setDebugMessage,
     handleSlashCommand,
@@ -624,7 +634,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           </Box>
         </OverflowProvider>
 
-        {showHelp && <Help commands={slashCommands} />}
+        {activeScreen === 'help' && <Help commands={slashCommands} />}
+        {activeScreen === 'status' && <StatusDisplay statusInfo={statusInfo} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
           {startupWarnings.length > 0 && (

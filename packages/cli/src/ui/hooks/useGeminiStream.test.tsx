@@ -246,7 +246,7 @@ describe('mergePartListUnions', () => {
 // --- Tests for useGeminiStream Hook ---
 describe('useGeminiStream', () => {
   let mockAddItem: Mock;
-  let mockSetShowHelp: Mock;
+  let mockSetActiveScreen: Mock;
   let mockConfig: Config;
   let mockOnDebugMessage: Mock;
   let mockHandleSlashCommand: Mock;
@@ -258,7 +258,7 @@ describe('useGeminiStream', () => {
     vi.clearAllMocks(); // Clear mocks before each test
 
     mockAddItem = vi.fn();
-    mockSetShowHelp = vi.fn();
+    mockSetActiveScreen = vi.fn();
     // Define the mock for getGeminiClient
     const mockGetGeminiClient = vi.fn().mockImplementation(() => {
       // MockedGeminiClientClass is defined in the module scope by the previous change.
@@ -355,7 +355,7 @@ describe('useGeminiStream', () => {
         client: any;
         history: HistoryItem[];
         addItem: UseHistoryManagerReturn['addItem'];
-        setShowHelp: Dispatch<SetStateAction<boolean>>;
+        setActiveScreen: Dispatch<SetStateAction<'chat' | 'help' | 'status'>>;
         config: Config;
         onDebugMessage: (message: string) => void;
         handleSlashCommand: (
@@ -376,7 +376,7 @@ describe('useGeminiStream', () => {
           props.client,
           props.history,
           props.addItem,
-          props.setShowHelp,
+          props.setActiveScreen,
           props.config,
           props.onDebugMessage,
           props.handleSlashCommand,
@@ -391,7 +391,7 @@ describe('useGeminiStream', () => {
           client,
           history: [],
           addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
-          setShowHelp: mockSetShowHelp,
+          setActiveScreen: mockSetActiveScreen,
           config: mockConfig,
           onDebugMessage: mockOnDebugMessage,
           handleSlashCommand: mockHandleSlashCommand as unknown as (
@@ -511,7 +511,7 @@ describe('useGeminiStream', () => {
         new MockedGeminiClientClass(mockConfig),
         [],
         mockAddItem,
-        mockSetShowHelp,
+        mockSetActiveScreen,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -575,7 +575,7 @@ describe('useGeminiStream', () => {
         client,
         [],
         mockAddItem,
-        mockSetShowHelp,
+        mockSetActiveScreen,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -768,7 +768,7 @@ describe('useGeminiStream', () => {
         new MockedGeminiClientClass(mockConfig),
         [],
         mockAddItem,
-        mockSetShowHelp,
+        mockSetActiveScreen,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -1012,7 +1012,7 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
+          mockSetActiveScreen,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1087,7 +1087,7 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
+          mockSetActiveScreen,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1136,7 +1136,7 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(testConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
+          mockSetActiveScreen,
           testConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,

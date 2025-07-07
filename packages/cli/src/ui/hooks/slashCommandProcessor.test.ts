@@ -92,7 +92,7 @@ describe('useSlashCommandProcessor', () => {
   let mockClearItems: ReturnType<typeof vi.fn>;
   let mockLoadHistory: ReturnType<typeof vi.fn>;
   let mockRefreshStatic: ReturnType<typeof vi.fn>;
-  let mockSetShowHelp: ReturnType<typeof vi.fn>;
+  let mockSetActiveScreen: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
@@ -110,7 +110,7 @@ describe('useSlashCommandProcessor', () => {
     mockClearItems = vi.fn();
     mockLoadHistory = vi.fn();
     mockRefreshStatic = vi.fn();
-    mockSetShowHelp = vi.fn();
+    mockSetActiveScreen = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
@@ -168,7 +168,7 @@ describe('useSlashCommandProcessor', () => {
         mockClearItems,
         mockLoadHistory,
         mockRefreshStatic,
-        mockSetShowHelp,
+        mockSetActiveScreen,
         mockOnDebugMessage,
         mockOpenThemeDialog,
         mockOpenAuthDialog,
@@ -387,7 +387,7 @@ describe('useSlashCommandProcessor', () => {
           mockClearItems,
           mockLoadHistory,
           mockRefreshStatic,
-          mockSetShowHelp,
+          mockSetActiveScreen,
           mockOnDebugMessage,
           mockOpenThemeDialog,
           mockOpenAuthDialog,
@@ -453,7 +453,7 @@ describe('useSlashCommandProcessor', () => {
       await act(async () => {
         commandResult = await handleSlashCommand('/help');
       });
-      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(mockSetActiveScreen).toHaveBeenCalledWith('help');
       expect(commandResult).toBe(true);
     });
 
@@ -484,6 +484,7 @@ describe('useSlashCommandProcessor', () => {
       await act(async () => {
         commandResult = await handleSlashCommand('/editor');
       });
+      expect(mockSetActiveScreen).toHaveBeenCalledWith('chat');
       expect(mockOpenEditorDialog).toHaveBeenCalled();
       expect(commandResult).toBe(true);
     });
