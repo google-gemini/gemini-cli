@@ -36,7 +36,10 @@ import {
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
 import { parseAndFormatApiError } from '../utils/errorParsing.js';
-import { useShellCommandProcessor } from './shellCommandProcessor.js';
+import {
+  useShellCommandProcessor,
+  processShellCommandsInPrompt,
+} from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
@@ -201,6 +204,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
+      custom?: boolean,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -245,32 +249,55 @@ export const useGeminiStream = (
           }
           return { queryToSend: null, shouldProceed: false }; // Handled by scheduling the tool
         }
+        let effectiveQuery =
+          typeof slashCommandResult === 'object' && slashCommandResult.custom
+            ? slashCommandResult.customPrompt
+            : trimmedQuery;
 
-        if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
+        // Pre-process the prompt for !`bash` commands
+        effectiveQuery = await processShellCommandsInPrompt(
+          effectiveQuery,
+          config,
+          abortSignal,
+          onDebugMessage,
+        );
+        if (
+          typeof slashCommandResult === 'object' &&
+          slashCommandResult?.custom && // Don't run shell mode on expanded prompts
+          shellModeActive &&
+          handleShellCommand(effectiveQuery, abortSignal)
+        ) {
           return { queryToSend: null, shouldProceed: false };
         }
 
         // Handle @-commands (which might involve tool calls)
         if (isAtCommand(trimmedQuery)) {
           const atCommandResult = await handleAtCommand({
-            query: trimmedQuery,
+            query: effectiveQuery,
             config,
             addItem,
             onDebugMessage,
             messageId: userMessageTimestamp,
             signal: abortSignal,
+            // custom: custom,
           });
           if (!atCommandResult.shouldProceed) {
             return { queryToSend: null, shouldProceed: false };
           }
           localQueryToSendToGemini = atCommandResult.processedQuery;
         } else {
-          // Normal query for Gemini
+          // Normal query for Gemini or custom prompt
+          // Added to UI
           addItem(
-            { type: MessageType.USER, text: trimmedQuery },
+            { type: MessageType.USER, text: effectiveQuery },
             userMessageTimestamp,
           );
-          localQueryToSendToGemini = trimmedQuery;
+          // Added to context
+          // geminiClient.addHistory({
+          //   role: 'user',
+          //   parts: [{ text: effectiveQuery }],
+          // });
+          localQueryToSendToGemini = effectiveQuery;
         }
       } else {
         // It's a function response (PartListUnion that isn't a string)
@@ -485,7 +512,10 @@ export const useGeminiStream = (
   );
 
   const submitQuery = useCallback(
-    async (query: PartListUnion, options?: { isContinuation: boolean }) => {
+    async (
+      query: PartListUnion,
+      options?: { isContinuation: boolean; custom?: boolean },
+    ) => {
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
@@ -504,6 +534,7 @@ export const useGeminiStream = (
         query,
         userMessageTimestamp,
         abortSignal,
+        options?.custom,
       );
 
       if (!shouldProceed || queryToSend === null) {

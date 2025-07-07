@@ -33,13 +33,25 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import { useCustomCommandDiscovery } from './useCustomCommandDiscovery.js';
 
-export interface SlashCommandActionReturn {
-  shouldScheduleTool?: boolean;
-  toolName?: string;
-  toolArgs?: Record<string, unknown>;
-  message?: string; // For simple messages or errors
-}
+export type SlashCommandActionReturn =
+  | {
+      custom: true;
+      customPrompt: string;
+      shouldScheduleTool?: boolean;
+      toolName?: string;
+      toolArgs?: Record<string, unknown>;
+      message?: string;
+    }
+  | {
+      custom?: never;
+      customPrompt?: never;
+      shouldScheduleTool?: boolean;
+      toolName?: string;
+      toolArgs?: Record<string, unknown>;
+      message?: string;
+    };
 
 export interface SlashCommand {
   name: string;
@@ -85,7 +97,7 @@ export const useSlashCommandProcessor = (
     }
     return new GitService(config.getProjectRoot());
   }, [config]);
-
+  const customCommands = useCustomCommandDiscovery();
   const pendingHistoryItems: HistoryItemWithoutId[] = [];
   const [pendingCompressionItemRef, setPendingCompressionItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -1034,7 +1046,35 @@ export const useSlashCommandProcessor = (
         },
       });
     }
-    return commands;
+
+    const dynamicCommands: SlashCommand[] = customCommands.map((custom) => {
+      const [name, subCommand] = custom.command.slice(1).split(':');
+      return {
+        name: `${name}:${subCommand}`,
+        description: custom.description,
+        action: async (_mainCommand, _subCommand, args) => {
+          try {
+            let prompt = await fs.readFile(custom.file, 'utf-8');
+            // Remove YAML frontmatter
+            prompt = prompt.replace(/^---\n(.*?)\n---/s, '');
+            if (args) {
+              prompt = prompt.replace('$ARGUMENTS', args);
+            }
+            return { custom: true, customPrompt: prompt };
+          } catch (e) {
+            const error = e as Error;
+            addMessage({
+              type: MessageType.ERROR,
+              content: `Error executing custom command: ${error.message}`,
+              timestamp: new Date(),
+            });
+            return;
+          }
+        },
+      };
+    });
+
+    return [...commands, ...dynamicCommands];
   }, [
     onDebugMessage,
     setShowHelp,
@@ -1060,6 +1100,7 @@ export const useSlashCommandProcessor = (
     pendingCompressionItemRef,
     setPendingCompressionItem,
     openPrivacyNotice,
+    customCommands,
   ]);
 
   const handleSlashCommand = useCallback(
@@ -1103,6 +1144,16 @@ export const useSlashCommandProcessor = (
       for (const cmd of slashCommands) {
         if (mainCommand === cmd.name || mainCommand === cmd.altName) {
           const actionResult = await cmd.action(mainCommand, subCommand, args);
+          if (typeof actionResult === 'object' && actionResult?.custom) {
+            //Regular slash commands maybe don't need to be added to history
+            //Perhaps custom commands should, though
+            addItem(
+              { type: MessageType.USER, text: trimmed },
+              userMessageTimestamp,
+            );
+            return actionResult;
+          }
+
           if (
             typeof actionResult === 'object' &&
             actionResult?.shouldScheduleTool

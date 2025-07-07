@@ -346,3 +346,60 @@ export const useShellCommandProcessor = (
 
   return { handleShellCommand };
 };
+
+export async function processShellCommandsInPrompt(
+  prompt: string,
+  config: Config,
+  abortSignal: AbortSignal,
+  onDebugMessage: (message: string) => void,
+): Promise<string> {
+  const bashCommandRegex = /!`([^`]+)`/g;
+  let processedPrompt = prompt;
+  const commandPromises: Array<
+    Promise<{
+      placeholder: string;
+      replacement: string;
+    }>
+  > = [];
+
+  let match;
+  while ((match = bashCommandRegex.exec(prompt)) !== null) {
+    const commandToRun = match[1];
+    const placeholder = match[0];
+
+    const promise = executeShellCommand(
+      commandToRun,
+      config.getTargetDir(),
+      abortSignal,
+      () => {
+        // No-op for streaming, we only want the final result.
+      },
+      onDebugMessage,
+    ).then((result) => {
+      if (result.error || result.exitCode !== 0 || result.aborted) {
+        const errorInfo =
+          result.error?.message ||
+          `exited with code ${result.exitCode}` ||
+          'was cancelled';
+        return {
+          placeholder,
+          replacement: `Error executing command "${commandToRun}": ${errorInfo}`,
+        };
+      }
+      return { placeholder, replacement: result.output };
+    });
+
+    commandPromises.push(promise);
+  }
+
+  const results = await Promise.all(commandPromises);
+
+  for (const result of results) {
+    processedPrompt = processedPrompt.replace(
+      result.placeholder,
+      result.replacement,
+    );
+  }
+
+  return processedPrompt;
+}
