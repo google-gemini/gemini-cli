@@ -52,7 +52,7 @@ async function findProjectRoot(startDir: string): Promise<string> {
   while (true) {
     const gitPath = path.join(currentDir, '.git');
     try {
-      const stats = await fs.stat(gitPath);
+      const stats = await fs.lstat(gitPath);
       if (stats.isDirectory()) {
         return currentDir;
       }
@@ -313,6 +313,8 @@ export function validateImportPath(
 
   return allowedDirectories.some((allowedDir) => {
     const normalizedAllowedDir = path.resolve(allowedDir);
-    return resolvedPath.startsWith(normalizedAllowedDir);
+    const isSamePath = resolvedPath === normalizedAllowedDir;
+    const isSubPath = resolvedPath.startsWith(normalizedAllowedDir + path.sep);
+    return isSamePath || isSubPath;
   });
 }
