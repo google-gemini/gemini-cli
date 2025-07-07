@@ -78,7 +78,7 @@ export function createIdeContextStore() {
 
   /**
    * Retrieves the current active file context.
-   * @returns The `ActiveFile` object if a file is active, otherwise `undefined`.
+   * @returns The `ActiveFile` object if a file is active; otherwise, `undefined`.
    */
   function getActiveFileContext(): ActiveFile | undefined {
     return activeFileContext;

@@ -202,7 +202,7 @@ export class GeminiChat {
 
   /**
    * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
   private async handleFlashFallback(
     authType?: string,
