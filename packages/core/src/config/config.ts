@@ -66,6 +66,11 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
+export interface ActiveExtension {
+  name: string;
+  version: string;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -134,6 +139,7 @@ export interface ConfigParameters {
   model: string;
   extensionContextFilePaths?: string[];
   listExtensions?: boolean;
+  activeExtensions?: ActiveExtension[];
 }
 
 export class Config {
@@ -174,6 +180,7 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
   private readonly listExtensions: boolean;
+  private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
 
   constructor(params: ConfigParameters) {
@@ -217,6 +224,7 @@ export class Config {
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.listExtensions = params.listExtensions ?? false;
+    this._activeExtensions = params.activeExtensions ?? [];
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -451,6 +459,10 @@ export class Config {
 
   getListExtensions(): boolean {
     return this.listExtensions;
+  }
+
+  getActiveExtensions(): ActiveExtension[] {
+    return this._activeExtensions;
   }
 
   async getGitService(): Promise<GitService> {

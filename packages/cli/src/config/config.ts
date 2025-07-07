@@ -303,6 +303,10 @@ export async function loadCliConfig(
     model: argv.model!,
     extensionContextFilePaths,
     listExtensions: argv['list-extensions'] || false,
+    activeExtensions: activeExtensions.map((e) => ({
+      name: e.config.name,
+      version: e.config.version,
+    })),
   });
 }
 

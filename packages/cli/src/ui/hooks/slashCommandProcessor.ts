@@ -494,6 +494,32 @@ export const useSlashCommandProcessor = (
         },
       },
       {
+        name: 'extensions',
+        description: 'list active extensions',
+        action: async () => {
+          const activeExtensions = config?.getActiveExtensions();
+          if (!activeExtensions || activeExtensions.length === 0) {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No active extensions.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          let message = 'Active extensions:\n\n';
+          for (const ext of activeExtensions) {
+            message += `  - ${ext.name} (v${ext.version})\n`;
+          }
+
+          addMessage({
+            type: MessageType.INFO,
+            content: message,
+            timestamp: new Date(),
+          });
+        },
+      },
+      {
         name: 'tools',
         description: 'list available Gemini CLI tools',
         action: async (_mainCommand, _subCommand, _args) => {
