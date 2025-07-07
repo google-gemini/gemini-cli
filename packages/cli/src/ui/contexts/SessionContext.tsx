@@ -22,7 +22,7 @@ import {
 
 export type { SessionMetrics, ModelMetrics };
 
-interface SessionStatsState {
+export interface SessionStatsState {
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
