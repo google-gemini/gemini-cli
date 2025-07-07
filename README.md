@@ -387,6 +387,47 @@ For detailed attribution and list of modifications, see [NOTICE](NOTICE) file.
 
 We're grateful for the excellent foundation provided by Google's original Gemini CLI project.
 
+## 🛠️ Troubleshooting
+
+### "OAuth/Google authentication required" Error
+
+If you're getting OAuth authentication errors when expecting local model inference, you may have legacy settings from an earlier version. Fix this by updating your authentication mode:
+
+```bash
+# Quick fix - update settings to use local models
+echo '{
+  "selectedAuthType": "trust-local",
+  "theme": "GitHub"
+}' > ~/.gemini/settings.json
+```
+
+**Alternative manual fix:**
+```bash
+# Edit your settings file
+nano ~/.gemini/settings.json
+
+# Change "oauth-personal" to "trust-local"
+# Change: "selectedAuthType": "oauth-personal"
+# To: "selectedAuthType": "trust-local"
+```
+
+After updating, restart trust-cli and it should use local models instead of trying to authenticate with Google.
+
+### "No model loaded" Error
+
+This usually means you need to download a model first:
+
+```bash
+# Download the lightweight model
+node bundle/trust.js model download qwen2.5-1.5b-instruct
+
+# Switch to the downloaded model
+node bundle/trust.js model switch qwen2.5-1.5b-instruct
+
+# Verify the model is loaded
+node bundle/trust.js model list
+```
+
 ## 🛟 Support
 
 - **Documentation**: [docs/](docs/)
