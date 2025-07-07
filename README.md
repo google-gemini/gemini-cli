@@ -466,6 +466,70 @@ node bundle/trust.js model switch qwen2.5-1.5b-instruct
 node bundle/trust.js model list
 ```
 
+### Models Not Showing After Git Pull/Rebuild
+
+If you're only seeing 4 models instead of 6 after pulling updates, this is usually a caching issue:
+
+**Step 1: Clear Trust CLI Cache**
+```bash
+# Clear all trust-cli cached data
+rm -rf ~/.trustcli
+
+# Also clear legacy cache if it exists
+rm -rf ~/.gemini
+```
+
+**Step 2: Force Clean Rebuild (if cache clearing doesn't work)**
+```bash
+# Force clean everything
+rm -rf node_modules
+rm -rf packages/*/node_modules
+rm -rf packages/*/dist
+rm -rf bundle
+rm -f package-lock.json
+rm -f packages/*/package-lock.json
+
+# Fresh install and build
+npm install
+npm run build
+npm run bundle
+```
+
+**Step 3: Update Your Alias**
+```bash
+# Test with direct path first
+node bundle/trust.js model list
+
+# Update your alias to current directory
+alias trust="node $(pwd)/bundle/trust.js"
+
+# Make permanent by adding to ~/.zshrc or ~/.bashrc
+echo 'alias trust="node /full/path/to/your/trust-cli/bundle/trust.js"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Step 4: Verify All 6 Models Appear**
+You should see:
+- qwen2.5-1.5b-instruct (1.5B, 2GB)
+- llama-3.2-3b-instruct (3B, 4GB)  
+- phi-3.5-mini-instruct (3.8B, 3GB)
+- phi-3.5-mini-uncensored (3.8B, 3GB)
+- deepseek-r1-distill-7b (7.6B, 6GB)
+- llama-3.1-8b-instruct (8B, 8GB)
+
+### TypeScript Build Errors on Node.js v24+
+
+If you encounter TypeScript build errors on newer Node.js versions:
+
+```bash
+# Pull the latest fixes
+git pull origin main
+
+# Rebuild
+npm run build
+npm run bundle
+```
+
 ## 🛟 Support
 
 - **Documentation**: [docs/](docs/)
