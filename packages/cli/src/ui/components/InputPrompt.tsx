@@ -132,8 +132,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         } else {
           const newValue = base + suggestion;
-          buffer.setText(newValue);
-          handleSubmitAndClear(newValue);
+          if (newValue === query) {
+            handleSubmitAndClear(newValue);
+          } else {
+            buffer.setText(newValue);
+          }
         }
       } else {
         const atIndex = query.lastIndexOf('@');
