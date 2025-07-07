@@ -13,6 +13,7 @@ import { SessionStatsState } from '../contexts/SessionContext.js';
 export interface CommandContext {
   // Core services and configuration
   services: {
+    // TODO(abhipatel12): Ensure that config is never null.
     config: Config | null;
     settings: LoadedSettings;
     git: GitService | undefined;
