@@ -48,6 +48,7 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  'auth-type': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -123,6 +124,11 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('auth-type', {
+      type: 'string',
+      description: 'Authentication type (oauth-personal, gemini-api-key, vertex-ai, openai-compatible, anthropic, azure, local-llm)',
+      choices: ['oauth-personal', 'gemini-api-key', 'vertex-ai', 'openai-compatible', 'anthropic', 'azure', 'local-llm'],
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -130,6 +136,10 @@ async function parseArguments(): Promise<CliArgs> {
     .strict().argv;
 
   return argv;
+}
+
+export async function getCliArguments(): Promise<CliArgs> {
+  return await parseArguments();
 }
 
 // This function is now a thin wrapper around the server's implementation.
