@@ -126,9 +126,6 @@ export function filterActiveExtensions(
   const lowerCaseEnabledExtensions = enabledExtensionNames.map((e) =>
     e.toLowerCase(),
   );
-  const activeExtensions = extensions.filter((e) =>
-    lowerCaseEnabledExtensions.includes(e.config.name.toLowerCase()),
-  );
 
   if (
     lowerCaseEnabledExtensions.length === 1 &&
@@ -137,13 +134,18 @@ export function filterActiveExtensions(
     return [];
   }
 
-  const activeNames = new Set(
-    activeExtensions.map((e) => e.config.name.toLowerCase()),
+  const extensionMap = new Map(
+    extensions.map((e) => [e.config.name.toLowerCase(), e]),
   );
-  for (const requestedExtension of lowerCaseEnabledExtensions) {
-    if (!activeNames.has(requestedExtension)) {
-      throw new Error(`Extension not found: ${requestedExtension}`);
+
+  const activeExtensions: Extension[] = [];
+  for (const requestedName of lowerCaseEnabledExtensions) {
+    const extension = extensionMap.get(requestedName);
+    if (!extension) {
+      throw new Error(`Extension not found: ${requestedName}`);
     }
+    activeExtensions.push(extension);
   }
+
   return activeExtensions;
 }
