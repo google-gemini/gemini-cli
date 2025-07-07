@@ -70,7 +70,7 @@ function renderHastNode(
 
   // Handle Root Node: Start recursion with initially inherited color
   if (node.type === 'root') {
-    // Check if children array is empty - this happens when lowlight can't detect language – fallback to plain text
+    // Check if children array is empty - this happens when lowlight can't detect language – fall back to plain text
     if (!node.children || node.children.length === 0) {
       return null;
     }
@@ -161,7 +161,7 @@ export function colorizeCode(
       `[colorizeCode] Error highlighting code for language "${language}":`,
       error,
     );
-    // Fallback to plain text with default color on error
+    // Fall back to plain text with default color on error
     // Also display line numbers in fallback
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines

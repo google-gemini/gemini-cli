@@ -73,7 +73,7 @@ export function ThemeDialog({
   const initialThemeIndex = themeItems.findIndex(
     (item) => item.value === selectedThemeName,
   );
-  // If not found, fallback to the first theme
+  // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const scopeItems = [
@@ -261,7 +261,7 @@ export function ThemeDialog({
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
           <Text bold>Preview</Text>
-          {/* Get the Theme object for the highlighted theme, fallback to default if not found */}
+          {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
           {(() => {
             const previewTheme =
               themeManager.getTheme(
