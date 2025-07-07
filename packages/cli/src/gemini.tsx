@@ -83,6 +83,18 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 
 export async function main() {
+  // Suppress specific deprecation warnings from dependencies
+  process.removeAllListeners('warning');
+  process.on('warning', (warning) => {
+    // Skip punycode and url.parse deprecation warnings from dependencies
+    if (warning.name === 'DeprecationWarning' && 
+        (warning.message.includes('punycode') || warning.message.includes('url.parse'))) {
+      return;
+    }
+    // Log other warnings normally
+    console.warn(warning);
+  });
+
   // Check for specific commands first
   const args = process.argv.slice(2);
   

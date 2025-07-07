@@ -110,5 +110,11 @@
   },
   "dependencies": {
     "node-llama-cpp": "^3.10.0"
+  },
+  "overrides": {
+    "follow-redirects": "^1.15.9",
+    "tr46": "^5.0.0",
+    "whatwg-url": "^14.0.0",
+    "node-fetch": "^3.3.2"
   }
 }
