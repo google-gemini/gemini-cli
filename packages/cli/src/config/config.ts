@@ -50,7 +50,7 @@ interface CliArgs {
   telemetryLogPrompts: boolean | undefined;
   'allowed-mcp-server-names': string | undefined;
   extensions: string[] | undefined;
-  'list-extensions': boolean | undefined;
+  listExtensions: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -302,7 +302,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
-    listExtensions: argv['list-extensions'] || false,
+    listExtensions: argv.listExtensions || false,
     activeExtensions: activeExtensions.map((e) => ({
       name: e.config.name,
       version: e.config.version,
