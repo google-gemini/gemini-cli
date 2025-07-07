@@ -454,7 +454,7 @@ export class Config {
   }
 }
 
-export function createToolRegistry(config: Config): Promise<ToolRegistry> {
+export async function createToolRegistry(config: Config): Promise<ToolRegistry> {
   const registry = new ToolRegistry(config);
   const targetDir = config.getTargetDir();
 
@@ -499,10 +499,8 @@ export function createToolRegistry(config: Config): Promise<ToolRegistry> {
   registerCoreTool(ShellTool, config);
   registerCoreTool(MemoryTool);
   registerCoreTool(WebSearchTool, config);
-  return (async () => {
-    await registry.discoverTools();
-    return registry;
-  })();
+  await registry.discoverTools();
+  return registry;
 }
 
 // Export model constants for use in CLI
