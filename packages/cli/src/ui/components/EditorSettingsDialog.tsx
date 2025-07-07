@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger, EditorType, isEditorAvailable } from '@google/gemini-cli-core';
+import {
+  Logger,
+  EditorType,
+  isEditorAvailable,
+  sessionId,
+} from '@google/gemini-cli-core';
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
@@ -53,7 +58,9 @@ export function EditorSettingsDialog({
       )
     : 0;
   if (editorIndex === -1) {
-    new Logger().error(`Editor is not supported: ${currentPreference}`);
+    new Logger(sessionId).error(
+      `Editor is not supported: ${currentPreference}`,
+    );
     editorIndex = 0;
   }
 
