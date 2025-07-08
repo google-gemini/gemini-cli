@@ -18,6 +18,7 @@ import {
   LoadedSettings,
   loadSettings,
   USER_SETTINGS_PATH,
+  SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
