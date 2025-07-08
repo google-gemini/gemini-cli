@@ -24,7 +24,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import minimatch from 'minimatch'; // Import minimatch for permission checks
+import { minimatch } from 'minimatch'; // Import minimatch for permission checks
 
 // Centralized logger for Termux
 const logger = {

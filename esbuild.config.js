@@ -26,7 +26,7 @@ const loaders = {
 
 esbuild
   .build({
-    entryPoints: ['packages/cli/index.ts', 'ts-tools/highlight_tool.ts'],
+    entryPoints: ['packages/cli/index.ts'],
     bundle: true,
     outdir: 'bundle',
     platform: 'node',
@@ -37,6 +37,8 @@ esbuild
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },
     external: [
+      '@oclif/core',
+      'colorama',
       'escalade/sync',
       'yoga-layout',
       'diff',

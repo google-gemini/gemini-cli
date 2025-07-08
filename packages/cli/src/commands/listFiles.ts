@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path'; // Import path module
@@ -14,7 +14,7 @@ export async function listFiles(
   dirPath: string,
   filter: string = '',
 ): Promise<void> {
-  logger.info(
+  new Logger('cli-command').info(
     chalk.green('// Pyrmethus conjures the File Lister with Gemini’s aid!'),
   );
 
@@ -22,20 +22,20 @@ export async function listFiles(
     'List directory contents in TypeScript.',
   );
   if (suggestion)
-    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    new Logger('cli-command').info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   const targetPath = dirPath || '/data/data/com.termux/files/home';
   if (!fs.existsSync(targetPath)) {
-    logger.error(chalk.red(`The path '${targetPath}' eludes the ether!`));
+    new Logger('cli-command').error(chalk.red(`The path '${targetPath}' eludes the ether!`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${targetPath}' not found.`,
     );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) new Logger('cli-command').info(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
 
   try {
-    logger.info(chalk.cyan(`// Listing contents of '${targetPath}'...`));
+    new Logger('cli-command').info(chalk.cyan(`// Listing contents of '${targetPath}'...`));
     const files = await fs.readdir(targetPath, { withFileTypes: true });
 
     const fileDetailsPromises = files.map(async (f) => {
@@ -60,8 +60,8 @@ export async function listFiles(
       : fileDetails;
 
     const result = filteredDetails.join('\n');
-    logger.info(chalk.yellow(result || 'No files found.'));
-    logger.info(
+    new Logger('cli-command').info(chalk.yellow(result || 'No files found.'));
+    new Logger('cli-command').info(
       chalk.green(
         `Success! Listed ${filteredDetails.length} items in '${targetPath}'.`,
       ),
@@ -71,11 +71,11 @@ export async function listFiles(
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
+    new Logger('cli-command').error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) new Logger('cli-command').info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }
 

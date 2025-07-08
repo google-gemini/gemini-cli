@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
 export async function generateCode(prompt: string): Promise<void> {
-  logger.info(
+  new Logger('cli-command').info(
     chalk.green('// Pyrmethus conjures the Code Generator with Gemini’s aid!'),
   );
 
@@ -18,26 +18,26 @@ export async function generateCode(prompt: string): Promise<void> {
     'Generate code in TypeScript.',
   );
   if (suggestion)
-    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    new Logger('cli-command').info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   if (!prompt) {
-    logger.error(chalk.red('The ether demands a prompt to weave code!'));
+    new Logger('cli-command').error(chalk.red('The ether demands a prompt to weave code!'));
     return;
   }
 
   try {
-    logger.info(chalk.cyan(`// Forging code for prompt: '${prompt}'...`));
+    new Logger('cli-command').info(chalk.cyan(`// Forging code for prompt: '${prompt}'...`));
     // Simulate Gemini API response
     const code = `// Generated code for: ${prompt}\nconsole.log('Hello, Termux!');`;
     const outputPath = `/data/data/com.termux/files/home/generated_${Date.now()}.ts`;
     await fs.writeFile(outputPath, code);
-    logger.info(chalk.green(`Success! Code forged at '${outputPath}'.`));
+    new Logger('cli-command').info(chalk.green(`Success! Code forged at '${outputPath}'.`));
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
+    new Logger('cli-command').error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );

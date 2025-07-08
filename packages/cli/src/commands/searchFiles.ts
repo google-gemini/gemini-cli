@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
@@ -15,7 +15,7 @@ export async function searchFiles(
   searchTerm: string,
   searchContent: string,
 ): Promise<void> {
-  logger.info(
+  new Logger('cli-command').info(
     chalk.green('// Pyrmethus conjures the File Searcher with Gemini’s aid!'),
   );
 
@@ -23,20 +23,20 @@ export async function searchFiles(
     'Search files in TypeScript.',
   );
   if (suggestion)
-    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+    new Logger('cli-command').info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
 
   const targetPath = dirPath || '/data/data/com.termux/files/home';
   if (!fs.existsSync(targetPath)) {
-    logger.error(chalk.red(`The path '${targetPath}' eludes the ether!`));
+    new Logger('cli-command').error(chalk.red(`The path '${targetPath}' eludes the ether!`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug path '${targetPath}' not found.`,
     );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) new Logger('cli-command').info(chalk.yellow(`// Gemini’s debug: ${debug}`));
     return;
   }
 
   try {
-    logger.info(
+    new Logger('cli-command').info(
       chalk.cyan(`// Searching '${targetPath}' for '${searchTerm}'...`),
     );
     const results: string[] = [];
@@ -56,8 +56,8 @@ export async function searchFiles(
       }
     };
     await searchDir(targetPath);
-    logger.info(chalk.yellow(results.join('\n') || 'No matches found.'));
-    logger.info(
+    new Logger('cli-command').info(chalk.yellow(results.join('\n') || 'No matches found.'));
+    new Logger('cli-command').info(
       chalk.green(
         `Success! Found ${results.length} matches in '${targetPath}'.`,
       ),
@@ -67,10 +67,10 @@ export async function searchFiles(
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    logger.error(chalk.red(`The spirits falter: ${errorMessage}`));
+    new Logger('cli-command').error(chalk.red(`The spirits falter: ${errorMessage}`));
     const debug = await MockGeminiAPI.getSuggestion(
       `Debug error: ${errorMessage}`,
     );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    if (debug) new Logger('cli-command').info(chalk.yellow(`// Gemini’s debug: ${debug}`));
   }
 }

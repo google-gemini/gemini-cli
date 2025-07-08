@@ -25,7 +25,7 @@ import {
   Settings,
   Extension,
 } from '@google/gemini-cli-core';
-import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { Logger } from '@google/gemini-cli-core';
 import { loadSandboxConfig, getCliVersion } from '@google/gemini-cli-core/dist/src/config/config.js';
 
 interface CliArgs {
@@ -136,7 +136,7 @@ export async function loadHierarchicalGeminiMemory(
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
-    logger.debug(
+    new Logger('cli-config').debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
     );
   }
@@ -245,7 +245,7 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
     Object.entries(extension.config.mcpServers || {}).forEach(
       ([key, server]) => {
         if (mcpServers[key]) {
-          logger.warn(
+          new Logger('cli-config').warn(
             `Skipping extension MCP config for server with key "${key}" as it already exists.`,
           );
           return;
