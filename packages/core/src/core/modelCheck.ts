@@ -35,7 +35,7 @@ export async function getEffectiveModel(
       maxOutputTokens: 1,
       temperature: 0,
       topK: 1,
-      thinkingConfig: { thinkingBudget: 0, includeThoughts: false },
+      thinkingConfig: { thinkingBudget: 128, includeThoughts: false },
     },
   });
 
