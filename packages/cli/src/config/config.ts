@@ -188,29 +188,10 @@ export async function loadCliConfig(
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
-  const enabledExtensions = argv.extensions?.map((e) => e.trim()) || [];
-
-  let activeExtensions;
-  try {
-    activeExtensions = filterActiveExtensions(extensions, enabledExtensions);
-  } catch (e) {
-    console.error((e as Error).message);
-    process.exit(1);
-  }
-
-  if (enabledExtensions.length > 0) {
-    const activeNames = new Set(
-      activeExtensions.map((e) => e.config.name.toLowerCase()),
-    );
-    for (const extension of extensions) {
-      const status = activeNames.has(extension.config.name.toLowerCase())
-        ? 'Activated'
-        : 'Disabled';
-      console.log(
-        `${status} extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
-    }
-  }
+  const activeExtensions = filterActiveExtensions(
+    extensions,
+    argv.extensions || [],
+  );
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed

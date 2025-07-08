@@ -119,10 +119,11 @@ describe('filterActiveExtensions', () => {
     expect(activeExtensions[0].config.name).toBe('ext1');
   });
 
-  it('should throw an error for unknown extensions', () => {
-    expect(() => filterActiveExtensions(extensions, ['ext4'])).toThrow(
-      'Extension not found: ext4',
-    );
+  it('should log an error for unknown extensions', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    filterActiveExtensions(extensions, ['ext4']);
+    expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
+    consoleSpy.mockRestore();
   });
 });
 
