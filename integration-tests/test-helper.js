@@ -82,4 +82,10 @@ export class TestRig {
     }
     return content;
   }
+
+  cleanup() {
+    if (this.testDir && existsSync(this.testDir)) {
+      rmSync(this.testDir, { recursive: true, force: true });
+    }
+  }
 }

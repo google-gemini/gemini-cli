@@ -1,0 +1,177 @@
+
+
+// packages/cli/src/commands/depCheck.ts
+// Pyrmethus, the Termux Coding Wizard, conjures a spell to manage project dependencies.
+
+import { Command } from '@oclif/core';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { Fore, Style, init } from 'colorama'; // For vibrant terminal output
+// The run_shell_command tool will be called via default_api.run_shell_command
+
+init(); // Initialize Colorama
+
+// Chromatic constants for enchanted logging
+const NG = Fore.LIGHTGREEN_EX + Style.BRIGHT; // Success
+const NB = Fore.CYAN + Style.BRIGHT;          // Information
+const NP = Fore.MAGENTA + Style.BRIGHT;       // Headers, prompts
+const NY = Fore.YELLOW + Style.BRIGHT;        // Warnings
+const NR = Fore.LIGHTRED_EX + Style.BRIGHT;   // Errors
+const RST = Style.RESET_ALL;                  // Reset
+
+export default class DepCheck extends Command {
+  static description = `${NP}Verifies and manages project dependencies for Node.js and Python projects.${RST}`;
+
+  static examples = [
+    `${NG}<%= config.bin %> <%= command.id %>${RST}`,
+  ];
+
+  public async run(): Promise<void> {
+    this.log(NP + 'Summoning the dependency spirits...' + RST);
+
+    const projectRoot = process.cwd(); // The current working directory is the project root
+
+    if (this.isNodeJsProject(projectRoot)) {
+      await this.checkNodeJsDependencies(projectRoot);
+    } else if (this.isPythonProject(projectRoot)) {
+      await this.checkPythonDependencies(projectRoot);
+    } else {
+      this.log(NY + 'No Node.js (package.json) or Python (requirements.txt) project detected in this realm.' + RST);
+    }
+
+    this.log(NG + 'Dependency check complete. The ether is clear.' + RST);
+  }
+
+  private isNodeJsProject(projectRoot: string): boolean {
+    return existsSync(join(projectRoot, 'package.json'));
+  }
+
+  private isPythonProject(projectRoot: string): boolean {
+    return existsSync(join(projectRoot, 'requirements.txt'));
+  }
+
+  private async checkNodeJsDependencies(projectRoot: string): Promise<void> {
+    this.log(NB + 'Channeling Node.js dependencies...' + RST);
+    try {
+      const packageJsonPath = join(projectRoot, 'package.json');
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+      const { stdout: npmLsOutput } = await default_api.run_shell_command({
+        command: 'npm list --json --depth=0',
+        description: 'Listing installed Node.js packages',
+        directory: projectRoot,
+      });
+
+      const installedPackages = JSON.parse(npmLsOutput).dependencies || {};
+
+      this.log(NP + '--- Node.js Dependency Report ---' + RST);
+      let missingCount = 0;
+      let outdatedCount = 0;
+
+      for (const depName in dependencies) {
+        const requiredVersion = dependencies[depName];
+        const installedInfo = installedPackages[depName];
+
+        if (!installedInfo) {
+          this.log(`${NR}Missing: ${depName} (Required: ${requiredVersion})${RST}`);
+          missingCount++;
+        } else {
+          const installedVersion = installedInfo.version;
+          // Simple version check: just compare if exact match for now.
+          // More robust version comparison (semver) can be added later.
+          if (requiredVersion.startsWith('^') || requiredVersion.startsWith('~')) {
+            // For simplicity, if it's a caret or tilde version, we'll just check if the major version matches.
+            // A full semver comparison would be more complex.
+            const requiredMajor = parseInt(requiredVersion.replace(/[^0-9.]/g, '').split('.')[0]);
+            const installedMajor = parseInt(installedVersion.split('.')[0]);
+            if (requiredMajor !== installedMajor) {
+              this.log(`${NY}Outdated: ${depName} (Required: ${requiredVersion}, Installed: ${installedVersion})${RST}`);
+              outdatedCount++;
+            }
+          } else if (requiredVersion !== installedVersion) {
+            this.log(`${NY}Outdated: ${depName} (Required: ${requiredVersion}, Installed: ${installedVersion})${RST}`);
+            outdatedCount++;
+          } else {
+            this.log(`${NG}Installed: ${depName} (Version: ${installedVersion})${RST}`);
+          }
+        }
+      }
+
+      if (missingCount > 0) {
+        this.log(NY + `
+Found ${missingCount} missing Node.js dependencies. Consider running: ${NG}npm install${RST}`);
+      }
+      if (outdatedCount > 0) {
+        this.log(NY + `Found ${outdatedCount} outdated Node.js dependencies. Consider running: ${NG}npm update${RST}`);
+      }
+      if (missingCount === 0 && outdatedCount === 0) {
+        this.log(NG + 'All Node.js dependencies are in harmony.' + RST);
+      }
+
+    } catch (error: any) {
+      this.log(`${NR}Failed to check Node.js dependencies: ${error.message}${RST}`);
+    }
+  }
+
+  private async checkPythonDependencies(projectRoot: string): Promise<void> {
+    this.log(NB + 'Channeling Python dependencies...' + RST);
+    try {
+      const requirementsTxtPath = join(projectRoot, 'requirements.txt');
+      const requiredPackages = readFileSync(requirementsTxtPath, 'utf8')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+
+      const { stdout: pipFreezeOutput } = await default_api.run_shell_command({
+        command: 'pip freeze',
+        description: 'Listing installed Python packages',
+        directory: projectRoot,
+      });
+
+      const installedPackages = pipFreezeOutput.split('\n').map(line => line.trim()).filter(Boolean);
+      const installedPackageMap: { [key: string]: string } = {};
+      installedPackages.forEach(pkg => {
+        const [name, version] = pkg.split('==');
+        if (name && version) {
+          installedPackageMap[name] = version;
+        }
+      });
+
+      this.log(NP + '--- Python Dependency Report ---' + RST);
+      let missingCount = 0;
+      let outdatedCount = 0;
+
+      for (const requiredPkg of requiredPackages) {
+        const [name, versionSpec] = requiredPkg.split('==');
+        const installedVersion = installedPackageMap[name];
+
+        if (!installedVersion) {
+          this.log(`${NR}Missing: ${name} (Required: ${versionSpec || 'any'})${RST}`);
+          missingCount++;
+        } else {
+          if (versionSpec && installedVersion !== versionSpec) {
+            this.log(`${NY}Outdated: ${name} (Required: ${versionSpec}, Installed: ${installedVersion})${RST}`);
+            outdatedCount++;
+          } else {
+            this.log(`${NG}Installed: ${name} (Version: ${installedVersion})${RST}`);
+          }
+        }
+      }
+
+      if (missingCount > 0) {
+        this.log(NY + `
+Found ${missingCount} missing Python dependencies. Consider running: ${NG}pip install -r requirements.txt${RST}`);
+      }
+      if (outdatedCount > 0) {
+        this.log(NY + `Found ${outdatedCount} outdated Python dependencies. Consider running: ${NG}pip install --upgrade -r requirements.txt${RST}`);
+      }
+      if (missingCount === 0 && outdatedCount === 0) {
+        this.log(NG + 'All Python dependencies are in harmony.' + RST);
+      }
+
+    } catch (error: any) {
+      this.log(`${NR}Failed to check Python dependencies: ${error.message}${RST}`);
+    }
+  }
+}

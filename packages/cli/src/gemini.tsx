@@ -46,6 +46,7 @@ import { deleteFile } from './commands/deleteFile.js';
 import { searchFiles } from './commands/searchFiles.js';
 import { fileInfo } from './commands/fileInfo.js';
 import { loadExtensions, Extension } from './config/extension.js';
+import DepCheck from './commands/depCheck.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -243,6 +244,16 @@ export async function main() {
       },
       (argv) => {
         fileInfo(argv.filePath as string).catch(logger.error);
+      },
+    )
+    .command(
+      'depCheck',
+      'Verifies and manages project dependencies for Node.js and Python projects.',
+      (yargs) => {
+        // No specific positional arguments for depCheck, it operates on the current directory
+      },
+      (argv) => {
+        new DepCheck().run().catch(logger.error);
       },
     )
     .command(
