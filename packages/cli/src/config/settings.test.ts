@@ -218,7 +218,7 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
-    it('should merge system, user and workspace settings, with system taking precedence over user, and user over workspace', () => {
+    it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemSettingsContent = {
         theme: 'system-theme',
@@ -258,7 +258,7 @@ describe('Settings Loading and Merging', () => {
         sandbox: false,
         telemetry: { enabled: false },
         coreTools: ['tool1'],
-        contextFileName: 'USER_CONTEXT.md',
+        contextFileName: 'WORKSPACE_CONTEXT.md',
       });
     });
 
