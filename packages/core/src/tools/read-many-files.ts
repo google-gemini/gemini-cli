@@ -4,24 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { getErrorMessage } from '../utils/errors.js';
-import * as path from 'path';
-import { glob } from 'glob';
-import { getCurrentGeminiMdFilename } from './memoryTool.js';
-import {
-  detectFileType,
-  processSingleFileContent,
-  DEFAULT_ENCODING,
-  getSpecificMimeType,
-} from '../utils/fileUtils.js';
 import { PartListUnion, Schema, Type } from '@google/genai';
+import { glob } from 'glob';
+import * as path from 'path';
 import { Config } from '../config/config.js';
 import {
-  recordFileOperationMetric,
-  FileOperation,
+    FileOperation,
+    recordFileOperationMetric,
 } from '../telemetry/metrics.js';
+import { getErrorMessage } from '../utils/errors.js';
+import {
+    DEFAULT_ENCODING,
+    detectFileType,
+    getSpecificMimeType,
+    processSingleFileContent,
+} from '../utils/fileUtils.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
+import { getCurrentGeminiMdFilename } from './memoryTool.js';
+import { BaseTool, ToolResult } from './tools.js';
 
 /**
  * Parameters for the ReadManyFilesTool.

@@ -4,13 +4,89 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const Ajv = require('ajv');
+import * as Ajv from 'ajv';
 
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
-  private static ajv = new Ajv({ allErrors: true });
+  private static ajv = new (Ajv as any)({ allErrors: true });
+
+  /**
+   * Converts Google Gemini Schema to standard JSON Schema format
+   * @param schema The schema to convert
+   * @returns Converted schema
+   */
+  private static convertGeminiSchema(schema: any): any {
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+
+    const converted = { ...schema };
+
+    // Convert Google Gemini type names to standard JSON Schema types
+    if (converted.type) {
+      switch (converted.type) {
+        case 'STRING':
+          converted.type = 'string';
+          break;
+        case 'ARRAY':
+          converted.type = 'array';
+          break;
+        case 'OBJECT':
+          converted.type = 'object';
+          break;
+        case 'BOOLEAN':
+          converted.type = 'boolean';
+          break;
+        case 'NUMBER':
+          converted.type = 'number';
+          break;
+        case 'INTEGER':
+          converted.type = 'integer';
+          break;
+        // Keep other types as-is for standard JSON Schema compatibility
+      }
+    }
+
+    // Convert string numbers to actual numbers for Ajv compatibility
+    if (converted.minLength && typeof converted.minLength === 'string') {
+      converted.minLength = parseInt(converted.minLength, 10);
+    }
+    if (converted.maxLength && typeof converted.maxLength === 'string') {
+      converted.maxLength = parseInt(converted.maxLength, 10);
+    }
+    if (converted.minItems && typeof converted.minItems === 'string') {
+      converted.minItems = parseInt(converted.minItems, 10);
+    }
+    if (converted.maxItems && typeof converted.maxItems === 'string') {
+      converted.maxItems = parseInt(converted.maxItems, 10);
+    }
+    if (converted.minimum && typeof converted.minimum === 'string') {
+      converted.minimum = parseFloat(converted.minimum);
+    }
+    if (converted.maximum && typeof converted.maximum === 'string') {
+      converted.maximum = parseFloat(converted.maximum);
+    }
+
+    // Recursively convert nested objects
+    if (converted.properties) {
+      converted.properties = Object.keys(converted.properties).reduce((acc, key) => {
+        acc[key] = this.convertGeminiSchema(converted.properties[key]);
+        return acc;
+      }, {} as any);
+    }
+
+    if (converted.items) {
+      converted.items = this.convertGeminiSchema(converted.items);
+    }
+
+    if (converted.additionalProperties && typeof converted.additionalProperties === 'object') {
+      converted.additionalProperties = this.convertGeminiSchema(converted.additionalProperties);
+    }
+
+    return converted;
+  }
 
   /**
    * Validates data against a JSON schema
@@ -24,7 +100,10 @@ export class SchemaValidator {
     }
 
     try {
-      const validate = this.ajv.compile(schema);
+      // Convert Google Gemini schema format to standard JSON Schema
+      const convertedSchema = this.convertGeminiSchema(schema);
+      
+      const validate = this.ajv.compile(convertedSchema);
       const valid = validate(data);
       
       if (!valid && validate.errors) {
