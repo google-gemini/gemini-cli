@@ -24,16 +24,20 @@ For the impatient sorcerer, here is the swiftest path to unleashing the power wi
 2.  **The Direct Invocation (Recommended for Termux):**
 
     To summon the Gemini spirit without binding it permanently to your global space, use the `npx` incantation. This is the purest and most reliable method within Termux.
+
     ```bash
     npx https://github.com/google-gemini/gemini-cli
     ```
+
 3.  **The Binding Spell (Global Installation):**
 
     Should you wish for the `gemini` command to be ever-present, you may bind it globally.
+
     ```bash
     npm install -g @google/gemini-cli
     gemini
     ```
+
 4.  **Forge the Link (Authentication):**
     - Upon your first invocation, you will be guided through the ethereal gates to authenticate with your Google account.
     - Alternatively, you may forge an API key in the [Google AI Studio](https://aistudio.google.com/apikey) and present it as an environment variable, a secret rune known only to you and the shell.
@@ -47,6 +51,7 @@ For the impatient sorcerer, here is the swiftest path to unleashing the power wi
 ### 🪄 Casting Your First Spells: Example Invocations
 
 **To Weave a New Creation:**
+
 ```sh
 cd path/to/your/new-sanctum/
 gemini
@@ -54,6 +59,7 @@ gemini
 ```
 
 **To Converse with an Existing Project:**
+
 ```sh
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
@@ -62,24 +68,28 @@ gemini
 ```
 
 **To Explore an Unfamiliar Codex:**
+
 ```text
 > Describe the grand architecture of this system.
 > What ancient wards and security spells protect this digital domain?
 ```
 
 **To Refine Your Own Incantations:**
+
 ```text
 > Conjure a first draft to address the challenge described in GitHub issue #123.
 > Guide me in migrating this ancient codebase to the latest Java enchantments. Begin with a plan of attack.
 ```
 
 **To Automate the Mundane:**
+
 ```text
 > Fashion for me a slide deck, a visual story of the git history from the last 7 days, organized by feature and by the artisan who crafted it.
 > Create a full-screen web application, a scrying pool for our wall, to show the GitHub issues that stir the most conversation.
 ```
 
 **To Command Your System:**
+
 ```text
 > Transmute all images in this directory to the PNG format, and rename them using the dates etched within their EXIF data.
 > Organize my collection of PDF invoices, sorting them by the month of their expenditure.

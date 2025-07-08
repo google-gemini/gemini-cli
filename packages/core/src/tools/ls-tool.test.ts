@@ -27,9 +27,10 @@ describe('LsTool', () => {
 
     expect(fs.readdir).toHaveBeenCalledWith('/test');
     expect(result.llmContent).toEqual('file1.txt\nfile2.txt');
-    expect(result.returnDisplay).toContain('Successfully listed 2 item(s) in /test.');
+    expect(result.returnDisplay).toContain(
+      'Successfully listed 2 item(s) in /test.',
+    );
   });
-
 
   it('should return an error if no directory is provided', async () => {
     const tool = new LsTool();
@@ -39,7 +40,9 @@ describe('LsTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('The "directory" parameter is required');
+    expect(result.llmContent).toContain(
+      'The "directory" parameter is required',
+    );
     expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
@@ -55,7 +58,9 @@ describe('LsTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error reading directory /test: Directory not found');
+    expect(result.llmContent).toContain(
+      'Error reading directory /test: Directory not found',
+    );
     expect(result.returnDisplay).toContain('## Directory Read Error');
   });
 });

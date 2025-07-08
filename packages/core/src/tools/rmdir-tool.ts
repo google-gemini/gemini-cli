@@ -17,21 +17,16 @@ export class RmdirTool extends BaseTool<RmdirToolParams, ToolResult> {
   static readonly Description: string = 'Removes a directory.';
 
   constructor() {
-    super(
-      RmdirTool.Name,
-      'Remove Directory',
-      RmdirTool.Description,
-      {
-        type: 'object',
-        properties: {
-          directory: {
-            type: 'string',
-            description: 'The path to the directory to remove.',
-          },
+    super(RmdirTool.Name, 'Remove Directory', RmdirTool.Description, {
+      type: 'object',
+      properties: {
+        directory: {
+          type: 'string',
+          description: 'The path to the directory to remove.',
         },
-        required: ['directory'],
       },
-    );
+      required: ['directory'],
+    });
   }
 
   validateToolParams(params: RmdirToolParams): string | null {
@@ -45,7 +40,10 @@ export class RmdirTool extends BaseTool<RmdirToolParams, ToolResult> {
     return `Will remove the directory: ${params.directory}`;
   }
 
-  async execute(params: RmdirToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: RmdirToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -57,7 +55,8 @@ export class RmdirTool extends BaseTool<RmdirToolParams, ToolResult> {
     if (signal.aborted) {
       return {
         llmContent: 'Tool execution aborted.',
-        returnDisplay: '## Tool Aborted\n\nRemove directory operation was aborted.',
+        returnDisplay:
+          '## Tool Aborted\n\nRemove directory operation was aborted.',
       };
     }
 
@@ -75,4 +74,3 @@ export class RmdirTool extends BaseTool<RmdirToolParams, ToolResult> {
     }
   }
 }
-

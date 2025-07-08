@@ -124,8 +124,8 @@ Signal: Signal number or \`(none)\` if no signal was received.
 }
 
 export class ToolRegistry {
-  private tools: Map<string, Tool> = new Map();
-  private discovery: Promise<void> | null = null;
+  private tools: Map<string, Tool<unknown, ToolResult>> = new Map();
+
   private config: Config;
 
   constructor(config: Config) {
@@ -138,7 +138,7 @@ export class ToolRegistry {
    * Registers a tool definition.
    * @param tool - The tool object containing schema and execution logic.
    */
-  registerTool(tool: Tool): void {
+  registerTool(tool: Tool<unknown, ToolResult>): void {
     if (this.tools.has(tool.name)) {
       // Decide on behavior: throw error, log warning, or allow overwrite
       console.warn(
@@ -212,15 +212,15 @@ export class ToolRegistry {
   /**
    * Returns an array of all registered and discovered tool instances.
    */
-  getAllTools(): Tool[] {
+  getAllTools(): Tool<unknown, ToolResult>[] {
     return Array.from(this.tools.values());
   }
 
   /**
    * Returns an array of tools registered from a specific MCP server.
    */
-  getToolsByServer(serverName: string): Tool[] {
-    const serverTools: Tool[] = [];
+  getToolsByServer(serverName: string): Tool<unknown, ToolResult>[] {
+    const serverTools: Tool<unknown, ToolResult>[] = [];
     for (const tool of this.tools.values()) {
       if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
         serverTools.push(tool);
@@ -232,7 +232,7 @@ export class ToolRegistry {
   /**
    * Get the definition of a specific tool.
    */
-  getTool(name: string): Tool | undefined {
+  getTool(name: string): Tool<unknown, ToolResult> | undefined {
     return this.tools.get(name);
   }
 }

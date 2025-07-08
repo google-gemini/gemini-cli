@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs/promises'; // Use promises API for async operations
+import fs from 'fs'; // Changed from 'fs/promises' to 'fs' for synchronous statSync
 import path from 'path';
 import * as Diff from 'diff';
 import { Config, ApprovalMode } from '../config/config.js';
@@ -146,9 +146,7 @@ export class WriteFileTool
    * @param params The parameters provided to the tool.
    * @returns A string with an error message if validation fails, otherwise null.
    */
-  validateToolParams(
-    params: WriteFileToolParams,
-  ): string | null {
+  validateToolParams(params: WriteFileToolParams): string | null {
     // 1. Schema Validation
     if (
       this.schema.parameters &&
@@ -232,7 +230,7 @@ export class WriteFileTool
       return false; // Auto-approve in AUTO_EDIT mode
     }
 
-    const validationError = await this.validateToolParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       // If validation fails, do not confirm and let execute handle the error message.
       return false;
@@ -299,7 +297,7 @@ export class WriteFileTool
     params: WriteFileToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolResult> {
-    const validationError = await this.validateToolParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
@@ -356,10 +354,10 @@ export class WriteFileTool
     try {
       const dirName = path.dirname(params.file_path);
       // Ensure the directory exists; create recursively if not.
-      await fs.mkdir(dirName, { recursive: true });
+      await fs.promises.mkdir(dirName, { recursive: true }); // Use fs.promises.mkdir for async
 
       // Write the file content.
-      await fs.writeFile(params.file_path, fileContent, 'utf8');
+      await fs.promises.writeFile(params.file_path, fileContent, 'utf8'); // Use fs.promises.writeFile for async
 
       // Generate diff for the return display, showing 'Original' vs 'Written'.
       const fileName = path.basename(params.file_path);
@@ -441,7 +439,7 @@ export class WriteFileTool
     let error: { message: string; code?: string } | undefined;
 
     try {
-      originalContent = await fs.readFile(filePath, 'utf8');
+      originalContent = await fs.promises.readFile(filePath, 'utf8'); // Use fs.promises.readFile for async
       fileExists = true;
       isReadable = true; // File existed and was successfully read
     } catch (err: unknown) {
@@ -474,7 +472,7 @@ export class WriteFileTool
         this.client,
         abortSignal,
       );
-      correctedContent = correctedParams.new_string;
+      correctedContent = correctedParams.new_string ?? '';
     } else if (!fileExists) {
       // This implies a new file (ENOENT case)
       correctedContent = await ensureCorrectFileContent(

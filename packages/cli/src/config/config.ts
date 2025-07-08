@@ -212,7 +212,9 @@ export async function loadCliConfig(
 async function mergeMcpServers(settings: Settings, extensions: Extension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
-    for (const [key, server] of Object.entries(extension.config.mcpServers || {})) {
+    for (const [key, server] of Object.entries(
+      extension.config.mcpServers || {},
+    )) {
       if (mcpServers[key]) {
         await new Logger('cli-config').warn(
           `Skipping extension MCP config for server with key "${key}" as it already exists.`,

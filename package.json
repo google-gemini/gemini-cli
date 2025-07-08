@@ -70,6 +70,7 @@
     "@commitlint/config-conventional": "^19.8.1",
     "@types/archiver": "^6.0.3",
     "@types/fs-extra": "^11.0.4",
+    "@types/js-yaml": "^4.0.9",
     "@types/micromatch": "^4.0.9",
     "@types/mime-types": "^2.1.4",
     "@types/minimatch": "^5.1.2",

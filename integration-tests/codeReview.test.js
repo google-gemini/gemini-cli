@@ -97,9 +97,9 @@ describe('codeReview command', () => {
   });
 
   test('should report no Ruff issues for a clean Python file', async () => {
-    const filePath = rig.createFile('clean.py', 'def hello():
+    const filePath = rig.createFile('clean.py', `def hello():
     print("Hello")
-');
+`);
     // Mock Ruff to return no issues
     const originalRunShellCommand = global.default_api.run_shell_command;
     global.default_api.run_shell_command = async ({ command }) => {

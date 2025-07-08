@@ -17,9 +17,7 @@ interface RefactorCodeParams {
   newName: string;
 }
 
-async function refactorCode(
-  params: RefactorCodeParams,
-): Promise<string> {
+async function refactorCode(params: RefactorCodeParams): Promise<string> {
   const logger = new Logger();
   logger.info(
     `// Initiating refactoring: ${params.refactoringType} in ${params.filePath}`,

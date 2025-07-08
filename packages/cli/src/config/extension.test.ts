@@ -16,7 +16,8 @@ import {
 import { Logger } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     Logger: {

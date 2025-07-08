@@ -36,7 +36,9 @@ describe('MvTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('The "destination" parameter is required');
+    expect(result.llmContent).toContain(
+      'The "destination" parameter is required',
+    );
     expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
@@ -51,7 +53,9 @@ describe('MvTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error moving file from /test.txt to /test2.txt: Permission denied');
+    expect(result.llmContent).toContain(
+      'Error moving file from /test.txt to /test2.txt: Permission denied',
+    );
     expect(result.returnDisplay).toContain('## Move File Error');
   });
 });

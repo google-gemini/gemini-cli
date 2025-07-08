@@ -15,28 +15,24 @@ export interface MvToolParams {
 
 export class MvTool extends BaseTool<MvToolParams, ToolResult> {
   static readonly Name: string = 'mv';
-  static readonly Description: string = 'Moves a file from source to destination.';
+  static readonly Description: string =
+    'Moves a file from source to destination.';
 
   constructor() {
-    super(
-      MvTool.Name,
-      'Move File',
-      MvTool.Description,
-      {
-        type: 'object',
-        properties: {
-          source: {
-            type: 'string',
-            description: 'The path to the source file.',
-          },
-          destination: {
-            type: 'string',
-            description: 'The path to the destination file.',
-          },
+    super(MvTool.Name, 'Move File', MvTool.Description, {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description: 'The path to the source file.',
         },
-        required: ['source', 'destination'],
+        destination: {
+          type: 'string',
+          description: 'The path to the destination file.',
+        },
       },
-    );
+      required: ['source', 'destination'],
+    });
   }
 
   validateToolParams(params: MvToolParams): string | null {
@@ -53,7 +49,10 @@ export class MvTool extends BaseTool<MvToolParams, ToolResult> {
     return `Will move file from ${params.source} to ${params.destination}.`;
   }
 
-  async execute(params: MvToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: MvToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -73,7 +72,7 @@ export class MvTool extends BaseTool<MvToolParams, ToolResult> {
       await fs.rename(params.source, params.destination);
       return {
         llmContent: `Moved ${params.source} to ${params.destination}`,
-        returnDisplay: `## Move File Result\n\nSuccessfully moved **${params.source}** to **${params.destination}**.`, 
+        returnDisplay: `## Move File Result\n\nSuccessfully moved **${params.source}** to **${params.destination}**.`,
       };
     } catch (error) {
       return {
@@ -83,4 +82,3 @@ export class MvTool extends BaseTool<MvToolParams, ToolResult> {
     }
   }
 }
-

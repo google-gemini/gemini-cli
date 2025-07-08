@@ -8,24 +8,20 @@ export interface TouchToolParams {
 
 export class TouchTool extends BaseTool<TouchToolParams, ToolResult> {
   static readonly Name: string = 'touch';
-  static readonly Description: string = 'Creates an empty file or updates its timestamp.';
+  static readonly Description: string =
+    'Creates an empty file or updates its timestamp.';
 
   constructor() {
-    super(
-      TouchTool.Name,
-      'Touch File',
-      TouchTool.Description,
-      {
-        type: 'object',
-        properties: {
-          file: {
-            type: 'string',
-            description: 'The path to the file to touch.',
-          },
+    super(TouchTool.Name, 'Touch File', TouchTool.Description, {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'The path to the file to touch.',
         },
-        required: ['file'],
       },
-    );
+      required: ['file'],
+    });
   }
 
   validateToolParams(params: TouchToolParams): string | null {
@@ -39,7 +35,10 @@ export class TouchTool extends BaseTool<TouchToolParams, ToolResult> {
     return `Will create or update the timestamp of the file: ${params.file}`;
   }
 
-  async execute(params: TouchToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: TouchToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {

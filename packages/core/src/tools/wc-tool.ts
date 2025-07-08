@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'fs';
 import { resolve } from 'path';
-import { checkFilePermission } from '../services/filePermissionService';
+import { checkFilePermission } from '../services/filePermissionService.js';
 
 export async function wcFile(
   filePath: string,

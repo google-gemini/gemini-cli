@@ -15,28 +15,24 @@ export interface CpToolParams {
 
 export class CpTool extends BaseTool<CpToolParams, ToolResult> {
   static readonly Name: string = 'cp';
-  static readonly Description: string = 'Copies a file from source to destination.';
+  static readonly Description: string =
+    'Copies a file from source to destination.';
 
   constructor() {
-    super(
-      CpTool.Name,
-      'Copy File',
-      CpTool.Description,
-      {
-        type: 'object',
-        properties: {
-          source: {
-            type: 'string',
-            description: 'The path to the source file.',
-          },
-          destination: {
-            type: 'string',
-            description: 'The path to the destination file.',
-          },
+    super(CpTool.Name, 'Copy File', CpTool.Description, {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description: 'The path to the source file.',
         },
-        required: ['source', 'destination'],
+        destination: {
+          type: 'string',
+          description: 'The path to the destination file.',
+        },
       },
-    );
+      required: ['source', 'destination'],
+    });
   }
 
   validateToolParams(params: CpToolParams): string | null {
@@ -53,7 +49,10 @@ export class CpTool extends BaseTool<CpToolParams, ToolResult> {
     return `Will copy file from ${params.source} to ${params.destination}.`;
   }
 
-  async execute(params: CpToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: CpToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -83,4 +82,3 @@ export class CpTool extends BaseTool<CpToolParams, ToolResult> {
     }
   }
 }
-

@@ -52,7 +52,7 @@ import DebugAssist from './commands/debugAssist.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
-import { RefactorTool } from "@google/gemini-cli-core";
+import { RefactorTool } from '@google/gemini-cli-core';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -64,9 +64,7 @@ function getNodeMemoryArgs(config: Config): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (config.getDebugMode()) {
-    logger.debug(
-      `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
-    );
+    logger.debug(`Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`);
   }
 
   if (process.env.GEMINI_CLI_NO_RELAUNCH) {

@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn, SpawnOptions } from 'child_process';
+import {
+  execSync,
+  spawn,
+  SpawnOptions,
+  ExecSyncOptionsWithStringEncoding,
+} from 'child_process';
 import { resolve } from 'path'; // For resolving paths
 
 // --- Interfaces and Types ---
@@ -50,15 +55,17 @@ function commandExists(cmd: string): boolean {
   try {
     const platformCommand =
       process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`;
-    execSync(platformCommand, { stdio: 'ignore' });
+    execSync(platformCommand, { stdio: 'ignore', encoding: 'utf8' });
     if (process.env.DEBUG) {
       console.log(`DEBUG: Command '${cmd}' exists.`);
     }
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     if (process.env.DEBUG) {
       console.error(
-        `DEBUG: Command '${cmd}' does not exist. Error: ${error.message}`,
+        `DEBUG: Command '${cmd}' does not exist. Error: ${
+          (error as Error).message
+        }`,
       );
     }
     return false;
@@ -165,7 +172,7 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
         '-c',
         'set showtabline=2', // Always show tabline
         '-c',
-        `set tabline=[Diff\\ Mode]\\ OLD\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ NEW\\ FILE\\ :wqa(save\\ &\\ quit)`, // Clearer tabline
+        `set tabline=[Diff\\ Mode]\\ OLD\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ NEW\\ FILE\\ :wqa(save\\ &\\ quit)`,
         '-c',
         'autocmd WinClosed * wqa', // Auto close all windows when one is closed
         oldPath,
@@ -193,7 +200,7 @@ const editorConfigs: Map<EditorType, EditorConfig> = new Map([
         '-c',
         'set showtabline=2', // Always show tabline
         '-c',
-        `set tabline=[Diff\\ Mode]\\ OLD\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ NEW\\ FILE\\ :wqa(save\\ &\\ quit)`, // Clearer tabline
+        `set tabline=[Diff\\ Mode]\\ OLD\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ NEW\\ FILE\\ :wqa(save\\ &\\ quit)`,
         '-c',
         'autocmd WinClosed * wqa', // Auto close all windows when one is closed
         oldPath,
@@ -398,11 +405,17 @@ export async function openDiff(
       const commandString = `${diffCommand.command} ${diffCommand.args
         .map((arg) =>
           // Quote arguments that contain spaces for shell execution, especially important on Linux/macOS
-          process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '"')}"`,
+          process.platform === 'win32' ? arg : `"${arg.replace(/"/g, '\"')}"`,
         )
         .join(' ')}`;
 
-      execSync(commandString, spawnOptions);
+      const execSyncOptions: ExecSyncOptionsWithStringEncoding = {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        shell: '/bin/sh', // Explicitly set shell to a string
+      };
+      execSync(commandString, execSyncOptions);
       return Promise.resolve(); // For non-waiting or terminal-blocking commands, resolve immediately after execSync
     }
   } catch (error) {

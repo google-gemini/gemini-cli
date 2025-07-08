@@ -6,7 +6,9 @@
     "checkJs": true,
     "lib": ["DOM", "DOM.Iterable", "ES2021"],
     "composite": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
   "exclude": ["node_modules", "dist"]

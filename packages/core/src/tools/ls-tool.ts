@@ -17,21 +17,16 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
   static readonly Description: string = 'Lists the contents of a directory.';
 
   constructor() {
-    super(
-      LsTool.Name,
-      'List Directory',
-      LsTool.Description,
-      {
-        type: 'object',
-        properties: {
-          directory: {
-            type: 'string',
-            description: 'The path to the directory to list.',
-          },
+    super(LsTool.Name, 'List Directory', LsTool.Description, {
+      type: 'object',
+      properties: {
+        directory: {
+          type: 'string',
+          description: 'The path to the directory to list.',
         },
-        required: ['directory'],
       },
-    );
+      required: ['directory'],
+    });
   }
 
   validateToolParams(params: LsToolParams): string | null {
@@ -45,7 +40,10 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
     return `Will list the contents of the directory: ${params.directory}`;
   }
 
-  async execute(params: LsToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: LsToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -57,7 +55,8 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
     if (signal.aborted) {
       return {
         llmContent: 'Tool execution aborted.',
-        returnDisplay: '## Tool Aborted\n\nList directory operation was aborted.',
+        returnDisplay:
+          '## Tool Aborted\n\nList directory operation was aborted.',
       };
     }
 
@@ -67,7 +66,7 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
         llmContent: files.join('\n'),
         returnDisplay: `## List Directory Result
 
-Successfully listed ${files.length} item(s) in **${params.directory}**.`
+Successfully listed ${files.length} item(s) in **${params.directory}**.`,
       };
     } catch (error) {
       return {
@@ -77,4 +76,3 @@ Successfully listed ${files.length} item(s) in **${params.directory}**.`
     }
   }
 }
-

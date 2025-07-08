@@ -17,8 +17,6 @@ export async function refactorCodeCommand(
     chalk.green('// Pyrmethus conjures the Code Refactorer with Gemini’s aid!'),
   );
 
-  
-
   if (refactoringType !== 'rename-symbol') {
     logger.error(
       chalk.red(`// Refactoring type '${refactoringType}' not yet supported.`),
@@ -65,6 +63,5 @@ export async function refactorCodeCommand(
     logger.error(
       chalk.red(`The spirits falter during refactoring: ${errorMessage}`),
     );
-    
   }
 }

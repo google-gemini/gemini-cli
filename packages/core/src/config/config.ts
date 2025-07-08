@@ -486,6 +486,16 @@ export class Config {
   getFilePermissionService(): FilePermissionService {
     return this.filePermissionService;
   }
+
+  private customToolsets: Map<string, Tool[]> = new Map();
+
+  addCustomToolset(name: string, toolset: Tool[]): void {
+    this.customToolsets.set(name, toolset);
+  }
+
+  getMemory(): string {
+    return this.userMemory;
+  }
 }
 
 export function createToolRegistry(config: Config): Promise<ToolRegistry> {

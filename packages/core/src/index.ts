@@ -6,7 +6,10 @@
 
 // Export config
 export * from './config/config.ts';
-export { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_EMBEDDING_MODEL } from './config/models.ts';
+export {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+} from './config/models.ts';
 
 // Export Core Logic
 export * from './core/client.ts';

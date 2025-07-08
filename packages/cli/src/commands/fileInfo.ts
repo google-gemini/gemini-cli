@@ -40,9 +40,7 @@ export async function fileInfo(filePath: string): Promise<void> {
       `Last Modified: ${stats.mtime.toISOString()}`,
     ].join('\n');
     logger.info(chalk.yellow(info));
-    logger.info(
-      chalk.green(`Success! Metadata retrieved for '${filePath}'.`),
-    );
+    logger.info(chalk.green(`Success! Metadata retrieved for '${filePath}'.`));
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {

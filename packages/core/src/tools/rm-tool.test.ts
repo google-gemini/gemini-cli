@@ -48,7 +48,9 @@ describe('RmTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error removing file /test.txt: Permission denied');
+    expect(result.llmContent).toContain(
+      'Error removing file /test.txt: Permission denied',
+    );
     expect(result.returnDisplay).toContain('## File Removal Error');
   });
 });

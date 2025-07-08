@@ -42,7 +42,7 @@ jobs:
           END_DATE=$(date -u +'%Y-%m-%d')
           echo "⏳ Generating report for contributions from $START_DATE to $END_DATE..."
 
-          
+
 
           total_issues=0
           total_prs=0

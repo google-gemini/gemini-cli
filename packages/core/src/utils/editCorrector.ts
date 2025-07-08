@@ -11,7 +11,7 @@ import {
   Type,
 } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
-import { EditToolParams } from '../tools/edit.js';
+import { EditToolParams } from '../tools/edit';
 import { LruCache } from './LruCache.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
@@ -37,8 +37,15 @@ const fileContentCorrectionCache = new LruCache<string, string>(MAX_CACHE_SIZE);
  */
 interface CorrectedEditParams {
   file_path: string;
-  old_string: string;
-  new_string: string;
+  old_string?: string;
+  new_string?: string;
+  expected_replacements?: number;
+  modified_by_user?: boolean;
+  reason?: string;
+  dry_run?: boolean;
+  use_regex?: boolean;
+  line?: number;
+  count?: number;
 }
 
 /**

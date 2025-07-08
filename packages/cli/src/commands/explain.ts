@@ -28,16 +28,12 @@ export async function explainCode(codeOrPath: string): Promise<void> {
   }
 
   if (!code) {
-    logger.error(
-      chalk.red('The ether requires code or a valid file path!'),
-    );
+    logger.error(chalk.red('The ether requires code or a valid file path!'));
     return;
   }
 
   try {
-    logger.info(
-      chalk.cyan(`// Explaining code: ${code.substring(0, 50)}...`),
-    );
+    logger.info(chalk.cyan(`// Explaining code: ${code.substring(0, 50)}...`));
     // Simulate Gemini API explanation
     const explanation = `This code appears to be a ${code.includes('console.log') ? 'JavaScript/TypeScript snippet' : 'generic script'}. It outputs content to the console.`;
     logger.info(chalk.yellow(explanation));

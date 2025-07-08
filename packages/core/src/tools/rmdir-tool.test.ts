@@ -34,7 +34,9 @@ describe('RmdirTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('The "directory" parameter is required');
+    expect(result.llmContent).toContain(
+      'The "directory" parameter is required',
+    );
     expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
@@ -48,7 +50,9 @@ describe('RmdirTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error removing directory /test: Permission denied');
+    expect(result.llmContent).toContain(
+      'Error removing directory /test: Permission denied',
+    );
     expect(result.returnDisplay).toContain('## Directory Removal Error');
   });
 });

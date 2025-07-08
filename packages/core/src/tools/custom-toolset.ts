@@ -17,6 +17,7 @@ import { ShellTool } from './shell.js';
 import { WebFetchTool } from './web-fetch.js';
 import { WebSearchTool } from './web-search.js';
 import { SubAgentTool } from './sub-agent.js';
+import { Config } from '../config/config.js';
 
 export interface CustomToolsetToolParams {
   name: string;
@@ -28,9 +29,8 @@ export class CustomToolsetTool extends BaseTool<
   ToolResult
 > {
   static readonly Name = 'custom_toolset';
-  private tools: Tool[];
 
-  constructor(tools: Tool[]) {
+  constructor(private readonly config: Config) {
     super(
       CustomToolsetTool.Name,
       'CustomToolset',
@@ -51,11 +51,6 @@ export class CustomToolsetTool extends BaseTool<
         type: 'object',
       },
     );
-    this.tools = tools;
-  }
-
-  getTools(): Tool[] {
-    return this.tools;
   }
 
   execute(params: CustomToolsetToolParams): Promise<ToolResult> {
@@ -82,13 +77,13 @@ export class CustomToolsetTool extends BaseTool<
         this.config.getTargetDir(),
         this.config,
       ),
-      [GlobTool.Name]: new GlobTool(this.config.getTargetDir()),
+      [GlobTool.Name]: new GlobTool(this.config, this.config.getTargetDir()),
       [GrepTool.Name]: new GrepTool(this.config.getTargetDir()),
-      [LSTool.Name]: new LSTool(this.config.getTargetDir()),
-      [MemoryTool.Name]: new MemoryTool(this.config.getMemory()),
+      [LSTool.Name]: new LSTool(this.config, this.config.getTargetDir()),
+      [MemoryTool.Name]: new MemoryTool(),
       [ShellTool.Name]: new ShellTool(this.config),
-      [WebFetchTool.Name]: new WebFetchTool(),
-      [WebSearchTool.Name]: new WebSearchTool(),
+      [WebFetchTool.Name]: new WebFetchTool(this.config),
+      [WebSearchTool.Name]: new WebSearchTool(this.config),
       [SubAgentTool.Name]: new SubAgentTool(this.config),
     };
     return toolNames.map((toolName) => {

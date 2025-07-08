@@ -17,21 +17,16 @@ export class RmTool extends BaseTool<RmToolParams, ToolResult> {
   static readonly Description: string = 'Removes a file.';
 
   constructor() {
-    super(
-      RmTool.Name,
-      'Remove File',
-      RmTool.Description,
-      {
-        type: 'object',
-        properties: {
-          file: {
-            type: 'string',
-            description: 'The path to the file to remove.',
-          },
+    super(RmTool.Name, 'Remove File', RmTool.Description, {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'The path to the file to remove.',
         },
-        required: ['file'],
       },
-    );
+      required: ['file'],
+    });
   }
 
   validateToolParams(params: RmToolParams): string | null {
@@ -45,7 +40,10 @@ export class RmTool extends BaseTool<RmToolParams, ToolResult> {
     return `Will remove the file: ${params.file}`;
   }
 
-  async execute(params: RmToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: RmToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -77,4 +75,3 @@ Successfully removed file **${params.file}**.`,
     }
   }
 }
-

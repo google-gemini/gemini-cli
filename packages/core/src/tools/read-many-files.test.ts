@@ -131,7 +131,9 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should return null for absolute paths as execute handles this', () => {
-      const params = { patterns: [path.join(tempDirOutsideRoot, 'absolute.txt')] };
+      const params = {
+        patterns: [path.join(tempDirOutsideRoot, 'absolute.txt')],
+      };
       expect(tool.validateParams(params)).toBeNull();
     });
 

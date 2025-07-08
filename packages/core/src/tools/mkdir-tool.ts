@@ -17,21 +17,16 @@ export class MkdirTool extends BaseTool<MkdirToolParams, ToolResult> {
   static readonly Description: string = 'Creates a directory.';
 
   constructor() {
-    super(
-      MkdirTool.Name,
-      'Make Directory',
-      MkdirTool.Description,
-      {
-        type: 'object',
-        properties: {
-          directory: {
-            type: 'string',
-            description: 'The path to the directory to create.',
-          },
+    super(MkdirTool.Name, 'Make Directory', MkdirTool.Description, {
+      type: 'object',
+      properties: {
+        directory: {
+          type: 'string',
+          description: 'The path to the directory to create.',
         },
-        required: ['directory'],
       },
-    );
+      required: ['directory'],
+    });
   }
 
   validateToolParams(params: MkdirToolParams): string | null {
@@ -45,7 +40,10 @@ export class MkdirTool extends BaseTool<MkdirToolParams, ToolResult> {
     return `Will create the directory: ${params.directory}`;
   }
 
-  async execute(params: MkdirToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: MkdirToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -57,7 +55,8 @@ export class MkdirTool extends BaseTool<MkdirToolParams, ToolResult> {
     if (signal.aborted) {
       return {
         llmContent: 'Tool execution aborted.',
-        returnDisplay: '## Tool Aborted\n\nMake directory operation was aborted.',
+        returnDisplay:
+          '## Tool Aborted\n\nMake directory operation was aborted.',
       };
     }
 
@@ -75,4 +74,3 @@ export class MkdirTool extends BaseTool<MkdirToolParams, ToolResult> {
     }
   }
 }
-

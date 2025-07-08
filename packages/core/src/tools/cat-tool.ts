@@ -18,26 +18,25 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
     'Reads the contents of one or more files and returns them as a single string.';
 
   constructor() {
-    super(
-      CatTool.Name,
-      'Cat',
-      CatTool.Description,
-      {
-        type: 'object',
-        properties: {
-          files: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'An array of file paths to read.',
-          },
+    super(CatTool.Name, 'Cat', CatTool.Description, {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'An array of file paths to read.',
         },
-        required: ['files'],
       },
-    );
+      required: ['files'],
+    });
   }
 
   validateToolParams(params: CatToolParams): string | null {
-    if (!params.files || !Array.isArray(params.files) || params.files.length === 0) {
+    if (
+      !params.files ||
+      !Array.isArray(params.files) ||
+      params.files.length === 0
+    ) {
       return 'The "files" parameter is required and must be a non-empty array of strings.';
     }
     for (const file of params.files) {
@@ -52,7 +51,10 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
     return `Will read the contents of the following files: ${params.files.join(', ')}`;
   }
 
-  async execute(params: CatToolParams, signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: CatToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
@@ -86,4 +88,3 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
     };
   }
 }
-

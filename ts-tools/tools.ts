@@ -157,8 +157,7 @@ const toolRegistry: { [key: string]: Tool } = {
   },
   'dry-run-replace': {
     description: 'Performs a dry run of a replacement.',
-    execute: (args, config) =>
-      dryRunReplace(args[0], args[1], args[2], config),
+    execute: (args, config) => dryRunReplace(args[0], args[1], args[2], config),
   },
   echo: {
     description: 'Displays a line of text.',
@@ -251,8 +250,7 @@ const toolRegistry: { [key: string]: Tool } = {
   },
   'natural-language-replace': {
     description: 'Performs a replacement using natural language.',
-    execute: (args, config) =>
-      replaceNaturalLanguage(args[0], args[1], config),
+    execute: (args, config) => replaceNaturalLanguage(args[0], args[1], config),
   },
   paste: {
     description: 'Merges lines of files.',
@@ -325,8 +323,7 @@ const toolRegistry: { [key: string]: Tool } = {
   },
   sort: {
     description: 'Sorts the lines of a file.',
-    execute: (args, config) =>
-      sortFile(args[0], config, args[1] === 'true'),
+    execute: (args, config) => sortFile(args[0], config, args[1] === 'true'),
   },
   split: {
     description: 'Splits a file into multiple smaller files.',
@@ -342,7 +339,8 @@ const toolRegistry: { [key: string]: Tool } = {
     execute: (args, config) => tailFile(args[0], parseInt(args[1]), config),
   },
   tee: {
-    description: 'Reads from standard input and writes to standard output and files.',
+    description:
+      'Reads from standard input and writes to standard output and files.',
     execute: (args, config) => teeFile(args[0], args[1], config),
   },
   template: {

@@ -44,7 +44,9 @@ describe('CatTool', () => {
 
     expect(fs.readFile).toHaveBeenCalledWith('/test1.txt', 'utf-8');
     expect(fs.readFile).toHaveBeenCalledWith('/test2.txt', 'utf-8');
-    expect(result.llmContent as string).toEqual('Hello, world!\nGoodbye, world!');
+    expect(result.llmContent as string).toEqual(
+      'Hello, world!\nGoodbye, world!',
+    );
     expect(result.returnDisplay).toContain('Successfully read 2 file(s).');
   });
 
@@ -56,7 +58,9 @@ describe('CatTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent as string).toContain('The "files" parameter is required');
+    expect(result.llmContent as string).toContain(
+      'The "files" parameter is required',
+    );
     expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
@@ -70,7 +74,9 @@ describe('CatTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent as string).toContain('Error reading file /test.txt: File not found');
+    expect(result.llmContent as string).toContain(
+      'Error reading file /test.txt: File not found',
+    );
     expect(result.returnDisplay).toContain('## File Read Error');
   });
 });

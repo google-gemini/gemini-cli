@@ -154,3 +154,4 @@ describe('depCheck command', () => {
     expect(stdout).toContain('Missing: flask (Required: any)'); // It will treat 'flask' as a missing package with no version spec
     global.default_api.run_shell_command = originalRunShellCommand;
   });
+});

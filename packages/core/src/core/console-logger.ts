@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -9,25 +8,25 @@
 // For now, it just wraps the console methods.
 
 export class ConsoleLogger {
-    info(...args: any[]) {
-        console.log(...args);
-    }
+  info(...args: any[]) {
+    console.log(...args);
+  }
 
-    debug(...args: any[]) {
-        console.debug(...args);
-    }
+  debug(...args: any[]) {
+    console.debug(...args);
+  }
 
-    warn(...args: any[]) {
-        console.warn(...args);
-    }
+  warn(...args: any[]) {
+    console.warn(...args);
+  }
 
-    error(...args: any[]) {
-        console.error(...args);
-    }
+  error(...args: any[]) {
+    console.error(...args);
+  }
 
-    clear() {
-        console.clear();
-    }
+  clear() {
+    console.clear();
+  }
 }
 
 // Export a singleton instance.

@@ -20,7 +20,7 @@
 import { rmSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { globSync } from 'glob';
+import { globSync } from 'glob/dist/commonjs/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');

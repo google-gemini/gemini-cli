@@ -37,7 +37,9 @@ describe('CpTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('The "destination" parameter is required');
+    expect(result.llmContent).toContain(
+      'The "destination" parameter is required',
+    );
     expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
@@ -54,7 +56,9 @@ describe('CpTool', () => {
 
     const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error copying file from /test.txt to /test2.txt: Permission denied');
+    expect(result.llmContent).toContain(
+      'Error copying file from /test.txt to /test2.txt: Permission denied',
+    );
     expect(result.returnDisplay).toContain('## Copy File Error');
   });
 });

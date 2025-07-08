@@ -12,11 +12,11 @@ init();
 
 // Chromatic constants for enchanted logging
 const NG = Fore.LIGHTGREEN_EX + Style.BRIGHT; // Success
-const NB = Fore.CYAN + Style.BRIGHT;          // Information
-const NP = Fore.MAGENTA + Style.BRIGHT;       // Headers, prompts
-const NY = Fore.YELLOW + Style.BRIGHT;        // Warnings
-const NR = Fore.LIGHTRED_EX + Style.BRIGHT;   // Errors
-const RST = Style.RESET_ALL;                  // Reset
+const NB = Fore.CYAN + Style.BRIGHT; // Information
+const NP = Fore.MAGENTA + Style.BRIGHT; // Headers, prompts
+const NY = Fore.YELLOW + Style.BRIGHT; // Warnings
+const NR = Fore.LIGHTRED_EX + Style.BRIGHT; // Errors
+const RST = Style.RESET_ALL; // Reset
 
 export default class DebugAssist extends Command {
   static description = `${NP}Provides interactive, guided debugging assistance.${RST}`;
@@ -26,8 +26,16 @@ export default class DebugAssist extends Command {
   ];
 
   static args = [
-    { name: 'codeOrPath', required: true, description: 'Code snippet or path to the file to debug.' },
-    { name: 'errorMsg', required: false, description: 'Optional error message to provide context.' },
+    {
+      name: 'codeOrPath',
+      required: true,
+      description: 'Code snippet or path to the file to debug.',
+    },
+    {
+      name: 'errorMsg',
+      required: false,
+      description: 'Optional error message to provide context.',
+    },
   ];
 
   private rl: readline.Interface | undefined;
@@ -64,7 +72,9 @@ export default class DebugAssist extends Command {
     await this.startDebuggingSession(codeContent, isFilePath, errorMsg);
 
     this.rl.close();
-    this.log(NG + 'Debugging session complete. May your code be bug-free.' + RST);
+    this.log(
+      NG + 'Debugging session complete. May your code be bug-free.' + RST,
+    );
   }
 
   private async askQuestion(query: string): Promise<string> {
@@ -75,7 +85,11 @@ export default class DebugAssist extends Command {
     });
   }
 
-  private async startDebuggingSession(code: string, isFilePath: boolean, initialErrorMsg?: string): Promise<void> {
+  private async startDebuggingSession(
+    code: string,
+    isFilePath: boolean,
+    initialErrorMsg?: string,
+  ): Promise<void> {
     let currentCode = code;
     let currentError = initialErrorMsg;
     let step = 0;
@@ -91,7 +105,10 @@ export default class DebugAssist extends Command {
       this.log(NB + 'Current Code:' + RST);
       this.log(currentCode);
 
-      const suggestion = await this.getDebuggingSuggestion(currentCode, currentError);
+      const suggestion = await this.getDebuggingSuggestion(
+        currentCode,
+        currentError,
+      );
       this.log(NG + `Suggestion: ${suggestion.suggestionText}${RST}`);
 
       if (suggestion.action === 'fix') {
@@ -100,7 +117,10 @@ export default class DebugAssist extends Command {
           if (isFilePath) {
             try {
               await replace({
-                file_path: join(process.cwd(), this.parse(DebugAssist).args.codeOrPath as string),
+                file_path: join(
+                  process.cwd(),
+                  this.parse(DebugAssist).args.codeOrPath as string,
+                ),
                 old_string: suggestion.oldCode || '',
                 new_string: suggestion.newCode || '',
                 expected_replacements: suggestion.expectedReplacements || 1,
@@ -116,7 +136,9 @@ export default class DebugAssist extends Command {
           }
         }
       } else if (suggestion.action === 'run') {
-        const confirmRun = await this.askQuestion('Run this command? (yes/no):');
+        const confirmRun = await this.askQuestion(
+          'Run this command? (yes/no):',
+        );
         if (confirmRun.toLowerCase() === 'yes') {
           try {
             const { stdout, stderr } = await run_shell_command({
@@ -137,20 +159,37 @@ export default class DebugAssist extends Command {
         }
       }
 
-      const continueDebugging = await this.askQuestion('Continue debugging? (yes/no/exit):');
-      if (continueDebugging.toLowerCase() === 'no' || continueDebugging.toLowerCase() === 'exit') {
+      const continueDebugging = await this.askQuestion(
+        'Continue debugging? (yes/no/exit):',
+      );
+      if (
+        continueDebugging.toLowerCase() === 'no' ||
+        continueDebugging.toLowerCase() === 'exit'
+      ) {
         break;
       }
 
       // If continuing, ask for new error or observation
-      currentError = await this.askQuestion('Any new error messages or observations? (Leave empty if none):');
+      currentError = await this.askQuestion(
+        'Any new error messages or observations? (Leave empty if none):',
+      );
       if (currentError === '') {
         currentError = undefined;
       }
     }
   }
 
-  private async getDebuggingSuggestion(code: string, errorMsg?: string): Promise<{ suggestionText: string; action: 'fix' | 'run' | 'info'; oldCode?: string; newCode?: string; command?: string; expectedReplacements?: number }> {
+  private async getDebuggingSuggestion(
+    code: string,
+    errorMsg?: string,
+  ): Promise<{
+    suggestionText: string;
+    action: 'fix' | 'run' | 'info';
+    oldCode?: string;
+    newCode?: string;
+    command?: string;
+    expectedReplacements?: number;
+  }> {
     // This is where the core AI logic would be. For now, a placeholder.
     // In a real scenario, this would call the Gemini API with the code and error.
     let prompt = `I am debugging the following code:\n\`\`\`\n${code}\n\`\`\``;
@@ -164,21 +203,24 @@ export default class DebugAssist extends Command {
     // For demonstration, let's provide a simple mock response.
     if (errorMsg && errorMsg.includes('TypeError') && code.includes('+')) {
       return {
-        suggestionText: 'It seems like a TypeError, possibly due to incorrect type concatenation. Consider converting variables to numbers before addition.',
+        suggestionText:
+          'It seems like a TypeError, possibly due to incorrect type concatenation. Consider converting variables to numbers before addition.',
         action: 'fix',
-        oldCode: 'result = add_numbers(\'5\'), \'3\')',
-        newCode: 'result = add_numbers(parseInt(\'5\'), parseInt(\'3\'))',
+        oldCode: "result = add_numbers('5'), '3')",
+        newCode: "result = add_numbers(parseInt('5'), parseInt('3'))",
         expectedReplacements: 1,
       };
     } else if (code.includes('console.log') && !errorMsg) {
       return {
-        suggestionText: 'The code seems to be logging. Try running it to see the output.',
+        suggestionText:
+          'The code seems to be logging. Try running it to see the output.',
         action: 'run',
-        command: 'node -e \"' + code.replace(/\n/g, '\n') + '\"' // Escape newlines for shell
+        command: 'node -e \"' + code.replace(/\n/g, '\n') + '\"', // Escape newlines for shell
       };
     } else {
       return {
-        suggestionText: 'Please provide more context or a specific error message for a better suggestion.',
+        suggestionText:
+          'Please provide more context or a specific error message for a better suggestion.',
         action: 'info',
       };
     }
