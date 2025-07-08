@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client, Credentials } from 'google-auth-library';
+import { OAuth2Client, Credentials, Compute } from 'google-auth-library';
 import * as http from 'http';
 import url from 'url';
 import crypto from 'crypto';
@@ -13,6 +13,8 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
+import { getErrorMessage } from '../utils/errors.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -53,15 +55,19 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(): Promise<OAuth2Client> {
+export async function getOauthClient(
+  authType: AuthType,
+): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
   });
+
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
   });
 
+  // If there are cached creds on disk, they always take precedence
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
     // Check if we need to retrieve Google Account ID
@@ -71,17 +77,39 @@ export async function getOauthClient(): Promise<OAuth2Client> {
         if (googleAccountId) {
           await cacheGoogleAccountId(googleAccountId);
         }
-      } catch (error) {
-        console.error(
-          'Failed to retrieve Google Account ID for existing credentials:',
-          error,
-        );
-        // Continue with existing auth flow
+      } catch {
+        // Non-fatal, continue with existing auth.
       }
     }
+    console.log('Loaded cached credentials.');
     return client;
   }
 
+  // In Google Cloud Shell, we can use Application Default Credentials (ADC)
+  // provided via its metadata server to authenticate non-interactively using
+  // the identity of the user logged into Cloud Shell.
+  if (authType === AuthType.CLOUD_SHELL) {
+    try {
+      console.log("Attempting to authenticate via Cloud Shell VM's ADC.");
+      const computeClient = new Compute({
+        // We can leave this empty, since the metadata server will provide
+        // the service account email.
+      });
+      await computeClient.getAccessToken();
+      console.log('Authentication successful.');
+
+      // Do not cache creds in this case; note that Compute client will handle its own refresh
+      return computeClient;
+    } catch (e) {
+      throw new Error(
+        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+          e,
+        )}`,
+      );
+    }
+  }
+
+  // Otherwise, obtain creds using standard web flow
   const webLogin = await authWithWeb(client);
 
   console.log(
