@@ -1,13 +1,17 @@
-# Gemini CLI
+# Gemini CLI (Custom Fork)
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+[![Gemini CLI CI](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml/badge.svg)](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+This repository contains a **custom fork** of the Gemini CLI, enhanced with personal optimizations and improvements. This is a command-line AI workflow tool that connects to your tools, understands your code and accelerates your workflows.
 
-With the Gemini CLI you can:
+**Custom Enhancements:**
+- Improved fallback model configuration for consistent coding quality
+- Cleaned up telemetry error handling for better user experience
+- Optimized for coding-focused workflows
+
+With this custom Gemini CLI you can:
 
 - Query and edit large codebases in and beyond Gemini's 1M token context window.
 - Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
@@ -20,23 +24,27 @@ With the Gemini CLI you can:
 ## Quickstart
 
 1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+2. **Run the Custom CLI:** Execute the following command in your terminal:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   npx https://github.com/Icarus603/gemini-code
    ```
 
-   Or install it with:
+   Or clone and install locally:
 
    ```bash
-   npm install -g @google/gemini-cli
+   git clone https://github.com/Icarus603/gemini-code.git
+   cd gemini-code
+   npm install
+   npm run build
+   npm link
    gemini
    ```
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
-You are now ready to use the Gemini CLI!
+You are now ready to use the custom Gemini CLI!
 
 ### Use a Gemini API key:
 
@@ -82,8 +90,8 @@ gemini
 Or work with an existing project:
 
 ```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
+git clone https://github.com/Icarus603/gemini-code
+cd gemini-code
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```

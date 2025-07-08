@@ -6,19 +6,18 @@
 
 import { Buffer } from 'buffer';
 import * as https from 'https';
+import { Config } from '../../config/config.js';
+import { getGoogleAccountId, getInstallationId } from '../../utils/user_id.js';
 import {
-  StartSessionEvent,
-  EndSessionEvent,
-  UserPromptEvent,
-  ToolCallEvent,
+  ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
-  ApiErrorEvent,
+  EndSessionEvent,
+  StartSessionEvent,
+  ToolCallEvent,
+  UserPromptEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
-import { Config } from '../../config/config.js';
-import { getInstallationId } from '../../utils/user_id.js';
-import { getGoogleAccountId } from '../../utils/user_id.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -41,6 +40,10 @@ export class ClearcutLogger {
   private readonly events: any = [];
   private last_flush_time: number = Date.now();
   private flush_interval_ms: number = 1000 * 60; // Wait at least a minute before flushing events.
+  private consecutive_failures = 0;
+  private last_failure_time = 0;
+  private readonly MAX_FAILURES_BEFORE_SILENCE = 3;
+  private readonly SILENCE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
   private constructor(config?: Config) {
     this.config = config;
@@ -80,9 +83,22 @@ export class ClearcutLogger {
       return;
     }
 
+    // Skip flushing if we've had too many recent failures
+    if (this.consecutive_failures >= this.MAX_FAILURES_BEFORE_SILENCE) {
+      const timeSinceLastFailure = Date.now() - this.last_failure_time;
+      if (timeSinceLastFailure < this.SILENCE_DURATION_MS) {
+        return; // Still in silence period
+      }
+      // Reset failure count after silence period
+      this.consecutive_failures = 0;
+    }
+
     // Fire and forget - don't await
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Only log if debug mode is enabled
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed (this does not affect functionality):', error);
+      }
     });
   }
 
@@ -115,6 +131,7 @@ export class ClearcutLogger {
         path: '/log',
         method: 'POST',
         headers: { 'Content-Length': Buffer.byteLength(body) },
+        timeout: 10000, // 10 second timeout
       };
       const bufs: Buffer[] = [];
       const req = https.request(options, (res) => {
@@ -125,29 +142,44 @@ export class ClearcutLogger {
       });
       req.on('error', (e) => {
         if (this.config?.getDebugMode()) {
-          console.log('Clearcut POST request error: ', e);
+          console.debug('Clearcut POST request error (telemetry only):', e);
         }
         // Add the events back to the front of the queue to be retried.
         this.events.unshift(...eventsToSend);
         reject(e);
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        const timeoutError = new Error('Telemetry request timeout');
+        this.events.unshift(...eventsToSend);
+        reject(timeoutError);
       });
       req.end(body);
     })
       .then((buf: Buffer) => {
         try {
           this.last_flush_time = Date.now();
+          this.consecutive_failures = 0; // Reset failure count on success
           return this.decodeLogResponse(buf) || {};
         } catch (error: unknown) {
-          console.error('Error flushing log events:', error);
+          this.handleFlushError(error);
           return {};
         }
       })
       .catch((error: unknown) => {
-        // Handle all errors to prevent unhandled promise rejections
-        console.error('Error flushing log events:', error);
-        // Return empty response to maintain the Promise<LogResponse> contract
+        this.handleFlushError(error);
         return {};
       });
+  }
+
+  private handleFlushError(error: unknown): void {
+    this.consecutive_failures++;
+    this.last_failure_time = Date.now();
+    
+    // Only log on first failure or if debug mode is enabled
+    if (this.consecutive_failures === 1 || this.config?.getDebugMode()) {
+      console.debug('Telemetry service unavailable (this does not affect functionality)');
+    }
   }
 
   // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
@@ -255,7 +287,10 @@ export class ClearcutLogger {
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     // Flush start event immediately
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing start session event to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for start session:', error);
+      }
     });
   }
 
@@ -269,7 +304,10 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for user prompt:', error);
+      }
     });
   }
 
@@ -303,7 +341,10 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(tool_call_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for tool call:', error);
+      }
     });
   }
 
@@ -317,7 +358,10 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for API request:', error);
+      }
     });
   }
 
@@ -368,7 +412,10 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for API response:', error);
+      }
     });
   }
 
@@ -394,7 +441,10 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for API error:', error);
+      }
     });
   }
 
@@ -409,7 +459,10 @@ export class ClearcutLogger {
     this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
     // Flush immediately on session end.
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      // Silent failure - telemetry errors don't affect functionality
+      if (this.config?.getDebugMode()) {
+        console.debug('Telemetry flush failed for end session:', error);
+      }
     });
   }
 
