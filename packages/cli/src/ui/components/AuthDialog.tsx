@@ -66,6 +66,11 @@ export function AuthDialog({
 
   useInput((_input, key) => {
     if (key.escape) {
+      // Prevent exit if there is an error message.
+      // This means they user is not authenticated yet.
+      if (errorMessage) {
+        return;
+      }
       if (settings.merged.selectedAuthType === undefined) {
         // Prevent exiting if no auth method is set
         setErrorMessage(
