@@ -139,5 +139,30 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>{' '}
       - Quit application
     </Text>
+
+    <Box height={1} />
+
+    {/* Confirmation Shortcuts */}
+    <Text bold color={Colors.Foreground}>
+      Confirmation Shortcuts:
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        y/Y
+      </Text>{' '}
+      - Yes, allow once
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        a/A
+      </Text>{' '}
+      - Yes, allow always (or always allow all tools from server for MCP)
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        m/M
+      </Text>{' '}
+      - Modify with external editor (for edits) or always allow tool (for MCP)
+    </Text>
   </Box>
 );

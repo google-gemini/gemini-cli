@@ -130,3 +130,14 @@ The `!` prefix lets you interact with your system's shell directly from within G
       - When exited, the UI reverts to its standard appearance and normal Gemini CLI behavior resumes.
 
 - **Caution for all `!` usage:** Commands you execute in shell mode have the same permissions and impact as if you ran them directly in your terminal.
+
+## Confirmation Shortcuts
+
+When Gemini CLI asks for confirmation before executing tools (such as file edits, shell commands, or MCP tool calls), you can use these keyboard shortcuts for quick responses:
+
+- **`y` or `Y`** - Yes, allow once
+- **`a` or `A`** - Yes, allow always (or always allow all tools from server for MCP confirmations)
+- **`m` or `M`** - Modify with external editor (for file edits) or always allow tool (for MCP confirmations)
+- **`Esc`** - No, cancel the operation
+
+These shortcuts work in addition to the existing radio button navigation using arrow keys and Enter.
