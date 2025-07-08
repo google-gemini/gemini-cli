@@ -2,6 +2,10 @@
 
 This document contains project-specific context and workflows for maintaining the custom gemini-code fork.
 
+## Development Guidelines
+
+- Remember to run npm run format locally everytime before committing the changes.
+
 ## Fork Maintenance Workflow
 
 This is a custom fork of Google's gemini-cli with personal enhancements. The project uses a 2-branch strategy:
@@ -132,6 +136,7 @@ npm publish --workspace=@icarus603/gemini-code
 - Run `npm run preflight` to validate all changes
 - Test that the CLI still works locally
 - Ensure no breaking changes to custom functionality
+- **Remember to run npm run format locally every time before committing the changes.**
 
 ## Project Goals
 
