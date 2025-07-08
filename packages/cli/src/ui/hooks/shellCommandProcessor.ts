@@ -268,7 +268,7 @@ export const useShellCommandProcessor = (
             let historyItemType: HistoryItemWithoutId['type'] = 'info';
             let mainContent: string;
 
-            // The context sent to the model utilizes a text tokenizer which means raw binary data is
+            // The context sent to the model utilizes a text tokenizer which means raw binary data
             // cannot be parsed and understood and thus would only pollute the context window and waste
             // tokens.
             if (isBinary(result.rawOutput)) {
