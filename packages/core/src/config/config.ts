@@ -714,7 +714,7 @@ export class Config {
 
     registerCoreTool(LSTool, this);
     registerCoreTool(ReadFileTool, this);
-  registerCoreTool(CleanDocstringTool, targetDir, config);
+    registerCoreTool(CleanDocstringTool, targetDir, this);
     registerCoreTool(GrepTool, this);
     registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
