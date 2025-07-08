@@ -48,8 +48,7 @@ With this custom Gemini CLI you can:
    cd gemini-code
    npm install
    npm run build
-   npm link
-   gemini
+   npm start
    ```
 
 3. **Pick a color theme**
