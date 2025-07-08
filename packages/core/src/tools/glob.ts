@@ -9,6 +9,7 @@ import path from 'path';
 import { glob } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { BaseTool, ToolResult } from './tools.js';
+import { Type } from '@google/genai';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
 
@@ -95,26 +96,26 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
           pattern: {
             description:
               "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-            type: 'string',
+            type: Type.STRING,
           },
           path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-            type: 'string',
+            type: Type.STRING,
           },
           case_sensitive: {
             description:
               'Optional: Whether the search should be case-sensitive. Defaults to false.',
-            type: 'boolean',
+            type: Type.BOOLEAN,
           },
           respect_git_ignore: {
             description:
               'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-            type: 'boolean',
+            type: Type.BOOLEAN,
           },
         },
         required: ['pattern'],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
 
@@ -145,14 +146,9 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
    * Validates the parameters for the tool.
    */
   validateToolParams(params: GlobToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return "Parameters failed schema validation. Ensure 'pattern' is a string, 'path' (if provided) is a string, and 'case_sensitive' (if provided) is a boolean.";
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
 
     const searchDirAbsolute = path.resolve(
