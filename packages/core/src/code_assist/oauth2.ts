@@ -120,7 +120,7 @@ export async function getOauthClient(
   try {
     // Use the open package to open the auth URL in the default browser.
     // This will throw an error if the browser cannot be opened.
-    await open(webLogin.authUrl, { wait: true });
+    await open(webLogin.authUrl);
   } catch (e) {
     console.log(
       `Failed to open browser for authentication. Please navigate to the following URL manually:\n\n${webLogin.authUrl}\n\n` +
@@ -136,18 +136,17 @@ export async function getOauthClient(
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   let port: number;
-  let host: string;
-  if (process.env.OAUTH_CALLBACK_PORT) {
-    port = Number(process.env.OAUTH_CALLBACK_PORT);
+  const portStr = process.env.OAUTH_CALLBACK_PORT;
+  if (portStr) {
+    port = parseInt(portStr, 10);
+    if (isNaN(port) || port <= 0 || port > 65535) {
+      throw new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`);
+    }
   } else {
     port = await getAvailablePort();
   }
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
-  if (process.env.OAUTH_CALLBACK_HOST) {
-    host = process.env.OAUTH_CALLBACK_HOST;
-  } else {
-    host = 'localhost';
-  }
+  const host = process.env.OAUTH_CALLBACK_HOST || 'localhost';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
