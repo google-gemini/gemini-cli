@@ -14,6 +14,33 @@ import fs from 'fs'; // Actual fs for setup
 import os from 'os';
 import { Config } from '../config/config.js';
 
+vi.mock('mime-types', () => {
+  const lookup = (filename: string) => {
+    if (filename.endsWith('.ts') || filename.endsWith('.js')) {
+      return 'text/plain';
+    }
+    if (filename.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (filename.endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+    if (filename.endsWith('.mp3') || filename.endsWith('.wav')) {
+      return 'audio/mpeg';
+    }
+    if (filename.endsWith('.mp4') || filename.endsWith('.mov')) {
+      return 'video/mp4';
+    }
+    return false;
+  };
+  return {
+    default: {
+      lookup,
+    },
+    lookup,
+  };
+});
+
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
   let tempRootDir: string;

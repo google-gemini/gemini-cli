@@ -1,29 +1,26 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.8",
-  "description": "Gemini CLI Server",
-  "repository": "google-gemini/gemini-cli",
+  "version": "0.1.9",
+  "description": "Gemini CLI Core",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/src/index.js",
     "build": "node ../../scripts/build_package.js",
-    "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
-    "prerelease:version": "node ../../scripts/bind_package_version.js",
-    "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build",
-    "prepublishOnly": "node ../../scripts/prepublish.js"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^1.4.0",
+    "@google/genai": "^1.8.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
@@ -42,7 +39,7 @@
     "ignore": "^7.0.0",
     "micromatch": "^4.0.8",
     "open": "^10.1.2",
-    "shell-quote": "^1.8.2",
+    "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
@@ -58,6 +55,6 @@
     "vitest": "^3.1.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

@@ -8,6 +8,8 @@ import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
 import { colorizeCode } from './CodeColorizer.js';
+import { TableRenderer } from './TableRenderer.js';
+import { RenderInline } from './InlineMarkdownRenderer.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -17,12 +19,6 @@ interface MarkdownDisplayProps {
 }
 
 // Constants for Markdown parsing and rendering
-const BOLD_MARKER_LENGTH = 2; // For "**"
-const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
-const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~"
-const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
-const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
-const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
 const EMPTY_LINE_HEIGHT = 1;
 const CODE_BLOCK_PADDING = 1;
@@ -43,12 +39,17 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
   const hrRegex = /^ *([-*_] *){3,} *$/;
+  const tableRowRegex = /^\s*\|(.+)\|\s*$/;
+  const tableSeparatorRegex = /^\s*\|?\s*(:?-+:?)\s*(\|\s*(:?-+:?)\s*)+\|?\s*$/;
 
   const contentBlocks: React.ReactNode[] = [];
   let inCodeBlock = false;
   let codeBlockContent: string[] = [];
   let codeBlockLang: string | null = null;
   let codeBlockFence = '';
+  let inTable = false;
+  let tableRows: string[][] = [];
+  let tableHeaders: string[] = [];
 
   lines.forEach((line, index) => {
     const key = `line-${index}`;
@@ -85,11 +86,71 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     const ulMatch = line.match(ulItemRegex);
     const olMatch = line.match(olItemRegex);
     const hrMatch = line.match(hrRegex);
+    const tableRowMatch = line.match(tableRowRegex);
+    const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
     if (codeFenceMatch) {
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
       codeBlockLang = codeFenceMatch[2] || null;
+    } else if (tableRowMatch && !inTable) {
+      // Potential table start - check if next line is separator
+      if (
+        index + 1 < lines.length &&
+        lines[index + 1].match(tableSeparatorRegex)
+      ) {
+        inTable = true;
+        tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        tableRows = [];
+      } else {
+        // Not a table, treat as regular text
+        contentBlocks.push(
+          <Box key={key}>
+            <Text wrap="wrap">
+              <RenderInline text={line} />
+            </Text>
+          </Box>,
+        );
+      }
+    } else if (inTable && tableSeparatorMatch) {
+      // Skip separator line - already handled
+    } else if (inTable && tableRowMatch) {
+      // Add table row
+      const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+      // Ensure row has same column count as headers
+      while (cells.length < tableHeaders.length) {
+        cells.push('');
+      }
+      if (cells.length > tableHeaders.length) {
+        cells.length = tableHeaders.length;
+      }
+      tableRows.push(cells);
+    } else if (inTable && !tableRowMatch) {
+      // End of table
+      if (tableHeaders.length > 0 && tableRows.length > 0) {
+        contentBlocks.push(
+          <RenderTable
+            key={`table-${contentBlocks.length}`}
+            headers={tableHeaders}
+            rows={tableRows}
+            terminalWidth={terminalWidth}
+          />,
+        );
+      }
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+
+      // Process current line as normal
+      if (line.trim().length > 0) {
+        contentBlocks.push(
+          <Box key={key}>
+            <Text wrap="wrap">
+              <RenderInline text={line} />
+            </Text>
+          </Box>,
+        );
+      }
     } else if (hrMatch) {
       contentBlocks.push(
         <Box key={key}>
@@ -194,147 +255,22 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     );
   }
 
+  // Handle table at end of content
+  if (inTable && tableHeaders.length > 0 && tableRows.length > 0) {
+    contentBlocks.push(
+      <RenderTable
+        key={`table-${contentBlocks.length}`}
+        headers={tableHeaders}
+        rows={tableRows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+  }
+
   return <>{contentBlocks}</>;
 };
 
 // Helper functions (adapted from static methods of MarkdownRenderer)
-
-interface RenderInlineProps {
-  text: string;
-}
-
-const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>)/g;
-  let match;
-
-  while ((match = inlineRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(
-        <Text key={`t-${lastIndex}`}>
-          {text.slice(lastIndex, match.index)}
-        </Text>,
-      );
-    }
-
-    const fullMatch = match[0];
-    let renderedNode: React.ReactNode = null;
-    const key = `m-${match.index}`;
-
-    try {
-      if (
-        fullMatch.startsWith('**') &&
-        fullMatch.endsWith('**') &&
-        fullMatch.length > BOLD_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} bold>
-            {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
-        ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-        !/\w/.test(text.substring(match.index - 1, match.index)) &&
-        !/\w/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
-        ) &&
-        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-        !/[./\\]\S/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
-        )
-      ) {
-        renderedNode = (
-          <Text key={key} italic>
-            {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('~~') &&
-        fullMatch.endsWith('~~') &&
-        fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} strikethrough>
-            {fullMatch.slice(
-              STRIKETHROUGH_MARKER_LENGTH,
-              -STRIKETHROUGH_MARKER_LENGTH,
-            )}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('`') &&
-        fullMatch.endsWith('`') &&
-        fullMatch.length > INLINE_CODE_MARKER_LENGTH
-      ) {
-        const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
-        if (codeMatch && codeMatch[2]) {
-          renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
-              {codeMatch[2]}
-            </Text>
-          );
-        } else {
-          renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
-              {fullMatch.slice(
-                INLINE_CODE_MARKER_LENGTH,
-                -INLINE_CODE_MARKER_LENGTH,
-              )}
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('[') &&
-        fullMatch.includes('](') &&
-        fullMatch.endsWith(')')
-      ) {
-        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
-        if (linkMatch) {
-          const linkText = linkMatch[1];
-          const url = linkMatch[2];
-          renderedNode = (
-            <Text key={key}>
-              {linkText}
-              <Text color={Colors.AccentBlue}> ({url})</Text>
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('<u>') &&
-        fullMatch.endsWith('</u>') &&
-        fullMatch.length >
-          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
-      ) {
-        renderedNode = (
-          <Text key={key} underline>
-            {fullMatch.slice(
-              UNDERLINE_TAG_START_LENGTH,
-              -UNDERLINE_TAG_END_LENGTH,
-            )}
-          </Text>
-        );
-      }
-    } catch (e) {
-      console.error('Error parsing inline markdown part:', fullMatch, e);
-      renderedNode = null;
-    }
-
-    nodes.push(renderedNode ?? <Text key={key}>{fullMatch}</Text>);
-    lastIndex = inlineRegex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(<Text key={`t-${lastIndex}`}>{text.slice(lastIndex)}</Text>);
-  }
-
-  return <>{nodes.filter((node) => node !== null)}</>;
-};
-
-const RenderInline = React.memo(RenderInlineInternal);
 
 interface RenderCodeBlockProps {
   content: string[];
@@ -442,5 +378,21 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
 };
 
 const RenderListItem = React.memo(RenderListItemInternal);
+
+interface RenderTableProps {
+  headers: string[];
+  rows: string[][];
+  terminalWidth: number;
+}
+
+const RenderTableInternal: React.FC<RenderTableProps> = ({
+  headers,
+  rows,
+  terminalWidth,
+}) => (
+  <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
+);
+
+const RenderTable = React.memo(RenderTableInternal);
 
 export const MarkdownDisplay = React.memo(MarkdownDisplayInternal);

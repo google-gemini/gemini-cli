@@ -1,8 +1,11 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Gemini CLI",
-  "repository": "google-gemini/gemini-cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -10,27 +13,22 @@
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
-    "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
-    "prerelease:version": "node ../../scripts/bind_package_version.js",
-    "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build",
-    "prepublishOnly": "node ../../scripts/prepublish.js"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "gemini-cli-sandbox"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "*",
+    "@google/gemini-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
@@ -41,9 +39,9 @@
     "ink": "^6.0.1",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
+    "ink-link": "^4.1.0",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
-    "ink-link": "^4.1.0",
     "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
     "mime-types": "^2.1.4",
@@ -58,24 +56,25 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.0",
     "@babel/runtime": "^7.27.6",
+    "@testing-library/react": "^16.3.0",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",
     "@types/yargs": "^17.0.32",
     "ink-testing-library": "^4.0.0",
     "jsdom": "^26.1.0",
-    "react-dom": "^19.1.0",
     "pretty-format": "^30.0.2",
+    "react-dom": "^19.1.0",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

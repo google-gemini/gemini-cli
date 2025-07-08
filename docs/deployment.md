@@ -43,7 +43,7 @@ For security and isolation, Gemini CLI can be run inside a container. This is th
 - **Using the `--sandbox` flag:**
   If you have Gemini CLI installed locally (using the standard installation described above), you can instruct it to run inside the sandbox container.
   ```bash
-  gemini --sandbox "your prompt here"
+  gemini --sandbox -y -p "your prompt here"
   ```
 
 ---
@@ -103,14 +103,12 @@ There are two distinct build processes used, depending on the distribution chann
 
 **Docker sandbox image**
 
-The Docker-based execution method is supported by the `gemini-cli-sandbox` container image. This image is published to a container registry and contains a pre-installed, global version of Gemini CLI. The `scripts/prepare-cli-packagejson.js` script dynamically injects the URI of this image into the CLI's `package.json` before publishing, so the CLI knows which image to pull when the `--sandbox` flag is used.
+The Docker-based execution method is supported by the `gemini-cli-sandbox` container image. This image is published to a container registry and contains a pre-installed, global version of Gemini CLI.
 
 ## Release process
 
-A unified script, `npm run publish:release`, orchestrates the release process. The script performs the following actions:
+The release process is automated through GitHub Actions. The release workflow performs the following actions:
 
 1.  Build the NPM packages using `tsc`.
-2.  Update the CLI's `package.json` with the Docker image URI.
-3.  Build and tag the `gemini-cli-sandbox` Docker image.
-4.  Push the Docker image to the container registry.
-5.  Publish the NPM packages to the artifact registry.
+2.  Publish the NPM packages to the artifact registry.
+3.  Create GitHub releases with bundled assets.

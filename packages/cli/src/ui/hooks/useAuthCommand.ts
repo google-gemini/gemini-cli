@@ -13,11 +13,6 @@ import {
   getErrorMessage,
 } from '@google/gemini-cli-core';
 
-async function performAuthFlow(authMethod: AuthType, config: Config) {
-  await config.refreshAuth(authMethod);
-  console.log(`Authenticated via "${authMethod}".`);
-}
-
 export const useAuthCommand = (
   settings: LoadedSettings,
   setAuthError: (error: string | null) => void,
@@ -35,16 +30,15 @@ export const useAuthCommand = (
 
   useEffect(() => {
     const authFlow = async () => {
-      if (isAuthDialogOpen || !settings.merged.selectedAuthType) {
+      const authType = settings.merged.selectedAuthType;
+      if (isAuthDialogOpen || !authType) {
         return;
       }
 
       try {
         setIsAuthenticating(true);
-        await performAuthFlow(
-          settings.merged.selectedAuthType as AuthType,
-          config,
-        );
+        await config.refreshAuth(authType);
+        console.log(`Authenticated via "${authType}".`);
       } catch (e) {
         setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
         openAuthDialog();
@@ -57,20 +51,16 @@ export const useAuthCommand = (
   }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
 
   const handleAuthSelect = useCallback(
-    async (authMethod: string | undefined, scope: SettingScope) => {
-      if (authMethod) {
+    async (authType: AuthType | undefined, scope: SettingScope) => {
+      if (authType) {
         await clearCachedCredentialFile();
-        settings.setValue(scope, 'selectedAuthType', authMethod);
+        settings.setValue(scope, 'selectedAuthType', authType);
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
     },
     [settings, setAuthError],
   );
-
-  const handleAuthHighlight = useCallback((_authMethod: string | undefined) => {
-    // For now, we don't do anything on highlight.
-  }, []);
 
   const cancelAuthentication = useCallback(() => {
     setIsAuthenticating(false);
@@ -80,7 +70,6 @@ export const useAuthCommand = (
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
-    handleAuthHighlight,
     isAuthenticating,
     cancelAuthentication,
   };

@@ -94,19 +94,37 @@ export function isBinaryFile(filePath: string): boolean {
 /**
  * Detects the type of file based on extension and content.
  * @param filePath Path to the file.
- * @returns 'text', 'image', 'pdf', or 'binary'.
+ * @returns 'text', 'image', 'pdf', 'audio', 'video', or 'binary'.
  */
 export function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'binary' {
+): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' {
   const ext = path.extname(filePath).toLowerCase();
-  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
 
-  if (lookedUpMimeType && lookedUpMimeType.startsWith('image/')) {
-    return 'image';
+  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
+  // to assume these are typescript files instead.
+  if (ext === '.ts') {
+    return 'text';
   }
-  if (lookedUpMimeType && lookedUpMimeType === 'application/pdf') {
-    return 'pdf';
+
+  if (ext === '.svg') {
+    return 'svg';
+  }
+
+  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
+  if (lookedUpMimeType) {
+    if (lookedUpMimeType.startsWith('image/')) {
+      return 'image';
+    }
+    if (lookedUpMimeType.startsWith('audio/')) {
+      return 'audio';
+    }
+    if (lookedUpMimeType.startsWith('video/')) {
+      return 'video';
+    }
+    if (lookedUpMimeType === 'application/pdf') {
+      return 'pdf';
+    }
   }
 
   // Stricter binary check for common non-text extensions before content check
@@ -187,13 +205,26 @@ export async function processSingleFileContent(
         error: `File not found: ${filePath}`,
       };
     }
-    const stats = fs.statSync(filePath); // Sync check
+    const stats = await fs.promises.stat(filePath);
     if (stats.isDirectory()) {
       return {
         llmContent: '',
         returnDisplay: 'Path is a directory.',
         error: `Path is a directory, not a file: ${filePath}`,
       };
+    }
+
+    const fileSizeInBytes = stats.size;
+    // 20MB limit
+    const maxFileSize = 20 * 1024 * 1024;
+
+    if (fileSizeInBytes > maxFileSize) {
+      throw new Error(
+        `File size exceeds the 20MB limit: ${filePath} (${(
+          fileSizeInBytes /
+          (1024 * 1024)
+        ).toFixed(2)}MB)`,
+      );
     }
 
     const fileType = detectFileType(filePath);
@@ -206,6 +237,20 @@ export async function processSingleFileContent(
         return {
           llmContent: `Cannot display content of binary file: ${relativePathForDisplay}`,
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'svg': {
+        const SVG_MAX_SIZE_BYTES = 1 * 1024 * 1024;
+        if (stats.size > SVG_MAX_SIZE_BYTES) {
+          return {
+            llmContent: `Cannot display content of SVG file larger than 1MB: ${relativePathForDisplay}`,
+            returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
+          };
+        }
+        const content = await fs.promises.readFile(filePath, 'utf8');
+        return {
+          llmContent: content,
+          returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {
@@ -253,7 +298,9 @@ export async function processSingleFileContent(
         };
       }
       case 'image':
-      case 'pdf': {
+      case 'pdf':
+      case 'audio':
+      case 'video': {
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {

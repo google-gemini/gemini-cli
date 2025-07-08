@@ -22,6 +22,7 @@ export interface ExtensionConfig {
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
+  excludeTools?: string[];
 }
 
 export function loadExtensions(workspaceDir: string): Extension[] {

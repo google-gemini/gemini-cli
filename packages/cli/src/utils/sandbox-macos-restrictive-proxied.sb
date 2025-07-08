@@ -88,5 +88,5 @@
 
 ;; allow outbound network traffic through proxy on localhost:8877
 ;; set `GEMINI_SANDBOX_PROXY_COMMAND=<command>` to run proxy alongside sandbox
-;; proxy must listen on :::8877 (see scripts/example-proxy.js)
+;; proxy must listen on :::8877 (see docs/examples/proxy-script.md)
 (allow network-outbound (remote tcp "localhost:8877"))

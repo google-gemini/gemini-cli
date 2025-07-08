@@ -17,18 +17,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { rmSync } from 'fs';
+import { rmSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { globSync } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 // remove npm install/build artifacts
 rmSync(join(root, 'node_modules'), { recursive: true, force: true });
+rmSync(join(root, 'bundle'), { recursive: true, force: true });
 rmSync(join(root, 'packages/cli/src/generated/'), {
   recursive: true,
   force: true,
 });
-execSync('npm run clean --workspaces', { stdio: 'inherit', cwd: root });
+const RMRF_OPTIONS = { recursive: true, force: true };
+rmSync(join(root, 'bundle'), RMRF_OPTIONS);
+// Dynamically clean dist directories in all workspaces
+const rootPackageJson = JSON.parse(
+  readFileSync(join(root, 'package.json'), 'utf-8'),
+);
+for (const workspace of rootPackageJson.workspaces) {
+  const packages = globSync(join(workspace, 'package.json'), { cwd: root });
+  for (const pkgPath of packages) {
+    const pkgDir = dirname(join(root, pkgPath));
+    rmSync(join(pkgDir, 'dist'), RMRF_OPTIONS);
+  }
+}

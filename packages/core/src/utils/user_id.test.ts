@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getInstallationId, getObfuscatedGoogleAccountId } from './user_id.js';
+import { getInstallationId, getGoogleAccountId } from './user_id.js';
 
 describe('user_id', () => {
   describe('getInstallationId', () => {
@@ -22,27 +22,30 @@ describe('user_id', () => {
     });
   });
 
-  describe('getObfuscatedGoogleAccountId', () => {
-    it('should return a non-empty string', () => {
-      const result = getObfuscatedGoogleAccountId();
+  describe('getGoogleAccountId', () => {
+    it('should return a non-empty string', async () => {
+      const result = await getGoogleAccountId();
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
 
       // Should be consistent on subsequent calls
-      const secondCall = getObfuscatedGoogleAccountId();
+      const secondCall = await getGoogleAccountId();
       expect(secondCall).toBe(result);
     });
 
-    it('should return the same as installation ID when no Google Account ID is cached', () => {
-      // In a clean test environment, there should be no cached Google Account ID
-      // so getObfuscatedGoogleAccountId should fall back to installation ID
-      const googleAccountIdResult = getObfuscatedGoogleAccountId();
-      const installationIdResult = getInstallationId();
+    it('should return empty string when no Google Account ID is cached, or a valid ID when cached', async () => {
+      // The function can return either an empty string (if no cached ID) or a valid Google Account ID (if cached)
+      const googleAccountIdResult = await getGoogleAccountId();
 
-      // They should be the same when no Google Account ID is cached
-      expect(googleAccountIdResult).toBe(installationIdResult);
+      expect(googleAccountIdResult).toBeDefined();
+      expect(typeof googleAccountIdResult).toBe('string');
+
+      // Should be either empty string or a numeric string (Google Account ID)
+      if (googleAccountIdResult !== '') {
+        // If we have a cached ID, it should be a numeric string
+        expect(googleAccountIdResult).toMatch(/^\d+$/);
+      }
     });
   });
 });

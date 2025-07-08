@@ -1,0 +1,36 @@
+name: Gemini Scheduled PR Triage 🚀
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Runs every 15 minutes
+  workflow_dispatch: {}
+
+jobs:
+  audit-prs:
+    timeout-minutes: 15
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    outputs:
+      prs_needing_comment: ${{ steps.run_triage.outputs.prs_needing_comment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Run PR Triage Script
+        id: run_triage
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: ./.github/scripts/pr-triage.sh

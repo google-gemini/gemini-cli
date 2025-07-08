@@ -123,13 +123,17 @@ function buildImage(imageName, dockerfile) {
     readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
   ).version;
 
+  const imageTag =
+    process.env.GEMINI_SANDBOX_IMAGE_TAG || imageName.split(':')[1];
+  const finalImageName = `${imageName.split(':')[0]}:${imageTag}`;
+
   execSync(
     `${buildCommand} ${
       process.env.BUILD_SANDBOX_FLAGS || ''
-    } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
+    } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${finalImageName}" .`,
     { stdio: buildStdout, shell: '/bin/bash' },
   );
-  console.log(`built ${imageName}`);
+  console.log(`built ${finalImageName}`);
 }
 
 if (baseImage && baseDockerfile) {

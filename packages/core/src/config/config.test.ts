@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -12,6 +12,8 @@ import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
 } from '../telemetry/index.js';
+
+import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -23,6 +25,10 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
+
+vi.mock('../utils/memoryDiscovery.js', () => ({
+  loadServerHierarchicalMemory: vi.fn(),
+}));
 
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
@@ -268,6 +274,40 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
+    });
+  });
+
+  describe('refreshMemory', () => {
+    it('should update memory and file count on successful refresh', async () => {
+      const config = new Config(baseParams);
+      const mockMemoryData = {
+        memoryContent: 'new memory content',
+        fileCount: 5,
+      };
+
+      (loadServerHierarchicalMemory as Mock).mockResolvedValue(mockMemoryData);
+
+      const result = await config.refreshMemory();
+
+      expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
+        config.getWorkingDir(),
+        config.getDebugMode(),
+        config.getFileService(),
+        config.getExtensionContextFilePaths(),
+      );
+
+      expect(config.getUserMemory()).toBe(mockMemoryData.memoryContent);
+      expect(config.getGeminiMdFileCount()).toBe(mockMemoryData.fileCount);
+      expect(result).toEqual(mockMemoryData);
+    });
+
+    it('should propagate errors from loadServerHierarchicalMemory', async () => {
+      const config = new Config(baseParams);
+      const testError = new Error('Failed to load memory');
+
+      (loadServerHierarchicalMemory as Mock).mockRejectedValue(testError);
+
+      await expect(config.refreshMemory()).rejects.toThrow(testError);
     });
   });
 });

@@ -350,3 +350,208 @@ describe('mergeMcpServers', () => {
     expect(settings).toEqual(originalSettings);
   });
 });
+
+describe('mergeExcludeTools', () => {
+  it('should merge excludeTools from settings and extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool3', 'tool4'],
+        },
+        contextFiles: [],
+      },
+      {
+        config: {
+          name: 'ext2',
+          version: '1.0.0',
+          excludeTools: ['tool5'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(5);
+  });
+
+  it('should handle overlapping excludeTools between settings and extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2', 'tool3'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(3);
+  });
+
+  it('should handle overlapping excludeTools between extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2', 'tool3'],
+        },
+        contextFiles: [],
+      },
+      {
+        config: {
+          name: 'ext2',
+          version: '1.0.0',
+          excludeTools: ['tool3', 'tool4'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(4);
+  });
+
+  it('should return an empty array when no excludeTools are specified', async () => {
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual([]);
+  });
+
+  it('should handle settings with excludeTools but no extensions', async () => {
+    const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
+    const extensions: Extension[] = [];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(2);
+  });
+
+  it('should handle extensions with excludeTools but no settings', async () => {
+    const settings: Settings = {};
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool1', 'tool2'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const config = await loadCliConfig(settings, extensions, 'test-session');
+    expect(config.getExcludeTools()).toEqual(
+      expect.arrayContaining(['tool1', 'tool2']),
+    );
+    expect(config.getExcludeTools()).toHaveLength(2);
+  });
+
+  it('should not modify the original settings object', async () => {
+    const settings: Settings = { excludeTools: ['tool1'] };
+    const extensions: Extension[] = [
+      {
+        config: {
+          name: 'ext1',
+          version: '1.0.0',
+          excludeTools: ['tool2'],
+        },
+        contextFiles: [],
+      },
+    ];
+    const originalSettings = JSON.parse(JSON.stringify(settings));
+    await loadCliConfig(settings, extensions, 'test-session');
+    expect(settings).toEqual(originalSettings);
+  });
+});
+
+describe('loadCliConfig with allowed-mcp-server-names', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  const baseSettings: Settings = {
+    mcpServers: {
+      server1: { url: 'http://localhost:8080' },
+      server2: { url: 'http://localhost:8081' },
+      server3: { url: 'http://localhost:8082' },
+    },
+  };
+
+  it('should allow all MCP servers if the flag is not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
+  });
+
+  it('should allow only the specified MCP server', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
+
+  it('should allow multiple specified MCP servers', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1,server3',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
+
+  it('should handle server names that do not exist', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1,server4',
+    ];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
+
+  it('should allow all MCP servers if the flag is an empty string', async () => {
+    process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
+    const config = await loadCliConfig(baseSettings, [], 'test-session');
+    expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
+  });
+});

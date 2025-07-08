@@ -11,9 +11,18 @@ import {
   Type,
 } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
-import { EditToolParams } from '../tools/edit.js';
+import { EditToolParams, EditTool } from '../tools/edit.js';
+import { WriteFileTool } from '../tools/write-file.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { ReadManyFilesTool } from '../tools/read-many-files.js';
+import { GrepTool } from '../tools/grep.js';
 import { LruCache } from './LruCache.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  isFunctionResponse,
+  isFunctionCall,
+} from '../utils/messageInspectors.js';
+import * as fs from 'fs';
 
 const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
 const EditConfig: GenerateContentConfig = {
@@ -50,6 +59,96 @@ export interface CorrectedEditResult {
 }
 
 /**
+ * Extracts the timestamp from the .id value, which is in format
+ * <tool.name>-<timestamp>-<uuid>
+ * @param fcnId the ID value of a functionCall or functionResponse object
+ * @returns -1 if the timestamp could not be extracted, else the timestamp (as a number)
+ */
+function getTimestampFromFunctionId(fcnId: string): number {
+  const idParts = fcnId.split('-');
+  if (idParts.length > 2) {
+    const timestamp = parseInt(idParts[1], 10);
+    if (!isNaN(timestamp)) {
+      return timestamp;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Will look through the gemini client history and determine when the most recent
+ * edit to a target file occured. If no edit happened, it will return -1
+ * @param filePath the path to the file
+ * @param client the geminiClient, so that we can get the history
+ * @returns a DateTime (as a number) of when the last edit occured, or -1 if no edit was found.
+ */
+async function findLastEditTimestamp(
+  filePath: string,
+  client: GeminiClient,
+): Promise<number> {
+  const history = (await client.getHistory()) ?? [];
+
+  // Tools that may reference the file path in their FunctionResponse `output`.
+  const toolsInResp = new Set([
+    WriteFileTool.Name,
+    EditTool.Name,
+    ReadManyFilesTool.Name,
+    GrepTool.Name,
+  ]);
+  // Tools that may reference the file path in their FunctionCall `args`.
+  const toolsInCall = new Set([...toolsInResp, ReadFileTool.Name]);
+
+  // Iterate backwards to find the most recent relevant action.
+  for (const entry of history.slice().reverse()) {
+    if (!entry.parts) continue;
+
+    for (const part of entry.parts) {
+      let id: string | undefined;
+      let content: unknown;
+
+      // Check for a relevant FunctionCall with the file path in its arguments.
+      if (
+        isFunctionCall(entry) &&
+        part.functionCall?.name &&
+        toolsInCall.has(part.functionCall.name)
+      ) {
+        id = part.functionCall.id;
+        content = part.functionCall.args;
+      }
+      // Check for a relevant FunctionResponse with the file path in its output.
+      else if (
+        isFunctionResponse(entry) &&
+        part.functionResponse?.name &&
+        toolsInResp.has(part.functionResponse.name)
+      ) {
+        const { response } = part.functionResponse;
+        if (response && !('error' in response) && 'output' in response) {
+          id = part.functionResponse.id;
+          content = response.output;
+        }
+      }
+
+      if (!id || content === undefined) continue;
+
+      // Use the "blunt hammer" approach to find the file path in the content.
+      // Note that the tool response data is inconsistent in their formatting
+      // with successes and errors - so, we just check for the existance
+      // as the best guess to if error/failed occured with the response.
+      const stringified = JSON.stringify(content);
+      if (
+        !stringified.includes('Error') && // only applicable for functionResponse
+        !stringified.includes('Failed') && // only applicable for functionResponse
+        stringified.includes(filePath)
+      ) {
+        return getTimestampFromFunctionId(id);
+      }
+    }
+  }
+
+  return -1;
+}
+
+/**
  * Attempts to correct edit parameters if the original old_string is not found.
  * It tries unescaping, and then LLM-based correction.
  * Results are cached to avoid redundant processing.
@@ -61,6 +160,7 @@ export interface CorrectedEditResult {
  *          EditToolParams (as CorrectedEditParams) and the final occurrences count.
  */
 export async function ensureCorrectEdit(
+  filePath: string,
   currentContent: string,
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
   client: GeminiClient,
@@ -140,6 +240,34 @@ export async function ensureCorrectEdit(
         );
       }
     } else if (occurrences === 0) {
+      if (filePath) {
+        // In order to keep from clobbering edits made outside our system,
+        // let's check if there was a more recent edit to the file than what
+        // our system has done
+        const lastEditedByUsTime = await findLastEditTimestamp(
+          filePath,
+          client,
+        );
+
+        // Add a 1-second buffer to account for timing inaccuracies. If the file
+        // was modified more than a second after the last edit tool was run, we
+        // can assume it was modified by something else.
+        if (lastEditedByUsTime > 0) {
+          const stats = fs.statSync(filePath);
+          const diff = stats.mtimeMs - lastEditedByUsTime;
+          if (diff > 2000) {
+            // Hard coded for 2 seconds
+            // This file was edited sooner
+            const result: CorrectedEditResult = {
+              params: { ...originalParams },
+              occurrences: 0, // Explicitly 0 as LLM failed
+            };
+            editCorrectionCache.set(cacheKey, result);
+            return result;
+          }
+        }
+      }
+
       const llmCorrectedOldString = await correctOldStringMismatch(
         client,
         currentContent,
@@ -177,7 +305,7 @@ export async function ensureCorrectEdit(
         return result;
       }
     } else {
-      // Unescaping old_string resulted in > 1 occurrences
+      // Unescaping old_string resulted in > 1 occurrence
       const result: CorrectedEditResult = {
         params: { ...originalParams },
         occurrences, // This will be > 1
