@@ -13,7 +13,6 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
@@ -21,12 +20,8 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension } from './extension.js';
+import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
@@ -53,10 +48,18 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  'allowed-mcp-server-names': string | undefined;
+  extensions: string[] | undefined;
+  listExtensions: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
   const argv = await yargs(hideBin(process.argv))
+    .scriptName('gemini')
+    .usage(
+      '$0 [options]',
+      'Gemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+    )
     .option('model', {
       alias: 'm',
       type: 'string',
@@ -128,6 +131,22 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('allowed-mcp-server-names', {
+      type: 'string',
+      description: 'Allowed MCP server names',
+    })
+    .option('extensions', {
+      alias: 'e',
+      type: 'array',
+      string: true,
+      description:
+        'A list of extensions to use. If not provided, all extensions are used.',
+    })
+    .option('list-extensions', {
+      alias: 'l',
+      type: 'boolean',
+      description: 'List all available extensions and exit.',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -166,10 +185,13 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
 ): Promise<Config> {
-  loadEnvironment();
-
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
+
+  const activeExtensions = filterActiveExtensions(
+    extensions,
+    argv.extensions || [],
+  );
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -182,7 +204,9 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
+  const extensionContextFilePaths = activeExtensions.flatMap(
+    (e) => e.contextFiles,
+  );
 
   const fileService = new FileDiscoveryService(process.cwd());
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
@@ -193,8 +217,21 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  const mcpServers = mergeMcpServers(settings, extensions);
-  const excludeTools = mergeExcludeTools(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, activeExtensions);
+  const excludeTools = mergeExcludeTools(settings, activeExtensions);
+
+  if (argv['allowed-mcp-server-names']) {
+    const allowedNames = new Set(
+      argv['allowed-mcp-server-names'].split(',').filter(Boolean),
+    );
+    if (allowedNames.size > 0) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+      );
+    } else {
+      mcpServers = {};
+    }
+  }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
@@ -246,6 +283,11 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    listExtensions: argv.listExtensions || false,
+    activeExtensions: activeExtensions.map((e) => ({
+      name: e.config.name,
+      version: e.config.version,
+    })),
   });
 }
 
@@ -278,40 +320,4 @@ function mergeExcludeTools(
     }
   }
   return [...allExcludeTools];
-}
-
-function findEnvFile(startDir: string): string | null {
-  let currentDir = path.resolve(startDir);
-  while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
-    }
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(os.homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(os.homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
-    }
-    currentDir = parentDir;
-  }
-}
-
-export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
-  if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
-  }
 }
