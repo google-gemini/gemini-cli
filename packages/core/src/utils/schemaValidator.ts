@@ -24,14 +24,18 @@ interface GeminiSchema {
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
-  private static ajv = new (Ajv as unknown as new (options: { allErrors: boolean }) => Ajv.default)({ allErrors: true });
+  private static ajv = new (Ajv as unknown as new (options: {
+    allErrors: boolean;
+  }) => Ajv.default)({ allErrors: true });
 
   /**
    * Converts Google Gemini Schema to standard JSON Schema format
    * @param schema The schema to convert
    * @returns Converted schema
    */
-  private static convertGeminiSchema(schema: GeminiSchema | unknown): GeminiSchema {
+  private static convertGeminiSchema(
+    schema: GeminiSchema | unknown,
+  ): GeminiSchema {
     if (!schema || typeof schema !== 'object') {
       return schema as GeminiSchema;
     }
@@ -118,7 +122,10 @@ export class SchemaValidator {
    * @param data Data to validate
    * @returns null if valid, error message string if invalid
    */
-  static validate(schema: GeminiSchema | unknown, data: unknown): string | null {
+  static validate(
+    schema: GeminiSchema | unknown,
+    data: unknown,
+  ): string | null {
     if (!schema) {
       return null;
     }
