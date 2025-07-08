@@ -46,6 +46,8 @@ export function useShellHistory(projectRoot: string) {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [historyFilePath, setHistoryFilePath] = useState<string | null>(null);
+  const [matchingCommands, setMatchingCommands] = useState<string[]>([]);
+  const [matchingIndex, setMatchingIndex] = useState(-1);
 
   useEffect(() => {
     async function loadHistory() {
@@ -94,10 +96,67 @@ export function useShellHistory(projectRoot: string) {
     return history[newIndex] ?? null;
   }, [history, historyIndex]);
 
+  const getMatchingCommand = useCallback(
+    (toMatch: string) => {
+      const query = toMatch.trim();
+      if (!query) {
+        setMatchingCommands([]);
+        setMatchingIndex(-1);
+        return null;
+      }
+
+      const matches = history.filter((cmd) =>
+        cmd.toLowerCase().includes(query.toLowerCase()),
+      );
+
+      setMatchingCommands(matches);
+      if (matches.length > 0) {
+        setMatchingIndex(0);
+        return matches[0];
+      }
+      setMatchingIndex(-1);
+      return null;
+    },
+    [history],
+  );
+
+  const getPreviousMatchingCommand = useCallback((): string | null => {
+    if (matchingCommands.length === 0) return null;
+    const newIndex =
+      matchingIndex < 0
+        ? 0
+        : Math.min(matchingIndex + 1, matchingCommands.length - 1);
+    setMatchingIndex(newIndex);
+    return matchingCommands[newIndex] ?? null;
+  }, [matchingCommands, matchingIndex]);
+
+  const getNextMatchingCommand = useCallback((): string | null => {
+    if (matchingCommands.length === 0) {
+      return null;
+    }
+    const newIndex = matchingIndex - 1;
+    if (newIndex < 0) {
+      setMatchingIndex(-1);
+      return '';
+    }
+    setMatchingIndex(newIndex);
+    return matchingCommands[newIndex] ?? null;
+  }, [matchingCommands, matchingIndex]);
+
+  const resetMatching = useCallback(() => {
+    setMatchingCommands([]);
+    setMatchingIndex(-1);
+  }, []);
+
   return {
     addCommandToHistory,
     getPreviousCommand,
     getNextCommand,
+    getMatchingCommand,
+    getPreviousMatchingCommand,
+    getNextMatchingCommand,
+    resetMatching,
+
     resetHistoryPosition: () => setHistoryIndex(-1),
   };
 }
