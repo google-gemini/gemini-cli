@@ -26,14 +26,6 @@ import {
 import { Logger } from '@google/gemini-cli-core';
 import { loadSandboxConfig } from '../config/sandboxConfig.js';
 import { getPackageJson } from '../utils/package.js';
-    .version(version) // Use the resolved version here
-    .alias('v', 'version')
-    .help()
-    .alias('h', 'help')
-    .strict().argv;
-
-  return argv;
-}
 
 function parseArguments(version: string) {
   const argv = yargs(hideBin(process.argv))
@@ -91,11 +83,8 @@ function parseArguments(version: string) {
     .option('checkpointing', {
       type: 'boolean',
       description: 'Enable or disable checkpointing.',
-    });
-
-  const yargsWithVersion = yargsInstance.version(version); // Use the resolved version here
-
-  const argv = yargsWithVersion
+    })
+    .version(version) // Use the resolved version here
     .alias('v', 'version')
     .help()
     .alias('h', 'help')

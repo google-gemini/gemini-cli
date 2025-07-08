@@ -8,6 +8,7 @@ import * as ts from 'typescript';
 import * as Diff from 'diff';
 import { Logger } from '../core/logger.js';
 import { promises as fsPromises } from 'fs';
+import { Tool, ToolCall } from './tools.js';
 
 interface RefactorCodeParams {
   filePath: string;
@@ -16,7 +17,7 @@ interface RefactorCodeParams {
   newName: string;
 }
 
-export async function refactorCode(
+async function refactorCode(
   params: RefactorCodeParams,
 ): Promise<string> {
   const logger = new Logger();
@@ -79,5 +80,14 @@ export async function refactorCode(
     }
     logger.error(`// Refactoring failed: ${errorMessage}`);
     throw new Error(`Refactoring failed: ${errorMessage}`);
+  }
+}
+
+export class RefactorTool implements Tool {
+  name = 'refactor-code';
+
+  async call(call: ToolCall): Promise<string> {
+    const params = call.args as unknown as RefactorCodeParams;
+    return await refactorCode(params);
   }
 }
