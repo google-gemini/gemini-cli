@@ -17,8 +17,8 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  SettingScope,
   USER_SETTINGS_PATH,
+  SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -111,15 +111,9 @@ export async function main() {
     process.exit(0);
   }
 
-  // Set a default auth type if one isn't set for a couple of known cases.
+  // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
-    if (process.env.GEMINI_API_KEY) {
-      settings.setValue(
-        SettingScope.User,
-        'selectedAuthType',
-        AuthType.USE_GEMINI,
-      );
-    } else if (process.env.CLOUD_SHELL === 'true') {
+    if (process.env.CLOUD_SHELL === 'true') {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
