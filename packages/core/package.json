@@ -1,6 +1,6 @@
 {
   "name": "@icarus603/gemini-code-core",
-  "version": "0.1.9-custom",
+  "version": "0.1.11-custom",
   "description": "Gemini CLI Core (Custom Fork)",
   "repository": {
     "type": "git",
