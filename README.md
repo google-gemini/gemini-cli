@@ -471,6 +471,133 @@ trust -p "Create API_DOCS.md documenting the REST endpoints in server.js"
 
 The key insight: Trust CLI models interpret "create/write code" as showing you code, but "save/write to disk/create a file" as filesystem operations!
 
+## 🛠️ Available Tools Reference
+
+Trust CLI provides a comprehensive set of tools that models can use to interact with your system. Understanding these tools helps you craft better prompts and understand what's possible.
+
+### 📁 **File Operations**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`read_file`** | Read file contents with optional line ranges | "Read the config.json file" |
+| **`write_file`** | Create new files or overwrite existing ones | "Save this code to app.py" |
+| **`edit`** | Make targeted edits to existing files | "Add error handling to line 50 in server.js" |
+| **`ls`** | List directory contents | "Show me all files in the src directory" |
+
+### 🔍 **Search & Discovery**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`grep`** | Search file contents using regex patterns | "Find all TODO comments in Python files" |
+| **`glob`** | Find files by name patterns | "List all .env files in the project" |
+| **`read_many_files`** | Read multiple files efficiently | "Read all configuration files" |
+
+### 🌐 **Web & Network**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`web_fetch`** | Fetch and analyze web pages | "Get the latest documentation from this URL" |
+| **`web_search`** | Search the web for information | "Search for Node.js best practices" |
+
+### 💻 **System Operations**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`shell`** | Execute shell commands | "Run npm install and show the output" |
+
+### 🧠 **Memory & Context**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`memory_tool`** | Manage conversation memory and context | Automatically used for context management |
+
+### 🔌 **Extensibility**
+
+| Tool | Purpose | Example Usage |
+|------|---------|---------------|
+| **`mcp_tool`** | Interface with Model Context Protocol servers | Custom integrations and extensions |
+
+### 🎯 **How to Use Tools Effectively**
+
+**Explicit Tool References:**
+```bash
+# Direct tool usage (most reliable)
+trust -p "Use the read_file tool to show me the contents of package.json"
+trust -p "Use the write_file tool to create a new script called deploy.sh"
+```
+
+**Natural Language (Trust CLI interprets intent):**
+```bash
+# Models understand these and select appropriate tools
+trust -p "Read the README file and summarize the installation steps"
+trust -p "Search for all functions named 'authenticate' in the codebase"
+trust -p "Create a backup script for the database"
+```
+
+**Interactive Mode Tool Usage:**
+```bash
+trust
+> Read the main configuration file
+> Now edit it to add the new database settings
+> Save the changes and show me a diff
+```
+
+### 📋 **Tool Capabilities & Limitations**
+
+**File Operations:**
+- ✅ Read files of any size (with chunking for large files)
+- ✅ Create new files with any content
+- ✅ Edit existing files with precise line-by-line changes
+- ✅ Handle binary files (images, etc.) appropriately
+- ⚠️ Some operations may require confirmation in interactive mode
+
+**Search Operations:**
+- ✅ Fast regex search across multiple files
+- ✅ Glob pattern matching for file discovery
+- ✅ Context-aware search results
+- ⚠️ Large repositories may have performance implications
+
+**Shell Operations:**
+- ✅ Full bash command execution
+- ✅ Environment variable access
+- ✅ Background process support
+- ⚠️ Commands require confirmation for security
+- ⚠️ Destructive operations may be blocked
+
+**Web Operations:**
+- ✅ Fetch and analyze web content
+- ✅ Search engines integration
+- ✅ Markdown conversion of HTML content
+- ⚠️ Respects robots.txt and rate limits
+
+### 💡 **Tool Usage Tips**
+
+1. **Be Specific About File Paths:**
+   ```bash
+   trust -p "Read ./src/config/database.js"  # Clear path
+   ```
+
+2. **Combine Multiple Operations:**
+   ```bash
+   trust -p "Find all .js files, read the main ones, and create a project overview"
+   ```
+
+3. **Use Interactive Mode for Complex Workflows:**
+   ```bash
+   trust
+   > Search for authentication functions
+   > Read the main auth file
+   > Add rate limiting to the login function
+   > Test the changes
+   ```
+
+4. **Leverage Tool Combinations:**
+   ```bash
+   trust -p "Use grep to find API endpoints, then read those files and document the API"
+   ```
+
+These tools make Trust CLI powerful for development workflows, code analysis, documentation, and automation tasks!
+
 ## 🎯 Solving Local AI Challenges
 
 Trust CLI directly addresses the core challenges of local AI deployment:
