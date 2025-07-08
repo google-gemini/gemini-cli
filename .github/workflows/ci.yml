@@ -42,6 +42,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Create bundle
+        run: npm run bundle
+
       - name: Run type check
         run: npm run typecheck
 
@@ -51,7 +54,8 @@ jobs:
           name: build-artifacts-${{ matrix.node-version }}
           path: |
             packages/*/dist
-            package-lock.json # Only upload dist and lockfile
+            bundle/
+            package-lock.json
   test:
     name: Test
     runs-on: ubuntu-latest

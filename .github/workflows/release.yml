@@ -127,6 +127,9 @@ jobs:
           npm run build:packages
           npm run prepare:package
 
+      - name: Create bundle
+        run: npm run bundle
+
       - name: Configure npm for publishing
         uses: actions/setup-node@v4
         with:

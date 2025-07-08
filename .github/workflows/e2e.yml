@@ -30,6 +30,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Create bundle
+        run: npm run bundle
+
       - name: Set up Docker
         if: matrix.sandbox == 'sandbox:docker'
         uses: docker/setup-buildx-action@v3
