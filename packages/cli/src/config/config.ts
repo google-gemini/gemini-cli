@@ -26,7 +26,7 @@ import {
   Extension,
 } from '@google/gemini-cli-core';
 import { Logger } from '@google/gemini-cli-core';
-import { loadSandboxConfig, getCliVersion } from '@google/gemini-cli-core/dist/src/config/config.js';
+import { loadSandboxConfig, getCliVersion } from '@google/gemini-cli-core';
 
 interface CliArgs {
   model: string | undefined;

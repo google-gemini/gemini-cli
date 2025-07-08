@@ -19,10 +19,15 @@ export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
 
-export * from './code_assist/codeAssist.js';
+export * from './code_assist/code-assist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
+export * from './code_assist/gemini-api-client.js';
+export * from './code_assist/model-factory.js';
+export * from './code_assist/prompt-translator.js';
+export * from './code_assist/tool-functions.js';
+export * from './code_assist/tools-selector.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -32,17 +37,34 @@ export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/editor.js';
+export * from './utils/is-error-like.js';
+export * from './utils/is-string.js';
+export * from './utils/is-truthy.js';
+export * from './utils/path.js';
+export * from './utils/proxy-agent.js';
+export * from './utils/simple-mcp-server.js';
+export * from './utils/stream-parser.js';
+export * from './utils/uri.js';
+export * from './utils/versions.js';
+export * from './utils/refactor-tool.js';
+export * from './utils/default_api.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/mcp.js';
+export * from './services/worker-service.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
 export * from './tools/tool-registry.js';
+export * from './tools/tool.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
+export * from './tools/list-directory.js';
+export * from './tools/search-file-content.js';
+export * from './tools/run-shell-command.js';
 export * from './tools/ls.js';
 export * from './tools/grep.js';
 export * from './tools/glob.js';
@@ -52,7 +74,9 @@ export * from './tools/web-fetch.js';
 export * from './tools/memoryTool.js';
 export * from './tools/shell.js';
 export * from './tools/web-search.js';
+export * from './tools/google-web-search.js';
 export * from './tools/read-many-files.js';
+export * from './tools/save-memory.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 

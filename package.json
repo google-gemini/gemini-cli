@@ -78,6 +78,7 @@
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
+    "esbuild-plugin-tsconfig-paths": "^1.0.1",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",

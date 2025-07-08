@@ -14,7 +14,7 @@ import {
   logUserPrompt,
   AuthType,
 } from '@google/gemini-cli-core';
-import { logger } from '@google/gemini-cli-core/dist/src/core/logger.js';
+import { logger } from '@google/gemini-cli-core';
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';

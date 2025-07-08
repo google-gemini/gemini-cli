@@ -1,57 +1,23 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+const path = require('path');
 
-import esbuild from 'esbuild';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+const esbuild = require('esbuild');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-const pkg = require(path.resolve(__dirname, 'package.json'));
-
-const plugins = [];
-
-const loaders = {
-  '.ts': 'ts',
-  '.tsx': 'tsx',
-  '.js': 'js',
-  '.jsx': 'jsx',
-  '.json': 'json',
+const config = {
+  entryPoints: ['packages/cli/src/index.ts'], // Adjust if entry point is different
+  bundle: true,
+  outfile: 'dist/cli.js', // Adjust output path as needed
+  platform: 'node',
+  target: 'node18', // Adjust based on your Node.js version
+  format: 'esm',
+  sourcemap: true,
+  resolveExtensions: ['.ts', '.tsx', '.js', '.jsx'], // Ensure .ts is included
+  loader: {
+    '.ts': 'ts',
+    '.tsx': 'tsx',
+  },
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
 };
 
-esbuild
-  .build({
-    entryPoints: ['packages/cli/index.ts'],
-    bundle: true,
-    outdir: 'bundle',
-    platform: 'node',
-    format: 'esm',
-    plugins,
-    loader: loaders,
-    define: {
-      'process.env.CLI_VERSION': JSON.stringify(pkg.version),
-    },
-    external: [
-      '@oclif/core',
-      'colorama',
-      'escalade/sync',
-      'yoga-layout',
-      'diff',
-      'selderee',
-      'ecdsa-sig-formatter',
-      './cjs/react-is.production.min.js',
-      './route',
-      './lib/source-map-generator',
-      './lib/source-map-consumer',
-      './lib/source-node',
-    ],
-    banner: {
-      js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
-    },
-  })
-  .catch(() => process.exit(1));
+esbuild.build(config).catch(() => process.exit(1));
