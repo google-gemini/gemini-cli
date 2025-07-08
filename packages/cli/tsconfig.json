@@ -13,6 +13,12 @@
     "src/**/*.json",
     "./package.json"
   ],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/test-utils"
+  ],
   "references": [{ "path": "../core" }]
 }
