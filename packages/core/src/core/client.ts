@@ -45,6 +45,39 @@ function isThinkingSupported(model: string) {
   return false;
 }
 
+/**
+ * Returns the index of the content after the fraction of the total characters in the history.
+ *
+ * Exported for testing purposes.
+ */
+export function findIndexAfterFraction(
+  history: Content[],
+  fraction: number,
+): number {
+  if (fraction <= 0 || fraction >= 1) {
+    throw new Error('Fraction must be between 0 and 1');
+  }
+
+  const contentLengths = history.map(
+    (content) => JSON.stringify(content).length,
+  );
+
+  const totalCharacters = contentLengths.reduce(
+    (sum, length) => sum + length,
+    0,
+  );
+  const targetCharacters = totalCharacters * fraction;
+
+  let charactersSoFar = 0;
+  for (let i = 0; i < contentLengths.length; i++) {
+    charactersSoFar += contentLengths[i];
+    if (charactersSoFar >= targetCharacters) {
+      return i;
+    }
+  }
+  return contentLengths.length;
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
@@ -54,7 +87,16 @@ export class GeminiClient {
     topP: 1,
   };
   private readonly MAX_TURNS = 100;
-  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
+  /**
+   * Threshold for compression token count as a fraction of the model's token limit.
+   * If the chat history exceeds this threshold, it will be compressed.
+   */
+  private readonly COMPRESSION_TOKEN_THRESHOLD = 0.7;
+  /**
+   * The fraction of the latest chat history to keep. A value of 0.3
+   * means that only the last 30% of the chat history will be kept after compression.
+   */
+  private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -90,11 +132,11 @@ export class GeminiClient {
     return this.chat;
   }
 
-  async getHistory(): Promise<Content[]> {
+  getHistory(): Content[] {
     return this.getChat().getHistory();
   }
 
-  async setHistory(history: Content[]): Promise<void> {
+  setHistory(history: Content[]) {
     this.getChat().setHistory(history);
   }
 
@@ -441,24 +483,40 @@ export class GeminiClient {
 
     const model = this.config.getModel();
 
-    let { totalTokens: originalTokenCount } =
+    const { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
         model,
         contents: curatedHistory,
       });
     if (originalTokenCount === undefined) {
       console.warn(`Could not determine token count for model ${model}.`);
-      originalTokenCount = 0;
+      return null;
     }
 
     // Don't compress if not forced and we are under the limit.
     if (
       !force &&
-      originalTokenCount <
-        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(model)
+      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
     ) {
       return null;
     }
+
+    let compressBeforeIndex = findIndexAfterFraction(
+      curatedHistory,
+      1 - this.COMPRESSION_PRESERVE_THRESHOLD,
+    );
+    // Find the first user message after the index. This is the start of the next turn.
+    while (
+      compressBeforeIndex < curatedHistory.length &&
+      curatedHistory[compressBeforeIndex]?.role !== 'user'
+    ) {
+      compressBeforeIndex++;
+    }
+
+    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
+    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+
+    this.getChat().setHistory(historyToCompress);
 
     const { text: summary } = await this.getChat().sendMessage({
       message: {
@@ -477,6 +535,7 @@ export class GeminiClient {
         role: 'model',
         parts: [{ text: 'Got it. Thanks for the additional context!' }],
       },
+      ...historyToKeep,
     ]);
 
     const { totalTokens: newTokenCount } =

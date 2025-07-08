@@ -11,7 +11,7 @@ import {
   ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
 } from './tools.js';
-import { CallableTool, Part, FunctionCall } from '@google/genai';
+import { CallableTool, Part, FunctionCall, Schema } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
@@ -23,7 +23,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly serverName: string,
     readonly name: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
     readonly serverToolName: string,
     readonly timeout?: number,
     readonly trust?: boolean,

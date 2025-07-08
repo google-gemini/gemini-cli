@@ -11,6 +11,7 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { Type } from '@google/genai';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -73,11 +74,11 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
           prompt: {
             description:
               'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
-            type: 'string',
+            type: Type.STRING,
           },
         },
         required: ['prompt'],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
   }
@@ -148,14 +149,9 @@ ${textContent}
   }
 
   validateParams(params: WebFetchToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
     if (!params.prompt || params.prompt.trim() === '') {
       return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
