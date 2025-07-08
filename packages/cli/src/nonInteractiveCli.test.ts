@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
+import { vol } from 'memfs';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async () => {
@@ -53,6 +54,7 @@ describe('runNonInteractive', () => {
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
+      getOutput: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     mockProcessStdoutWrite = vi.fn().mockImplementation(() => true);
@@ -69,30 +71,57 @@ describe('runNonInteractive', () => {
     // This might require storing the original methods before patching them in beforeEach
   });
 
-  it('should process input and write text output', async () => {
-    const inputStream = (async function* () {
-      yield {
-        candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
-      } as GenerateContentResponse;
-      yield {
-        candidates: [{ content: { parts: [{ text: ' World' }] } }],
-      } as GenerateContentResponse;
-    })();
-    mockChat.sendMessageStream.mockResolvedValue(inputStream);
+  it.each([{ withOutputFile: false }, { withOutputFile: true }])(
+    'should process input and write text output (with output file: $withOutputFile)',
+    async ({ withOutputFile }) => {
+      if (withOutputFile) {
+        vi.mock('fs', async () => {
+          const { fs } = await import('memfs');
+          return {
+            default: fs,
+            ...fs,
+          };
+        });
 
-    await runNonInteractive(mockConfig, 'Test input');
+        mockConfig.getOutput = vi.fn().mockReturnValue('/test/output.txt');
+        // Set up memfs with the directory structure
+        vol.fromJSON({
+          '/test': null, // Create directory
+        });
+      }
 
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith({
-      message: [{ text: 'Test input' }],
-      config: {
-        abortSignal: expect.any(AbortSignal),
-        tools: [{ functionDeclarations: [] }],
-      },
-    });
-    expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Hello');
-    expect(mockProcessStdoutWrite).toHaveBeenCalledWith(' World');
-    expect(mockProcessStdoutWrite).toHaveBeenCalledWith('\n');
-  });
+      const inputStream = (async function* () {
+        yield {
+          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+        } as GenerateContentResponse;
+        yield {
+          candidates: [{ content: { parts: [{ text: ' World' }] } }],
+        } as GenerateContentResponse;
+      })();
+      mockChat.sendMessageStream.mockResolvedValue(inputStream);
+
+      await runNonInteractive(mockConfig, 'Test input');
+
+      expect(mockChat.sendMessageStream).toHaveBeenCalledWith({
+        message: [{ text: 'Test input' }],
+        config: {
+          abortSignal: expect.any(AbortSignal),
+          tools: [{ functionDeclarations: [] }],
+        },
+      });
+
+      if (withOutputFile) {
+        // Verify file was created and contains expected content
+        expect(vol.existsSync('/test/output.txt')).toBe(true);
+        const fileContent = vol.readFileSync('/test/output.txt', 'utf8');
+        expect(fileContent).toBe('Hello World'); // No newline in file, only in stdout
+      } else {
+        expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Hello');
+        expect(mockProcessStdoutWrite).toHaveBeenCalledWith(' World');
+        expect(mockProcessStdoutWrite).toHaveBeenCalledWith('\n');
+      }
+    },
+  );
 
   it('should handle a single tool call and respond', async () => {
     const functionCall: FunctionCall = {

@@ -40,6 +40,7 @@ interface CliArgs {
   'sandbox-image': string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
+  output: string | undefined;
   all_files: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
@@ -70,6 +71,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'p',
       type: 'string',
       description: 'Prompt. Appended to input on stdin (if any).',
+    })
+    .option('output', {
+      alias: 'o',
+      type: 'string',
+      description: 'Output file. In association with `prompt`',
     })
     .option('sandbox', {
       alias: 's',
@@ -242,6 +248,7 @@ export async function loadCliConfig(
     targetDir: process.cwd(),
     debugMode,
     question: argv.prompt || '',
+    output: argv.output || '',
     fullContext: argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
