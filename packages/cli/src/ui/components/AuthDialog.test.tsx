@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { AuthType } from '@icarus603/gemini-code-core';
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi } from 'vitest';
-import { AuthDialog } from './AuthDialog.js';
+import { describe, expect, it, vi } from 'vitest';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthDialog } from './AuthDialog.js';
 
 describe('AuthDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import type { Mocked } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useCompletion } from './useCompletion.js';
+import { Config, FileDiscoveryService } from '@icarus603/gemini-code-core';
+import { act, renderHook } from '@testing-library/react';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
+import type { Mocked } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { useCompletion } from './useCompletion.js';
 
 interface MockConfig {
   getFileFilteringRespectGitIgnore: () => boolean;
@@ -21,8 +21,8 @@ interface MockConfig {
 
 // Mock dependencies
 vi.mock('fs/promises');
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@icarus603/gemini-code-core', async () => {
+  const actual = await vi.importActual('@icarus603/gemini-code-core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn(),

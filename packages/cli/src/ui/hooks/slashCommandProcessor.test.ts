@@ -53,25 +53,25 @@ vi.mock('../../utils/version.js', () => ({
   getCliVersion: (...args: []) => mockGetCliVersionFn(...args),
 }));
 
-import { act, renderHook } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
-import open from 'open';
-import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { MessageType, SlashCommandProcessorResult } from '../types.js';
 import {
-  Config,
-  MCPDiscoveryState,
-  MCPServerStatus,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
-  GeminiClient,
-} from '@google/gemini-cli-core';
-import { useSessionStats } from '../contexts/SessionContext.js';
+    Config,
+    GeminiClient,
+    getMCPDiscoveryState,
+    getMCPServerStatus,
+    MCPDiscoveryState,
+    MCPServerStatus,
+} from '@icarus603/gemini-code-core';
+import { act, renderHook } from '@testing-library/react';
+import open from 'open';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { LoadedSettings } from '../../config/settings.js';
-import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
 import { SlashCommand } from '../commands/types.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import { MessageType, SlashCommandProcessorResult } from '../types.js';
+import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(),
@@ -88,9 +88,9 @@ vi.mock('open', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@icarus603/gemini-code-core')>();
   return {
     ...actual,
     getMCPServerStatus: vi.fn(),
@@ -584,7 +584,7 @@ describe('useSlashCommandProcessor', () => {
 *   **Memory Usage:** ${memoryUsage}
 `;
       let url =
-        'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml';
+        'https://github.com/Icarus603/gemini-code/issues/new?template=bug_report.yml';
       if (description) {
         url += `&title=${encodeURIComponent(description)}`;
       }

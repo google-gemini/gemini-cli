@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '@icarus603/gemini-code-core';
 import { Box, Newline, Text, useInput } from 'ink';
+import { Colors } from '../colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
 import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
-import { Config } from '@google/gemini-cli-core';
-import { Colors } from '../colors.js';
 
 interface CloudFreePrivacyNoticeProps {
   config: Config;

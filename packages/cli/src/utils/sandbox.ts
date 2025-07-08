@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { SandboxConfig } from '@icarus603/gemini-code-core';
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { quote } from 'shell-quote';
-import {
-  USER_SETTINGS_DIR,
-  SETTINGS_DIRECTORY_NAME,
-} from '../config/settings.js';
 import { promisify } from 'util';
-import { SandboxConfig } from '@google/gemini-cli-core';
+import {
+    SETTINGS_DIRECTORY_NAME,
+    USER_SETTINGS_DIR,
+} from '../config/settings.js';
 
 const execAsync = promisify(exec);
 
@@ -355,7 +355,7 @@ export async function start_sandbox(
     const remedy =
       image === LOCAL_DEV_SANDBOX_IMAGE_NAME
         ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
-        : 'Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists.';
+                  : 'Please check the image name, your network connection, or contact the repository maintainer if the issue persists.';
     console.error(
       `ERROR: Sandbox image '${image}' is missing or could not be pulled. ${remedy}`,
     );

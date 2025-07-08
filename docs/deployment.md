@@ -16,7 +16,7 @@ This is the recommended way for end-users to install Gemini CLI. It involves dow
 
   ```bash
   # Install the CLI globally
-  npm install -g @google/gemini-cli
+  npm install -g @icarus603/gemini-code
 
   # Now you can run the CLI from anywhere
   gemini
@@ -25,7 +25,7 @@ This is the recommended way for end-users to install Gemini CLI. It involves dow
 - **NPX execution:**
   ```bash
   # Execute the latest version from NPM without a global install
-  npx @google/gemini-cli
+  npx @icarus603/gemini-code
   ```
 
 ---
@@ -77,7 +77,7 @@ You can run the most recently committed version of Gemini CLI directly from the 
 
 ```bash
 # Execute the CLI directly from the main branch on GitHub
-npx https://github.com/google-gemini/gemini-cli
+	npx https://github.com/Icarus603/gemini-code
 ```
 
 ## Deployment architecture
@@ -88,8 +88,8 @@ The execution methods described above are made possible by the following archite
 
 Gemini CLI project is a monorepo that publishes two core packages to the NPM registry:
 
-- `@google/gemini-cli-core`: The backend, handling logic and tool execution.
-- `@google/gemini-cli`: The user-facing frontend.
+- `@icarus603/gemini-code-core`: The backend, handling logic and tool execution.
+- `@icarus603/gemini-code`: The user-facing frontend.
 
 These packages are used when performing the standard installation and when running Gemini CLI from the source.
 
@@ -97,7 +97,7 @@ These packages are used when performing the standard installation and when runni
 
 There are two distinct build processes used, depending on the distribution channel:
 
-- **NPM publication:** For publishing to the NPM registry, the TypeScript source code in `@google/gemini-cli-core` and `@google/gemini-cli` is transpiled into standard JavaScript using the TypeScript Compiler (`tsc`). The resulting `dist/` directory is what gets published in the NPM package. This is a standard approach for TypeScript libraries.
+- **NPM publication:** For publishing to the NPM registry, the TypeScript source code in `@icarus603/gemini-code-core` and `@icarus603/gemini-code` is transpiled into standard JavaScript using the TypeScript Compiler (`tsc`). The resulting `dist/` directory is what gets published in the NPM package. This is a standard approach for TypeScript libraries.
 
 - **GitHub `npx` execution:** When running the latest version of Gemini CLI directly from GitHub, a different process is triggered by the `prepare` script in `package.json`. This script uses `esbuild` to bundle the entire application and its dependencies into a single, self-contained JavaScript file. This bundle is created on-the-fly on the user's machine and is not checked into the repository.
 

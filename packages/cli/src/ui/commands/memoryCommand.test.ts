@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { memoryCommand } from './memoryCommand.js';
-import { type CommandContext, SlashCommand } from './types.js';
+import { getErrorMessage } from '@icarus603/gemini-code-core';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { getErrorMessage } from '@google/gemini-cli-core';
+import { memoryCommand } from './memoryCommand.js';
+import { type CommandContext, SlashCommand } from './types.js';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@icarus603/gemini-code-core')>();
   return {
     ...original,
     getErrorMessage: vi.fn((error: unknown) => {

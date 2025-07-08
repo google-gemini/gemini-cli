@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import { EditorType, isEditorAvailable } from '@icarus603/gemini-code-core';
 import { Box, Text, useInput } from 'ink';
+import React, { useState } from 'react';
+import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { Colors } from '../colors.js';
 import {
-  EDITOR_DISPLAY_NAMES,
-  editorSettingsManager,
-  type EditorDisplay,
+    EDITOR_DISPLAY_NAMES,
+    editorSettingsManager,
+    type EditorDisplay,
 } from '../editors/editorSettingsManager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { EditorType, isEditorAvailable } from '@google/gemini-cli-core';
 
 interface EditorDialogProps {
   onSelect: (editorType: EditorType | undefined, scope: SettingScope) => void;

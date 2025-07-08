@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as ServerConfig from '@icarus603/gemini-code-core';
 import * as os from 'os';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadCliConfig } from './config.js';
-import { Settings } from './settings.js';
 import { Extension } from './extension.js';
-import * as ServerConfig from '@google/gemini-cli-core';
+import { Settings } from './settings.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -29,9 +29,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@google/gemini-cli-core', async () => {
+vi.mock('@icarus603/gemini-code-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@google/gemini-cli-core',
+    '@icarus603/gemini-code-core',
   );
   return {
     ...actualServer,

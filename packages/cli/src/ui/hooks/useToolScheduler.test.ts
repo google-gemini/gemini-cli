@@ -5,35 +5,35 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { FunctionResponse, PartUnion } from '@google/genai';
 import {
-  useReactToolScheduler,
-  mapToDisplay,
-} from './useReactToolScheduler.js';
-import { PartUnion, FunctionResponse } from '@google/genai';
+    ApprovalMode,
+    Config,
+    Tool,
+    ToolCall,
+    ToolCallConfirmationDetails,
+    ToolCallRequestInfo,
+    ToolCallResponseInfo, // Import from core
+    Status as ToolCallStatusType,
+    ToolConfirmationOutcome,
+    ToolRegistry,
+    ToolResult,
+} from '@icarus603/gemini-code-core';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import {
-  Config,
-  ToolCallRequestInfo,
-  Tool,
-  ToolRegistry,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
-  ToolCallResponseInfo,
-  ToolCall, // Import from core
-  Status as ToolCallStatusType,
-  ApprovalMode, // Import from core
-} from '@google/gemini-cli-core';
-import {
-  HistoryItemWithoutId,
-  ToolCallStatus,
-  HistoryItemToolGroup,
+    HistoryItemToolGroup,
+    HistoryItemWithoutId,
+    ToolCallStatus,
 } from '../types.js';
+import {
+    mapToDisplay,
+    useReactToolScheduler,
+} from './useReactToolScheduler.js';
 
 // Mocks
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@icarus603/gemini-code-core', async () => {
+  const actual = await vi.importActual('@icarus603/gemini-code-core');
   return {
     ...actual,
     ToolRegistry: vi.fn(),

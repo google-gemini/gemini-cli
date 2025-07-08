@@ -7,7 +7,7 @@ on:
 jobs:
   triage-issue:
     timeout-minutes: 5
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    if: ${{ github.repository == 'Icarus603/gemini-code' }}
     permissions:
       issues: write
       contents: read
@@ -25,7 +25,7 @@ jobs:
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Run Gemini Issue Triage
-        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
+        uses: Icarus603/gemini-code-action@main
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
         with:

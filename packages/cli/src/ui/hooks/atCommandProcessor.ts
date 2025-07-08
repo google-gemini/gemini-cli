@@ -12,7 +12,7 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
-} from '@google/gemini-cli-core';
+} from '@icarus603/gemini-code-core';
 import {
   HistoryItem,
   IndividualToolCallDisplay,

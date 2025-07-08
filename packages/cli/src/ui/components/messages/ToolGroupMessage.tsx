@@ -10,7 +10,7 @@ import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { Colors } from '../../colors.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config } from '@icarus603/gemini-code-core';
 
 interface ToolGroupMessageProps {
   groupId: number;

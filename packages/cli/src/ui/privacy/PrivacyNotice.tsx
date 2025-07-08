@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type Config, AuthType } from '@icarus603/gemini-code-core';
 import { Box } from 'ink';
-import { type Config, AuthType } from '@google/gemini-cli-core';
-import { GeminiPrivacyNotice } from './GeminiPrivacyNotice.js';
-import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
 import { CloudFreePrivacyNotice } from './CloudFreePrivacyNotice.js';
+import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
+import { GeminiPrivacyNotice } from './GeminiPrivacyNotice.js';
 
 interface PrivacyNoticeProps {
   onExit: () => void;

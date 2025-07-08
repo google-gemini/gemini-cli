@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import type { Mocked } from 'vitest';
-import { handleAtCommand } from './atCommandProcessor.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
-import { ToolCallStatus } from '../types.js';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import * as fsPromises from 'fs/promises';
+import { Config, FileDiscoveryService } from '@icarus603/gemini-code-core';
 import type { Stats } from 'fs';
+import * as fsPromises from 'fs/promises';
+import type { Mocked } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { ToolCallStatus } from '../types.js';
+import { handleAtCommand } from './atCommandProcessor.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const mockGetToolRegistry = vi.fn();
 const mockGetTargetDir = vi.fn();
@@ -52,8 +52,8 @@ vi.mock('fs/promises', async () => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@icarus603/gemini-code-core', async () => {
+  const actual = await vi.importActual('@icarus603/gemini-code-core');
   return {
     ...actual,
     FileDiscoveryService: vi.fn(),

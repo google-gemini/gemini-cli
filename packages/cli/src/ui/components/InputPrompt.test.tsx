@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '@icarus603/gemini-code-core';
 import { render } from 'ink-testing-library';
-import { InputPrompt, InputPromptProps } from './InputPrompt.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { Config } from '@google/gemini-cli-core';
-import { CommandContext, SlashCommand } from '../commands/types.js';
 import { vi } from 'vitest';
-import { useShellHistory } from '../hooks/useShellHistory.js';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { InputPrompt, InputPromptProps } from './InputPrompt.js';
+import type { TextBuffer } from './shared/text-buffer.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');

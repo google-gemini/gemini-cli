@@ -16,7 +16,7 @@ import {
   uiTelemetryService,
   SessionMetrics,
   ModelMetrics,
-} from '@google/gemini-cli-core';
+} from '@icarus603/gemini-code-core';
 
 // --- Interface Definitions ---
 

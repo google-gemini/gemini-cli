@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import { GeminiClient } from '@icarus603/gemini-code-core';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { clearCommand } from './clearCommand.js';
 import { type CommandContext } from './types.js';
-import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { GeminiClient } from '@google/gemini-cli-core';
 
 describe('clearCommand', () => {
   let mockContext: CommandContext;

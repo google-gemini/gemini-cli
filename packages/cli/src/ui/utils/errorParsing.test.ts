@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { AuthType, StructuredError } from '@icarus603/gemini-code-core';
+import { describe, expect, it } from 'vitest';
 import { parseAndFormatApiError } from './errorParsing.js';
-import { AuthType, StructuredError } from '@google/gemini-cli-core';
 
 describe('parseAndFormatApiError', () => {
   const enterpriseMessage = 'upgrade to a plan with higher limits';

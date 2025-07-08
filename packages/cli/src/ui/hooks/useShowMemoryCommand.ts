@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Message, MessageType } from '../types.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config } from '@icarus603/gemini-code-core';
 import { LoadedSettings } from '../../config/settings.js';
+import { Message, MessageType } from '../types.js';
 
 export function createShowMemoryAction(
   config: Config | null,

@@ -33,10 +33,10 @@ Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
 
 ### Method 2: Using npm (Global Install)
 
-If you installed the CLI globally (e.g., `npm install -g @google/gemini-cli`), use the `npm uninstall` command with the `-g` flag to remove it.
+If you installed the CLI globally (e.g., `npm install -g @icarus603/gemini-code`), use the `npm uninstall` command with the `-g` flag to remove it.
 
 ```bash
-npm uninstall -g @google/gemini-cli
+npm uninstall -g @icarus603/gemini-code
 ```
 
 This command completely removes the package from your system.

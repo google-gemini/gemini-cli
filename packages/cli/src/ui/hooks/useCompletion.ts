@@ -4,23 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { glob } from 'glob';
 import {
-  isNodeError,
-  escapePath,
-  unescapePath,
-  getErrorMessage,
   Config,
+  escapePath,
   FileDiscoveryService,
-} from '@google/gemini-cli-core';
+  getErrorMessage,
+  isNodeError,
+  unescapePath,
+} from '@icarus603/gemini-code-core';
+import * as fs from 'fs/promises';
+import { glob } from 'glob';
+import * as path from 'path';
+import { useCallback, useEffect, useState } from 'react';
+import { CommandContext, SlashCommand } from '../commands/types.js';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];

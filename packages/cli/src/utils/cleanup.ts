@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { getProjectTempDir } from '@icarus603/gemini-code-core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { getProjectTempDir } from '@google/gemini-cli-core';
 
 export async function cleanupCheckpoints() {
   const tempDir = getProjectTempDir(process.cwd());

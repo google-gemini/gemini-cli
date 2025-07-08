@@ -4,41 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
-import open from 'open';
-import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
 import {
-  Config,
-  GitService,
-  Logger,
-  MCPDiscoveryState,
-  MCPServerStatus,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
-} from '@google/gemini-cli-core';
+    Config,
+    GitService,
+    Logger,
+    MCPDiscoveryState,
+    MCPServerStatus,
+    getMCPDiscoveryState,
+    getMCPServerStatus,
+} from '@icarus603/gemini-code-core';
+import { promises as fs } from 'fs';
+import process from 'node:process';
+import open from 'open';
+import path from 'path';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LoadedSettings } from '../../config/settings.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { CommandService } from '../../services/CommandService.js';
+import { getCliVersion } from '../../utils/version.js';
+import {
+    type CommandContext,
+    type SlashCommand,
+    type SlashCommandActionReturn,
+} from '../commands/types.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
-  Message,
-  MessageType,
-  HistoryItemWithoutId,
-  HistoryItem,
-  SlashCommandProcessorResult,
+    HistoryItem,
+    HistoryItemWithoutId,
+    Message,
+    MessageType,
+    SlashCommandProcessorResult,
 } from '../types.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
-import {
-  type CommandContext,
-  type SlashCommandActionReturn,
-  type SlashCommand,
-} from '../commands/types.js';
-import { CommandService } from '../../services/CommandService.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { useStateAndRef } from './useStateAndRef.js';
 
 // This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -635,7 +635,7 @@ export const useSlashCommandProcessor = (
 `;
 
           let bugReportUrl =
-            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
+            'https://github.com/Icarus603/gemini-code/issues/new?template=bug_report.yml&title={title}&info={info}';
           const bugCommand = config?.getBugCommand();
           if (bugCommand?.urlTemplate) {
             bugReportUrl = bugCommand.urlTemplate;

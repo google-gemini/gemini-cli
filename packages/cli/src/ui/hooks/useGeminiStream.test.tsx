@@ -5,28 +5,28 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useGeminiStream, mergePartListUnions } from './useGeminiStream.js';
-import { useInput } from 'ink';
-import {
-  useReactToolScheduler,
-  TrackedToolCall,
-  TrackedCompletedToolCall,
-  TrackedExecutingToolCall,
-  TrackedCancelledToolCall,
-} from './useReactToolScheduler.js';
-import { Config, EditorType, AuthType } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
+import { AuthType, Config, EditorType } from '@icarus603/gemini-code-core';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { useInput } from 'ink';
+import { Dispatch, SetStateAction } from 'react';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { LoadedSettings } from '../../config/settings.js';
+import {
+    HistoryItem,
+    MessageType,
+    SlashCommandProcessorResult,
+    StreamingState,
+} from '../types.js';
+import { mergePartListUnions, useGeminiStream } from './useGeminiStream.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import {
-  HistoryItem,
-  MessageType,
-  SlashCommandProcessorResult,
-  StreamingState,
-} from '../types.js';
-import { Dispatch, SetStateAction } from 'react';
-import { LoadedSettings } from '../../config/settings.js';
+    TrackedCancelledToolCall,
+    TrackedCompletedToolCall,
+    TrackedExecutingToolCall,
+    TrackedToolCall,
+    useReactToolScheduler,
+} from './useReactToolScheduler.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -47,7 +47,7 @@ const MockedUserPromptEvent = vi.hoisted(() =>
   vi.fn().mockImplementation(() => {}),
 );
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,

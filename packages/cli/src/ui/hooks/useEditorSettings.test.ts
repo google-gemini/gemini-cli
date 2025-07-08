@@ -5,27 +5,27 @@
  */
 
 import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type MockedFunction,
-} from 'vitest';
-import { act } from 'react';
+    allowEditorTypeInSandbox,
+    checkHasEditorType,
+    type EditorType,
+} from '@icarus603/gemini-code-core';
 import { renderHook } from '@testing-library/react';
-import { useEditorSettings } from './useEditorSettings.js';
+import { act } from 'react';
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+    type MockedFunction,
+} from 'vitest';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { MessageType, type HistoryItem } from '../types.js';
-import {
-  type EditorType,
-  checkHasEditorType,
-  allowEditorTypeInSandbox,
-} from '@google/gemini-cli-core';
+import { useEditorSettings } from './useEditorSettings.js';
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@icarus603/gemini-code-core', async () => {
+  const actual = await vi.importActual('@icarus603/gemini-code-core');
   return {
     ...actual,
     checkHasEditorType: vi.fn(() => true),

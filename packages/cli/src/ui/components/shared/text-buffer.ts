@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
+import { unescapePath } from '@icarus603/gemini-code-core';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import stringWidth from 'string-width';
-import { unescapePath } from '@google/gemini-cli-core';
-import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
+import stripAnsi from 'strip-ansi';
+import { cpLen, cpSlice, toCodePoints } from '../../utils/textUtils.js';
 
 export type Direction =
   | 'left'

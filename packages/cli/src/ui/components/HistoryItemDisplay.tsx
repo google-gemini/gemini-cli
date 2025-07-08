@@ -4,23 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '@icarus603/gemini-code-core';
+import { Box } from 'ink';
 import React from 'react';
 import type { HistoryItem } from '../types.js';
+import { AboutBox } from './AboutBox.js';
+import { CompressionMessage } from './messages/CompressionMessage.js';
+import { ErrorMessage } from './messages/ErrorMessage.js';
+import { GeminiMessage } from './messages/GeminiMessage.js';
+import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
+import { InfoMessage } from './messages/InfoMessage.js';
+import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { UserMessage } from './messages/UserMessage.js';
 import { UserShellMessage } from './messages/UserShellMessage.js';
-import { GeminiMessage } from './messages/GeminiMessage.js';
-import { InfoMessage } from './messages/InfoMessage.js';
-import { ErrorMessage } from './messages/ErrorMessage.js';
-import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
-import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
-import { CompressionMessage } from './messages/CompressionMessage.js';
-import { Box } from 'ink';
-import { AboutBox } from './AboutBox.js';
-import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
-import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
-import { Config } from '@google/gemini-cli-core';
+import { StatsDisplay } from './StatsDisplay.js';
+import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;

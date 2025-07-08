@@ -8,7 +8,7 @@ body:
         > [!IMPORTANT]  
         > Thanks for taking the time to suggest an enhancement!
         >
-        > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if a similar feature has already been requested.
+        > Please search **[existing issues](https://github.com/Icarus603/gemini-code/issues)** to see if a similar feature has already been requested.
 
   - type: textarea
     id: feature

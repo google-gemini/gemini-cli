@@ -4,30 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { act, renderHook } from '@testing-library/react';
 import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  type MockedFunction,
-  type Mock,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+    type Mock,
+    type MockedFunction,
 } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
 import {
-  Config,
-  Config as ActualConfigType,
-  ApprovalMode,
-} from '@google/gemini-cli-core';
+    Config as ActualConfigType,
+    ApprovalMode,
+    Config,
+} from '@icarus603/gemini-code-core';
 import { useInput, type Key as InkKey } from 'ink';
 
 vi.mock('ink');
 
-vi.mock('@google/gemini-cli-core', async () => {
+vi.mock('@icarus603/gemini-code-core', async () => {
   const actualServerModule = (await vi.importActual(
-    '@google/gemini-cli-core',
+    '@icarus603/gemini-code-core',
   )) as Record<string, unknown>;
   return {
     ...actualServerModule,

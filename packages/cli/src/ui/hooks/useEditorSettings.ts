@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import {
+    allowEditorTypeInSandbox,
+    checkHasEditorType,
+    EditorType,
+} from '@icarus603/gemini-code-core';
+import { useCallback, useState } from 'react';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { type HistoryItem, MessageType } from '../types.js';
-import {
-  allowEditorTypeInSandbox,
-  checkHasEditorType,
-  EditorType,
-} from '@google/gemini-cli-core';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;

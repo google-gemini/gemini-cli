@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getStartupWarnings } from './startupWarnings.js';
+import { getErrorMessage } from '@icarus603/gemini-code-core';
 import * as fs from 'fs/promises';
-import { getErrorMessage } from '@google/gemini-cli-core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getStartupWarnings } from './startupWarnings.js';
 
 vi.mock('fs/promises');
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,

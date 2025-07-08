@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { render } from 'ink-testing-library';
-import { AppWrapper as App } from './App.js';
 import {
-  Config as ServerConfig,
-  MCPServerConfig,
-  ApprovalMode,
-  ToolRegistry,
-  AccessibilitySettings,
-  SandboxConfig,
-} from '@google/gemini-cli-core';
-import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
+    AccessibilitySettings,
+    ApprovalMode,
+    MCPServerConfig,
+    SandboxConfig,
+    Config as ServerConfig,
+    ToolRegistry,
+} from '@icarus603/gemini-code-core';
+import { render } from 'ink-testing-library';
 import process from 'node:process';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { LoadedSettings, Settings, SettingsFile } from '../config/settings.js';
+import { AppWrapper as App } from './App.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -69,10 +69,10 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
 }
 
-// Mock @google/gemini-cli-core and its Config class
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  // Mock @icarus603/gemini-code-core and its Config class
+vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const actualCore =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@icarus603/gemini-code-core')>();
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {
