@@ -25,7 +25,7 @@ export const MemoryUsageDisplay: React.FC = () => {
     const intervalId = setInterval(updateMemory, 2000);
     updateMemory(); // Initial update
     return () => clearInterval(intervalId);
-  }, []);
+  }, [memoryUsage]);
 
   return (
     <Box>
