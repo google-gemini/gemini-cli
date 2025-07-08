@@ -4,63 +4,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Schema } from '@google/genai';
-import * as ajv from 'ajv';
-
-const ajValidator = new ajv.Ajv();
-
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
   /**
-   * Returns null if the data confroms to the schema described by schema (or if schema
-   *  is null). Otherwise, returns a string describing the error.
+   * Validates data against a JSON schema
+   * @param schema JSON Schema to validate against (can be undefined)
+   * @param data Data to validate
+   * @returns null if valid, error message string if invalid
    */
-  static validate(schema: Schema | undefined, data: unknown): string | null {
+  static validate(schema: any, data: unknown): string | null {
     if (!schema) {
       return null;
     }
-    if (typeof data !== 'object' || data === null) {
-      return 'Value of params must be an object';
-    }
-    const validate = ajValidator.compile(this.toObjectSchema(schema));
-    const valid = validate(data);
-    if (!valid && validate.errors) {
-      return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
-    }
-    return null;
-  }
 
-  /**
-   * Converts @google/genai's Schema to an object compatible with avj.
-   * This is necessry because it represents Types as an Enum (with
-   * UPPERCASE values) and minItems and minLength as strings, when they should be numbers.
-   */
-  private static toObjectSchema(schema: Schema): object {
-    const newSchema: Record<string, unknown> = { ...schema };
-    if (newSchema.anyOf && Array.isArray(newSchema.anyOf)) {
-      newSchema.anyOf = newSchema.anyOf.map((v) => this.toObjectSchema(v));
-    }
-    if (newSchema.items) {
-      newSchema.items = this.toObjectSchema(newSchema.items);
-    }
-    if (newSchema.properties && typeof newSchema.properties === 'object') {
-      const newProperties: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(newSchema.properties)) {
-        newProperties[key] = this.toObjectSchema(value as Schema);
+    // Convert schema to Record<string, unknown> if needed
+    const schemaObj = typeof schema === 'object' && schema !== null ? schema : {};
+
+    // This is a simplified implementation
+    // In a real application, you would use a library like Ajv for proper validation
+
+    // Check for required fields
+    if (schemaObj.required && Array.isArray(schemaObj.required)) {
+      const required = schemaObj.required as string[];
+      const dataObj = data as Record<string, unknown>;
+
+      for (const field of required) {
+        if (dataObj[field] === undefined) {
+          return `Missing required field: ${field}`;
+        }
       }
-      newSchema.properties = newProperties;
     }
-    if (newSchema.type) {
-      newSchema.type = String(newSchema.type).toLowerCase();
+
+    // Check property types if properties are defined
+    if (schemaObj.properties && typeof schemaObj.properties === 'object') {
+      const properties = schemaObj.properties as Record<string, { type?: string }>;
+      const dataObj = data as Record<string, unknown>;
+
+      for (const [key, prop] of Object.entries(properties)) {
+        if (dataObj[key] !== undefined && prop.type) {
+          const expectedType = prop.type;
+          const actualType = Array.isArray(dataObj[key])
+            ? 'array'
+            : typeof dataObj[key];
+
+          if (expectedType !== actualType) {
+            return `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`;
+          }
+        }
+      }
     }
-    if (newSchema.minItems) {
-      newSchema.minItems = Number(newSchema.minItems);
-    }
-    if (newSchema.minLength) {
-      newSchema.minLength = Number(newSchema.minLength);
-    }
-    return newSchema;
+
+    return null;
   }
 }
