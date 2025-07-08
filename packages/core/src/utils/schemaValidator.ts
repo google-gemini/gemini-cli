@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as Ajv from 'ajv';
+import Ajv, { type AnySchema } from 'ajv';
 
 interface GeminiSchema {
   type?: string;
@@ -24,9 +24,7 @@ interface GeminiSchema {
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
-  private static ajv = new (Ajv as unknown as new (options: {
-    allErrors: boolean;
-  }) => Ajv.default)({ allErrors: true });
+  private static ajv = new Ajv.default({ allErrors: true });
 
   /**
    * Converts Google Gemini Schema to standard JSON Schema format
@@ -134,7 +132,7 @@ export class SchemaValidator {
       // Convert Google Gemini schema format to standard JSON Schema
       const convertedSchema = this.convertGeminiSchema(schema);
 
-      const validate = this.ajv.compile(convertedSchema as Ajv.AnySchema);
+      const validate = this.ajv.compile(convertedSchema as AnySchema);
       const valid = validate(data);
 
       if (!valid && validate.errors) {
