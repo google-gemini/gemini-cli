@@ -4,10 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import Ajv from 'ajv';
+
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
+  private static ajv = new Ajv({ allErrors: true });
+
   /**
    * Validates data against a JSON schema
    * @param schema JSON Schema to validate against (can be undefined)
@@ -19,43 +23,33 @@ export class SchemaValidator {
       return null;
     }
 
-    // Convert schema to Record<string, unknown> if needed
-    const schemaObj = typeof schema === 'object' && schema !== null ? schema : {};
-
-    // This is a simplified implementation
-    // In a real application, you would use a library like Ajv for proper validation
-
-    // Check for required fields
-    if (schemaObj.required && Array.isArray(schemaObj.required)) {
-      const required = schemaObj.required as string[];
-      const dataObj = data as Record<string, unknown>;
-
-      for (const field of required) {
-        if (dataObj[field] === undefined) {
-          return `Missing required field: ${field}`;
+    try {
+      const validate = this.ajv.compile(schema);
+      const valid = validate(data);
+      
+      if (!valid && validate.errors) {
+        // Format errors to match expected test format
+        const error = validate.errors[0];
+        if (error.keyword === 'required') {
+          return `params must have required property '${error.params?.missingProperty}'`;
+        } else if (error.keyword === 'pattern') {
+          return `params${error.instancePath} must match pattern "${error.params?.pattern}"`;
+        } else if (error.keyword === 'minItems') {
+          return `params${error.instancePath} must NOT have fewer than ${error.params?.limit} items`;
+        } else if (error.keyword === 'minLength') {
+          return `params${error.instancePath} must NOT have fewer than ${error.params?.limit} characters`;
+        } else if (error.keyword === 'type') {
+          return `params${error.instancePath} must be ${error.params?.type}`;
         }
+        
+        // Fallback to general error message
+        return `params${error.instancePath} ${error.message}`;
       }
+      
+      return null;
+    } catch (error) {
+      // Handle schema compilation errors
+      return `Invalid schema: ${error}`;
     }
-
-    // Check property types if properties are defined
-    if (schemaObj.properties && typeof schemaObj.properties === 'object') {
-      const properties = schemaObj.properties as Record<string, { type?: string }>;
-      const dataObj = data as Record<string, unknown>;
-
-      for (const [key, prop] of Object.entries(properties)) {
-        if (dataObj[key] !== undefined && prop.type) {
-          const expectedType = prop.type;
-          const actualType = Array.isArray(dataObj[key])
-            ? 'array'
-            : typeof dataObj[key];
-
-          if (expectedType !== actualType) {
-            return `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`;
-          }
-        }
-      }
-    }
-
-    return null;
   }
 }
