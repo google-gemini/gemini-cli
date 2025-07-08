@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import Ajv from 'ajv';
+const Ajv = require('ajv');
 
 /**
  * Simple utility to validate objects against JSON Schemas
