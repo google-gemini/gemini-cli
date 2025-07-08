@@ -181,12 +181,10 @@ export async function handleAtCommand({
       return { processedQuery: null, shouldProceed: false };
     }
 
-    // Check if path should be ignored by git
-    if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
-      const reason = respectGitIgnore
-        ? 'git-ignored and will be skipped'
-        : 'ignored by custom patterns';
-      onDebugMessage(`Path ${pathName} is ${reason}.`);
+    // Check if path should be ignored based on filtering options
+    if (fileDiscovery.shouldIgnoreFile(pathName, { respectGitIgnore })) {
+      const reason = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
+      onDebugMessage(`Path ${pathName} is ${reason} and will be skipped.`);
       ignoredPaths.push(pathName);
       continue;
     }
@@ -349,7 +347,7 @@ export async function handleAtCommand({
 
   const toolArgs = {
     paths: pathSpecsToRead,
-    respectGitIgnore, // Use configuration setting
+    respect_git_ignore: respectGitIgnore, // Use configuration setting
   };
   let toolCallDisplay: IndividualToolCallDisplay;
 
