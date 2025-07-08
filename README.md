@@ -357,6 +357,23 @@ trust -p "Create a new file called config.json containing these settings: {...}"
 trust -p "Write to the filesystem: a shell script named deploy.sh that builds and deploys the app"
 ```
 
+**Advanced File Creation Commands:**
+```bash
+# Method 1: Direct tool reference (most explicit)
+trust -p "Use the Write tool to create analyze.py with pandas code for BankChurners.csv"
+
+# Method 2: Filesystem-specific verbs (clear intent)  
+trust -p "Save the following to disk as analyze.py: Python code that reads CSV files"
+
+# Method 3: Explicit file path (absolute clarity)
+trust -p "Create /home/user/analyze.py file containing Python pandas code"
+```
+
+**When to use each method:**
+- **Method 1** (Tool reference): When you need guaranteed file creation and the model isn't responding to other prompts
+- **Method 2** (Filesystem verbs): Best balance of clarity and natural language - recommended for most use cases
+- **Method 3** (Explicit paths): When working with specific directories or when relative paths might be ambiguous
+
 **Two-Step Instructions:**
 ```bash
 trust -p "I need you to: 1) Generate Python code for CSV analysis, and 2) Save it to analyze.py"
