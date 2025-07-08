@@ -1,6 +1,6 @@
 # Gemini CLI (Custom Fork)
 
-[![Gemini CLI CI](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml/badge.svg)](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml)
+[![Simplified CI](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml/badge.svg)](https://github.com/Icarus603/gemini-code/actions/workflows/ci.yml)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
