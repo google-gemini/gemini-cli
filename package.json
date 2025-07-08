@@ -50,6 +50,9 @@
   },
   "files": [
     "bundle/",
+    "scripts/",
+    "esbuild.config.js",
+    "packages/",
     "README.md",
     "LICENSE"
   ],
