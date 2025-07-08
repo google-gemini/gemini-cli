@@ -6,6 +6,7 @@
 
 import { GroundingMetadata } from '@google/genai';
 import { BaseTool, ToolResult } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 
 import { getErrorMessage } from '../utils/errors.js';
@@ -69,10 +70,10 @@ export class WebSearchTool extends BaseTool<
       'GoogleSearch',
       'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
       {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
           query: {
-            type: 'string',
+            type: Type.STRING,
             description: 'The search query to find information on the web.',
           },
         },
@@ -81,16 +82,17 @@ export class WebSearchTool extends BaseTool<
     );
   }
 
+  /**
+   * Validates the parameters for the WebSearchTool.
+   * @param params The parameters to validate
+   * @returns An error message string if validation fails, null if valid
+   */
   validateParams(params: WebSearchToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return "Parameters failed schema validation. Ensure 'query' is a string.";
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
+
     if (!params.query || params.query.trim() === '') {
       return "The 'query' parameter cannot be empty.";
     }
@@ -105,7 +107,7 @@ export class WebSearchTool extends BaseTool<
     params: WebSearchToolParams,
     signal: AbortSignal,
   ): Promise<WebSearchToolResult> {
-    const validationError = this.validateParams(params);
+    const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
         llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
