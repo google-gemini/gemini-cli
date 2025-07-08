@@ -892,29 +892,6 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('/mcp command', () => {
-    // beforeEach(() => {
-    //   // Mock the core module with getMCPServerStatus and getMCPDiscoveryState
-    //   vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-    //     const actual = await importOriginal();
-    //     return {
-    //       ...actual,
-    //       Logger: MockLogger,
-    //       MCPServerStatus: {
-    //         CONNECTED: 'connected',
-    //         CONNECTING: 'connecting',
-    //         DISCONNECTED: 'disconnected',
-    //       },
-    //       MCPDiscoveryState: {
-    //         NOT_STARTED: 'not_started',
-    //         IN_PROGRESS: 'in_progress',
-    //         COMPLETED: 'completed',
-    //       },
-    //       getMCPServerStatus: vi.fn(),
-    //       getMCPDiscoveryState: vi.fn(),
-    //     };
-    //   });
-    // });
-
     it('should show an error if tool registry is not available', async () => {
       mockConfig = {
         ...mockConfig,
@@ -1390,7 +1367,6 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('/chat save', () => {
-
     it('should save conversation with valid tag', async () => {
       const validTag = 'valid_tag-123';
       const mockHistory = [{ role: 'user', parts: [{ text: 'Hello' }] }];
