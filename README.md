@@ -25,21 +25,20 @@ With this custom Gemini CLI you can:
 
 1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
 
-2. **Run the Custom CLI:** Execute the following command in your terminal:
+2. **Install and Run:** Choose one of these methods:
 
+   **Method 1: Direct installation (Recommended)**
    ```bash
-   npx https://github.com/Icarus603/gemini-code
-   ```
-
-   Or install it globally:
-
-   ```bash
-   npm install -g https://github.com/Icarus603/gemini-code
+   npm install -g @icarus603/gemini-code
    gemini
    ```
 
-   For local development:
+   **Method 2: Run without installing**
+   ```bash
+   npx @icarus603/gemini-code
+   ```
 
+   **Method 3: Development mode**
    ```bash
    git clone https://github.com/Icarus603/gemini-code.git
    cd gemini-code
@@ -53,6 +52,14 @@ With this custom Gemini CLI you can:
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
 You are now ready to use the custom Gemini CLI!
+
+### What's Different?
+
+This is a customized version of Google's official Gemini CLI with the following enhancements:
+- Rebranded as "gemini-code" for development-focused use
+- Improved tool schema validation
+- Enhanced error messages
+- All the original Gemini CLI features you love
 
 ### Use a Gemini API key:
 
