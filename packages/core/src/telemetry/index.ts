@@ -49,7 +49,14 @@ export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-export * from './uiTelemetry.js';
+export {
+  uiTelemetryService,
+  SessionMetrics,
+  ModelMetrics,
+  ToolCallStats,
+  UiTelemetryService,
+  UiEvent,
+} from './uiTelemetry.js';
 export {
   // Core metrics functions
   recordToolCallMetrics,
