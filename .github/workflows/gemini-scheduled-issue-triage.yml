@@ -8,6 +8,7 @@ on:
 jobs:
   triage-issues:
     timeout-minutes: 10
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
