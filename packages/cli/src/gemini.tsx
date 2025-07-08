@@ -222,7 +222,8 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    const windowTitle = process.env.CLI_TITLE || `Gemini - ${title}`;
+    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
