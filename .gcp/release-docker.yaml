@@ -34,8 +34,8 @@ steps:
         else
           echo "Development/RC release detected. Using commit SHA as tag."
         fi
-        echo "Determined image tag: $FINAL_TAG"
-        echo "$FINAL_TAG" > /workspace/image_tag.txt
+        echo "Determined image tag: $$FINAL_TAG"
+        echo "$$FINAL_TAG" > /workspace/image_tag.txt
 
   # Step 7: Build sandbox container image
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
@@ -44,8 +44,8 @@ steps:
     args:
       - -c
       - |
-        export GEMINI_SANDBOX_IMAGE_TAG=$(cat /workspace/image_tag.txt)
-        echo "Using Docker image tag for build: $GEMINI_SANDBOX_IMAGE_TAG"
+        export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
+        echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
         npm run build:sandbox:fast
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
@@ -57,8 +57,8 @@ steps:
     args:
       - -c
       - |
-        export GEMINI_SANDBOX_IMAGE_TAG=$(cat /workspace/image_tag.txt)
-        echo "Using Docker image tag for publish: $GEMINI_SANDBOX_IMAGE_TAG"
+        export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
+        echo "Using Docker image tag for publish: $$GEMINI_SANDBOX_IMAGE_TAG"
         npm run publish:sandbox
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
