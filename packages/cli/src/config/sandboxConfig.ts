@@ -14,7 +14,7 @@ import { Settings } from './settings.js';
 // to avoid circular dependencies.
 interface SandboxCliArgs {
   sandbox?: boolean | string;
-  'sandbox-image'?: string;
+  sandboxImage?: string;
 }
 
 const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
@@ -99,7 +99,7 @@ export async function loadSandboxConfig(
 
   const packageJson = await getPackageJson();
   const image =
-    argv['sandbox-image'] ??
+    argv.sandboxImage ??
     process.env.GEMINI_SANDBOX_IMAGE ??
     packageJson?.config?.sandboxImageUri;
 

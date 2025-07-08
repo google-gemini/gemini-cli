@@ -62,8 +62,8 @@ describe('loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set showMemoryUsage to true when --memory flag is present', async () => {
-    process.argv = ['node', 'script.js', '--show_memory_usage'];
+  it('should set showMemoryUsage to true when --show-memory-usage flag is present', async () => {
+    process.argv = ['node', 'script.js', '--show-memory-usage'];
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
@@ -84,7 +84,7 @@ describe('loadCliConfig', () => {
   });
 
   it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
-    process.argv = ['node', 'script.js', '--show_memory_usage'];
+    process.argv = ['node', 'script.js', '--show-memory-usage'];
     const settings: Settings = { showMemoryUsage: false };
     const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
