@@ -308,7 +308,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const nextQuery = reverseSearchQuery.slice(0, -1);
               setReverseSearchQuery(nextQuery);
               const match = shellHistory.getMatchingCommand(nextQuery);
-              buffer.setText(match !== null ? match : reverseSearchQuery);
+              buffer.setText(match !== null ? match : nextQuery);
               return;
             }
 
