@@ -103,6 +103,14 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
+  if (config.getListExtensions()) {
+    console.log('Installed extensions:');
+    for (const extension of extensions) {
+      console.log(`- ${extension.config.name}`);
+    }
+    process.exit(0);
+  }
+
   // Set a default auth type if one isn't set for a couple of known cases.
   if (!settings.merged.selectedAuthType) {
     if (process.env.GEMINI_API_KEY) {
@@ -214,7 +222,12 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+      // eslint-disable-next-line no-control-regex
+      /[\x00-\x1F\x7F]/g,
+      '',
+    );
+    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
