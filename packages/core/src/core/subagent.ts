@@ -230,18 +230,18 @@ export class SubAgentScope {
       await this.runtimeContext.getToolRegistry();
 
     // Prepare the list of tools available to the subagent.
-    const tools_to_load: string[] = [];
+    const toolsToLoad: string[] = [];
     const toolsList: FunctionDeclaration[] = [];
     for (const toolName of this.promptConfig.tools) {
       if (typeof toolName === 'string') {
-        tools_to_load.push(toolName);
+        toolsToLoad.push(toolName);
       } else {
         toolsList.push(toolName);
       }
     }
 
     toolsList.push(
-      ...toolRegistry.getFunctionDeclarationsFiltered(tools_to_load),
+      ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
     );
     toolsList.push(...this.getScopeLocalFuncDefs());
 
@@ -352,7 +352,7 @@ export class SubAgentScope {
       let toolResponse;
 
       // Handle scope-local tools first.
-      if (callId.startsWith('self.emitvalue')) {
+      if (functionCall.name === 'self.emitvalue') {
         const valName = String(requestInfo.args['emit_variable_name']);
         const valVal = String(requestInfo.args['emit_variable_value']);
         this.output.emitted_vars[valName] = valVal;
@@ -392,6 +392,12 @@ export class SubAgentScope {
           }
         }
       }
+    }
+    // If all tool calls failed, inform the model so it can re-evaluate.
+    if (functionCalls.length > 0 && toolResponseParts.length === 0) {
+      toolResponseParts.push({
+        text: 'All tool calls failed. Please analyze the errors, review the plan, and try an alternative approach.',
+      });
     }
     currentMessages = [{ role: 'user', parts: toolResponseParts }];
     return currentMessages;
