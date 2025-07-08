@@ -28,14 +28,15 @@ export async function getEffectiveModel(
 
   const modelToTest = DEFAULT_GEMINI_MODEL;
   const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToTest}:generateContent?key=${apiKey}`;
+  const baseUrl = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com';
+  const endpoint = `${baseUrl}/v1beta/models/${modelToTest}:generateContent`;
   const body = JSON.stringify({
     contents: [{ parts: [{ text: 'test' }] }],
     generationConfig: {
       maxOutputTokens: 1,
       temperature: 0,
       topK: 1,
-      thinkingConfig: { thinkingBudget: 0, includeThoughts: false },
+      thinkingConfig: { thinkingBudget: 256, includeThoughts: false },
     },
   });
 
@@ -45,7 +46,7 @@ export async function getEffectiveModel(
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': `${apiKey}` },
       body,
       signal: controller.signal,
     });

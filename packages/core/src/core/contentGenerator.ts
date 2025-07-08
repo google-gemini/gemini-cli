@@ -80,7 +80,6 @@ export async function createContentGeneratorConfig(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
     );
-
     return contentGeneratorConfig;
   }
 
@@ -106,6 +105,7 @@ export async function createContentGenerator(
     headers: {
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
+    baseUrl: process.env.GEMINI_BASE_URL,
   };
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
