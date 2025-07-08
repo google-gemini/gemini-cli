@@ -244,7 +244,7 @@ export class SubAgentScope {
     );
     toolsList.push(...this.getScopeLocalFuncDefs());
 
-    chat.setSystemInstruction(this.buildChatSystemPrompt(context, toolsList));
+    chat.setSystemInstruction(this.buildChatSystemPrompt(context));
 
     let currentMessages: Content[] = [
       { role: 'user', parts: [{ text: 'Get Started!' }] },
@@ -496,13 +496,9 @@ export class SubAgentScope {
    * Builds the system prompt for the chat, incorporating the subagent's plan, goals, and available tools.
    * This prompt is intentionally different from the main agent's prompt to allow for scoped work with specific tools or personas.
    * @param {ContextState} context - The current context state containing variables for prompt templating.
-   * @param {FunctionDeclaration[]} toolsList - An array of `FunctionDeclaration` objects representing the tools available to the subagent.
    * @returns {string} The complete system prompt for the chat.
    */
-  private buildChatSystemPrompt(
-    context: ContextState,
-    toolsList: FunctionDeclaration[],
-  ): string {
+  private buildChatSystemPrompt(context: ContextState): string {
     const templated_plan = templateString(this.promptConfig.plan, context);
     let templated_goals = templateString(this.promptConfig.goals, context);
 
@@ -512,11 +508,6 @@ export class SubAgentScope {
     }
 
     const input = `You are an expert AI that takes on all sorts of roles to accomplish tasks for the user. You will continue to iterate, and call tools until the goals are complete. 
-
-Here are the tools you have access to, for this session, to solve the goals:
-<TOOLS>
-${JSON.stringify(toolsList)}
-</TOOLS>
     
 Below is your plan or persona for this session:
 <THE_PLAN>
