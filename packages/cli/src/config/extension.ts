@@ -31,19 +31,17 @@ export function loadExtensions(workspaceDir: string): Extension[] {
     ...loadExtensionsFromDir(os.homedir()),
   ];
 
-  const uniqueExtensions: Extension[] = [];
-  const seenNames = new Set<string>();
+  const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
-    if (!seenNames.has(extension.config.name)) {
+    if (!uniqueExtensions.has(extension.config.name)) {
       console.log(
         `Loading extension: ${extension.config.name} (version: ${extension.config.version})`,
       );
-      uniqueExtensions.push(extension);
-      seenNames.add(extension.config.name);
+      uniqueExtensions.set(extension.config.name, extension);
     }
   }
 
-  return uniqueExtensions;
+  return Array.from(uniqueExtensions.values());
 }
 
 function loadExtensionsFromDir(dir: string): Extension[] {
@@ -113,4 +111,49 @@ function getContextFileNames(config: ExtensionConfig): string[] {
     return [config.contextFileName];
   }
   return config.contextFileName;
+}
+
+export function filterActiveExtensions(
+  extensions: Extension[],
+  enabledExtensionNames: string[],
+): Extension[] {
+  if (enabledExtensionNames.length === 0) {
+    return extensions;
+  }
+
+  const lowerCaseEnabledExtensions = new Set(
+    enabledExtensionNames.map((e) => e.trim().toLowerCase()),
+  );
+
+  if (
+    lowerCaseEnabledExtensions.size === 1 &&
+    lowerCaseEnabledExtensions.has('none')
+  ) {
+    if (extensions.length > 0) {
+      console.log('All extensions are disabled.');
+    }
+    return [];
+  }
+
+  const activeExtensions: Extension[] = [];
+  const notFoundNames = new Set(lowerCaseEnabledExtensions);
+
+  for (const extension of extensions) {
+    const lowerCaseName = extension.config.name.toLowerCase();
+    if (lowerCaseEnabledExtensions.has(lowerCaseName)) {
+      console.log(
+        `Activated extension: ${extension.config.name} (version: ${extension.config.version})`,
+      );
+      activeExtensions.push(extension);
+      notFoundNames.delete(lowerCaseName);
+    } else {
+      console.log(`Disabled extension: ${extension.config.name}`);
+    }
+  }
+
+  for (const requestedName of notFoundNames) {
+    console.log(`Extension not found: ${requestedName}`);
+  }
+
+  return activeExtensions;
 }

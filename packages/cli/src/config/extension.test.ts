@@ -11,6 +11,7 @@ import * as path from 'path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   EXTENSIONS_DIRECTORY_NAME,
+  filterActiveExtensions,
   loadExtensions,
 } from './extension.js';
 
@@ -82,6 +83,47 @@ describe('loadExtensions', () => {
     expect(ext1?.contextFiles).toEqual([
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
+  });
+});
+
+describe('filterActiveExtensions', () => {
+  const extensions = [
+    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+  ];
+
+  it('should return all extensions if no enabled extensions are provided', () => {
+    const activeExtensions = filterActiveExtensions(extensions, []);
+    expect(activeExtensions).toHaveLength(3);
+  });
+
+  it('should return only the enabled extensions', () => {
+    const activeExtensions = filterActiveExtensions(extensions, [
+      'ext1',
+      'ext3',
+    ]);
+    expect(activeExtensions).toHaveLength(2);
+    expect(activeExtensions.some((e) => e.config.name === 'ext1')).toBe(true);
+    expect(activeExtensions.some((e) => e.config.name === 'ext3')).toBe(true);
+  });
+
+  it('should return no extensions when "none" is provided', () => {
+    const activeExtensions = filterActiveExtensions(extensions, ['none']);
+    expect(activeExtensions).toHaveLength(0);
+  });
+
+  it('should handle case-insensitivity', () => {
+    const activeExtensions = filterActiveExtensions(extensions, ['EXT1']);
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].config.name).toBe('ext1');
+  });
+
+  it('should log an error for unknown extensions', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    filterActiveExtensions(extensions, ['ext4']);
+    expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
+    consoleSpy.mockRestore();
   });
 });
 
