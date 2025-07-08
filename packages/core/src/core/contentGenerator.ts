@@ -54,7 +54,7 @@ export async function createContentGeneratorConfig(
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
+  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT_ID;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
