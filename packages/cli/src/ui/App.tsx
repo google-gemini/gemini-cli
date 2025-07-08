@@ -265,6 +265,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleSlashCommand,
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
+    commandContext,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -278,7 +279,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
     setQuittingMessages,
@@ -310,6 +310,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     stdin,
     setRawMode,
     isValidPath,
+    shellModeActive,
   });
 
   const handleExit = useCallback(
@@ -325,9 +326,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         const quitCommand = slashCommands.find(
           (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
         );
-        if (quitCommand) {
-          quitCommand.action('quit', '', '');
+        if (quitCommand && quitCommand.action) {
+          quitCommand.action(commandContext, '');
         } else {
+          // This is unlikely to be needed but added for an additional fallback.
           process.exit(0);
         }
       } else {
@@ -338,7 +340,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         }, CTRL_EXIT_PROMPT_DURATION_MS);
       }
     },
-    [slashCommands],
+    // Add commandContext to the dependency array here!
+    [slashCommands, commandContext],
   );
 
   useInput((input: string, key: InkKeyType) => {
@@ -567,6 +570,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
+        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
+        {updateMessage && <UpdateNotification message={updateMessage} />}
+
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -584,7 +590,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             <Box flexDirection="column" key="header">
               <Header terminalWidth={terminalWidth} />
               {!settings.merged.hideTips && <Tips config={config} />}
-              {updateMessage && <UpdateNotification message={updateMessage} />}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -749,14 +754,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
               {showErrorDetails && (
                 <OverflowProvider>
-                  <DetailedMessagesDisplay
-                    messages={filteredConsoleMessages}
-                    maxHeight={
-                      constrainHeight ? debugConsoleMaxHeight : undefined
-                    }
-                    width={inputWidth}
-                  />
-                  <ShowMoreLines constrainHeight={constrainHeight} />
+                  <Box flexDirection="column">
+                    <DetailedMessagesDisplay
+                      messages={filteredConsoleMessages}
+                      maxHeight={
+                        constrainHeight ? debugConsoleMaxHeight : undefined
+                      }
+                      width={inputWidth}
+                    />
+                    <ShowMoreLines constrainHeight={constrainHeight} />
+                  </Box>
                 </OverflowProvider>
               )}
 
@@ -770,6 +777,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
+                  commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                 />

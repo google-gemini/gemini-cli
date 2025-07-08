@@ -29,9 +29,20 @@ export function AuthDialog({
   const items = [
     {
       label: 'Login with Google',
-      value: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      value: AuthType.LOGIN_WITH_GOOGLE,
     },
-    { label: 'Gemini API Key (AI Studio)', value: AuthType.USE_GEMINI },
+    ...(process.env.CLOUD_SHELL === 'true'
+      ? [
+          {
+            label: 'Use Cloud Shell user credentials',
+            value: AuthType.CLOUD_SHELL,
+          },
+        ]
+      : []),
+    {
+      label: 'Use Gemini API Key',
+      value: AuthType.USE_GEMINI,
+    },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
@@ -55,6 +66,11 @@ export function AuthDialog({
 
   useInput((_input, key) => {
     if (key.escape) {
+      // Prevent exit if there is an error message.
+      // This means they user is not authenticated yet.
+      if (errorMessage) {
+        return;
+      }
       if (settings.merged.selectedAuthType === undefined) {
         // Prevent exiting if no auth method is set
         setErrorMessage(
