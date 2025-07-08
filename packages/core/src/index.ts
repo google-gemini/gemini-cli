@@ -32,6 +32,7 @@ export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/editor.js';
+export * from './utils/secureLogging.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

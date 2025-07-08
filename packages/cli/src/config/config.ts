@@ -17,22 +17,15 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  createSecureLogger,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
-
 import { Extension } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
-// Simple console logger for now - replace with actual logger if available
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR]', ...args),
-};
+// Secure logger that redacts sensitive information like API keys
+const logger = createSecureLogger(process.env.DEBUG === '1');
 
 interface CliArgs {
   model: string | undefined;
