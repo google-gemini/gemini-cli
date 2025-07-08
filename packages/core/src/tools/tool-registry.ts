@@ -154,8 +154,6 @@ export class ToolRegistry {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
-      } else {
-        // Keep manually registered tools
       }
     }
 

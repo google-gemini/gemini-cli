@@ -82,6 +82,40 @@ describe('AuthDialog', () => {
     unmount();
   });
 
+  it('should not exit if there is already an error message', async () => {
+    const onSelect = vi.fn();
+    const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
+      {
+        settings: {},
+        path: '',
+      },
+      [],
+    );
+
+    const { lastFrame, stdin, unmount } = render(
+      <AuthDialog
+        onSelect={onSelect}
+        settings={settings}
+        initialErrorMessage="Initial error"
+      />,
+    );
+    await wait();
+
+    expect(lastFrame()).toContain('Initial error');
+
+    // Simulate pressing escape key
+    stdin.write('\u001b'); // ESC key
+    await wait();
+
+    // Should not call onSelect
+    expect(onSelect).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should allow exiting when auth method is already selected', async () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(

@@ -20,7 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings, setSystemSettingsPath } from './settings.js';
 
-import { Extension } from './extension.js';
+import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
@@ -49,11 +49,18 @@ interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   'allowed-mcp-server-names': string | undefined;
+  extensions: string[] | undefined;
+  listExtensions: boolean | undefined;
   'system-settings-path': string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
   const argv = await yargs(hideBin(process.argv))
+    .scriptName('gemini')
+    .usage(
+      '$0 [options]',
+      'Gemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+    )
     .option('model', {
       alias: 'm',
       type: 'string',
@@ -129,6 +136,18 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: 'Allowed MCP server names',
     })
+    .option('extensions', {
+      alias: 'e',
+      type: 'array',
+      string: true,
+      description:
+        'A list of extensions to use. If not provided, all extensions are used.',
+    })
+    .option('list-extensions', {
+      alias: 'l',
+      type: 'boolean',
+      description: 'List all available extensions and exit.',
+    })
     .option('system-settings-path', {
       type: 'string',
       description: 'Path to system settings file.',
@@ -174,6 +193,11 @@ export async function loadCliConfig(
   const argv = await parseArguments();
   const debugMode = argv.debug || false;
 
+  const activeExtensions = filterActiveExtensions(
+    extensions,
+    argv.extensions || [],
+  );
+
   if (argv['system-settings-path']) {
     setSystemSettingsPath(argv['system-settings-path']);
   }
@@ -189,7 +213,9 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
+  const extensionContextFilePaths = activeExtensions.flatMap(
+    (e) => e.contextFiles,
+  );
 
   const fileService = new FileDiscoveryService(process.cwd());
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
@@ -200,8 +226,8 @@ export async function loadCliConfig(
     extensionContextFilePaths,
   );
 
-  let mcpServers = mergeMcpServers(settings, extensions);
-  const excludeTools = mergeExcludeTools(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, activeExtensions);
+  const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
   if (argv['allowed-mcp-server-names']) {
     const allowedNames = new Set(
@@ -266,6 +292,11 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    listExtensions: argv.listExtensions || false,
+    activeExtensions: activeExtensions.map((e) => ({
+      name: e.config.name,
+      version: e.config.version,
+    })),
   });
 }
 

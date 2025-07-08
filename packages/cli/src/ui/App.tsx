@@ -265,6 +265,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleSlashCommand,
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
+    commandContext,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -278,7 +279,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
     setQuittingMessages,
@@ -326,9 +326,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         const quitCommand = slashCommands.find(
           (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
         );
-        if (quitCommand) {
-          quitCommand.action('quit', '', '');
+        if (quitCommand && quitCommand.action) {
+          quitCommand.action(commandContext, '');
         } else {
+          // This is unlikely to be needed but added for an additional fallback.
           process.exit(0);
         }
       } else {
@@ -339,7 +340,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         }, CTRL_EXIT_PROMPT_DURATION_MS);
       }
     },
-    [slashCommands],
+    // Add commandContext to the dependency array here!
+    [slashCommands, commandContext],
   );
 
   useInput((input: string, key: InkKeyType) => {
@@ -775,6 +777,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
+                  commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                 />
