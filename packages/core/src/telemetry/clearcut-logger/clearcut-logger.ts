@@ -175,7 +175,7 @@ export class ClearcutLogger {
       });
   }
 
-  private handleFlushError(error: unknown): void {
+  private handleFlushError(_error: unknown): void {
     this.consecutive_failures++;
     this.last_failure_time = Date.now();
 

@@ -6,23 +6,37 @@
 
 import * as Ajv from 'ajv';
 
+interface GeminiSchema {
+  type?: string;
+  minLength?: string | number;
+  maxLength?: string | number;
+  minItems?: string | number;
+  maxItems?: string | number;
+  minimum?: string | number;
+  maximum?: string | number;
+  properties?: Record<string, GeminiSchema>;
+  items?: GeminiSchema;
+  additionalProperties?: GeminiSchema | boolean;
+  [key: string]: unknown;
+}
+
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
-  private static ajv = new (Ajv as any)({ allErrors: true });
+  private static ajv = new (Ajv as unknown as new (options: { allErrors: boolean }) => Ajv.default)({ allErrors: true });
 
   /**
    * Converts Google Gemini Schema to standard JSON Schema format
    * @param schema The schema to convert
    * @returns Converted schema
    */
-  private static convertGeminiSchema(schema: any): any {
+  private static convertGeminiSchema(schema: GeminiSchema | unknown): GeminiSchema {
     if (!schema || typeof schema !== 'object') {
-      return schema;
+      return schema as GeminiSchema;
     }
 
-    const converted = { ...schema };
+    const converted = { ...(schema as GeminiSchema) };
 
     // Convert Google Gemini type names to standard JSON Schema types
     if (converted.type) {
@@ -45,7 +59,9 @@ export class SchemaValidator {
         case 'INTEGER':
           converted.type = 'integer';
           break;
-        // Keep other types as-is for standard JSON Schema compatibility
+        default:
+          // Keep other types as-is for standard JSON Schema compatibility
+          break;
       }
     }
 
@@ -73,10 +89,10 @@ export class SchemaValidator {
     if (converted.properties) {
       converted.properties = Object.keys(converted.properties).reduce(
         (acc, key) => {
-          acc[key] = this.convertGeminiSchema(converted.properties[key]);
+          acc[key] = this.convertGeminiSchema(converted.properties![key]);
           return acc;
         },
-        {} as any,
+        {} as Record<string, GeminiSchema>,
       );
     }
 
@@ -102,7 +118,7 @@ export class SchemaValidator {
    * @param data Data to validate
    * @returns null if valid, error message string if invalid
    */
-  static validate(schema: any, data: unknown): string | null {
+  static validate(schema: GeminiSchema | unknown, data: unknown): string | null {
     if (!schema) {
       return null;
     }
@@ -111,7 +127,7 @@ export class SchemaValidator {
       // Convert Google Gemini schema format to standard JSON Schema
       const convertedSchema = this.convertGeminiSchema(schema);
 
-      const validate = this.ajv.compile(convertedSchema);
+      const validate = this.ajv.compile(convertedSchema as Ajv.AnySchema);
       const valid = validate(data);
 
       if (!valid && validate.errors) {
