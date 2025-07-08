@@ -5,6 +5,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { AuthClient } from '../auth/authClient.js';
 import {
   describe,
   it,
@@ -169,6 +170,86 @@ describe('DiscoveredMCPTool', () => {
       mockCallTool.mockRejectedValue(expectedError);
 
       await expect(tool.execute(params)).rejects.toThrow(expectedError);
+    });
+
+    it('should get and apply auth headers if authClient is provided', async () => {
+      const mockAuthClient: AuthClient = {
+        getHeaders: vi
+          .fn()
+          .mockResolvedValue({ Authorization: 'Bearer fresh-token' }),
+      };
+
+      const headers = { 'X-Initial-Header': 'initial-value' };
+
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        undefined,
+        false,
+        mockAuthClient,
+        headers,
+      );
+
+      const params = { param: 'authValue' };
+      mockCallTool.mockResolvedValue([]);
+
+      await tool.execute(params);
+
+      expect(mockAuthClient.getHeaders).toHaveBeenCalledTimes(1);
+      expect(headers).toEqual({
+        'X-Initial-Header': 'initial-value',
+        Authorization: 'Bearer fresh-token',
+      });
+    });
+
+    it('should refresh auth token on every call', async () => {
+      const mockAuthClient: AuthClient = {
+        getHeaders: vi.fn(),
+      };
+
+      const headers = { 'X-Initial-Header': 'initial-value' };
+
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        undefined,
+        false,
+        mockAuthClient,
+        headers,
+      );
+
+      const params = { param: 'authValue' };
+      mockCallTool.mockResolvedValue([]);
+
+      // First call
+      vi.mocked(mockAuthClient.getHeaders).mockResolvedValueOnce({
+        Authorization: 'Bearer first-token',
+      });
+      await tool.execute(params);
+      expect(mockAuthClient.getHeaders).toHaveBeenCalledTimes(1);
+      expect(headers).toEqual({
+        'X-Initial-Header': 'initial-value',
+        Authorization: 'Bearer first-token',
+      });
+
+      // Second call
+      vi.mocked(mockAuthClient.getHeaders).mockResolvedValueOnce({
+        Authorization: 'Bearer second-token',
+      });
+      await tool.execute(params);
+      expect(mockAuthClient.getHeaders).toHaveBeenCalledTimes(2);
+      expect(headers).toEqual({
+        'X-Initial-Header': 'initial-value',
+        Authorization: 'Bearer second-token',
+      });
     });
   });
 

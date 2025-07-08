@@ -6,6 +6,7 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
+import { AuthProvider } from '../auth/authProvider.js';
 import {
   AuthType,
   ContentGeneratorConfig,
@@ -88,6 +89,7 @@ export class MCPServerConfig {
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
+    readonly oauth?: AuthProvider,
     // Metadata
     readonly description?: string,
     readonly includeTools?: string[],
