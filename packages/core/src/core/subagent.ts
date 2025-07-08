@@ -10,7 +10,7 @@ import { Config } from '../config/config.js';
 import { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
 import { createContentGenerator } from './contentGenerator.js';
-import { getFolderStructure } from '../utils/getFolderStructure.js';
+import { getEnvironmentContext } from '../utils/environmentContext.js';
 import {
   Content,
   Part,
@@ -20,7 +20,6 @@ import {
   Type,
 } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 
 /**
  * @fileoverview Defines the configuration interfaces for a subagent.
@@ -410,7 +409,7 @@ export class SubAgentScope {
    * @returns {Promise<GeminiChat | undefined>} A promise that resolves to a `GeminiChat` instance, or undefined if creation fails.
    */
   private async createChatObject(extraHistory?: Content[]) {
-    const envParts = await this.getEnvironment();
+    const envParts = await getEnvironmentContext(this.runtimeContext);
     const initialHistory: Content[] = [
       {
         role: 'user',
@@ -461,72 +460,6 @@ export class SubAgentScope {
       // The calling function will handle the undefined return.
       return undefined;
     }
-  }
-
-  /**
-   * Retrieves environment-related information to be included in the chat context.
-   * This includes the current working directory, date, operating system, and folder structure.
-   * Optionally, it can also include the full file context if enabled.
-   * @returns A promise that resolves to an array of `Part` objects containing environment information.
-   */
-  private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.runtimeContext.getWorkingDir();
-    const today = new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.runtimeContext.getFileService(),
-    });
-    const context = `
-  Okay, just setting up the context for our chat.
-  Today is ${today}.
-  My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
-  ${folderStructure}
-          `.trim();
-
-    const initialParts: Part[] = [{ text: context }];
-    const toolRegistry = await this.runtimeContext.getToolRegistry();
-
-    // Add full file context if the flag is set
-    if (this.runtimeContext.getFullContext()) {
-      try {
-        const readManyFilesTool = toolRegistry.getTool(
-          'read_many_files',
-        ) as ReadManyFilesTool;
-        if (readManyFilesTool) {
-          // Read all files in the target directory
-          const result = await readManyFilesTool.execute(
-            {
-              paths: ['**/*'], // Read everything recursively
-              useDefaultExcludes: true, // Use default excludes
-            },
-            AbortSignal.timeout(30000),
-          );
-          if (result.llmContent) {
-            initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
-            });
-          } else {
-            console.warn(
-              'Full context requested, but read_many_files returned no content.',
-            );
-          }
-        }
-      } catch (error) {
-        // This error is logged but doesn't halt the process, as full context is optional.
-        console.error('Error reading full file context:', error);
-        initialParts.push({
-          text: '\n--- Error reading full file context ---',
-        });
-      }
-    }
-
-    return initialParts;
   }
 
   /**
