@@ -13,6 +13,10 @@ const LOG_FILE_NAME = 'logs.json';
 
 export enum MessageSenderType {
   USER = 'user',
+  INFO = 'info',
+  ERROR = 'error',
+  WARN = 'warn',
+  DEBUG = 'debug',
 }
 
 export interface LogEntry {
@@ -292,5 +296,26 @@ export class Logger {
     this.logs = [];
     this.sessionId = undefined;
     this.messageId = 0;
+  }
+
+  info(message: string): Promise<void> {
+    return this.logMessage(MessageSenderType.INFO, message);
+  }
+
+  error(message: string): Promise<void> {
+    return this.logMessage(MessageSenderType.ERROR, message);
+  }
+
+  warn(message: string): Promise<void> {
+    return this.logMessage(MessageSenderType.WARN, message);
+  }
+
+  debug(message: string): Promise<void> {
+    return this.logMessage(MessageSenderType.DEBUG, message);
+  }
+
+  clear(): void {
+    this.logs = [];
+    // Optionally, clear the log file as well, but for now, just in-memory
   }
 }

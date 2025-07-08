@@ -3,7 +3,7 @@ const path = require('path');
 const esbuild = require('esbuild');
 
 const config = {
-  entryPoints: ['packages/cli/src/index.ts'], // Adjust if entry point is different
+  entryPoints: ['packages/cli/src/gemini.tsx'], // Adjust if entry point is different
   bundle: true,
   outfile: 'dist/cli.js', // Adjust output path as needed
   platform: 'node',
@@ -15,9 +15,16 @@ const config = {
     '.ts': 'ts',
     '.tsx': 'tsx',
   },
-  banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  alias: {
+    '@google/gemini-cli-core': path.resolve(__dirname, 'packages/core/src'),
   },
+  external: [
+    '@oclif/core',
+    'colorama',
+    'spdx-license-ids',
+    'spdx-license-ids/deprecated',
+    'spdx-exceptions',
+  ],
 };
 
 esbuild.build(config).catch(() => process.exit(1));

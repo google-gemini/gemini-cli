@@ -2,9 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
+    "allowJs": true,
+    "checkJs": true,
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "types": ["node", "vitest/globals"],
+    "allowImportingTsExtensions": true,
+    "noEmit": false,
     "paths": {
       "@google/gemini-cli-core": ["../core/src"],
       "@google/gemini-cli-core/*": ["../core/src/*"]

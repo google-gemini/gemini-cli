@@ -38,7 +38,7 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
-    "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
+    "bundle": "npm run generate && node esbuild.config.cjs && node scripts/copy_bundle_assets.js",
     "build:cli": "npm run build --workspace packages/cli",
     "build:core": "npm run build --workspace packages/core",
     "build:packages": "npm run build:core && npm run build:cli",

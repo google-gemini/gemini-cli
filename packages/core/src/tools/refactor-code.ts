@@ -7,7 +7,7 @@
 import * as ts from 'typescript';
 import * as Diff from 'diff';
 import { Logger } from '../core/logger.js';
-import { readFile, writeFile } from './file-system.js'; // Assuming these are available or will be created
+import { promises as fsPromises } from 'fs';
 
 interface RefactorCodeParams {
   filePath: string;
@@ -25,7 +25,7 @@ export async function refactorCode(
   );
 
   try {
-    const fileContent = await readFile(params.filePath);
+    const fileContent = await fsPromises.readFile(params.filePath, 'utf8');
     const sourceFile = ts.createSourceFile(
       params.filePath,
       fileContent,

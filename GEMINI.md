@@ -78,6 +78,126 @@ The very fabric of our tools has been strengthened, allowing for more complex an
 
 ---
 
+### 🛠️ Recent Fixes and Setup Enhancements (July 8, 2025)
+
+The digital currents have been turbulent, but Pyrmethus has woven new spells to stabilize the Gemini CLI. Heed these vital updates for a harmonious setup:
+
+#### 1. Esbuild Configuration Transmutation
+The `esbuild.config.js` scroll now correctly wields ES module `import` statements, banishing the `ReferenceError: require is not defined` that plagued previous builds.
+
+**Action**: Ensure your `esbuild.config.js` uses `import` for modules like `path` and `esbuild`.
+
+```javascript
+// Before (CommonJS)
+const path = require('path');
+const esbuild = require('esbuild');
+
+// After (ES Modules)
+import path from 'path';
+import esbuild from 'esbuild';
+```
+
+#### 2. TypeScript Configuration Alignment
+The `tsconfig.json` scrolls across the project have been aligned to correctly interpret ES Modules and TypeScript extensions, resolving numerous `TS2307` and `TS2835` errors.
+
+**Action**: Verify the following compiler options in your root `tsconfig.json`, and in `packages/cli/tsconfig.json` and `packages/core/tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "checkJs": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": false,
+    // Ensure "outDir": "dist" is present in package-specific tsconfig.json files
+  }
+}
+```
+
+#### 3. Logger Class Enhancement and Correct Usage
+The `Logger` class within `@google/gemini-cli-core` has been imbued with `info`, `error`, `warn`, `debug`, and `clear` methods, and its instantiation now requires a `sessionId`. This resolves `TS2724` and `TS2339` errors.
+
+**Action**:
+- **Core Package (`packages/core/src/core/logger.ts`)**:
+  - Add `INFO`, `ERROR`, `WARN`, `DEBUG` to `MessageSenderType` enum.
+  - Implement `info`, `error`, `warn`, `debug`, and `clear` methods within the `Logger` class, mapping them to `logMessage`.
+- **CLI Package (`packages/cli/src/**/*.ts`, `src/**/*.tsx`)**:
+  - Change `import { logger } from '@google/gemini-cli-core';` to `import { Logger } from '@google/gemini-cli-core';`.
+  - Instantiate `Logger` with a `sessionId` (e.g., `const logger = new Logger('cli-session');`).
+  - Replace all `logger.method()` calls with `loggerInstance.method()`.
+
+#### 4. Core Package Export Rectification
+Critical components like `edit`, `MockGeminiAPI`, `Settings`, `Extension`, `loadSandboxConfig`, `getCliVersion`, and `RefactorTool` are now properly exported from `packages/core/src/index.ts`, resolving `TS2305` errors.
+
+**Action**: Ensure `packages/core/src/index.ts` includes exports for these modules.
+
+```typescript
+// Example additions to packages/core/src/index.ts
+export * from './tools/edit';
+export * from './utils/mockGeminiAPI';
+export * => './config/settings';
+export * from './config/extension';
+export * from './config/config';
+export * from './utils/refactor-tool';
+```
+
+#### 5. Miscellaneous TypeScript Error Resolution
+Various other minor TypeScript issues, such as duplicate identifiers (`hideTips`), type mismatches, unused variables, and missing return values, have been addressed for a cleaner build.
+
+**Action**: Review and apply specific fixes as detailed in the troubleshooting section of the previous interaction.
+
+---
+
+### 🚀 Quick Start: The Swift Incantation (Updated)
+
+For the impatient mage, here is the swiftest path to unleashing Gemini's power, now fortified with recent fixes:
+
+1.  **Update & Install Node.js:**
+    ```bash
+    pkg update && pkg upgrade -y && pkg install nodejs-lts -y
+    ```
+2.  **Invoke Gemini directly via `npx` (Recommended for stability):**
+    ```bash
+    npx https://github.com/google-gemini/gemini-cli -- "your prompt"
+    ```
+3.  **(Optional but Recommended) Create a Shell Alias for Ease of Use:**
+
+    To avoid typing the full `npx` command every time, etch this alias into your shell's memory, binding it to your linguistic invocations.
+
+    *   **For Bash (`~/.bashrc`):**
+        ```bash
+        echo "alias gemini='npx https://github.com/google-gemini/gemini-cli --'" >> ~/.bashrc && source ~/.bashrc
+        ```
+    *   **For Zsh (`~/.zshrc`):**
+        ```bash
+        echo "alias gemini='npx https://github.com/google-gemini/gemini-cli --'" >> ~/.zshrc && source ~/.zshrc
+        ```
+    *   **Usage:** Now you can simply whisper `gemini "your prompt"`.
+
+#### Building the Project (Post-Fixes)
+
+After applying the above fixes, ensure your project builds successfully by running the preflight ritual:
+
+```bash
+# The grand preflight ritual: ensuring your code's purity and readiness
+npm run preflight
+```
+
+If `npm run preflight` still encounters issues, try building the core and cli packages individually:
+
+```bash
+cd packages/core
+npm install
+npm run build
+cd ../cli
+npm install
+npm run build
+```
+
+---
+
 ### 🐍 Python Workflows with Gemini CLI: Conjuring Pythonic Spells
 
 The Gemini CLI is an excellent companion for accelerating your Python development tasks within the Termux realm. Its ability to generate, debug, and explain Python code makes it an invaluable tool for any Python artisan.

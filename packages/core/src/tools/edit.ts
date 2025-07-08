@@ -26,12 +26,7 @@ import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 import { minimatch } from 'minimatch';
 
-// Centralized logger for Termux
-const logger = {
-  info: (msg: string) => console.log(chalk.cyan(`// [INFO] ${msg}`)),
-  warn: (msg: string) => console.log(chalk.yellow(`// [WARN] ${msg}`)),
-  error: (msg: string) => console.log(chalk.red(`// [ERROR] ${msg}`)),
-};
+import { Logger } from '../core/logger.js';
 
 /**
  * Parameters for the Edit tool
@@ -115,6 +110,7 @@ export class EditTool
   private readonly config: Config;
   private readonly rootDirectory: string;
   private readonly client: GeminiClient;
+  private readonly logger: Logger; // Added logger property
   private fileCache: Map<string, string> = new Map(); // Cache file contents
   private lastEditBackup: { filePath: string; content: string } | null = null; // For undo functionality
 
@@ -230,7 +226,8 @@ export class EditTool
       this.config.getTargetDir() || '/data/data/com.termux/files/home',
     );
     this.client = config.getGeminiClient();
-    logger.info(`EditTool forged for Termux realm at ${this.rootDirectory}`);
+    this.logger = new Logger('edit-tool-session'); // Instantiate logger
+    this.logger.info(`EditTool forged for Termux realm at ${this.rootDirectory}`);
   }
 
   private isWithinRoot(pathToCheck: string): boolean {
@@ -239,7 +236,7 @@ export class EditTool
     const relative = path.relative(normalizedRoot, normalizedPath);
     const isValid = !relative.startsWith('..') && !path.isAbsolute(relative);
     if (!isValid) {
-      logger.warn(
+      this.logger.warn( // Changed logger.warn to this.logger.warn
         `Path ${pathToCheck} attempts to escape the root ${normalizedRoot}`,
       );
     }
@@ -275,12 +272,12 @@ export class EditTool
       );
       const errorMsg =
         typeof errors === 'string' ? errors : 'Schema validation failed.';
-      logger.error(`Validation failed: ${errorMsg}`);
+      this.logger.error(`Validation failed: ${errorMsg}`); // Changed logger.error to this.logger.error
       return `Parameters failed schema validation: ${errorMsg}`;
     }
 
     if (!path.isAbsolute(params.file_path)) {
-      logger.error(`Non-absolute path: ${params.file_path}`);
+      this.logger.error(`Non-absolute path: ${params.file_path}`); // Changed logger.error to this.logger.error
       return `${ErrorMessages.ABSOLUTE_PATH_REQUIRED}: ${params.file_path}`;
     }
 
@@ -289,7 +286,7 @@ export class EditTool
     }
 
     if (params.old_string !== '' && params.new_string === '') {
-      logger.error('Attempted to replace with empty new_string');
+      this.logger.error('Attempted to replace with empty new_string'); // Changed logger.error to this.logger.error
       return ErrorMessages.EMPTY_NEW_STRING_ERROR;
     }
 
@@ -297,7 +294,7 @@ export class EditTool
       try {
         new RegExp(params.old_string);
       } catch (err) {
-        logger.error(`Invalid regex: ${params.old_string}`);
+        this.logger.error(`Invalid regex: ${params.old_string}`); // Changed logger.error to this.logger.error
         return `${ErrorMessages.REGEX_INVALID}: ${String(err)}`;
       }
     }
@@ -352,10 +349,10 @@ export class EditTool
 
     // Escape lookbehind and lookahead for regex safety
     const escapedLookbehind = lookbehind
-      ? lookbehind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      ? lookbehind.replace(/[.*+?^${}()|[\]\\]/g, '\$&')
       : '';
     const escapedLookahead = lookahead
-      ? lookahead.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      ? lookahead.replace(/[.*+?^${}()|[\]\\]/g, '\$&')
       : '';
 
     if (useRegex) {
@@ -459,7 +456,7 @@ export class EditTool
       }
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {
-        logger.error(`Stat failed for ${params.file_path}: ${err}`);
+        await this.logger.error(`Stat failed for ${params.file_path}: ${err}`); // Changed logger.error to this.logger.error
         throw err;
       }
     }
@@ -468,7 +465,7 @@ export class EditTool
     if (this.fileCache.has(params.file_path)) {
       currentContent = this.fileCache.get(params.file_path)!;
       fileExists = true;
-      logger.info(`Using cached content for ${params.file_path}`);
+      await this.logger.info(`Using cached content for ${params.file_path}`); // Changed logger.info to this.logger.info
     } else {
       try {
         currentContent = fs
@@ -478,7 +475,7 @@ export class EditTool
         fileExists = true;
       } catch (err: unknown) {
         if (!isNodeError(err) || err.code !== 'ENOENT') {
-          logger.error(`Failed to read ${params.file_path}: ${err}`);
+          await this.logger.error(`Failed to read ${params.file_path}: ${err}`); // Changed logger.error to this.logger.error
           throw err;
         }
       }
@@ -619,13 +616,13 @@ export class EditTool
       params.dry_run ||
       this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT
     ) {
-      logger.info('Skipping confirmation due to dry_run or AUTO_EDIT mode');
+      await this.logger.info('Skipping confirmation due to dry_run or AUTO_EDIT mode'); // Changed logger.info to this.logger.info
       return false;
     }
 
     const validationError = this.validateToolParams(params);
     if (validationError) {
-      logger.error(`Confirmation blocked: ${validationError}`);
+      await this.logger.error(`Confirmation blocked: ${validationError}`); // Changed logger.error to this.logger.error
       return {
         type: 'error',
         title: 'Validation Error',
@@ -639,7 +636,7 @@ export class EditTool
       editData = await this.calculateEdit(params, abortSignal);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Edit calculation failed: ${errorMsg}`);
+      await this.logger.error(`Edit calculation failed: ${errorMsg}`); // Changed logger.error to this.logger.error
       return {
         type: 'error',
         title: 'Edit Calculation Error',
@@ -649,7 +646,7 @@ export class EditTool
     }
 
     if (editData.error) {
-      logger.warn(`Edit error: ${editData.error.display}`);
+      await this.logger.warn(`Edit error: ${editData.error.display}`); // Changed logger.warn to this.logger.warn
       return {
         type: 'error',
         title: 'Edit Error',
@@ -677,7 +674,7 @@ export class EditTool
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-          logger.info('Approval mode set to AUTO_EDIT');
+          await this.logger.info('Approval mode set to AUTO_EDIT'); // Changed logger.info to this.logger.info
         }
       },
     };
@@ -741,7 +738,7 @@ export class EditTool
   ): Promise<ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
-      logger.error(`Execution failed: ${validationError}`);
+      await this.logger.error(`Execution failed: ${validationError}`); // Changed logger.error to this.logger.error
       return {
         llmContent: `Error: ${ErrorMessages.INVALID_PARAMETERS} Reason: ${validationError}`,
         returnDisplay: `Error: ${validationError}`,
@@ -794,7 +791,7 @@ export class EditTool
         // File doesn't exist, no backup needed for new file creation
         this.lastEditBackup = null;
       } else {
-        logger.error(
+        await this.logger.error( // Changed logger.error to this.logger.error
           `Failed to create backup for ${params.file_path}: ${error}`,
         );
         return {
@@ -813,7 +810,7 @@ export class EditTool
         };
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Append failed for ${params.file_path}: ${errorMsg}`);
+        await this.logger.error(`Append failed for ${params.file_path}: ${errorMsg}`); // Changed logger.error to this.logger.error
         return {
           llmContent: `Error executing append: ${errorMsg}`,
           returnDisplay: `Error executing append: ${errorMsg}`,
@@ -826,7 +823,7 @@ export class EditTool
       editData = await this.calculateEdit(params, signal);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Edit calculation failed: ${errorMsg}`);
+      await this.logger.error(`Edit calculation failed: ${errorMsg}`); // Changed logger.error to this.logger.error
       return {
         llmContent: `${ErrorMessages.ERROR_PREPARING_EDIT} ${errorMsg}`,
         returnDisplay: `${ErrorMessages.ERROR_PREPARING_EDIT} ${errorMsg}`,
@@ -834,7 +831,7 @@ export class EditTool
     }
 
     if (editData.error) {
-      logger.warn(`Edit failed: ${editData.error.raw}`);
+      await this.logger.warn(`Edit failed: ${editData.error.raw}`); // Changed logger.warn to this.logger.warn
       return {
         llmContent: editData.error.raw,
         returnDisplay: {
@@ -854,7 +851,7 @@ export class EditTool
         'Proposed',
         DEFAULT_DIFF_OPTIONS,
       );
-      logger.info(`Dry run completed for ${params.file_path}`);
+      await this.logger.info(`Dry run completed for ${params.file_path}`); // Changed logger.info to this.logger.info
       return {
         llmContent: `Dry run successful for ${params.file_path}. ${editData.occurrences} replacements calculated.`,
         returnDisplay: {
@@ -969,14 +966,14 @@ export class EditTool
         );
       }
 
-      logger.info(`Edit successful: ${llmSuccessMessageParts.join(' ')}`);
+      await this.logger.info(`Edit successful: ${llmSuccessMessageParts.join(' ')}`); // Changed logger.info to this.logger.info
       return {
         llmContent: llmSuccessMessageParts.join(' '),
         returnDisplay: displayResult,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Write failed for ${params.file_path}: ${errorMsg}`);
+      await this.logger.error(`Write failed for ${params.file_path}: ${errorMsg}`); // Changed logger.error to this.logger.error
       return {
         llmContent: `Error executing edit: ${errorMsg}`,
         returnDisplay: `${ErrorMessages.FAILED_TO_WRITE_FILE}: ${errorMsg}`,
@@ -1012,7 +1009,7 @@ export class EditTool
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to undo edit for ${params.file_path}: ${errorMsg}`);
+      await this.logger.error(`Failed to undo edit for ${params.file_path}: ${errorMsg}`); // Changed logger.error to this.logger.error
       return {
         llmContent: `Error: Failed to undo edit for ${params.file_path}: ${errorMsg}`,
         returnDisplay: `Error: Failed to undo edit for ${params.file_path}: ${errorMsg}`,
@@ -1178,9 +1175,9 @@ export class EditTool
     if (!fs.existsSync(dirName)) {
       try {
         fs.mkdirSync(dirName, { recursive: true });
-        logger.info(`Created directories for ${filePath}`);
+        this.logger.info(`Created directories for ${filePath}`); // Changed logger.info to this.logger.info
       } catch (err: unknown) {
-        logger.error(`Failed to create directories for ${filePath}: ${err}`);
+        this.logger.error(`Failed to create directories for ${filePath}: ${err}`); // Changed logger.error to this.logger.error
         throw new Error(`Failed to create directories for ${filePath}: ${err}`);
       }
     }
@@ -1201,7 +1198,7 @@ export class EditTool
           return content;
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') {
-            logger.error(`Failed to read ${params.file_path}: ${err}`);
+            this.logger.error(`Failed to read ${params.file_path}: ${err}`); // Changed logger.error to this.logger.error
             throw err;
           }
           return '';

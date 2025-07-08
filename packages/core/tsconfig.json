@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
+    "allowJs": true,
+    "checkJs": true,
     "lib": ["DOM", "DOM.Iterable", "ES2021"],
     "composite": true,
     "types": ["node", "vitest/globals"]

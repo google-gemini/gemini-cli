@@ -5,7 +5,7 @@ import { Command } from '@oclif/core';
 import { readFileSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { Fore, Style, init } from 'colorama';
-import { default_api } from '../../../core/src/index'; // Assuming default_api is exposed here
+
 import * as readline from 'readline';
 
 init();
@@ -99,7 +99,7 @@ export default class DebugAssist extends Command {
         if (confirmFix.toLowerCase() === 'yes') {
           if (isFilePath) {
             try {
-              await default_api.replace({
+              await replace({
                 file_path: join(process.cwd(), this.parse(DebugAssist).args.codeOrPath as string),
                 old_string: suggestion.oldCode || '',
                 new_string: suggestion.newCode || '',
@@ -119,7 +119,7 @@ export default class DebugAssist extends Command {
         const confirmRun = await this.askQuestion('Run this command? (yes/no):');
         if (confirmRun.toLowerCase() === 'yes') {
           try {
-            const { stdout, stderr } = await default_api.run_shell_command({
+            const { stdout, stderr } = await run_shell_command({
               command: suggestion.command || '',
               description: 'Executing suggested command',
             });

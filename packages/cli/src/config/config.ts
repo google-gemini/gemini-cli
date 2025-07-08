@@ -22,102 +22,80 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
-  Settings,
-  Extension,
 } from '@google/gemini-cli-core';
 import { Logger } from '@google/gemini-cli-core';
-import { loadSandboxConfig, getCliVersion } from '@google/gemini-cli-core';
+import { loadSandboxConfig } from '../config/sandboxConfig.js';
+import { getPackageJson } from '../utils/package.js';
+    .version(version) // Use the resolved version here
+    .alias('v', 'version')
+    .help()
+    .alias('h', 'help')
+    .strict().argv;
 
-interface CliArgs {
-  model: string | undefined;
-  sandbox: boolean | string | undefined;
-  'sandbox-image': string | undefined;
-  debug: boolean | undefined;
-  prompt: string | undefined;
-  all_files: boolean | undefined;
-  show_memory_usage: boolean | undefined;
-  yolo: boolean | undefined;
-  telemetry: boolean | undefined;
-  checkpointing: boolean | undefined;
-  telemetryTarget: string | undefined;
-  telemetryOtlpEndpoint: string | undefined;
-  telemetryLogPrompts: boolean | undefined;
+  return argv;
 }
 
-async function parseArguments(): Promise<CliArgs> {
-  const argv = await yargs(hideBin(process.argv))
-    .option('model', {
-      alias: 'm',
-      type: 'string',
-      description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-    })
-    .option('prompt', {
-      alias: 'p',
-      type: 'string',
-      description: 'Prompt. Appended to input on stdin (if any).',
-    })
-    .option('sandbox', {
-      alias: 's',
-      type: 'boolean',
-      description: 'Run in sandbox?',
-    })
-    .option('sandbox-image', {
-      type: 'string',
-      description: 'Sandbox image URI.',
-    })
+function parseArguments(version: string) {
+  const argv = yargs(hideBin(process.argv))
+    .command(
+      '$0 [prompt...]',
+      'Ask Gemini a question or ask it to perform a task.',
+      (yargs) => {
+        yargs.positional('prompt', {
+          describe: 'The prompt to send to Gemini.',
+          type: 'string',
+        });
+      },
+    )
     .option('debug', {
-      alias: 'd',
       type: 'boolean',
-      description: 'Run in debug mode?',
       default: false,
+      description: 'Enable debug logging.',
     })
     .option('all_files', {
-      alias: 'a',
       type: 'boolean',
-      description: 'Include ALL files in context?',
       default: false,
+      description: 'Include all files in the current directory as context.',
+    })
+    .option('model', {
+      type: 'string',
+      default: DEFAULT_GEMINI_MODEL,
+      description: 'The model to use for generating content.',
+    })
+    .option('yolo', {
+      type: 'boolean',
+      default: false,
+      description: 'Skip approval for tool calls.',
     })
     .option('show_memory_usage', {
       type: 'boolean',
-      description: 'Show memory usage in status bar',
       default: false,
-    })
-    .option('yolo', {
-      alias: 'y',
-      type: 'boolean',
-      description:
-        'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
-      default: false,
+      description: 'Show memory usage statistics.',
     })
     .option('telemetry', {
       type: 'boolean',
-      description:
-        'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
+      description: 'Enable or disable telemetry.',
     })
-    .option('telemetry-target', {
+    .option('telemetryTarget', {
       type: 'string',
-      choices: ['local', 'gcp'],
-      description:
-        'Set the telemetry target (local or gcp). Overrides settings files.',
+      description: 'Telemetry target (e.g., "gcp", "console").',
     })
-    .option('telemetry-otlp-endpoint', {
+    .option('telemetryOtlpEndpoint', {
       type: 'string',
-      description:
-        'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+      description: 'OTLP endpoint for telemetry.',
     })
-    .option('telemetry-log-prompts', {
+    .option('telemetryLogPrompts', {
       type: 'boolean',
-      description:
-        'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
+      description: 'Log prompts to telemetry.',
     })
     .option('checkpointing', {
-      alias: 'c',
       type: 'boolean',
-      description: 'Enables checkpointing of file edits',
-      default: false,
-    })
-    .version(await getCliVersion()) // This will enable the --version flag based on package.json
+      description: 'Enable or disable checkpointing.',
+    });
+
+  const yargsWithVersion = yargsInstance.version(version); // Use the resolved version here
+
+  const argv = yargsWithVersion
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
@@ -157,7 +135,10 @@ export async function loadCliConfig(
 ): Promise<Config> {
   loadEnvironment();
 
-  const argv = await parseArguments();
+  const packageJson = await getPackageJson();
+  const version = packageJson?.version || 'unknown';
+
+  const argv = parseArguments(version);
   const debugMode = argv.debug || false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
@@ -239,20 +220,18 @@ export async function loadCliConfig(
   });
 }
 
-function mergeMcpServers(settings: Settings, extensions: Extension[]) {
+async function mergeMcpServers(settings: Settings, extensions: Extension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
-    Object.entries(extension.config.mcpServers || {}).forEach(
-      ([key, server]) => {
-        if (mcpServers[key]) {
-          new Logger('cli-config').warn(
-            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-          );
-          return;
-        }
-        mcpServers[key] = server;
-      },
-    );
+    for (const [key, server] of Object.entries(extension.config.mcpServers || {})) {
+      if (mcpServers[key]) {
+        await new Logger('cli-config').warn(
+          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+        );
+        continue;
+      }
+      mcpServers[key] = server;
+    }
   }
   return mcpServers;
 }

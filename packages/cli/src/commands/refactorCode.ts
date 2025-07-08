@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger, edit, MockGeminiAPI } from '@google/gemini-cli-core';
+import { Logger, edit } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
 export async function refactorCodeCommand(
@@ -17,11 +17,7 @@ export async function refactorCodeCommand(
     chalk.green('// Pyrmethus conjures the Code Refactorer with Gemini’s aid!'),
   );
 
-  const suggestion = await MockGeminiAPI.getSuggestion(
-    `Refactor code: ${refactoringType} in ${filePath}`,
-  );
-  if (suggestion)
-    logger.info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+  
 
   if (refactoringType !== 'rename-symbol') {
     logger.error(
@@ -69,9 +65,6 @@ export async function refactorCodeCommand(
     logger.error(
       chalk.red(`The spirits falter during refactoring: ${errorMessage}`),
     );
-    const debug = await MockGeminiAPI.getSuggestion(
-      `Debug refactoring error: ${errorMessage}`,
-    );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    
   }
 }

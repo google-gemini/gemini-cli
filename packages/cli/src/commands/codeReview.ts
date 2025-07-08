@@ -5,7 +5,7 @@ import { Command } from '@oclif/core';
 import { readFileSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { Fore, Style, init } from 'colorama';
-import { default_api } from '../../../core/src/index'; // Assuming default_api is exposed here
+
 
 init();
 
@@ -59,7 +59,7 @@ export default class CodeReview extends Command {
   private async reviewJavaScriptTypeScript(filePath: string): Promise<void> {
     this.log(NB + `Channeling ESLint for ${filePath}...` + RST);
     try {
-      const { stdout, stderr } = await default_api.run_shell_command({
+      const { stdout, stderr } = await run_shell_command({
         command: `npx eslint --format json ${filePath}`,
         description: `Running ESLint on ${filePath}`,
       });
@@ -92,7 +92,7 @@ Consider running: ${NG}npm run lint:fix${NY} to automatically resolve some issue
   private async reviewPython(filePath: string): Promise<void> {
     this.log(NB + `Channeling Ruff for ${filePath}...` + RST);
     try {
-      const { stdout, stderr } = await default_api.run_shell_command({
+      const { stdout, stderr } = await run_shell_command({
         command: `ruff check --output-format=json ${filePath}`,
         description: `Running Ruff on ${filePath}`,
       });

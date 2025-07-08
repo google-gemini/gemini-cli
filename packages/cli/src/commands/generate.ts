@@ -7,18 +7,13 @@
 import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
-import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
 export async function generateCode(prompt: string): Promise<void> {
   new Logger('cli-command').info(
     chalk.green('// Pyrmethus conjures the Code Generator with Gemini’s aid!'),
   );
 
-  const suggestion = await MockGeminiAPI.getSuggestion(
-    'Generate code in TypeScript.',
-  );
-  if (suggestion)
-    new Logger('cli-command').info(chalk.yellow(`// Gemini’s wisdom: ${suggestion}`));
+  
 
   if (!prompt) {
     new Logger('cli-command').error(chalk.red('The ether demands a prompt to weave code!'));
@@ -38,9 +33,6 @@ export async function generateCode(prompt: string): Promise<void> {
       errorMessage = error.message;
     }
     new Logger('cli-command').error(chalk.red(`The spirits falter: ${errorMessage}`));
-    const debug = await MockGeminiAPI.getSuggestion(
-      `Debug error: ${errorMessage}`,
-    );
-    if (debug) logger.info(chalk.yellow(`// Gemini’s debug: ${debug}`));
+    
   }
 }
