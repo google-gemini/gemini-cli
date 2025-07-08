@@ -50,7 +50,7 @@ export function AuthDialog({
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
-  let initialAuthIndex = items.findIndex((item) => {
+  const initialAuthIndex = items.findIndex((item) => {
     if (settings.merged.selectedAuthType) {
       return item.value === settings.merged.selectedAuthType;
     }
