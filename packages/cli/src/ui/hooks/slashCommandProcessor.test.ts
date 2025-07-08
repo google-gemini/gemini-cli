@@ -54,12 +54,12 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import {
-    Config,
-    GeminiClient,
-    getMCPDiscoveryState,
-    getMCPServerStatus,
-    MCPDiscoveryState,
-    MCPServerStatus,
+  Config,
+  GeminiClient,
+  getMCPDiscoveryState,
+  getMCPServerStatus,
+  MCPDiscoveryState,
+  MCPServerStatus,
 } from '@icarus603/gemini-code-core';
 import { act, renderHook } from '@testing-library/react';
 import open from 'open';

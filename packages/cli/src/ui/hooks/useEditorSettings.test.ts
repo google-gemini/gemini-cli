@@ -5,20 +5,20 @@
  */
 
 import {
-    allowEditorTypeInSandbox,
-    checkHasEditorType,
-    type EditorType,
+  allowEditorTypeInSandbox,
+  checkHasEditorType,
+  type EditorType,
 } from '@icarus603/gemini-code-core';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react';
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type MockedFunction,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
 } from 'vitest';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { MessageType, type HistoryItem } from '../types.js';

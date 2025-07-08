@@ -6,20 +6,20 @@
 
 import { act, renderHook } from '@testing-library/react';
 import {
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type Mock,
-    type MockedFunction,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+  type MockedFunction,
 } from 'vitest';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
 import {
-    Config as ActualConfigType,
-    ApprovalMode,
-    Config,
+  Config as ActualConfigType,
+  ApprovalMode,
+  Config,
 } from '@icarus603/gemini-code-core';
 import { useInput, type Key as InkKey } from 'ink';
 

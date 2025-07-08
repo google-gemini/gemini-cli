@@ -16,7 +16,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        node-version: [20.x]  # Simplified to just LTS
+        node-version: [20.x] # Simplified to just LTS
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

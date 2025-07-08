@@ -7,10 +7,12 @@ This document contains project-specific context and workflows for maintaining th
 This is a custom fork of Google's gemini-cli with personal enhancements. The project uses a 2-branch strategy:
 
 ### Branch Structure
+
 - **`main`** - Your stable custom version (default branch, what users see, contains custom changes)
 - **`development`** - Your active development branch (also contains custom changes, used for testing upstream merges)
 
 ### Upstream Repository
+
 - **Upstream**: `https://github.com/google-gemini/gemini-cli.git`
 
 ### Workflow for Upstream Updates (Example)
@@ -31,7 +33,7 @@ git merge upstream/main
 # Test that everything works with: npm run build && npm run bundle
 
 # 4. When stable, update main branch
-git checkout main  
+git checkout main
 git merge development
 git push origin main
 
@@ -41,27 +43,32 @@ git push origin v0.1.12-custom
 ```
 
 ### Custom Changes Overview
+
 - Rebranded as "gemini-code" for development-focused use
-- Improved tool schema validation  
+- Improved tool schema validation
 - Enhanced error messages
 - Custom npm package: `@icarus603/gemini-code`
 
 ## CI/CD Strategy
 
 ### Recommended Approach: Hybrid Strategy
+
 Keep automated npm publishing while simplifying testing to reduce maintenance overhead.
 
 ### What to Keep:
+
 - **Automated npm publishing** - Enables `npm install -g @icarus603/gemini-code` workflow
 - **Basic validation** - Linting, building, type checking to catch issues when merging upstream
 - **Release workflow** - Handles automated npm publishing when tags are created
 
 ### What to Simplify:
+
 - Remove complex integration tests that require API keys
 - Remove Docker/sandbox testing (overkill for personal fork)
 - Remove flaky E2E tests that don't add value for development workflow
 
 ### CI Workflow Goals:
+
 1. Validate that upstream merges don't break custom changes
 2. Automatically publish to npm when releases are tagged
 3. Minimal maintenance overhead
@@ -115,11 +122,13 @@ npm publish --workspace=@icarus603/gemini-code
 ## Development Workflow
 
 ### Local Development
+
 - Use `npm start` for development
 - Use `npm run build && npm run bundle` to test full build
 - Test with `node bundle/gemini.js --version`
 
 ### Before Pushing Changes
+
 - Run `npm run preflight` to validate all changes
 - Test that the CLI still works locally
 - Ensure no breaking changes to custom functionality
@@ -127,6 +136,7 @@ npm publish --workspace=@icarus603/gemini-code
 ## Project Goals
 
 This fork serves as:
+
 1. **Personal development tool** - Enhanced gemini-cli for coding workflows
 2. **Custom npm package** - Distributable via `npm install -g @icarus603/gemini-code`
 3. **Upstream sync capability** - Easy to merge Google's updates while preserving customizations

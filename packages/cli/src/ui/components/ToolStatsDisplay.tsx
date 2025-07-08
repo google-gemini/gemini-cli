@@ -10,11 +10,11 @@ import React from 'react';
 import { Colors } from '../colors.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
-    getStatusColor,
-    TOOL_SUCCESS_RATE_HIGH,
-    TOOL_SUCCESS_RATE_MEDIUM,
-    USER_AGREEMENT_RATE_HIGH,
-    USER_AGREEMENT_RATE_MEDIUM,
+  getStatusColor,
+  TOOL_SUCCESS_RATE_HIGH,
+  TOOL_SUCCESS_RATE_MEDIUM,
+  USER_AGREEMENT_RATE_HIGH,
+  USER_AGREEMENT_RATE_MEDIUM,
 } from '../utils/displayUtils.js';
 import { formatDuration } from '../utils/formatters.js';
 

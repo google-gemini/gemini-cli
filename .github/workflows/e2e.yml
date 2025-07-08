@@ -1,5 +1,5 @@
 # .github/workflows/e2e.yml - DISABLED
-# 
+#
 # This workflow has been disabled to simplify CI/CD for the personal fork.
 # Integration tests are complex and not essential for development workflow.
 # Local testing with `npm run build && npm run bundle` is sufficient.

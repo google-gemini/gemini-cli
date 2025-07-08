@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*-custom'  # Triggers on tags like v0.1.12-custom
+      - 'v*-custom' # Triggers on tags like v0.1.12-custom
   workflow_dispatch:
     inputs:
       version:

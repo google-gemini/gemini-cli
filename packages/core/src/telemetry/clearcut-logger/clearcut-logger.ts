@@ -97,7 +97,10 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       // Only log if debug mode is enabled
       if (this.config?.getDebugMode()) {
-        console.debug('Telemetry flush failed (this does not affect functionality):', error);
+        console.debug(
+          'Telemetry flush failed (this does not affect functionality):',
+          error,
+        );
       }
     });
   }
@@ -175,10 +178,12 @@ export class ClearcutLogger {
   private handleFlushError(error: unknown): void {
     this.consecutive_failures++;
     this.last_failure_time = Date.now();
-    
+
     // Only log on first failure or if debug mode is enabled
     if (this.consecutive_failures === 1 || this.config?.getDebugMode()) {
-      console.debug('Telemetry service unavailable (this does not affect functionality)');
+      console.debug(
+        'Telemetry service unavailable (this does not affect functionality)',
+      );
     }
   }
 

@@ -71,18 +71,26 @@ export class SchemaValidator {
 
     // Recursively convert nested objects
     if (converted.properties) {
-      converted.properties = Object.keys(converted.properties).reduce((acc, key) => {
-        acc[key] = this.convertGeminiSchema(converted.properties[key]);
-        return acc;
-      }, {} as any);
+      converted.properties = Object.keys(converted.properties).reduce(
+        (acc, key) => {
+          acc[key] = this.convertGeminiSchema(converted.properties[key]);
+          return acc;
+        },
+        {} as any,
+      );
     }
 
     if (converted.items) {
       converted.items = this.convertGeminiSchema(converted.items);
     }
 
-    if (converted.additionalProperties && typeof converted.additionalProperties === 'object') {
-      converted.additionalProperties = this.convertGeminiSchema(converted.additionalProperties);
+    if (
+      converted.additionalProperties &&
+      typeof converted.additionalProperties === 'object'
+    ) {
+      converted.additionalProperties = this.convertGeminiSchema(
+        converted.additionalProperties,
+      );
     }
 
     return converted;
@@ -102,10 +110,10 @@ export class SchemaValidator {
     try {
       // Convert Google Gemini schema format to standard JSON Schema
       const convertedSchema = this.convertGeminiSchema(schema);
-      
+
       const validate = this.ajv.compile(convertedSchema);
       const valid = validate(data);
-      
+
       if (!valid && validate.errors) {
         // Format errors to match expected test format
         const error = validate.errors[0];
@@ -120,11 +128,11 @@ export class SchemaValidator {
         } else if (error.keyword === 'type') {
           return `params${error.instancePath} must be ${error.params?.type}`;
         }
-        
+
         // Fallback to general error message
         return `params${error.instancePath} ${error.message}`;
       }
-      
+
       return null;
     } catch (error) {
       // Handle schema compilation errors

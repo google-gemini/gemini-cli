@@ -5,9 +5,9 @@
  */
 
 import {
-    allowEditorTypeInSandbox,
-    checkHasEditorType,
-    EditorType,
+  allowEditorTypeInSandbox,
+  checkHasEditorType,
+  EditorType,
 } from '@icarus603/gemini-code-core';
 import { useCallback, useState } from 'react';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';

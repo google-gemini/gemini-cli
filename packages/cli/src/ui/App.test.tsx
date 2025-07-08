@@ -5,12 +5,12 @@
  */
 
 import {
-    AccessibilitySettings,
-    ApprovalMode,
-    MCPServerConfig,
-    SandboxConfig,
-    Config as ServerConfig,
-    ToolRegistry,
+  AccessibilitySettings,
+  ApprovalMode,
+  MCPServerConfig,
+  SandboxConfig,
+  Config as ServerConfig,
+  ToolRegistry,
 } from '@icarus603/gemini-code-core';
 import { render } from 'ink-testing-library';
 import process from 'node:process';
@@ -69,7 +69,7 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
 }
 
-  // Mock @icarus603/gemini-code-core and its Config class
+// Mock @icarus603/gemini-code-core and its Config class
 vi.mock('@icarus603/gemini-code-core', async (importOriginal) => {
   const actualCore =
     await importOriginal<typeof import('@icarus603/gemini-code-core')>();

@@ -9,15 +9,15 @@ import { glob } from 'glob';
 import * as path from 'path';
 import { Config } from '../config/config.js';
 import {
-    FileOperation,
-    recordFileOperationMetric,
+  FileOperation,
+  recordFileOperationMetric,
 } from '../telemetry/metrics.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
-    DEFAULT_ENCODING,
-    detectFileType,
-    getSpecificMimeType,
-    processSingleFileContent,
+  DEFAULT_ENCODING,
+  detectFileType,
+  getSpecificMimeType,
+  processSingleFileContent,
 } from '../utils/fileUtils.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getCurrentGeminiMdFilename } from './memoryTool.js';

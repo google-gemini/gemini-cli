@@ -7,28 +7,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FunctionResponse, PartUnion } from '@google/genai';
 import {
-    ApprovalMode,
-    Config,
-    Tool,
-    ToolCall,
-    ToolCallConfirmationDetails,
-    ToolCallRequestInfo,
-    ToolCallResponseInfo, // Import from core
-    Status as ToolCallStatusType,
-    ToolConfirmationOutcome,
-    ToolRegistry,
-    ToolResult,
+  ApprovalMode,
+  Config,
+  Tool,
+  ToolCall,
+  ToolCallConfirmationDetails,
+  ToolCallRequestInfo,
+  ToolCallResponseInfo, // Import from core
+  Status as ToolCallStatusType,
+  ToolConfirmationOutcome,
+  ToolRegistry,
+  ToolResult,
 } from '@icarus603/gemini-code-core';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import {
-    HistoryItemToolGroup,
-    HistoryItemWithoutId,
-    ToolCallStatus,
+  HistoryItemToolGroup,
+  HistoryItemWithoutId,
+  ToolCallStatus,
 } from '../types.js';
 import {
-    mapToDisplay,
-    useReactToolScheduler,
+  mapToDisplay,
+  useReactToolScheduler,
 } from './useReactToolScheduler.js';
 
 // Mocks

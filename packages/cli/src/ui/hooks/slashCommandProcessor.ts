@@ -6,13 +6,13 @@
 
 import { type PartListUnion } from '@google/genai';
 import {
-    Config,
-    GitService,
-    Logger,
-    MCPDiscoveryState,
-    MCPServerStatus,
-    getMCPDiscoveryState,
-    getMCPServerStatus,
+  Config,
+  GitService,
+  Logger,
+  MCPDiscoveryState,
+  MCPServerStatus,
+  getMCPDiscoveryState,
+  getMCPServerStatus,
 } from '@icarus603/gemini-code-core';
 import { promises as fs } from 'fs';
 import process from 'node:process';
@@ -24,17 +24,17 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
 import { getCliVersion } from '../../utils/version.js';
 import {
-    type CommandContext,
-    type SlashCommand,
-    type SlashCommandActionReturn,
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
 } from '../commands/types.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
-    HistoryItem,
-    HistoryItemWithoutId,
-    Message,
-    MessageType,
-    SlashCommandProcessorResult,
+  HistoryItem,
+  HistoryItemWithoutId,
+  Message,
+  MessageType,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';

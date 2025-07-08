@@ -6,7 +6,11 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FunctionCall, GenerateContentResponse, Part } from '@google/genai';
-import { Config, GeminiClient, ToolRegistry } from '@icarus603/gemini-code-core';
+import {
+  Config,
+  GeminiClient,
+  ToolRegistry,
+} from '@icarus603/gemini-code-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
 

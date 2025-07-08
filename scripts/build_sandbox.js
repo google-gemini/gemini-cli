@@ -79,7 +79,9 @@ if (!argv.s) {
 
 console.log('packing @icarus603/gemini-code ...');
 const cliPackageDir = join('packages', 'cli');
-rmSync(join(cliPackageDir, 'dist', 'icarus603-gemini-code-*.tgz'), { force: true });
+rmSync(join(cliPackageDir, 'dist', 'icarus603-gemini-code-*.tgz'), {
+  force: true,
+});
 execSync(
   `npm pack -w @icarus603/gemini-code --pack-destination ./packages/cli/dist`,
   {
@@ -106,7 +108,11 @@ chmodSync(
   0o755,
 );
 chmodSync(
-  join(corePackageDir, 'dist', `icarus603-gemini-code-core-${packageVersion}.tgz`),
+  join(
+    corePackageDir,
+    'dist',
+    `icarus603-gemini-code-core-${packageVersion}.tgz`,
+  ),
   0o755,
 );
 

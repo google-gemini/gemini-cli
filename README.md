@@ -7,6 +7,7 @@
 This repository contains a **custom fork** of the Gemini CLI, enhanced with personal optimizations and improvements. This is a command-line AI workflow tool that connects to your tools, understands your code and accelerates your workflows.
 
 **Custom Enhancements:**
+
 - Improved fallback model configuration for consistent coding quality
 - Cleaned up telemetry error handling for better user experience
 - Optimized for coding-focused workflows
@@ -28,17 +29,20 @@ With this custom Gemini CLI you can:
 2. **Install and Run:** Choose one of these methods:
 
    **Method 1: Direct installation (Recommended)**
+
    ```bash
    npm install -g @icarus603/gemini-code
    gemini
    ```
 
    **Method 2: Run without installing**
+
    ```bash
    npx @icarus603/gemini-code
    ```
 
    **Method 3: Development mode**
+
    ```bash
    git clone https://github.com/Icarus603/gemini-code.git
    cd gemini-code
@@ -56,6 +60,7 @@ You are now ready to use the custom Gemini CLI!
 ### What's Different?
 
 This is a customized version of Google's official Gemini CLI with the following enhancements:
+
 - Rebranded as "gemini-code" for development-focused use
 - Improved tool schema validation
 - Enhanced error messages

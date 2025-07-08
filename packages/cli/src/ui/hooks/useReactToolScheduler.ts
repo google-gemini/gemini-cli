@@ -5,29 +5,29 @@
  */
 
 import {
-    AllToolCallsCompleteHandler,
-    CancelledToolCall,
-    CompletedToolCall,
-    Config,
-    Status as CoreStatus,
-    CoreToolScheduler,
-    EditorType,
-    ExecutingToolCall,
-    OutputUpdateHandler,
-    ScheduledToolCall,
-    Tool,
-    ToolCall,
-    ToolCallRequestInfo,
-    ToolCallsUpdateHandler,
-    ValidatingToolCall,
-    WaitingToolCall,
+  AllToolCallsCompleteHandler,
+  CancelledToolCall,
+  CompletedToolCall,
+  Config,
+  Status as CoreStatus,
+  CoreToolScheduler,
+  EditorType,
+  ExecutingToolCall,
+  OutputUpdateHandler,
+  ScheduledToolCall,
+  Tool,
+  ToolCall,
+  ToolCallRequestInfo,
+  ToolCallsUpdateHandler,
+  ValidatingToolCall,
+  WaitingToolCall,
 } from '@icarus603/gemini-code-core';
 import { useCallback, useMemo, useState } from 'react';
 import {
-    HistoryItemToolGroup,
-    HistoryItemWithoutId,
-    IndividualToolCallDisplay,
-    ToolCallStatus,
+  HistoryItemToolGroup,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+  ToolCallStatus,
 } from '../types.js';
 
 export type ScheduleFn = (

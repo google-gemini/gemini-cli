@@ -13,19 +13,19 @@ import { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { LoadedSettings } from '../../config/settings.js';
 import {
-    HistoryItem,
-    MessageType,
-    SlashCommandProcessorResult,
-    StreamingState,
+  HistoryItem,
+  MessageType,
+  SlashCommandProcessorResult,
+  StreamingState,
 } from '../types.js';
 import { mergePartListUnions, useGeminiStream } from './useGeminiStream.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import {
-    TrackedCancelledToolCall,
-    TrackedCompletedToolCall,
-    TrackedExecutingToolCall,
-    TrackedToolCall,
-    useReactToolScheduler,
+  TrackedCancelledToolCall,
+  TrackedCompletedToolCall,
+  TrackedExecutingToolCall,
+  TrackedToolCall,
+  useReactToolScheduler,
 } from './useReactToolScheduler.js';
 
 // --- MOCKS ---
