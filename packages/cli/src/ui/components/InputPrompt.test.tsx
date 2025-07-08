@@ -88,6 +88,8 @@ describe('InputPrompt', () => {
       openInExternalEditor: vi.fn(),
       newline: vi.fn(),
       replaceRangeByOffset: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -405,6 +407,28 @@ describe('InputPrompt', () => {
 
     expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should call buffer.undo on Ctrl+G', async () => {
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u0007'); // Ctrl+G
+    await wait();
+
+    expect(props.buffer.undo).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should call buffer.redo on Ctrl+R', async () => {
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u0012'); // Ctrl+R
+    await wait();
+
+    expect(props.buffer.redo).toHaveBeenCalled();
     unmount();
   });
 });
