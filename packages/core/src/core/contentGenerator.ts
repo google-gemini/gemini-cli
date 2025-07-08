@@ -16,11 +16,7 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
-import {
-  OpenAICompatibleContentGenerator,
-  AnthropicContentGenerator,
-  AzureContentGenerator,
-} from './customContentGenerators.js';
+import { createCustomContentGenerator } from '../adapters/index.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -197,9 +193,7 @@ export async function createContentGenerator(
       sessionId,
     );
   }
-  if (config.authType === AuthType.USE_AZURE) {
-    return new AzureContentGenerator(config);
-  }
+
 
   // Google Gemini API and Vertex AI
   if (
@@ -215,22 +209,9 @@ export async function createContentGenerator(
     return googleGenAI.models;
   }
 
-  // OpenAI Compatible APIs (including OpenAI, local LLMs with OpenAI-compatible endpoints)
-  if (config.authType === AuthType.USE_OPENAI_COMPATIBLE) {
-    return new OpenAICompatibleContentGenerator(config);
+  // All other providers (OpenAI Compatible, Anthropic, Local LLMs, Azure)
+  if (!config.authType) {
+    throw new Error('Auth type is required');
   }
-
-  // Anthropic Claude API
-  if (config.authType === AuthType.USE_ANTHROPIC) {
-    return new AnthropicContentGenerator(config);
-  }
-
-  // Local LLM (typically OpenAI-compatible)
-  if (config.authType === AuthType.USE_LOCAL_LLM) {
-    return new OpenAICompatibleContentGenerator(config);
-  }
-
-  throw new Error(
-    `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
-  );
+  return createCustomContentGenerator(config.authType, config);
 }
