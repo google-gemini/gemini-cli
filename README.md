@@ -331,6 +331,129 @@ Analyze code or documents:
 trust -p "Review this code for security vulnerabilities" < app.js
 ```
 
+## 📁 Working with Files
+
+Trust CLI provides powerful file operations for creating, reading, and modifying files. Understanding how to prompt for file operations is key to effective usage.
+
+### 🎯 Creating Files: Prompt Strategies
+
+The key to getting Trust CLI to create files is being **explicit about filesystem operations**:
+
+#### ✅ **Successful File Creation Prompts:**
+
+**Interactive Mode (Recommended):**
+```bash
+trust
+> Generate Python code to analyze data.csv with pandas
+[Model shows code]
+> Save that code to a file named analyze.py
+[Model creates the file]
+```
+
+**Command Line - Explicit Filesystem Language:**
+```bash
+trust -p "Save to disk a Python script named analyze.py that reads data.csv using pandas"
+trust -p "Create a new file called config.json containing these settings: {...}"
+trust -p "Write to the filesystem: a shell script named deploy.sh that builds and deploys the app"
+```
+
+**Two-Step Instructions:**
+```bash
+trust -p "I need you to: 1) Generate Python code for CSV analysis, and 2) Save it to analyze.py"
+```
+
+#### ❌ **Common Prompts That Only Show Code:**
+
+```bash
+trust -p "Create a Python script for data analysis"     # Too ambiguous
+trust -p "Write Python code to read CSV files"          # Sounds like composition
+trust -p "Generate a data analysis program"             # No file operation implied
+```
+
+### 📖 **Reading and Analyzing Files**
+
+Trust CLI can read and analyze existing files in your directory:
+
+```bash
+# Interactive mode
+trust
+> Read the file data.csv and show me the first few rows
+> Analyze the structure of config.json and suggest improvements
+> Compare the data in sales_q1.csv and sales_q2.csv
+
+# Command line
+trust -p "Read requirements.txt and explain what each dependency is for"
+trust -p "Analyze app.py for potential security vulnerabilities"
+trust -p "Find all TODO comments in the files in this directory"
+```
+
+### 🔧 **Modifying Existing Files**
+
+```bash
+# Interactive mode
+trust
+> Read analyze.py and add error handling to the CSV reading function
+> Update the config.json file to include the new database settings
+
+# Command line  
+trust -p "Add logging statements to the main function in app.py"
+trust -p "Update requirements.txt to include pandas version 2.0"
+```
+
+### 💡 **Best Practices for File Operations**
+
+1. **Be Explicit About Intent:**
+   - ✅ "Save to disk" / "Write to filesystem" / "Create a file"
+   - ❌ "Create" / "Write" / "Generate" (ambiguous)
+
+2. **Use Two-Step Instructions:**
+   - First: Generate/create the content
+   - Second: Save/write it to a specific file
+
+3. **Specify File Paths Clearly:**
+   ```bash
+   trust -p "Create ./scripts/backup.sh with a bash script that backs up the database"
+   ```
+
+4. **Interactive Mode for Complex Operations:**
+   - Better context preservation
+   - Natural conversation flow
+   - Easier to iterate and refine
+
+### 🗂️ **File System Navigation**
+
+Trust CLI understands your current directory and can work with relative paths:
+
+```bash
+trust -p "List all Python files in this directory and summarize their purpose"
+trust -p "Find all CSV files and create a data processing script for each one"
+trust -p "Read the README.md and create a summary document"
+```
+
+### 📝 **Common File Creation Patterns**
+
+**Configuration Files:**
+```bash
+trust -p "Save a package.json file for a Node.js project with these dependencies: express, axios"
+```
+
+**Scripts and Automation:**
+```bash
+trust -p "Create deploy.sh that builds the project and uploads to the server"
+```
+
+**Data Analysis:**
+```bash
+trust -p "Generate analyze_sales.py that reads sales.csv and creates monthly revenue charts"
+```
+
+**Documentation:**
+```bash
+trust -p "Create API_DOCS.md documenting the REST endpoints in server.js"
+```
+
+The key insight: Trust CLI models interpret "create/write code" as showing you code, but "save/write to disk/create a file" as filesystem operations!
+
 ## 🎯 Solving Local AI Challenges
 
 Trust CLI directly addresses the core challenges of local AI deployment:
