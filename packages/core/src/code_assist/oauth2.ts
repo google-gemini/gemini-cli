@@ -118,13 +118,29 @@ export async function getOauthClient(
       `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
   );
   try {
-    // Use the open package to open the auth URL in the default browser.
-    // This will throw an error if the browser cannot be opened.
-    await open(webLogin.authUrl);
-  } catch (e) {
-    console.log(
-      `Failed to open browser for authentication. Please navigate to the following URL manually:\n\n${webLogin.authUrl}\n\n` +
-        `Error: ${getErrorMessage(e)}`,
+    // Attempt to open the authentication URL in the default browser.
+    // We do not use the `wait` option here because the main script's execution
+    // is already paused by `loginCompletePromise`, which awaits the server callback.
+    const childProcess = await open(webLogin.authUrl);
+
+    // IMPORTANT: Attach an error handler to the returned child process.
+    // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
+    // in a minimal Docker container), it will emit an unhandled 'error' event,
+    // causing the entire Node.js process to crash.
+    childProcess.on('error', (err) => {
+      // Instead of crashing, we gracefully inform the user to open the URL manually.
+      // The application continues to wait for the callback, so the login can still be completed.
+      console.error(
+        'Failed to open browser automatically. Please open the URL manually:',
+      );
+      console.error(webLogin.authUrl);
+    });
+  } catch (err) {
+    // This catch block is for unexpected errors during the `open` call itself,
+    // though failures like command-not-found are typically raised as 'error' events.
+    console.error(
+      'An unexpected error occurred while trying to open the browser:',
+      err,
     );
   }
   console.log('Waiting for authentication...');
