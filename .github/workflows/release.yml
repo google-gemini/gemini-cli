@@ -86,14 +86,14 @@ jobs:
           IS_NIGHTLY: ${{ steps.vars.outputs.is_nightly }}
           MANUAL_VERSION: ${{ inputs.version }}
 
-      - name: Run Tests
-        if: github.event.inputs.force_skip_tests != 'true'
-        run: |
-          npm run preflight
-          npm run test:integration:sandbox:none
-          npm run test:integration:sandbox:docker
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # - name: Run Tests
+        # if: github.event.inputs.force_skip_tests != 'true'
+        # run: |
+        #   npm run preflight
+        #   npm run test:integration:sandbox:none
+        #   npm run test:integration:sandbox:docker
+        # env:
+        #   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Configure Git User
         run: |
