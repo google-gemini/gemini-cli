@@ -186,7 +186,11 @@ export async function loadCliConfig(
   sessionId: string,
 ): Promise<Config> {
   const argv = await parseArguments();
-  const debugMode = argv.debug || false;
+  const debugMode =
+    argv.debug ||
+    [process.env.DEBUG, process.env.DEBUG_MODE].some(
+      (v) => v === 'true' || v === '1',
+    );
 
   const activeExtensions = filterActiveExtensions(
     extensions,
