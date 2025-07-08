@@ -117,7 +117,16 @@ export async function getOauthClient(
       `Attempting to open authentication page in your browser.\n` +
       `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
   );
-  await open(webLogin.authUrl);
+  try {
+    // Use the open package to open the auth URL in the default browser.
+    // This will throw an error if the browser cannot be opened.
+    await open(webLogin.authUrl, { wait: true });
+  } catch (e) {
+    console.log(
+      `Failed to open browser for authentication. Please navigate to the following URL manually:\n\n${webLogin.authUrl}\n\n` +
+        `Error: ${getErrorMessage(e)}`,
+    );
+  }
   console.log('Waiting for authentication...');
 
   await webLogin.loginCompletePromise;
@@ -133,12 +142,17 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   } else {
     port = await getAvailablePort();
   }
+  // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   if (process.env.OAUTH_CALLBACK_HOST) {
     host = process.env.OAUTH_CALLBACK_HOST;
   } else {
     host = 'localhost';
   }
-  const redirectUri = `http://${host}:${port}/oauth2callback`;
+  // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
+  // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
+  // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
+  // authorization code interception attacks.
+  const redirectUri = `http://localhost:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl: string = client.generateAuthUrl({
     redirect_uri: redirectUri,
@@ -198,7 +212,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         server.close();
       }
     });
-    server.listen(port);
+    server.listen(port, host);
   });
 
   return {
