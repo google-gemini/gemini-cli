@@ -56,7 +56,7 @@ interface CliArgs {
 }
 
 async function parseArguments(): Promise<CliArgs> {
-  const yargsInstance = await yargs(hideBin(process.argv))
+  const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
       '$0 [options]',
