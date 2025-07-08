@@ -555,3 +555,41 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
   });
 });
+
+describe('loadCliConfig extensions', () => {
+  const mockExtensions: Extension[] = [
+    {
+      config: { name: 'ext1', version: '1.0.0' },
+      contextFiles: ['/path/to/ext1.md'],
+    },
+    {
+      config: { name: 'ext2', version: '1.0.0' },
+      contextFiles: ['/path/to/ext2.md'],
+    },
+  ];
+
+  it('should not filter extensions if --extensions flag is not used', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(
+      settings,
+      mockExtensions,
+      'test-session',
+    );
+    expect(config.getExtensionContextFilePaths()).toEqual([
+      '/path/to/ext1.md',
+      '/path/to/ext2.md',
+    ]);
+  });
+
+  it('should filter extensions if --extensions flag is used', async () => {
+    process.argv = ['node', 'script.js', '--extensions', 'ext1'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(
+      settings,
+      mockExtensions,
+      'test-session',
+    );
+    expect(config.getExtensionContextFilePaths()).toEqual(['/path/to/ext1.md']);
+  });
+});
