@@ -226,6 +226,7 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
+    disablePromptBell: settings.disablePromptBell,
     mcpServerCommand: settings.mcpServerCommand,
     mcpServers,
     userMemory: memoryContent,
