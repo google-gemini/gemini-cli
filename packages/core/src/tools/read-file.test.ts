@@ -74,7 +74,7 @@ describe('ReadFileTool', () => {
     it('should return error for relative path', () => {
       const params: ReadFileToolParams = { absolute_path: 'test.txt' };
       expect(tool.validateToolParams(params)).toBe(
-        `params/absolute_path must match pattern "^/"`,
+        `File path must be absolute, but was relative: test.txt. You must provide an absolute path.`,
       );
     });
 
@@ -144,10 +144,10 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { absolute_path: 'relative/path.txt' };
       const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toBe(
-        'Error: Invalid parameters provided. Reason: params/absolute_path must match pattern "^/"',
+        'Error: Invalid parameters provided. Reason: File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
       );
       expect(result.returnDisplay).toBe(
-        'params/absolute_path must match pattern "^/"',
+        'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
       );
     });
 
