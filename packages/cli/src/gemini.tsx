@@ -47,6 +47,8 @@ import { searchFiles } from './commands/searchFiles.js';
 import { fileInfo } from './commands/fileInfo.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import DepCheck from './commands/depCheck.js';
+import CodeReview from './commands/codeReview.js';
+import DebugAssist from './commands/debugAssist.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -254,6 +256,37 @@ export async function main() {
       },
       (argv) => {
         new DepCheck().run().catch(logger.error);
+      },
+    )
+    .command(
+      'codeReview <filePath>',
+      'Analyzes code for quality issues and provides suggestions.',
+      (yargs) => {
+        yargs.positional('filePath', {
+          describe: 'Path to the file to review.',
+          type: 'string',
+        });
+      },
+      (argv) => {
+        new CodeReview().run().catch(logger.error);
+      },
+    )
+    .command(
+      'debugAssist <codeOrPath> [errorMsg]',
+      'Provides interactive, guided debugging assistance.',
+      (yargs) => {
+        yargs
+          .positional('codeOrPath', {
+            describe: 'Code snippet or path to the file to debug.',
+            type: 'string',
+          })
+          .positional('errorMsg', {
+            describe: 'Optional error message to provide context.',
+            type: 'string',
+          });
+      },
+      (argv) => {
+        new DebugAssist().run().catch(logger.error);
       },
     )
     .command(

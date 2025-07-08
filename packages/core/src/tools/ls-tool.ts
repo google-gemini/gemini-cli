@@ -5,33 +5,76 @@
  */
 
 import { promises as fs } from 'fs';
-import { Tool, ToolInvocation, ToolOutput } from '@google/gemini-cli';
+import { BaseTool, ToolResult } from './tools.js';
+import { getErrorMessage } from '../utils/errors.js';
 
-export class LsTool implements Tool {
-  name = 'ls';
-  description = 'Lists the contents of a directory.';
+export interface LsToolParams {
+  directory: string;
+}
 
-  async run(invocation: ToolInvocation): Promise<ToolOutput> {
-    if (!invocation.files || invocation.files.length === 0) {
+export class LsTool extends BaseTool<LsToolParams, ToolResult> {
+  static readonly Name: string = 'ls';
+  static readonly Description: string = 'Lists the contents of a directory.';
+
+  constructor() {
+    super(
+      LsTool.Name,
+      'List Directory',
+      LsTool.Description,
+      {
+        type: 'object',
+        properties: {
+          directory: {
+            type: 'string',
+            description: 'The path to the directory to list.',
+          },
+        },
+        required: ['directory'],
+      },
+    );
+  }
+
+  validateToolParams(params: LsToolParams): string | null {
+    if (!params.directory || params.directory.trim() === '') {
+      return 'The "directory" parameter is required and must be a non-empty string.';
+    }
+    return null;
+  }
+
+  getDescription(params: LsToolParams): string {
+    return `Will list the contents of the directory: ${params.directory}`;
+  }
+
+  async execute(params: LsToolParams, signal: AbortSignal): Promise<ToolResult> {
+    const validationError = this.validateToolParams(params);
+    if (validationError) {
       return {
-        type: 'error',
-        message: 'No directory was provided to the ls tool.',
+        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
+        returnDisplay: `## Parameter Error\n\n${validationError}`,
       };
     }
 
-    const dirPath = invocation.files[0];
+    if (signal.aborted) {
+      return {
+        llmContent: 'Tool execution aborted.',
+        returnDisplay: '## Tool Aborted\n\nList directory operation was aborted.',
+      };
+    }
 
     try {
-      const files = await fs.readdir(dirPath);
+      const files = await fs.readdir(params.directory);
       return {
-        type: 'text',
-        content: files.join('\n'),
+        llmContent: files.join('\n'),
+        returnDisplay: `## List Directory Result
+
+Successfully listed ${files.length} item(s) in **${params.directory}**.`
       };
     } catch (error) {
       return {
-        type: 'error',
-        message: `Error reading directory ${dirPath}: ${error.message}`,
+        llmContent: `Error reading directory ${params.directory}: ${getErrorMessage(error)}`,
+        returnDisplay: `## Directory Read Error\n\nAn error occurred while reading directory ${params.directory}:\n\n${getErrorMessage(error)}\n\n`,
       };
     }
   }
 }
+

@@ -5,33 +5,74 @@
  */
 
 import { promises as fs } from 'fs';
-import { Tool, ToolInvocation, ToolOutput } from '@google/gemini-cli';
+import { BaseTool, ToolResult } from './tools.js';
+import { getErrorMessage } from '../utils/errors.js';
 
-export class RmdirTool implements Tool {
-  name = 'rmdir';
-  description = 'Removes a directory.';
+export interface RmdirToolParams {
+  directory: string;
+}
 
-  async run(invocation: ToolInvocation): Promise<ToolOutput> {
-    if (!invocation.files || invocation.files.length === 0) {
+export class RmdirTool extends BaseTool<RmdirToolParams, ToolResult> {
+  static readonly Name: string = 'rmdir';
+  static readonly Description: string = 'Removes a directory.';
+
+  constructor() {
+    super(
+      RmdirTool.Name,
+      'Remove Directory',
+      RmdirTool.Description,
+      {
+        type: 'object',
+        properties: {
+          directory: {
+            type: 'string',
+            description: 'The path to the directory to remove.',
+          },
+        },
+        required: ['directory'],
+      },
+    );
+  }
+
+  validateToolParams(params: RmdirToolParams): string | null {
+    if (!params.directory || params.directory.trim() === '') {
+      return 'The "directory" parameter is required and must be a non-empty string.';
+    }
+    return null;
+  }
+
+  getDescription(params: RmdirToolParams): string {
+    return `Will remove the directory: ${params.directory}`;
+  }
+
+  async execute(params: RmdirToolParams, signal: AbortSignal): Promise<ToolResult> {
+    const validationError = this.validateToolParams(params);
+    if (validationError) {
       return {
-        type: 'error',
-        message: 'No directory was provided to the rmdir tool.',
+        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
+        returnDisplay: `## Parameter Error\n\n${validationError}`,
       };
     }
 
-    const dirPath = invocation.files[0];
+    if (signal.aborted) {
+      return {
+        llmContent: 'Tool execution aborted.',
+        returnDisplay: '## Tool Aborted\n\nRemove directory operation was aborted.',
+      };
+    }
 
     try {
-      await fs.rmdir(dirPath);
+      await fs.rmdir(params.directory);
       return {
-        type: 'text',
-        content: `Removed directory ${dirPath}`,
+        llmContent: `Removed directory ${params.directory}`,
+        returnDisplay: `## Remove Directory Result\n\nSuccessfully removed directory **${params.directory}**.`,
       };
     } catch (error) {
       return {
-        type: 'error',
-        message: `Error removing directory ${dirPath}: ${error.message}`,
+        llmContent: `Error removing directory ${params.directory}: ${getErrorMessage(error)}`,
+        returnDisplay: `## Directory Removal Error\n\nAn error occurred while removing directory ${params.directory}:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
       };
     }
   }
 }
+

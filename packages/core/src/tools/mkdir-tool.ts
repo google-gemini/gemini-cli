@@ -5,33 +5,74 @@
  */
 
 import { promises as fs } from 'fs';
-import { Tool, ToolInvocation, ToolOutput } from '@google/gemini-cli';
+import { BaseTool, ToolResult } from './tools.js';
+import { getErrorMessage } from '../utils/errors.js';
 
-export class MkdirTool implements Tool {
-  name = 'mkdir';
-  description = 'Creates a directory.';
+export interface MkdirToolParams {
+  directory: string;
+}
 
-  async run(invocation: ToolInvocation): Promise<ToolOutput> {
-    if (!invocation.files || invocation.files.length === 0) {
+export class MkdirTool extends BaseTool<MkdirToolParams, ToolResult> {
+  static readonly Name: string = 'mkdir';
+  static readonly Description: string = 'Creates a directory.';
+
+  constructor() {
+    super(
+      MkdirTool.Name,
+      'Make Directory',
+      MkdirTool.Description,
+      {
+        type: 'object',
+        properties: {
+          directory: {
+            type: 'string',
+            description: 'The path to the directory to create.',
+          },
+        },
+        required: ['directory'],
+      },
+    );
+  }
+
+  validateToolParams(params: MkdirToolParams): string | null {
+    if (!params.directory || params.directory.trim() === '') {
+      return 'The "directory" parameter is required and must be a non-empty string.';
+    }
+    return null;
+  }
+
+  getDescription(params: MkdirToolParams): string {
+    return `Will create the directory: ${params.directory}`;
+  }
+
+  async execute(params: MkdirToolParams, signal: AbortSignal): Promise<ToolResult> {
+    const validationError = this.validateToolParams(params);
+    if (validationError) {
       return {
-        type: 'error',
-        message: 'No directory was provided to the mkdir tool.',
+        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
+        returnDisplay: `## Parameter Error\n\n${validationError}`,
       };
     }
 
-    const dirPath = invocation.files[0];
+    if (signal.aborted) {
+      return {
+        llmContent: 'Tool execution aborted.',
+        returnDisplay: '## Tool Aborted\n\nMake directory operation was aborted.',
+      };
+    }
 
     try {
-      await fs.mkdir(dirPath, { recursive: true });
+      await fs.mkdir(params.directory, { recursive: true });
       return {
-        type: 'text',
-        content: `Created directory ${dirPath}`,
+        llmContent: `Created directory ${params.directory}`,
+        returnDisplay: `## Make Directory Result\n\nSuccessfully created directory **${params.directory}**.`,
       };
     } catch (error) {
       return {
-        type: 'error',
-        message: `Error creating directory ${dirPath}: ${error.message}`,
+        llmContent: `Error creating directory ${params.directory}: ${getErrorMessage(error)}`,
+        returnDisplay: `## Directory Creation Error\n\nAn error occurred while creating directory ${params.directory}:\n\n${getErrorMessage(error)}\n\n`,
       };
     }
   }
 }
+

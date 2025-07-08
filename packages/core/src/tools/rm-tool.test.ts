@@ -5,7 +5,6 @@
  */
 
 import { RmTool } from './rm-tool.js';
-import { ToolInvocation } from '@google/gemini-cli';
 import { promises as fs } from 'fs';
 import { vi } from 'vitest';
 
@@ -18,54 +17,38 @@ jest.mock('fs', () => ({
 describe('RmTool', () => {
   it('should remove a file', async () => {
     const tool = new RmTool();
-    const invocation: ToolInvocation = {
-      toolName: 'rm',
-      files: ['/test.txt'],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      file: '/test.txt',
     };
 
-    await tool.run(invocation, stream);
+    await tool.execute(params, new AbortController().signal);
 
     expect(fs.unlink).toHaveBeenCalledWith('/test.txt');
   });
 
   it('should return an error if no file is provided', async () => {
     const tool = new RmTool();
-    const invocation: ToolInvocation = {
-      toolName: 'rm',
-      files: [],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      file: '',
     };
 
-    const result = await tool.run(invocation, stream);
+    const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result).toEqual({
-      type: 'error',
-      message: 'No file was provided to the rm tool.',
-    });
+    expect(result.llmContent).toContain('The "file" parameter is required');
+    expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
   it('should return an error if the file cannot be removed', async () => {
     const tool = new RmTool();
-    const invocation: ToolInvocation = {
-      toolName: 'rm',
-      files: ['/test.txt'],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      file: '/test.txt',
     };
 
     (fs.unlink as jest.Mock).mockRejectedValue(new Error('Permission denied'));
 
-    const result = await tool.run(invocation, stream);
+    const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result).toEqual({
-      type: 'error',
-      message: 'Error removing file /test.txt: Permission denied',
-    });
+    expect(result.llmContent).toContain('Error removing file /test.txt: Permission denied');
+    expect(result.returnDisplay).toContain('## File Removal Error');
   });
 });

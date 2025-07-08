@@ -5,7 +5,6 @@
  */
 
 import { MvTool } from './mv-tool.js';
-import { ToolInvocation } from '@google/gemini-cli';
 import { promises as fs } from 'fs';
 import { vi } from 'vitest';
 
@@ -18,55 +17,41 @@ jest.mock('fs', () => ({
 describe('MvTool', () => {
   it('should move a file', async () => {
     const tool = new MvTool();
-    const invocation: ToolInvocation = {
-      toolName: 'mv',
-      files: ['/test.txt', '/test2.txt'],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      source: '/test.txt',
+      destination: '/test2.txt',
     };
 
-    await tool.run(invocation, stream);
+    await tool.execute(params, new AbortController().signal);
 
     expect(fs.rename).toHaveBeenCalledWith('/test.txt', '/test2.txt');
   });
 
-  it('should return an error if not enough files are provided', async () => {
+  it('should return an error if destination is not provided', async () => {
     const tool = new MvTool();
-    const invocation: ToolInvocation = {
-      toolName: 'mv',
-      files: ['/test.txt'],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      source: '/test.txt',
+      destination: '',
     };
 
-    const result = await tool.run(invocation, stream);
+    const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result).toEqual({
-      type: 'error',
-      message: 'Please provide a source and destination to the mv tool.',
-    });
+    expect(result.llmContent).toContain('The "destination" parameter is required');
+    expect(result.returnDisplay).toContain('## Parameter Error');
   });
 
   it('should return an error if the file cannot be moved', async () => {
     const tool = new MvTool();
-    const invocation: ToolInvocation = {
-      toolName: 'mv',
-      files: ['/test.txt', '/test2.txt'],
-    };
-    const stream = {
-      write: jest.fn(),
+    const params = {
+      source: '/test.txt',
+      destination: '/test2.txt',
     };
 
     (fs.rename as jest.Mock).mockRejectedValue(new Error('Permission denied'));
 
-    const result = await tool.run(invocation, stream);
+    const result = await tool.execute(params, new AbortController().signal);
 
-    expect(result).toEqual({
-      type: 'error',
-      message:
-        'Error moving file from /test.txt to /test2.txt: Permission denied',
-    });
+    expect(result.llmContent).toContain('Error moving file from /test.txt to /test2.txt: Permission denied');
+    expect(result.returnDisplay).toContain('## Move File Error');
   });
 });

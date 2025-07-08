@@ -37,6 +37,7 @@ The winds of change have swept through the Gemini CLI, bringing with them new po
 | `generate-test` | Generates a test file. | **NEW**: Creates a Jest test file. | A guardian spell, ensuring the integrity of your creations. |
 | `generate-docs` | Generates Markdown documentation. | **NEW**: Creates a Markdown file. | A chronicler's spell, to document the purpose of your work. |
 | `depCheck` | Verifies and manages project dependencies for Node.js and Python projects. | **NEW**: Initial implementation. | A watchful spirit, ensuring your project's foundations are sound. |
+| `codeReview` | Analyzes code for quality issues and provides suggestions. | **NEW**: Initial implementation. | A discerning eye, guiding your code towards purity and elegance. |
 
 ---
 
@@ -179,6 +180,16 @@ $MY_PYTHON_FUNC" > test_greet.py
     ```
 *   **Expected Output:** The CLI will scan `requirements.txt`, compare with installed packages, and report any missing or outdated dependencies, along with suggested `pip` commands to resolve them.
 
+### Example 8: Reviewing Python Code Quality (`codeReview`)
+
+*   **Task:** Analyze a Python file for common code quality issues using Ruff.
+*   **Command:**
+    ```bash
+    # Invoke Gemini to review a Python file
+    gemini codeReview my_python_script.py
+    ```
+*   **Expected Output:** The CLI will run Ruff on the specified file and report any identified issues (errors, warnings) with line numbers and suggested fixes, if available. It will also provide a command to automatically fix some issues.
+
 ---
 
 ### 🚀 Node.js Workflows with Gemini CLI: Weaving JavaScript Enchantments
@@ -277,6 +288,16 @@ $NODE_CODE"
     gemini depCheck
     ```
 *   **Expected Output:** The CLI will scan `package.json`, compare with installed packages, and report any missing or outdated dependencies, along with suggested `npm` commands to resolve them.
+
+### Example 8: Reviewing Node.js Code Quality (`codeReview`)
+
+*   **Task:** Analyze a Node.js/TypeScript file for common code quality issues using ESLint.
+*   **Command:**
+    ```bash
+    # Invoke Gemini to review a Node.js/TypeScript file
+    gemini codeReview my_javascript_file.js
+    ```
+*   **Expected Output:** The CLI will run ESLint on the specified file and report any identified issues (errors, warnings) with line numbers and suggested fixes, if available. It will also provide a command to automatically fix some issues.
 
 ---
 

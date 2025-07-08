@@ -146,9 +146,9 @@ export class WriteFileTool
    * @param params The parameters provided to the tool.
    * @returns A string with an error message if validation fails, otherwise null.
    */
-  async validateToolParams(
+  validateToolParams(
     params: WriteFileToolParams,
-  ): Promise<string | null> {
+  ): string | null {
     // 1. Schema Validation
     if (
       this.schema.parameters &&
@@ -186,19 +186,16 @@ export class WriteFileTool
 
     // 4. Directory Check (if path exists)
     try {
-      // Use fs.promises.stat for async check and to avoid race conditions with lstatSync
-      const stats = await fs.stat(filePath).catch((err: unknown) => {
-        if (isNodeError(err) && err.code === 'ENOENT') {
-          return null; // File does not exist, which is fine for writing (new file)
-        }
-        throw err; // Re-throw other errors
-      });
+      const stats = fs.statSync(filePath);
 
       if (stats && stats.isDirectory()) {
         return `Path is a directory, not a file: ${filePath}`;
       }
     } catch (statError: unknown) {
-      // If fs.stat fails for reasons other than ENOENT (e.g., permissions), report it.
+      if (isNodeError(statError) && statError.code === 'ENOENT') {
+        return null; // File does not exist, which is fine for writing (new file)
+      }
+      // If fs.statSync fails for reasons other than ENOENT (e.g., permissions), report it.
       return `Error accessing path properties for validation: ${filePath}. Reason: ${getErrorMessage(statError)}`;
     }
 
