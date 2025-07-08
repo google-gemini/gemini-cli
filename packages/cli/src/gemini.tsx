@@ -102,17 +102,20 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  setMaxSizedBoxDebugging(config.getDebugMode());
-
-  // Initialize centralized FileDiscoveryService
-  config.getFileService();
-  if (config.getCheckpointingEnabled()) {
-    try {
-      await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
+  // Set a default auth type if one isn't set
+  if (!settings.merged.selectedAuthType) {
+    if (process.env.CLOUD_SHELL === 'true') {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.CLOUD_SHELL,
+      );
     }
   }
+
+  setMaxSizedBoxDebugging(config.getDebugMode());
+
+  await config.initialize();
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -122,12 +125,11 @@ export async function main() {
     }
   }
 
-  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
-    ? getNodeMemoryArgs(config)
-    : [];
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
+    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+      ? getNodeMemoryArgs(config)
+      : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (settings.merged.selectedAuthType) {
