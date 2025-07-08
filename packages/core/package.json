@@ -1,10 +1,10 @@
 {
-  "name": "@google/gemini-cli-core",
-  "version": "0.1.9",
-  "description": "Gemini CLI Core",
+  "name": "@icarus603/gemini-code-core",
+  "version": "0.1.9-custom",
+  "description": "Gemini CLI Core (Custom Fork)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/Icarus603/gemini-code.git"
   },
   "type": "module",
   "main": "dist/index.js",
