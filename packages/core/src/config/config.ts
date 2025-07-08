@@ -44,7 +44,6 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { CleanDocstringTool } from '../tools/clean-docstring.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
@@ -712,11 +711,10 @@ export class Config {
       }
     };
 
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
-    registerCoreTool(CleanDocstringTool, targetDir, this);
-    registerCoreTool(GrepTool, this);
-    registerCoreTool(GlobTool, this);
+    registerCoreTool(LSTool, targetDir, this);
+    registerCoreTool(ReadFileTool, targetDir, this);
+    registerCoreTool(GrepTool, targetDir);
+    registerCoreTool(GlobTool, targetDir, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
