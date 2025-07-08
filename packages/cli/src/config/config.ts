@@ -99,7 +99,10 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Include ALL files in context?',
       default: false,
     })
-    .deprecateOption('all_files', 'Use --all-files instead. We will be removing --all_files in the coming weeks.')
+    .deprecateOption(
+      'all_files',
+      'Use --all-files instead. We will be removing --all_files in the coming weeks.',
+    )
     .option('show-memory-usage', {
       type: 'boolean',
       description: 'Show memory usage in status bar',
@@ -110,7 +113,10 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Show memory usage in status bar',
       default: false,
     })
-    .deprecateOption('show_memory_usage', 'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.')
+    .deprecateOption(
+      'show_memory_usage',
+      'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
+    )
     .option('yolo', {
       alias: 'y',
       type: 'boolean',
