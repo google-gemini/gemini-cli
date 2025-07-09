@@ -34,6 +34,8 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
+import { get, set } from './config-command.js';
+
 interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
@@ -53,11 +55,55 @@ interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  // This is for the config command
+  config?: {
+    command: 'get' | 'set';
+    key: string;
+    value?: string;
+  };
 }
 
 async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
+    .command(
+      'config <command> [key] [value]',
+      'Manage Gemini CLI configuration. `get` prints a value, `set` sets a value.',
+      (yargs) =>
+        yargs
+          .positional('command', {
+            describe: 'The config command to run',
+            type: 'string',
+            choices: ['get', 'set'],
+          })
+          .positional('key', {
+            describe: 'The config key',
+            type: 'string',
+          })
+          .positional('value', {
+            describe: 'The config value (for `set` command)',
+            type: 'string',
+          })
+          .demandCommand(1, 'You must provide a command: `get` or `set`.')
+          .check((argv) => {
+            if (argv.command === 'set' && typeof argv.value === 'undefined') {
+              throw new Error('The `set` command requires a value to be provided.');
+            }
+            return true;
+          }),
+      (async (argv) => {
+        if (argv.command === 'get' && argv.key) {
+          const value = await get(argv.key);
+          console.log(value);
+        } else if (argv.command === 'set' && argv.key && argv.value) {
+          await set(argv.key, argv.value);
+        } else {
+          // This case should be covered by the yargs check, but as a fallback:
+          console.log('Invalid command or arguments.');
+        }
+        process.exit(0);
+      }),
+    )
     .usage(
       '$0 [options]',
       'Gemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
