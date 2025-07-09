@@ -13,9 +13,12 @@ import {
 const rateLimitCache = new Map<string, { limited: boolean; timestamp: number }>();
 const CACHE_DURATION = 60000; // 1 minute
 
+// Track pending rate limit checks to prevent race conditions
+const pendingChecks = new Map<string, Promise<boolean>>();
+
 /**
  * Checks if model is rate-limited, returns fallback if needed.
- * Implements caching and optimized error handling.
+ * Implements caching and optimized error handling with race condition protection.
  */
 export async function getEffectiveModel(
   apiKey: string,
@@ -34,9 +37,17 @@ export async function getEffectiveModel(
     return cached.limited ? DEFAULT_GEMINI_FLASH_MODEL : currentConfiguredModel;
   }
 
-  const isLimited = await checkRateLimit(apiKey);
+  // Check if rate limit check is already in progress
+  let isLimitedPromise = pendingChecks.get(cacheKey);
+  if (!isLimitedPromise) {
+    isLimitedPromise = checkRateLimit(apiKey);
+    pendingChecks.set(cacheKey, isLimitedPromise);
+  }
+
+  const isLimited = await isLimitedPromise;
   
-  // Update cache
+  // Clean up pending check and update cache
+  pendingChecks.delete(cacheKey);
   rateLimitCache.set(cacheKey, { limited: isLimited, timestamp: Date.now() });
   
   if (isLimited) {
@@ -76,12 +87,37 @@ async function checkRateLimit(apiKey: string): Promise<boolean> {
   }
 }
 
-// Clean up old cache entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of rateLimitCache.entries()) {
-    if (now - value.timestamp > CACHE_DURATION * 2) {
-      rateLimitCache.delete(key);
+// Clean up old cache entries periodically (with graceful shutdown)
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Start cache cleanup interval
+ */
+export function startCacheCleanup(): void {
+  if (cleanupInterval) return;
+  
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of rateLimitCache.entries()) {
+      if (now - value.timestamp > CACHE_DURATION * 2) {
+        rateLimitCache.delete(key);
+      }
     }
+  }, CACHE_DURATION);
+  
+  // Allow graceful shutdown
+  cleanupInterval.unref();
+}
+
+/**
+ * Stop cache cleanup interval
+ */
+export function stopCacheCleanup(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
   }
-}, CACHE_DURATION);
+}
+
+// Auto-start cleanup
+startCacheCleanup();
