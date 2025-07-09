@@ -19,6 +19,9 @@ export * from './schemaEnforcement.js';
 export * from './jsonRepairParser.js';
 export * from './gbnfFunctionRegistry.js';
 export * from './functionCallEvaluator.js';
+export * from './ollamaClient.js';
+export * from './ollamaToolRegistry.js';
+export * from './ollamaContentGenerator.js';
 
 // Trust version and metadata
 // Trust: An Open System for Modern Assurance
