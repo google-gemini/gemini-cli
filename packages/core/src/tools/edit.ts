@@ -2,12 +2,11 @@ import {
   ModifiableTool,
   ModifyContext,
 } from './modifiable-tool.js';
-import { ToolConfirmationOutcome } from './tools.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { Logger } from '../core/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
-import Diff from 'diff';
+import * as Diff from 'diff';
 import { execSync } from 'child_process';
 
 /** Parameters for the Edit tool */
@@ -24,15 +23,36 @@ export interface EditToolParams {
   branch_name?: string;
 }
 
-export class EditTool extends BaseTool implements ModifiableTool {
+export class EditTool extends BaseTool implements ModifiableTool<EditToolParams> {
   static readonly Name = 'edit';
-  private readonly client: any;
   private readonly logger: Logger;
   private readonly fileCache: Map<string, string> = new Map();
 
-  constructor(config: any) {
-    super(config);
-    this.client = config.getGeminiClient();
+  constructor(config: any) { // TODO: Define a proper type for config
+    const parameterSchema = {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Path to the file to edit.' },
+        old_string: { type: 'string', description: 'The string to be replaced. Can be a regex if use_regex is true.' },
+        new_string: { type: 'string', description: 'The string to replace with.' },
+        use_regex: { type: 'boolean', description: 'Whether to treat old_string as a regex.', default: false },
+        lookbehind: { type: 'string', description: 'Positive lookbehind for regex.' },
+        lookahead: { type: 'string', description: 'Positive lookahead for regex.' },
+        case_insensitive: { type: 'boolean', description: 'Perform case-insensitive match.', default: false },
+        count: { type: 'number', description: 'Maximum number of replacements to make.' },
+        commit_message: { type: 'string', description: 'Git commit message if changes should be committed.' },
+        branch_name: { type: 'string', description: 'Git branch name to commit to.' },
+      },
+      required: ['file_path'],
+    };
+    super(
+      EditTool.Name,
+      'Edit File', // displayName
+      'Edits a file by replacing strings or applying regex. Can also commit changes to git.', // description
+      parameterSchema, // parameterSchema
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+    );
     this.logger = new Logger('edit-tool-session');
   }
 
@@ -40,8 +60,8 @@ export class EditTool extends BaseTool implements ModifiableTool {
     if (!params.file_path) {
       return 'file_path is required.';
     }
-    if (!params.old_string && !params.new_string) {
-      return 'old_string or new_string is required.';
+    if (params.old_string === undefined && params.new_string === undefined) {
+      return 'at least one of old_string or new_string is required.';
     }
     return null;
   }
@@ -49,9 +69,31 @@ export class EditTool extends BaseTool implements ModifiableTool {
   async shouldConfirmExecute(
     params: EditToolParams,
     signal: AbortSignal,
-  ): Promise<boolean> {
-    // Implement confirmation logic if needed
-    return true;
+  ): Promise<import('./tools.js').ToolCallConfirmationDetails | false> {
+    const context = this.getModifyContext(signal);
+    const oldContent = await context.getCurrentContent(params);
+    const newContent = await context.getProposedContent(params);
+
+    if (oldContent === newContent) {
+      return false;
+    }
+
+    const fileDiff = Diff.createPatch(
+      params.file_path,
+      oldContent,
+      newContent,
+      '',
+      '',
+      { context: 3 }
+    );
+
+    return {
+      type: 'edit',
+      title: `Confirm Edit: ${params.file_path}`,
+      fileName: params.file_path,
+      fileDiff: fileDiff,
+      onConfirm: async () => {},
+    };
   }
 
   async execute(
@@ -70,7 +112,7 @@ export class EditTool extends BaseTool implements ModifiableTool {
     return `Edits file: ${params.file_path}`;
   }
 
-  async modify(context: ModifyContext): Promise<void> {
+  async modify(context: ModifyContext<EditToolParams>): Promise<void> {
     await this.logger.info('Starting edit operation');
     try {
       const params = context.getParams();
@@ -79,7 +121,6 @@ export class EditTool extends BaseTool implements ModifiableTool {
         content,
         params.old_string || '',
         params.new_string || '',
-        params.old_string === '' && content === '',
         params.use_regex ?? false,
         params.lookbehind,
         params.lookahead,
@@ -109,7 +150,6 @@ export class EditTool extends BaseTool implements ModifiableTool {
     content: string,
     oldString: string,
     newString: string,
-    isNewFileContext: boolean,
     useRegex: boolean,
     lookbehind?: string,
     lookahead?: string,
@@ -297,12 +337,10 @@ export class EditTool extends BaseTool implements ModifiableTool {
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         const content =
           await this.getModifyContext(_).getCurrentContent(params);
-        const isNewFileContext = params.old_string === '' && content === '';
         const { newContent } = await this.applyReplacement(
           content,
           params.old_string || '',
           params.new_string || '',
-          isNewFileContext,
           params.use_regex ?? false,
           params.lookbehind,
           params.lookahead,
@@ -319,8 +357,10 @@ export class EditTool extends BaseTool implements ModifiableTool {
         ...originalParams,
         old_string: oldContent,
         new_string: modifiedProposedContent,
-        modified_by_user: true,
       }),
+      getParams: () => {
+        throw new Error("Method not implemented.");
+      }
     };
   }
 
@@ -445,7 +485,3 @@ export class EditTool extends BaseTool implements ModifiableTool {
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
-
-const DEFAULT_DIFF_OPTIONS = {
-  context: 3,
-};
