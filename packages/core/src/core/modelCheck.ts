@@ -9,60 +9,79 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 
+// Cache for rate limit status - prevents repeated API calls
+const rateLimitCache = new Map<string, { limited: boolean; timestamp: number }>();
+const CACHE_DURATION = 60000; // 1 minute
+
 /**
- * Checks if the default "pro" model is rate-limited and returns a fallback "flash"
- * model if necessary. This function is designed to be silent.
- * @param apiKey The API key to use for the check.
- * @param currentConfiguredModel The model currently configured in settings.
- * @returns An object indicating the model to use, whether a switch occurred,
- *          and the original model if a switch happened.
+ * Checks if model is rate-limited, returns fallback if needed.
+ * Implements caching and optimized error handling.
  */
 export async function getEffectiveModel(
   apiKey: string,
   currentConfiguredModel: string,
 ): Promise<string> {
+  // Early return if not using default pro model
   if (currentConfiguredModel !== DEFAULT_GEMINI_MODEL) {
-    // Only check if the user is trying to use the specific pro model we want to fallback from.
     return currentConfiguredModel;
   }
 
-  const modelToTest = DEFAULT_GEMINI_MODEL;
-  const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToTest}:generateContent?key=${apiKey}`;
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: 'test' }] }],
-    generationConfig: {
-      maxOutputTokens: 1,
-      temperature: 0,
-      topK: 1,
-      thinkingConfig: { thinkingBudget: 128, includeThoughts: false },
-    },
-  });
+  const cacheKey = `${apiKey.slice(-8)}_${DEFAULT_GEMINI_MODEL}`;
+  const cached = rateLimitCache.get(cacheKey);
+  
+  // Use cached result if recent
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.limited ? DEFAULT_GEMINI_FLASH_MODEL : currentConfiguredModel;
+  }
 
+  const isLimited = await checkRateLimit(apiKey);
+  
+  // Update cache
+  rateLimitCache.set(cacheKey, { limited: isLimited, timestamp: Date.now() });
+  
+  if (isLimited) {
+    console.log(`[INFO] Model ${DEFAULT_GEMINI_MODEL} rate-limited. Using ${DEFAULT_GEMINI_FLASH_MODEL}.`);
+    return DEFAULT_GEMINI_FLASH_MODEL;
+  }
+  
+  return currentConfiguredModel;
+}
+
+/**
+ * Optimized rate limit check with minimal payload
+ */
+async function checkRateLimit(apiKey: string): Promise<boolean> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2000); // 500ms timeout for the request
+  const timeoutId = setTimeout(() => controller.abort(), 1000); // Reduced timeout
 
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: controller.signal,
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'x' }] }], // Minimal test
+          generationConfig: { maxOutputTokens: 1, temperature: 0 }
+        }),
+        signal: controller.signal,
+      }
+    );
 
+    return response.status === 429;
+  } catch {
+    return false; // Assume not rate-limited on error
+  } finally {
     clearTimeout(timeoutId);
-
-    if (response.status === 429) {
-      console.log(
-        `[INFO] Your configured model (${modelToTest}) was temporarily unavailable. Switched to ${fallbackModel} for this session.`,
-      );
-      return fallbackModel;
-    }
-    // For any other case (success, other error codes), we stick to the original model.
-    return currentConfiguredModel;
-  } catch (_error) {
-    clearTimeout(timeoutId);
-    // On timeout or any other fetch error, stick to the original model.
-    return currentConfiguredModel;
   }
 }
+
+// Clean up old cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of rateLimitCache.entries()) {
+    if (now - value.timestamp > CACHE_DURATION * 2) {
+      rateLimitCache.delete(key);
+    }
+  }
+}, CACHE_DURATION);
