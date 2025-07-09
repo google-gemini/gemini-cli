@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -14,6 +13,33 @@ import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
 import { Config } from '../config/config.js';
+
+vi.mock('mime-types', () => {
+  const lookup = (filename: string) => {
+    if (filename.endsWith('.ts') || filename.endsWith('.js')) {
+      return 'text/plain';
+    }
+    if (filename.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (filename.endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+    if (filename.endsWith('.mp3') || filename.endsWith('.wav')) {
+      return 'audio/mpeg';
+    }
+    if (filename.endsWith('.mp4') || filename.endsWith('.mov')) {
+      return 'video/mp4';
+    }
+    return false;
+  };
+  return {
+    default: {
+      lookup,
+    },
+    lookup,
+  };
+});
 
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
@@ -112,7 +138,7 @@ describe('ReadManyFilesTool', () => {
     it('should return error if paths array is empty', () => {
       const params = { paths: [] };
       expect(tool.validateParams(params)).toBe(
-        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.',
+        'params/paths must NOT have fewer than 1 items',
       );
     });
 
@@ -128,7 +154,7 @@ describe('ReadManyFilesTool', () => {
     it('should return error if paths array contains an empty string', () => {
       const params = { paths: ['file1.txt', ''] };
       expect(tool.validateParams(params)).toBe(
-        'Each item in "paths" must be a non-empty string/glob pattern.',
+        'params/paths/1 must NOT have fewer than 1 characters',
       );
     });
 
@@ -138,7 +164,7 @@ describe('ReadManyFilesTool', () => {
         include: ['*.ts', 123] as string[],
       };
       expect(tool.validateParams(params)).toBe(
-        'If provided, "include" must be an array of strings/glob patterns.',
+        'params/include/1 must be string',
       );
     });
 
@@ -148,7 +174,7 @@ describe('ReadManyFilesTool', () => {
         exclude: ['*.log', {}] as string[],
       };
       expect(tool.validateParams(params)).toBe(
-        'If provided, "exclude" must be an array of strings/glob patterns.',
+        'params/exclude/1 must be string',
       );
     });
   });

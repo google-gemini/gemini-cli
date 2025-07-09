@@ -87,6 +87,7 @@ Each server configuration supports the following properties:
 #### Optional
 
 - **`args`** (string[]): Command-line arguments for Stdio transport
+- **`headers`** (object): Custom HTTP headers when using `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
@@ -160,6 +161,24 @@ Each server configuration supports the following properties:
   "mcpServers": {
     "httpServer": {
       "httpUrl": "http://localhost:3000/mcp",
+      "timeout": 5000
+    }
+  }
+}
+```
+
+#### HTTP-based MCP Server with Custom Headers
+
+```json
+{
+  "mcpServers": {
+    "httpServerWithAuth": {
+      "httpUrl": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-token",
+        "X-Custom-Header": "custom-value",
+        "Content-Type": "application/json"
+      },
       "timeout": 5000
     }
   }

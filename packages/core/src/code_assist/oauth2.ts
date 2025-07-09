@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client, Credentials } from 'google-auth-library';
+import { OAuth2Client, Credentials, Compute } from 'google-auth-library';
 import * as http from 'http';
 import url from 'url';
 import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
+import { getErrorMessage } from '../utils/errors.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -41,6 +43,7 @@ const SIGN_IN_FAILURE_URL =
 
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
+const GOOGLE_ACCOUNT_ID_FILENAME = 'google_account_id';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -52,17 +55,61 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(): Promise<OAuth2Client> {
+export async function getOauthClient(
+  authType: AuthType,
+): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
   });
 
+  client.on('tokens', async (tokens: Credentials) => {
+    await cacheCredentials(tokens);
+  });
+
+  // If there are cached creds on disk, they always take precedence
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
+    // Check if we need to retrieve Google Account ID
+    if (!getCachedGoogleAccountId()) {
+      try {
+        const googleAccountId = await getRawGoogleAccountId(client);
+        if (googleAccountId) {
+          await cacheGoogleAccountId(googleAccountId);
+        }
+      } catch {
+        // Non-fatal, continue with existing auth.
+      }
+    }
+    console.log('Loaded cached credentials.');
     return client;
   }
 
+  // In Google Cloud Shell, we can use Application Default Credentials (ADC)
+  // provided via its metadata server to authenticate non-interactively using
+  // the identity of the user logged into Cloud Shell.
+  if (authType === AuthType.CLOUD_SHELL) {
+    try {
+      console.log("Attempting to authenticate via Cloud Shell VM's ADC.");
+      const computeClient = new Compute({
+        // We can leave this empty, since the metadata server will provide
+        // the service account email.
+      });
+      await computeClient.getAccessToken();
+      console.log('Authentication successful.');
+
+      // Do not cache creds in this case; note that Compute client will handle its own refresh
+      return computeClient;
+    } catch (e) {
+      throw new Error(
+        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+          e,
+        )}`,
+      );
+    }
+  }
+
+  // Otherwise, obtain creds using standard web flow
   const webLogin = await authWithWeb(client);
 
   console.log(
@@ -114,7 +161,19 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
             redirect_uri: redirectUri,
           });
           client.setCredentials(tokens);
-          await cacheCredentials(client.credentials);
+          // Retrieve and cache Google Account ID during authentication
+          try {
+            const googleAccountId = await getRawGoogleAccountId(client);
+            if (googleAccountId) {
+              await cacheGoogleAccountId(googleAccountId);
+            }
+          } catch (error) {
+            console.error(
+              'Failed to retrieve Google Account ID during authentication:',
+              error,
+            );
+            // Don't fail the auth flow if Google Account ID retrieval fails
+          }
 
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
           res.end();
@@ -193,10 +252,80 @@ function getCachedCredentialPath(): string {
   return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
 }
 
+function getGoogleAccountIdCachePath(): string {
+  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNT_ID_FILENAME);
+}
+
+async function cacheGoogleAccountId(googleAccountId: string): Promise<void> {
+  const filePath = getGoogleAccountIdCachePath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, googleAccountId, 'utf-8');
+}
+
+export function getCachedGoogleAccountId(): string | null {
+  try {
+    const filePath = getGoogleAccountIdCachePath();
+    if (existsSync(filePath)) {
+      return readFileSync(filePath, 'utf-8').trim() || null;
+    }
+    return null;
+  } catch (error) {
+    console.debug('Error reading cached Google Account ID:', error);
+    return null;
+  }
+}
+
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(getCachedCredentialPath());
+    await fs.rm(getCachedCredentialPath(), { force: true });
+    // Clear the Google Account ID cache when credentials are cleared
+    await fs.rm(getGoogleAccountIdCachePath(), { force: true });
   } catch (_) {
     /* empty */
+  }
+}
+
+/**
+ * Retrieves the authenticated user's Google Account ID from Google's UserInfo API.
+ * @param client - The authenticated OAuth2Client
+ * @returns The user's Google Account ID or null if not available
+ */
+export async function getRawGoogleAccountId(
+  client: OAuth2Client,
+): Promise<string | null> {
+  try {
+    // 1. Get a new Access Token including the id_token
+    const refreshedTokens = await new Promise<Credentials | null>(
+      (resolve, reject) => {
+        client.refreshAccessToken((err, tokens) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(tokens ?? null);
+        });
+      },
+    );
+
+    if (!refreshedTokens?.id_token) {
+      console.warn('No id_token obtained after refreshing tokens.');
+      return null;
+    }
+
+    // 2. Verify the ID token to securely get the user's Google Account ID.
+    const ticket = await client.verifyIdToken({
+      idToken: refreshedTokens.id_token,
+      audience: OAUTH_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub) {
+      console.warn('Could not extract sub claim from verified ID token.');
+      return null;
+    }
+
+    return payload.sub;
+  } catch (error) {
+    console.error('Error retrieving or verifying Google Account ID:', error);
+    return null;
   }
 }

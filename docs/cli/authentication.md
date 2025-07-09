@@ -1,4 +1,4 @@
-## Authentication Setup
+# Authentication Setup
 
 The Gemini CLI requires you to authenticate with Google's AI services. On initial startup you'll need to configure **one** of the following authentication methods:
 
@@ -19,7 +19,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
       ```bash
       export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
       ```
-      - For repeated use, you can add the environment variable to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
 
       ```bash
       echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
@@ -33,7 +33,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         ```bash
         export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
         ```
-      - For repeated use, you can add the environment variable to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
         ```bash
         echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
         source ~/.bashrc
@@ -47,18 +47,16 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         gcloud auth application-default login
         ```
         For more information, see [Set up Application Default Credentials for Google Cloud](https://cloud.google.com/docs/authentication/provide-credentials-adc).
-      - Set the `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_VERTEXAI` environment variables. In the following methods, replace `YOUR_PROJECT_ID` and `YOUR_PROJECT_LOCATION` with the relevant values for your project:
+      - Set the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables. In the following methods, replace `YOUR_PROJECT_ID` and `YOUR_PROJECT_LOCATION` with the relevant values for your project:
         - You can temporarily set these environment variables in your current shell session using the following commands:
           ```bash
           export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
           export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
-          export GOOGLE_GENAI_USE_VERTEXAI=true
           ```
-        - For repeated use, you can add the environment variables to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
           ```bash
           echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
           echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
-          echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
           source ~/.bashrc
           ```
     - If using express mode:
@@ -66,11 +64,47 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         - You can temporarily set these environment variables in your current shell session using the following commands:
           ```bash
           export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-          export GOOGLE_GENAI_USE_VERTEXAI=true
           ```
-        - For repeated use, you can add the environment variables to your `.env` file (located in the project directory or user home directory) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
           ```bash
           echo 'export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"' >> ~/.bashrc
-          echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
           source ~/.bashrc
           ```
+4.  **Cloud Shell:**
+    - This option is only available when running in a Google Cloud Shell environment.
+    - It automatically uses the credentials of the logged-in user in the Cloud Shell environment.
+    - This is the default authentication method when running in Cloud Shell and no other method is configured.
+
+### Persisting Environment Variables with `.env` Files
+
+You can create a **`.gemini/.env`** file in your project directory or in your home directory. Creating a plain **`.env`** file also works, but `.gemini/.env` is recommended to keep Gemini variables isolated from other tools.
+
+Gemini CLI automatically loads environment variables from the **first** `.env` file it finds, using the following search order:
+
+1. Starting in the **current directory** and moving upward toward `/`, for each directory it checks:
+   1. `.gemini/.env`
+   2. `.env`
+2. If no file is found, it falls back to your **home directory**:
+   - `~/.gemini/.env`
+   - `~/.env`
+
+> **Important:** The search stops at the **first** file encountered—variables are **not merged** across multiple files.
+
+#### Examples
+
+**Project-specific overrides** (take precedence when you are inside the project):
+
+```bash
+mkdir -p .gemini
+echo 'GOOGLE_CLOUD_PROJECT="your-project-id"' >> .gemini/.env
+```
+
+**User-wide settings** (available in every directory):
+
+```bash
+mkdir -p ~/.gemini
+cat >> ~/.gemini/.env <<'EOF'
+GOOGLE_CLOUD_PROJECT="your-project-id"
+GEMINI_API_KEY="your-gemini-api-key"
+EOF
+```

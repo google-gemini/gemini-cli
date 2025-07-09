@@ -1,0 +1,69 @@
+name: Gemini Automated Issue Triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  triage-issue:
+    timeout-minutes: 5
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    permissions:
+      issues: write
+      contents: read
+      id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Run Gemini Issue Triage
+        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        with:
+          version: 0.1.8-rc.0
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(gh label list)",
+                "run_shell_command(gh issue edit)",
+                "run_shell_command(gh issue list)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              },
+              "sandbox": false
+            }
+          prompt: |
+            You are an issue triage assistant. Analyze the current GitHub issue and apply the most appropriate existing labels.
+
+            Steps:
+            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
+            2. Review the issue title and body provided in the environment variables.
+            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
+            4. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+            5. If the issue has a "status/need-triage" label, remove it after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/need-triage"`
+
+            Guidelines:
+            - Only use labels that already exist in the repository.
+            - Do not add comments or modify the issue content.
+            - Triage only the current issue.
+            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
+
+            Guidelines:
+            - Only use labels that already exist in the repository.
+            - Do not add comments or modify the issue content.
+            - Triage only the current issue.
+            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
