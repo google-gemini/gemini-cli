@@ -67,6 +67,10 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
+import {
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+} from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
@@ -243,15 +247,34 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     const flashFallbackHandler = async (
       currentModel: string,
       fallbackModel: string,
+      error?: unknown,
     ): Promise<boolean> => {
+      let message: string;
+
+      // Check if this is a Pro quota exceeded error
+      if (error && isProQuotaExceededError(error)) {
+        message = `⚡ You have reached your daily ${currentModel} quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+      } else if (error && isGenericQuotaExceededError(error)) {
+        message = `⚡ You have reached your daily quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+      } else {
+        // Default fallback message for other cases (like consecutive 429s)
+        message = `⚡ Slow response times detected.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.`;
+      }
+
       // Add message to UI history
       addItem(
         {
           type: MessageType.INFO,
-          text: `⚡ Slow response times detected. Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
-⚡ To avoid this you can either upgrade to Standard tier. See: https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`,
+          text: message,
         },
         Date.now(),
       );
