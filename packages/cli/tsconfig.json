@@ -8,7 +8,7 @@
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "types": ["node", "vitest/globals"],
     "allowImportingTsExtensions": true,
-    "noEmit": false,
+    "noEmit": true,
     "paths": {
       "@google/gemini-cli-core": ["../core/src"],
       "@google/gemini-cli-core/*": ["../core/src/*"]

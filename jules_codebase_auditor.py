@@ -1,43 +1,3 @@
-You are tasked with guiding the gemini-cli tool through an autonomous self-improvement process that identifies, designs, and implements new features and tools to enhance its functionality.
-
-Follow this clear, structured approach:
-
-1. Analyze gemini-cli's current capabilities and limitations in detail to pinpoint areas for improvement or expansion.
-2. Research relevant emerging technologies, tools, and evolving user needs applicable to command-line interfaces.
-3. Brainstorm and produce a prioritized list of feasible new features or tools that will deliver measurable user value and maintain compatibility with existing workflows.
-4. Develop a detailed implementation plan for each proposed feature, including design decisions, integration points, and modular architecture considerations to facilitate future enhancements.
-5. Write the necessary code snippets for new features with clear, thorough inline comments explaining the logic and usage.
-6. Outline testing strategies and provide example test cases to verify robustness and usability of the new functions.
-7. Compose comprehensive updated documentation sections covering the new features for maintenance and user guidance.
-
-Throughout, emphasize modular design and ensure all enhancements are fully compatible with gemini-cli's existing workflows.
-
-# Output
-
-- Structured development plan covering analysis, research, feature prioritization, and implementation details.
-- Commented code snippets for each new feature.
-- Testing strategies along with sample test cases.
-- Updated usage documentation sections reflecting all changes.
-
-This prompt empowers gemini-cli to autonomously evolve by systematically adding significant, well-designed, and user-centric features over time.
-
----
-
-## ✨ Leveraging Specialized Tools for Self-Improvement: The Jules AI Codebase Auditor
-
-As the `gemini-cli` embarks upon its journey of autonomous self-improvement, it can summon specialized tools to enhance its analytical prowess. One such potent incantation is the **Jules AI Codebase Auditor**, a Python-driven utility designed to meticulously scrutinize the codebase for a myriad of quality metrics, directly aiding in the initial phase of self-analysis (Step 1: "Analyze gemini-cli's current capabilities and limitations").
-
-This auditor, imbued with the persona of "Google Jules," performs a comprehensive audit across correctness, security, performance, style, architecture, Dev-X, CI/CD, and testing. It is a vital component for `gemini-cli` to gain deep insights into its own structure and identify areas ripe for enhancement.
-
-### Components of the Jules AI Codebase Auditor
-
-The Jules AI Codebase Auditor comprises two primary components: a Python orchestration script and a foundational shell script for invocation.
-
-#### 1. The Python Orchestration Script (`jules_codebase_auditor.py`)
-
-This Python script serves as the central nexus, gathering the codebase, preparing the audit prompt, and invoking the external AI script. It ensures the audit is conducted with precision and the output is channeled effectively.
-
-```python
 from colorama import init, Fore, Style
 import json
 import os
@@ -66,12 +26,12 @@ JULES_PROMPT_JSON = {
             {"category": "Correctness", "description": "No runtime exceptions or logic errors."},
             {"category": "Security", "description": "Sanitise inputs, protect secrets, CVE‑free deps."},
             {"category": "Performance", "description": "Avoid blocking, redundant ops, O(N²) loops."},
-            {"category": "Readability", "description": "Idiomatic style (PEP
-8, Clippy, Prettier)."},
+            {"category": "Readability", "description": "Idiomatic style (PEP\n8, Clippy, Prettier)."},
             {"category": "Architecture", "description": "SOLID, modular, dead‑code removal."},
             {"category": "Dev-X", "description": "Reliable setup, docs, onboarding UX."},
             {"category": "CI/CD", "description": "Fast‑fail, cache‑aware workflows."},
-            {"category": "Testing", "description": "Edge‑case coverage, no flakiness."}
+            {"category": "Testing", "description": "Edge‑case coverage, no flakiness."
+            }
         ],
         "code_modularity_rules": [
             "Split logic into focused functions & modules",
@@ -133,7 +93,7 @@ JULES_PROMPT_JSON = {
                 "path": "scripts/jules-audit.sh",
                 "executable": True,
                 "language": "bash",
-                "content": "#!/data/data/com.termux/files/usr/bin/bash\nset -euo pipefail\n\n# === CONFIG ===\nPROMPT_FILE=\"${HOME}/jules_prompt.json\"\nJULES_API_SCRIPT=\"${HOME}/bin/ai-v4.0.sh\" # Adjust if needed\nPROJECT_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || echo $PWD)\"\n\n# === STYLE ===\ncyan=\"\\033[1;36m\"\ngreen=\"\\033[1;32m\"\nred=\"\\033[1;31m\"\nreset=\"\\033[0m\"\n\necho -e \"${cyan} Google Jules AI - Autonomous Codebase Auditor${reset}\"\necho -e \"${green}→ Project Root: ${PROJECT_ROOT}${reset}\"\n\n# --- Checks ---\n[[ -f \"$PROMPT_FILE\" ]] || { echo -e \"${red}✖ Prompt file not found: $PROMPT_FILE${reset}\"; exit 1; }\n[[ -x \"$JULES_API_SCRIPT\" ]] || { echo -e \"${red}✖ Gemini API script not executable: $JULES_API_SCRIPT${reset}\"; exit 1; }\n\n# --- Build code payload ---\necho -e \"${cyan} Building input payload...${reset}\"\nCODE_PAYLOAD=$(find \"$PROJECT_ROOT\" \\\n -type f \\\n -not -path '/\\.' \\\n -not -path '/node_modules/' \\\n -not -path '/pycache/' \\\n -not -path '/dist/*' \\\n -exec echo -e \"\\n### {} ###\\n\" \\\n -exec cat {} \\\n | awk '{ printf \"%s\\n\", $0 }' | sed 's/\"/\\\\\"/g')\n\n# --- Final JSON ---\nFINAL_PAYLOAD=$(jq -n --argjson prompt \"$(cat \"$PROPT_FILE\")\" --arg code \"$CODE_PAYLOAD\" '{prompt: $prompt, source_code: $code}')\n\n# --- Send to Gemini ---\necho -e \"${green} Auditing with Jules...${reset}\"\necho \"$FINAL_PAYLOAD\" | \"$JULES_API_SCRIPT\" --json --model gemini-pro\n\necho -e \"${green}✅ Audit complete.${reset}\n"
+                "content": "#!/data/data/com.termux/files/usr/bin/bash\nset -euo pipefail\n\n# === CONFIG ===\nPROMPT_FILE=\"${HOME}/jules_prompt.json\"\nJULES_API_SCRIPT=\"${HOME}/bin/ai-v4.0.sh\" # Adjust if needed\nPROJECT_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || echo $PWD)\"\n\n# === STYLE ===\ncyan=\"\\033[1;36m\"\ngreen=\"\\033[1;32m\"\nred=\"\\033[1;31m\"\nreset=\"\\033[0m\"\n\necho -e \"${cyan} Google Jules AI - Autonomous Codebase Auditor${reset}\"\necho -e \"${green}→ Project Root: ${PROJECT_ROOT}${reset}\"\n\n# --- Checks ---\n[[ -f \"$PROMPT_FILE\" ]] || { echo -e \"${red}✖ Prompt file not found: $PROMPT_FILE${reset}\"; exit 1; }\n[[ -x \"$JULES_API_SCRIPT\" ]] || { echo -e \"${red}✖ Gemini API script not executable: $JULES_API_SCRIPT${reset}\"; exit 1; }\n\n# --- Build code payload ---\necho -e \"${cyan} Building input payload...${reset}\"\nCODE_PAYLOAD=$(find \"$PROJECT_ROOT\" \\\n -type f \\\n -not -path '/\\.' \\\n -not -path '/node_modules/' \\\n -not -path '/pycache/' \\\n -not -path '/dist/*' \\\n -exec echo -e \"\\n### {} ###\\n\" \\\n -exec cat {} \\\n | awk '{ printf \"%s\\n\", $0 }' | sed 's/\"/\\\\\"/g')\n\n# --- Final JSON ---\nFINAL_PAYLOAD=$(jq -n --argjson prompt \"$(cat \"$PROMPT_FILE\")\" --arg code \"$CODE_PAYLOAD\" '{prompt: $prompt, source_code: $code}')\n\n# --- Send to Gemini ---\necho -e \"${green} Auditing with Jules...${reset}\"\necho \"$FINAL_PAYLOAD\" | \"$JULES_API_SCRIPT\" --json --model gemini-pro\n\necho -e \"${green}✅ Audit complete.${reset}\n"
             }
         ],
         "example_usage": "chmod +x scripts/jules-audit.sh && scripts/jules-audit.sh"
@@ -265,62 +225,3 @@ if __name__ == "__main__":
     execute_ai_script(final_payload_json)
 
     print(Fore.MAGENTA + "\n Pyrmethus's work is done. May your code be ever luminous!" + Style.RESET_ALL)
-```
-
-#### 2. The Shell Invocation Script (`scripts/jules-audit.sh`)
-
-This bash script acts as the direct command-line interface for initiating the Jules AI audit. It sets up the environment and pipes the generated payload to the external AI script. This script is also embedded within the `JULES_PROMPT_JSON` for self-documentation and potential self-generation.
-
-```bash
-#!/data/data/com.termux/files/usr/bin/bash
-set -euo pipefail
-
-# === CONFIG ===
-PROMPT_FILE="${HOME}/jules_prompt.json"
-JULES_API_SCRIPT="${HOME}/bin/ai-v4.0.sh" # Adjust if needed
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo $PWD)"
-
-# === STYLE ===
-cyan="\033[1;36m"
-green="\033[1;32m"
-red="\033[1;31m"
-reset="\033[0m"
-
-echo -e "${cyan} Google Jules AI - Autonomous Codebase Auditor${reset}"
-echo -e "${green}→ Project Root: ${PROJECT_ROOT}${reset}"
-
-# --- Checks ---
-[[ -f "$PROMPT_FILE" ]] || { echo -e "${red}✖ Prompt file not found: $PROMPT_FILE${reset}"; exit 1; }
-[[ -x "$JULES_API_SCRIPT" ]] || { echo -e "${red}✖ Gemini API script not executable: $JULES_API_SCRIPT${reset}"; exit 1; }
-
-# --- Build code payload ---
-echo -e "${cyan} Building input payload...${reset}"
-CODE_PAYLOAD=$(find "$PROJECT_ROOT" \
- -type f \
- -not -path '/\.' \
- -not -path '/node_modules/' \
- -not -path '/pycache/' \
- -not -path '/dist/*' \
- -exec echo -e "\n### {} ###\n" \; \
- -exec cat {} \; | awk '{ printf "%s\n", $0 }' | sed 's/"/\\"/g')
-
-# --- Final JSON ---
-FINAL_PAYLOAD=$(jq -n --argjson prompt "$(cat "$PROMPT_FILE")" --arg code "$CODE_PAYLOAD" '{prompt: $prompt, source_code: $code}')
-
-# --- Send to Gemini ---
-echo -e "${green} Auditing with Jules...${reset}"
-echo "$FINAL_PAYLOAD" | "$JULES_API_SCRIPT" --json --model gemini-pro
-
-echo -e "${green}✅ Audit complete.${reset}"
-```
-
-### Integration with `gemini-cli`'s Self-Improvement Workflow
-
-The `gemini-cli` can integrate the Jules AI Codebase Auditor into its self-improvement cycle by:
-
-1.  **Initial Analysis**: As part of its initial self-analysis (Step 1), `gemini-cli` can invoke `scripts/jules-audit.sh` on its own codebase.
-2.  **Receiving Audit Report**: The output from the Jules AI (channeled through `ai-v4.0.sh`) will provide a detailed audit report, highlighting areas for improvement.
-3.  **Informing Feature Prioritization**: This report will directly inform Step 3 ("Brainstorm and produce a prioritized list of feasible new features or tools"), allowing `gemini-cli` to prioritize enhancements based on identified weaknesses or opportunities.
-4.  **Verification**: The `test_commands` and `postconditions` within `JULES_PROMPT_JSON` ensure that any automated improvements suggested by Jules are verifiable, aligning with Step 6 ("Outline testing strategies and provide example test cases").
-
-By incorporating such a powerful auditing tool, `gemini-cli` can achieve a more profound and data-driven approach to its autonomous evolution, ensuring that its enhancements are not only innovative but also robust and aligned with best practices.

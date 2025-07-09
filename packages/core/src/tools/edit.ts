@@ -1,8 +1,8 @@
 import {
   ModifiableTool,
   ModifyContext,
-  ToolConfirmationOutcome,
 } from './modifiable-tool.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { BaseTool, ToolResult } from './tools.js';
 import { Logger } from '../core/logger.js';
 import fs from 'fs/promises';

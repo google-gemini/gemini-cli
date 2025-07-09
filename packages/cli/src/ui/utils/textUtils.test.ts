@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isBinary } from './textUtils';
+import { isBinary } from './textUtils.js';
 
 describe('textUtils', () => {
   describe('isBinary', () => {
