@@ -237,7 +237,7 @@ export const useGeminiStream = (
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
-              prompt_id: prompt_id,
+              prompt_id,
             };
             scheduleToolCalls([toolCallRequest], abortSignal);
           }
@@ -582,6 +582,8 @@ export const useGeminiStream = (
       geminiClient,
       onAuthError,
       config,
+      startNewPrompt,
+      getPromptCount,
     ],
   );
 

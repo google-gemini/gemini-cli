@@ -104,9 +104,10 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     }));
   }, []);
 
-  const getPromptCount = useCallback(() => {
-    return stats.promptCount;
-  }, [stats.promptCount]);
+  const getPromptCount = useCallback(
+    () => stats.promptCount,
+    [stats.promptCount],
+  );
 
   const value = useMemo(
     () => ({
