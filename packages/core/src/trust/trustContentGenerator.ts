@@ -21,17 +21,21 @@ import { TrustModelManagerImpl } from './modelManager.js';
 import { TrustModelConfig, GenerationOptions } from './types.js';
 import { GBNFunctionRegistry } from './gbnfFunctionRegistry.js';
 import { JsonRepairParser } from './jsonRepairParser.js';
+import { OllamaContentGenerator } from './ollamaContentGenerator.js';
 
 export class TrustContentGenerator implements ContentGenerator {
   private modelClient: TrustNodeLlamaClient;
   private modelManager: TrustModelManagerImpl;
+  private ollamaGenerator?: OllamaContentGenerator;
   private isInitialized = false;
   private gbnfEnabled = true; // Feature flag for GBNF grammar-based function calling
   private config?: any; // Will be properly typed later
   private toolRegistry?: any; // Will be properly typed later
   private jsonRepairParser: JsonRepairParser;
+  private useOllama = false; // Flag to track if Ollama is available and preferred
 
   constructor(modelsDir?: string, config?: any, toolRegistry?: any) {
+    console.error('🏗️  TrustContentGenerator constructor called with Ollama integration'); // Using console.error to ensure visibility
     this.modelClient = new TrustNodeLlamaClient();
     this.modelManager = new TrustModelManagerImpl(modelsDir);
     this.config = config;
@@ -40,10 +44,65 @@ export class TrustContentGenerator implements ContentGenerator {
   }
 
   async initialize(): Promise<void> {
+    console.log('🔧 TrustContentGenerator.initialize() called');
     if (this.isInitialized) {
+      console.log('⚠️  Already initialized, skipping');
       return;
     }
 
+    // Step 1: Try Ollama first (preferred local option)
+    console.log('🚀 Step 1: Attempting Ollama initialization...');
+    await this.tryInitializeOllama();
+
+    // Step 2: Fallback to Trust Local models if Ollama not available
+    if (!this.useOllama) {
+      console.log('🏠 Step 2: Falling back to Trust Local models...');
+      await this.initializeTrustLocal();
+    }
+
+    this.isInitialized = true;
+    console.log('✅ TrustContentGenerator initialization complete');
+  }
+
+  /**
+   * Try to initialize Ollama integration (preferred local option)
+   */
+  private async tryInitializeOllama(): Promise<void> {
+    try {
+      console.log('🔍 Checking for Ollama availability...');
+      
+      // Create Ollama content generator
+      this.ollamaGenerator = new OllamaContentGenerator(
+        this.config, 
+        this.toolRegistry,
+        {
+          model: 'qwen2.5:1.5b', // Default to smaller model
+          enableToolCalling: true,
+          maxToolCalls: 5,
+        }
+      );
+
+      // Try to initialize
+      await this.ollamaGenerator.initialize();
+      
+      this.useOllama = true;
+      console.log('✅ Ollama initialized successfully - using Ollama for local AI');
+      
+    } catch (error) {
+      console.log('ℹ️  Ollama not available, falling back to Trust Local models');
+      console.log('   Install Ollama (https://ollama.ai) for improved local AI experience');
+      console.log('   Error details:', error instanceof Error ? error.message : String(error));
+      this.useOllama = false;
+      this.ollamaGenerator = undefined;
+    }
+  }
+
+  /**
+   * Initialize Trust Local models (HuggingFace GGUF fallback)
+   */
+  private async initializeTrustLocal(): Promise<void> {
+    console.log('🔍 Initializing Trust Local models...');
+    
     await this.modelManager.initialize();
     
     // Load default model if available
@@ -66,17 +125,27 @@ export class TrustContentGenerator implements ContentGenerator {
           }
         }
       }
+    } else {
+      console.log('⚠️  No Trust Local models available');
+      console.log('   Consider downloading models or using Ollama for local AI');
     }
-
-    this.isInitialized = true;
   }
 
   async generateContent(request: GenerateContentParameters): Promise<GenerateContentResponse> {
     await this.initialize();
 
-    if (!this.modelClient.isModelLoaded()) {
-      throw new Error('No model loaded. Please load a model first.');
+    // Route to appropriate backend based on what's available
+    if (this.useOllama && this.ollamaGenerator) {
+      console.log('🚀 Using Ollama for content generation');
+      return this.ollamaGenerator.generateContent(request);
     }
+
+    // Fallback to Trust Local models
+    if (!this.modelClient.isModelLoaded()) {
+      throw new Error('No AI backend available. Please install Ollama or download Trust Local models.');
+    }
+    
+    console.log('🏠 Using Trust Local models for content generation');
 
     try {
       // Convert Gemini request format to simple text prompt
@@ -118,9 +187,18 @@ export class TrustContentGenerator implements ContentGenerator {
     console.log('DEBUG: TrustContentGenerator.generateContentStream called');
     await this.initialize();
 
-    if (!this.modelClient.isModelLoaded()) {
-      throw new Error('No model loaded. Please load a model first.');
+    // Route to appropriate backend based on what's available
+    if (this.useOllama && this.ollamaGenerator) {
+      console.log('🚀 Using Ollama for streaming content generation');
+      return this.ollamaGenerator.generateContentStream(request);
     }
+
+    // Fallback to Trust Local models
+    if (!this.modelClient.isModelLoaded()) {
+      throw new Error('No AI backend available. Please install Ollama or download Trust Local models.');
+    }
+    
+    console.log('🏠 Using Trust Local models for streaming content generation');
 
     const prompt = this.convertRequestToPrompt(request);
     const options: GenerationOptions = {
