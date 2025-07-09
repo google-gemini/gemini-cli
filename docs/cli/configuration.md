@@ -285,6 +285,10 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-1.5-pro-latest`
+- **`--force-model`**:
+  - Disables automatic model switching when slow response times are detected.
+  - When enabled, the CLI will continue using the specified model regardless of performance.
+  - Useful when you need consistent model behavior or are working with specific model capabilities.
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
 - **`--sandbox`** (**`-s`**):
