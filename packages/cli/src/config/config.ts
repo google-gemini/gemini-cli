@@ -53,7 +53,7 @@ interface CliArgs {
   allowedMcpServerNames: string | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  'system-settings-path': string | undefined;
+  systemSettingsPath: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
