@@ -18,6 +18,7 @@ import {
   FunctionCall,
   GenerateContentResponse,
 } from '@google/genai';
+import { logTokenUsage, TokenUsageData } from '@google/gemini-cli-core/dist/src/utils/token-logger.js';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 
@@ -81,7 +82,9 @@ export async function runNonInteractive(
         prompt_id,
       );
 
+      let lastResponse: GenerateContentResponse | undefined;
       for await (const resp of responseStream) {
+        lastResponse = resp;
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
           return;
@@ -93,6 +96,20 @@ export async function runNonInteractive(
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
         }
+      }
+
+      if (config.getJsonLog() && lastResponse?.usageMetadata) {
+        const tokenData: TokenUsageData = {
+          timestamp: new Date().toISOString(),
+          model: config.getModel(),
+          input_token_count: lastResponse.usageMetadata.promptTokenCount ?? 0,
+          output_token_count: lastResponse.usageMetadata.candidatesTokenCount ?? 0,
+          cached_content_token_count: lastResponse.usageMetadata.cachedContentTokenCount ?? 0,
+          thoughts_token_count: lastResponse.usageMetadata.cachedContentTokenCount ?? 0,
+          tool_token_count: 0,
+          total_token_count: lastResponse.usageMetadata.totalTokenCount ?? 0,
+        };
+        await logTokenUsage(tokenData);
       }
 
       if (functionCalls.length > 0) {

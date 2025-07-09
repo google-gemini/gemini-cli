@@ -20,7 +20,7 @@
 import { rmSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { globSync } from 'glob';
+import * as glob from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -39,7 +39,7 @@ const rootPackageJson = JSON.parse(
   readFileSync(join(root, 'package.json'), 'utf-8'),
 );
 for (const workspace of rootPackageJson.workspaces) {
-  const packages = globSync(join(workspace, 'package.json'), { cwd: root });
+  const packages = glob.sync(join(workspace, 'package.json'), { cwd: root });
   for (const pkgPath of packages) {
     const pkgDir = dirname(join(root, pkgPath));
     rmSync(join(pkgDir, 'dist'), RMRF_OPTIONS);

@@ -34,6 +34,8 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
+import { get, set } from './config-command.js';
+
 interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
@@ -53,11 +55,48 @@ interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  jsonLog: boolean | undefined;
+  // This is for the config command
+  config?: {
+    command: 'get' | 'set';
+    key: string;
+    value?: string;
+  };
 }
 
 async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
+    .command(
+      'config <command> [key] [value]',
+      'Manage Gemini CLI configuration',
+      (yargs) =>
+        yargs
+          .positional('command', {
+            describe: 'The config command to run',
+            type: 'string',
+            choices: ['get', 'set'],
+          })
+          .positional('key', {
+            describe: 'The config key',
+            type: 'string',
+          })
+          .positional('value', {
+            describe: 'The config value',
+            type: 'string',
+          }),
+      (async (argv) => {
+        if (argv.command === 'get' && argv.key) {
+          const value = await get(argv.key);
+          console.log(value);
+        } else if (argv.command === 'set' && argv.key && argv.value) {
+          await set(argv.key, argv.value);
+        } else {
+          console.log('Invalid config command');
+        }
+        process.exit(0);
+      }),
+    )
     .usage(
       '$0 [options]',
       'Gemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
@@ -167,6 +206,11 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'l',
       type: 'boolean',
       description: 'List all available extensions and exit.',
+    })
+    .option('json-log', {
+      type: 'boolean',
+      description: 'Enable JSON logging of token usage',
+      default: false,
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -316,6 +360,7 @@ export async function loadCliConfig(
       name: e.config.name,
       version: e.config.version,
     })),
+    jsonLog: argv.jsonLog,
   });
 }
 
