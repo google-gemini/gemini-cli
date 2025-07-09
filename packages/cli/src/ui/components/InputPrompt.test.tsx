@@ -191,13 +191,15 @@ describe('InputPrompt', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
-      vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(undefined);
+      vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(
+        undefined,
+      );
     });
 
     it('should handle Ctrl+V when clipboard has an image', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
-        '/test/.gemini-clipboard/clipboard-123.png'
+        '/test/.gemini-clipboard/clipboard-123.png',
       );
 
       const { stdin, unmount } = render(<InputPrompt {...props} />);
@@ -209,10 +211,10 @@ describe('InputPrompt', () => {
 
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
       expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
-        props.config.getTargetDir()
+        props.config.getTargetDir(),
       );
       expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
-        props.config.getTargetDir()
+        props.config.getTargetDir(),
       );
       expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
       unmount();
@@ -251,7 +253,7 @@ describe('InputPrompt', () => {
     it('should insert image path at cursor position with proper spacing', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
-        '/test/.gemini-clipboard/clipboard-456.png'
+        '/test/.gemini-clipboard/clipboard-456.png',
       );
 
       // Set initial text and cursor position
@@ -268,19 +270,24 @@ describe('InputPrompt', () => {
 
       // Should insert at cursor position with spaces
       expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
-      
+
       // Get the actual call to see what path was used
-      const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock.calls[0];
+      const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
+        .calls[0];
       expect(actualCall[0]).toBe(5); // start offset
       expect(actualCall[1]).toBe(5); // end offset
-      expect(actualCall[2]).toMatch(/@.*\.gemini-clipboard\/clipboard-456\.png/); // flexible path match
+      expect(actualCall[2]).toMatch(
+        /@.*\.gemini-clipboard\/clipboard-456\.png/,
+      ); // flexible path match
       unmount();
     });
 
     it('should handle errors during clipboard operations', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
-        new Error('Clipboard error')
+        new Error('Clipboard error'),
       );
 
       const { stdin, unmount } = render(<InputPrompt {...props} />);
@@ -291,10 +298,10 @@ describe('InputPrompt', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error handling clipboard image:',
-        expect.any(Error)
+        expect.any(Error),
       );
       expect(mockBuffer.setText).not.toHaveBeenCalled();
-      
+
       consoleErrorSpy.mockRestore();
       unmount();
     });
