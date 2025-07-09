@@ -55,6 +55,7 @@ interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  jsonLog: boolean | undefined;
   // This is for the config command
   config?: {
     command: 'get' | 'set';
@@ -206,7 +207,11 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-
+    .option('json-log', {
+      type: 'boolean',
+      description: 'Enable JSON logging of token usage',
+      default: false,
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -355,6 +360,7 @@ export async function loadCliConfig(
       name: e.config.name,
       version: e.config.version,
     })),
+    jsonLog: argv.jsonLog,
   });
 }
 

@@ -141,7 +141,10 @@ export interface ConfigParameters {
   extensionContextFilePaths?: string[];
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
+  jsonLog?: boolean;
 }
+
+import { Logger } from '../core/logger.js';
 
 export class Config {
   private toolRegistry!: ToolRegistry;
@@ -184,6 +187,8 @@ export class Config {
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  private readonly logger: Logger;
+  private readonly jsonLog: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -212,6 +217,8 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
+    this.logger = new Logger(this.sessionId);
+    this.jsonLog = params.jsonLog ?? false;
 
     this.fileFiltering = {
       respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
@@ -245,7 +252,12 @@ export class Config {
     }
   }
 
+  getJsonLog(): boolean {
+    return this.jsonLog;
+  }
+
   async initialize(): Promise<void> {
+    await this.logger.initialize();
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -257,6 +269,11 @@ export class Config {
     }
     this.toolRegistry = await this.createToolRegistry();
   }
+
+  getLogger(): Logger {
+    return this.logger;
+  }
+
 
   async refreshAuth(authMethod: AuthType) {
     this.contentGeneratorConfig = await createContentGeneratorConfig(
