@@ -224,8 +224,8 @@ export async function loadCliConfig(
     argv.extensions || [],
   );
 
-  if (argv['system-settings-path']) {
-    setSystemSettingsPath(argv['system-settings-path']);
+  if (argv.systemSettingsPath) {
+    setSystemSettingsPath(argv.systemSettingsPath);
   }
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
