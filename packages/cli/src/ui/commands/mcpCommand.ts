@@ -16,10 +16,10 @@ import {
   MCPDiscoveryState,
   MCPServerStatus,
 } from '@google/gemini-cli-core';
+import open from 'open';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
-const COLOR_RED = '\u001b[31m';
 const COLOR_CYAN = '\u001b[36m';
 const RESET_COLOR = '\u001b[0m';
 
@@ -48,48 +48,115 @@ const getMcpStatus = async (
 
   const mcpServers = config.getMcpServers() || {};
   const serverNames = Object.keys(mcpServers);
-  const discoveryState = getMCPDiscoveryState();
-
-  let message = 'MCP Servers Status:\n\n';
 
   if (serverNames.length === 0) {
-    message += 'No MCP servers configured.\n';
-  } else {
-    for (const serverName of serverNames) {
-      const status =
-        getMCPServerStatus(serverName) || MCPServerStatus.DISCONNECTED;
-      const serverConfig = mcpServers[serverName];
-      let serverId = '';
-      if (serverConfig.command) {
-        serverId = `${serverConfig.command} ${serverConfig.args?.join(' ') || ''}`;
-      } else if (serverConfig.httpUrl) {
-        serverId = serverConfig.httpUrl;
-      } else if (serverConfig.url) {
-        serverId = serverConfig.url;
+    const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
+    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
+      };
+    } else {
+      // Open the URL in the browser
+      await open(docsUrl);
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
+      };
+    }
+  }
+
+  // Check if any servers are still connecting
+  const connectingServers = serverNames.filter(
+    (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
+  );
+  const discoveryState = getMCPDiscoveryState();
+
+  let message = '';
+
+  // Add overall discovery status message if needed
+  if (
+    discoveryState === MCPDiscoveryState.IN_PROGRESS ||
+    connectingServers.length > 0
+  ) {
+    message += `${COLOR_YELLOW}⏳ MCP servers are starting up (${connectingServers.length} initializing)...${RESET_COLOR}\n`;
+    message += `${COLOR_CYAN}Note: First startup may take longer. Tool availability will update automatically.${RESET_COLOR}\n\n`;
+  }
+
+  message += 'Configured MCP servers:\n\n';
+
+  for (const serverName of serverNames) {
+    const allTools = toolRegistry.getAllTools();
+    const serverTools = allTools.filter(
+      (tool) =>
+        tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
+    ) as DiscoveredMCPTool[];
+
+    const status = getMCPServerStatus(serverName);
+
+    // Add status indicator with descriptive text
+    let statusIndicator = '';
+    let statusText = '';
+    switch (status) {
+      case MCPServerStatus.CONNECTED:
+        statusIndicator = '🟢';
+        statusText = 'Ready';
+        break;
+      case MCPServerStatus.CONNECTING:
+        statusIndicator = '🔄';
+        statusText = 'Starting... (first startup may take longer)';
+        break;
+      case MCPServerStatus.DISCONNECTED:
+      default:
+        statusIndicator = '🔴';
+        statusText = 'Disconnected';
+        break;
+    }
+
+    // Get server description if available
+    const server = mcpServers[serverName];
+
+    // Format server header with bold formatting and status
+    message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m - ${statusText}`;
+
+    // Add tool count with conditional messaging
+    if (status === MCPServerStatus.CONNECTED) {
+      message += ` (${serverTools.length} tools)`;
+    } else if (status === MCPServerStatus.CONNECTING) {
+      message += ` (tools will appear when ready)`;
+    } else {
+      message += ` (${serverTools.length} tools cached)`;
+    }
+
+    // Add server description with proper handling of multi-line descriptions
+    if ((showDescriptions || showSchema) && server?.description) {
+      const descLines = server.description.trim().split('\n');
+      if (descLines) {
+        message += ':\n';
+        for (const descLine of descLines) {
+          message += `    ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
+        }
+      } else {
+        message += '\n';
       }
+    } else {
+      message += '\n';
+    }
 
-      const statusColor =
-        status === MCPServerStatus.CONNECTED
-          ? COLOR_GREEN
-          : status === MCPServerStatus.CONNECTING
-            ? COLOR_YELLOW
-            : COLOR_RED;
+    // Reset formatting after server entry
+    message += RESET_COLOR;
 
-      message += `📡 ${serverName} (${statusColor}${status}${RESET_COLOR})\n`;
-      message += `  ID: ${serverId}\n`;
+    if (serverTools.length > 0) {
+      serverTools.forEach((tool) => {
+        if ((showDescriptions || showSchema) && tool.description) {
+          // Format tool name in cyan using simple ANSI cyan color
+          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}`;
 
-      const allTools = toolRegistry.getAllTools();
-      const serverTools = allTools.filter(
-        (tool) =>
-          tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
-      ) as DiscoveredMCPTool[];
-
-      if (serverTools.length > 0) {
-        message += '  Tools:\n';
-        serverTools.forEach((tool: DiscoveredMCPTool) => {
-          message += `    - ${COLOR_CYAN}${tool.name}${RESET_COLOR}`;
-          if ((showDescriptions || showSchema) && tool.description) {
-            const descLines = tool.description.trim().split('\n');
+          // Handle multi-line descriptions by properly indenting and preserving formatting
+          const descLines = tool.description.trim().split('\n');
+          if (descLines) {
             message += ':\n';
             for (const descLine of descLines) {
               message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
@@ -97,29 +164,33 @@ const getMcpStatus = async (
           } else {
             message += '\n';
           }
+          // Reset is handled inline with each line now
+        } else {
+          // Use cyan color for the tool name even when not showing descriptions
+          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}\n`;
+        }
+        if (showSchema) {
+          // Prefix the parameters in cyan
+          message += `    ${COLOR_CYAN}Parameters:${RESET_COLOR}\n`;
 
-          if (showSchema) {
-            message += `    ${COLOR_CYAN}Parameters:${RESET_COLOR}\n`;
-            const paramsLines = JSON.stringify(tool.parameterSchema, null, 2)
-              .trim()
-              .split('\n');
+          const paramsLines = JSON.stringify(tool.parameterSchema, null, 2)
+            .trim()
+            .split('\n');
+          if (paramsLines) {
             for (const paramsLine of paramsLines) {
               message += `      ${COLOR_GREEN}${paramsLine}${RESET_COLOR}\n`;
             }
           }
-        });
-      } else {
-        message += '  No tools available\n';
-      }
-      message += '\n';
+        }
+      });
+    } else {
+      message += '  No tools available\n';
     }
+    message += '\n';
   }
 
-  const discoveryColor =
-    discoveryState === MCPDiscoveryState.COMPLETED ? COLOR_GREEN : COLOR_YELLOW;
-  message += `Discovery State: ${discoveryColor}${discoveryState}${RESET_COLOR}\n`;
-
-  message += RESET_COLOR; // Final reset
+  // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
+  message += RESET_COLOR;
 
   return {
     type: 'message',
@@ -131,24 +202,22 @@ const getMcpStatus = async (
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'list configured MCP servers and tools',
-  action: (context: CommandContext) => getMcpStatus(context, false, false),
-  subCommands: [
-    {
-      name: 'desc',
-      altName: 'descriptions',
-      description: 'Show detailed descriptions for MCP servers and tools.',
-      action: (context: CommandContext) => getMcpStatus(context, true, false),
-    },
-    {
-      name: 'nodesc',
-      altName: 'nodescriptions',
-      description: 'Hide tool descriptions, showing only the tool names.',
-      action: (context: CommandContext) => getMcpStatus(context, false, false),
-    },
-    {
-      name: 'schema',
-      description: "Show the full JSON schema for the tool's parameters.",
-      action: (context: CommandContext) => getMcpStatus(context, false, true),
-    },
-  ],
+  action: async (context: CommandContext, args: string) => {
+    // Check if the args includes a specific flag to control description visibility
+    let useShowDescriptions = false;
+    let useShowSchema = false;
+
+    if (args) {
+      const lowerCase = args.toLowerCase();
+      if (lowerCase === 'desc' || lowerCase === 'descriptions') {
+        useShowDescriptions = true;
+      } else if (lowerCase === 'nodesc' || lowerCase === 'nodescriptions') {
+        useShowDescriptions = false;
+      } else if (lowerCase === 'schema') {
+        useShowSchema = true;
+      }
+    }
+
+    return getMcpStatus(context, useShowDescriptions, useShowSchema);
+  },
 };
