@@ -112,11 +112,10 @@ export function useKeypress(
 
         if (isPrefixNext) {
           nextMarkerPos = prefixPos;
-          markerLength = PASTE_MODE_PREFIX.length;
         } else if (isSuffixNext) {
           nextMarkerPos = suffixPos;
-          markerLength = PASTE_MODE_SUFFIX.length;
         }
+        markerLength = PASTE_MODE_SUFFIX.length;
 
         if (nextMarkerPos === -1) {
           keypressStream.write(data.slice(pos));
