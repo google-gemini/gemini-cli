@@ -67,7 +67,10 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import { isProQuotaExceededError, isGenericQuotaExceededError } from '@google/gemini-cli-core';
+import {
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+} from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
@@ -247,7 +250,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       error?: unknown,
     ): Promise<boolean> => {
       let message: string;
-      
+
       // Check if this is a Pro quota exceeded error
       if (error && isProQuotaExceededError(error)) {
         message = `⚡ You have reached your daily ${currentModel} quota limit.
@@ -266,7 +269,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         message = `⚡ Slow response times detected.
 ⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.`;
       }
-      
+
       // Add message to UI history
       addItem(
         {

@@ -5,15 +5,20 @@
  */
 
 import { AuthType } from '../core/contentGenerator.js';
-import { isProQuotaExceededError, isGenericQuotaExceededError } from './quotaErrorDetection.js';
-
+import {
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+} from './quotaErrorDetection.js';
 
 export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
   shouldRetry: (error: Error) => boolean;
-  onPersistent429?: (authType?: string, error?: unknown) => Promise<string | null>;
+  onPersistent429?: (
+    authType?: string,
+    error?: unknown,
+  ) => Promise<string | null>;
   authType?: string;
 }
 

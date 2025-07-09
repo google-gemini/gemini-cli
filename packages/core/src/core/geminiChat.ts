@@ -191,7 +191,10 @@ export class GeminiChat {
    * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
    * Uses a fallback handler if provided by the config, otherwise returns null.
    */
-  private async handleFlashFallback(authType?: string, error?: unknown): Promise<string | null> {
+  private async handleFlashFallback(
+    authType?: string,
+    error?: unknown,
+  ): Promise<string | null> {
     // Only handle fallback for OAuth users
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
@@ -209,7 +212,11 @@ export class GeminiChat {
     const fallbackHandler = this.config.flashFallbackHandler;
     if (typeof fallbackHandler === 'function') {
       try {
-        const accepted = await fallbackHandler(currentModel, fallbackModel, error);
+        const accepted = await fallbackHandler(
+          currentModel,
+          fallbackModel,
+          error,
+        );
         if (accepted) {
           this.config.setModel(fallbackModel);
           return fallbackModel;

@@ -45,35 +45,36 @@ export function isProQuotaExceededError(error: unknown): boolean {
   // - "Quota exceeded for quota metric 'Gemini beta-3.0 Pro Requests'"
   // - "Quota exceeded for quota metric 'Gemini experimental-v2 Pro Requests'"
   // The pattern matches: "Gemini" + whitespace + any characters (non-greedy) + whitespace + "Pro Requests'"
-  const proQuotaRegex = /Quota exceeded for quota metric 'Gemini\s+.*?\s+Pro Requests'/;
-  
+  const proQuotaRegex =
+    /Quota exceeded for quota metric 'Gemini\s+.*?\s+Pro Requests'/;
+
   if (typeof error === 'string') {
     return proQuotaRegex.test(error);
   }
-  
+
   if (isStructuredError(error)) {
     return proQuotaRegex.test(error.message);
   }
-  
+
   if (isApiError(error)) {
     return proQuotaRegex.test(error.error.message);
   }
-  
+
   return false;
 }
 
 export function isGenericQuotaExceededError(error: unknown): boolean {
   if (typeof error === 'string') {
-    return error.includes("Quota exceeded for quota metric");
+    return error.includes('Quota exceeded for quota metric');
   }
-  
+
   if (isStructuredError(error)) {
-    return error.message.includes("Quota exceeded for quota metric");
+    return error.message.includes('Quota exceeded for quota metric');
   }
-  
+
   if (isApiError(error)) {
-    return error.error.message.includes("Quota exceeded for quota metric");
+    return error.error.message.includes('Quota exceeded for quota metric');
   }
-  
+
   return false;
 }
