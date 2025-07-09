@@ -37,6 +37,7 @@ import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
+import { CLEAR_QUEUE_SIGNAL } from './constants.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
@@ -136,6 +137,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef(false);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -497,17 +499,18 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       const trimmedValue = submittedValue.trim();
 
       // Handle special queue clearing signal
-      if (trimmedValue === '__CLEAR_QUEUE__') {
+      if (trimmedValue === CLEAR_QUEUE_SIGNAL) {
         setQueuedInput(null);
         return;
       }
 
       if (trimmedValue.length > 0) {
-        if (streamingState === StreamingState.Idle) {
-          // Submit immediately if AI is idle
+        if (streamingState === StreamingState.Idle && !isSubmittingRef.current) {
+          // If idle and not already submitting, submit immediately.
+          isSubmittingRef.current = true;
           submitQuery(trimmedValue);
         } else {
-          // Queue the input for when AI finishes
+          // Otherwise, queue the input.
           setQueuedInput(trimmedValue);
         }
       }
@@ -559,11 +562,19 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   // Process queued input when AI becomes idle
   useEffect(() => {
     if (streamingState === StreamingState.Idle && queuedInput && !initError) {
+      isSubmittingRef.current = true; // Set lock before submitting
       const inputToSubmit = queuedInput;
       setQueuedInput(null);
       submitQuery(inputToSubmit);
     }
   }, [streamingState, queuedInput, initError, submitQuery]);
+
+  // Reset submission lock when streaming is finished.
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      isSubmittingRef.current = false;
+    }
+  }, [streamingState]);
 
   // Clear queued input if user cancels or there's an error
   useEffect(() => {

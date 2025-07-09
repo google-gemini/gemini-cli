@@ -20,6 +20,7 @@ import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
+import { CLEAR_QUEUE_SIGNAL } from '../constants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -215,7 +216,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         // Clear queued input on escape
         if (hasQueuedInput) {
-          onSubmit('__CLEAR_QUEUE__');
+          onSubmit(CLEAR_QUEUE_SIGNAL);
           return;
         }
       }
