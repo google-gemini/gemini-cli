@@ -302,10 +302,11 @@ describe('useGeminiStream', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       addHistory: vi.fn(),
-
       getSessionId() {
         return 'test-session-id';
       },
+      setQuotaErrorOccurred: vi.fn(),
+      getQuotaErrorOccurred: vi.fn(() => false),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -391,6 +392,8 @@ describe('useGeminiStream', () => {
           () => 'vscode' as EditorType,
           () => {},
           () => Promise.resolve(),
+          false,
+          () => {},
         );
       },
       {
@@ -531,6 +534,8 @@ describe('useGeminiStream', () => {
         () => 'vscode' as EditorType,
         () => {},
         () => Promise.resolve(),
+        false,
+        () => {},
       ),
     );
 
@@ -597,6 +602,8 @@ describe('useGeminiStream', () => {
         () => 'vscode' as EditorType,
         () => {},
         () => Promise.resolve(),
+        false,
+        () => {},
       ),
     );
 
@@ -692,6 +699,8 @@ describe('useGeminiStream', () => {
         () => 'vscode' as EditorType,
         () => {},
         () => Promise.resolve(),
+        false,
+        () => {},
       ),
     );
 
@@ -793,6 +802,8 @@ describe('useGeminiStream', () => {
         () => 'vscode' as EditorType,
         () => {},
         () => Promise.resolve(),
+        false,
+        () => {},
       ),
     );
 
@@ -1083,6 +1094,8 @@ describe('useGeminiStream', () => {
           () => 'vscode' as EditorType,
           () => {},
           mockPerformMemoryRefresh,
+          false,
+          () => {},
         ),
       );
 
@@ -1133,6 +1146,8 @@ describe('useGeminiStream', () => {
           () => 'vscode' as EditorType,
           () => {},
           () => Promise.resolve(),
+          false,
+          () => {},
         ),
       );
 

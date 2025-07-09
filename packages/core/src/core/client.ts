@@ -263,6 +263,7 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = this.MAX_TURNS,
+    originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
@@ -270,7 +271,11 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
+    // Track the original model from the first call to detect model switching
+    const initialModel = originalModel || this.config.getModel();
+
     const compressed = await this.tryCompressChat(prompt_id);
+
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
@@ -280,6 +285,14 @@ export class GeminiClient {
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+      // Check if model was switched during the call (likely due to quota error)
+      const currentModel = this.config.getModel();
+      if (currentModel !== initialModel) {
+        // Model was switched (likely due to quota error fallback)
+        // Don't continue with recursive call to prevent unwanted Flash execution
+        return turn;
+      }
+
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this,
@@ -294,6 +307,7 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
+          initialModel,
         );
       }
     }
@@ -304,9 +318,12 @@ export class GeminiClient {
     contents: Content[],
     schema: SchemaUnion,
     abortSignal: AbortSignal,
-    model: string = DEFAULT_GEMINI_FLASH_MODEL,
+    model?: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
+    // Use current model from config instead of hardcoded Flash model
+    const modelToUse =
+      model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -318,7 +335,7 @@ export class GeminiClient {
 
       const apiCall = () =>
         this.getContentGenerator().generateContent({
-          model,
+          model: modelToUse,
           config: {
             ...requestConfig,
             systemInstruction,
@@ -595,9 +612,13 @@ export class GeminiClient {
           fallbackModel,
           error,
         );
-        if (accepted) {
+        if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
           return fallbackModel;
+        }
+        // Check if the model was switched manually in the handler
+        if (this.config.getModel() === fallbackModel) {
+          return null; // Model was switched but don't continue with current prompt
         }
       } catch (error) {
         console.warn('Flash fallback handler failed:', error);
