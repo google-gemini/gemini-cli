@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { processImports, validateImportPath } from './memoryImportProcessor.js';
+import { processImports, validateImportPath, getAllowedImportDirectories } from './memoryImportProcessor.js';
 
 // Mock fs/promises
 vi.mock('fs/promises');
@@ -161,7 +161,7 @@ describe('memoryImportProcessor', () => {
       const result = await processImports(content, basePath, true);
 
       expect(result).toContain(
-        '<!-- Import failed: /absolute/path/file.md - Path traversal attempt -->',
+        '<!-- Import failed: /absolute/path/file.md - Absolute paths not allowed -->',
       );
     });
 
@@ -182,6 +182,25 @@ describe('memoryImportProcessor', () => {
       expect(result).toContain('<!-- Imported from: ./second.md -->');
       expect(result).toContain(firstContent);
       expect(result).toContain(secondContent);
+    });
+
+    it('should handle parent directory imports', async () => {
+      const content = 'Content @../parent.md more content';
+      const basePath = '/test/path/subdir';
+      const parentContent = 'Parent directory content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(parentContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result).toContain('<!-- Imported from: ../parent.md -->');
+      expect(result).toContain(parentContent);
+      expect(result).toContain('<!-- End of import from: ../parent.md -->');
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, '../parent.md'),
+        'utf-8',
+      );
     });
   });
 
@@ -204,6 +223,9 @@ describe('memoryImportProcessor', () => {
       expect(validateImportPath('./file.md', '/base', ['/base'])).toBe(true);
       expect(validateImportPath('../file.md', '/base', ['/allowed'])).toBe(
         false,
+      );
+      expect(validateImportPath('../file.md', '/base', ['/base', '/'])).toBe(
+        true,
       );
       expect(
         validateImportPath('/allowed/sub/file.md', '/base', ['/allowed']),
@@ -252,6 +274,67 @@ describe('memoryImportProcessor', () => {
       expect(
         validateImportPath('/forbidden/file.md', '/base', ['/allowed']),
       ).toBe(false);
+    });
+  });
+
+  describe('getAllowedImportDirectories', () => {
+    it('should include the base directory', () => {
+      const basePath = '/test/path/subdir';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).toContain(basePath);
+    });
+
+    it('should include all parent directories up to filesystem root', () => {
+      const basePath = '/a/b/c/d';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).toEqual([
+        '/a/b/c/d',  // current
+        '/a/b/c',    // 1 level up
+        '/a/b',      // 2 levels up
+        '/a',        // 3 levels up
+      ]);
+    });
+
+    it('should stop before filesystem root', () => {
+      const basePath = '/a';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).toEqual(['/a']);
+    });
+
+    it('should handle deep paths correctly', () => {
+      const basePath = '/very/deep/nested/path/with/many/levels';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).toHaveLength(7); // current + all levels up to root
+      expect(allowedDirs[0]).toBe(basePath);
+      expect(allowedDirs[1]).toBe('/very/deep/nested/path/with/many');
+      expect(allowedDirs[2]).toBe('/very/deep/nested/path/with');
+      expect(allowedDirs[3]).toBe('/very/deep/nested/path');
+      expect(allowedDirs[4]).toBe('/very/deep/nested');
+      expect(allowedDirs[5]).toBe('/very/deep');
+      expect(allowedDirs[6]).toBe('/very');
+    });
+
+    it('should not include filesystem root in allowed directories', () => {
+      const basePath = '/a/b';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).not.toContain('/');
+      expect(allowedDirs).toEqual(['/a/b', '/a']);
+    });
+
+    it('should handle paths very close to filesystem root', () => {
+      const basePath = '/projects/myproject';
+      const allowedDirs = getAllowedImportDirectories(basePath);
+      
+      expect(allowedDirs).toEqual([
+        '/projects/myproject',  // current
+        '/projects',            // 1 level up
+      ]);
+      expect(allowedDirs).not.toContain('/');
     });
   });
 });
