@@ -128,8 +128,6 @@ export async function getOauthClient(
     // in a minimal Docker container), it will emit an unhandled 'error' event,
     // causing the entire Node.js process to crash.
     childProcess.on('error', (_) => {
-      // Instead of crashing, we gracefully inform the user to open the URL manually.
-      // The application continues to wait for the callback, so the login can still be completed.
       console.error(
         'Failed to open browser automatically. Please open the URL manually:',
       );
