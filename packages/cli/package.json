@@ -31,7 +31,7 @@
     "@google/gemini-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
-    "diff": "^7.0.0",
+    "diff": "^8.0.2",
     "dotenv": "^16.6.1",
     "gaxios": "^7.1.1",
     "glob": "^10.4.1",
