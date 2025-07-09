@@ -4,55 +4,63 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Schema } from '@google/genai';
+import * as ajv from 'ajv';
+
+const ajValidator = new ajv.Ajv();
+
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
   /**
-   * Validates data against a JSON schema
-   * @param schema JSON Schema to validate against
-   * @param data Data to validate
-   * @returns True if valid, false otherwise
+   * Returns null if the data confroms to the schema described by schema (or if schema
+   *  is null). Otherwise, returns a string describing the error.
    */
-  static validate(schema: Record<string, unknown>, data: unknown): boolean {
-    // This is a simplified implementation
-    // In a real application, you would use a library like Ajv for proper validation
-
-    // Check for required fields
-    if (schema.required && Array.isArray(schema.required)) {
-      const required = schema.required as string[];
-      const dataObj = data as Record<string, unknown>;
-
-      for (const field of required) {
-        if (dataObj[field] === undefined) {
-          console.error(`Missing required field: ${field}`);
-          return false;
-        }
-      }
+  static validate(schema: Schema | undefined, data: unknown): string | null {
+    if (!schema) {
+      return null;
     }
-
-    // Check property types if properties are defined
-    if (schema.properties && typeof schema.properties === 'object') {
-      const properties = schema.properties as Record<string, { type?: string }>;
-      const dataObj = data as Record<string, unknown>;
-
-      for (const [key, prop] of Object.entries(properties)) {
-        if (dataObj[key] !== undefined && prop.type) {
-          const expectedType = prop.type;
-          const actualType = Array.isArray(dataObj[key])
-            ? 'array'
-            : typeof dataObj[key];
-
-          if (expectedType !== actualType) {
-            console.error(
-              `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`,
-            );
-            return false;
-          }
-        }
-      }
+    if (typeof data !== 'object' || data === null) {
+      return 'Value of params must be an object';
     }
+    const validate = ajValidator.compile(this.toObjectSchema(schema));
+    const valid = validate(data);
+    if (!valid && validate.errors) {
+      return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
+    }
+    return null;
+  }
 
-    return true;
+  /**
+   * Converts @google/genai's Schema to an object compatible with avj.
+   * This is necessry because it represents Types as an Enum (with
+   * UPPERCASE values) and minItems and minLength as strings, when they should be numbers.
+   */
+  private static toObjectSchema(schema: Schema): object {
+    const newSchema: Record<string, unknown> = { ...schema };
+    if (newSchema.anyOf && Array.isArray(newSchema.anyOf)) {
+      newSchema.anyOf = newSchema.anyOf.map((v) => this.toObjectSchema(v));
+    }
+    if (newSchema.items) {
+      newSchema.items = this.toObjectSchema(newSchema.items);
+    }
+    if (newSchema.properties && typeof newSchema.properties === 'object') {
+      const newProperties: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(newSchema.properties)) {
+        newProperties[key] = this.toObjectSchema(value as Schema);
+      }
+      newSchema.properties = newProperties;
+    }
+    if (newSchema.type) {
+      newSchema.type = String(newSchema.type).toLowerCase();
+    }
+    if (newSchema.minItems) {
+      newSchema.minItems = Number(newSchema.minItems);
+    }
+    if (newSchema.minLength) {
+      newSchema.minLength = Number(newSchema.minLength);
+    }
+    return newSchema;
   }
 }
