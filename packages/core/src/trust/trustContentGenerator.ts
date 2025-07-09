@@ -73,6 +73,9 @@ export class TrustContentGenerator implements ContentGenerator {
       // Convert Gemini request format to simple text prompt
       const prompt = this.convertRequestToPrompt(request);
       
+      console.log('DEBUG: Generated prompt length:', prompt.length);
+      console.log('DEBUG: Has tools:', 'config' in request && request.config?.tools && request.config.tools.length > 0);
+      
       // Get generation options from request config
       const options: GenerationOptions = {
         temperature: request.config?.temperature || 0.7,
@@ -80,11 +83,16 @@ export class TrustContentGenerator implements ContentGenerator {
         maxTokens: 512, // Reduced maxTokens for faster responses
       };
 
+      console.log('DEBUG: Starting text generation...');
       // Generate response using local model
       const response = await this.modelClient.generateText(prompt, options);
+      console.log('DEBUG: Generated response length:', response.length);
 
       // Convert to Gemini response format
-      return this.convertToGeminiResponse(response);
+      console.log('DEBUG: Converting to Gemini response...');
+      const geminiResponse = this.convertToGeminiResponse(response);
+      console.log('DEBUG: Found function calls:', geminiResponse.functionCalls?.length || 0);
+      return geminiResponse;
 
     } catch (error) {
       console.error('Error in generateContent:', error);
