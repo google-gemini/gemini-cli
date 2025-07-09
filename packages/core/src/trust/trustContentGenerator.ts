@@ -20,6 +20,7 @@ import { TrustNodeLlamaClient } from './nodeLlamaClient.js';
 import { TrustModelManagerImpl } from './modelManager.js';
 import { TrustModelConfig, GenerationOptions } from './types.js';
 import { GBNFunctionRegistry } from './gbnfFunctionRegistry.js';
+import { JsonRepairParser } from './jsonRepairParser.js';
 
 export class TrustContentGenerator implements ContentGenerator {
   private modelClient: TrustNodeLlamaClient;
@@ -28,12 +29,14 @@ export class TrustContentGenerator implements ContentGenerator {
   private gbnfEnabled = true; // Feature flag for GBNF grammar-based function calling
   private config?: any; // Will be properly typed later
   private toolRegistry?: any; // Will be properly typed later
+  private jsonRepairParser: JsonRepairParser;
 
   constructor(modelsDir?: string, config?: any, toolRegistry?: any) {
     this.modelClient = new TrustNodeLlamaClient();
     this.modelManager = new TrustModelManagerImpl(modelsDir);
     this.config = config;
     this.toolRegistry = toolRegistry;
+    this.jsonRepairParser = new JsonRepairParser();
   }
 
   async initialize(): Promise<void> {
@@ -287,6 +290,34 @@ Assistant: \`\`\`json
   }
 
   private parseFunctionCalls(text: string): { text: string; functionCalls: FunctionCall[] } {
+    // First try the tolerant parser
+    const parseResult = this.jsonRepairParser.parseFunctionCalls(text);
+    
+    if (parseResult.success && parseResult.functionCalls.length > 0) {
+      // Log successful repairs for debugging
+      if (parseResult.repairedJson && parseResult.errors && parseResult.errors.length > 0) {
+        console.log('DEBUG: JSON auto-repair succeeded after', parseResult.errors.length, 'attempts');
+      }
+      
+      // Remove function calls from original text
+      let cleanedText = text;
+      for (const call of parseResult.functionCalls) {
+        // Try to remove various patterns
+        const patterns = [
+          new RegExp(`\\{"function_call":\\s*\\{"name":\\s*"${call.name}"[^}]+\\}\\s*\\}`, 'g'),
+          new RegExp(`\\{"name":\\s*"${call.name}"[^}]+\\}`, 'g'),
+          new RegExp(`\`\`\`(?:json)?[^\\}]*"${call.name}"[^\\}]+\\}\`\`\``, 'gs'),
+        ];
+        
+        for (const pattern of patterns) {
+          cleanedText = cleanedText.replace(pattern, '').trim();
+        }
+      }
+      
+      return { text: cleanedText, functionCalls: parseResult.functionCalls };
+    }
+    
+    // Fall back to original parsing logic if repair fails
     const functionCalls: FunctionCall[] = [];
     let cleanedText = text;
 

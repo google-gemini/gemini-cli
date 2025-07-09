@@ -16,6 +16,9 @@ export * from './gitIntegration.js';
 export * from './helpSystem.js';
 export * from './benchmarkSystem.js';
 export * from './schemaEnforcement.js';
+export * from './jsonRepairParser.js';
+export * from './gbnfFunctionRegistry.js';
+export * from './functionCallEvaluator.js';
 
 // Trust version and metadata
 // Trust: An Open System for Modern Assurance
