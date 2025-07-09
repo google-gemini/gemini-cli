@@ -74,7 +74,7 @@
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
     "prettier": "^3.5.3",
-    "react-devtools-core": "^4.28.5",
+    "react-devtools-core": "^6.1.5",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
