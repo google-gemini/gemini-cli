@@ -13,6 +13,7 @@ import {
   EmbedContentParameters,
   Content,
   Part,
+  FunctionCall,
 } from '@google/genai';
 import { ContentGenerator } from '../core/contentGenerator.js';
 import { TrustNodeLlamaClient } from './nodeLlamaClient.js';
@@ -161,9 +162,28 @@ export class TrustContentGenerator implements ContentGenerator {
       if (typeof request.config.systemInstruction === 'object' && 'parts' in request.config.systemInstruction) {
         const systemText = this.extractTextFromParts(request.config.systemInstruction.parts);
         if (systemText) {
-          prompt += `System: ${systemText}\n\n`;
+          prompt += `${systemText}\n\n`;
         }
       }
+    }
+
+    // Add available tools information if tools are present
+    if ('config' in request && request.config?.tools && request.config.tools.length > 0) {
+      prompt += `\n# Available Function Calls\n\nYou have access to the following functions that you can call by outputting JSON in the specified format:\n\n`;
+      
+      for (const tool of request.config.tools) {
+        if (tool && typeof tool === 'object' && 'functionDeclarations' in tool && tool.functionDeclarations) {
+          for (const func of tool.functionDeclarations) {
+            prompt += `**${func.name}**: ${func.description || 'No description provided'}\n`;
+            if (func.parameters) {
+              prompt += `Parameters: ${JSON.stringify(func.parameters, null, 2)}\n`;
+            }
+            prompt += `\nTo call this function, output:\n\`\`\`json\n{"function_call": {"name": "${func.name}", "arguments": {...}}}\n\`\`\`\n\n`;
+          }
+        }
+      }
+      
+      prompt += `IMPORTANT: When you need to perform an action, always use the appropriate function call rather than providing instructions. Output the function call JSON immediately when you need to perform an action.\n\n`;
     }
 
     // Convert conversation history
@@ -199,24 +219,103 @@ export class TrustContentGenerator implements ContentGenerator {
       .trim();
   }
 
+  private parseFunctionCalls(text: string): { text: string; functionCalls: FunctionCall[] } {
+    const functionCalls: FunctionCall[] = [];
+    let cleanedText = text;
+
+    // Look for JSON function call patterns
+    const functionCallRegex = /```json\s*\n?\s*{"function_call":\s*{[^}]+}}\s*\n?\s*```/g;
+    let match;
+    
+    while ((match = functionCallRegex.exec(text)) !== null) {
+      try {
+        const jsonMatch = match[0].replace(/```json\s*\n?\s*/, '').replace(/\s*\n?\s*```/, '');
+        const parsed = JSON.parse(jsonMatch);
+        
+        if (parsed.function_call && parsed.function_call.name) {
+          const functionCall: FunctionCall = {
+            name: parsed.function_call.name,
+            args: parsed.function_call.arguments || {},
+            id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          };
+          functionCalls.push(functionCall);
+          
+          // Remove the function call from the text
+          cleanedText = cleanedText.replace(match[0], '').trim();
+        }
+      } catch (error) {
+        console.warn('Failed to parse function call JSON:', error);
+      }
+    }
+
+    // Also look for simpler patterns without code blocks
+    const simpleFunctionCallRegex = /{"function_call":\s*{"name":\s*"[^"]+",\s*"arguments":\s*{[^}]*}}}/g;
+    
+    while ((match = simpleFunctionCallRegex.exec(cleanedText)) !== null) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        
+        if (parsed.function_call && parsed.function_call.name) {
+          const functionCall: FunctionCall = {
+            name: parsed.function_call.name,
+            args: parsed.function_call.arguments || {},
+            id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          };
+          functionCalls.push(functionCall);
+          
+          // Remove the function call from the text
+          cleanedText = cleanedText.replace(match[0], '').trim();
+        }
+      } catch (error) {
+        console.warn('Failed to parse simple function call JSON:', error);
+      }
+    }
+
+    return { text: cleanedText, functionCalls };
+  }
+
   private convertToGeminiResponse(text: string): GenerateContentResponse {
-    return {
+    const { text: cleanedText, functionCalls } = this.parseFunctionCalls(text);
+    
+    const response: GenerateContentResponse = {
       candidates: [
         {
           content: {
-            parts: [{ text }],
+            parts: [{ text: cleanedText }],
             role: 'model',
           },
           finishReason: 'STOP' as any,
           index: 0,
         },
       ],
-      text: text,
+      text: cleanedText,
       data: undefined,
-      functionCalls: [],
+      functionCalls: functionCalls,
       executableCode: undefined,
       codeExecutionResult: undefined,
     } as unknown as GenerateContentResponse;
+
+    // If we found function calls, we need to add them to the response parts
+    if (functionCalls.length > 0) {
+      const parts: Part[] = [];
+      
+      // Add text part if there's any text content
+      if (cleanedText.trim()) {
+        parts.push({ text: cleanedText });
+      }
+      
+      // Add function call parts
+      for (const call of functionCalls) {
+        parts.push({ functionCall: call });
+      }
+      
+      // Update the candidate content parts
+      if (response.candidates && response.candidates[0] && response.candidates[0].content) {
+        response.candidates[0].content.parts = parts;
+      }
+    }
+
+    return response;
   }
 
   // Model management methods
