@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
 import { CustomTheme } from './theme.js';
@@ -33,7 +39,7 @@ describe('ThemeManager', () => {
 
   it('should not load invalid custom themes', () => {
     const invalidTheme = { ...validCustomTheme, Background: 'not-a-color' };
-    themeManager.loadCustomThemes({ InvalidTheme: invalidTheme as any });
+    themeManager.loadCustomThemes({ InvalidTheme: invalidTheme as unknown as CustomTheme });
     expect(themeManager.getCustomThemeNames()).not.toContain('InvalidTheme');
     expect(themeManager.isCustomTheme('InvalidTheme')).toBe(false);
   });
@@ -73,7 +79,7 @@ describe('ThemeManager', () => {
   });
 
   it('should fallback to default theme if active theme is invalid', () => {
-    (themeManager as any).activeTheme = { name: 'NonExistent', type: 'custom' };
+    (themeManager as unknown as { activeTheme: unknown }).activeTheme = { name: 'NonExistent', type: 'custom' };
     expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
   });
 

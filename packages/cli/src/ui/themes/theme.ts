@@ -317,7 +317,7 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
   error?: string;
 } {
   // Check required fields
-  const requiredFields: (keyof CustomTheme)[] = [
+  const requiredFields: Array<keyof CustomTheme> = [
     'name',
     'Background',
     'Foreground',
@@ -342,7 +342,7 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
   }
 
   // Validate color format (basic hex validation)
-  const colorFields: (keyof CustomTheme)[] = [
+  const colorFields: Array<keyof CustomTheme> = [
     'Background',
     'Foreground',
     'LightBlue',
