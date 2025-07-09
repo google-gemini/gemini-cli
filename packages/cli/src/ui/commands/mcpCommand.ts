@@ -88,8 +88,8 @@ const getMcpStatus = async (
 
   message += 'Configured MCP servers:\n\n';
 
+  const allTools = toolRegistry.getAllTools();
   for (const serverName of serverNames) {
-    const allTools = toolRegistry.getAllTools();
     const serverTools = allTools.filter(
       (tool) =>
         tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
