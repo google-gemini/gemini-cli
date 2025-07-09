@@ -36,12 +36,6 @@ function getSystemSettingsPath(): string {
 
 export const SYSTEM_SETTINGS_PATH = getSystemSettingsPath();
 
-export let systemSettingsPath = getSystemSettingsPath();
-
-export function setSystemSettingsPath(newPath: string) {
-  systemSettingsPath = newPath;
-}
-
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
@@ -275,8 +269,8 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   // Load system settings
   try {
-    if (fs.existsSync(systemSettingsPath)) {
-      const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
+    if (fs.existsSync(SYSTEM_SETTINGS_PATH)) {
+      const systemContent = fs.readFileSync(SYSTEM_SETTINGS_PATH, 'utf-8');
       const parsedSystemSettings = JSON.parse(
         stripJsonComments(systemContent),
       ) as Settings;
@@ -285,7 +279,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   } catch (error: unknown) {
     settingsErrors.push({
       message: getErrorMessage(error),
-      path: systemSettingsPath,
+      path: SYSTEM_SETTINGS_PATH,
     });
   }
 
@@ -343,7 +337,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   return new LoadedSettings(
     {
-      path: systemSettingsPath,
+      path: SYSTEM_SETTINGS_PATH,
       settings: systemSettings,
     },
     {

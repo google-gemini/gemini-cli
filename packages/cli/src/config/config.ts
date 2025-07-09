@@ -18,7 +18,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
 } from '@google/gemini-cli-core';
-import { Settings, setSystemSettingsPath } from './settings.js';
+import { Settings } from './settings.js';
 
 import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -53,7 +53,6 @@ interface CliArgs {
   allowedMcpServerNames: string | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  systemSettingsPath: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -168,10 +167,7 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-    .option('system-settings-path', {
-      type: 'string',
-      description: 'Path to system settings file.',
-    })
+
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -223,10 +219,6 @@ export async function loadCliConfig(
     extensions,
     argv.extensions || [],
   );
-
-  if (argv.systemSettingsPath) {
-    setSystemSettingsPath(argv.systemSettingsPath);
-  }
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
