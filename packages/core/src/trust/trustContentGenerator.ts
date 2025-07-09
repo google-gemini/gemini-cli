@@ -128,19 +128,55 @@ export class TrustContentGenerator implements ContentGenerator {
     options: GenerationOptions
   ): AsyncGenerator<GenerateContentResponse> {
     console.log('DEBUG: Starting generateStreamingResponse...');
+    
+    // Let's test if we can yield at all
+    try {
+      console.log('DEBUG: Testing basic yield functionality...');
+      const testResponse: GenerateContentResponse = {
+        candidates: [{
+          content: { parts: [{ text: 'test' }], role: 'model' },
+          finishReason: 'STOP' as any,
+          index: 0,
+        }],
+        text: 'test',
+        functionCalls: [],
+      } as any;
+      
+      console.log('DEBUG: About to yield test response...');
+      yield testResponse;
+      console.log('DEBUG: Successfully yielded test response');
+      
+    } catch (error) {
+      console.error('DEBUG: Basic yield failed:', error);
+      throw error;
+    }
+    
+    console.log('DEBUG: Basic yield test completed, now trying model stream...');
+    
     try {
       console.log('DEBUG: About to call modelClient.generateStream...');
-      for await (const chunk of this.modelClient.generateStream(prompt, options)) {
-        console.log('DEBUG: Got chunk from model client:', chunk.substring(0, 50));
-        console.log('DEBUG: Full chunk length:', chunk.length);
+      const streamGenerator = this.modelClient.generateStream(prompt, options);
+      console.log('DEBUG: Created stream generator:', typeof streamGenerator);
+      
+      let chunkCount = 0;
+      console.log('DEBUG: Starting for-await loop...');
+      
+      for await (const chunk of streamGenerator) {
+        chunkCount++;
+        console.log(`DEBUG: *** INSIDE LOOP - Processing chunk ${chunkCount} ***`);
+        console.log(`DEBUG: Chunk content:`, chunk.substring(0, 100));
+        
         const geminiResponse = this.convertToGeminiResponse(chunk);
-        console.log('DEBUG: Yielding response with function calls:', geminiResponse.functionCalls?.length || 0);
+        console.log('DEBUG: Conversion completed, yielding...');
         yield geminiResponse;
+        console.log('DEBUG: Yield completed for chunk', chunkCount);
       }
-      console.log('DEBUG: Finished streaming generation');
+      
+      console.log(`DEBUG: Exited for-await loop, processed ${chunkCount} chunks`);
+      
     } catch (error) {
-      console.error('Error in generateContentStream:', error);
-      throw new Error(`Local model streaming failed: ${error}`);
+      console.error('DEBUG: Error in streaming loop:', error);
+      throw error;
     }
   }
 
@@ -247,6 +283,11 @@ export class TrustContentGenerator implements ContentGenerator {
     // Look for JSON function call patterns - updated to handle nested objects and multiline formatting
     // Support both ```json and ```bash blocks since models sometimes use different blocks
     const functionCallRegex = /```(?:json|bash)\s*\n([\s\S]*?)\n\s*```/gs;
+    console.log('DEBUG: Testing regex against text...');
+    console.log('DEBUG: Regex pattern:', functionCallRegex.source);
+    console.log('DEBUG: Regex test result:', functionCallRegex.test(text));
+    // Reset regex since test() advances the lastIndex
+    functionCallRegex.lastIndex = 0;
     let match;
     
     while ((match = functionCallRegex.exec(text)) !== null) {
@@ -302,6 +343,8 @@ export class TrustContentGenerator implements ContentGenerator {
 
   private convertToGeminiResponse(text: string): GenerateContentResponse {
     console.log('DEBUG: Converting to Gemini response, text length:', text.length);
+    console.log('DEBUG: Text contains function_call:', text.includes('function_call'));
+    console.log('DEBUG: Raw text (first 300 chars):', JSON.stringify(text.substring(0, 300)));
     const { text: cleanedText, functionCalls } = this.parseFunctionCalls(text);
     
     const response: GenerateContentResponse = {
