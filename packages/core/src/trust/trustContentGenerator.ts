@@ -77,7 +77,7 @@ export class TrustContentGenerator implements ContentGenerator {
       const options: GenerationOptions = {
         temperature: request.config?.temperature || 0.7,
         topP: request.config?.topP || 0.9,
-        maxTokens: 2048, // Default maxTokens since it's not in GenerateContentConfig
+        maxTokens: 512, // Reduced maxTokens for faster responses
       };
 
       // Generate response using local model
@@ -105,7 +105,7 @@ export class TrustContentGenerator implements ContentGenerator {
     const options: GenerationOptions = {
       temperature: request.config?.temperature || 0.7,
       topP: request.config?.topP || 0.9,
-      maxTokens: 2048, // Default maxTokens
+      maxTokens: 512, // Reduced maxTokens for faster responses
     };
 
     return this.generateStreamingResponse(prompt, options);
@@ -169,21 +169,17 @@ export class TrustContentGenerator implements ContentGenerator {
 
     // Add available tools information if tools are present
     if ('config' in request && request.config?.tools && request.config.tools.length > 0) {
-      prompt += `\n# Available Function Calls\n\nYou have access to the following functions that you can call by outputting JSON in the specified format:\n\n`;
+      prompt += `\nAVAILABLE TOOLS: You can call functions by outputting JSON like {"function_call": {"name": "FUNCTION_NAME", "arguments": {...}}}.\n\nTools:\n`;
       
       for (const tool of request.config.tools) {
         if (tool && typeof tool === 'object' && 'functionDeclarations' in tool && tool.functionDeclarations) {
           for (const func of tool.functionDeclarations) {
-            prompt += `**${func.name}**: ${func.description || 'No description provided'}\n`;
-            if (func.parameters) {
-              prompt += `Parameters: ${JSON.stringify(func.parameters, null, 2)}\n`;
-            }
-            prompt += `\nTo call this function, output:\n\`\`\`json\n{"function_call": {"name": "${func.name}", "arguments": {...}}}\n\`\`\`\n\n`;
+            prompt += `- ${func.name}: ${func.description || 'No description'}\n`;
           }
         }
       }
       
-      prompt += `IMPORTANT: When you need to perform an action, always use the appropriate function call rather than providing instructions. Output the function call JSON immediately when you need to perform an action.\n\n`;
+      prompt += `\nUse functions instead of providing instructions. Call them immediately when needed.\n\n`;
     }
 
     // Convert conversation history
