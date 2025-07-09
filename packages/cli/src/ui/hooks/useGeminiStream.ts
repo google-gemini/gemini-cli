@@ -716,10 +716,13 @@ export const useGeminiStream = (
         return;
       }
 
-      submitQuery(mergePartListUnions(responsesToSend), {
-        isContinuation: true,
-      },
-        prompt_ids[0],);
+      submitQuery(
+        mergePartListUnions(responsesToSend),
+        {
+          isContinuation: true,
+        },
+        prompt_ids[0],
+      );
     },
     [
       isResponding,
