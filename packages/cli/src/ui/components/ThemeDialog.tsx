@@ -70,7 +70,7 @@ export function ThemeDialog({
   // Find the index of the selected theme, but only if it exists in the list
   const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
-    (item) => item.value === selectedThemeName
+    (item) => item.value === selectedThemeName,
   );
   // If not found, fallback to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
@@ -136,8 +136,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-      PREVIEW_PANE_WIDTH_PERCENTAGE *
-      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+        PREVIEW_PANE_WIDTH_PERCENTAGE *
+        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
