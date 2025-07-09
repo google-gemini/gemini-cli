@@ -18,10 +18,11 @@ import {
 import { ContentGenerator } from '../core/contentGenerator.js';
 import { TrustNodeLlamaClient } from './nodeLlamaClient.js';
 import { TrustModelManagerImpl } from './modelManager.js';
-import { TrustModelConfig, GenerationOptions } from './types.js';
+import { TrustModelConfig, GenerationOptions, TrustConfig, AIBackend } from './types.js';
 import { GBNFunctionRegistry } from './gbnfFunctionRegistry.js';
 import { JsonRepairParser } from './jsonRepairParser.js';
 import { OllamaContentGenerator } from './ollamaContentGenerator.js';
+import { TrustConfiguration } from '../config/trustConfig.js';
 
 export class TrustContentGenerator implements ContentGenerator {
   private modelClient: TrustNodeLlamaClient;
@@ -33,6 +34,7 @@ export class TrustContentGenerator implements ContentGenerator {
   private toolRegistry?: any; // Will be properly typed later
   private jsonRepairParser: JsonRepairParser;
   private useOllama = false; // Flag to track if Ollama is available and preferred
+  private trustConfig: TrustConfiguration;
 
   constructor(modelsDir?: string, config?: any, toolRegistry?: any) {
     console.error('🏗️  TrustContentGenerator constructor called with Ollama integration'); // Using console.error to ensure visibility
@@ -41,6 +43,7 @@ export class TrustContentGenerator implements ContentGenerator {
     this.config = config;
     this.toolRegistry = toolRegistry;
     this.jsonRepairParser = new JsonRepairParser();
+    this.trustConfig = new TrustConfiguration();
   }
 
   async initialize(): Promise<void> {
@@ -50,14 +53,28 @@ export class TrustContentGenerator implements ContentGenerator {
       return;
     }
 
-    // Step 1: Try Ollama first (preferred local option)
-    console.log('🚀 Step 1: Attempting Ollama initialization...');
-    await this.tryInitializeOllama();
+    // Initialize configuration
+    await this.trustConfig.initialize();
 
-    // Step 2: Fallback to Trust Local models if Ollama not available
-    if (!this.useOllama) {
-      console.log('🏠 Step 2: Falling back to Trust Local models...');
-      await this.initializeTrustLocal();
+    // Use configuration-based backend ordering
+    const fallbackOrder = this.trustConfig.getFallbackOrder();
+    const isFallbackEnabled = this.trustConfig.isFallbackEnabled();
+
+    console.log(`🔧 AI Backend Configuration: ${fallbackOrder.join(' → ')} (fallback: ${isFallbackEnabled ? 'enabled' : 'disabled'})`);
+
+    // Try each backend in order
+    for (const backend of fallbackOrder) {
+      if (this.trustConfig.isBackendEnabled(backend as AIBackend)) {
+        if (await this.tryInitializeBackend(backend as AIBackend)) {
+          console.log(`✅ Successfully initialized ${backend} backend`);
+          break;
+        } else if (!isFallbackEnabled) {
+          console.log(`❌ Failed to initialize ${backend} backend (fallback disabled)`);
+          break;
+        }
+      } else {
+        console.log(`⚠️  Backend ${backend} is disabled in configuration`);
+      }
     }
 
     this.isInitialized = true;
@@ -65,43 +82,71 @@ export class TrustContentGenerator implements ContentGenerator {
   }
 
   /**
-   * Try to initialize Ollama integration (preferred local option)
+   * Try to initialize a specific backend
    */
-  private async tryInitializeOllama(): Promise<void> {
+  private async tryInitializeBackend(backend: AIBackend): Promise<boolean> {
     try {
-      console.log('🔍 Checking for Ollama availability...');
-      
-      // Create Ollama content generator
-      this.ollamaGenerator = new OllamaContentGenerator(
-        this.config, 
-        this.toolRegistry,
-        {
-          model: 'qwen2.5:1.5b', // Default to smaller model
-          enableToolCalling: true,
-          maxToolCalls: 5,
-        }
-      );
-
-      // Try to initialize
-      await this.ollamaGenerator.initialize();
-      
-      this.useOllama = true;
-      console.log('✅ Ollama initialized successfully - using Ollama for local AI');
-      
+      switch (backend) {
+        case 'ollama':
+          return await this.tryInitializeOllama();
+        case 'trust-local':
+          return await this.tryInitializeTrustLocal();
+        case 'cloud':
+          return await this.tryInitializeCloud();
+        default:
+          console.log(`⚠️  Unknown backend: ${backend}`);
+          return false;
+      }
     } catch (error) {
-      console.log('ℹ️  Ollama not available, falling back to Trust Local models');
-      console.log('   Install Ollama (https://ollama.ai) for improved local AI experience');
-      console.log('   Error details:', error instanceof Error ? error.message : String(error));
-      this.useOllama = false;
-      this.ollamaGenerator = undefined;
+      console.log(`❌ Failed to initialize ${backend} backend:`, error instanceof Error ? error.message : String(error));
+      return false;
     }
   }
 
   /**
-   * Initialize Trust Local models (HuggingFace GGUF fallback)
+   * Try to initialize Ollama integration (preferred local option)
    */
-  private async initializeTrustLocal(): Promise<void> {
+  private async tryInitializeOllama(): Promise<boolean> {
+    console.log('🔍 Checking for Ollama availability...');
+    
+    // Get Ollama configuration from trust config
+    const ollamaConfig = this.trustConfig.getOllamaConfig();
+    
+    // Create Ollama content generator with configuration
+    this.ollamaGenerator = new OllamaContentGenerator(
+      this.config, 
+      this.toolRegistry,
+      {
+        model: ollamaConfig.defaultModel,
+        baseUrl: ollamaConfig.baseUrl,
+        enableToolCalling: true,
+        maxToolCalls: ollamaConfig.maxToolCalls,
+        timeout: ollamaConfig.timeout,
+      }
+    );
+
+    // Try to initialize
+    await this.ollamaGenerator.initialize();
+    
+    this.useOllama = true;
+    console.log('✅ Ollama initialized successfully - using Ollama for local AI');
+    console.log(`ℹ️  Model: ${ollamaConfig.defaultModel} | Timeout: ${ollamaConfig.timeout}ms`);
+    
+    return true;
+  }
+
+  /**
+   * Try to initialize Trust Local models (HuggingFace GGUF fallback)
+   */
+  private async tryInitializeTrustLocal(): Promise<boolean> {
     console.log('🔍 Initializing Trust Local models...');
+    
+    // Check if Trust Local is enabled
+    const trustLocalConfig = this.trustConfig.getTrustLocalConfig();
+    if (!trustLocalConfig.enabled) {
+      console.log('⚠️  Trust Local backend is disabled in configuration');
+      return false;
+    }
     
     await this.modelManager.initialize();
     
@@ -110,7 +155,8 @@ export class TrustContentGenerator implements ContentGenerator {
     if (currentModel) {
       try {
         await this.modelClient.loadModel(currentModel.path, currentModel);
-        console.log(`Loaded default model: ${currentModel.name}`);
+        console.log(`✅ Loaded default model: ${currentModel.name}`);
+        return true;
       } catch (error) {
         console.warn(`Failed to load default model ${currentModel.name}:`, error);
         // Try to load a recommended model
@@ -119,16 +165,41 @@ export class TrustContentGenerator implements ContentGenerator {
           try {
             await this.modelClient.loadModel(recommended.path, recommended);
             await this.modelManager.switchModel(recommended.name);
-            console.log(`Loaded recommended model: ${recommended.name}`);
+            console.log(`✅ Loaded recommended model: ${recommended.name}`);
+            return true;
           } catch (error2) {
-            console.error('Failed to load any model:', error2);
+            console.error('❌ Failed to load any model:', error2);
+            return false;
           }
         }
       }
     } else {
       console.log('⚠️  No Trust Local models available');
       console.log('   Consider downloading models or using Ollama for local AI');
+      return false;
     }
+    
+    return false;
+  }
+
+  /**
+   * Try to initialize Cloud backend
+   */
+  private async tryInitializeCloud(): Promise<boolean> {
+    console.log('🔍 Checking for Cloud backend availability...');
+    
+    // Check if Cloud is enabled
+    const cloudConfig = this.trustConfig.getCloudConfig();
+    if (!cloudConfig.enabled) {
+      console.log('⚠️  Cloud backend is disabled in configuration');
+      return false;
+    }
+    
+    console.log(`✅ Cloud backend ready (provider: ${cloudConfig.provider})`);
+    console.log('ℹ️  Note: Cloud functionality requires additional setup');
+    
+    // For now, return true since cloud setup is handled elsewhere
+    return true;
   }
 
   async generateContent(request: GenerateContentParameters): Promise<GenerateContentResponse> {
@@ -525,6 +596,57 @@ Assistant: \`\`\`json
 
   getRecommendedModel(task: string, ramLimit?: number): TrustModelConfig | null {
     return this.modelManager.getRecommendedModel(task, ramLimit);
+  }
+
+  // Configuration management methods
+  getTrustConfig(): TrustConfiguration {
+    return this.trustConfig;
+  }
+
+  async saveConfig(): Promise<void> {
+    await this.trustConfig.save();
+  }
+
+  async setBackendPreference(backend: AIBackend): Promise<void> {
+    this.trustConfig.setPreferredBackend(backend);
+    await this.saveConfig();
+    
+    // Reinitialize with new preference
+    this.isInitialized = false;
+    this.useOllama = false;
+    this.ollamaGenerator = undefined;
+    
+    await this.initialize();
+  }
+
+  async setFallbackOrder(order: AIBackend[]): Promise<void> {
+    this.trustConfig.setFallbackOrder(order);
+    await this.saveConfig();
+    
+    // Reinitialize with new order
+    this.isInitialized = false;
+    this.useOllama = false;
+    this.ollamaGenerator = undefined;
+    
+    await this.initialize();
+  }
+
+  getCurrentBackend(): string {
+    if (this.useOllama && this.ollamaGenerator) {
+      return 'ollama';
+    } else if (this.modelClient.isModelLoaded()) {
+      return 'trust-local';
+    } else {
+      return 'cloud';
+    }
+  }
+
+  getBackendStatus(): { [key: string]: boolean } {
+    return {
+      ollama: this.useOllama && !!this.ollamaGenerator,
+      'trust-local': this.modelClient.isModelLoaded(),
+      cloud: this.trustConfig.getCloudConfig().enabled,
+    };
   }
 
   /**

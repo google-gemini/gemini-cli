@@ -36,6 +36,25 @@ export const DEFAULT_TRUST_CONFIG: TrustConfig = {
     showModelInfo: true,
     showPerformanceMetrics: true,
   },
+  ai: {
+    preferredBackend: 'ollama',
+    fallbackOrder: ['ollama', 'trust-local', 'cloud'],
+    enableFallback: true,
+    ollama: {
+      baseUrl: 'http://localhost:11434',
+      defaultModel: 'qwen2.5:1.5b',
+      timeout: 120000,
+      maxToolCalls: 3,
+    },
+    trustLocal: {
+      enabled: true,
+      gbnfFunctions: true,
+    },
+    cloud: {
+      enabled: false,
+      provider: 'google',
+    },
+  },
 };
 
 export class TrustConfiguration {
@@ -131,5 +150,78 @@ export class TrustConfiguration {
 
   setTransparencySettings(settings: Partial<TrustConfig['transparency']>): void {
     this.config.transparency = { ...this.config.transparency, ...settings };
+  }
+
+  // AI Backend Configuration Methods
+  getPreferredBackend(): string {
+    return this.config.ai.preferredBackend;
+  }
+
+  setPreferredBackend(backend: 'ollama' | 'trust-local' | 'cloud'): void {
+    this.config.ai.preferredBackend = backend;
+  }
+
+  getFallbackOrder(): string[] {
+    return [...this.config.ai.fallbackOrder];
+  }
+
+  setFallbackOrder(order: ('ollama' | 'trust-local' | 'cloud')[]): void {
+    this.config.ai.fallbackOrder = order;
+  }
+
+  isFallbackEnabled(): boolean {
+    return this.config.ai.enableFallback;
+  }
+
+  setFallbackEnabled(enabled: boolean): void {
+    this.config.ai.enableFallback = enabled;
+  }
+
+  getOllamaConfig() {
+    return { ...this.config.ai.ollama };
+  }
+
+  setOllamaConfig(config: Partial<TrustConfig['ai']['ollama']>): void {
+    this.config.ai.ollama = { ...this.config.ai.ollama, ...config };
+  }
+
+  getTrustLocalConfig() {
+    return { ...this.config.ai.trustLocal };
+  }
+
+  setTrustLocalConfig(config: Partial<TrustConfig['ai']['trustLocal']>): void {
+    this.config.ai.trustLocal = { ...this.config.ai.trustLocal, ...config };
+  }
+
+  getCloudConfig() {
+    return { ...this.config.ai.cloud };
+  }
+
+  setCloudConfig(config: Partial<TrustConfig['ai']['cloud']>): void {
+    this.config.ai.cloud = { ...this.config.ai.cloud, ...config };
+  }
+
+  isBackendEnabled(backend: 'ollama' | 'trust-local' | 'cloud'): boolean {
+    switch (backend) {
+      case 'ollama':
+        return true; // Ollama is always enabled if available
+      case 'trust-local':
+        return this.config.ai.trustLocal.enabled;
+      case 'cloud':
+        return this.config.ai.cloud.enabled;
+      default:
+        return false;
+    }
+  }
+
+  setBackendEnabled(backend: 'trust-local' | 'cloud', enabled: boolean): void {
+    switch (backend) {
+      case 'trust-local':
+        this.config.ai.trustLocal.enabled = enabled;
+        break;
+      case 'cloud':
+        this.config.ai.cloud.enabled = enabled;
+        break;
+    }
   }
 }

@@ -94,6 +94,12 @@ export interface TrustModelManager {
 export type PrivacyMode = 'strict' | 'moderate' | 'open';
 
 /**
+ * AI Backend Type
+ * Part of Trust: An Open System for Modern Assurance
+ */
+export type AIBackend = 'ollama' | 'trust-local' | 'cloud';
+
+/**
  * Trust Configuration
  * Part of Trust: An Open System for Modern Assurance
  */
@@ -120,6 +126,25 @@ export interface TrustConfig {
     logResponses: boolean;
     showModelInfo: boolean;
     showPerformanceMetrics: boolean;
+  };
+  ai: {
+    preferredBackend: AIBackend;
+    fallbackOrder: AIBackend[];
+    enableFallback: boolean;
+    ollama: {
+      baseUrl: string;
+      defaultModel: string;
+      timeout: number;
+      maxToolCalls: number;
+    };
+    trustLocal: {
+      enabled: boolean;
+      gbnfFunctions: boolean;
+    };
+    cloud: {
+      enabled: boolean;
+      provider: 'google' | 'openai' | 'anthropic';
+    };
   };
 }
 
