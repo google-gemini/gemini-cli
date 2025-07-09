@@ -5,13 +5,13 @@
  */
 
 import { FunctionDeclaration, Schema, Type } from '@google/genai';
-import { Tool, ToolResult, BaseTool } from './tools.js';
-import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
+import { parse } from 'shell-quote';
+import { Config } from '../config/config.js';
 import { discoverMcpTools } from './mcp-client.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { parse } from 'shell-quote';
+import { BaseTool, Tool, ToolResult } from './tools.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -339,6 +339,7 @@ export class ToolRegistry {
  * It performs the following actions:
  * - Removes the `default` property when `anyOf` is present.
  * - Removes unsupported `format` values from string properties, keeping only 'enum' and 'date-time'.
+ * - Ensures type values are properly formatted for the Gemini API (uppercase).
  * - Recursively sanitizes nested schemas within `anyOf`, `items`, and `properties`.
  * - Handles circular references within the schema to prevent infinite loops.
  *
@@ -358,6 +359,34 @@ function _sanitizeParameters(schema: Schema | undefined, visited: Set<Schema>) {
     return;
   }
   visited.add(schema);
+
+  // Ensure type values are in the correct format for the Gemini API
+  // Note: Type values should already be in the correct format when using @google/genai Type enum
+  if (schema.type && typeof schema.type === 'string') {
+    // Handle cases where schema.type might be a string literal instead of Type enum
+    const typeAsString = schema.type as string;
+    switch (typeAsString) {
+      case 'string':
+        (schema as any).type = Type.STRING;
+        break;
+      case 'array':
+        (schema as any).type = Type.ARRAY;
+        break;
+      case 'object':
+        (schema as any).type = Type.OBJECT;
+        break;
+      case 'boolean':
+        (schema as any).type = Type.BOOLEAN;
+        break;
+      case 'number':
+        (schema as any).type = Type.NUMBER;
+        break;
+      case 'integer':
+        (schema as any).type = Type.INTEGER;
+        break;
+      // If already in correct format (Type enum), keep as-is
+    }
+  }
 
   if (schema.anyOf) {
     // Vertex AI gets confused if both anyOf and default are set.
