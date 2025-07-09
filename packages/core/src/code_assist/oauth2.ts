@@ -127,7 +127,7 @@ export async function getOauthClient(
     // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
     // in a minimal Docker container), it will emit an unhandled 'error' event,
     // causing the entire Node.js process to crash.
-    childProcess.on('error', (err) => {
+    childProcess.on('error', (_) => {
       // Instead of crashing, we gracefully inform the user to open the URL manually.
       // The application continues to wait for the callback, so the login can still be completed.
       console.error(
@@ -136,8 +136,6 @@ export async function getOauthClient(
       console.error(webLogin.authUrl);
     });
   } catch (err) {
-    // This catch block is for unexpected errors during the `open` call itself,
-    // though failures like command-not-found are typically raised as 'error' events.
     console.error(
       'An unexpected error occurred while trying to open the browser:',
       err,
@@ -151,16 +149,7 @@ export async function getOauthClient(
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
-  let port: number;
-  const portStr = process.env.OAUTH_CALLBACK_PORT;
-  if (portStr) {
-    port = parseInt(portStr, 10);
-    if (isNaN(port) || port <= 0 || port > 65535) {
-      throw new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`);
-    }
-  } else {
-    port = await getAvailablePort();
-  }
+  const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   const host = process.env.OAUTH_CALLBACK_HOST || 'localhost';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
@@ -240,6 +229,16 @@ export function getAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     let port = 0;
     try {
+      const portStr = process.env.OAUTH_CALLBACK_PORT;
+      if (portStr) {
+        port = parseInt(portStr, 10);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          throw new Error(
+            `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
+          );
+        }
+        return port;
+      }
       const server = net.createServer();
       server.listen(0, () => {
         const address = server.address()! as net.AddressInfo;
