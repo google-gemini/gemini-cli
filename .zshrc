@@ -1,102 +1,120 @@
-# Pyrmethus, the Termux Coding Wizard, summons the power of Zsh in Termux
-# Crafting an enchanted .zshrc for harmony and efficiency
-
-# Source Termux environment setup
-[ -f /data/data/com.termux/files/usr/etc/profile ] && source /data/data/com.termux/files/usr/etc/profile
-
-# Initialize Zsh plugins (ensure installed via pkg)
-# Command: pkg install zsh zsh-completions git
-ZSH_PLUGINS_DIR="$HOME/.zsh"
-[ ! -d "$ZSH_PLUGINS_DIR" ] && mkdir -p "$ZSH_PLUGINS_DIR"
-
-# Load zsh-completions
-fpath=($ZSH_PLUGINS_DIR/zsh-completions/src $fpath)
-
-# Clone and load zsh-autosuggestions if not present
-if [ ! -d "$ZSH_PLUGINS_DIR/zsh-autosuggestions" ]; then
-  git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_PLUGINS_DIR/zsh-autosuggestions"
+if [ -z "$ZSH_VERSION" ]; then
+  echo "This config is for ZSH, and will not work with other shells."
+  return 1
 fi
-source "$ZSH_PLUGINS_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-# Clone and load zsh-syntax-highlighting if not present
-if [ ! -d "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting" ]; then
-  git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting"
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
-source "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 
-# Enable completion system
-autoload -Uz compinit
-compinit
+# If you come from bash you might have to change your $PATH.
+# export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
-# History settings for eternal memory
-setopt APPEND_HISTORY
-setopt SHARE_HISTORY
-HISTFILE=$HOME/.zsh_history
-HISTSIZE=10000
-SAVEHIST=10000
+# Path to your Oh My Zsh installation.
+export ZSH="$HOME/.oh-my-zsh"
 
-# Prompt enchantment: Display user, host, and directory in vibrant colors
-autoload -U colors && colors
-PROMPT="%{$fg_bold[blue]%}%n@%m%{$reset_color%} %{$fg[green]%}%~%{$reset_color%} $ "
+# Set name of the theme to load --- if set to "random", it will
+# load a random theme each time Oh My Zsh is loaded, in which case,
+# to know which specific one was loaded, run: echo $RANDOM_THEME
+# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
+ZSH_THEME="powerlevel10k/powerlevel10k"
 
-# Aliases: Summon shortcuts to wield terminal powers
-alias ls='ls --color=auto'          # Colorized ls output
-alias ll='ls -lah'                  # Detailed listing with human-readable sizes
-alias cls='clear; termux-toast "Screen cleared!"' # Clear with a mystical toast
-alias py='python'                   # Quick Python invocation
-alias gs='git status'               # Swift Git status check
-alias gp='git pull'                 # Pull from the ether
-alias gc='git commit -m'            # Commit with a message
-alias termux-reload='termux-reload-settings' # Reload Termux settings
-alias pkgup='pkg update && pkg upgrade' # Update and upgrade packages
+# Set list of themes to pick from when loading at random
+# Setting this variable when ZSH_THEME=random will cause zsh to load
+# a theme from this variable instead of looking in $ZSH/themes/
+# If set to an empty array, this variable will have no effect.
+# ZSH_THEME_RANDOM_CANDIDATES=( "robbyrussell" "agnoster" )
 
-# Functions: Arcane spells for common tasks
+# Uncomment the following line to use case-sensitive completion.
+# CASE_SENSITIVE="true"
 
-# Function to create and enter a directory
-mkcd() {
-  mkdir -p "$1" && cd "$1"
-  echo -e "\033[1;32mEntered the newly forged path: $1\033[0m"
-}
+# Uncomment the following line to use hyphen-insensitive completion.
+# Case-sensitive completion must be off. _ and - will be interchangeable.
+# HYPHEN_INSENSITIVE="true"
 
-# Function to backup a file with timestamp
-backup() {
-  if [ -f "$1" ]; then
-    cp "$1" "${1}.bak-$(date +%Y%m%d_%H%M%S)"
-    echo -e "\033[1;34mBackup created: ${1}.bak-$(date +%Y%m%d_%H%M%S)\033[0m"
-    termux-toast "Backup complete!"
-  else
-    echo -e "\033[1;31mError: File $1 not found!\033[0m"
-    termux-toast -g error "File not found!"
-  fi
-}
+# Uncomment one of the following lines to change the auto-update behavior
+# zstyle ':omz:update' mode disabled  # disable automatic updates
+# zstyle ':omz:update' mode auto      # update automatically without asking
+# zstyle ':omz:update' mode reminder  # just remind me to update when it's time
 
-# Function to search for a string in files recursively
-search() {
-  grep -rni "$1" . | while read -r line; do
-    echo -e "\033[1;33m$line\033[0m"
-  done
-}
+# Uncomment the following line to change how often to auto-update (in days).
+# zstyle ':omz:update' frequency 13
 
-# Function to summon a Python virtual environment
-venv() {
-  python -m venv "$1" && source "$1/bin/activate"
-  echo -e "\033[1;36mVirtual environment $1 activated!\033[0m"
-  termux-toast "Virtual environment ready!"
-}
+# Uncomment the following line if pasting URLs and other text is messed up.
+# DISABLE_MAGIC_FUNCTIONS="true"
 
-# Key bindings for swift navigation
-bindkey '^[[A' history-substring-search-up
-bindkey '^[[B' history-substring-search-down
+# Uncomment the following line to disable colors in ls.
+# DISABLE_LS_COLORS="true"
 
-# Load zsh-history-substring-search for enchanted history search
-if [ ! -d "$ZSH_PLUGINS_DIR/zsh-history-substring-search" ]; then
-  git clone https://github.com/zsh-users/zsh-history-substring-search "$ZSH_PLUGINS_DIR/zsh-history-substring-search"
-fi
-source "$ZSH_PLUGINS_DIR/zsh-history-substring-search/zsh-history-substring-search.zsh"
+# Uncomment the following line to disable auto-setting terminal title.
+# DISABLE_AUTO_TITLE="true"
 
-# Final incantation to ensure Termux-specific settings
-export TERM=xterm-256color
-export PATH=$PATH:$HOME/.local/bin
+# Uncomment the following line to enable command auto-correction.
+# ENABLE_CORRECTION="true"
 
-# Display a mystical welcome
-echo -e "\033[1;35mPyrmethus welcomes you to the Termux realm!\033[0m"
+# Uncomment the following line to display red dots whilst waiting for completion.
+# You can also set it to another string to have that shown instead of the default red dots.
+# e.g. COMPLETION_WAITING_DOTS="%F{yellow}waiting...%f"
+# Caution: this setting can cause issues with multiline prompts in zsh < 5.7.1 (see #5765)
+# COMPLETION_WAITING_DOTS="true"
+
+# Uncomment the following line if you want to disable marking untracked files
+# under VCS as dirty. This makes repository status check for large repositories
+# much, much faster.
+# DISABLE_UNTRACKED_FILES_DIRTY="true"
+
+# Uncomment the following line if you want to change the command execution time
+# stamp shown in the history command output.
+# You can set one of the optional three formats:
+# "mm/dd/yyyy"|"dd.mm.yyyy"|"yyyy-mm-dd"
+# or set a custom format using the strftime function format specifications,
+# see 'man strftime' for details.
+# HIST_STAMPS="mm/dd/yyyy"
+
+# Would you like to use another custom folder than $ZSH/custom?
+# ZSH_CUSTOM=/path/to/new-custom-folder
+
+# Which plugins would you like to load?
+# Standard plugins can be found in $ZSH/plugins/
+# Custom plugins may be added to $ZSH_CUSTOM/plugins/
+# Example format: plugins=(rails git textmate ruby lighthouse)
+# Add wisely, as too many plugins slow down shell startup.
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+
+source $ZSH/oh-my-zsh.sh
+
+# User configuration
+
+# export MANPATH="/usr/local/man:$MANPATH"
+
+# You may need to manually set your language environment
+# export LANG=en_US.UTF-8
+
+# Preferred editor for local and remote sessions
+# if [[ -n $SSH_CONNECTION ]]; then
+#   export EDITOR='vim'
+# else
+#   export EDITOR='nvim'
+# fi
+
+# Compilation flags
+# export ARCHFLAGS="-arch $(uname -m)"
+
+# Set personal aliases, overriding those provided by Oh My Zsh libs,
+# plugins, and themes. Aliases can be placed here, though Oh My Zsh
+# users are encouraged to define aliases within a top-level file in
+# the $ZSH_CUSTOM folder, with .zsh extension. Examples:
+# - $ZSH_CUSTOM/aliases.zsh
+# - $ZSH_CUSTOM/macos.zsh
+# For a full list of active aliases, run `alias`.
+#
+# Example aliases
+# alias zshconfig="mate ~/.zshrc"
+# alias ohmyzsh="mate ~/.oh-my-zsh"
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+export GEMINI_API_KEY=AIzaSyAFxIJvdXXrIBng92mXFfNvy1uI21cIpdo

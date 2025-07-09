@@ -5,7 +5,7 @@ const esbuild = require('esbuild');
 const config = {
   entryPoints: ['packages/cli/src/gemini.tsx'], // Adjust if entry point is different
   bundle: true,
-  outfile: 'dist/cli.js', // Adjust output path as needed
+  outfile: 'bundle/gemini.js', // Adjust output path as needed
   platform: 'node',
   target: 'node18', // Adjust based on your Node.js version
   format: 'esm',
