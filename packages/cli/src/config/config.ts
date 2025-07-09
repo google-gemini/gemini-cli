@@ -50,13 +50,13 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
-  allowedMcpServerNames: string | undefined;
+  allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
-  const argv = await yargs(hideBin(process.argv))
+  const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
       '$0 [options]',
@@ -152,7 +152,8 @@ async function parseArguments(): Promise<CliArgs> {
       default: false,
     })
     .option('allowed-mcp-server-names', {
-      type: 'string',
+      type: 'array',
+      string: true,
       description: 'Allowed MCP server names',
     })
     .option('extensions', {
@@ -171,9 +172,11 @@ async function parseArguments(): Promise<CliArgs> {
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
-    .strict().argv;
+    .strict();
 
-  return argv;
+  yargsInstance.wrap(yargsInstance.terminalWidth());
+
+  return yargsInstance.argv;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -245,9 +248,7 @@ export async function loadCliConfig(
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
   if (argv.allowedMcpServerNames) {
-    const allowedNames = new Set(
-      argv.allowedMcpServerNames.split(',').filter(Boolean),
-    );
+    const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
         Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
