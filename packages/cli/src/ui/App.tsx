@@ -67,6 +67,11 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
+import {
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  UserTierId,
+} from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
@@ -134,6 +139,8 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
+    useState<boolean>(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -245,19 +252,73 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
     const flashFallbackHandler = async (
       currentModel: string,
       fallbackModel: string,
+      error?: unknown,
     ): Promise<boolean> => {
+      let message: string;
+
+      // For quota errors, assume FREE tier (safe default) - only show upgrade messaging to free tier users
+      // TODO: Get actual user tier from config when available
+      const userTier = undefined; // Defaults to FREE tier behavior
+      const isPaidTier =
+        userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
+
+      // Check if this is a Pro quota exceeded error
+      if (error && isProQuotaExceededError(error)) {
+        if (isPaidTier) {
+          message = `⚡ You have reached your daily ${currentModel} quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+        } else {
+          message = `⚡ You have reached your daily ${currentModel} quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+        }
+      } else if (error && isGenericQuotaExceededError(error)) {
+        if (isPaidTier) {
+          message = `⚡ You have reached your daily quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+        } else {
+          message = `⚡ You have reached your daily quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+        }
+      } else {
+        if (isPaidTier) {
+          // Default fallback message for other cases (like consecutive 429s)
+          message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
+⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+        } else {
+          // Default fallback message for other cases (like consecutive 429s)
+          message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.  
+⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+        }
+      }
+
       // Add message to UI history
       addItem(
         {
           type: MessageType.INFO,
-          text: `⚡ Slow response times detected. Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
-⚡ To avoid this you can either upgrade to Standard tier. See: https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`,
+          text: message,
         },
         Date.now(),
       );
-      return true; // Always accept the fallback
+
+      // Set the flag to prevent tool continuation
+      setModelSwitchedFromQuotaError(true);
+      // Set global quota error flag to prevent Flash model calls
+      config.setQuotaErrorOccurred(true);
+      // Switch model for future use but return false to stop current retry
+      config.setModel(fallbackModel);
+      return false; // Don't continue with current prompt
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
@@ -267,6 +328,7 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
     handleSlashCommand,
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
+    commandContext,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -280,7 +342,6 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    performMemoryRefresh,
     toggleCorgiMode,
     showToolDescriptions,
     setQuittingMessages,
@@ -328,9 +389,10 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
         const quitCommand = slashCommands.find(
           (cmd) => cmd.name === 'quit' || cmd.altName === 'exit',
         );
-        if (quitCommand) {
-          quitCommand.action('quit', '', '');
+        if (quitCommand && quitCommand.action) {
+          quitCommand.action(commandContext, '');
         } else {
+          // This is unlikely to be needed but added for an additional fallback.
           process.exit(0);
         }
       } else {
@@ -341,7 +403,8 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
         }, CTRL_EXIT_PROMPT_DURATION_MS);
       }
     },
-    [slashCommands],
+    // Add commandContext to the dependency array here!
+    [slashCommands, commandContext],
   );
 
   useInput((input: string, key: InkKeyType) => {
@@ -422,6 +485,8 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    modelSwitchedFromQuotaError,
+    setModelSwitchedFromQuotaError,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
@@ -800,6 +865,7 @@ const App = ({ config, settings, startupWarnings = [], initialPrompt = '', initi
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
+                  commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                 />
