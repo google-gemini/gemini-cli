@@ -54,16 +54,7 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  beforeAll,
-  Mock,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { MessageType, SlashCommandProcessorResult } from '../types.js';
@@ -159,7 +150,7 @@ describe('useSlashCommandProcessor', () => {
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
         cumulative: {
-          promptCount: 0,
+          turnCount: 0,
           promptTokenCount: 0,
           candidatesTokenCount: 0,
           totalTokenCount: 0,
@@ -206,6 +197,159 @@ describe('useSlashCommandProcessor', () => {
 
   const getProcessor = (showToolDescriptions: boolean = false) =>
     getProcessorHook(showToolDescriptions).result.current;
+
+  describe('/stats command', () => {
+    it('should show detailed session statistics', async () => {
+      // Arrange
+      mockUseSessionStats.mockReturnValue({
+        stats: {
+          sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
+        },
+      });
+
+      const { handleSlashCommand } = getProcessor();
+      const mockDate = new Date('2025-01-01T01:02:03.000Z'); // 1h 2m 3s duration
+      vi.setSystemTime(mockDate);
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.STATS,
+          duration: '1h 2m 3s',
+        }),
+        expect.any(Number),
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('should show model-specific statistics when using /stats model', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats model');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.MODEL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show tool-specific statistics when using /stats tools', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats tools');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.TOOL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('/about command', () => {
+    it('should show the about box with all details including auth and project', async () => {
+      // Arrange
+      mockGetCliVersionFn.mockResolvedValue('test-version');
+      process.env.SANDBOX = 'gemini-sandbox';
+      process.env.GOOGLE_CLOUD_PROJECT = 'test-gcp-project';
+      vi.mocked(mockConfig.getModel).mockReturnValue('test-model-from-config');
+
+      const settings = {
+        merged: {
+          selectedAuthType: 'test-auth-type',
+          contextFileName: 'GEMINI.md',
+        },
+      } as unknown as LoadedSettings;
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          settings,
+          [],
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          mockRefreshStatic,
+          mockSetShowHelp,
+          mockOnDebugMessage,
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          mockOpenEditorDialog,
+          mockCorgiMode,
+          false,
+          mockSetQuittingMessages,
+          vi.fn(), // mockOpenPrivacyNotice
+        ),
+      );
+
+      // Act
+      await act(async () => {
+        await result.current.handleSlashCommand('/about');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenCalledTimes(2); // user message + about message
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: 'about',
+          cliVersion: 'test-version',
+          osVersion: 'test-platform',
+          sandboxEnv: 'gemini-sandbox',
+          modelVersion: 'test-model-from-config',
+          selectedAuthType: 'test-auth-type',
+          gcpProject: 'test-gcp-project',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show sandbox-exec profile when applicable', async () => {
+      // Arrange
+      mockGetCliVersionFn.mockResolvedValue('test-version');
+      process.env.SANDBOX = 'sandbox-exec';
+      process.env.SEATBELT_PROFILE = 'test-profile';
+      vi.mocked(mockConfig.getModel).mockReturnValue('test-model-from-config');
+
+      const { result } = getProcessorHook();
+
+      // Act
+      await act(async () => {
+        await result.current.handleSlashCommand('/about');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sandboxEnv: 'sandbox-exec (test-profile)',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
 
   describe('Other commands', () => {
     it('/editor should open editor dialog and return handled', async () => {
@@ -351,59 +495,6 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockAction).toHaveBeenCalledTimes(1);
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should open the auth dialog when a new command returns an auth dialog action', async () => {
-      const mockAction = vi.fn().mockResolvedValue({
-        type: 'dialog',
-        dialog: 'auth',
-      });
-      const newAuthCommand: SlashCommand = { name: 'auth', action: mockAction };
-
-      const mockLoader = async () => [newAuthCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
-      vi.mocked(CommandService).mockImplementation(
-        () => commandServiceInstance,
-      );
-
-      const { result } = getProcessorHook();
-      await vi.waitFor(() => {
-        expect(
-          result.current.slashCommands.some((c) => c.name === 'auth'),
-        ).toBe(true);
-      });
-
-      const commandResult = await result.current.handleSlashCommand('/auth');
-
-      expect(mockAction).toHaveBeenCalledTimes(1);
-      expect(mockOpenAuthDialog).toHaveBeenCalledWith();
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should open the theme dialog when a new command returns a theme dialog action', async () => {
-      const mockAction = vi.fn().mockResolvedValue({
-        type: 'dialog',
-        dialog: 'theme',
-      });
-      const newCommand: SlashCommand = { name: 'test', action: mockAction };
-      const mockLoader = async () => [newCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
-      vi.mocked(CommandService).mockImplementation(
-        () => commandServiceInstance,
-      );
-
-      const { result } = getProcessorHook();
-      await vi.waitFor(() => {
-        expect(
-          result.current.slashCommands.some((c) => c.name === 'test'),
-        ).toBe(true);
-      });
-
-      const commandResult = await result.current.handleSlashCommand('/test');
-
-      expect(mockAction).toHaveBeenCalledTimes(1);
-      expect(mockOpenThemeDialog).toHaveBeenCalledWith();
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
@@ -749,6 +840,37 @@ describe('useSlashCommandProcessor', () => {
       expect(message).toContain('Tool2');
       expect(message).toContain('Description for Tool2');
       expect(commandResult).toEqual({ type: 'handled' });
+    });
+  });
+
+  describe('/compress command', () => {
+    it('should call tryCompressChat(true)', async () => {
+      const hook = getProcessorHook();
+      mockTryCompressChat.mockResolvedValue({
+        originalTokenCount: 100,
+        newTokenCount: 50,
+      });
+
+      await act(async () => {
+        hook.result.current.handleSlashCommand('/compress');
+      });
+      await act(async () => {
+        hook.rerender();
+      });
+      expect(hook.result.current.pendingHistoryItems).toEqual([]);
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.COMPRESSION,
+          compression: {
+            isPending: false,
+            originalTokenCount: 100,
+            newTokenCount: 50,
+          },
+        }),
+        expect.any(Number),
+      );
     });
   });
 });
