@@ -30,6 +30,10 @@ describe('AuthDialog', () => {
 
     const settings: LoadedSettings = new LoadedSettings(
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
         },
@@ -84,6 +88,12 @@ describe('AuthDialog', () => {
     const settings: LoadedSettings = new LoadedSettings(
       {
         settings: {},
+        path: '',
+      },
+      {
+        settings: {
+          selectedAuthType: undefined,
+        },
         path: '',
       },
       {
@@ -147,6 +157,10 @@ describe('AuthDialog', () => {
   it('should allow exiting when auth method is already selected', async () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
       {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
