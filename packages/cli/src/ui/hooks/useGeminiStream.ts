@@ -704,13 +704,7 @@ export const useGeminiStream = (
       );
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-      submitQuery(
-        mergePartListUnions(responsesToSend),
-        {
-          isContinuation: true,
-        },
-        prompt_ids[0],
-      );
+
       // Don't continue if model was switched due to quota error
       if (modelSwitchedFromQuotaError) {
         return;
