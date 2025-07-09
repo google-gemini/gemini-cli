@@ -24,6 +24,13 @@ export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
+function getSystemSettingsPath(): string {
+  if (process.platform === 'win32') {
+    return path.join(process.env.ALLUSERSPROFILE!, 'gemini', 'settings.json');
+  }
+  return '/etc/gemini/settings.json';
+}
+
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
@@ -81,16 +88,19 @@ export interface SettingsFile {
 }
 export class LoadedSettings {
   constructor(
+    system: SettingsFile,
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
   ) {
+    this.system = system;
     this.user = user;
     this.workspace = workspace;
     this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
+  readonly system: SettingsFile;
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
@@ -103,6 +113,7 @@ export class LoadedSettings {
 
   private computeMergedSettings(): Settings {
     return {
+      ...this.system.settings,
       ...this.user.settings,
       ...this.workspace.settings,
     };
@@ -243,9 +254,27 @@ export function loadEnvironment(): void {
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
   loadEnvironment();
+  let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
+
+  // Load system settings
+  const systemSettingsPath = getSystemSettingsPath();
+  try {
+    if (fs.existsSync(systemSettingsPath)) {
+      const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
+      const parsedSystemSettings = JSON.parse(
+        stripJsonComments(systemContent),
+      ) as Settings;
+      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+    }
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: systemSettingsPath,
+    });
+  }
 
   // Load user settings
   try {
@@ -300,6 +329,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   return new LoadedSettings(
+    {
+      path: systemSettingsPath,
+      settings: systemSettings,
+    },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
