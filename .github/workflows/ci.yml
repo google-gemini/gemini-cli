@@ -124,7 +124,7 @@ jobs:
       pull-requests: write # For commenting
     strategy:
       matrix:
-        node-version: [20.x, 22.x, 24.x] # Should match the test job's matrix
+        node-version: [22.x] # Reduce noise by only posting the comment once
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
