@@ -196,10 +196,12 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
     prompt_length: input.length,
   });
 
@@ -210,7 +212,7 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
