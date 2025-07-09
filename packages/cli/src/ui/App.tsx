@@ -136,6 +136,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
+    useState<boolean>(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -278,7 +280,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         },
         Date.now(),
       );
-      return true; // Always accept the fallback
+
+      // Set the flag to prevent tool continuation
+      setModelSwitchedFromQuotaError(true);
+      // Set global quota error flag to prevent Flash model calls
+      config.setQuotaErrorOccurred(true);
+      // Switch model for future use but return false to stop current retry
+      config.setModel(fallbackModel);
+      return false; // Don't continue with current prompt
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
@@ -445,6 +454,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    modelSwitchedFromQuotaError,
+    setModelSwitchedFromQuotaError,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
