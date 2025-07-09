@@ -554,7 +554,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
   const isInputVisible = !initError; // Always show input unless there's an error
 
   // Process queued input when AI becomes idle
