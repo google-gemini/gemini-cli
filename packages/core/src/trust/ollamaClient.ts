@@ -70,8 +70,8 @@ export class OllamaClient {
   private timeout: number;
 
   constructor(config: OllamaConfig = {}) {
-    this.model = config.model || 'qwen2.5:7b'; // Default to qwen2.5:7b for better compatibility
-    this.timeout = config.timeout || 30000; // 30 second timeout
+    this.model = config.model || 'qwen2.5:1.5b'; // Default to smaller, faster model
+    this.timeout = config.timeout || 120000; // 2 minute timeout for CPU inference
     
     // Initialize OpenAI client with Ollama endpoint
     this.client = new OpenAI({
