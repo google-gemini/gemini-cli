@@ -495,13 +495,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      
+
       // Handle special queue clearing signal
       if (trimmedValue === '__CLEAR_QUEUE__') {
         setQueuedInput(null);
         return;
       }
-      
+
       if (trimmedValue.length > 0) {
         if (streamingState === StreamingState.Idle) {
           // Submit immediately if AI is idle
@@ -809,9 +809,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 elapsedTime={elapsedTime}
               />
               {queuedInput && (
-                <Box 
-                  borderStyle="round" 
-                  borderColor={Colors.Foreground} 
+                <Box
+                  borderStyle="round"
+                  borderColor={Colors.Foreground}
                   flexDirection="row"
                   paddingX={2}
                   paddingY={0}

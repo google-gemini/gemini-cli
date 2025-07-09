@@ -57,7 +57,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   streamingState,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const isQueued = streamingState !== StreamingState.Idle && streamingState !== undefined;
+  const isQueued =
+    streamingState !== StreamingState.Idle && streamingState !== undefined;
   const hasQueuedInput = queuedInput !== null && queuedInput !== undefined;
 
   const completion = useCompletion(
