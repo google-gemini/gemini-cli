@@ -104,23 +104,10 @@ export class GeminiClient {
 
   private async getEnvironment(): Promise<Part[]> {
     const cwd = this.config.getWorkingDir();
-    const today = new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
     const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.config.getFileService(),
-    });
-    const context = `
-  This is the Gemini CLI. We are setting up the context for our chat.
-  Today's date is ${today}.
-  My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
-  ${folderStructure}
-          `.trim();
+    
+    // Minimal context for better performance with local models
+    const context = `Working in: ${cwd} (${platform})`.trim();
 
     const initialParts: Part[] = [{ text: context }];
     const toolRegistry = await this.config.getToolRegistry();
