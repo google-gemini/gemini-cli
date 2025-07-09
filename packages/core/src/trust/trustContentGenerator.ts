@@ -132,7 +132,10 @@ export class TrustContentGenerator implements ContentGenerator {
       console.log('DEBUG: About to call modelClient.generateStream...');
       for await (const chunk of this.modelClient.generateStream(prompt, options)) {
         console.log('DEBUG: Got chunk from model client:', chunk.substring(0, 50));
-        yield this.convertToGeminiResponse(chunk);
+        console.log('DEBUG: Full chunk length:', chunk.length);
+        const geminiResponse = this.convertToGeminiResponse(chunk);
+        console.log('DEBUG: Yielding response with function calls:', geminiResponse.functionCalls?.length || 0);
+        yield geminiResponse;
       }
       console.log('DEBUG: Finished streaming generation');
     } catch (error) {
@@ -238,25 +241,33 @@ export class TrustContentGenerator implements ContentGenerator {
     const functionCalls: FunctionCall[] = [];
     let cleanedText = text;
 
-    // Look for JSON function call patterns - updated to handle nested objects
-    const functionCallRegex = /```json\s*\n?\s*{"function_call":\s*{.*?}}\s*\n?\s*```/gs;
+    console.log('DEBUG: Parsing function calls from text (first 200 chars):', text.substring(0, 200));
+    console.log('DEBUG: Full text being parsed:', text);
+
+    // Look for JSON function call patterns - updated to handle nested objects and multiline formatting
+    // Support both ```json and ```bash blocks since models sometimes use different blocks
+    const functionCallRegex = /```(?:json|bash)\s*\n([\s\S]*?)\n\s*```/gs;
     let match;
     
     while ((match = functionCallRegex.exec(text)) !== null) {
       try {
-        const jsonMatch = match[0].replace(/```json\s*\n?\s*/, '').replace(/\s*\n?\s*```/, '');
-        const parsed = JSON.parse(jsonMatch);
-        
-        if (parsed.function_call && parsed.function_call.name) {
-          const functionCall: FunctionCall = {
-            name: parsed.function_call.name,
-            args: parsed.function_call.arguments || {},
-            id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          };
-          functionCalls.push(functionCall);
+        const jsonMatch = match[1].trim();
+        console.log('DEBUG: Found JSON match:', jsonMatch);
+        // Only process if it contains function_call
+        if (jsonMatch.includes('function_call')) {
+          const parsed = JSON.parse(jsonMatch);
           
-          // Remove the function call from the text
-          cleanedText = cleanedText.replace(match[0], '').trim();
+          if (parsed.function_call && parsed.function_call.name) {
+            const functionCall: FunctionCall = {
+              name: parsed.function_call.name,
+              args: parsed.function_call.arguments || {},
+              id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            };
+            functionCalls.push(functionCall);
+            
+            // Remove the function call from the text
+            cleanedText = cleanedText.replace(match[0], '').trim();
+          }
         }
       } catch (error) {
         console.warn('Failed to parse function call JSON:', error);
@@ -290,6 +301,7 @@ export class TrustContentGenerator implements ContentGenerator {
   }
 
   private convertToGeminiResponse(text: string): GenerateContentResponse {
+    console.log('DEBUG: Converting to Gemini response, text length:', text.length);
     const { text: cleanedText, functionCalls } = this.parseFunctionCalls(text);
     
     const response: GenerateContentResponse = {

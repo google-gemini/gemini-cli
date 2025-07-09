@@ -186,13 +186,24 @@ export async function loadCliConfig(
   const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
 
   const fileService = new FileDiscoveryService(process.cwd());
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
-    debugMode,
-    fileService,
-    extensionContextFilePaths,
-  );
+  
+  // Skip memory discovery for local models to prevent prompt bloat
+  let memoryContent = '';
+  let fileCount = 0;
+  
+  if (settings.selectedAuthType !== 'trust-local') {
+    // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
+    const memoryResult = await loadHierarchicalGeminiMemory(
+      process.cwd(),
+      debugMode,
+      fileService,
+      extensionContextFilePaths,
+    );
+    memoryContent = memoryResult.memoryContent;
+    fileCount = memoryResult.fileCount;
+  } else {
+    console.log('DEBUG: Skipping memory discovery for local models to prevent prompt bloat');
+  }
 
   const mcpServers = mergeMcpServers(settings, extensions);
   const excludeTools = mergeExcludeTools(settings, extensions);
