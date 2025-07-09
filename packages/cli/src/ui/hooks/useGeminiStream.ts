@@ -90,6 +90,8 @@ export const useGeminiStream = (
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: () => void,
   performMemoryRefresh: () => Promise<void>,
+  modelSwitchedFromQuotaError: boolean,
+  setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -494,6 +496,12 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
       setShowHelp(false);
 
+      // Reset quota error flag when starting a new query (not a continuation)
+      if (!options?.isContinuation) {
+        setModelSwitchedFromQuotaError(false);
+        config.setQuotaErrorOccurred(false);
+      }
+
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
       turnCancelledRef.current = false;
@@ -552,6 +560,7 @@ export const useGeminiStream = (
     [
       streamingState,
       setShowHelp,
+      setModelSwitchedFromQuotaError,
       prepareQueryForGemini,
       processGeminiStreamEvents,
       pendingHistoryItemRef,
@@ -668,6 +677,12 @@ export const useGeminiStream = (
       );
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+
+      // Don't continue if model was switched due to quota error
+      if (modelSwitchedFromQuotaError) {
+        return;
+      }
+
       submitQuery(mergePartListUnions(responsesToSend), {
         isContinuation: true,
       });
@@ -678,6 +693,7 @@ export const useGeminiStream = (
       markToolsAsSubmitted,
       geminiClient,
       performMemoryRefresh,
+      modelSwitchedFromQuotaError,
     ],
   );
 
