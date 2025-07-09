@@ -848,6 +848,7 @@ describe('Gemini Client (client.ts)', () => {
       expect(mockFallbackHandler).toHaveBeenCalledWith(
         currentModel,
         fallbackModel,
+        undefined,
       );
     });
   });

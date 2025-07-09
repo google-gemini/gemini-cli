@@ -1117,6 +1117,7 @@ describe('useGeminiStream', () => {
         getContentGeneratorConfig: vi.fn(() => ({
           authType: mockAuthType,
         })),
+        getModel: vi.fn(() => 'gemini-2.5-pro'),
       } as unknown as Config;
 
       const { result } = renderHook(() =>
@@ -1145,6 +1146,9 @@ describe('useGeminiStream', () => {
         expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
           'Rate limit exceeded',
           mockAuthType,
+          undefined,
+          'gemini-2.5-pro',
+          'gemini-2.5-flash',
         );
       });
     });

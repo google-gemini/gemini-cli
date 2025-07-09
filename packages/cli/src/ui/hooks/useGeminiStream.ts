@@ -24,6 +24,7 @@ import {
   ThoughtSummary,
   UnauthorizedError,
   UserPromptEvent,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
@@ -401,6 +402,9 @@ export const useGeminiStream = (
           text: parseAndFormatApiError(
             eventValue.error,
             config.getContentGeneratorConfig().authType,
+            undefined,
+            config.getModel(),
+            DEFAULT_GEMINI_FLASH_MODEL,
           ),
         },
         userMessageTimestamp,
@@ -554,6 +558,9 @@ export const useGeminiStream = (
               text: parseAndFormatApiError(
                 getErrorMessage(error) || 'Unknown error',
                 config.getContentGeneratorConfig().authType,
+                undefined,
+                config.getModel(),
+                DEFAULT_GEMINI_FLASH_MODEL,
               ),
             },
             userMessageTimestamp,
