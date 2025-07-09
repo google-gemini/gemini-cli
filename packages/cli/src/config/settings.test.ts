@@ -528,6 +528,95 @@ describe('Settings Loading and Merging', () => {
       }
     });
 
+    it('should prioritize workspace env variables over user env variables if keys clash after resolution', () => {
+      const userSettingsContent = { configValue: '$SHARED_VAR' };
+      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const originalSharedVar = process.env.SHARED_VAR;
+      // Temporarily delete to ensure a clean slate for the test's specific manipulations
+      delete process.env.SHARED_VAR;
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'user_value_for_user_read'; // Set for user settings read
+            return JSON.stringify(userSettingsContent);
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.user.settings.configValue).toBe(
+        'user_value_for_user_read',
+      );
+      expect(settings.workspace.settings.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+      // Merged should take workspace's resolved value
+      expect(settings.merged.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+
+      // Restore original environment variable state
+      if (originalSharedVar !== undefined) {
+        process.env.SHARED_VAR = originalSharedVar;
+      } else {
+        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+      }
+    });
+
+    it('should prioritize system env variables over workspace env variables if keys clash after resolution', () => {
+      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
+      const systemSettingsContent = { configValue: '$SHARED_VAR' };
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const originalSharedVar = process.env.SHARED_VAR;
+      // Temporarily delete to ensure a clean slate for the test's specific manipulations
+      delete process.env.SHARED_VAR;
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === SYSTEM_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'system_value_for_system_read'; // Set for system settings read
+            return JSON.stringify(systemSettingsContent);
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.system.settings.configValue).toBe(
+        'system_value_for_system_read',
+      );
+      expect(settings.workspace.settings.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+      // Merged should take workspace's resolved value
+      expect(settings.merged.configValue).toBe(
+        'system_value_for_system_read',
+      );
+
+      // Restore original environment variable state
+      if (originalSharedVar !== undefined) {
+        process.env.SHARED_VAR = originalSharedVar;
+      } else {
+        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+      }
+    });
+
+
     it('should leave unresolved environment variables as is', () => {
       const userSettingsContent = { apiKey: '$UNDEFINED_VAR' };
       (mockFsExistsSync as Mock).mockImplementation(
