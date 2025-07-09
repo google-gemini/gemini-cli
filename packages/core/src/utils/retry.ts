@@ -116,10 +116,11 @@ export async function retryWithBackoff<T>(
         }
       }
 
-      // Check for generic quota exceeded error - immediate fallback for OAuth users
+      // Check for generic quota exceeded error (but not Pro, which was handled above) - immediate fallback for OAuth users
       if (
         errorStatus === 429 &&
         authType === AuthType.LOGIN_WITH_GOOGLE &&
+        !isProQuotaExceededError(error) &&
         isGenericQuotaExceededError(error) &&
         onPersistent429
       ) {
