@@ -527,7 +527,9 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       'node',
       'script.js',
       '--allowed-mcp-server-names',
-      'server1,server3',
+      'server1',
+      '--allowed-mcp-server-names',
+      'server3',
     ];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
     expect(config.getMcpServers()).toEqual({
@@ -541,7 +543,9 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       'node',
       'script.js',
       '--allowed-mcp-server-names',
-      'server1,server4',
+      'server1',
+      '--allowed-mcp-server-names',
+      'server4',
     ];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
     expect(config.getMcpServers()).toEqual({
@@ -549,10 +553,10 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     });
   });
 
-  it('should allow all MCP servers if the flag is an empty string', async () => {
+  it('should allow no MCP servers if the flag is provided but empty', async () => {
     process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
     const config = await loadCliConfig(baseSettings, [], 'test-session');
-    expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
+    expect(config.getMcpServers()).toEqual({});
   });
 });
 
