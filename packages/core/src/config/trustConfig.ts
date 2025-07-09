@@ -10,7 +10,7 @@ import * as os from 'os';
 import { TrustConfig } from '../trust/types.js';
 
 export const TRUST_CONFIG_DIR = path.join(os.homedir(), '.trustcli');
-export const TRUST_CONFIG_FILE = path.join(TRUST_CONFIG_DIR, 'config.yaml');
+export const TRUST_CONFIG_FILE = path.join(TRUST_CONFIG_DIR, 'config.json');
 export const TRUST_MODELS_DIR = path.join(TRUST_CONFIG_DIR, 'models');
 
 export const DEFAULT_TRUST_CONFIG: TrustConfig = {
