@@ -12,7 +12,9 @@ import type { ModelCommandArgs } from './modelCommands.js';
 vi.mock('../../../core/dist/index.js', () => ({
   TrustConfiguration: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
-    getModelsDirectory: vi.fn().mockReturnValue('/test/models')
+    getModelsDirectory: vi.fn().mockReturnValue('/test/models'),
+    setDefaultModel: vi.fn(),
+    save: vi.fn()
   })),
   TrustModelManagerImpl: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
@@ -25,8 +27,10 @@ vi.mock('../../../core/dist/index.js', () => ({
         contextSize: 4096,
         quantization: 'Q4_K_M',
         trustScore: 9,
-        ramRequirement: 2,
-        tasks: ['coding', 'writing']
+        ramRequirement: '2GB',
+        description: 'Lightweight model for quick questions - 1.5B parameters',
+        verificationHash: 'sha256:d7efb072e...',
+        downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-gguf'
       },
       {
         name: 'codellama-7b-instruct',
@@ -36,8 +40,9 @@ vi.mock('../../../core/dist/index.js', () => ({
         contextSize: 8192,
         quantization: 'Q4_K_M',
         trustScore: 8,
-        ramRequirement: 4,
-        tasks: ['coding']
+        ramRequirement: '4GB',
+        description: 'Code-focused model - 7B parameters',
+        verificationHash: 'sha256:pending'
       }
     ]),
     getCurrentModel: vi.fn().mockReturnValue({
@@ -48,8 +53,8 @@ vi.mock('../../../core/dist/index.js', () => ({
       contextSize: 4096,
       quantization: 'Q4_K_M',
       trustScore: 9,
-      ramRequirement: 2,
-      tasks: ['coding', 'writing']
+      ramRequirement: '2GB',
+      description: 'Lightweight model for quick questions - 1.5B parameters'
     }),
     switchModel: vi.fn(),
     downloadModel: vi.fn(),
@@ -61,11 +66,17 @@ vi.mock('../../../core/dist/index.js', () => ({
       contextSize: 4096,
       quantization: 'Q4_K_M',
       trustScore: 9,
-      ramRequirement: 2,
-      tasks: ['coding', 'writing']
+      ramRequirement: '2GB',
+      description: 'Lightweight model for quick questions - 1.5B parameters'
     }),
-    verifyModelIntegrity: vi.fn().mockResolvedValue({ valid: true, message: 'Model is valid' }),
-    deleteModel: vi.fn()
+    verifyModel: vi.fn().mockReturnValue(true),
+    verifyModelIntegrity: vi.fn().mockResolvedValue({ valid: true, message: 'Model integrity verified successfully' }),
+    verifyAllModels: vi.fn().mockResolvedValue(new Map([
+      ['qwen2.5-1.5b-instruct', { valid: true, message: 'Model integrity verified successfully' }],
+      ['codellama-7b-instruct', { valid: false, message: 'Model not downloaded' }]
+    ])),
+    deleteModel: vi.fn(),
+    generateModelReport: vi.fn().mockResolvedValue('/models/qwen2.5-1.5b-instruct.gguf.manifest.json')
   })),
   globalPerformanceMonitor: {
     getSystemMetrics: vi.fn().mockReturnValue({
@@ -508,6 +519,222 @@ describe('ModelCommandHandler', () => {
       await commandHandler.handleCommand(args);
 
       expect(mockConsoleLog).toHaveBeenCalledWith('Example: trust model download qwen2.5-1.5b-instruct');
+    });
+  });
+
+  describe('report command', () => {
+    it('should generate integrity report for specified model', async () => {
+      const args: ModelCommandArgs = {
+        action: 'report',
+        modelName: 'qwen2.5-1.5b-instruct',
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('📄 Generating integrity report for: qwen2.5-1.5b-instruct');
+      expect(mockConsoleLog).toHaveBeenCalledWith('✅ Integrity report generated successfully');
+    });
+
+    it('should handle missing model name for report', async () => {
+      const args: ModelCommandArgs = {
+        action: 'report',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await expect(commandHandler.handleCommand(args)).rejects.toThrow('Model name required for report command');
+    });
+
+    it('should handle report generation failure', async () => {
+      const mockModelManager = (await import('../../../core/dist/index.js')).TrustModelManagerImpl;
+      const mockInstance = new mockModelManager();
+      (mockInstance.generateModelReport as MockedFunction<any>).mockResolvedValue(null);
+
+      const args: ModelCommandArgs = {
+        action: 'report',
+        modelName: 'non-existent-model',
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Failed to generate report'));
+    });
+  });
+
+  describe('trust command', () => {
+    it('should show trusted models registry', async () => {
+      const args: ModelCommandArgs = {
+        action: 'trust',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('🛡️  Trust CLI - Trusted Model Registry');
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Model Trust Status:'));
+    });
+
+    it('should handle export functionality', async () => {
+      const args: ModelCommandArgs = {
+        action: 'trust',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined,
+        export: true
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('📤 Exporting trusted model database...');
+    });
+
+    it('should display trusted models with hashes', async () => {
+      const args: ModelCommandArgs = {
+        action: 'trust',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('✅ qwen2.5-1.5b-instruct'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Hash: sha256:d7efb072e...'));
+    });
+  });
+
+  describe('verify command enhancements', () => {
+    it('should verify all models when no model name provided', async () => {
+      const args: ModelCommandArgs = {
+        action: 'verify',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('🔍 Verifying all models...');
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Summary:'));
+    });
+
+    it('should show detailed verification results', async () => {
+      const args: ModelCommandArgs = {
+        action: 'verify',
+        modelName: 'qwen2.5-1.5b-instruct',
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('🔍 Verifying model: qwen2.5-1.5b-instruct');
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('File integrity verified'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Size validation passed'));
+    });
+
+    it('should provide security status information', async () => {
+      const args: ModelCommandArgs = {
+        action: 'verify',
+        modelName: 'qwen2.5-1.5b-instruct',
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('🛡️  Security Status:'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Cryptographic hash verified'));
+    });
+
+    it('should show remediation steps for failed verification', async () => {
+      const mockModelManager = (await import('../../../core/dist/index.js')).TrustModelManagerImpl;
+      const mockInstance = new mockModelManager();
+      (mockInstance.verifyModelIntegrity as MockedFunction<any>).mockResolvedValue({
+        valid: false,
+        message: 'Hash mismatch detected'
+      });
+
+      const args: ModelCommandArgs = {
+        action: 'verify',
+        modelName: 'corrupted-model',
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('⚠️  Model verification failed!'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('🔧 Recommended actions:'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('1. Delete the corrupted file'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('2. Re-download the model'));
+    });
+  });
+
+  describe('security and integrity features', () => {
+    it('should display model integrity information', async () => {
+      const args: ModelCommandArgs = {
+        action: 'list',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined,
+        verbose: true
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Trust: 9/10'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Status: ✓'));
+    });
+
+    it('should show download URLs in verbose mode', async () => {
+      const args: ModelCommandArgs = {
+        action: 'list',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined,
+        verbose: true
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Download: https://huggingface.co'));
+    });
+
+    it('should handle models without verification hash', async () => {
+      const args: ModelCommandArgs = {
+        action: 'trust',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('⚠️  codellama-7b-instruct'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Status: Verified but no stored hash'));
+    });
+
+    it('should provide security tips', async () => {
+      const args: ModelCommandArgs = {
+        action: 'trust',
+        modelName: undefined,
+        task: undefined,
+        ramLimit: undefined
+      };
+
+      await commandHandler.handleCommand(args);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('💡 Tips:'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Run \'trust model verify\' to check all models'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Run \'trust model report <name>\' for detailed integrity report'));
     });
   });
 });

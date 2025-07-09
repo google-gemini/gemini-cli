@@ -11,16 +11,19 @@ import { TrustModelConfig, TrustModelManager } from './types.js';
 import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
 import { ModelDownloader, DownloadProgress } from './modelDownloader.js';
+import { ModelIntegrityChecker, VerificationResult } from './modelIntegrity.js';
 
 export class TrustModelManagerImpl implements TrustModelManager {
   private modelsDir: string;
   private configFile: string;
   private availableModels: TrustModelConfig[] = [];
   private currentModel: TrustModelConfig | null = null;
+  private integrityChecker: ModelIntegrityChecker;
 
   constructor(modelsDir?: string) {
     this.modelsDir = modelsDir || path.join(os.homedir(), '.trustcli', 'models');
     this.configFile = path.join(path.dirname(this.modelsDir), 'models.json');
+    this.integrityChecker = new ModelIntegrityChecker(path.dirname(this.modelsDir));
     this.initializeDefaultModels();
   }
 
@@ -119,6 +122,9 @@ export class TrustModelManagerImpl implements TrustModelManager {
       // Ensure models directory exists
       await fs.mkdir(this.modelsDir, { recursive: true });
       
+      // Initialize integrity checker
+      await this.integrityChecker.initialize();
+      
       // Load existing config if it exists
       try {
         const configData = await fs.readFile(this.configFile, 'utf-8');
@@ -186,10 +192,39 @@ export class TrustModelManagerImpl implements TrustModelManager {
       console.log(`✅ Model ${modelId} downloaded successfully`);
       console.log(`📁 Location: ${finalPath}`);
       
+      // Verify the downloaded model
+      console.log(`🔍 Verifying model integrity...`);
+      const verificationResult = await this.integrityChecker.verifyModel(
+        finalPath,
+        modelId,
+        model.verificationHash,
+        (status, progress) => {
+          process.stdout.write('\r\x1b[K');
+          process.stdout.write(`🔍 ${status}${progress ? ` (${Math.round(progress)}%)` : ''}`);
+        }
+      );
+      
+      process.stdout.write('\r\x1b[K');
+      
+      if (!verificationResult.valid) {
+        // Delete the corrupted download
+        await fs.unlink(finalPath);
+        throw new Error(`Model verification failed: ${verificationResult.reason}`);
+      }
+      
+      console.log(`✅ Model integrity verified`);
+      
+      // Add to trusted registry
+      await this.integrityChecker.addTrustedModel(modelId, finalPath, model.downloadUrl!);
+      
       // Update model path to point to the downloaded file
       const modelIndex = this.availableModels.findIndex(m => m.name === modelId);
       if (modelIndex !== -1) {
         this.availableModels[modelIndex].path = finalPath;
+        // Update hash if it was computed
+        if (verificationResult.details?.actualHash) {
+          this.availableModels[modelIndex].verificationHash = verificationResult.details.actualHash;
+        }
         await this.saveConfig();
       }
       
@@ -226,83 +261,103 @@ export class TrustModelManagerImpl implements TrustModelManager {
     });
   }
   
-  async verifyModelIntegrity(modelName: string): Promise<{ valid: boolean; message: string }> {
+  async verifyModelIntegrity(modelName: string, showProgress: boolean = true): Promise<{ valid: boolean; message: string }> {
     const model = this.availableModels.find(m => m.name === modelName);
     if (!model) {
       return { valid: false, message: `Model ${modelName} not found` };
     }
     
     try {
-      const stats = await fs.stat(model.path);
+      // Use the new integrity checker for comprehensive verification
+      const result = await this.integrityChecker.verifyModel(
+        model.path,
+        modelName,
+        model.verificationHash,
+        showProgress ? (status, progress) => {
+          process.stdout.write('\r\x1b[K');
+          process.stdout.write(`🔍 ${status}${progress ? ` (${Math.round(progress)}%)` : ''}`);
+        } : undefined
+      );
       
-      // Check file size if expected size is provided
-      if (model.expectedSize) {
-        const sizeDiff = Math.abs(stats.size - model.expectedSize);
-        const tolerance = model.expectedSize * 0.10; // 10% tolerance for file size variations
-        
-        if (sizeDiff > tolerance * 0.5) { // Only show debug for meaningful differences
-          console.log(`📊 Size verification: Expected ${this.formatBytes(model.expectedSize)}, Actual ${this.formatBytes(stats.size)} (${((sizeDiff / model.expectedSize) * 100).toFixed(1)}% difference)`);
-        }
-        
-        if (sizeDiff > tolerance) {
-          // Auto-update expected size if the difference is reasonable (within 20%)
-          const largerTolerance = model.expectedSize * 0.20;
-          if (sizeDiff <= largerTolerance) {
-            console.log(`📏 Auto-updating expected size for ${modelName} from ${this.formatBytes(model.expectedSize)} to ${this.formatBytes(stats.size)}`);
-            const modelIndex = this.availableModels.findIndex(m => m.name === modelName);
-            if (modelIndex !== -1) {
-              this.availableModels[modelIndex].expectedSize = stats.size;
-              await this.saveConfig();
-            }
-          } else {
-            return {
-              valid: false,
-              message: `File size mismatch. Expected: ${this.formatBytes(model.expectedSize)}, Actual: ${this.formatBytes(stats.size)}`
-            };
-          }
-        }
+      if (showProgress) {
+        process.stdout.write('\r\x1b[K');
       }
       
-      // Compute hash if verification hash is not 'pending'
-      if (model.verificationHash && model.verificationHash !== 'sha256:pending') {
-        console.log(`Computing SHA256 hash for ${modelName}...`);
-        const computedHash = await this.computeModelHash(model.path);
-        
-        if (computedHash !== model.verificationHash) {
-          return {
-            valid: false,
-            message: `Hash mismatch. Expected: ${model.verificationHash}, Computed: ${computedHash}`
-          };
-        }
-        
-        return { valid: true, message: 'Model integrity verified successfully' };
-      }
-      
-      // If no hash is set or it's pending, compute and save it
-      if (!model.verificationHash || model.verificationHash === 'sha256:pending') {
-        console.log(`Computing and saving hash for ${modelName}...`);
-        const computedHash = await this.computeModelHash(model.path);
-        
-        // Update the model's verification hash
+      // Update model hash if it was computed for the first time
+      if (result.valid && result.details?.actualHash && 
+          (!model.verificationHash || model.verificationHash === 'sha256:pending')) {
         const modelIndex = this.availableModels.findIndex(m => m.name === modelName);
         if (modelIndex !== -1) {
-          this.availableModels[modelIndex].verificationHash = computedHash;
+          this.availableModels[modelIndex].verificationHash = result.details.actualHash;
           await this.saveConfig();
         }
-        
-        return { 
-          valid: true, 
-          message: `Model hash computed and saved: ${computedHash.substring(0, 16)}...` 
-        };
       }
       
-      return { valid: true, message: 'Model file exists and size is valid' };
+      return { 
+        valid: result.valid, 
+        message: result.reason + (result.details?.timeTaken ? 
+          ` (took ${(result.details.timeTaken / 1000).toFixed(1)}s)` : '')
+      };
       
     } catch (error) {
       return { 
         valid: false, 
         message: `Error verifying model: ${error instanceof Error ? error.message : String(error)}` 
       };
+    }
+  }
+  
+  /**
+   * Verify all downloaded models
+   */
+  async verifyAllModels(): Promise<Map<string, { valid: boolean; message: string }>> {
+    console.log('🔍 Verifying all models...\n');
+    
+    const results = new Map<string, { valid: boolean; message: string }>();
+    
+    for (const model of this.availableModels) {
+      const exists = await this.verifyModel(model.path);
+      if (exists) {
+        console.log(`Checking ${model.name}...`);
+        const result = await this.verifyModelIntegrity(model.name, false);
+        results.set(model.name, result);
+        console.log(`  ${result.valid ? '✅' : '❌'} ${result.message}\n`);
+      } else {
+        results.set(model.name, { valid: false, message: 'Model not downloaded' });
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Generate an integrity report for a model
+   */
+  async generateModelReport(modelName: string): Promise<string | null> {
+    const model = this.availableModels.find(m => m.name === modelName);
+    if (!model) {
+      return null;
+    }
+    
+    try {
+      const report = await this.integrityChecker.generateIntegrityReport(model.path, modelName);
+      const manifestPath = await this.integrityChecker.createModelManifest(
+        model.path, 
+        modelName,
+        {
+          type: model.type,
+          quantization: model.quantization,
+          parameters: model.parameters,
+          contextSize: model.contextSize,
+          trustScore: model.trustScore
+        }
+      );
+      
+      console.log(`📄 Integrity report saved to: ${manifestPath}`);
+      return manifestPath;
+    } catch (error) {
+      console.error(`Failed to generate report for ${modelName}:`, error);
+      return null;
     }
   }
 
