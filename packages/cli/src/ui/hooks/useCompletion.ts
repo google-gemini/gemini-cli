@@ -297,6 +297,10 @@ export function useCompletion(
       const lowerSearchPrefix = searchPrefix.toLowerCase();
       let foundSuggestions: Suggestion[] = [];
       try {
+        // Check abort signal before reading directory
+        if (signal.aborted) {
+          return [];
+        }
         const entries = await fs.readdir(startDir, { withFileTypes: true });
         for (const entry of entries) {
           // Check abort signal frequently during intensive operations
@@ -374,6 +378,10 @@ export function useCompletion(
       }
 
       const globPattern = `**/${searchPrefix}*`;
+      // Check abort signal before expensive glob operation
+      if (signal.aborted) {
+        return [];
+      }
       const files = await glob(globPattern, {
         cwd,
         dot: searchPrefix.startsWith('.'),
