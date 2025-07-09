@@ -95,6 +95,7 @@ export const AppWrapper = (props: AppProps) => (
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [queuedInput, setQueuedInput] = useState<string | null>(null);
   const { stdout } = useStdout();
 
   useEffect(() => {
@@ -494,11 +495,24 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
+      
+      // Handle special queue clearing signal
+      if (trimmedValue === '__CLEAR_QUEUE__') {
+        setQueuedInput(null);
+        return;
+      }
+      
       if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
+        if (streamingState === StreamingState.Idle) {
+          // Submit immediately if AI is idle
+          submitQuery(trimmedValue);
+        } else {
+          // Queue the input for when AI finishes
+          setQueuedInput(trimmedValue);
+        }
       }
     },
-    [submitQuery],
+    [submitQuery, streamingState],
   );
 
   const logger = useLogger();
@@ -541,6 +555,23 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputVisible = !initError; // Always show input unless there's an error
+
+  // Process queued input when AI becomes idle
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle && queuedInput && !initError) {
+      const inputToSubmit = queuedInput;
+      setQueuedInput(null);
+      submitQuery(inputToSubmit);
+    }
+  }, [streamingState, queuedInput, initError, submitQuery]);
+
+  // Clear queued input if user cancels or there's an error
+  useEffect(() => {
+    if (initError) {
+      setQueuedInput(null);
+    }
+  }, [initError]);
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -777,6 +808,26 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
+              {queuedInput && (
+                <Box 
+                  borderStyle="round" 
+                  borderColor={Colors.Foreground} 
+                  flexDirection="row"
+                  paddingX={2}
+                  paddingY={0}
+                  marginTop={1}
+                  alignSelf="flex-start"
+                >
+                  <Box width={2}>
+                    <Text color={Colors.Foreground}>{'> '}</Text>
+                  </Box>
+                  <Box flexGrow={1}>
+                    <Text wrap="wrap" color={Colors.Foreground}>
+                      {queuedInput}
+                    </Text>
+                  </Box>
+                </Box>
+              )}
               <Box
                 marginTop={1}
                 display="flex"
@@ -830,7 +881,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 </OverflowProvider>
               )}
 
-              {isInputActive && (
+              {isInputVisible && (
                 <InputPrompt
                   buffer={buffer}
                   inputWidth={inputWidth}
@@ -843,6 +894,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  focus={isInputVisible}
+                  queuedInput={queuedInput}
+                  streamingState={streamingState}
                 />
               )}
             </>
