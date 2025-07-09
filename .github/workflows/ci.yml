@@ -92,7 +92,7 @@ jobs:
 
       - name: Publish Test Report (for non-forks)
         if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         with:
           name: Test Results (Node ${{ matrix.node-version }})
           path: packages/*/junit.xml
@@ -144,3 +144,22 @@ jobs:
           core_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
           node_version: ${{ matrix.node-version }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@181d5eefc20863364f96762470ba6f862bdef56b # v3

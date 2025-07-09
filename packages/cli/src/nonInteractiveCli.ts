@@ -48,6 +48,7 @@ export async function runNonInteractive(
   input: string,
   prompt_id: string,
 ): Promise<void> {
+  await config.initialize();
   // Handle EPIPE errors when the output is piped to a command that closes early.
   process.stdout.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EPIPE') {
