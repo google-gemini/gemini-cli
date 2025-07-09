@@ -13,7 +13,7 @@ Configuration is applied in the following order of precedence (lower numbers are
 5.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
 6.  **Command-line arguments:** Values passed when launching the CLI.
 
-## The user settings file and project settings file
+## Settings files
 
 Gemini CLI uses `settings.json` files for persistent configuration. There are three locations for these files:
 
