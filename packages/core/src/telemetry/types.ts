@@ -209,6 +209,18 @@ export class ApiResponseEvent {
   }
 }
 
+export class ModelFallbackEvent {
+  'event.name': 'model_fallback';
+  'event.timestamp': string; // ISO 8601
+  reason: string;
+
+  constructor(reason: string) {
+    this['event.name'] = 'model_fallback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.reason = reason;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -216,4 +228,5 @@ export type TelemetryEvent =
   | ToolCallEvent
   | ApiRequestEvent
   | ApiErrorEvent
-  | ApiResponseEvent;
+  | ApiResponseEvent
+  | ModelFallbackEvent;
