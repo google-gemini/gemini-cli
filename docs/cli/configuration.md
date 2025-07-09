@@ -7,21 +7,27 @@ Gemini CLI offers several ways to configure its behavior, including environment 
 Configuration is applied in the following order of precedence (lower numbers are overridden by higher numbers):
 
 1.  **Default values:** Hardcoded defaults within the application.
-2.  **User settings file:** Global settings for the current user.
-3.  **Project settings file:** Project-specific settings.
-4.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
-5.  **Command-line arguments:** Values passed when launching the CLI.
+2.  **System settings file:** System-wide settings for all users.
+3.  **User settings file:** Global settings for the current user.
+4.  **Project settings file:** Project-specific settings.
+5.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
+6.  **Command-line arguments:** Values passed when launching the CLI.
 
 ## The user settings file and project settings file
 
-Gemini CLI uses `settings.json` files for persistent configuration. There are two locations for these files:
+Gemini CLI uses `settings.json` files for persistent configuration. There are three locations for these files:
 
+- **System settings file:**
+  - **Location (Linux/macOS):** `/etc/gemini/settings.json`
+  - **Location (Windows):** `%ALLUSERSPROFILE%\\gemini\\settings.json`
+  - **Scope:** Applies to all Gemini CLI sessions for all users on the system.
 - **User settings file:**
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
   - **Scope:** Applies to all Gemini CLI sessions for the current user.
 - **Project settings file:**
   - **Location:** `.gemini/settings.json` within your project's root directory.
-  - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user settings.
+  - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user and system settings.
+
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
