@@ -217,9 +217,13 @@ export class GeminiChat {
           fallbackModel,
           error,
         );
-        if (accepted) {
+        if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
           return fallbackModel;
+        }
+        // Check if the model was switched manually in the handler
+        if (this.config.getModel() === fallbackModel) {
+          return null; // Model was switched but don't continue with current prompt
         }
       } catch (error) {
         console.warn('Flash fallback handler failed:', error);
@@ -262,12 +266,25 @@ export class GeminiChat {
     let response: GenerateContentResponse;
 
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent({
-          model: this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL,
+      const apiCall = () => {
+        const modelToUse = this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
+
+        // Prevent Flash model calls immediately after quota error
+        if (
+          this.config.getQuotaErrorOccurred() &&
+          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        ) {
+          throw new Error(
+            'Please submit a new query to continue with the Flash model.',
+          );
+        }
+
+        return this.contentGenerator.generateContent({
+          model: modelToUse,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
+      };
 
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
@@ -354,12 +371,25 @@ export class GeminiChat {
     const startTime = Date.now();
 
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContentStream({
-          model: this.config.getModel(),
+      const apiCall = () => {
+        const modelToUse = this.config.getModel();
+
+        // Prevent Flash model calls immediately after quota error
+        if (
+          this.config.getQuotaErrorOccurred() &&
+          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        ) {
+          throw new Error(
+            'Please submit a new query to continue with the Flash model.',
+          );
+        }
+
+        return this.contentGenerator.generateContentStream({
+          model: modelToUse,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
+      };
 
       // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
       // for transient issues internally before yielding the async generator, this retry will re-initiate
