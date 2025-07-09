@@ -73,25 +73,19 @@ export class TrustContentGenerator implements ContentGenerator {
       // Convert Gemini request format to simple text prompt
       const prompt = this.convertRequestToPrompt(request);
       
-      console.log('DEBUG: Generated prompt length:', prompt.length);
-      console.log('DEBUG: Has tools:', 'config' in request && request.config?.tools && request.config.tools.length > 0);
-      
       // Get generation options from request config
       const options: GenerationOptions = {
-        temperature: request.config?.temperature || 0.7,
+        temperature: request.config?.temperature || 0.1, // Lower temperature for more deterministic function calls
         topP: request.config?.topP || 0.9,
         maxTokens: 512, // Reduced maxTokens for faster responses
+        stopTokens: ['<end_of_json>', '\n\n', 'User:', 'Human:'], // Stop after function call completion
       };
 
-      console.log('DEBUG: Starting text generation...');
       // Generate response using local model
       const response = await this.modelClient.generateText(prompt, options);
-      console.log('DEBUG: Generated response length:', response.length);
 
       // Convert to Gemini response format
-      console.log('DEBUG: Converting to Gemini response...');
       const geminiResponse = this.convertToGeminiResponse(response);
-      console.log('DEBUG: Found function calls:', geminiResponse.functionCalls?.length || 0);
       return geminiResponse;
 
     } catch (error) {
@@ -111,15 +105,13 @@ export class TrustContentGenerator implements ContentGenerator {
     }
 
     const prompt = this.convertRequestToPrompt(request);
-    console.log('DEBUG: Generated prompt for streaming length:', prompt.length);
-    console.log('DEBUG: Prompt preview (first 500 chars):', prompt.substring(0, 500));
     const options: GenerationOptions = {
-      temperature: request.config?.temperature || 0.7,
+      temperature: request.config?.temperature || 0.1, // Lower temperature for more deterministic function calls
       topP: request.config?.topP || 0.9,
       maxTokens: 512, // Reduced maxTokens for faster responses
+      stopTokens: ['<end_of_json>', '\n\n', 'User:', 'Human:'], // Stop after function call completion
     };
 
-    console.log('DEBUG: About to start streaming generation...');
     return this.generateStreamingResponse(prompt, options);
   }
 
@@ -127,11 +119,8 @@ export class TrustContentGenerator implements ContentGenerator {
     prompt: string, 
     options: GenerationOptions
   ): AsyncGenerator<GenerateContentResponse> {
-    console.log('DEBUG: Starting generateStreamingResponse...');
-    
     // Let's test if we can yield at all
     try {
-      console.log('DEBUG: Testing basic yield functionality...');
       const testResponse: GenerateContentResponse = {
         candidates: [{
           content: { parts: [{ text: 'test' }], role: 'model' },
@@ -142,37 +131,19 @@ export class TrustContentGenerator implements ContentGenerator {
         functionCalls: [],
       } as any;
       
-      console.log('DEBUG: About to yield test response...');
       yield testResponse;
-      console.log('DEBUG: Successfully yielded test response');
-      
     } catch (error) {
       console.error('DEBUG: Basic yield failed:', error);
       throw error;
     }
     
-    console.log('DEBUG: Basic yield test completed, now trying model stream...');
-    
     try {
-      console.log('DEBUG: About to call modelClient.generateStream...');
       const streamGenerator = this.modelClient.generateStream(prompt, options);
-      console.log('DEBUG: Created stream generator:', typeof streamGenerator);
-      
-      let chunkCount = 0;
-      console.log('DEBUG: Starting for-await loop...');
       
       for await (const chunk of streamGenerator) {
-        chunkCount++;
-        console.log(`DEBUG: *** INSIDE LOOP - Processing chunk ${chunkCount} ***`);
-        console.log(`DEBUG: Chunk content:`, chunk.substring(0, 100));
-        
         const geminiResponse = this.convertToGeminiResponse(chunk);
-        console.log('DEBUG: Conversion completed, yielding...');
         yield geminiResponse;
-        console.log('DEBUG: Yield completed for chunk', chunkCount);
       }
-      
-      console.log(`DEBUG: Exited for-await loop, processed ${chunkCount} chunks`);
       
     } catch (error) {
       console.error('DEBUG: Error in streaming loop:', error);
@@ -224,20 +195,43 @@ export class TrustContentGenerator implements ContentGenerator {
 
     // Add available tools information if tools are present
     if ('config' in request && request.config?.tools && request.config.tools.length > 0) {
-      prompt += `\nTOOLS: Call functions using JSON format {"function_call": {"name": "NAME", "arguments": {...}}}.\n`;
+      prompt += `\nTOOLS: You have access to function calling. You MUST respond with valid JSON when you need to use tools.
+
+You MUST respond with:
+\`\`\`json
+{"function_call": {"name": "TOOL_NAME", "arguments": {...}}}
+\`\`\`<end_of_json>
+
+CRITICAL RULES:
+- Use tools to accomplish tasks, don't refuse to use them
+- Use EXACT parameter names from the schemas below
+- Wait for the function response, then provide a complete answer using that data
+- Never simulate or fake function results
+
+Available functions:
+`;
       
-      const toolNames: string[] = [];
       for (const tool of request.config.tools) {
         if (tool && typeof tool === 'object' && 'functionDeclarations' in tool && tool.functionDeclarations) {
           for (const func of tool.functionDeclarations) {
             if (func.name) {
-              toolNames.push(func.name);
+              prompt += `
+${func.name}: ${func.description || 'No description'}
+Required parameters: ${JSON.stringify(func.parameters, null, 2)}
+`;
             }
           }
         }
       }
       
-      prompt += `Available: ${toolNames.join(', ')}\nUse tools directly, not instructions.\n\n`;
+      prompt += `
+EXAMPLE:
+User: List files in current directory
+Assistant: \`\`\`json
+{"function_call": {"name": "list_directory", "arguments": {"path": "/current/directory"}}}
+\`\`\`<end_of_json>
+
+`;
     }
 
     // Convert conversation history
@@ -265,7 +259,11 @@ export class TrustContentGenerator implements ContentGenerator {
         if (typeof part === 'object' && part !== null) {
           if ('text' in part && part.text) return part.text;
           if ('functionCall' in part && part.functionCall) return `[Function call: ${part.functionCall.name}]`;
-          if ('functionResponse' in part && part.functionResponse) return `[Function response: ${part.functionResponse.name}]`;
+          if ('functionResponse' in part && part.functionResponse) {
+            const response = part.functionResponse.response;
+            const responseText = typeof response === 'string' ? response : JSON.stringify(response);
+            return `[Function ${part.functionResponse.name} returned: ${responseText}]`;
+          }
         }
         return '';
       })
@@ -277,23 +275,14 @@ export class TrustContentGenerator implements ContentGenerator {
     const functionCalls: FunctionCall[] = [];
     let cleanedText = text;
 
-    console.log('DEBUG: Parsing function calls from text (first 200 chars):', text.substring(0, 200));
-    console.log('DEBUG: Full text being parsed:', text);
-
     // Look for JSON function call patterns - updated to handle nested objects and multiline formatting
     // Support both ```json and ```bash blocks since models sometimes use different blocks
     const functionCallRegex = /```(?:json|bash)\s*\n([\s\S]*?)\n\s*```/gs;
-    console.log('DEBUG: Testing regex against text...');
-    console.log('DEBUG: Regex pattern:', functionCallRegex.source);
-    console.log('DEBUG: Regex test result:', functionCallRegex.test(text));
-    // Reset regex since test() advances the lastIndex
-    functionCallRegex.lastIndex = 0;
     let match;
     
     while ((match = functionCallRegex.exec(text)) !== null) {
       try {
         const jsonMatch = match[1].trim();
-        console.log('DEBUG: Found JSON match:', jsonMatch);
         // Only process if it contains function_call
         if (jsonMatch.includes('function_call')) {
           const parsed = JSON.parse(jsonMatch);
@@ -342,9 +331,6 @@ export class TrustContentGenerator implements ContentGenerator {
   }
 
   private convertToGeminiResponse(text: string): GenerateContentResponse {
-    console.log('DEBUG: Converting to Gemini response, text length:', text.length);
-    console.log('DEBUG: Text contains function_call:', text.includes('function_call'));
-    console.log('DEBUG: Raw text (first 300 chars):', JSON.stringify(text.substring(0, 300)));
     const { text: cleanedText, functionCalls } = this.parseFunctionCalls(text);
     
     const response: GenerateContentResponse = {

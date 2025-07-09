@@ -63,14 +63,11 @@ export async function runNonInteractive(
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
 
   try {
-    console.log('DEBUG: Starting nonInteractive chat loop...');
     let loopCount = 0;
     while (true) {
       loopCount++;
-      console.log(`DEBUG: Loop iteration ${loopCount}`);
       const functionCalls: FunctionCall[] = [];
 
-      console.log('DEBUG: About to call sendMessageStream...');
       const responseStream = await chat.sendMessageStream({
         message: currentMessages[0]?.parts || [], // Ensure parts are always provided
         config: {
@@ -80,28 +77,22 @@ export async function runNonInteractive(
           ],
         },
       });
-      console.log('DEBUG: Got response stream, starting to iterate...');
 
       for await (const resp of responseStream) {
-        console.log('DEBUG: Got response chunk');
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
           return;
         }
         const textPart = getResponseText(resp);
         if (textPart) {
-          console.log('DEBUG: Writing text part:', textPart.substring(0, 50));
           process.stdout.write(textPart);
         }
         if (resp.functionCalls) {
-          console.log('DEBUG: Found function calls:', resp.functionCalls.length);
           functionCalls.push(...resp.functionCalls);
         }
       }
-      console.log('DEBUG: Finished iterating response stream');
 
       if (functionCalls.length > 0) {
-        console.log('DEBUG: Processing', functionCalls.length, 'function calls');
         const toolResponseParts: Part[] = [];
 
         for (const fc of functionCalls) {
@@ -145,10 +136,8 @@ export async function runNonInteractive(
             }
           }
         }
-        currentMessages = [{ role: 'user', parts: toolResponseParts }];
-        console.log('DEBUG: Continuing loop with tool responses...');
+        currentMessages = [{ role: 'model', parts: toolResponseParts }];
       } else {
-        console.log('DEBUG: No function calls, exiting loop');
         process.stdout.write('\n'); // Ensure a final newline
         return;
       }

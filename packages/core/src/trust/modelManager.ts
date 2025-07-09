@@ -113,6 +113,62 @@ export class TrustModelManagerImpl implements TrustModelManager {
         downloadUrl: 'https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/blob/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
         verificationHash: 'sha256:pending',
         expectedSize: 4920000000 // ~4.9GB
+      },
+      {
+        name: 'mistral-7b-instruct',
+        path: 'Mistral-7B-Instruct-v0.3-Q4_K_M.gguf',
+        type: 'mistral',
+        quantization: 'Q4_K_M',
+        contextSize: 8192,
+        ramRequirement: '6GB',
+        description: 'Efficient multilingual model - 7B parameters',
+        parameters: '7B',
+        trustScore: 9.1,
+        downloadUrl: 'https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF/blob/main/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 4370000000 // ~4.37GB
+      },
+      {
+        name: 'mistral-nemo-12b-instruct',
+        path: 'Mistral-Nemo-Instruct-2407-Q4_K_M.gguf',
+        type: 'mistral',
+        quantization: 'Q4_K_M',
+        contextSize: 128000,
+        ramRequirement: '10GB',
+        description: 'Large context multilingual model - 12B parameters',
+        parameters: '12B',
+        trustScore: 9.4,
+        downloadUrl: 'https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF/blob/main/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 6900000000 // ~6.9GB
+      },
+      {
+        name: 'gemma-2-2b-instruct',
+        path: 'gemma-2-2b-it-Q4_K_M.gguf',
+        type: 'gemma',
+        quantization: 'Q4_K_M',
+        contextSize: 8192,
+        ramRequirement: '3GB',
+        description: 'Compact Google model - 2.6B parameters',
+        parameters: '2.6B',
+        trustScore: 8.9,
+        downloadUrl: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/blob/main/gemma-2-2b-it-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 1640000000 // ~1.64GB
+      },
+      {
+        name: 'gemma-2-9b-instruct',
+        path: 'gemma-2-9b-it-Q4_K_M.gguf',
+        type: 'gemma',
+        quantization: 'Q4_K_M',
+        contextSize: 8192,
+        ramRequirement: '8GB',
+        description: 'Advanced Google model - 9B parameters',
+        parameters: '9B',
+        trustScore: 9.3,
+        downloadUrl: 'https://huggingface.co/bartowski/gemma-2-9b-it-GGUF/blob/main/gemma-2-9b-it-Q4_K_M.gguf',
+        verificationHash: 'sha256:pending',
+        expectedSize: 5400000000 // ~5.4GB
       }
     ];
   }
@@ -400,30 +456,70 @@ export class TrustModelManagerImpl implements TrustModelManager {
       return null;
     }
 
-    // Task-specific recommendations
+    // Task-specific recommendations with format-aware logic
     switch (task.toLowerCase()) {
       case 'coding':
       case 'code':
-        // Prefer models with good coding performance
-        return suitableModels.find(m => m.name.includes('phi')) || suitableModels[0];
+      case 'programming':
+        // Prefer Phi models for coding, then DeepSeek for complex reasoning
+        return suitableModels.find(m => m.type === 'phi') || 
+               suitableModels.find(m => m.type === 'deepseek') ||
+               suitableModels.find(m => m.name.includes('llama-3.1')) ||
+               suitableModels[0];
       
       case 'quick':
       case 'simple':
-        // Prefer smallest suitable model
-        return suitableModels.reduce((smallest, current) => 
-          parseInt(current.ramRequirement) < parseInt(smallest.ramRequirement) ? current : smallest
-        );
+      case 'lightweight':
+        // Prefer smallest models: Qwen -> Gemma -> Phi
+        return suitableModels.find(m => m.type === 'qwen') ||
+               suitableModels.find(m => m.type === 'gemma' && m.parameters === '2.6B') ||
+               suitableModels.reduce((smallest, current) => 
+                 parseInt(current.ramRequirement) < parseInt(smallest.ramRequirement) ? current : smallest
+               );
+      
+      case 'multilingual':
+      case 'translation':
+      case 'international':
+        // Prefer Mistral models for multilingual tasks
+        return suitableModels.find(m => m.type === 'mistral') ||
+               suitableModels.find(m => m.type === 'gemma') ||
+               suitableModels[0];
+      
+      case 'reasoning':
+      case 'analysis':
+      case 'research':
+        // Prefer DeepSeek for advanced reasoning, then larger models
+        return suitableModels.find(m => m.type === 'deepseek') ||
+               suitableModels.find(m => m.name.includes('llama-3.1-8b')) ||
+               suitableModels.find(m => m.name.includes('gemma-2-9b')) ||
+               suitableModels.reduce((best, current) => 
+                 (current.trustScore || 0) > (best.trustScore || 0) ? current : best
+               );
+      
+      case 'context':
+      case 'longform':
+      case 'document':
+        // Prefer models with larger context windows
+        return suitableModels.find(m => m.name.includes('mistral-nemo')) || // 128k context
+               suitableModels.find(m => m.contextSize >= 8192) ||
+               suitableModels[0];
       
       case 'quality':
       case 'complex':
-        // Prefer highest quality model within RAM limit
+      case 'detailed':
+        // Prefer highest quality models within RAM limit
         return suitableModels.reduce((best, current) => 
           (current.trustScore || 0) > (best.trustScore || 0) ? current : best
         );
       
+      case 'general':
+      case 'default':
       default:
-        // Default to balanced model
-        return suitableModels.find(m => m.name.includes('llama-3.2')) || suitableModels[0];
+        // Default to balanced model: Llama -> Phi -> others
+        return suitableModels.find(m => m.name.includes('llama-3.2')) ||
+               suitableModels.find(m => m.type === 'phi') ||
+               suitableModels.find(m => m.type === 'gemma') ||
+               suitableModels[0];
     }
   }
 

@@ -72,10 +72,66 @@ export class ModelIntegrityChecker {
             addedDate: new Date().toISOString(),
             lastUpdated: new Date().toISOString()
           },
+          'phi-3.5-mini-uncensored': {
+            sha256: 'pending_verification',
+            size: 2390000000,
+            source: 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
           'qwen2.5-1.5b-instruct': {
             sha256: 'pending_verification',
             size: 1894532128,
             source: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-gguf',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'llama-3.2-3b-instruct': {
+            sha256: 'pending_verification',
+            size: 2019377696,
+            source: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'llama-3.1-8b-instruct': {
+            sha256: 'pending_verification',
+            size: 4920000000,
+            source: 'https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'deepseek-r1-distill-7b': {
+            sha256: 'pending_verification',
+            size: 4450000000,
+            source: 'https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'mistral-7b-instruct': {
+            sha256: 'pending_verification',
+            size: 4370000000,
+            source: 'https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'mistral-nemo-12b-instruct': {
+            sha256: 'pending_verification',
+            size: 6900000000,
+            source: 'https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'gemma-2-2b-instruct': {
+            sha256: 'pending_verification',
+            size: 1640000000,
+            source: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF',
+            addedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+          },
+          'gemma-2-9b-instruct': {
+            sha256: 'pending_verification',
+            size: 5400000000,
+            source: 'https://huggingface.co/bartowski/gemma-2-9b-it-GGUF',
             addedDate: new Date().toISOString(),
             lastUpdated: new Date().toISOString()
           }

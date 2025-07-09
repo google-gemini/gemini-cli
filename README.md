@@ -8,10 +8,13 @@ A privacy-focused, local-first AI command-line interface that puts you in contro
 
 - **100% Local Execution** - All AI inference runs on your hardware
 - **Privacy First** - Your data never leaves your machine
+- **Multi-Format Support** - 10 models across 6 formats (Llama, Phi, Qwen, Mistral, Gemma, DeepSeek)
+- **Smart Recommendations** - Task-specific model suggestions with RAM-aware filtering
 - **Model Management** - Download, verify, and manage GGUF models locally
 - **Performance Monitoring** - Real-time system metrics and optimization
 - **Hardware-Aware** - Automatic optimization based on your system specs
-- **Transparent** - Open source with cryptographic model verification
+- **Cryptographic Security** - SHA-256 verification for all models
+- **Transparent** - Open source with full audit trail
 
 ## 🚀 Quick Start
 
@@ -132,10 +135,12 @@ node bundle/trust.js model recommend <task-type>
 # or with alias: trust model recommend <task-type>
 ```
 Get intelligent model recommendations based on your task and hardware:
-- `coding` - Best models for programming tasks
-- `quick` - Fast models for simple queries  
-- `complex` - High-quality models for detailed work
-- `default` - Balanced general-purpose models
+- `coding` - Phi models optimized for programming tasks
+- `multilingual` - Mistral models for international/translation work
+- `reasoning` - DeepSeek models for complex analysis
+- `quick` - Qwen models for fast responses
+- `context` - Large context models for document processing
+- `quality` - Highest trust score models within RAM limits
 
 ### Delete Models
 ```bash
@@ -253,31 +258,90 @@ trust ui benchmark         # Live benchmarking interface
 
 ## 🤖 Available Models
 
-| Model | Parameters | RAM | Description | Trust Score | Access |
-|-------|------------|-----|-------------|-------------|---------|
-| **qwen2.5-1.5b-instruct** | 1.5B | 2GB | Lightweight model for quick responses | 8.8/10 | ✅ Public |
-| **llama-3.2-3b-instruct** | 3B | 4GB | Balanced performance for general use | 9.2/10 | ✅ Public |
-| **phi-3.5-mini-instruct** | 3.8B | 3GB | Optimized for coding and technical tasks | 9.5/10 | ✅ Public |
-| **phi-3.5-mini-uncensored** | 3.8B | 3GB | Uncensored model for risk analysis & auditing | 9.3/10 | ✅ Public |
-| **deepseek-r1-distill-7b** | 7.6B | 6GB | Advanced reasoning for complex analysis | 9.6/10 | ✅ Public |
-| **llama-3.1-8b-instruct** | 8B | 8GB | High-quality responses for complex tasks | 9.7/10 | ✅ Public |
+Trust CLI now supports **10 models** across **6 different model formats** with intelligent task-specific recommendations:
+
+### **Lightweight Models (2-4GB RAM)**
+| Model | Format | Parameters | RAM | Context | Description | Trust Score |
+|-------|--------|------------|-----|---------|-------------|-------------|
+| **qwen2.5-1.5b-instruct** | Qwen | 1.5B | 2GB | 4K | Ultra-fast for quick responses | 8.8/10 |
+| **gemma-2-2b-instruct** | Gemma | 2.6B | 3GB | 8K | Compact Google model with larger context | 8.9/10 |
+| **phi-3.5-mini-instruct** | Phi | 3.8B | 3GB | 4K | Optimized for coding and technical tasks | 9.5/10 |
+| **phi-3.5-mini-uncensored** | Phi | 3.8B | 3GB | 4K | Uncensored for risk analysis & auditing | 9.3/10 |
+| **llama-3.2-3b-instruct** | Llama | 3B | 4GB | 4K | Balanced performance for general use | 9.2/10 |
+
+### **Mid-Range Models (6-8GB RAM)**
+| Model | Format | Parameters | RAM | Context | Description | Trust Score |
+|-------|--------|------------|-----|---------|-------------|-------------|
+| **mistral-7b-instruct** | Mistral | 7B | 6GB | 8K | Efficient multilingual model | 9.1/10 |
+| **deepseek-r1-distill-7b** | DeepSeek | 7.6B | 6GB | 4K | Advanced reasoning for complex analysis | 9.6/10 |
+| **llama-3.1-8b-instruct** | Llama | 8B | 8GB | 4K | High-quality responses for complex tasks | 9.7/10 |
+| **gemma-2-9b-instruct** | Gemma | 9B | 8GB | 8K | Advanced Google model with strong performance | 9.3/10 |
+
+### **Large Context Models (10GB+ RAM)**
+| Model | Format | Parameters | RAM | Context | Description | Trust Score |
+|-------|--------|------------|-----|---------|-------------|-------------|
+| **mistral-nemo-12b-instruct** | Mistral | 12B | 10GB | 128K | Massive context for document analysis | 9.4/10 |
 
 ### 📥 Downloading Models
 
 **All models** can be downloaded directly without authentication:
+
+**Lightweight Models (Great for getting started):**
 ```bash
-trust model download qwen2.5-1.5b-instruct     # 1.7GB - Lightweight & fast
-trust model download llama-3.2-3b-instruct     # 1.9GB - Balanced performance  
-trust model download phi-3.5-mini-instruct     # 2.4GB - Great for coding
-trust model download phi-3.5-mini-uncensored   # 2.4GB - Risk analysis & auditing
-trust model download deepseek-r1-distill-7b    # 4.5GB - Advanced reasoning & analysis
-trust model download llama-3.1-8b-instruct     # 4.9GB - Highest quality
+trust model download qwen2.5-1.5b-instruct     # 1.8GB - Ultra-fast responses
+trust model download gemma-2-2b-instruct       # 1.6GB - Google's compact model
+trust model download phi-3.5-mini-instruct     # 2.4GB - Excellent for coding
+trust model download llama-3.2-3b-instruct     # 1.9GB - Balanced general use
 ```
 
-**Model Selection Guide:**
-- **Standard models** (`phi-3.5-mini-instruct`, `llama-*`, `qwen-*`): Best for general development, have safety guardrails
-- **Uncensored model** (`phi-3.5-mini-uncensored`): For auditors & security researchers who need to explore edge cases without content filtering
-- **Reasoning model** (`deepseek-r1-distill-7b`): Excels at complex analysis, step-by-step reasoning, and problem-solving - ideal for auditors working through complex risk scenarios
+**Mid-Range Models (Best performance/resource balance):**
+```bash
+trust model download mistral-7b-instruct       # 4.4GB - Great for multilingual
+trust model download deepseek-r1-distill-7b    # 4.5GB - Advanced reasoning & analysis
+trust model download llama-3.1-8b-instruct     # 4.9GB - Highest quality responses
+trust model download gemma-2-9b-instruct       # 5.4GB - Advanced Google model
+```
+
+**Large Context Models (For document processing):**
+```bash
+trust model download mistral-nemo-12b-instruct # 6.9GB - 128K context window
+```
+
+**Specialized Models:**
+```bash
+trust model download phi-3.5-mini-uncensored   # 2.4GB - Risk analysis & auditing
+```
+
+### 🎯 **Smart Model Recommendations**
+
+Use Trust CLI's intelligent recommendation system to get the perfect model for your task:
+
+```bash
+trust model recommend coding        # → Recommends Phi models
+trust model recommend multilingual  # → Recommends Mistral models  
+trust model recommend reasoning     # → Recommends DeepSeek models
+trust model recommend quick         # → Recommends Qwen models
+trust model recommend context       # → Recommends Mistral Nemo (128K context)
+trust model recommend --ram 16      # → Shows models that fit in 16GB RAM
+```
+
+### **Model Selection Guide by Use Case:**
+
+**🚀 Getting Started (2-4GB RAM):**
+- **`qwen2.5-1.5b-instruct`**: Start here - fastest responses, minimal resources
+- **`gemma-2-2b-instruct`**: More capable, 8K context window
+- **`phi-3.5-mini-instruct`**: Best for coding and technical work
+
+**💼 Professional Work (6-8GB RAM):**
+- **`mistral-7b-instruct`**: Multilingual projects, efficient performance
+- **`deepseek-r1-distill-7b`**: Complex analysis, step-by-step reasoning
+- **`llama-3.1-8b-instruct`**: Highest quality general responses
+
+**📚 Document & Research Work (10GB+ RAM):**
+- **`mistral-nemo-12b-instruct`**: 128K context for processing entire documents
+
+**🔍 Security & Risk Analysis:**
+- **`phi-3.5-mini-uncensored`**: For auditors who need unfiltered model responses
 
 All models use community GGUF conversions that are publicly accessible.
 
@@ -775,14 +839,14 @@ echo 'alias trust="node /full/path/to/your/trust-cli/bundle/trust.js"' >> ~/.zsh
 source ~/.zshrc
 ```
 
-**Step 4: Verify All 6 Models Appear**
-You should see:
-- qwen2.5-1.5b-instruct (1.5B, 2GB)
-- llama-3.2-3b-instruct (3B, 4GB)  
-- phi-3.5-mini-instruct (3.8B, 3GB)
-- phi-3.5-mini-uncensored (3.8B, 3GB)
-- deepseek-r1-distill-7b (7.6B, 6GB)
-- llama-3.1-8b-instruct (8B, 8GB)
+**Step 4: Verify All 10 Models Appear**
+You should see all models across 6 different formats:
+- **Qwen**: qwen2.5-1.5b-instruct (1.5B, 2GB)
+- **Gemma**: gemma-2-2b-instruct (2.6B, 3GB), gemma-2-9b-instruct (9B, 8GB)
+- **Phi**: phi-3.5-mini-instruct (3.8B, 3GB), phi-3.5-mini-uncensored (3.8B, 3GB)
+- **Llama**: llama-3.2-3b-instruct (3B, 4GB), llama-3.1-8b-instruct (8B, 8GB)
+- **Mistral**: mistral-7b-instruct (7B, 6GB), mistral-nemo-12b-instruct (12B, 10GB)
+- **DeepSeek**: deepseek-r1-distill-7b (7.6B, 6GB)
 
 ### TypeScript Build Errors on Node.js v24+
 

@@ -128,6 +128,7 @@ export class TrustNodeLlamaClient implements TrustModelClient {
         topP: options?.topP ?? 0.9,
         topK: options?.topK ?? 40,
         maxTokens: options?.maxTokens ?? 2048
+        // Note: stopSequence not supported in current node-llama-cpp version
       });
 
       const endTime = Date.now();
@@ -157,6 +158,7 @@ export class TrustNodeLlamaClient implements TrustModelClient {
         topP: options?.topP ?? 0.9,
         topK: options?.topK ?? 40,
         maxTokens: options?.maxTokens ?? 512  // Already reduced from 2048
+        // Note: stopSequence not supported in current node-llama-cpp version
       });
       
       totalTokens = response.length;
@@ -176,6 +178,7 @@ export class TrustNodeLlamaClient implements TrustModelClient {
           topP: options?.topP ?? 0.9,
           topK: options?.topK ?? 40,
           maxTokens: options?.maxTokens ?? 512
+          // Note: stopSequence not supported in current node-llama-cpp version
         });
         yield response;
       } catch (fallbackError) {
