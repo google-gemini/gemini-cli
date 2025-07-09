@@ -43,8 +43,12 @@ export const DEFAULT_TRUST_CONFIG: TrustConfig = {
     ollama: {
       baseUrl: 'http://localhost:11434',
       defaultModel: 'qwen2.5:1.5b',
-      timeout: 120000,
+      timeout: 60000, // Reduced to 1 minute for faster failures
+      keepAlive: '5m', // Keep model loaded for 5 minutes
       maxToolCalls: 3,
+      concurrency: 2, // Limit concurrent requests
+      temperature: 0.1, // Lower temperature for more consistent results
+      numPredict: 1000, // Limit response length for faster generation
     },
     trustLocal: {
       enabled: true,

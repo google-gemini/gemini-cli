@@ -310,6 +310,7 @@ describe('OllamaContentGenerator', () => {
 
     it('should count tokens', async () => {
       const request = {
+        model: 'test-model',
         contents: [{
           role: 'user',
           parts: [{ text: 'Hello world' }],

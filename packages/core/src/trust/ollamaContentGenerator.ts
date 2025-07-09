@@ -95,7 +95,11 @@ export class OllamaContentGenerator implements ContentGenerator {
       },
     ];
 
-    console.log(`Ollama Content Generator initialized with model: ${currentModel}`);
+    // Preheat the model for better performance
+    console.log(`🔥 Preheating model ${currentModel}...`);
+    await this.ollamaClient.preheatModel();
+
+    console.log(`✅ Ollama Content Generator initialized with model: ${currentModel}`);
   }
 
   /**
@@ -328,19 +332,41 @@ export class OllamaContentGenerator implements ContentGenerator {
   }
 
   /**
-   * Get current model information
+   * Get current model information with performance metrics
    */
   async getModelInfo(): Promise<{
     model: string;
     connected: boolean;
     availableModels: string[];
+    performance?: {
+      requestCount: number;
+      averageLatency: number;
+      lastRequestTime: number;
+      activeRequests: number;
+      queuedRequests: number;
+    };
   }> {
     const status = await this.ollamaClient.getStatus();
     return {
       model: status.model,
       connected: status.connected,
       availableModels: status.availableModels,
+      performance: status.performance,
     };
+  }
+
+  /**
+   * Get performance metrics
+   */
+  async getPerformanceMetrics(): Promise<{
+    requestCount: number;
+    averageLatency: number;
+    lastRequestTime: number;
+    activeRequests: number;
+    queuedRequests: number;
+  }> {
+    const status = await this.ollamaClient.getStatus();
+    return status.performance;
   }
 
   /**

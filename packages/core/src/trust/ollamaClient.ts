@@ -11,6 +11,13 @@ export interface OllamaConfig {
   baseUrl?: string;
   model?: string;
   timeout?: number;
+  keepAlive?: string;
+  numPredict?: number;
+  temperature?: number;
+  topP?: number;
+  repeatPenalty?: number;
+  seed?: number;
+  concurrency?: number;
 }
 
 export interface ToolDefinition {
@@ -68,25 +75,40 @@ export class OllamaClient {
   private client: OpenAI;
   private model: string;
   private timeout: number;
+  private keepAlive: string;
+  private concurrency: number;
+  private pendingRequests = new Map<string, Promise<any>>();
+  private requestQueue: Array<() => Promise<any>> = [];
+  private activeRequests = 0;
 
   constructor(config: OllamaConfig = {}) {
     this.model = config.model || 'qwen2.5:1.5b'; // Default to smaller, faster model
-    this.timeout = config.timeout || 120000; // 2 minute timeout for CPU inference
+    this.timeout = config.timeout || 60000; // Reduced to 1 minute default
+    this.keepAlive = config.keepAlive || '5m'; // Keep model loaded for 5 minutes
+    this.concurrency = config.concurrency || 2; // Limit concurrent requests
     
     // Initialize OpenAI client with Ollama endpoint
     this.client = new OpenAI({
       baseURL: config.baseUrl || 'http://localhost:11434/v1',
       apiKey: 'ollama', // Dummy key for local Ollama
       timeout: this.timeout,
+      maxRetries: 1, // Reduce retries for faster failure
     });
   }
 
   /**
-   * Check if Ollama is running and accessible
+   * Check if Ollama is running and accessible with timeout
    */
   async checkConnection(): Promise<boolean> {
     try {
-      const response = await fetch('http://localhost:11434/api/tags');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for health check
+      
+      const response = await fetch('http://localhost:11434/api/tags', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
       return false;
@@ -112,10 +134,21 @@ export class OllamaClient {
   }
 
   /**
-   * Check if a specific model is available
+   * Check if a specific model is available (with caching)
    */
+  private modelCache = new Map<string, { models: string[], timestamp: number }>();
+  
   async isModelAvailable(modelName: string): Promise<boolean> {
+    const cached = this.modelCache.get('models');
+    const now = Date.now();
+    
+    // Use cached models if less than 30 seconds old
+    if (cached && (now - cached.timestamp) < 30000) {
+      return cached.models.includes(modelName);
+    }
+    
     const models = await this.listModels();
+    this.modelCache.set('models', { models, timestamp: now });
     return models.includes(modelName);
   }
 
@@ -171,7 +204,40 @@ export class OllamaClient {
   }
 
   /**
-   * Generate a chat completion with tool calling support
+   * Queue management for concurrent requests
+   */
+  private async executeWithConcurrency<T>(operation: () => Promise<T>): Promise<T> {
+    // If we're at capacity, queue the request
+    if (this.activeRequests >= this.concurrency) {
+      return new Promise((resolve, reject) => {
+        this.requestQueue.push(async () => {
+          try {
+            const result = await operation();
+            resolve(result);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    }
+
+    // Execute immediately
+    this.activeRequests++;
+    try {
+      const result = await operation();
+      return result;
+    } finally {
+      this.activeRequests--;
+      // Process next queued request
+      const nextRequest = this.requestQueue.shift();
+      if (nextRequest) {
+        setImmediate(() => nextRequest());
+      }
+    }
+  }
+
+  /**
+   * Generate a chat completion with tool calling support and concurrency management
    */
   async chatCompletion(
     messages: OllamaMessage[],
@@ -182,16 +248,18 @@ export class OllamaClient {
       stream?: boolean;
     } = {}
   ): Promise<OllamaResponse> {
-    try {
-      const completion = await this.client.chat.completions.create({
-        model: this.model,
-        messages: messages as any, // Type assertion for OpenAI compatibility
-        tools: tools as any,
-        tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
-        temperature: options.temperature ?? 0.1,
-        max_tokens: options.maxTokens ?? 2000,
-        stream: false, // We'll handle streaming separately if needed
-      });
+    return this.executeWithConcurrency(async () => {
+      try {
+        const completion = await this.client.chat.completions.create({
+          model: this.model,
+          messages: messages as any, // Type assertion for OpenAI compatibility
+          tools: tools as any,
+          tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
+          temperature: options.temperature ?? 0.1,
+          max_tokens: options.maxTokens ?? 1000, // Reduced for faster responses
+          stream: false, // We'll handle streaming separately if needed
+          // Note: Ollama-specific options handled via separate API calls
+        });
 
       const choice = completion.choices[0];
       if (!choice) {
@@ -231,10 +299,11 @@ export class OllamaClient {
           totalTokens: completion.usage.total_tokens,
         } : undefined,
       };
-    } catch (error) {
-      console.error('Error in chat completion:', error);
-      throw new Error(`Ollama chat completion failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+      } catch (error) {
+        console.error('Error in chat completion:', error);
+        throw new Error(`Ollama chat completion failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
   }
 
   /**
@@ -252,13 +321,55 @@ export class OllamaClient {
   }
 
   /**
-   * Get client statistics and health info
+   * Performance monitoring
+   */
+  private performanceMetrics = {
+    requestCount: 0,
+    totalLatency: 0,
+    lastRequestTime: 0,
+    averageLatency: 0,
+  };
+
+  private updateMetrics(latency: number): void {
+    this.performanceMetrics.requestCount++;
+    this.performanceMetrics.totalLatency += latency;
+    this.performanceMetrics.lastRequestTime = Date.now();
+    this.performanceMetrics.averageLatency = 
+      this.performanceMetrics.totalLatency / this.performanceMetrics.requestCount;
+  }
+
+  /**
+   * Preheat the model to improve first request performance
+   */
+  async preheatModel(): Promise<void> {
+    try {
+      const startTime = Date.now();
+      await this.chatCompletion([
+        { role: 'user', content: 'Hello' }
+      ], [], { maxTokens: 1 });
+      const latency = Date.now() - startTime;
+      this.updateMetrics(latency);
+      console.log(`✅ Model ${this.model} preheated (${latency}ms)`);
+    } catch (error) {
+      console.log(`⚠️  Model preheat failed: ${error}`);
+    }
+  }
+
+  /**
+   * Get client statistics and health info with performance metrics
    */
   async getStatus(): Promise<{
     connected: boolean;
     model: string;
     availableModels: string[];
     modelLoaded: boolean;
+    performance: {
+      requestCount: number;
+      averageLatency: number;
+      lastRequestTime: number;
+      activeRequests: number;
+      queuedRequests: number;
+    };
   }> {
     const connected = await this.checkConnection();
     const availableModels = connected ? await this.listModels() : [];
@@ -269,6 +380,13 @@ export class OllamaClient {
       model: this.model,
       availableModels,
       modelLoaded,
+      performance: {
+        requestCount: this.performanceMetrics.requestCount,
+        averageLatency: this.performanceMetrics.averageLatency,
+        lastRequestTime: this.performanceMetrics.lastRequestTime,
+        activeRequests: this.activeRequests,
+        queuedRequests: this.requestQueue.length,
+      },
     };
   }
 

@@ -135,7 +135,11 @@ export interface TrustConfig {
       baseUrl: string;
       defaultModel: string;
       timeout: number;
+      keepAlive: string;
       maxToolCalls: number;
+      concurrency: number;
+      temperature: number;
+      numPredict: number;
     };
     trustLocal: {
       enabled: boolean;

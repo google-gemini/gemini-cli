@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { OllamaClient } from './ollamaClient.js';
+import { OllamaClient, OllamaMessage } from './ollamaClient.js';
 import OpenAI from 'openai';
 
 // Mock dependencies
@@ -140,7 +140,7 @@ describe('OllamaClient', () => {
 
       mockOpenAIClient.chat.completions.create.mockResolvedValueOnce(mockCompletion);
 
-      const messages = [
+      const messages: OllamaMessage[] = [
         { role: 'user', content: 'Read test.txt' },
       ];
       const tools = [{
@@ -182,7 +182,7 @@ describe('OllamaClient', () => {
 
       mockOpenAIClient.chat.completions.create.mockResolvedValueOnce(mockCompletion);
 
-      const messages = [
+      const messages: OllamaMessage[] = [
         { role: 'user', content: 'Hello' },
       ];
 
@@ -198,7 +198,7 @@ describe('OllamaClient', () => {
         new Error('API error')
       );
 
-      const messages = [
+      const messages: OllamaMessage[] = [
         { role: 'user', content: 'Hello' },
       ];
 
