@@ -323,8 +323,8 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
@@ -411,8 +411,8 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       return result;
@@ -559,7 +559,10 @@ export class GeminiClient {
    * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
    * Uses a fallback handler if provided by the config, otherwise returns null.
    */
-  private async handleFlashFallback(authType?: string): Promise<string | null> {
+  private async handleFlashFallback(
+    authType?: string,
+    error?: unknown,
+  ): Promise<string | null> {
     // Only handle fallback for OAuth users
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
@@ -577,7 +580,11 @@ export class GeminiClient {
     const fallbackHandler = this.config.flashFallbackHandler;
     if (typeof fallbackHandler === 'function') {
       try {
-        const accepted = await fallbackHandler(currentModel, fallbackModel);
+        const accepted = await fallbackHandler(
+          currentModel,
+          fallbackModel,
+          error,
+        );
         if (accepted) {
           this.config.setModel(fallbackModel);
           return fallbackModel;
