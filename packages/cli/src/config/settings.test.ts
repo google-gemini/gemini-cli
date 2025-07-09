@@ -604,9 +604,7 @@ describe('Settings Loading and Merging', () => {
         'workspace_value_for_workspace_read',
       );
       // Merged should take workspace's resolved value
-      expect(settings.merged.configValue).toBe(
-        'system_value_for_system_read',
-      );
+      expect(settings.merged.configValue).toBe('system_value_for_system_read');
 
       // Restore original environment variable state
       if (originalSharedVar !== undefined) {
@@ -615,7 +613,6 @@ describe('Settings Loading and Merging', () => {
         delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
       }
     });
-
 
     it('should leave unresolved environment variables as is', () => {
       const userSettingsContent = { apiKey: '$UNDEFINED_VAR' };
