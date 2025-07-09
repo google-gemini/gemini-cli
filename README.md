@@ -374,6 +374,244 @@ Trust CLI stores its configuration and models in `~/.trustcli/`:
 - `TRUST_MODEL` - Override default model selection
 - `TRUST_MODELS_DIR` - Custom models directory location
 
+## 🎯 Multi-Model Architecture & Setup
+
+Trust CLI now supports **three different AI backends** with intelligent fallback to give you complete choice over your AI inference approach:
+
+### 🚀 **Ollama Integration (Recommended)**
+
+**Best for**: Fast setup, excellent performance, easy model management
+
+Ollama provides the optimal balance of performance, simplicity, and privacy. It uses OpenAI-compatible APIs with native tool calling support.
+
+#### Quick Ollama Setup:
+```bash
+# 1. Install Ollama (Linux/macOS)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# 2. Start Ollama service
+ollama serve
+
+# 3. Trust CLI will automatically detect and use Ollama
+trust
+> hello world
+```
+
+#### Ollama Model Management:
+```bash
+# List available models
+ollama list
+
+# Pull recommended models
+ollama pull qwen2.5:1.5b      # Lightweight (1.5B, ~1GB)
+ollama pull qwen2.5:7b        # Balanced (7B, ~4GB)
+ollama pull llama3.2:3b       # Alternative (3B, ~2GB)
+
+# Trust CLI will automatically use the best available model
+```
+
+#### Ollama Configuration:
+```bash
+# Set preferred Ollama model
+trust config set ai.ollama.defaultModel qwen2.5:7b
+
+# Adjust timeout for slower hardware
+trust config set ai.ollama.timeout 180000  # 3 minutes
+
+# Set custom Ollama URL (if running remotely)
+trust config set ai.ollama.baseUrl http://your-server:11434
+```
+
+### 🏠 **Trust Local Models (HuggingFace GGUF)**
+
+**Best for**: Complete offline operation, fine-grained control, zero dependencies
+
+This is the original Trust CLI approach using locally downloaded GGUF models.
+
+#### Trust Local Setup:
+```bash
+# Download models directly
+trust model download qwen2.5-1.5b-instruct
+trust model download phi-3.5-mini-instruct
+
+# Switch to downloaded model
+trust model switch qwen2.5-1.5b-instruct
+
+# Trust CLI will use Trust Local if Ollama isn't available
+```
+
+#### Trust Local Configuration:
+```bash
+# Enable/disable Trust Local fallback
+trust config set ai.trustLocal.enabled true
+
+# Enable GBNF grammar-based function calling
+trust config set ai.trustLocal.gbnfFunctions true
+```
+
+### 🌐 **Cloud Models (Fallback)**
+
+**Best for**: Maximum performance, latest capabilities, when local resources are limited
+
+Cloud integration provides access to the most advanced models but requires internet connectivity.
+
+#### Cloud Setup:
+```bash
+# Enable cloud fallback
+trust config set ai.cloud.enabled true
+
+# Set cloud provider
+trust config set ai.cloud.provider google  # or 'openai', 'anthropic'
+
+# Configure authentication (see existing auth docs)
+trust auth login --provider google
+```
+
+### ⚙️ **Backend Configuration & Preferences**
+
+Trust CLI automatically tries backends in order: **Ollama → Trust Local → Cloud**
+
+#### View Current Configuration:
+```bash
+# Check current backend status
+trust config show
+
+# See which backend is active
+trust status
+
+# View AI configuration
+trust config get ai
+```
+
+#### Customize Backend Order:
+```bash
+# Change fallback order
+trust config set ai.fallbackOrder "ollama,trust-local,cloud"
+
+# Disable fallback (use only preferred backend)
+trust config set ai.enableFallback false
+
+# Set preferred backend
+trust config set ai.preferredBackend ollama
+```
+
+#### Backend-Specific Settings:
+```bash
+# Ollama settings
+trust config set ai.ollama.defaultModel qwen2.5:1.5b
+trust config set ai.ollama.timeout 120000
+trust config set ai.ollama.maxToolCalls 3
+
+# Trust Local settings  
+trust config set ai.trustLocal.enabled true
+trust config set ai.trustLocal.gbnfFunctions true
+
+# Cloud settings
+trust config set ai.cloud.enabled false
+trust config set ai.cloud.provider google
+```
+
+### 🔄 **Intelligent Fallback System**
+
+Trust CLI automatically selects the best available backend:
+
+1. **🚀 Ollama**: If running on `localhost:11434`
+2. **🏠 Trust Local**: If GGUF models are downloaded  
+3. **🌐 Cloud**: If configured and enabled
+
+#### Fallback Behavior:
+```bash
+# Example fallback scenario:
+# 1. Try Ollama (preferred) → Success ✅
+trust
+🔧 AI Backend Configuration: ollama → trust-local → cloud (fallback: enabled)
+✅ Successfully initialized ollama backend
+🚀 Using Ollama for content generation
+
+# 2. Try Ollama → Fail → Try Trust Local → Success ✅  
+trust
+🔧 AI Backend Configuration: ollama → trust-local → cloud (fallback: enabled)
+❌ Failed to initialize ollama backend: connection refused
+✅ Successfully initialized trust-local backend
+🏠 Using Trust Local models for content generation
+```
+
+### 📊 **Backend Comparison**
+
+| Feature | Ollama | Trust Local | Cloud |
+|---------|---------|-------------|-------|
+| **Setup** | Simple | Moderate | Simple |
+| **Performance** | Fast | Medium | Fastest |
+| **Privacy** | Private | Private | Shared |
+| **Offline** | Yes | Yes | No |
+| **Model Selection** | Extensive | Curated | Latest |
+| **Tool Calling** | Native | GBNF | Native |
+| **Resource Usage** | Low | Medium | None |
+
+### 🎯 **Recommended Setups**
+
+#### **Quick Start (Ollama)**:
+```bash
+# Best for most users
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve &
+ollama pull qwen2.5:1.5b
+trust  # Automatically detects and uses Ollama
+```
+
+#### **Maximum Privacy (Trust Local Only)**:
+```bash
+# Disable cloud, use only local models
+trust config set ai.cloud.enabled false
+trust config set ai.fallbackOrder "ollama,trust-local"
+trust model download phi-3.5-mini-instruct
+```
+
+#### **Hybrid Setup (Best of Both)**:
+```bash
+# Ollama for general use, Trust Local for sensitive work
+ollama pull qwen2.5:7b
+trust model download deepseek-r1-distill-7b
+trust config set ai.fallbackOrder "ollama,trust-local,cloud"
+```
+
+#### **Enterprise/Security (Local Only)**:
+```bash
+# Complete local operation, no cloud fallback
+trust config set ai.enableFallback false
+trust config set ai.preferredBackend trust-local
+trust config set ai.cloud.enabled false
+```
+
+### 🔧 **Configuration File Location**
+
+All settings are stored in `~/.trustcli/config.json`:
+```json
+{
+  "ai": {
+    "preferredBackend": "ollama",
+    "fallbackOrder": ["ollama", "trust-local", "cloud"],
+    "enableFallback": true,
+    "ollama": {
+      "baseUrl": "http://localhost:11434",
+      "defaultModel": "qwen2.5:1.5b",
+      "timeout": 120000,
+      "maxToolCalls": 3
+    },
+    "trustLocal": {
+      "enabled": true,
+      "gbnfFunctions": true
+    },
+    "cloud": {
+      "enabled": false,
+      "provider": "google"
+    }
+  }
+}
+```
+
+This multi-model architecture gives you complete flexibility while maintaining the privacy-first principles of Trust CLI!
+
 ## 💡 Examples
 
 ### Interactive Mode
