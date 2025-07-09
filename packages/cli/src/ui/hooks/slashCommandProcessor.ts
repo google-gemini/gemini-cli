@@ -880,7 +880,8 @@ export const useSlashCommandProcessor = (
           try {
             const compressed = await config!
               .getGeminiClient()!
-              .tryCompressChat(true);
+              // TODO: Set Prompt id for CompressChat from SlashCommandProcessor.
+              .tryCompressChat('Prompt Id not set', true);
             if (compressed) {
               addMessage({
                 type: MessageType.COMPRESSION,
