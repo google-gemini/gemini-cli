@@ -43,7 +43,6 @@ import stripJsonComments from 'strip-json-comments'; // Will be mocked separatel
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
-  LoadedSettings,
   loadSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
@@ -595,7 +594,7 @@ describe('Settings Loading and Merging', () => {
   describe('LoadedSettings class', () => {
     it('setValue should update the correct scope and recompute merged settings', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false);
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR) as LoadedSettings;
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
       vi.mocked(fs.writeFileSync).mockImplementation(() => {});
       // mkdirSync is mocked in beforeEach to return undefined, which is fine for void usage

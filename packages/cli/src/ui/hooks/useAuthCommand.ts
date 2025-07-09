@@ -13,11 +13,6 @@ import {
   getErrorMessage,
 } from '@google/gemini-cli-core';
 
-async function performAuthFlow(authMethod: AuthType, config: Config) {
-  await config.refreshAuth(authMethod);
-  console.log(`Authenticated via "${authMethod}".`);
-}
-
 export const useAuthCommand = (
   settings: LoadedSettings,
   setAuthError: (error: string | null) => void,
@@ -35,24 +30,17 @@ export const useAuthCommand = (
 
   useEffect(() => {
     const authFlow = async () => {
-      if (isAuthDialogOpen || !settings.merged.selectedAuthType) {
+      const authType = settings.merged.selectedAuthType;
+      if (isAuthDialogOpen || !authType) {
         return;
       }
 
       try {
         setIsAuthenticating(true);
-        await performAuthFlow(
-          settings.merged.selectedAuthType as AuthType,
-          config,
-        );
+        await config.refreshAuth(authType);
+        console.log(`Authenticated via "${authType}".`);
       } catch (e) {
-        const errorMessage =
-          settings.merged.selectedAuthType ===
-          AuthType.LOGIN_WITH_GOOGLE_PERSONAL
-            ? `Failed to login. Ensure the Google account you are using is not a Workspace account and that you are not a licensed Code Assist user (see https://goo.gle/gemini-cli-auth-docs#workspace-gca).
-Message: ${getErrorMessage(e)}`
-            : `Failed to login. Message: ${getErrorMessage(e)}`;
-        setAuthError(errorMessage);
+        setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
         openAuthDialog();
       } finally {
         setIsAuthenticating(false);
@@ -63,20 +51,16 @@ Message: ${getErrorMessage(e)}`
   }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
 
   const handleAuthSelect = useCallback(
-    async (authMethod: string | undefined, scope: SettingScope) => {
-      if (authMethod) {
+    async (authType: AuthType | undefined, scope: SettingScope) => {
+      if (authType) {
         await clearCachedCredentialFile();
-        settings.setValue(scope, 'selectedAuthType', authMethod);
+        settings.setValue(scope, 'selectedAuthType', authType);
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
     },
     [settings, setAuthError],
   );
-
-  const handleAuthHighlight = useCallback((_authMethod: string | undefined) => {
-    // For now, we don't do anything on highlight.
-  }, []);
 
   const cancelAuthentication = useCallback(() => {
     setIsAuthenticating(false);
@@ -86,7 +70,6 @@ Message: ${getErrorMessage(e)}`
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
-    handleAuthHighlight,
     isAuthenticating,
     cancelAuthentication,
   };

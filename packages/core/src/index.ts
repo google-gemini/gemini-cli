@@ -21,6 +21,8 @@ export * from './core/nonInteractiveToolExecutor.js';
 
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
+export * from './code_assist/server.js';
+export * from './code_assist/types.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -30,6 +32,7 @@ export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/editor.js';
+export * from './utils/quotaErrorDetection.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

@@ -114,6 +114,7 @@ describe('WriteFileTool', () => {
     // Default mock implementations that return valid structures
     mockEnsureCorrectEdit.mockImplementation(
       async (
+        filePath: string,
         _currentContent: string,
         params: EditToolParams,
         _client: GeminiClient,
@@ -248,6 +249,7 @@ describe('WriteFileTool', () => {
       );
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         originalContent,
         {
           old_string: originalContent,
@@ -388,6 +390,7 @@ describe('WriteFileTool', () => {
       )) as ToolEditConfirmationDetails;
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         originalContent,
         {
           old_string: originalContent,
@@ -523,6 +526,7 @@ describe('WriteFileTool', () => {
       const result = await tool.execute(params, abortSignal);
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         initialContent,
         {
           old_string: initialContent,
@@ -566,6 +570,50 @@ describe('WriteFileTool', () => {
       expect(fs.statSync(dirPath).isDirectory()).toBe(true);
       expect(fs.existsSync(filePath)).toBe(true);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(content);
+    });
+
+    it('should include modification message when proposed content is modified', async () => {
+      const filePath = path.join(rootDir, 'new_file_modified.txt');
+      const content = 'New file content modified by user';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = {
+        file_path: filePath,
+        content,
+        modified_by_user: true,
+      };
+      const result = await tool.execute(params, abortSignal);
+
+      expect(result.llmContent).toMatch(/User modified the `content`/);
+    });
+
+    it('should not include modification message when proposed content is not modified', async () => {
+      const filePath = path.join(rootDir, 'new_file_unmodified.txt');
+      const content = 'New file content not modified';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = {
+        file_path: filePath,
+        content,
+        modified_by_user: false,
+      };
+      const result = await tool.execute(params, abortSignal);
+
+      expect(result.llmContent).not.toMatch(/User modified the `content`/);
+    });
+
+    it('should not include modification message when modified_by_user is not provided', async () => {
+      const filePath = path.join(rootDir, 'new_file_unmodified.txt');
+      const content = 'New file content not modified';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = {
+        file_path: filePath,
+        content,
+      };
+      const result = await tool.execute(params, abortSignal);
+
+      expect(result.llmContent).not.toMatch(/User modified the `content`/);
     });
   });
 });

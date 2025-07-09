@@ -23,8 +23,6 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
-  candidatesTokenCount: number;
-  totalTokenCount: number;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -37,10 +35,10 @@ export const Footer: React.FC<FooterProps> = ({
   errorCount,
   showErrorDetails,
   showMemoryUsage,
-  totalTokenCount,
+  promptTokenCount,
 }) => {
   const limit = tokenLimit(model);
-  const percentage = totalTokenCount / limit;
+  const percentage = promptTokenCount / limit;
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
