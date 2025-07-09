@@ -103,6 +103,7 @@ export class TrustContentGenerator implements ContentGenerator {
   async generateContentStream(
     request: GenerateContentParameters
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    console.log('DEBUG: TrustContentGenerator.generateContentStream called');
     await this.initialize();
 
     if (!this.modelClient.isModelLoaded()) {
@@ -110,12 +111,15 @@ export class TrustContentGenerator implements ContentGenerator {
     }
 
     const prompt = this.convertRequestToPrompt(request);
+    console.log('DEBUG: Generated prompt for streaming length:', prompt.length);
+    console.log('DEBUG: Prompt preview (first 500 chars):', prompt.substring(0, 500));
     const options: GenerationOptions = {
       temperature: request.config?.temperature || 0.7,
       topP: request.config?.topP || 0.9,
       maxTokens: 512, // Reduced maxTokens for faster responses
     };
 
+    console.log('DEBUG: About to start streaming generation...');
     return this.generateStreamingResponse(prompt, options);
   }
 
@@ -123,10 +127,14 @@ export class TrustContentGenerator implements ContentGenerator {
     prompt: string, 
     options: GenerationOptions
   ): AsyncGenerator<GenerateContentResponse> {
+    console.log('DEBUG: Starting generateStreamingResponse...');
     try {
+      console.log('DEBUG: About to call modelClient.generateStream...');
       for await (const chunk of this.modelClient.generateStream(prompt, options)) {
+        console.log('DEBUG: Got chunk from model client:', chunk.substring(0, 50));
         yield this.convertToGeminiResponse(chunk);
       }
+      console.log('DEBUG: Finished streaming generation');
     } catch (error) {
       console.error('Error in generateContentStream:', error);
       throw new Error(`Local model streaming failed: ${error}`);

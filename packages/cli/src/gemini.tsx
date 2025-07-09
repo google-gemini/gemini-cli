@@ -174,6 +174,8 @@ export async function main() {
 
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
+  
+  console.log('DEBUG: Loaded settings selectedAuthType:', settings.merged.selectedAuthType);
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
@@ -194,12 +196,15 @@ export async function main() {
   // set default fallback to Trust for local-first AI
   // this has to go after load cli because that's where the env is set
   if (!settings.merged.selectedAuthType) {
+    console.log('DEBUG: No auth type set, defaulting to trust-local');
     settings.setValue(
       SettingScope.User,
       'selectedAuthType',
       AuthType.USE_TRUST_LOCAL,
     );
   }
+  
+  console.log('DEBUG: Final selectedAuthType:', settings.merged.selectedAuthType);
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
