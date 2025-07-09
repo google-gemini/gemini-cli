@@ -6,11 +6,11 @@
 
 import { RmTool } from './rm-tool.js';
 import { promises as fs } from 'fs';
-import { vi } from 'vitest';
+import { vi, Mock } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    unlink: jest.fn(),
+    unlink: vi.fn(),
   },
 }));
 
@@ -44,7 +44,7 @@ describe('RmTool', () => {
       file: '/test.txt',
     };
 
-    (fs.unlink as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+    (fs.unlink as Mock).mockRejectedValue(new Error('Permission denied'));
 
     const result = await tool.execute(params, new AbortController().signal);
 

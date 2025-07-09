@@ -2,12 +2,10 @@
 # transformer_encoder.py
 # Pyrmethus, the Termux Coding Wizard, weaves the arcane spell of a Transformer Encoder.
 
-import numpy as np
-from typing import Optional
-from typing import Dict, List, Optional, Union
-from pybit.unified_trading import HTTP, WebSocket
-from colorama import init, Fore, Style
 import math
+
+import numpy as np
+from colorama import Fore, init, Style
 
 # Initialize Colorama for vibrant terminal output
 init(autoreset=True)
@@ -76,12 +74,12 @@ class MultiHeadAttention:
         self.W_v = np.random.rand(d_model, d_model) * 0.01
         self.W_o = np.random.rand(d_model, d_model) * 0.01
 
-    def _attention(self, query: np.ndarray, key: np.ndarray, value: np.ndarray, mask: Optional[np.ndarray] = None) -> tuple[np.ndarray, np.ndarray]:
+    def _attention(self, query: np.ndarray, key: np.ndarray, value: np.ndarray, mask: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
         """Computes scaled dot-product attention."""
         scores = np.matmul(query, key.transpose(0, 1, 3, 2)) / math.sqrt(self.d_k)
         if mask is not None:
             scores = scores + (mask * -1e9) # Apply mask by setting masked values to a very small number
-        
+
         p_attn = self._softmax(scores, axis=-1)
         return np.matmul(p_attn, value), p_attn
 
@@ -90,7 +88,7 @@ class MultiHeadAttention:
         e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
         return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
-    def forward(self, query: np.ndarray, key: np.ndarray, value: np.ndarray, mask: Optional[np.ndarray] = None) -> np.ndarray:
+    def forward(self, query: np.ndarray, key: np.ndarray, value: np.ndarray, mask: np.ndarray | None = None) -> np.ndarray:
         batch_size = query.shape[0]
 
         # 1) Do linear projections and split into heads
@@ -139,7 +137,7 @@ class EncoderLayer:
             return x * mask
         return x
 
-    def forward(self, x: np.ndarray, mask: Optional[np.ndarray] = None) -> np.ndarray:
+    def forward(self, x: np.ndarray, mask: np.ndarray | None = None) -> np.ndarray:
         # Self-attention sub-layer
         attn_output = self.self_attn.forward(x, x, x, mask)
         x = self.norm1.forward(x + self._dropout(attn_output))
@@ -161,7 +159,7 @@ class Encoder:
         self.layers = [EncoderLayer(d_model, num_heads, d_ff, dropout_rate) for _ in range(num_layers)]
         self.norm = LayerNormalization(d_model) # Final normalization
 
-    def forward(self, src: np.ndarray, src_mask: Optional[np.ndarray] = None) -> np.ndarray:
+    def forward(self, src: np.ndarray, src_mask: np.ndarray | None = None) -> np.ndarray:
         # Input embedding
         x = self.embedding[src] * math.sqrt(self.d_model) # Scale embeddings
         x = self.positional_encoding.forward(x)
@@ -169,7 +167,7 @@ class Encoder:
         # Pass through encoder layers
         for layer in self.layers:
             x = layer.forward(x, src_mask)
-        
+
         return self.norm.forward(x)
 
 if __name__ == "__main__":

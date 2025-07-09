@@ -6,11 +6,11 @@
 
 import { MvTool } from './mv-tool.js';
 import { promises as fs } from 'fs';
-import { vi } from 'vitest';
+import { vi, Mock } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    rename: jest.fn(),
+    rename: vi.fn(),
   },
 }));
 
@@ -49,7 +49,7 @@ describe('MvTool', () => {
       destination: '/test2.txt',
     };
 
-    (fs.rename as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+    (fs.rename as Mock).mockRejectedValue(new Error('Permission denied'));
 
     const result = await tool.execute(params, new AbortController().signal);
 

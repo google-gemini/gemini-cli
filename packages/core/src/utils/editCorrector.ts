@@ -81,25 +81,25 @@ export async function ensureCorrectEdit(
 
   let finalNewString = originalParams.new_string;
   const newStringPotentiallyEscaped =
-    unescapeStringForGeminiBug(originalParams.new_string) !==
+    unescapeStringForGeminiBug(originalParams.new_string ?? '') !==
     originalParams.new_string;
 
-  const expectedReplacements = originalParams.expected_replacements ?? 1;
+  const expectedReplacements = originalParams.count ?? 1;
 
   let finalOldString = originalParams.old_string;
-  let occurrences = countOccurrences(currentContent, finalOldString);
+  let occurrences = countOccurrences(currentContent, finalOldString ?? '');
 
   if (occurrences === expectedReplacements) {
     if (newStringPotentiallyEscaped) {
       finalNewString = await correctNewStringEscaping(
         client,
-        finalOldString,
-        originalParams.new_string,
+        finalOldString ?? '',
+        originalParams.new_string ?? '',
         abortSignal,
       );
     }
   } else if (occurrences > expectedReplacements) {
-    const expectedReplacements = originalParams.expected_replacements ?? 1;
+    const expectedReplacements = originalParams.count ?? 1;
 
     // If user expects multiple replacements, return as-is
     if (occurrences === expectedReplacements) {
@@ -131,7 +131,7 @@ export async function ensureCorrectEdit(
   } else {
     // occurrences is 0 or some other unexpected state initially
     const unescapedOldStringAttempt = unescapeStringForGeminiBug(
-      originalParams.old_string,
+      originalParams.old_string ?? '',
     );
     occurrences = countOccurrences(currentContent, unescapedOldStringAttempt);
 
@@ -140,9 +140,9 @@ export async function ensureCorrectEdit(
       if (newStringPotentiallyEscaped) {
         finalNewString = await correctNewString(
           client,
-          originalParams.old_string, // original old
+          originalParams.old_string ?? '', // original old
           unescapedOldStringAttempt, // corrected old
-          originalParams.new_string, // original new (which is potentially escaped)
+          originalParams.new_string ?? '', // original new (which is potentially escaped)
           abortSignal,
         );
       }
@@ -164,11 +164,11 @@ export async function ensureCorrectEdit(
 
         if (newStringPotentiallyEscaped) {
           const baseNewStringForLLMCorrection = unescapeStringForGeminiBug(
-            originalParams.new_string,
+            originalParams.new_string ?? '',
           );
           finalNewString = await correctNewString(
             client,
-            originalParams.old_string, // original old
+            originalParams.old_string ?? '', // original old
             llmCorrectedOldString, // corrected old
             baseNewStringForLLMCorrection, // base new for correction
             abortSignal,
@@ -195,8 +195,8 @@ export async function ensureCorrectEdit(
   }
 
   const { targetString, pair } = trimPairIfPossible(
-    finalOldString,
-    finalNewString,
+    finalOldString ?? '',
+    finalNewString ?? '',
     currentContent,
     expectedReplacements,
   );
@@ -210,7 +210,7 @@ export async function ensureCorrectEdit(
       old_string: finalOldString,
       new_string: finalNewString,
     },
-    occurrences: countOccurrences(currentContent, finalOldString), // Recalculate occurrences with the final old_string
+    occurrences: countOccurrences(currentContent, finalOldString ?? ''), // Recalculate occurrences with the final old_string
   };
   editCorrectionCache.set(cacheKey, result);
   return result;

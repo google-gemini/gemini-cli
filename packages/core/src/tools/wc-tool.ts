@@ -12,7 +12,7 @@ export async function wcFile(
   filePath: string,
   config: unknown,
 ): Promise<string> {
-  if (!(await checkFilePermission(filePath, 'read', config))) {
+  if (!(await checkFilePermission())) {
     throw new Error(`Read access denied for ${filePath}`);
   }
 

@@ -1,12 +1,13 @@
-from colorama import init, Fore, Style
 import json
 import os
 import subprocess
 
+from colorama import Fore, init, Style
+
 init()
 
 # Path to the external AI script (e.g., a wrapper for Gemini API)
-AI_SCRIPT_PATH = os.path.join(os.environ['HOME'], 'bin', 'ai-v4.0.sh')
+AI_SCRIPT_PATH = os.path.join(os.environ["HOME"], "bin", "ai-v4.0.sh")
 
 # The core prompt configuration for Google Jules AI
 JULES_PROMPT_JSON = {
@@ -104,7 +105,7 @@ def get_project_root():
     """Determines the project root, preferring git top-level or current working directory."""
     try:
         result = subprocess.run(
-            ['git', 'rev-parse', '--show-toplevel'],
+            ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             check=True,
@@ -132,15 +133,15 @@ def collect_code_files(root_dir, exclude_paths):
                 continue
 
             _, ext = os.path.splitext(filename)
-            lang = ext.lstrip('.').lower()
+            lang = ext.lstrip(".").lower()
             if not lang:
-                lang = 'plaintext' # Default to plaintext if no extension
+                lang = "plaintext" # Default to plaintext if no extension
 
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                     # Escape double quotes for JSON payload
-                    escaped_content = content.replace('"', '\"')
+                    escaped_content = content.replace('"', '"')
                     # Append file content with metadata for the AI
                     code_payload_parts.append(f"\n### {os.path.relpath(file_path, root_dir)} ###\n{lang}\n{content}\n")
             except Exception as e:
@@ -158,7 +159,7 @@ def create_jules_payload(prompt_data, code_content):
 def save_prompt_to_file(prompt_data, file_path):
     """Saves the Jules prompt configuration to a JSON file."""
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(prompt_data, f, indent=2)
         print(Fore.GREEN + f"✅ Prompt saved to {file_path}" + Style.RESET_ALL)
         return True
@@ -181,12 +182,12 @@ def execute_ai_script(payload):
     print(Fore.CYAN + " Invoking Jules with the codebase..." + Style.RESET_ALL)
     try:
         process = subprocess.Popen(
-            [AI_SCRIPT_PATH, '--json', '--model', 'gemini-pro'],
+            [AI_SCRIPT_PATH, "--json", "--model", "gemini-pro"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding="utf-8"
         )
         stdout, stderr = process.communicate(input=payload)
 
@@ -209,12 +210,12 @@ if __name__ == "__main__":
     project_root = get_project_root()
     print(Fore.BLUE + f"→ Project Root Identified: {project_root}" + Style.RESET_ALL)
 
-    exclude_paths = JULES_PROMPT_JSON['sections']['exclude_paths']
+    exclude_paths = JULES_PROMPT_JSON["sections"]["exclude_paths"]
     print(Fore.CYAN + " Gathering codebase essence..." + Style.RESET_ALL)
     code_content = collect_code_files(project_root, exclude_paths)
     print(Fore.GREEN + f"✅ Collected {len(code_content.split('###')) - 1} files for audit." + Style.RESET_ALL)
 
-    prompt_file_path = os.path.join(os.environ['HOME'], 'jules_prompt.json')
+    prompt_file_path = os.path.join(os.environ["HOME"], "jules_prompt.json")
     if not save_prompt_to_file(JULES_PROMPT_JSON, prompt_file_path):
         print(Fore.RED + "✖ Aborting due to failure in saving prompt file." + Style.RESET_ALL)
         exit(1)

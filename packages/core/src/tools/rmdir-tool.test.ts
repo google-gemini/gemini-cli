@@ -6,11 +6,11 @@
 
 import { RmdirTool } from './rmdir-tool.js';
 import { promises as fs } from 'fs';
-import { vi } from 'vitest';
+import { vi, Mock } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    rmdir: jest.fn(),
+    rmdir: vi.fn(),
   },
 }));
 
@@ -46,7 +46,7 @@ describe('RmdirTool', () => {
       directory: '/test',
     };
 
-    (fs.rmdir as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+    (fs.rmdir as Mock).mockRejectedValue(new Error('Permission denied'));
 
     const result = await tool.execute(params, new AbortController().signal);
 

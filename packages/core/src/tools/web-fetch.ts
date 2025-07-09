@@ -79,6 +79,8 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
         required: ['prompt'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
   }
 

@@ -3,7 +3,7 @@
 # Pyrmethus, the Termux Coding Wizard, demonstrates how to wield the Transformer Encoder.
 
 import numpy as np
-from colorama import init, Fore, Style
+from colorama import Fore, init, Style
 
 # Summon the Encoder class from our previously forged spell
 from transformer_encoder import Encoder

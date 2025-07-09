@@ -66,31 +66,35 @@ export class SubAgentTool extends BaseTool<SubAgentToolParams, ToolResult> {
   }
 
   private getToolset(toolset: string[]): Array<BaseTool<unknown, ToolResult>> {
-    const allTools = {
-      [EditTool.Name]: new EditTool(this.config),
-      [ReadFileTool.Name]: new ReadFileTool(
-        this.config.getTargetDir(),
-        this.config,
-      ),
-      [WriteFileTool.Name]: new WriteFileTool(this.config),
-      [ReadManyFilesTool.Name]: new ReadManyFilesTool(
-        this.config.getTargetDir(),
-        this.config,
-      ),
-      [GlobTool.Name]: new GlobTool(this.config.getTargetDir()),
-      [GrepTool.Name]: new GrepTool(this.config.getTargetDir()),
-      [LSTool.Name]: new LSTool(this.config.getTargetDir()),
-      [MemoryTool.Name]: new MemoryTool(this.config.getMemory()),
-      [ShellTool.Name]: new ShellTool(this.config),
-      [WebFetchTool.Name]: new WebFetchTool(),
-      [WebSearchTool.Name]: new WebSearchTool(),
-    };
-    return toolset.map((toolName) => {
-      const tool = allTools[toolName];
-      if (!tool) {
-        throw new Error(`Tool ${toolName} not found.`);
+    const createToolInstance = (toolName: string, config: Config): BaseTool<unknown, ToolResult> => {
+      switch (toolName) {
+        case EditTool.Name:
+          return new EditTool(config);
+        case ReadFileTool.Name:
+          return new ReadFileTool(config.getTargetDir(), config);
+        case WriteFileTool.Name:
+          return new WriteFileTool(config);
+        case ReadManyFilesTool.Name:
+          return new ReadManyFilesTool(config.getTargetDir(), config);
+        case GlobTool.Name:
+          return new GlobTool(config.getTargetDir());
+        case GrepTool.Name:
+          return new GrepTool(config.getTargetDir());
+        case LSTool.Name:
+          return new LSTool(config.getTargetDir());
+        // case MemoryTool.Name:
+        //   return new MemoryTool() as BaseTool<unknown, ToolResult>;
+        case ShellTool.Name:
+          return new ShellTool(config);
+        // case WebFetchTool.Name:
+        //   return new WebFetchTool(config) as BaseTool<unknown, ToolResult>;
+        case WebSearchTool.Name:
+          return new WebSearchTool(config);
+        default:
+          throw new Error(`Tool ${toolName} not found.`);
       }
-      return tool;
-    });
+    };
+
+    return toolset.map((toolName) => createToolInstance(toolName, this.config));
   }
 }

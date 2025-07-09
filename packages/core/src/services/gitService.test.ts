@@ -87,6 +87,7 @@ describe('GitService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoistedIsGitRepositoryMock.mockReturnValue(true);
+    // @ts-expect-error
     hoistedMockExec.mockImplementation((command, callback) => {
       if (command === 'git --version') {
         callback(null, 'git version 2.0.0');
@@ -144,6 +145,7 @@ describe('GitService', () => {
     });
 
     it('should resolve false if git --version command fails', async () => {
+      // @ts-expect-error
       hoistedMockExec.mockImplementation((command, callback) => {
         callback(new Error('git not found'));
         return {} as ChildProcess;

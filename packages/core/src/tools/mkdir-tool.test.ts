@@ -6,11 +6,11 @@
 
 import { MkdirTool } from './mkdir-tool.js';
 import { promises as fs } from 'fs';
-import { vi } from 'vitest';
+import { vi, Mock } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    mkdir: jest.fn(),
+    mkdir: vi.fn(),
   },
 }));
 
@@ -46,7 +46,7 @@ describe('MkdirTool', () => {
       directory: '/test',
     };
 
-    (fs.mkdir as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+    (fs.mkdir as Mock).mockRejectedValue(new Error('Permission denied'));
 
     const result = await tool.execute(params, new AbortController().signal);
 

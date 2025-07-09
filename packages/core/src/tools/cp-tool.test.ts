@@ -50,7 +50,7 @@ describe('CpTool', () => {
       destination: '/test2.txt',
     };
 
-    (fs.copyFile as jest.Mock<any, any>).mockRejectedValue(
+    (fs.copyFile as jest.Mock).mockRejectedValue(
       new Error('Permission denied'),
     );
 

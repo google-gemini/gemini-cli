@@ -1,8 +1,8 @@
-import unittest
-import subprocess
 import os
 import shutil
+import subprocess
 import tempfile
+import unittest
 
 # Assuming replace_in_file.py is in the same directory or accessible in PATH
 SCRIPT_PATH = "./replace_in_file.py"
@@ -26,13 +26,13 @@ class TestReplaceInFile(unittest.TestCase):
     def read_file(self, filepath):
         if not os.path.exists(filepath):
             return None
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             return f.read()
 
     def run_script(self, args):
         cmd = ["python3", SCRIPT_PATH] + args
         # print(f"Running command: {shlex.join(cmd)}") # For debugging tests
-        return subprocess.run(cmd, capture_output=True, text=True)
+        return subprocess.run(cmd, check=False, capture_output=True, text=True)
 
     def test_simple_replace_single_file(self):
         content = "Hello world, this is a test world."

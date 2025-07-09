@@ -105,6 +105,8 @@ export class MemoryTool extends BaseTool<SaveMemoryParams, ToolResult> {
       'Save Memory',
       memoryToolDescription,
       memoryToolSchemaData.parameters as Record<string, unknown>,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
   }
 

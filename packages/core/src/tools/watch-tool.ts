@@ -13,9 +13,8 @@ export async function watchFile(
   filePath: string,
   command: string,
   interval: number,
-  config: unknown,
 ): Promise<void> {
-  if (!(await checkFilePermission(filePath, 'read', config))) {
+  if (!(await checkFilePermission())) {
     throw new Error(`Read access denied for ${filePath}`);
   }
 

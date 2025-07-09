@@ -21,7 +21,7 @@ describe('CatTool', () => {
       files: ['/test.txt'],
     };
 
-    (fs.readFile as jest.Mock).mockResolvedValue('Hello, world!');
+        (fs.readFile as unknown as jest.Mock<(...args: any[]) => Promise<string>>).mockResolvedValue('Hello, world!');
 
     const result = await tool.execute(params, new AbortController().signal);
 
@@ -36,7 +36,7 @@ describe('CatTool', () => {
       files: ['/test1.txt', '/test2.txt'],
     };
 
-    (fs.readFile as jest.Mock)
+    (fs.readFile as unknown as jest.Mock<(...args: any[]) => Promise<string>>)
       .mockResolvedValueOnce('Hello, world!')
       .mockResolvedValueOnce('Goodbye, world!');
 
@@ -70,7 +70,7 @@ describe('CatTool', () => {
       files: ['/test.txt'],
     };
 
-    (fs.readFile as jest.Mock).mockRejectedValue(new Error('File not found'));
+    (fs.readFile as unknown as jest.Mock<(...args: any[]) => Promise<string>>).mockRejectedValue(new Error('File not found'));
 
     const result = await tool.execute(params, new AbortController().signal);
 

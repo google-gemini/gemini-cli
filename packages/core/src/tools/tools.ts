@@ -149,8 +149,8 @@ export abstract class BaseTool<
    * @returns Whether or not execute should be confirmed by the user.
    */
   shouldConfirmExecute(
-    params: TParams,
-    abortSignal: AbortSignal,
+    _params: TParams,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     return Promise.resolve(false);
   }
