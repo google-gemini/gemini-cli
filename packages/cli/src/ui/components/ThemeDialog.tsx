@@ -142,7 +142,7 @@ export function ThemeDialog({
     1,
   );
 
-  const DAILOG_PADDING = 2;
+  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
   const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
   const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
@@ -152,7 +152,7 @@ export function ThemeDialog({
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
 
   let totalLeftHandSideHeight =
-    DAILOG_PADDING +
+    DIALOG_PADDING +
     selectThemeHeight +
     SCOPE_SELECTION_HEIGHT +
     SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
@@ -163,7 +163,7 @@ export function ThemeDialog({
   // Remove content from the LHS that can be omitted if it exceeds the available height.
   if (totalLeftHandSideHeight > availableTerminalHeight) {
     includePadding = false;
-    totalLeftHandSideHeight -= DAILOG_PADDING;
+    totalLeftHandSideHeight -= DIALOG_PADDING;
   }
 
   if (totalLeftHandSideHeight > availableTerminalHeight) {
