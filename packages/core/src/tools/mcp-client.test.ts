@@ -385,6 +385,18 @@ describe('discoverMcpTools', () => {
         {},
       );
     });
+
+    it('should pass oauth token when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+      };
+      const { serverConfig } = await setupHttpTest(headers);
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.httpUrl!),
+        { requestInit: { headers } },
+      );
+    });
   });
 
   it('should prefix tool names if multiple MCP servers are configured', async () => {
@@ -655,6 +667,115 @@ describe('discoverMcpTools', () => {
     const lastClientInstance =
       clientInstances[clientInstances.length - 1]?.value;
     expect(lastClientInstance?.onerror).toEqual(expect.any(Function));
+  });
+
+  describe('Tool Filtering', () => {
+    const mockTools = [
+      {
+        name: 'toolA',
+        description: 'descA',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+      {
+        name: 'toolB',
+        description: 'descB',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+      {
+        name: 'toolC',
+        description: 'descC',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({
+        tools: mockTools,
+      });
+      mockToolRegistry.getToolsByServer.mockReturnValue([
+        expect.any(DiscoveredMCPTool),
+      ]);
+    });
+
+    it('should only include specified tools with includeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-include',
+        includeTools: ['toolA', 'toolC'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'include-server': serverConfig,
+      });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+    });
+
+    it('should exclude specified tools with excludeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-exclude',
+        excludeTools: ['toolB'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'exclude-server': serverConfig,
+      });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+    });
+
+    it('should handle both includeTools and excludeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-both',
+        includeTools: ['toolA', 'toolB'],
+        excludeTools: ['toolB'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({ 'both-server': serverConfig });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+    });
   });
 });
 
