@@ -27,7 +27,7 @@ if (!process.cwd().includes('packages')) {
 }
 
 // build typescript files
-execSync('tsc --build', { stdio: 'inherit' });
+execSync('npx tsc --build', { stdio: 'inherit' });
 
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });

@@ -1,0 +1,2 @@
+#!/usr/bin/env node
+import('/data/data/com.termux/files/home/pyrm-cli/bundle/gemini.js');

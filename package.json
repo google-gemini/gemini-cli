@@ -18,7 +18,7 @@
     "build:sandbox": "node scripts/build_sandbox.js",
     "build:all": "npm run build && npm run build:sandbox",
     "clean": "node scripts/clean.js",
-    "prepare": "npm run bundle",
+    
     "test": "npm run test --workspaces",
     "test:ci": "npm run test:ci --workspaces --if-present",
     "test:e2e": "npm run test:integration:sandbox:none -- --verbose --keep-output",

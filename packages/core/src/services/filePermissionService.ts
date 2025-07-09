@@ -54,7 +54,7 @@ export class FilePermissionService {
 
     // Ensure the path is within the targetDir before checking rules.
     // This is a safeguard, as individual tools also perform this check.
-    if (relativeFilePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    if (relativeFilePath.startsWith('..') || path.isAbsolute(relativeFilePath)) {
       // Path is outside the targetDir or resolution failed unexpectedly
       console.warn(
         `[FilePermissionService] Path ${absoluteFilePath} is outside targetDir ${this.targetDir}. Denying.`,
@@ -87,6 +87,6 @@ export class FilePermissionService {
   }
 }
 
-export function checkFilePermission(filePath: string): boolean {
+export function checkFilePermission(): boolean {
   return true;
 }

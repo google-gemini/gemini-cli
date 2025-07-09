@@ -4,17 +4,17 @@
 import { Command } from '@oclif/core';
 import { readFileSync, existsSync } from 'fs';
 import { join, extname } from 'path';
-import { Fore, Style, init } from 'colorama';
+import chalk from 'chalk';
 
-init();
+
 
 // Chromatic constants for enchanted logging
-const NG = Fore.LIGHTGREEN_EX + Style.BRIGHT; // Success
-const NB = Fore.CYAN + Style.BRIGHT; // Information
-const NP = Fore.MAGENTA + Style.BRIGHT; // Headers, prompts
-const NY = Fore.YELLOW + Style.BRIGHT; // Warnings
-const NR = Fore.LIGHTRED_EX + Style.BRIGHT; // Errors
-const RST = Style.RESET_ALL; // Reset
+const NG = chalk.green.bold; // Success
+const NB = chalk.cyan.bold; // Information
+const NP = chalk.magenta.bold; // Headers, prompts
+const NY = chalk.yellow.bold; // Warnings
+const NR = chalk.red.bold; // Errors
+const RST = chalk.reset; // Reset
 
 export default class CodeReview extends Command {
   static description = `${NP}Analyzes code for quality issues and provides suggestions.${RST}`;

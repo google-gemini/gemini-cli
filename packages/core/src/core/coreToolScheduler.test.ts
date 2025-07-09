@@ -9,7 +9,6 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
-  ValidatingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
 import {
@@ -100,8 +99,7 @@ describe('CoreToolScheduler', () => {
     abortController.abort();
     await scheduler.schedule([request], abortController.signal);
 
-    const _waitingCall = onToolCallsUpdate.mock
-      .calls[1][0][0] as ValidatingToolCall;
+    
     const confirmationDetails = await mockTool.shouldConfirmExecute(
       {},
       abortController.signal,

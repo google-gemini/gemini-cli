@@ -10,6 +10,10 @@ const config = {
   target: 'node18', // Adjust based on your Node.js version
   format: 'esm',
   sourcemap: true,
+  inject: ['./scripts/esbuild-helpers.js'],
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
+  },
   resolveExtensions: ['.ts', '.tsx', '.js', '.jsx'], // Ensure .ts is included
   loader: {
     '.ts': 'ts',
@@ -19,8 +23,6 @@ const config = {
     '@google/gemini-cli-core': path.resolve(__dirname, 'packages/core/src'),
   },
   external: [
-    '@oclif/core',
-    'colorama',
     'spdx-license-ids',
     'spdx-license-ids/deprecated',
     'spdx-exceptions',

@@ -30,6 +30,8 @@
   },
   "dependencies": {
     "@google/gemini-cli-core": "*",
+    "@oclif/core": "^3.21.0",
+    "colorama": "latest",
     "@types/update-notifier": "^6.0.8",
     "chalk": "^5.3.0",
     "command-exists": "^1.2.9",

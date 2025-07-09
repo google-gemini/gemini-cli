@@ -648,18 +648,7 @@ export class GeminiChat {
     }
   }
 
-  private isTextContent(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
-    );
-  }
+  
 
   private isThoughtContent(
     content: Content | undefined,

@@ -137,7 +137,7 @@ export class GeminiClient {
           // Read all files in the target directory
           const result = await readManyFilesTool.execute(
             {
-              paths: ['**/*'], // Read everything recursively
+              patterns: ['**/*'], // Read everything recursively
               useDefaultExcludes: true, // Use default excludes
             },
             AbortSignal.timeout(30000),
