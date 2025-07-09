@@ -264,15 +264,13 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         signal
       );
 
+      if (!commitMessage?.trim()) {
+        throw new Error('Generated commit message is empty');
+      }
+
       const finalCommitMessage = commitMessage;
       
-      this.cachedCommitData = {
-        statusOutput: gitState.statusOutput,
-        diffOutput: gitState.diffOutput,
-        logOutput: gitState.logOutput,
-        commitMessage,
-        timestamp: Date.now(),
-      };
+      this.updateCacheData(gitState, commitMessage);
 
       const filesToCommit = this.parseFilesToBeCommitted(
         gitState.statusOutput
@@ -401,6 +399,16 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       throw new Error('Generated commit message is empty');
     }
 
+    this.updateCacheData(gitState, commitMessage);
+
+    return commitMessage;
+  }
+  
+  /** Update cache data with git state and commit message */
+  private updateCacheData(
+    gitState: { statusOutput: string; diffOutput: string; logOutput: string },
+    commitMessage: string
+  ): void {
     this.cachedCommitData = {
       statusOutput: gitState.statusOutput,
       diffOutput: gitState.diffOutput,
@@ -408,10 +416,8 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       commitMessage,
       timestamp: Date.now(),
     };
-
-    return commitMessage;
   }
-  
+
   /** Clear cache only for specific error types */
   private clearCacheOnCommitError(error: unknown): void {
     if (error instanceof Error) {
