@@ -27,6 +27,7 @@ const getMcpStatus = async (
   context: CommandContext,
   showDescriptions: boolean,
   showSchema: boolean,
+  showTips: boolean = false,
 ): Promise<SlashCommandActionReturn> => {
   const { config } = context.services;
   if (!config) {
@@ -131,7 +132,7 @@ const getMcpStatus = async (
     }
 
     // Add server description with proper handling of multi-line descriptions
-    if ((showDescriptions || showSchema) && server?.description) {
+    if (showDescriptions && server?.description) {
       const descLines = server.description.trim().split('\n');
       if (descLines) {
         message += ':\n';
@@ -150,7 +151,7 @@ const getMcpStatus = async (
 
     if (serverTools.length > 0) {
       serverTools.forEach((tool) => {
-        if ((showDescriptions || showSchema) && tool.description) {
+        if (showDescriptions && tool.description) {
           // Format tool name in cyan using simple ANSI cyan color
           message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}`;
 
@@ -189,6 +190,17 @@ const getMcpStatus = async (
     message += '\n';
   }
 
+  // Add helpful tips when no arguments are provided
+  if (showTips) {
+    message += '\n';
+    message += `${COLOR_CYAN}💡 Tips:${RESET_COLOR}\n`;
+    message += `  • Use ${COLOR_CYAN}/mcp desc${RESET_COLOR} to show server and tool descriptions\n`;
+    message += `  • Use ${COLOR_CYAN}/mcp schema${RESET_COLOR} to show tool parameter schemas\n`;
+    message += `  • Use ${COLOR_CYAN}/mcp nodesc${RESET_COLOR} to hide descriptions\n`;
+    message += `  • Press ${COLOR_CYAN}Ctrl+T${RESET_COLOR} to toggle tool descriptions on/off\n`;
+    message += '\n';
+  }
+
   // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
   message += RESET_COLOR;
 
@@ -203,21 +215,22 @@ export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'list configured MCP servers and tools',
   action: async (context: CommandContext, args: string) => {
-    // Check if the args includes a specific flag to control description visibility
-    let useShowDescriptions = false;
-    let useShowSchema = false;
+    const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
 
-    if (args) {
-      const lowerCase = args.toLowerCase();
-      if (lowerCase === 'desc' || lowerCase === 'descriptions') {
-        useShowDescriptions = true;
-      } else if (lowerCase === 'nodesc' || lowerCase === 'nodescriptions') {
-        useShowDescriptions = false;
-      } else if (lowerCase === 'schema') {
-        useShowSchema = true;
-      }
-    }
+    const hasDesc =
+      lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
+    const hasNodesc =
+      lowerCaseArgs.includes('nodesc') ||
+      lowerCaseArgs.includes('nodescriptions');
+    const showSchema = lowerCaseArgs.includes('schema');
 
-    return getMcpStatus(context, useShowDescriptions, useShowSchema);
+    // Show descriptions if `desc` or `schema` is present,
+    // but `nodesc` takes precedence and disables them.
+    const showDescriptions = !hasNodesc && (hasDesc || showSchema);
+
+    // Show tips only when no arguments are provided
+    const showTips = lowerCaseArgs.length === 0;
+
+    return getMcpStatus(context, showDescriptions, showSchema, showTips);
   },
 };

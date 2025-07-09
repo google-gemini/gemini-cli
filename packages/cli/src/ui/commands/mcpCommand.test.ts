@@ -223,6 +223,13 @@ describe('mcpCommand', () => {
           '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
         );
         expect(message).toContain('server3_tool1');
+
+        // Check that helpful tips are displayed when no arguments are provided
+        expect(message).toContain('💡 Tips:');
+        expect(message).toContain('/mcp desc');
+        expect(message).toContain('/mcp schema');
+        expect(message).toContain('/mcp nodesc');
+        expect(message).toContain('Ctrl+T');
       }
     });
 
@@ -275,6 +282,9 @@ describe('mcpCommand', () => {
         expect(message).toContain(
           '\u001b[32mThis is tool 2 description\u001b[0m',
         );
+
+        // Check that tips are NOT displayed when arguments are provided
+        expect(message).not.toContain('💡 Tips:');
       }
     });
 
@@ -312,6 +322,9 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('This is a server description');
         expect(message).not.toContain('This is tool 1 description');
         expect(message).toContain('\u001b[36mtool1\u001b[0m');
+
+        // Check that tips are NOT displayed when arguments are provided
+        expect(message).not.toContain('💡 Tips:');
       }
     });
 
@@ -529,7 +542,10 @@ describe('mcpCommand', () => {
   describe('argument parsing', () => {
     beforeEach(() => {
       const mockMcpServers = {
-        server1: { command: 'cmd1' },
+        server1: {
+          command: 'cmd1',
+          description: 'Server description',
+        },
       };
 
       mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
@@ -550,6 +566,7 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
       }
     });
 
@@ -560,6 +577,7 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
         expect(message).toContain('\u001b[36mtool1\u001b[0m');
       }
     });
@@ -571,6 +589,123 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
+      }
+    });
+
+    it('should handle multiple arguments - "schema desc"', async () => {
+      const result = await mcpCommand.action!(mockContext, 'schema desc');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
+        expect(message).toContain('Parameters:');
+      }
+    });
+
+    it('should handle multiple arguments - "desc schema"', async () => {
+      const result = await mcpCommand.action!(mockContext, 'desc schema');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
+        expect(message).toContain('Parameters:');
+      }
+    });
+
+    it('should handle "schema" alone showing descriptions', async () => {
+      const result = await mcpCommand.action!(mockContext, 'schema');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
+        expect(message).toContain('Parameters:');
+      }
+    });
+
+    it('should handle "nodesc" overriding "schema" - "schema nodesc"', async () => {
+      const result = await mcpCommand.action!(mockContext, 'schema nodesc');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
+        expect(message).toContain('Parameters:'); // Schema should still show
+        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      }
+    });
+
+    it('should handle "nodesc" overriding "desc" - "desc nodesc"', async () => {
+      const result = await mcpCommand.action!(mockContext, 'desc nodesc');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
+        expect(message).not.toContain('Parameters:');
+        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      }
+    });
+
+    it('should handle "nodesc" overriding both "desc" and "schema" - "desc schema nodesc"', async () => {
+      const result = await mcpCommand.action!(
+        mockContext,
+        'desc schema nodesc',
+      );
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
+        expect(message).toContain('Parameters:'); // Schema should still show
+        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      }
+    });
+
+    it('should handle extra whitespace in arguments', async () => {
+      const result = await mcpCommand.action!(mockContext, '  desc   schema  ');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('Test tool');
+        expect(message).toContain('Server description');
+        expect(message).toContain('Parameters:');
+      }
+    });
+
+    it('should handle empty arguments gracefully', async () => {
+      const result = await mcpCommand.action!(mockContext, '');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
+        expect(message).not.toContain('Parameters:');
+        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      }
+    });
+
+    it('should handle unknown arguments gracefully', async () => {
+      const result = await mcpCommand.action!(mockContext, 'unknown arg');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).not.toContain('Test tool');
+        expect(message).not.toContain('Server description');
+        expect(message).not.toContain('Parameters:');
+        expect(message).toContain('\u001b[36mtool1\u001b[0m');
       }
     });
   });
