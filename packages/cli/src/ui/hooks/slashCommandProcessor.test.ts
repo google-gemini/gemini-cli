@@ -1304,28 +1304,6 @@ describe('useSlashCommandProcessor', () => {
         newTokenCount: 50,
       });
 
-      mockTryCompressChat.mockImplementationOnce(
-        async (prompt_id?: string, force?: boolean) => {
-          expect(force).toBe(true);
-          await act(async () => {
-            hook.rerender();
-          });
-          expect(hook.result.current.pendingHistoryItems).toContainEqual({
-            type: MessageType.COMPRESSION,
-            compression: {
-              isPending: true,
-              originalTokenCount: null,
-              newTokenCount: null,
-            },
-          });
-          return {
-            originalTokenCount: 100,
-            newTokenCount: 50,
-          };
-        },
-      );
->>>>>>> 032c4f17 (Fixing the formatting. And also incoporating the AI suggestions)
-
       await act(async () => {
         hook.result.current.handleSlashCommand('/compress');
       });
