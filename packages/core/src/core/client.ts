@@ -45,29 +45,71 @@ function isThinkingSupported(model: string) {
   return false;
 }
 
+/**
+ * Returns the index of the content after the fraction of the total characters in the history.
+ *
+ * Exported for testing purposes.
+ */
+export function findIndexAfterFraction(
+  history: Content[],
+  fraction: number,
+): number {
+  if (fraction <= 0 || fraction >= 1) {
+    throw new Error('Fraction must be between 0 and 1');
+  }
+
+  const contentLengths = history.map(
+    (content) => JSON.stringify(content).length,
+  );
+
+  const totalCharacters = contentLengths.reduce(
+    (sum, length) => sum + length,
+    0,
+  );
+  const targetCharacters = totalCharacters * fraction;
+
+  let charactersSoFar = 0;
+  for (let i = 0; i < contentLengths.length; i++) {
+    charactersSoFar += contentLengths[i];
+    if (charactersSoFar >= targetCharacters) {
+      return i;
+    }
+  }
+  return contentLengths.length;
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
-  private model: string;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
     topP: 1,
   };
   private readonly MAX_TURNS = 100;
+  /**
+   * Threshold for compression token count as a fraction of the model's token limit.
+   * If the chat history exceeds this threshold, it will be compressed.
+   */
+  private readonly COMPRESSION_TOKEN_THRESHOLD = 0.7;
+  /**
+   * The fraction of the latest chat history to keep. A value of 0.3
+   * means that only the last 30% of the chat history will be kept after compression.
+   */
+  private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
-    this.model = config.getModel();
     this.embeddingModel = config.getEmbeddingModel();
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config.getSessionId(),
     );
     this.chat = await this.startChat();
   }
@@ -90,11 +132,11 @@ export class GeminiClient {
     return this.chat;
   }
 
-  async getHistory(): Promise<Content[]> {
+  getHistory(): Content[] {
     return this.getChat().getHistory();
   }
 
-  async setHistory(history: Content[]): Promise<void> {
+  setHistory(history: Content[]) {
     this.getChat().setHistory(history);
   }
 
@@ -185,7 +227,9 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
+      const generateContentConfigWithThinking = isThinkingSupported(
+        this.config.getModel(),
+      )
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -219,7 +263,9 @@ export class GeminiClient {
     signal: AbortSignal,
     turns: number = this.MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!turns) {
+    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
+    const boundedTurns = Math.min(turns, this.MAX_TURNS);
+    if (!boundedTurns) {
       return new Turn(this.getChat());
     }
 
@@ -242,7 +288,7 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
       }
     }
     return turn;
@@ -341,7 +387,7 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
+    const modelToUse = this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -435,20 +481,42 @@ export class GeminiClient {
       return null;
     }
 
-    let { totalTokens: originalTokenCount } =
+    const model = this.config.getModel();
+
+    const { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        model,
         contents: curatedHistory,
       });
     if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${this.model}.`);
-      originalTokenCount = 0;
+      console.warn(`Could not determine token count for model ${model}.`);
+      return null;
     }
 
     // Don't compress if not forced and we are under the limit.
-    if (!force && originalTokenCount < 0.95 * tokenLimit(this.model)) {
+    if (
+      !force &&
+      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
+    ) {
       return null;
     }
+
+    let compressBeforeIndex = findIndexAfterFraction(
+      curatedHistory,
+      1 - this.COMPRESSION_PRESERVE_THRESHOLD,
+    );
+    // Find the first user message after the index. This is the start of the next turn.
+    while (
+      compressBeforeIndex < curatedHistory.length &&
+      curatedHistory[compressBeforeIndex]?.role !== 'user'
+    ) {
+      compressBeforeIndex++;
+    }
+
+    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
+    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+
+    this.getChat().setHistory(historyToCompress);
 
     const { text: summary } = await this.getChat().sendMessage({
       message: {
@@ -467,11 +535,13 @@ export class GeminiClient {
         role: 'model',
         parts: [{ text: 'Got it. Thanks for the additional context!' }],
       },
+      ...historyToKeep,
     ]);
 
     const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({
-        model: this.model,
+        // model might change after calling `sendMessage`, so we get the newest value from config
+        model: this.config.getModel(),
         contents: this.getChat().getHistory(),
       });
     if (newTokenCount === undefined) {
@@ -495,7 +565,7 @@ export class GeminiClient {
       return null;
     }
 
-    const currentModel = this.model;
+    const currentModel = this.config.getModel();
     const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
     // Don't fallback if already using Flash model
@@ -510,7 +580,6 @@ export class GeminiClient {
         const accepted = await fallbackHandler(currentModel, fallbackModel);
         if (accepted) {
           this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
           return fallbackModel;
         }
       } catch (error) {
