@@ -185,17 +185,20 @@ export class TrustContentGenerator implements ContentGenerator {
 
     // Add available tools information if tools are present
     if ('config' in request && request.config?.tools && request.config.tools.length > 0) {
-      prompt += `\nAVAILABLE TOOLS: You can call functions by outputting JSON like {"function_call": {"name": "FUNCTION_NAME", "arguments": {...}}}.\n\nTools:\n`;
+      prompt += `\nTOOLS: Call functions using JSON format {"function_call": {"name": "NAME", "arguments": {...}}}.\n`;
       
+      const toolNames: string[] = [];
       for (const tool of request.config.tools) {
         if (tool && typeof tool === 'object' && 'functionDeclarations' in tool && tool.functionDeclarations) {
           for (const func of tool.functionDeclarations) {
-            prompt += `- ${func.name}: ${func.description || 'No description'}\n`;
+            if (func.name) {
+              toolNames.push(func.name);
+            }
           }
         }
       }
       
-      prompt += `\nUse functions instead of providing instructions. Call them immediately when needed.\n\n`;
+      prompt += `Available: ${toolNames.join(', ')}\nUse tools directly, not instructions.\n\n`;
     }
 
     // Convert conversation history
@@ -235,8 +238,8 @@ export class TrustContentGenerator implements ContentGenerator {
     const functionCalls: FunctionCall[] = [];
     let cleanedText = text;
 
-    // Look for JSON function call patterns
-    const functionCallRegex = /```json\s*\n?\s*{"function_call":\s*{[^}]+}}\s*\n?\s*```/g;
+    // Look for JSON function call patterns - updated to handle nested objects
+    const functionCallRegex = /```json\s*\n?\s*{"function_call":\s*{.*?}}\s*\n?\s*```/gs;
     let match;
     
     while ((match = functionCallRegex.exec(text)) !== null) {
@@ -261,7 +264,7 @@ export class TrustContentGenerator implements ContentGenerator {
     }
 
     // Also look for simpler patterns without code blocks
-    const simpleFunctionCallRegex = /{"function_call":\s*{"name":\s*"[^"]+",\s*"arguments":\s*{[^}]*}}}/g;
+    const simpleFunctionCallRegex = /{"function_call":\s*{"name":\s*"[^"]+",\s*"arguments":\s*{.*?}}}/gs;
     
     while ((match = simpleFunctionCallRegex.exec(cleanedText)) !== null) {
       try {

@@ -150,15 +150,15 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     
     try {
       const session = await this.createChatSession();
+      
+      // Simplified non-blocking approach with lower token limit
       const response = await session.prompt(prompt, {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
         topK: options?.topK ?? 40,
-        maxTokens: options?.maxTokens ?? 2048
+        maxTokens: options?.maxTokens ?? 512  // Already reduced from 2048
       });
-
-      // For now, yield the complete response as a single chunk
-      // TODO: Implement proper streaming with node-llama-cpp
+      
       totalTokens = response.length;
       yield response;
 
@@ -167,7 +167,20 @@ export class TrustNodeLlamaClient implements TrustModelClient {
       
     } catch (error) {
       console.error('Error generating stream:', error);
-      throw new Error(`Stream generation failed: ${error}`);
+      // Fallback to non-streaming if streaming fails
+      try {
+        console.log('Falling back to non-streaming generation...');
+        const session = await this.createChatSession();
+        const response = await session.prompt(prompt, {
+          temperature: options?.temperature ?? 0.7,
+          topP: options?.topP ?? 0.9,
+          topK: options?.topK ?? 40,
+          maxTokens: options?.maxTokens ?? 512
+        });
+        yield response;
+      } catch (fallbackError) {
+        throw new Error(`Stream generation failed: ${error}. Fallback failed: ${fallbackError}`);
+      }
     }
   }
 
