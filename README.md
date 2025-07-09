@@ -65,6 +65,14 @@ The Vertex AI provides [free tier](https://cloud.google.com/vertex-ai/generative
 
 3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
+### Run with Docker
+
+You can also run the Gemini CLI using Docker. This is a good option if you want to run the CLI in an isolated environment.
+
+```bash
+docker run -it --env GOOGLE_API_KEY="YOUR_API_KEY" ghcr.io/google-gemini/gemini-cli:latest
+```
+
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
 ## Examples
