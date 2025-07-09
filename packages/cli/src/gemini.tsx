@@ -272,6 +272,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
     );
+    await finalConfig.initialize();
   }
 
   return await validateNonInterActiveAuth(

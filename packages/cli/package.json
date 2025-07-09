@@ -32,7 +32,7 @@
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
-    "dotenv": "^16.6.1",
+    "dotenv": "^17.1.0",
     "gaxios": "^7.1.1",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
@@ -53,7 +53,7 @@
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
     "update-notifier": "^7.3.1",
-    "yargs": "^18.0.0"
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
