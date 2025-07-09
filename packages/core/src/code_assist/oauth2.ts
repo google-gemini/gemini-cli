@@ -233,11 +233,11 @@ export function getAvailablePort(): Promise<number> {
       if (portStr) {
         port = parseInt(portStr, 10);
         if (isNaN(port) || port <= 0 || port > 65535) {
-          throw new Error(
+          return reject(new Error(
             `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
-          );
+          ));
         }
-        return port;
+        return resolve(port);
       }
       const server = net.createServer();
       server.listen(0, () => {
