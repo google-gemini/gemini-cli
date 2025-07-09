@@ -19,15 +19,21 @@ import { ContentGenerator } from '../core/contentGenerator.js';
 import { TrustNodeLlamaClient } from './nodeLlamaClient.js';
 import { TrustModelManagerImpl } from './modelManager.js';
 import { TrustModelConfig, GenerationOptions } from './types.js';
+import { GBNFunctionRegistry } from './gbnfFunctionRegistry.js';
 
 export class TrustContentGenerator implements ContentGenerator {
   private modelClient: TrustNodeLlamaClient;
   private modelManager: TrustModelManagerImpl;
   private isInitialized = false;
+  private gbnfEnabled = true; // Feature flag for GBNF grammar-based function calling
+  private config?: any; // Will be properly typed later
+  private toolRegistry?: any; // Will be properly typed later
 
-  constructor(modelsDir?: string) {
+  constructor(modelsDir?: string, config?: any, toolRegistry?: any) {
     this.modelClient = new TrustNodeLlamaClient();
     this.modelManager = new TrustModelManagerImpl(modelsDir);
+    this.config = config;
+    this.toolRegistry = toolRegistry;
   }
 
   async initialize(): Promise<void> {
@@ -80,6 +86,15 @@ export class TrustContentGenerator implements ContentGenerator {
         maxTokens: 512, // Reduced maxTokens for faster responses
         stopTokens: ['<end_of_json>', '\n\n', 'User:', 'Human:'], // Stop after function call completion
       };
+
+      // Add GBNF function calling if tools are available
+      if (this.gbnfEnabled && this.shouldUseGBNFunctions(request)) {
+        const functions = await this.createGBNFFunctions(request);
+        if (functions && Object.keys(functions).length > 0) {
+          options.functions = functions;
+          console.log('DEBUG: Using GBNF grammar-based function calling with', Object.keys(functions).length, 'functions');
+        }
+      }
 
       // Generate response using local model
       const response = await this.modelClient.generateText(prompt, options);
@@ -401,5 +416,50 @@ Assistant: \`\`\`json
 
   getRecommendedModel(task: string, ramLimit?: number): TrustModelConfig | null {
     return this.modelManager.getRecommendedModel(task, ramLimit);
+  }
+
+  /**
+   * Determine if we should use GBNF function calling for this request
+   */
+  private shouldUseGBNFunctions(request: GenerateContentParameters): boolean {
+    return !!(
+      'config' in request && 
+      request.config?.tools && 
+      request.config.tools.length > 0
+    );
+  }
+
+  /**
+   * Create GBNF functions from Gemini function declarations
+   * This enables grammar-based JSON schema enforcement for reliable function calling
+   */
+  private async createGBNFFunctions(request: GenerateContentParameters): Promise<Record<string, any> | null> {
+    if (!('config' in request) || !request.config?.tools) {
+      return null;
+    }
+
+    // Check if we have the required dependencies
+    if (!this.config || !this.toolRegistry) {
+      console.log('DEBUG: Config or ToolRegistry not available, falling back to regex-based parsing');
+      return null;
+    }
+
+    try {
+      console.log('DEBUG: Creating GBNF functions from', request.config.tools.length, 'tool groups');
+      
+      // Create GBNF function registry
+      const gbnfRegistry = new GBNFunctionRegistry(this.config, this.toolRegistry);
+      
+      // Convert our tools to native node-llama-cpp functions
+      const functions = await gbnfRegistry.createNativeFunctions();
+      
+      console.log('DEBUG: Successfully created', Object.keys(functions).length, 'GBNF functions');
+      return functions;
+      
+    } catch (error) {
+      console.error('Error creating GBNF functions:', error);
+      console.log('DEBUG: Falling back to regex-based function parsing');
+      return null;
+    }
   }
 }

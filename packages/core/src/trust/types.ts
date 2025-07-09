@@ -43,6 +43,8 @@ export interface GenerationOptions {
   maxTokens?: number;
   stopTokens?: string[];
   stream?: boolean;
+  functions?: Record<string, any>; // Function definitions for GBNF grammar-based calling
+  grammar?: any; // JSON schema grammar for structured output
 }
 
 /**

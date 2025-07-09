@@ -104,6 +104,7 @@ export async function createContentGeneratorConfig(
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
   sessionId?: string,
+  fullConfig?: any, // Optional full Config object for GBNF support
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
@@ -114,7 +115,24 @@ export async function createContentGenerator(
   
   if (config.authType === AuthType.USE_TRUST_LOCAL) {
     const { TrustContentGenerator } = await import('../trust/trustContentGenerator.js');
-    const trustGenerator = new TrustContentGenerator(config.trustModelsDir);
+    // Pass real Config and ToolRegistry for GBNF function calling support
+    let toolRegistry = null;
+    if (fullConfig && fullConfig.getToolRegistry) {
+      toolRegistry = await fullConfig.getToolRegistry();
+    } else {
+      // Fallback: create minimal ToolRegistry with empty config
+      const { ToolRegistry } = await import('../tools/tool-registry.js');
+      const { Config } = await import('../config/config.js');
+      const emptyConfig = new Config({
+        sessionId: 'fallback',
+        targetDir: process.cwd(),
+        debugMode: false,
+        cwd: process.cwd(),
+        model: 'fallback'
+      });
+      toolRegistry = new ToolRegistry(emptyConfig);
+    }
+    const trustGenerator = new TrustContentGenerator(config.trustModelsDir, fullConfig, toolRegistry);
     await trustGenerator.initialize();
     return trustGenerator;
   }

@@ -68,6 +68,7 @@ export class GeminiClient {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
       this.config.getSessionId(),
+      this.config, // Pass full config for GBNF support
     );
     this.chat = await this.startChat();
   }

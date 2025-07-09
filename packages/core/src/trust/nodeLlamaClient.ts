@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getLlama, LlamaChatSession } from 'node-llama-cpp';
+import { getLlama, LlamaChatSession, defineChatSessionFunction } from 'node-llama-cpp';
 import { 
   TrustModelClient, 
   TrustModelConfig, 
@@ -123,13 +123,26 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     
     try {
       const session = await this.createChatSession();
-      const response = await session.prompt(prompt, {
+      
+      // Build prompt options with native function calling support
+      const promptOptions: any = {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
         topK: options?.topK ?? 40,
         maxTokens: options?.maxTokens ?? 2048
-        // Note: stopSequence not supported in current node-llama-cpp version
-      });
+      };
+      
+      // Add native function calling support if functions are provided
+      if (options?.functions) {
+        promptOptions.functions = options.functions;
+      }
+      
+      // Add JSON schema grammar support if provided
+      if (options?.grammar) {
+        promptOptions.grammar = options.grammar;
+      }
+      
+      const response = await session.prompt(prompt, promptOptions);
 
       const endTime = Date.now();
       this.updateMetrics(endTime - startTime, response.length);
@@ -152,14 +165,25 @@ export class TrustNodeLlamaClient implements TrustModelClient {
     try {
       const session = await this.createChatSession();
       
-      // Simplified non-blocking approach with lower token limit
-      const response = await session.prompt(prompt, {
+      // Build prompt options with native function calling support
+      const promptOptions: any = {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
         topK: options?.topK ?? 40,
         maxTokens: options?.maxTokens ?? 512  // Already reduced from 2048
-        // Note: stopSequence not supported in current node-llama-cpp version
-      });
+      };
+      
+      // Add native function calling support if functions are provided
+      if (options?.functions) {
+        promptOptions.functions = options.functions;
+      }
+      
+      // Add JSON schema grammar support if provided
+      if (options?.grammar) {
+        promptOptions.grammar = options.grammar;
+      }
+      
+      const response = await session.prompt(prompt, promptOptions);
       
       totalTokens = response.length;
       yield response;
@@ -173,13 +197,26 @@ export class TrustNodeLlamaClient implements TrustModelClient {
       try {
         console.log('Falling back to non-streaming generation...');
         const session = await this.createChatSession();
-        const response = await session.prompt(prompt, {
+        
+        // Build prompt options with native function calling support
+        const promptOptions: any = {
           temperature: options?.temperature ?? 0.7,
           topP: options?.topP ?? 0.9,
           topK: options?.topK ?? 40,
           maxTokens: options?.maxTokens ?? 512
-          // Note: stopSequence not supported in current node-llama-cpp version
-        });
+        };
+        
+        // Add native function calling support if functions are provided
+        if (options?.functions) {
+          promptOptions.functions = options.functions;
+        }
+        
+        // Add JSON schema grammar support if provided
+        if (options?.grammar) {
+          promptOptions.grammar = options.grammar;
+        }
+        
+        const response = await session.prompt(prompt, promptOptions);
         yield response;
       } catch (fallbackError) {
         throw new Error(`Stream generation failed: ${error}. Fallback failed: ${fallbackError}`);
