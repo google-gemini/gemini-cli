@@ -38,26 +38,28 @@ export function isStructuredError(error: unknown): error is StructuredError {
 }
 
 export function isProQuotaExceededError(error: unknown): boolean {
-  // Regular expression to match "Quota exceeded for quota metric 'Gemini" followed by any version string and "Pro Requests'"
+  // Check for Pro quota exceeded errors by looking for the specific pattern
   // This will match patterns like:
   // - "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'"
   // - "Quota exceeded for quota metric 'Gemini 1.5-preview Pro Requests'"
   // - "Quota exceeded for quota metric 'Gemini beta-3.0 Pro Requests'"
   // - "Quota exceeded for quota metric 'Gemini experimental-v2 Pro Requests'"
-  // The pattern matches: "Gemini" + whitespace + any characters (non-greedy) + whitespace + "Pro Requests'"
-  const proQuotaRegex =
-    /Quota exceeded for quota metric 'Gemini\s+.*?\s+Pro Requests'/;
+  // We use string methods instead of regex to avoid ReDoS vulnerabilities
+
+  const checkMessage = (message: string): boolean =>
+    message.includes("Quota exceeded for quota metric 'Gemini") &&
+    message.includes("Pro Requests'");
 
   if (typeof error === 'string') {
-    return proQuotaRegex.test(error);
+    return checkMessage(error);
   }
 
   if (isStructuredError(error)) {
-    return proQuotaRegex.test(error.message);
+    return checkMessage(error.message);
   }
 
   if (isApiError(error)) {
-    return proQuotaRegex.test(error.error.message);
+    return checkMessage(error.error.message);
   }
 
   return false;
