@@ -58,7 +58,14 @@ export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
   const command =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commandExists(command);
+
+  const primaryExists = commandExists(command);
+
+  if (editor === 'zed' && !primaryExists) {
+    return commandExists('zeditor');
+  }
+
+  return primaryExists;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -99,8 +106,14 @@ export function getDiffCommand(
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
-    case 'zed':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
+    case 'zed': {
+      const zedCommand = commandExists(command) ? command : 'zeditor';
+      return {
+        command: zedCommand,
+        args: ['--wait', '--diff', oldPath, newPath],
+      };
+    }
     case 'vim':
     case 'neovim':
       return {

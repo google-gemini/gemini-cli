@@ -103,6 +103,46 @@ describe('editor utils', () => {
           });
           expect(checkHasEditorType(editor)).toBe(false);
         });
+
+        if (editor === 'zed') {
+          it('should return true if "zed" does not exist but "zeditor" does on non-windows', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
+            (execSync as Mock)
+              .mockImplementationOnce(() => {
+                throw new Error(); // zed command not found
+              })
+              .mockReturnValueOnce(Buffer.from('/usr/bin/zeditor')); // zeditor found
+            expect(checkHasEditorType(editor)).toBe(true);
+          });
+
+          it('should return false if neither "zed" nor "zeditor" exist on non-windows', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
+            (execSync as Mock).mockImplementation(() => {
+              throw new Error(); // both commands not found
+            });
+            expect(checkHasEditorType(editor)).toBe(false);
+          });
+
+          it('should return true if "zed" does not exist but "zeditor" does on windows', () => {
+            Object.defineProperty(process, 'platform', { value: 'win32' });
+            (execSync as Mock)
+              .mockImplementationOnce(() => {
+                throw new Error(); // zed command not found
+              })
+              .mockReturnValueOnce(
+                Buffer.from('C:\\Program Files\\...\\zeditor.exe'),
+              ); // zeditor found
+            expect(checkHasEditorType(editor)).toBe(true);
+          });
+
+          it('should return false if neither "zed" nor "zeditor" exist on windows', () => {
+            Object.defineProperty(process, 'platform', { value: 'win32' });
+            (execSync as Mock).mockImplementation(() => {
+              throw new Error(); // both commands not found
+            });
+            expect(checkHasEditorType(editor)).toBe(false);
+          });
+        }
       });
     }
   });
@@ -123,6 +163,7 @@ describe('editor utils', () => {
     for (const { editor, command, win32Command } of guiEditors) {
       it(`should return the correct command for ${editor} on non-windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
+        (execSync as Mock).mockReturnValue(Buffer.from(`/usr/bin/${command}`));
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command,
@@ -130,14 +171,53 @@ describe('editor utils', () => {
         });
       });
 
+      if (editor === 'zed') {
+        it('should use zeditor when zed command does not exist', () => {
+          Object.defineProperty(process, 'platform', { value: 'linux' });
+          (execSync as Mock)
+            .mockImplementationOnce(() => {
+              throw new Error(); // zed command not found
+            })
+            .mockReturnValueOnce(Buffer.from('/usr/bin/zeditor')); // zeditor found
+
+          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+          expect(diffCommand).toEqual({
+            command: 'zeditor',
+            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          });
+        });
+      }
+
       it(`should return the correct command for ${editor} on windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`C:\\Program Files\\...\\${win32Command}`),
+        );
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: win32Command,
           args: ['--wait', '--diff', 'old.txt', 'new.txt'],
         });
       });
+
+      if (editor === 'zed') {
+        it('should use zeditor on windows when zed command does not exist', () => {
+          Object.defineProperty(process, 'platform', { value: 'win32' });
+          (execSync as Mock)
+            .mockImplementationOnce(() => {
+              throw new Error(); // zed command not found
+            })
+            .mockReturnValueOnce(
+              Buffer.from('C:\\Program Files\\...\\zeditor.exe'),
+            ); // zeditor found
+
+          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+          expect(diffCommand).toEqual({
+            command: 'zeditor',
+            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          });
+        });
+      }
     }
 
     const terminalEditors: Array<{
