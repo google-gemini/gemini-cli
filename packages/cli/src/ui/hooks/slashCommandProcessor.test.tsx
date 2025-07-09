@@ -867,7 +867,10 @@ describe('useSlashCommandProcessor', () => {
         hook.rerender();
       });
       expect(hook.result.current.pendingHistoryItems).toEqual([]);
-      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(
+        'Prompt Id not set',
+        true,
+      );
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
