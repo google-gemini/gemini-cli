@@ -178,6 +178,8 @@ describe('Gemini Client (client.ts)', () => {
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       };
       return mock as unknown as Config;
     });
@@ -351,7 +353,7 @@ describe('Gemini Client (client.ts)', () => {
       await client.generateJson(contents, schema, abortSignal);
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: DEFAULT_GEMINI_FLASH_MODEL,
+        model: 'test-model', // Should use current model from config
         config: {
           abortSignal,
           systemInstruction: getCoreSystemPrompt(''),
