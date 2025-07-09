@@ -291,13 +291,13 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
-- **`--debug_mode`** (**`-d`**):
+- **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all_files`** (**`-a`**):
+- **`--all-files`** (**`-a`**):
   - If set, recursively includes all files within the current directory as context for the prompt.
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--show_memory_usage`**:
+- **`--show-memory-usage`**:
   - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
