@@ -9,6 +9,7 @@ import {
   cacheGoogleAccount,
   getCachedGoogleAccount,
   clearCachedGoogleAccount,
+  getLifetimeGoogleAccounts,
 } from './user_account.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -175,6 +176,62 @@ describe('user_account', () => {
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
       expect(stored.old).toEqual([]);
+    });
+  });
+
+  describe('getLifetimeGoogleAccounts', () => {
+    it('should return 0 if the file does not exist', () => {
+      expect(getLifetimeGoogleAccounts()).toBe(0);
+    });
+
+    it('should return 0 if the file is empty', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(accountsFile(), '');
+      expect(getLifetimeGoogleAccounts()).toBe(0);
+    });
+
+    it('should return 0 if the file is corrupted', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(accountsFile(), 'invalid json');
+      const consoleDebugSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      expect(getLifetimeGoogleAccounts()).toBe(0);
+      expect(consoleDebugSpy).toHaveBeenCalled();
+    });
+
+    it('should return 1 if there is only an active account', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: 'test1@google.com', old: [] }),
+      );
+      expect(getLifetimeGoogleAccounts()).toBe(1);
+    });
+
+    it('should correctly count old accounts when active is null', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({
+          active: null,
+          old: ['test1@google.com', 'test2@google.com'],
+        }),
+      );
+      expect(getLifetimeGoogleAccounts()).toBe(2);
+    });
+
+    it('should correctly count both active and old accounts', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({
+          active: 'test3@google.com',
+          old: ['test1@google.com', 'test2@google.com'],
+        }),
+      );
+      expect(getLifetimeGoogleAccounts()).toBe(3);
     });
   });
 });
