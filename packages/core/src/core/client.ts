@@ -241,16 +241,6 @@ export class GeminiClient {
       // So, the explicit persona handling block here can be simplified or removed
       // if getCoreSystemPrompt and config.getModel() are sufficient.
 
-      if (currentPersona) {
-        // Ensure persona's prompt is used if getCoreSystemPrompt didn't handle it (it should now)
-        // This is more of a safeguard or if direct persona prompt usage is preferred over conditional logic in getCoreSystemPrompt
-        systemInstruction = { role: 'system', parts: [{ text: currentPersona.prompt }] };
-
-        if (currentPersona.model) {
-          model = currentPersona.model; // Ensure persona's model is used
-        }
-      }
-
 
       const generateContentConfigWithThinking = isThinkingSupported(model)
         ? {
