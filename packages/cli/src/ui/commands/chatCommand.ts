@@ -6,22 +6,48 @@
 
 import { promises as fs } from 'fs';
 import { CommandContext, SlashCommand, MessageActionReturn } from './types.js';
+import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
+
+interface ChatDetail {
+  name: string;
+  mtime: Date;
+}
 
 // Helper function to get saved chat tags.
 // This logic was previously inside the useSlashCommandProcessor hook.
-const getSavedChatTags = async (context: CommandContext): Promise<string[]> => {
+const getSavedChatTags = async (
+  context: CommandContext,
+  mtSortDesc: boolean,
+): Promise<ChatDetail[]> => {
   const geminiDir = context.services.config?.getProjectTempDir();
   if (!geminiDir) {
     return [];
   }
   try {
+    const file_head = 'checkpoint-';
+    const file_tail = '.json';
     const files = await fs.readdir(geminiDir);
-    return files
-      .filter(
-        (file) => file.startsWith('checkpoint-') && file.endsWith('.json'),
-      )
-      .map((file) => file.replace('checkpoint-', '').replace('.json', ''));
+    const chatDetails: Array<{ name: string; mtime: Date }> = [];
+
+    for (const file of files) {
+      if (file.startsWith(file_head) && file.endsWith(file_tail)) {
+        const filePath = path.join(geminiDir, file);
+        const stats = await fs.stat(filePath);
+        chatDetails.push({
+          name: file.slice(file_head.length, -file_tail.length),
+          mtime: stats.mtime,
+        });
+      }
+    }
+
+    chatDetails.sort((a, b) =>
+      mtSortDesc
+        ? b.mtime.getTime() - a.mtime.getTime()
+        : a.mtime.getTime() - b.mtime.getTime(),
+    );
+
+    return chatDetails;
   } catch (_err) {
     return [];
   }
@@ -31,18 +57,24 @@ const listCommand: SlashCommand = {
   name: 'list',
   description: 'List saved conversation checkpoints',
   action: async (context): Promise<MessageActionReturn> => {
-    const tags = await getSavedChatTags(context);
-    if (tags.length === 0) {
+    const chatDetails = await getSavedChatTags(context, false);
+    if (chatDetails.length === 0) {
       return {
         type: 'message',
         messageType: 'info',
         content: 'No saved conversation checkpoints found.',
       };
     }
+
+    let message = 'List of saved conversations:\n\n';
+    for (const chat of chatDetails) {
+      message += `  - \u001b[36m${chat.name}\u001b[0m\n`;
+    }
+    message += `\n\u001b[90mNote: Newest last, oldest first\u001b[0m`;
     return {
       type: 'message',
       messageType: 'info',
-      content: 'List of saved conversations: ' + tags.join(', '),
+      content: message,
     };
   },
 };
@@ -167,9 +199,11 @@ const resumeCommand: SlashCommand = {
       }
     }
   },
-  completion: async (context) => {
-    const tags = await getSavedChatTags(context);
-    return tags;
+  completion: async (context, partialArg) => {
+    const chatDetails = await getSavedChatTags(context, true);
+    return chatDetails
+      .map((chat) => chat.name)
+      .filter((name) => name.startsWith(partialArg));
   },
 };
 
