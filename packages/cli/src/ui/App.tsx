@@ -138,7 +138,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSubmittingRef = useRef(false);
-  const justSubmittedQueuedItemRef = useRef(false);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -562,19 +561,19 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const isInputVisible = !initError;
 
   useEffect(() => {
-    if (streamingState === StreamingState.Idle) {
-      if (queuedInput && !initError && !justSubmittedQueuedItemRef.current) {
-        isSubmittingRef.current = true;
-        justSubmittedQueuedItemRef.current = true;
-        const inputToSubmit = queuedInput;
-        setQueuedInput(null);
-        submitQuery(inputToSubmit);
-      } else if (!queuedInput) {
-        isSubmittingRef.current = false;
-        justSubmittedQueuedItemRef.current = false;
-      }
+    if (streamingState === StreamingState.Idle && queuedInput && !initError) {
+      isSubmittingRef.current = true;
+      const inputToSubmit = queuedInput;
+      setQueuedInput(null);
+      submitQuery(inputToSubmit);
     }
   }, [streamingState, queuedInput, initError, submitQuery]);
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      isSubmittingRef.current = false;
+    }
+  }, [streamingState]);
 
   // Clear queued input if user cancels or there's an error
   useEffect(() => {

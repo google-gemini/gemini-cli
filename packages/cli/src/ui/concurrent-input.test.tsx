@@ -16,7 +16,6 @@ function useConcurrentInputLogic(
   initError: boolean = false,
 ) {
   const isSubmittingRef = useRef(false);
-  const justSubmittedQueuedItemRef = useRef(false);
   const [queuedInput, setQueuedInput] = useState<string | null>(null);
 
   const handleFinalSubmit = useCallback(
@@ -44,25 +43,24 @@ function useConcurrentInputLogic(
   );
 
   useEffect(() => {
-    if (streamingState === StreamingState.Idle) {
-      if (queuedInput && !initError && !justSubmittedQueuedItemRef.current) {
-        isSubmittingRef.current = true;
-        justSubmittedQueuedItemRef.current = true;
-        const inputToSubmit = queuedInput;
-        setQueuedInput(null);
-        submitQuery(inputToSubmit);
-      } else if (!queuedInput) {
-        isSubmittingRef.current = false;
-        justSubmittedQueuedItemRef.current = false;
-      }
+    if (streamingState === StreamingState.Idle && queuedInput && !initError) {
+      isSubmittingRef.current = true;
+      const inputToSubmit = queuedInput;
+      setQueuedInput(null);
+      submitQuery(inputToSubmit);
     }
   }, [streamingState, queuedInput, initError, submitQuery]);
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      isSubmittingRef.current = false;
+    }
+  }, [streamingState]);
 
   return {
     handleFinalSubmit,
     queuedInput,
     isSubmittingRef,
-    justSubmittedQueuedItemRef,
   };
 }
 
