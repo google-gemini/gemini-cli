@@ -72,35 +72,59 @@ async function main() {
       `------------- Running test file: ${testFileName} ------------------------------`,
     );
 
-    const child = spawn('node', ['--test', testFile], {
+    const nodeArgs = ['--test'];
+    if (verbose) {
+      nodeArgs.push('--test-reporter=spec');
+    }
+    nodeArgs.push(testFile);
+
+    const child = spawn('node', nodeArgs, {
       stdio: 'pipe',
       env: {
         ...process.env,
         GEMINI_CLI_INTEGRATION_TEST: 'true',
         INTEGRATION_TEST_FILE_DIR: testFileDir,
         KEEP_OUTPUT: keepOutput.toString(),
+        VERBOSE: verbose.toString(),
         TEST_FILE_NAME: testFileName,
       },
     });
 
-    if (verbose) {
-      child.stdout.pipe(process.stdout);
-      child.stderr.pipe(process.stderr);
-    }
-
+    let outputStream;
     if (keepOutput) {
       const outputFile = join(testFileDir, 'output.log');
-      const outputStream = createWriteStream(outputFile);
-      child.stdout.pipe(outputStream);
-      child.stderr.pipe(outputStream);
+      outputStream = createWriteStream(outputFile);
       console.log(`Output for ${testFileName} written to: ${outputFile}`);
-    } else if (!verbose) {
-      child.stdout.pipe(process.stdout);
-      child.stderr.pipe(process.stderr);
     }
 
+    child.stdout.on('data', (data) => {
+      if (verbose) {
+        process.stdout.write(data);
+      }
+      if (outputStream) {
+        outputStream.write(data);
+      }
+    });
+
+    child.stderr.on('data', (data) => {
+      if (verbose) {
+        process.stderr.write(data);
+      }
+      if (outputStream) {
+        outputStream.write(data);
+      }
+    });
+
     const exitCode = await new Promise((resolve) => {
-      child.on('close', resolve);
+      child.on('close', (code) => {
+        if (outputStream) {
+          outputStream.end(() => {
+            resolve(code);
+          });
+        } else {
+          resolve(code);
+        }
+      });
     });
 
     if (exitCode !== 0) {

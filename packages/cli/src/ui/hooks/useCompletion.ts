@@ -20,7 +20,7 @@ import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
-import { SlashCommand } from './slashCommandProcessor.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -40,6 +40,7 @@ export function useCompletion(
   cwd: string,
   isActive: boolean,
   slashCommands: SlashCommand[],
+  commandContext: CommandContext,
   config?: Config,
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -123,74 +124,129 @@ export function useCompletion(
       return;
     }
 
-    const trimmedQuery = query.trimStart(); // Trim leading whitespace
+    const trimmedQuery = query.trimStart();
 
-    // --- Handle Slash Command Completion ---
     if (trimmedQuery.startsWith('/')) {
-      const parts = trimmedQuery.substring(1).split(' ');
-      const commandName = parts[0];
-      const subCommand = parts.slice(1).join(' ');
+      const fullPath = trimmedQuery.substring(1);
+      const hasTrailingSpace = trimmedQuery.endsWith(' ');
 
-      const command = slashCommands.find(
-        (cmd) => cmd.name === commandName || cmd.altName === commandName,
-      );
+      // Get all non-empty parts of the command.
+      const rawParts = fullPath.split(/\s+/).filter((p) => p);
 
-      if (command && command.completion) {
+      let commandPathParts = rawParts;
+      let partial = '';
+
+      // If there's no trailing space, the last part is potentially a partial segment.
+      // We tentatively separate it.
+      if (!hasTrailingSpace && rawParts.length > 0) {
+        partial = rawParts[rawParts.length - 1];
+        commandPathParts = rawParts.slice(0, -1);
+      }
+
+      // Traverse the Command Tree using the tentative completed path
+      let currentLevel: SlashCommand[] | undefined = slashCommands;
+      let leafCommand: SlashCommand | null = null;
+
+      for (const part of commandPathParts) {
+        if (!currentLevel) {
+          leafCommand = null;
+          currentLevel = [];
+          break;
+        }
+        const found: SlashCommand | undefined = currentLevel.find(
+          (cmd) => cmd.name === part || cmd.altName === part,
+        );
+        if (found) {
+          leafCommand = found;
+          currentLevel = found.subCommands;
+        } else {
+          leafCommand = null;
+          currentLevel = [];
+          break;
+        }
+      }
+
+      // Handle the Ambiguous Case
+      if (!hasTrailingSpace && currentLevel) {
+        const exactMatchAsParent = currentLevel.find(
+          (cmd) =>
+            (cmd.name === partial || cmd.altName === partial) &&
+            cmd.subCommands,
+        );
+
+        if (exactMatchAsParent) {
+          // It's a perfect match for a parent command. Override our initial guess.
+          // Treat it as a completed command path.
+          leafCommand = exactMatchAsParent;
+          currentLevel = exactMatchAsParent.subCommands;
+          partial = ''; // We now want to suggest ALL of its sub-commands.
+        }
+      }
+
+      const depth = commandPathParts.length;
+
+      // Provide Suggestions based on the now-corrected context
+
+      // Argument Completion
+      if (
+        leafCommand?.completion &&
+        (hasTrailingSpace ||
+          (rawParts.length > depth && depth > 0 && partial !== ''))
+      ) {
         const fetchAndSetSuggestions = async () => {
           setIsLoadingSuggestions(true);
-          if (command.completion) {
-            const results = await command.completion();
-            const filtered = results.filter((r) => r.startsWith(subCommand));
-            const newSuggestions = filtered.map((s) => ({
-              label: s,
-              value: s,
-            }));
-            setSuggestions(newSuggestions);
-            setShowSuggestions(newSuggestions.length > 0);
-            setActiveSuggestionIndex(newSuggestions.length > 0 ? 0 : -1);
-          }
+          const argString = rawParts.slice(depth).join(' ');
+          const results =
+            (await leafCommand!.completion!(commandContext, argString)) || [];
+          const finalSuggestions = results.map((s) => ({ label: s, value: s }));
+          setSuggestions(finalSuggestions);
+          setShowSuggestions(finalSuggestions.length > 0);
+          setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
           setIsLoadingSuggestions(false);
         };
         fetchAndSetSuggestions();
         return;
       }
 
-      const partialCommand = trimmedQuery.substring(1);
-      const filteredSuggestions = slashCommands
-        .filter(
+      // Command/Sub-command Completion
+      const commandsToSearch = currentLevel || [];
+      if (commandsToSearch.length > 0) {
+        let potentialSuggestions = commandsToSearch.filter(
           (cmd) =>
-            cmd.name.startsWith(partialCommand) ||
-            cmd.altName?.startsWith(partialCommand),
-        )
-        // Filter out ? and any other single character commands unless it's the only char
-        .filter((cmd) => {
-          const nameMatch = cmd.name.startsWith(partialCommand);
-          const altNameMatch = cmd.altName?.startsWith(partialCommand);
-          if (partialCommand.length === 1) {
-            return nameMatch || altNameMatch; // Allow single char match if query is single char
-          }
-          return (
-            (nameMatch && cmd.name.length > 1) ||
-            (altNameMatch && cmd.altName && cmd.altName.length > 1)
-          );
-        })
-        .filter((cmd) => cmd.description)
-        .map((cmd) => ({
-          label: cmd.name, // Always show the main name as label
-          value: cmd.name, // Value should be the main command name for execution
-          description: cmd.description,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+            cmd.description &&
+            (cmd.name.startsWith(partial) || cmd.altName?.startsWith(partial)),
+        );
 
-      setSuggestions(filteredSuggestions);
-      setShowSuggestions(filteredSuggestions.length > 0);
-      setActiveSuggestionIndex(filteredSuggestions.length > 0 ? 0 : -1);
-      setVisibleStartIndex(0);
-      setIsLoadingSuggestions(false);
+        // If a user's input is an exact match and it is a leaf command,
+        // enter should submit immediately.
+        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
+          const perfectMatch = potentialSuggestions.find(
+            (s) => s.name === partial,
+          );
+          if (perfectMatch && !perfectMatch.subCommands) {
+            potentialSuggestions = [];
+          }
+        }
+
+        const finalSuggestions = potentialSuggestions.map((cmd) => ({
+          label: cmd.name,
+          value: cmd.name,
+          description: cmd.description,
+        }));
+
+        setSuggestions(finalSuggestions);
+        setShowSuggestions(finalSuggestions.length > 0);
+        setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
+        setIsLoadingSuggestions(false);
+        return;
+      }
+
+      // If we fall through, no suggestions are available.
+      resetCompletionState();
       return;
     }
 
-    // --- Handle At Command Completion ---
+    // Handle At Command Completion
     const atIndex = query.lastIndexOf('@');
     if (atIndex === -1) {
       resetCompletionState();
@@ -216,7 +272,11 @@ export function useCompletion(
     const findFilesRecursively = async (
       startDir: string,
       searchPrefix: string,
-      fileDiscovery: { shouldGitIgnoreFile: (path: string) => boolean } | null,
+      fileDiscovery: FileDiscoveryService | null,
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       currentRelativePath = '',
       depth = 0,
       maxDepth = 10, // Limit recursion depth
@@ -244,10 +304,10 @@ export function useCompletion(
             continue;
           }
 
-          // Check if this entry should be ignored by git-aware filtering
+          // Check if this entry should be ignored by filtering options
           if (
             fileDiscovery &&
-            fileDiscovery.shouldGitIgnoreFile(entryPathFromRoot)
+            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
           ) {
             continue;
           }
@@ -271,6 +331,7 @@ export function useCompletion(
                   path.join(startDir, entry.name),
                   searchPrefix, // Pass original searchPrefix for recursive calls
                   fileDiscovery,
+                  filterOptions,
                   entryPathRelative,
                   depth + 1,
                   maxDepth,
@@ -289,6 +350,10 @@ export function useCompletion(
     const findFilesWithGlob = async (
       searchPrefix: string,
       fileDiscoveryService: FileDiscoveryService,
+      filterOptions: {
+        respectGitIgnore?: boolean;
+        respectGeminiIgnore?: boolean;
+      },
       maxResults = 50,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
@@ -308,7 +373,10 @@ export function useCompletion(
         })
         .filter((s) => {
           if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldGitIgnoreFile(s.label); // relative path
+            return !fileDiscoveryService.shouldIgnoreFile(
+              s.label,
+              filterOptions,
+            ); // relative path
           }
           return true;
         })
@@ -324,6 +392,10 @@ export function useCompletion(
       const fileDiscoveryService = config ? config.getFileService() : null;
       const enableRecursiveSearch =
         config?.getEnableRecursiveFileSearch() ?? true;
+      const filterOptions = {
+        respectGitIgnore: config?.getFileFilteringRespectGitIgnore() ?? true,
+        respectGeminiIgnore: true,
+      };
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
@@ -336,12 +408,14 @@ export function useCompletion(
             fetchedSuggestions = await findFilesWithGlob(
               prefix,
               fileDiscoveryService,
+              filterOptions,
             );
           } else {
             fetchedSuggestions = await findFilesRecursively(
               cwd,
               prefix,
               fileDiscoveryService,
+              filterOptions,
             );
           }
         } else {
@@ -366,7 +440,7 @@ export function useCompletion(
             );
             if (
               fileDiscoveryService &&
-              fileDiscoveryService.shouldGitIgnoreFile(relativePath)
+              fileDiscoveryService.shouldIgnoreFile(relativePath, filterOptions)
             ) {
               continue;
             }
@@ -432,7 +506,15 @@ export function useCompletion(
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
-  }, [query, cwd, isActive, resetCompletionState, slashCommands, config]);
+  }, [
+    query,
+    cwd,
+    isActive,
+    resetCompletionState,
+    slashCommands,
+    commandContext,
+    config,
+  ]);
 
   return {
     suggestions,
