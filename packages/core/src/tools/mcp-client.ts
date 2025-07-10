@@ -14,13 +14,8 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import {
-  CallableTool,
-  FunctionDeclaration,
-  mcpToTool,
-  Schema,
-} from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
+import { Type, mcpToTool } from '@google/genai';
+import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -162,6 +157,16 @@ export async function discoverMcpTools(
   }
 }
 
+/**
+ * Connects to an MCP server and discovers available tools, registering them with the tool registry.
+ * This function handles the complete lifecycle of connecting to a server, discovering tools,
+ * and cleaning up resources if no tools are found.
+ *
+ * @param mcpServerName The name identifier for this MCP server
+ * @param mcpServerConfig Configuration object containing connection details
+ * @param toolRegistry The registry to register discovered tools with
+ * @returns Promise that resolves when discovery is complete
+ */
 async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
@@ -270,13 +275,10 @@ async function connectAndDiscover(
   }
 
   try {
-    const mcpCallableTool: CallableTool = mcpToTool(mcpClient);
-    const discoveredToolFunctions = await mcpCallableTool.tool();
+    const mcpCallableTool = mcpToTool(mcpClient);
+    const tool = await mcpCallableTool.tool();
 
-    if (
-      !discoveredToolFunctions ||
-      !Array.isArray(discoveredToolFunctions.functionDeclarations)
-    ) {
+    if (!tool || !Array.isArray(tool.functionDeclarations)) {
       console.error(
         `MCP server '${mcpServerName}' did not return valid tool function declarations. Skipping.`,
       );
@@ -292,11 +294,31 @@ async function connectAndDiscover(
       return;
     }
 
-    for (const funcDecl of discoveredToolFunctions.functionDeclarations) {
+    for (const funcDecl of tool.functionDeclarations) {
       if (!funcDecl.name) {
         console.warn(
           `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
         );
+        continue;
+      }
+
+      const { includeTools, excludeTools } = mcpServerConfig;
+      const toolName = funcDecl.name;
+
+      let isEnabled = false;
+      if (includeTools === undefined) {
+        isEnabled = true;
+      } else {
+        isEnabled = includeTools.some(
+          (tool) => tool === toolName || tool.startsWith(`${toolName}(`),
+        );
+      }
+
+      if (excludeTools?.includes(toolName)) {
+        isEnabled = false;
+      }
+
+      if (!isEnabled) {
         continue;
       }
 
@@ -319,19 +341,13 @@ async function connectAndDiscover(
 
       sanitizeParameters(funcDecl.parameters);
 
-      // Ensure parameters is a valid JSON schema object, default to empty if not.
-      const parameterSchema: Record<string, unknown> =
-        funcDecl.parameters && typeof funcDecl.parameters === 'object'
-          ? { ...(funcDecl.parameters as FunctionDeclaration) }
-          : { type: 'object', properties: {} };
-
       toolRegistry.registerTool(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
           toolNameForModel,
           funcDecl.description ?? '',
-          parameterSchema,
+          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
           funcDecl.name,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
@@ -371,27 +387,6 @@ async function connectAndDiscover(
       await transport.close();
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-    }
-  }
-}
-
-export function sanitizeParameters(schema?: Schema) {
-  if (!schema) {
-    return;
-  }
-  if (schema.anyOf) {
-    // Vertex AI gets confused if both anyOf and default are set.
-    schema.default = undefined;
-    for (const item of schema.anyOf) {
-      sanitizeParameters(item);
-    }
-  }
-  if (schema.items) {
-    sanitizeParameters(schema.items);
-  }
-  if (schema.properties) {
-    for (const item of Object.values(schema.properties)) {
-      sanitizeParameters(item);
     }
   }
 }
