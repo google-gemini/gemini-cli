@@ -211,7 +211,14 @@ export class GeminiClient {
   private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    let toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const currentPersona = this.config.getCurrentPersona();
+
+    if (currentPersona && currentPersona.tools) {
+      const personaTools = new Set(currentPersona.tools);
+      toolDeclarations = toolDeclarations.filter(toolDef => personaTools.has(toolDef.name));
+    }
+
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     const history: Content[] = [
       {
@@ -226,10 +233,26 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(
-        this.config.getModel(),
-      )
+      let systemInstruction = getCoreSystemPrompt(userMemory, this.config); // Pass config here
+      let model = this.config.getModel();
+
+      // Persona prompt is now handled by getCoreSystemPrompt if a persona is active.
+      // Model is handled by config.getModel() which is updated by persona selection.
+      // So, the explicit persona handling block here can be simplified or removed
+      // if getCoreSystemPrompt and config.getModel() are sufficient.
+
+      if (currentPersona) {
+        // Ensure persona's prompt is used if getCoreSystemPrompt didn't handle it (it should now)
+        // This is more of a safeguard or if direct persona prompt usage is preferred over conditional logic in getCoreSystemPrompt
+        systemInstruction = { role: 'system', parts: [{ text: currentPersona.prompt }] };
+
+        if (currentPersona.model) {
+          model = currentPersona.model; // Ensure persona's model is used
+        }
+      }
+
+
+      const generateContentConfigWithThinking = isThinkingSupported(model)
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
@@ -237,6 +260,14 @@ export class GeminiClient {
             },
           }
         : this.generateContentConfig;
+
+      // Ensure the contentGenerator is using the potentially updated model from persona
+      const contentGeneratorConfig = this.config.getContentGeneratorConfig();
+      if (contentGeneratorConfig.model !== model) {
+         await this.initialize({ ...contentGeneratorConfig, model });
+      }
+
+
       return new GeminiChat(
         this.config,
         this.getContentGenerator(),
@@ -326,7 +357,7 @@ export class GeminiClient {
       model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(userMemory, this.config); // Pass config here
       const requestConfig = {
         abortSignal,
         ...this.generateContentConfig,
@@ -418,7 +449,7 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(userMemory, this.config); // Pass config here
 
       const requestConfig = {
         abortSignal,

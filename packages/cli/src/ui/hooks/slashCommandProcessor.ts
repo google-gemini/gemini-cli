@@ -1127,6 +1127,14 @@ export const useSlashCommandProcessor = (
                   },
                   Date.now(),
                 );
+                // If persona was changed, update it in the main config
+                if (commandToExecute.name === 'persona' && result.messageType === 'info' && result.content.startsWith('Switched to persona:')) {
+                  const newPersonaName = result.content.substring('Switched to persona: '.length);
+                  const persona = config?.getPersonas().find(p => p.name === newPersonaName);
+                  if (persona) {
+                    config?.setCurrentPersona(persona);
+                  }
+                }
                 return { type: 'handled' };
               case 'dialog':
                 switch (result.dialog) {

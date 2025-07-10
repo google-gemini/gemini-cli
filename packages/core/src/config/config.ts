@@ -43,6 +43,14 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
+
+export interface Persona {
+  name: string;
+  prompt: string;
+  model?: string;
+  tools?: string[];
+  description: string;
+}
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 export enum ApprovalMode {
@@ -141,6 +149,8 @@ export interface ConfigParameters {
   extensionContextFilePaths?: string[];
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
+  personas?: Persona[];
+  currentPersona?: Persona | null;
 }
 
 export class Config {
@@ -182,6 +192,8 @@ export class Config {
   private modelSwitchedDuringSession: boolean = false;
   private readonly listExtensions: boolean;
   private readonly _activeExtensions: ActiveExtension[];
+  private readonly personas: Persona[];
+  private currentPersona: Persona | null;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
 
@@ -227,6 +239,8 @@ export class Config {
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
+    this.personas = params.personas ?? [];
+    this.currentPersona = params.currentPersona ?? null;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -473,6 +487,18 @@ export class Config {
 
   getActiveExtensions(): ActiveExtension[] {
     return this._activeExtensions;
+  }
+
+  getPersonas(): Persona[] {
+    return this.personas;
+  }
+
+  getCurrentPersona(): Persona | null {
+    return this.currentPersona;
+  }
+
+  setCurrentPersona(persona: Persona | null): void {
+    this.currentPersona = persona;
   }
 
   async getGitService(): Promise<GitService> {

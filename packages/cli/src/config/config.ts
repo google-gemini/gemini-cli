@@ -17,8 +17,11 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  Persona,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import { Settings, loadSettings } from './settings.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -53,6 +56,7 @@ interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  persona: string | undefined;
 }
 
 async function parseArguments(): Promise<CliArgs> {
@@ -168,7 +172,15 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-
+    .option('persona', {
+      type: 'string',
+      description: 'Select a persona to use.',
+    })
+    .command('describe-persona', 'Describe the currently active persona', {}, async () => {
+      // This handler will be executed by yargs if the command is called.
+      // We will handle the actual logic in the main part of loadCliConfig
+      // to avoid duplicating config loading.
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -177,7 +189,45 @@ async function parseArguments(): Promise<CliArgs> {
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
 
-  return yargsInstance.argv;
+  const argv = await yargsInstance.argv;
+
+  // Handle describe-persona command directly
+  if (argv._[0] === 'describe-persona') {
+    // We need to load config partially to get persona info
+    // This is a bit of a workaround as yargs commands are usually handled internally
+    const tempSettings = loadSettings(process.cwd()); // Assuming loadSettings is synchronous or adapted
+    let tempPersonas: Persona[] = [];
+    try {
+      const personasPath = path.join(path.dirname(import.meta.url), 'personas.json');
+      const fileContent = await fs.readFile(new URL(personasPath), 'utf-8');
+      tempPersonas = JSON.parse(fileContent) as Persona[];
+    } catch { /* ignore */ }
+
+    const personaName = argv.persona || tempSettings.merged.selectedPersona;
+    const personaToDescribe = tempPersonas.find(p => p.name === personaName);
+
+    if (personaToDescribe) {
+      console.log(`Name: ${personaToDescribe.name}`);
+      console.log(`Description: ${personaToDescribe.description}`);
+      console.log(`Model: ${personaToDescribe.model || 'Default'}`);
+      console.log(`Prompt: ${personaToDescribe.prompt}`);
+      if (personaToDescribe.tools && personaToDescribe.tools.length > 0) {
+        console.log('Tools:');
+        personaToDescribe.tools.forEach(t => console.log(`  - ${t}`));
+      } else {
+        console.log('Tools: All available tools');
+      }
+    } else if (personaName) {
+      console.log(`Persona "${personaName}" not found.`);
+    } else {
+      console.log('No persona is currently active.');
+      console.log('Use --persona <name> or /persona <name> to select one.');
+    }
+    process.exit(0);
+  }
+
+
+  return argv;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -210,6 +260,33 @@ export async function loadCliConfig(
   sessionId: string,
 ): Promise<Config> {
   const argv = await parseArguments();
+
+  let personas: Persona[] = [];
+  try {
+    const personasPath = path.join(
+      path.dirname(import.meta.url),
+      'personas.json',
+    );
+    const fileContent = await fs.readFile(new URL(personasPath), 'utf-8');
+    personas = JSON.parse(fileContent) as Persona[];
+  } catch (error) {
+    if (debugMode) {
+      logger.debug('Error loading personas.json:', error);
+    }
+    // It's okay if personas.json doesn't exist or is invalid, we'll just use an empty array.
+  }
+
+  let currentPersona: Persona | null = null;
+  const selectedPersonaName = argv.persona || settings.selectedPersona;
+
+  if (selectedPersonaName) {
+    currentPersona =
+      personas.find((p) => p.name === selectedPersonaName) || null;
+    if (!currentPersona && selectedPersonaName) {
+      logger.warn(`Persona "${selectedPersonaName}" not found. Using default.`);
+    }
+  }
+
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
@@ -317,6 +394,8 @@ export async function loadCliConfig(
       name: e.config.name,
       version: e.config.version,
     })),
+    personas,
+    currentPersona,
   });
 }
 
