@@ -61,11 +61,30 @@ describe('oauth2', () => {
     const mockGetAccessToken = vi
       .fn()
       .mockResolvedValue({ token: 'mock-access-token' });
+    const mockRefreshAccessToken = vi.fn().mockImplementation((callback) => {
+      // Mock the callback-style refreshAccessToken method
+      const mockTokensWithIdToken = {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+        id_token:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWdvb2dsZS1hY2NvdW50LWlkLTEyMyJ9.signature', // Mock JWT with sub: test-google-account-id-123
+      };
+      callback(null, mockTokensWithIdToken);
+    });
+    const mockVerifyIdToken = vi.fn().mockResolvedValue({
+      getPayload: () => ({
+        sub: 'test-google-account-id-123',
+        aud: 'test-audience',
+        iss: 'https://accounts.google.com',
+      }),
+    });
     const mockOAuth2Client = {
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
       setCredentials: mockSetCredentials,
       getAccessToken: mockGetAccessToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      verifyIdToken: mockVerifyIdToken,
       credentials: mockTokens,
       on: vi.fn(),
     } as unknown as OAuth2Client;
