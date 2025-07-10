@@ -13,6 +13,7 @@ on:
 jobs:
   generate-report:
     name: Generate Report 📝
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -24,7 +25,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token 🔑
         id: generate_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
@@ -162,14 +163,13 @@ jobs:
 
       - name: 🤖 Get Insights from Report
         if: steps.report.outputs.report_body != ''
-        uses: google-gemini/gemini-cli-action@41c0f1b3cbd1a0b284251bd1aac034edd07a3a2f
+        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
         with:
           version: 0.1.8-rc.0
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}
           OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
           settings_json: |
             {
