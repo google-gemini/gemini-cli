@@ -893,12 +893,9 @@ export const useSlashCommandProcessor = (
     session,
     gitService,
     loadHistory,
-    addItem,
     setQuittingMessages,
     pendingCompressionItemRef,
     setPendingCompressionItem,
-    clearItems,
-    refreshStatic,
   ]);
 
   const handleSlashCommand = useCallback(
