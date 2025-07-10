@@ -368,7 +368,10 @@ async function cacheCredentials(credentials: Credentials) {
 }
 
 function getCachedCredentialPath(): string {
-  return process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
+  return (
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME)
+  );
 }
 
 export async function clearCachedCredentialFile() {
