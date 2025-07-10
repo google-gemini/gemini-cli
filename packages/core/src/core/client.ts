@@ -352,9 +352,25 @@ export class GeminiClient {
     model?: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
-    // Use current model from config instead of hardcoded Flash model
-    const modelToUse =
-      model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
+    // Model selection logic:
+    // 1. Use the model provided in the arguments.
+    // 2. If no model in arguments, use the model from the active persona.
+    // 3. If no active persona model, use the model from the general config.
+    // 4. Fallback to DEFAULT_GEMINI_FLASH_MODEL if none of the above are set.
+    let modelToUse = model;
+    if (!modelToUse) {
+      const currentPersona = this.config.getCurrentPersona();
+      if (currentPersona && currentPersona.model) {
+        modelToUse = currentPersona.model;
+      }
+    }
+    if (!modelToUse) {
+      modelToUse = this.config.getModel();
+    }
+    if (!modelToUse) {
+      modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
+    }
+
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory, this.config); // Pass config here
@@ -441,10 +457,29 @@ export class GeminiClient {
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.config.getModel();
+    // Model selection logic:
+    // 1. Use the model from generationConfig if provided.
+    // 2. If no model in generationConfig, use the model from the active persona.
+    // 3. If no active persona model, use the model from the general config.
+    let modelToUse = generationConfig?.model; // Check generationConfig first
+    if (!modelToUse) {
+      const currentPersona = this.config.getCurrentPersona();
+      if (currentPersona && currentPersona.model) {
+        modelToUse = currentPersona.model;
+      }
+    }
+    if (!modelToUse) {
+      modelToUse = this.config.getModel();
+    }
+    // Ensure modelToUse is not undefined before spreading to avoid issues if no model is found.
+    // Though this.config.getModel() should ideally always return a string or be handled by the caller.
+    // If modelToUse is still undefined here, it means no model was set in config, persona, or args.
+    // The underlying generateContent call will likely use a default or throw an error.
+
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
+      model: modelToUse, // Explicitly set the chosen model
     };
 
     try {
