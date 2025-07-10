@@ -44,7 +44,6 @@ const SIGN_IN_FAILURE_URL =
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
 const GOOGLE_ACCOUNT_ID_FILENAME = 'google_account_id';
-const GOOGLE_ACCOUNT_EMAIL_FILENAME = 'google_account_email';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -71,10 +70,13 @@ export async function getOauthClient(
   // If there are cached creds on disk, they always take precedence
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
-    // Check if we need to retrieve Google Account ID or Email
-    if (!getCachedGoogleAccountId() || !getCachedGoogleAccountEmail()) {
+    // Check if we need to retrieve Google Account ID
+    if (!getCachedGoogleAccountId()) {
       try {
-        await fetchAndCacheUserInfo(client);
+        const googleAccountId = await getRawGoogleAccountId(client);
+        if (googleAccountId) {
+          await cacheGoogleAccountId(googleAccountId);
+        }
       } catch {
         // Non-fatal, continue with existing auth.
       }
@@ -161,7 +163,10 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           client.setCredentials(tokens);
           // Retrieve and cache Google Account ID during authentication
           try {
-            await fetchAndCacheUserInfo(client);
+            const googleAccountId = await getRawGoogleAccountId(client);
+            if (googleAccountId) {
+              await cacheGoogleAccountId(googleAccountId);
+            }
           } catch (error) {
             console.error(
               'Failed to retrieve Google Account ID during authentication:',
@@ -270,73 +275,57 @@ export function getCachedGoogleAccountId(): string | null {
   }
 }
 
-function getGoogleAccountEmailCachePath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNT_EMAIL_FILENAME);
-}
-
-async function cacheGoogleAccountEmail(email: string): Promise<void> {
-  const filePath = getGoogleAccountEmailCachePath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, email, 'utf-8');
-}
-
-export function getCachedGoogleAccountEmail(): string | null {
-  try {
-    const filePath = getGoogleAccountEmailCachePath();
-    if (existsSync(filePath)) {
-      return readFileSync(filePath, 'utf-8').trim() || null;
-    }
-    return null;
-  } catch (error) {
-    console.debug('Error reading cached Google Account Email:', error);
-    return null;
-  }
-}
-
 export async function clearCachedCredentialFile() {
   try {
     await fs.rm(getCachedCredentialPath(), { force: true });
     // Clear the Google Account ID cache when credentials are cleared
     await fs.rm(getGoogleAccountIdCachePath(), { force: true });
-    await fs.rm(getGoogleAccountEmailCachePath(), { force: true });
   } catch (_) {
     /* empty */
   }
 }
 
-async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
+/**
+ * Retrieves the authenticated user's Google Account ID from Google's UserInfo API.
+ * @param client - The authenticated OAuth2Client
+ * @returns The user's Google Account ID or null if not available
+ */
+export async function getRawGoogleAccountId(
+  client: OAuth2Client,
+): Promise<string | null> {
   try {
-    const { token } = await client.getAccessToken();
-    if (!token) {
-      return;
-    }
-
-    const response = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    // 1. Get a new Access Token including the id_token
+    const refreshedTokens = await new Promise<Credentials | null>(
+      (resolve, reject) => {
+        client.refreshAccessToken((err, tokens) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(tokens ?? null);
+        });
       },
     );
 
-    if (!response.ok) {
-      console.error(
-        'Failed to fetch user info:',
-        response.status,
-        response.statusText,
-      );
-      return;
+    if (!refreshedTokens?.id_token) {
+      console.warn('No id_token obtained after refreshing tokens.');
+      return null;
     }
 
-    const userInfo = await response.json();
-    if (userInfo.id) {
-      await cacheGoogleAccountId(userInfo.id);
+    // 2. Verify the ID token to securely get the user's Google Account ID.
+    const ticket = await client.verifyIdToken({
+      idToken: refreshedTokens.id_token,
+      audience: OAUTH_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub) {
+      console.warn('Could not extract sub claim from verified ID token.');
+      return null;
     }
-    if (userInfo.email) {
-      await cacheGoogleAccountEmail(userInfo.email);
-    }
+
+    return payload.sub;
   } catch (error) {
-    console.error('Error retrieving user info:', error);
+    console.error('Error retrieving or verifying Google Account ID:', error);
+    return null;
   }
 }
