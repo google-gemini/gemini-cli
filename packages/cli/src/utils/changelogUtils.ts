@@ -18,8 +18,10 @@ export interface ReleaseInfo {
 export async function fetchCurrentVersionRelease(): Promise<ReleaseInfo | null> {
   try {
     const currentVersion = await getCliVersion();
-    const tagName = currentVersion.startsWith('v') ? currentVersion : `v${currentVersion}`;
-    
+    const tagName = currentVersion.startsWith('v')
+      ? currentVersion
+      : `v${currentVersion}`;
+
     // First try to get the release for the current version
     try {
       const response = await request<ReleaseInfo>({
@@ -34,7 +36,9 @@ export async function fetchCurrentVersionRelease(): Promise<ReleaseInfo | null> 
       return response.data;
     } catch (_versionError) {
       // If current version not found, fall back to latest release
-      console.warn(`Release for version ${tagName} not found, falling back to latest release`);
+      console.warn(
+        `Release for version ${tagName} not found, falling back to latest release`,
+      );
       const response = await request<ReleaseInfo>({
         url: 'https://api.github.com/repos/google-gemini/gemini-cli/releases/latest',
         method: 'GET',
