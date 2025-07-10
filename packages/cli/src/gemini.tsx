@@ -17,8 +17,8 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  SettingScope,
   USER_SETTINGS_PATH,
+  SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -111,15 +111,9 @@ export async function main() {
     process.exit(0);
   }
 
-  // Set a default auth type if one isn't set for a couple of known cases.
+  // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
-    if (process.env.GEMINI_API_KEY) {
-      settings.setValue(
-        SettingScope.User,
-        'selectedAuthType',
-        AuthType.USE_GEMINI,
-      );
-    } else if (process.env.CLOUD_SHELL === 'true') {
+    if (process.env.CLOUD_SHELL === 'true') {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
@@ -202,10 +196,12 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
     prompt_length: input.length,
   });
 
@@ -216,7 +212,7 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
@@ -278,6 +274,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
     );
+    await finalConfig.initialize();
   }
 
   return await validateNonInterActiveAuth(
