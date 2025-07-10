@@ -108,19 +108,13 @@ export function calculateCharacterLimit(
   tokenLimit: number,
   historyLength: number,
 ): number {
-  if (tokenLimit === 0) {
+  if (tokenConsumed === 0) {
     return 0;
   }
 
-  const tokenUsageRatio = tokenConsumed / tokenLimit;
-
-  if (tokenUsageRatio === 0) {
-    return 0;
-  }
-  const baseCharacterLimit = historyLength / tokenUsageRatio;
-  const characterLimit = baseCharacterLimit * COMPRESSION_LIMIT_THRESHOLD;
-
-  return Math.floor(characterLimit);
+  const charsPerToken = historyLength / tokenConsumed;
+  const charsLimit = tokenLimit * charsPerToken;
+  return COMPRESSION_LIMIT_THRESHOLD * charsLimit;
 }
 
 export class GeminiClient {
@@ -561,12 +555,12 @@ export class GeminiClient {
       return null;
     }
 
-    const limit = tokenLimit(this.model);
+    const limit = tokenLimit(model);
 
     // Don't compress if not forced and we are under the limit.
     if (
       !force &&
-      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
+      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * limit
     ) {
       return null;
     }
@@ -605,14 +599,14 @@ export class GeminiClient {
         },
         config: {
           systemInstruction: {
-          text: getCompressionPrompt(
-            calculateCharacterLimit(
-              originalTokenCount,
-              limit,
-              historyCharacterLength,
+            text: getCompressionPrompt(
+              calculateCharacterLimit(
+                originalTokenCount,
+                limit,
+                historyCharacterLength,
+              ),
             ),
-          ),
-        },
+          },
         },
       },
       prompt_id,

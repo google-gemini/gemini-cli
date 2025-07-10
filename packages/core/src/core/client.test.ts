@@ -13,7 +13,8 @@ import {
   GenerateContentResponse,
   GoogleGenAI,
 } from '@google/genai';
-import { findIndexAfterFraction,
+import {
+  findIndexAfterFraction,
   calculateCharacterLimit,
   COMPRESSION_LIMIT_THRESHOLD,
   GeminiClient,
