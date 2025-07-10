@@ -17,8 +17,20 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { Config } from '../config/config.js'; // Import Config
 
-export function getCoreSystemPrompt(userMemory?: string): string {
+export function getCoreSystemPrompt(userMemory?: string, config?: Config): string {
+  const currentPersona = config?.getCurrentPersona();
+  if (currentPersona) {
+    // If a persona is active, its prompt takes precedence
+    const personaPrompt = currentPersona.prompt;
+    const memorySuffix =
+      userMemory && userMemory.trim().length > 0
+        ? `\n\n---\n\n${userMemory.trim()}`
+        : '';
+    return `${personaPrompt}${memorySuffix}`;
+  }
+
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
