@@ -10,7 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stringify as stringifyYaml } from 'yaml';
-import { PROMPTS_DIRECTORY_NAME, loadPrompts } from './prompt.js';
+import { PROMPTS_DIRECTORY_NAME, loadPromptsFromFiles } from './prompt-file.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -20,7 +20,7 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-describe('loadPrompts', () => {
+describe('loadPromptsFromFiles', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;
 
@@ -50,7 +50,7 @@ describe('loadPrompts', () => {
       'controller',
       'Generates a new nestjs controller',
       'class {{name}}Controller extends Controller {}',
-      [{ name: 'name', type: 'string', required: true }],
+      [{ name: 'name' }],
     );
     createPrompt(
       workspaceExtensionsDir,
@@ -59,7 +59,7 @@ describe('loadPrompts', () => {
       'class TestModule extends OnInit {}',
     );
 
-    const prompts = loadPrompts(tempWorkspaceDir);
+    const prompts = loadPromptsFromFiles(tempWorkspaceDir);
 
     expect(prompts).toHaveLength(2);
     const p1 = prompts.find((p) => p.id === 'controller');

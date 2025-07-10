@@ -121,7 +121,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
-  prompts?: PromptFromFile[];
+  promptsFromFiles?: PromptFromFile[];
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
@@ -161,7 +161,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
-  private readonly prompts: PromptFromFile[] | undefined;
+  private readonly promptsFromFiles: PromptFromFile[] | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
@@ -203,7 +203,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
-    this.prompts = params.prompts;
+    this.promptsFromFiles = params.promptsFromFiles;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
@@ -373,7 +373,7 @@ export class Config {
   }
 
   getPromptsFromFiles(): PromptFromFile[] | undefined {
-    return this.prompts;
+    return this.promptsFromFiles;
   }
 
   getUserMemory(): string {

@@ -106,7 +106,7 @@ describe('useSlashCommandProcessor', () => {
   let mockSetShowHelp: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
-  let mockOpenPromptsDialog: ReturnType<typeof vi.fn>;
+  let mockOpenPromptFromFilesDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
@@ -138,7 +138,7 @@ describe('useSlashCommandProcessor', () => {
     mockSetShowHelp = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
-    mockOpenPromptsDialog = vi.fn();
+    mockOpenPromptFromFilesDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
     mockOpenEditorDialog = vi.fn();
     mockSetQuittingMessages = vi.fn();
@@ -198,7 +198,7 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockOpenAuthDialog,
         mockOpenEditorDialog,
-        mockOpenPromptsDialog,
+        mockOpenPromptFromFilesDialog,
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
@@ -309,7 +309,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockOpenPromptsDialog,
+          mockOpenPromptFromFilesDialog,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,

@@ -75,7 +75,7 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
-  openPromptsDialog: () => void,
+  openPromptFilesDialog: () => void,
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
@@ -918,7 +918,7 @@ export const useSlashCommandProcessor = (
         action: async (_mainCommand, _subCommand, _args) => {
           const prompts = config?.getPromptsFromFiles() ?? [];
           if (prompts.length > 0) {
-            openPromptsDialog();
+            openPromptFilesDialog();
           } else {
             addMessage({
               type: MessageType.INFO,
@@ -1056,7 +1056,7 @@ export const useSlashCommandProcessor = (
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    openPromptsDialog,
+    openPromptFilesDialog,
     openPrivacyNotice,
     toggleCorgiMode,
     savedChatTags,

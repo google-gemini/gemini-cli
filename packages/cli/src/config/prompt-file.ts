@@ -12,7 +12,7 @@ import { parse as parseYaml } from 'yaml';
 
 export const PROMPTS_DIRECTORY_NAME = path.join(GEMINI_CONFIG_DIR, 'prompts');
 
-export function loadPrompts(workspaceDir: string): PromptFromFile[] {
+export function loadPromptsFromFiles(workspaceDir: string): PromptFromFile[] {
   const allPrompts = [
     ...loadPromptsFromDir(workspaceDir),
     ...loadPromptsFromDir(os.homedir()),

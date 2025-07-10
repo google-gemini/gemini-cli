@@ -39,7 +39,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
-import { loadPrompts } from './config/prompt.js';
+import { loadPromptsFromFiles } from './config/prompt-file.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -103,11 +103,11 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const prompts = loadPrompts(workspaceRoot);
+  const promptFiles = loadPromptsFromFiles(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
     extensions,
-    prompts,
+    promptFiles,
     sessionId,
   );
 
@@ -217,7 +217,7 @@ export async function main() {
   const nonInteractiveConfig = await loadNonInteractiveConfig(
     config,
     extensions,
-    prompts,
+    promptFiles,
     settings,
   );
 
@@ -258,7 +258,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
-  prompts: PromptFromFile[],
+  promptsFromFiles: PromptFromFile[],
   settings: LoadedSettings,
 ) {
   let finalConfig = config;
@@ -282,7 +282,7 @@ async function loadNonInteractiveConfig(
     finalConfig = await loadCliConfig(
       nonInteractiveSettings,
       extensions,
-      prompts,
+      promptsFromFiles,
       config.getSessionId(),
     );
     await finalConfig.initialize();
