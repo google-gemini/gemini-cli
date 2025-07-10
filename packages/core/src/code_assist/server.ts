@@ -31,7 +31,23 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import { PassThrough } from 'node:stream';
+import { Readable } from 'node:stream';
+
+interface ErrorData {
+  error?: {
+    message?: string;
+  };
+}
+
+interface GaxiosResponse {
+  status: number;
+  data: unknown;
+}
+
+interface StreamError extends Error {
+  status?: number;
+  response?: GaxiosResponse;
+}
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -39,7 +55,6 @@ export interface HttpOptions {
   headers?: Record<string, string>;
 }
 
-// TODO: Use production endpoint once it supports our methods.
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
@@ -178,8 +193,45 @@ export class CodeAssistServer implements ContentGenerator {
     });
 
     return (async function* (): AsyncGenerator<T> {
+      // Convert ReadableStream to Node.js stream if needed
+      let nodeStream: NodeJS.ReadableStream;
+
+      if (res.data instanceof ReadableStream) {
+        // Convert Web ReadableStream to Node.js Readable stream
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nodeStream = Readable.fromWeb(res.data as any);
+      } else if (
+        res.data &&
+        typeof (res.data as NodeJS.ReadableStream).on === 'function'
+      ) {
+        // Already a Node.js stream
+        nodeStream = res.data as NodeJS.ReadableStream;
+      } else {
+        // If res.data is not a stream, it might be an error response
+        // Try to extract error information from the response
+        let errorMessage =
+          'Response data is not a readable stream. This may indicate a server error or quota issue.';
+
+        if (res.data && typeof res.data === 'object') {
+          // Check if this is an error response with error details
+          const errorData = res.data as ErrorData;
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          }
+        }
+
+        // Create an error that looks like a quota error if it contains quota information
+        const error: StreamError = new Error(errorMessage);
+        // Add status and response properties so it can be properly handled by retry logic
+        error.status = res.status;
+        error.response = res;
+        throw error;
+      }
+
       const rl = readline.createInterface({
-        input: res.data as PassThrough,
+        input: nodeStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
