@@ -1,3 +1,8 @@
+# Example Proxy Script
+
+The following is an example of a proxy script that can be used with the `GEMINI_SANDBOX_PROXY_COMMAND` environment variable. This script only allows `HTTPS` connections to `example.com:443` and declines all other requests.
+
+```javascript
 #!/usr/bin/env node
 
 /**
@@ -73,3 +78,4 @@ server.listen(PROXY_PORT, () => {
     `[PROXY] Allowing HTTPS connections to domains: ${ALLOWED_DOMAINS.join(', ')}`,
   );
 });
+```
