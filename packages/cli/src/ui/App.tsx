@@ -44,7 +44,7 @@ import { Help } from './components/Help.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
-import { PromptsDialog } from './components/prompts-dialog/PromptsDialog.js';
+import { PromptsFromFilesDialog } from './components/PromptsFromFilesDialog.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
@@ -68,7 +68,7 @@ import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useLogger } from './hooks/useLogger.js';
-import { usePromptsCommand } from './hooks/usePromptsCommand.js';
+import { usePromptsFromFilesCommand } from './hooks/usePromptsFromFilesCommand.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import {
@@ -167,8 +167,11 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
 
-  const { isPromptsDialogOpen, openPromptsDialog, closePromptsDialog } =
-    usePromptsCommand();
+  const {
+    isPromptsFromFilesDialogOpen,
+    openPromptsFromFilesDialog,
+    closePromptsFromFilesDialog,
+  } = usePromptsFromFilesCommand();
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -346,7 +349,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    openPromptsDialog,
+    openPromptsFromFilesDialog,
     toggleCorgiMode,
     showToolDescriptions,
     setQuittingMessages,
@@ -616,10 +619,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   const handlePromptsSubmit = useCallback(
     (query: string) => {
-      closePromptsDialog();
+      closePromptsFromFilesDialog();
       handleFinalSubmit(query);
     },
-    [closePromptsDialog, handleFinalSubmit],
+    [closePromptsFromFilesDialog, handleFinalSubmit],
   );
 
   if (quittingMessages) {
@@ -758,12 +761,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                 initialErrorMessage={authError}
               />
             </Box>
-          ) : isPromptsDialogOpen ? (
+          ) : isPromptsFromFilesDialogOpen ? (
             <Box flexDirection="column">
-              <PromptsDialog
+              <PromptsFromFilesDialog
                 onSubmit={handlePromptsSubmit}
                 config={config}
-                onEscape={closePromptsDialog}
+                onEscape={closePromptsFromFilesDialog}
               />
             </Box>
           ) : isEditorDialogOpen ? (

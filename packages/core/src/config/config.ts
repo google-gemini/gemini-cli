@@ -12,7 +12,7 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { PredefinedPrompt } from '../core/prompts.js';
+import { PromptFromFile } from '../core/prompts.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
@@ -121,7 +121,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
-  prompts?: PredefinedPrompt[];
+  prompts?: PromptFromFile[];
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
@@ -161,7 +161,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
-  private readonly prompts: PredefinedPrompt[] | undefined;
+  private readonly prompts: PromptFromFile[] | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
@@ -372,7 +372,7 @@ export class Config {
     return this.mcpServers;
   }
 
-  getPredefinedPrompts(): PredefinedPrompt[] | undefined {
+  getPromptsFromFiles(): PromptFromFile[] | undefined {
     return this.prompts;
   }
 

@@ -1,21 +1,15 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import {
-  PredefinedPrompt,
-  PredefinedPromptVariable,
+  PromptFromFile,
+  PromptFromFileVariable,
 } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
-import { UncontrolledTextInput } from 'ink-text-input';
+import { UncontrolledTextInput } from 'ink-text-input'; // You'll need to install 'ink-text-input'
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Colors } from '../../colors.js';
-import { renderTemplate } from '../../../utils/template.js';
+import { renderTemplate } from '../../utils/template.js';
+import { Colors } from '../colors.js';
 
 interface Props {
-  prompt: PredefinedPrompt;
+  prompt: PromptFromFile;
   onSubmit: (query: string) => void;
   setErrorMessage: (message: string | null) => void;
 }
@@ -25,7 +19,11 @@ interface InputValue {
   value: string;
 }
 
-export function PromptItem({ prompt, onSubmit, setErrorMessage }: Props) {
+export function PromptFromFileItemDisplay({
+  prompt,
+  onSubmit,
+  setErrorMessage,
+}: Props) {
   const variables = useMemo(() => prompt.variables || [], [prompt.variables]);
 
   const [inputValues, setInputValues] = useState<InputValue[]>([]);
@@ -82,7 +80,7 @@ export function PromptItem({ prompt, onSubmit, setErrorMessage }: Props) {
   );
 
   const renderVariable = useCallback(
-    (variable: PredefinedPromptVariable, index: number) => {
+    (variable: PromptFromFileVariable, index: number) => {
       if (index > currentStep) {
         return null;
       }

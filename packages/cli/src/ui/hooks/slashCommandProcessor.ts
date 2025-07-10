@@ -915,7 +915,7 @@ export const useSlashCommandProcessor = (
         name: 'prompts',
         description: 'Select a predefined prompt',
         action: async (_mainCommand, _subCommand, _args) => {
-          const prompts = config?.getPredefinedPrompts() ?? [];
+          const prompts = config?.getPromptsFromFiles() ?? [];
           if (prompts.length > 0) {
             openPromptsDialog();
           } else {

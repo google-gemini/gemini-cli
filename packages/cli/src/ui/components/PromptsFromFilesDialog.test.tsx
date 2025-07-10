@@ -4,18 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Config,
-  PredefinedPrompt,
-  PredefinedPromptVariable,
-} from '@google/gemini-cli-core';
+import { Config, PromptFromFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
 import { render } from 'ink-testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PromptsDialog } from './PromptsDialog.js';
+import { PromptsFromFilesDialog } from './PromptsFromFilesDialog.js';
 
 // Mock RadioButtonSelect component
-vi.mock('../shared/RadioButtonSelect.js', () => ({
+vi.mock('./shared/RadioButtonSelect.js', () => ({
   RadioButtonSelect: ({
     items,
     onSelect,
@@ -34,13 +30,13 @@ vi.mock('../shared/RadioButtonSelect.js', () => ({
 }));
 
 // Mock PromptItem component
-vi.mock('./PromptItem.js', () => ({
-  PromptItem: ({
+vi.mock('./PromptFromFileItemDisplay.js', () => ({
+  PromptFromFileItemDisplay: ({
     prompt,
     onSubmit,
     setErrorMessage,
   }: {
-    prompt: PredefinedPrompt;
+    prompt: PromptFromFile;
     onSubmit: (query: string) => void;
     setErrorMessage: (error: string | null) => void;
   }) => {
@@ -60,14 +56,14 @@ declare global {
     | undefined;
   var mockPromptItem:
     | {
-        prompt: PredefinedPrompt;
+        prompt: PromptFromFile;
         onSubmit: (query: string) => void;
         setErrorMessage: (error: string | null) => void;
       }
     | undefined;
 }
 
-describe('PromptsDialog', () => {
+describe('PromptsFromFilesDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const mockOnSubmit = vi.fn();
@@ -83,17 +79,17 @@ describe('PromptsDialog', () => {
     vi.clearAllMocks();
   });
 
-  const createMockConfig = (prompts: PredefinedPrompt[]): Config =>
+  const createMockConfig = (prompts: PromptFromFile[]): Config =>
     ({
-      getPredefinedPrompts: () => prompts,
+      getPromptsFromFiles: () => prompts,
     }) as Config;
 
   const createPrompt = (
     id: string,
     name: string,
     template: string,
-    variables?: PredefinedPromptVariable[],
-  ): PredefinedPrompt => ({
+    variables?: PromptFromFile[],
+  ): PromptFromFile => ({
     id,
     name,
     template,
@@ -108,7 +104,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -127,7 +123,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig([]);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -148,7 +144,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -180,7 +176,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -207,7 +203,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -238,7 +234,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig([]);
 
     const { stdin } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -258,7 +254,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig([]);
 
     const { stdin } = render(
-      <PromptsDialog config={config} onSubmit={mockOnSubmit} />,
+      <PromptsFromFilesDialog config={config} onSubmit={mockOnSubmit} />,
     );
 
     await wait();
@@ -276,7 +272,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -308,7 +304,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -339,7 +335,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -367,7 +363,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -396,11 +392,11 @@ describe('PromptsDialog', () => {
 
   it('should handle config with null prompts', () => {
     const config = {
-      getPredefinedPrompts: () => null,
+      getPromptsFromFiles: () => null,
     } as unknown as Config;
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}
@@ -423,7 +419,7 @@ describe('PromptsDialog', () => {
     const config = createMockConfig(prompts);
 
     const { lastFrame } = render(
-      <PromptsDialog
+      <PromptsFromFilesDialog
         config={config}
         onSubmit={mockOnSubmit}
         onEscape={mockOnEscape}

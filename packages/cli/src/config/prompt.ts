@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PredefinedPrompt } from '@google/gemini-cli-core';
+import { PromptFromFile } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -12,13 +12,13 @@ import { parse as parseYaml } from 'yaml';
 
 export const PROMPTS_DIRECTORY_NAME = path.join('.gemini', 'prompts');
 
-export function loadPrompts(workspaceDir: string): PredefinedPrompt[] {
+export function loadPrompts(workspaceDir: string): PromptFromFile[] {
   const allPrompts = [
     ...loadPromptsFromDir(workspaceDir),
     ...loadPromptsFromDir(os.homedir()),
   ];
 
-  const uniquePrompts: PredefinedPrompt[] = [];
+  const uniquePrompts: PromptFromFile[] = [];
   const seenIds = new Set<string>();
   for (const prompt of allPrompts) {
     if (!seenIds.has(prompt.id)) {
@@ -30,13 +30,13 @@ export function loadPrompts(workspaceDir: string): PredefinedPrompt[] {
   return uniquePrompts;
 }
 
-function loadPromptsFromDir(dir: string): PredefinedPrompt[] {
+function loadPromptsFromDir(dir: string): PromptFromFile[] {
   const promptsDir = path.join(dir, PROMPTS_DIRECTORY_NAME);
   if (!fs.existsSync(promptsDir)) {
     return [];
   }
 
-  const prompts: PredefinedPrompt[] = [];
+  const prompts: PromptFromFile[] = [];
   for (const relativePromptPath of fs.readdirSync(promptsDir)) {
     const absolutPromptPath = path.join(promptsDir, relativePromptPath);
     const prompt = loadPrompt(absolutPromptPath);
@@ -47,7 +47,7 @@ function loadPromptsFromDir(dir: string): PredefinedPrompt[] {
   return prompts;
 }
 
-function loadPrompt(promptPath: string): PredefinedPrompt | null {
+function loadPrompt(promptPath: string): PromptFromFile | null {
   try {
     const content = fs.readFileSync(promptPath, 'utf-8');
     const config = parseYaml(content);

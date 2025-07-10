@@ -5,15 +5,15 @@
  */
 
 import {
-  PredefinedPrompt,
-  PredefinedPromptVariable,
+  PromptFromFile,
+  PromptFromFileVariable,
 } from '@google/gemini-cli-core';
 import { render } from 'ink-testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PromptItem } from './PromptItem.js';
+import { PromptFromFileItemDisplay as PromptFromFileItem } from './PromptFromFileItemDisplay.js';
 
 // Mock the renderTemplate function
-vi.mock('../../../utils/template.js', () => ({
+vi.mock('../../utils/template.js', () => ({
   renderTemplate: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ vi.mock('ink-text-input', () => ({
 // Mock console.error to avoid noise in tests
 const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-describe('PromptItem', () => {
+describe('PromptFromFileItem', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const mockOnSubmit = vi.fn();
@@ -57,8 +57,8 @@ describe('PromptItem', () => {
     id: string,
     name: string,
     template: string,
-    variables?: PredefinedPromptVariable[],
-  ): PredefinedPrompt => ({
+    variables?: PromptFromFileVariable[],
+  ): PromptFromFile => ({
     id,
     name,
     template,
@@ -71,7 +71,7 @@ describe('PromptItem', () => {
     ]);
 
     const { lastFrame } = render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -86,7 +86,7 @@ describe('PromptItem', () => {
     const prompt = createPrompt('id', 'No Variables', 'Static template');
 
     const { lastFrame } = render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -101,7 +101,7 @@ describe('PromptItem', () => {
   });
 
   it('should handle single variable input', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
     const prompt = createPrompt('id', 'Single Variable', 'Hello {{name}}!', [
@@ -109,7 +109,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -132,7 +132,7 @@ describe('PromptItem', () => {
   });
 
   it('should handle multiple variables sequentially', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue(
       'class UserController extends Controller {}',
     );
@@ -145,7 +145,7 @@ describe('PromptItem', () => {
     );
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -184,7 +184,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -208,7 +208,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -227,7 +227,7 @@ describe('PromptItem', () => {
   });
 
   it('should trim input values', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello John!');
 
     const prompt = createPrompt('id', 'Trim Test', 'Hello {{name}}!', [
@@ -235,7 +235,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -256,7 +256,7 @@ describe('PromptItem', () => {
   });
 
   it('should handle template rendering errors', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockImplementation(() => {
       throw new Error('Template rendering failed');
     });
@@ -266,7 +266,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -291,7 +291,7 @@ describe('PromptItem', () => {
   });
 
   it('should handle prompt with undefined variables', async () => {
-    const prompt: PredefinedPrompt = {
+    const prompt: PromptFromFile = {
       id: 'test',
       name: 'Undefined Variables',
       template: 'Static content',
@@ -299,7 +299,7 @@ describe('PromptItem', () => {
     };
 
     const { lastFrame } = render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -314,7 +314,7 @@ describe('PromptItem', () => {
   });
 
   it('should show completion message when all variables are filled', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Complete template');
 
     const prompt = createPrompt('id', 'Completion Test', 'Hello {{name}}!', [
@@ -322,7 +322,7 @@ describe('PromptItem', () => {
     ]);
 
     const { lastFrame } = render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -341,7 +341,7 @@ describe('PromptItem', () => {
   });
 
   it('should clear error message on successful input', async () => {
-    const { renderTemplate } = await import('../../../utils/template.js');
+    const { renderTemplate } = await import('../../utils/template.js');
     vi.mocked(renderTemplate).mockReturnValue('Hello ValidName!');
 
     const prompt = createPrompt('id', 'Error Clear Test', 'Hello {{name}}!', [
@@ -349,7 +349,7 @@ describe('PromptItem', () => {
     ]);
 
     render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}
@@ -382,7 +382,7 @@ describe('PromptItem', () => {
     );
 
     const { lastFrame } = render(
-      <PromptItem
+      <PromptFromFileItem
         prompt={prompt}
         onSubmit={mockOnSubmit}
         setErrorMessage={mockSetErrorMessage}

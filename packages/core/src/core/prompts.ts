@@ -18,14 +18,14 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
-export interface PredefinedPrompt {
+export interface PromptFromFile {
   id: string;
   name: string;
-  variables?: PredefinedPromptVariable[];
+  variables?: PromptFromFileVariable[];
   template: string;
 }
 
-export interface PredefinedPromptVariable {
+export interface PromptFromFileVariable {
   name: string;
   description?: string;
 }

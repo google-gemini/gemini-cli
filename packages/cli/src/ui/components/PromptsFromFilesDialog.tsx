@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config, PromptFromFile } from '@google/gemini-cli-core';
 import { Box, Text, useInput } from 'ink';
-import React, { useState, useMemo } from 'react';
-import { Colors } from '../../colors.js';
-import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
-import { PromptItem } from './PromptItem.js';
 import TextInput from 'ink-text-input'; // You'll need to install 'ink-text-input'
-import { Config, PredefinedPrompt } from '@google/gemini-cli-core';
+import React, { useMemo, useState } from 'react';
+import { Colors } from '../colors.js';
+import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { PromptFromFileItemDisplay as PromptFromFileItem } from './PromptFromFileItemDisplay.js';
 
 interface PromptsDialogProps {
   config: Config;
@@ -18,18 +18,18 @@ interface PromptsDialogProps {
   onEscape?: () => void;
 }
 
-export function PromptsDialog({
+export function PromptsFromFilesDialog({
   config,
   onSubmit,
   onEscape,
 }: PromptsDialogProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPrompt, setSelectedPrompt] = useState<PredefinedPrompt | null>(
+  const [selectedPrompt, setSelectedPrompt] = useState<PromptFromFile | null>(
     null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const prompts = useMemo(() => config.getPredefinedPrompts() || [], [config]);
+  const prompts = useMemo(() => config.getPromptsFromFiles() || [], [config]);
 
   const filteredItems = useMemo(
     () =>
@@ -75,7 +75,7 @@ export function PromptsDialog({
 
   if (selectedPrompt) {
     return (
-      <PromptItem
+      <PromptFromFileItem
         prompt={selectedPrompt}
         onSubmit={handleSubmit}
         setErrorMessage={setErrorMessage}

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PredefinedPromptVariable } from '@google/gemini-cli-core';
+import { PromptFromFileVariable } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -79,7 +79,7 @@ function createPrompt(
   id: string,
   name: string,
   template: string,
-  variables?: PredefinedPromptVariable[],
+  variables?: PromptFromFileVariable[],
 ): void {
   const promptPath = path.join(promptsDir, `${name}.yaml`);
   fs.writeFileSync(

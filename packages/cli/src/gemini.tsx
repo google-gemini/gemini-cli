@@ -35,7 +35,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
-  PredefinedPrompt,
+  PromptFromFile,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -258,7 +258,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
-  prompts: PredefinedPrompt[],
+  prompts: PromptFromFile[],
   settings: LoadedSettings,
 ) {
   let finalConfig = config;
