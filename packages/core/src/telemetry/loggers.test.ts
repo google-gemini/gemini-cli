@@ -127,7 +127,12 @@ describe('loggers', () => {
     } as unknown as Config;
 
     it('should log a user prompt', () => {
-      const event = new UserPromptEvent(11, 'prompt-id-8', 'test-prompt');
+      const event = new UserPromptEvent(
+        11,
+        'prompt-id-8',
+        AuthType.USE_VERTEX_AI,
+        'test-prompt',
+      );
 
       logUserPrompt(mockConfig, event);
 
@@ -202,6 +207,7 @@ describe('loggers', () => {
         'test-model',
         100,
         'prompt-id-1',
+        AuthType.LOGIN_WITH_GOOGLE,
         usageData,
         'test-response',
       );
@@ -226,6 +232,7 @@ describe('loggers', () => {
           total_token_count: 0,
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
+          auth_type: 'oauth-personal',
         },
       });
 
@@ -263,6 +270,7 @@ describe('loggers', () => {
         'test-model',
         100,
         'prompt-id-1',
+        AuthType.USE_GEMINI,
         usageData,
         'test-response',
         'test-error',

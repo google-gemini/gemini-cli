@@ -202,6 +202,7 @@ export async function main() {
     'event.timestamp': new Date().toISOString(),
     prompt: input,
     prompt_id,
+    auth_type: config.getContentGeneratorConfig().authType!,
     prompt_length: input.length,
   });
 
