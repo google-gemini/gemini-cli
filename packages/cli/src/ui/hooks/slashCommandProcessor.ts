@@ -250,11 +250,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'auth',
-        description: 'change the auth method',
-        action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
-      },
-      {
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
@@ -1035,7 +1030,6 @@ export const useSlashCommandProcessor = (
   }, [
     addMessage,
     openThemeDialog,
-    openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
     toggleCorgiMode,
@@ -1132,6 +1126,9 @@ export const useSlashCommandProcessor = (
                 switch (result.dialog) {
                   case 'help':
                     setShowHelp(true);
+                    return { type: 'handled' };
+                  case 'auth':
+                    openAuthDialog();
                     return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
