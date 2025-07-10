@@ -8,7 +8,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useKeypress, Key } from './useKeypress.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
-import readline from 'readline';
 import { PassThrough } from 'stream';
 
 // Mock the 'ink' module to control stdin
