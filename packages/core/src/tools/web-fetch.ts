@@ -98,10 +98,15 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.host === 'github.com' && url.includes('/blob/')) {
+        url = url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+      }
+    } catch (error) {
+      throw new Error(`Invalid URL: ${url}`);
     }
 
     try {
