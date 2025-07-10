@@ -156,7 +156,11 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
       } as unknown as Config;
-      const event = new UserPromptEvent(11, 'test-prompt');
+      const event = new UserPromptEvent(
+        11,
+        'test-prompt',
+        AuthType.CLOUD_SHELL,
+      );
 
       logUserPrompt(mockConfig, event);
 
