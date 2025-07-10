@@ -505,12 +505,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       }
 
       if (trimmedValue.length > 0) {
-        if (streamingState === StreamingState.Idle && !isSubmittingRef.current) {
-          // If idle and not already submitting, submit immediately.
+        if (
+          streamingState === StreamingState.Idle &&
+          !isSubmittingRef.current
+        ) {
           isSubmittingRef.current = true;
           submitQuery(trimmedValue);
         } else {
-          // Otherwise, queue the input.
           setQueuedInput(trimmedValue);
         }
       }
@@ -557,19 +558,17 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputVisible = !initError; // Always show input unless there's an error
+  const isInputVisible = !initError;
 
-  // Process queued input when AI becomes idle
   useEffect(() => {
     if (streamingState === StreamingState.Idle && queuedInput && !initError) {
-      isSubmittingRef.current = true; // Set lock before submitting
+      isSubmittingRef.current = true;
       const inputToSubmit = queuedInput;
       setQueuedInput(null);
       submitQuery(inputToSubmit);
     }
   }, [streamingState, queuedInput, initError, submitQuery]);
 
-  // Reset submission lock when streaming is finished.
   useEffect(() => {
     if (streamingState === StreamingState.Idle) {
       isSubmittingRef.current = false;
