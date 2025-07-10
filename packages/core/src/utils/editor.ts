@@ -181,8 +181,8 @@ export async function openDiff(
       case 'vim':
       case 'neovim': {
         // Use execSync for terminal-based editors
-        const args = diffCommand.args;
-        execFileSync(diffCommand.command, args, {
+
+        execSync(`${diffCommand.command} ${diffCommand.args.join(' ')}`, {
           stdio: 'inherit',
           encoding: 'utf8',
         });

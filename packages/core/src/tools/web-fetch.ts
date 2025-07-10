@@ -105,7 +105,7 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
           .replace('github.com', 'raw.githubusercontent.com')
           .replace('/blob/', '/');
       }
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`Invalid URL: ${url}`);
     }
 
@@ -143,8 +143,8 @@ ${textContent}
         llmContent: resultText,
         returnDisplay: `Content for ${url} processed using fallback fetch.`,
       };
-    } catch (e) {
-      const error = e as Error;
+    } catch (_e) {
+      const error = _e as Error;
       const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
       return {
         llmContent: `Error: ${errorMessage}`,
@@ -200,7 +200,7 @@ ${textContent}
             .replace('github.com', 'raw.githubusercontent.com')
             .replace('/blob/', '/');
         }
-      } catch (e) {
+      } catch (_e) {
         // If URL parsing fails, ignore this URL
         console.error(`Invalid URL encountered: ${url}`);
       }
