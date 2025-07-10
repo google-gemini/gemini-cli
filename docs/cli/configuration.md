@@ -136,11 +136,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       },
       "myDockerServer": {
         "command": "docker",
-        "args": ["run", "i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
+        "args": ["run", "-i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
-      },
+      }
     }
     ```
 
