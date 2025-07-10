@@ -9,12 +9,13 @@ Configuration is applied in the following order of precedence (lower numbers are
 1.  **Default values:** Hardcoded defaults within the application.
 2.  **User settings file:** Global settings for the current user.
 3.  **Project settings file:** Project-specific settings.
-4.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
-5.  **Command-line arguments:** Values passed when launching the CLI.
+4.  **System settings file:** System-wide settings.
+5.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
+6.  **Command-line arguments:** Values passed when launching the CLI.
 
-## The user settings file and project settings file
+## Settings files
 
-Gemini CLI uses `settings.json` files for persistent configuration. There are two locations for these files:
+Gemini CLI uses `settings.json` files for persistent configuration. There are three locations for these files:
 
 - **User settings file:**
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
@@ -22,6 +23,9 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are tw
 - **Project settings file:**
   - **Location:** `.gemini/settings.json` within your project's root directory.
   - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user settings.
+- **System settings file:**
+  - **Location:** `/etc/gemini-cli/settings.json` (Linux), `C:\ProgramData\gemini-cli\settings.json` (Windows) or `/Library/Application Support/GeminiCli/settings.json` (macOS).
+  - **Scope:** Applies to all Gemini CLI sessions on the system, for all users. System settings override user and project settings. May be useful for system administrators at enterprises to have controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
@@ -242,12 +246,13 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
-  - Ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+  - Ensure you have the necessary permissions.
   - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.
-  - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+  - If using Vertex AI, ensure you have the necessary permissions in this project.
+  - **Cloud Shell Note:** When running in a Cloud Shell environment, this variable defaults to a special project allocated for Cloud Shell users. If you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud Shell, it will be overridden by this default. To use a different project in Cloud Shell, you must define `GOOGLE_CLOUD_PROJECT` in a `.env` file.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
@@ -258,7 +263,6 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non express mode.
-  - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
@@ -291,13 +295,13 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
-- **`--debug_mode`** (**`-d`**):
+- **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all_files`** (**`-a`**):
+- **`--all-files`** (**`-a`**):
   - If set, recursively includes all files within the current directory as context for the prompt.
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--show_memory_usage`**:
+- **`--show-memory-usage`**:
   - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
@@ -311,6 +315,12 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
   - Enables [checkpointing](./commands.md#checkpointing-commands).
+- **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
+  - Specifies a list of extensions to use for the session. If not provided, all available extensions are used.
+  - Use the special term `gemini -e none` to disable all extensions.
+  - Example: `gemini -e my-extension -e my-other-extension`
+- **`--list-extensions`** (**`-l`**):
+  - Lists all available extensions and exits.
 - **`--version`**:
   - Displays the version of the CLI.
 
@@ -332,7 +342,7 @@ Here's a conceptual example of what a context file at the root of a TypeScript p
 - When generating new TypeScript code, please follow the existing coding style.
 - Ensure all new functions and classes have JSDoc comments.
 - Prefer functional programming paradigms where appropriate.
-- All code should be compatible with TypeScript 5.0 and Node.js 18+.
+- All code should be compatible with TypeScript 5.0 and Node.js 20+.
 
 ## Coding Style:
 
@@ -364,7 +374,7 @@ This example demonstrates how you can provide general project context, specific 
       - Scope: Provides context relevant to the entire project or a significant portion of it.
   3.  **Sub-directory Context Files (Contextual/Local):**
       - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
-      - Scope: Allows for highly specific instructions relevant to a particular component, module, or sub-section of your project.
+      - Scope: Allows for highly specific instructions relevant to a particular component, module, or subsection of your project.
 - **Concatenation & UI Indication:** The contents of all found context files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded context files, giving you a quick visual cue about the active instructional context.
 - **Commands for Memory Management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
