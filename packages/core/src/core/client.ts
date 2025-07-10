@@ -264,7 +264,10 @@ export class GeminiClient {
       // Ensure the contentGenerator is using the potentially updated model from persona
       const contentGeneratorConfig = this.config.getContentGeneratorConfig();
       if (contentGeneratorConfig.model !== model) {
-         await this.initialize({ ...contentGeneratorConfig, model });
+        this.contentGenerator = await createContentGenerator(
+          { ...contentGeneratorConfig, model },
+          this.config.getSessionId(),
+        );
       }
 
 
