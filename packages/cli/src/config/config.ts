@@ -261,6 +261,12 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const argv = await parseArguments();
 
+  const debugMode =
+    argv.debug ||
+    [process.env.DEBUG, process.env.DEBUG_MODE].some(
+      (v) => v === 'true' || v === '1',
+    );
+
   let personas: Persona[] = [];
   try {
     const personasPath = path.join(
@@ -286,12 +292,6 @@ export async function loadCliConfig(
       logger.warn(`Persona "${selectedPersonaName}" not found. Using default.`);
     }
   }
-
-  const debugMode =
-    argv.debug ||
-    [process.env.DEBUG, process.env.DEBUG_MODE].some(
-      (v) => v === 'true' || v === '1',
-    );
 
   const activeExtensions = filterActiveExtensions(
     extensions,
