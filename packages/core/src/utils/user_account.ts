@@ -73,6 +73,29 @@ export function getCachedGoogleAccount(): string | null {
   }
 }
 
+export function getLifetimeGoogleAccounts(): number {
+  try {
+    const filePath = getGoogleAccountsCachePath();
+    if (!existsSync(filePath)) {
+      return 0;
+    }
+
+    const content = readFileSync(filePath, 'utf-8').trim();
+    if (!content) {
+      return 0;
+    }
+    const accounts: UserAccounts = JSON.parse(content);
+    let count = accounts.old.length;
+    if (accounts.active) {
+      count++;
+    }
+    return count;
+  } catch (error) {
+    console.debug('Error reading lifetime Google Accounts:', error);
+    return 0;
+  }
+}
+
 export async function clearCachedGoogleAccount(): Promise<void> {
   const filePath = getGoogleAccountsCachePath();
   if (!existsSync(filePath)) {
