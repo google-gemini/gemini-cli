@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient, getCachedGoogleAccountId } from './oauth2.js';
+import { getOauthClient } from './oauth2.js';
+import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -84,7 +85,9 @@ describe('oauth2', () => {
     // Mock the UserInfo API response
     (global.fetch as Mock).mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue({ id: 'test-google-account-id-123' }),
+      json: vi
+        .fn()
+        .mockResolvedValue({ email: 'test-google-account@gmail.com' }),
     } as unknown as Response);
 
     let requestCallback!: http.RequestListener<
@@ -150,18 +153,21 @@ describe('oauth2', () => {
     });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
-    // Verify Google Account ID was cached
-    const googleAccountIdPath = path.join(
+    // Verify Google Account was cached
+    const googleAccountPath = path.join(
       tempHomeDir,
       '.gemini',
-      'google_account_id',
+      'google_accounts.json',
     );
-    expect(fs.existsSync(googleAccountIdPath)).toBe(true);
-    const cachedGoogleAccountId = fs.readFileSync(googleAccountIdPath, 'utf-8');
-    expect(cachedGoogleAccountId).toBe('test-google-account-id-123');
+    expect(fs.existsSync(googleAccountPath)).toBe(true);
+    const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
+    expect(JSON.parse(cachedGoogleAccount)).toEqual({
+      active: 'test-google-account@gmail.com',
+      old: [],
+    });
 
-    // Verify the getCachedGoogleAccountId function works
-    expect(getCachedGoogleAccountId()).toBe('test-google-account-id-123');
+    // Verify the getCachedGoogleAccount function works
+    expect(getCachedGoogleAccount()).toBe('test-google-account@gmail.com');
   });
 
   describe('in Cloud Shell', () => {

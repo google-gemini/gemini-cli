@@ -17,10 +17,8 @@ import {
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
-import {
-  getInstallationId,
-  getGoogleAccountEmail,
-} from '../../utils/user_id.js';
+import { getInstallationId } from '../../utils/user_id.js';
+import { getCachedGoogleAccount } from '../../utils/user_account.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -67,7 +65,7 @@ export class ClearcutLogger {
     ]);
   }
 
-  async createLogEvent(name: string, data: object): Promise<object> {
+  createLogEvent(name: string, data: object): object {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const logEvent: any = {
       console_type: 'GEMINI_CLI',
@@ -76,7 +74,7 @@ export class ClearcutLogger {
       event_metadata: [data] as object[],
     };
 
-    const email = await getGoogleAccountEmail();
+    const email = getCachedGoogleAccount();
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
       logEvent.client_email = email;
@@ -85,13 +83,6 @@ export class ClearcutLogger {
     }
 
     return logEvent;
-  }
-
-  private _enqueueAndFlush(logEvent: object): void {
-    this.enqueueLogEvent(logEvent);
-    this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
-    });
   }
 
   flushIfNeeded(): void {
@@ -262,9 +253,10 @@ export class ClearcutLogger {
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
     ];
-    this.createLogEvent(start_session_event_name, data).then((logEvent) => {
-      // Flush start event immediately
-      this._enqueueAndFlush(logEvent);
+    // Flush start event immediately
+    this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -280,9 +272,8 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(new_prompt_event_name, data).then((logEvent) => {
-      this._enqueueAndFlush(logEvent);
-    });
+    this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
+    this.flushIfNeeded();
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
@@ -317,9 +308,9 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(tool_call_event_name, data).then((logEvent) => {
-      this._enqueueAndFlush(logEvent);
-    });
+    const logEvent = this.createLogEvent(tool_call_event_name, data);
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
@@ -334,9 +325,8 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(api_request_event_name, data).then((logEvent) => {
-      this._enqueueAndFlush(logEvent);
-    });
+    this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
+    this.flushIfNeeded();
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
@@ -388,9 +378,8 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(api_response_event_name, data).then((logEvent) => {
-      this._enqueueAndFlush(logEvent);
-    });
+    this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
+    this.flushIfNeeded();
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
@@ -417,9 +406,8 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(api_error_event_name, data).then((logEvent) => {
-      this._enqueueAndFlush(logEvent);
-    });
+    this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
+    this.flushIfNeeded();
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
@@ -430,9 +418,10 @@ export class ClearcutLogger {
       },
     ];
 
-    this.createLogEvent(end_session_event_name, data).then((logEvent) => {
-      // Flush immediately on session end.
-      this._enqueueAndFlush(logEvent);
+    // Flush immediately on session end.
+    this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
     });
   }
 

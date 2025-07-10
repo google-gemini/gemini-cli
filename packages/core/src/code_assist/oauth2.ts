@@ -16,10 +16,15 @@ import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
-import { promises as fs, existsSync, readFileSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import * as os from 'os';
 import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
+import {
+  cacheGoogleAccount,
+  getCachedGoogleAccount,
+  clearCachedGoogleAccount,
+} from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
 
@@ -50,8 +55,6 @@ const SIGN_IN_FAILURE_URL =
 
 const GEMINI_DIR = '.gemini';
 const CREDENTIAL_FILENAME = 'oauth_creds.json';
-const GOOGLE_ACCOUNT_ID_FILENAME = 'google_account_id';
-const GOOGLE_ACCOUNT_EMAIL_FILENAME = 'google_account_email';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -80,7 +83,7 @@ export async function getOauthClient(
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
     // Check if we need to retrieve Google Account ID or Email
-    if (!getCachedGoogleAccountId() || !getCachedGoogleAccountEmail()) {
+    if (!getCachedGoogleAccount()) {
       try {
         await fetchAndCacheUserInfo(client);
       } catch {
@@ -321,58 +324,11 @@ function getCachedCredentialPath(): string {
   return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
 }
 
-function getGoogleAccountIdCachePath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNT_ID_FILENAME);
-}
-
-async function cacheGoogleAccountId(googleAccountId: string): Promise<void> {
-  const filePath = getGoogleAccountIdCachePath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, googleAccountId, 'utf-8');
-}
-
-export function getCachedGoogleAccountId(): string | null {
-  try {
-    const filePath = getGoogleAccountIdCachePath();
-    if (existsSync(filePath)) {
-      return readFileSync(filePath, 'utf-8').trim() || null;
-    }
-    return null;
-  } catch (error) {
-    console.debug('Error reading cached Google Account ID:', error);
-    return null;
-  }
-}
-
-function getGoogleAccountEmailCachePath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNT_EMAIL_FILENAME);
-}
-
-async function cacheGoogleAccountEmail(email: string): Promise<void> {
-  const filePath = getGoogleAccountEmailCachePath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, email, 'utf-8');
-}
-
-export function getCachedGoogleAccountEmail(): string | null {
-  try {
-    const filePath = getGoogleAccountEmailCachePath();
-    if (existsSync(filePath)) {
-      return readFileSync(filePath, 'utf-8').trim() || null;
-    }
-    return null;
-  } catch (error) {
-    console.debug('Error reading cached Google Account Email:', error);
-    return null;
-  }
-}
-
 export async function clearCachedCredentialFile() {
   try {
     await fs.rm(getCachedCredentialPath(), { force: true });
     // Clear the Google Account ID cache when credentials are cleared
-    await fs.rm(getGoogleAccountIdCachePath(), { force: true });
-    await fs.rm(getGoogleAccountEmailCachePath(), { force: true });
+    await clearCachedGoogleAccount();
   } catch (_) {
     /* empty */
   }
@@ -404,11 +360,8 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     }
 
     const userInfo = await response.json();
-    if (userInfo.id) {
-      await cacheGoogleAccountId(userInfo.id);
-    }
     if (userInfo.email) {
-      await cacheGoogleAccountEmail(userInfo.email);
+      await cacheGoogleAccount(userInfo.email);
     }
   } catch (error) {
     console.error('Error retrieving user info:', error);

@@ -56,27 +56,3 @@ export function getInstallationId(): string {
     return '123456789';
   }
 }
-
-/**
- * Retrieves the email for the currently authenticated user.
- * When OAuth is available, returns the user's cached email. Otherwise, returns an empty string.
- * @returns A string email for the user (Google Account email if available, otherwise empty string).
- */
-export async function getGoogleAccountEmail(): Promise<string> {
-  // Try to get cached Google Account email first
-  try {
-    // Dynamically import to avoid circular dependencies
-    const { getCachedGoogleAccountEmail } = await import(
-      '../code_assist/oauth2.js'
-    );
-    const googleAccountEmail = getCachedGoogleAccountEmail();
-    if (googleAccountEmail) {
-      return googleAccountEmail;
-    }
-  } catch (error) {
-    // If there's any error accessing Google Account email, just return empty string
-    console.debug('Could not get cached Google Account email:', error);
-  }
-
-  return '';
-}
