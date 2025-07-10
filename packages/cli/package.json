@@ -45,6 +45,7 @@
     "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
     "mime-types": "^3.0.1",
+    "mustache": "^4.2.0",
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
@@ -53,6 +54,7 @@
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
     "update-notifier": "^7.3.1",
+    "yaml": "^2.8.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
@@ -61,6 +63,7 @@
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "@types/mustache": "^4.2.6",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

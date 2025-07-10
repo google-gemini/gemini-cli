@@ -35,9 +35,11 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  PromptFromFile,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { loadPromptsFromFiles } from './config/prompt-file.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -101,7 +103,13 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const promptFiles = loadPromptsFromFiles(workspaceRoot);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    promptFiles,
+    sessionId,
+  );
 
   if (config.getListExtensions()) {
     console.log('Installed extensions:');
@@ -209,6 +217,7 @@ export async function main() {
   const nonInteractiveConfig = await loadNonInteractiveConfig(
     config,
     extensions,
+    promptFiles,
     settings,
   );
 
@@ -249,6 +258,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
+  promptsFromFiles: PromptFromFile[],
   settings: LoadedSettings,
 ) {
   let finalConfig = config;
@@ -272,6 +282,7 @@ async function loadNonInteractiveConfig(
     finalConfig = await loadCliConfig(
       nonInteractiveSettings,
       extensions,
+      promptsFromFiles,
       config.getSessionId(),
     );
     await finalConfig.initialize();

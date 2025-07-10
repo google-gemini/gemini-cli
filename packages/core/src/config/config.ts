@@ -6,44 +6,45 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
+import { GeminiClient } from '../core/client.js';
 import {
   AuthType,
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { GlobTool } from '../tools/glob.js';
-import { EditTool } from '../tools/edit.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import {
-  MemoryTool,
-  setGeminiMdFilename,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
-} from '../tools/memoryTool.js';
-import { WebSearchTool } from '../tools/web-search.js';
-import { GeminiClient } from '../core/client.js';
+import { PromptFromFile } from '../core/prompts.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import {
+  DEFAULT_OTLP_ENDPOINT,
+  DEFAULT_TELEMETRY_TARGET,
+  initializeTelemetry,
+  StartSessionEvent,
+  TelemetryTarget,
+} from '../telemetry/index.js';
+import { EditTool } from '../tools/edit.js';
+import { GlobTool } from '../tools/glob.js';
+import { GrepTool } from '../tools/grep.js';
+import { LSTool } from '../tools/ls.js';
+import {
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
+  MemoryTool,
+  setGeminiMdFilename,
+} from '../tools/memoryTool.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { ReadManyFilesTool } from '../tools/read-many-files.js';
+import { ShellTool } from '../tools/shell.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { WebFetchTool } from '../tools/web-fetch.js';
+import { WebSearchTool } from '../tools/web-search.js';
+import { WriteFileTool } from '../tools/write-file.js';
 import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
-import {
-  initializeTelemetry,
-  DEFAULT_TELEMETRY_TARGET,
-  DEFAULT_OTLP_ENDPOINT,
-  TelemetryTarget,
-  StartSessionEvent,
-} from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -120,6 +121,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  promptsFromFiles?: PromptFromFile[];
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
@@ -159,6 +161,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly promptsFromFiles: PromptFromFile[] | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
@@ -200,6 +203,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.promptsFromFiles = params.promptsFromFiles;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
@@ -366,6 +370,10 @@ export class Config {
 
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getPromptsFromFiles(): PromptFromFile[] | undefined {
+    return this.promptsFromFiles;
   }
 
   getUserMemory(): string {

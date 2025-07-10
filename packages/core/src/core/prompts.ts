@@ -18,6 +18,18 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
+export interface PromptFromFile {
+  id: string;
+  name: string;
+  variables?: PromptFromFileVariable[];
+  template: string;
+}
+
+export interface PromptFromFileVariable {
+  name: string;
+  description?: string;
+}
+
 export function getCoreSystemPrompt(userMemory?: string): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD

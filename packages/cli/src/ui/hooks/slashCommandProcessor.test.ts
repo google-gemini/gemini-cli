@@ -53,25 +53,25 @@ vi.mock('../../utils/version.js', () => ({
   getCliVersion: (...args: []) => mockGetCliVersionFn(...args),
 }));
 
-import { act, renderHook } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
-import open from 'open';
-import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { MessageType, SlashCommandProcessorResult } from '../types.js';
 import {
   Config,
-  MCPDiscoveryState,
-  MCPServerStatus,
+  GeminiClient,
   getMCPDiscoveryState,
   getMCPServerStatus,
-  GeminiClient,
+  MCPDiscoveryState,
+  MCPServerStatus,
 } from '@google/gemini-cli-core';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import { act, renderHook } from '@testing-library/react';
+import open from 'open';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { LoadedSettings } from '../../config/settings.js';
-import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
 import { SlashCommand } from '../commands/types.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import { MessageType, SlashCommandProcessorResult } from '../types.js';
+import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(),
@@ -106,6 +106,7 @@ describe('useSlashCommandProcessor', () => {
   let mockSetShowHelp: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
+  let mockOpenPromptFromFilesDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
@@ -137,6 +138,7 @@ describe('useSlashCommandProcessor', () => {
     mockSetShowHelp = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
+    mockOpenPromptFromFilesDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
     mockOpenEditorDialog = vi.fn();
     mockSetQuittingMessages = vi.fn();
@@ -196,6 +198,7 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockOpenAuthDialog,
         mockOpenEditorDialog,
+        mockOpenPromptFromFilesDialog,
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
@@ -306,6 +309,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
+          mockOpenPromptFromFilesDialog,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,

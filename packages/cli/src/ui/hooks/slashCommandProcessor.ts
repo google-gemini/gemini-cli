@@ -4,14 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
-import { type PartListUnion } from '@google/genai';
-import open from 'open';
-import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import {
   Config,
+  GEMINI_CONFIG_DIR,
   GitService,
   Logger,
   MCPDiscoveryState,
@@ -19,26 +16,31 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
 } from '@google/gemini-cli-core';
-import { useSessionStats } from '../contexts/SessionContext.js';
-import {
-  Message,
-  MessageType,
-  HistoryItemWithoutId,
-  HistoryItem,
-  SlashCommandProcessorResult,
-} from '../types.js';
+import { type PartListUnion } from '@google/genai';
 import { promises as fs } from 'fs';
+import process from 'node:process';
+import open from 'open';
 import path from 'path';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { CommandService } from '../../services/CommandService.js';
+import { getCliVersion } from '../../utils/version.js';
 import {
   type CommandContext,
-  type SlashCommandActionReturn,
   type SlashCommand,
+  type SlashCommandActionReturn,
 } from '../commands/types.js';
-import { CommandService } from '../../services/CommandService.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  HistoryItem,
+  HistoryItemWithoutId,
+  Message,
+  MessageType,
+  SlashCommandProcessorResult,
+} from '../types.js';
+import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { useStateAndRef } from './useStateAndRef.js';
 
 // This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -73,6 +75,7 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
+  openPromptFilesDialog: () => void,
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
@@ -909,6 +912,22 @@ export const useSlashCommandProcessor = (
           setPendingCompressionItem(null);
         },
       },
+      {
+        name: 'prompts',
+        description: 'Select a prompt file',
+        action: async (_mainCommand, _subCommand, _args) => {
+          const prompts = config?.getPromptsFromFiles() ?? [];
+          if (prompts.length > 0) {
+            openPromptFilesDialog();
+          } else {
+            addMessage({
+              type: MessageType.INFO,
+              content: `No prompt files found. Please add prompt files to ${path.join(GEMINI_CONFIG_DIR, 'prompts')} or ${path.join('~', GEMINI_CONFIG_DIR, 'prompts')}.`,
+              timestamp: new Date(),
+            });
+          }
+        },
+      },
     ];
 
     if (config?.getCheckpointingEnabled()) {
@@ -1037,6 +1056,7 @@ export const useSlashCommandProcessor = (
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
+    openPromptFilesDialog,
     openPrivacyNotice,
     toggleCorgiMode,
     savedChatTags,

@@ -17,6 +17,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  PromptFromFile,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -207,6 +208,7 @@ export async function loadHierarchicalGeminiMemory(
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
+  promptsFromFiles: PromptFromFile[],
   sessionId: string,
 ): Promise<Config> {
   const argv = await parseArguments();
@@ -275,6 +277,7 @@ export async function loadCliConfig(
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
     mcpServers,
+    promptsFromFiles,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
