@@ -201,7 +201,7 @@ async function parseArguments(): Promise<CliArgs> {
       const personasPath = path.join(path.dirname(import.meta.url), 'personas.json');
       const fileContent = await fs.readFile(new URL(personasPath), 'utf-8');
       tempPersonas = JSON.parse(fileContent) as Persona[];
-    } catch { /* ignore */ }
+    } catch (error) { console.error(`[ERROR] Failed to load or parse personas.json: ${error instanceof Error ? error.message : String(error)}`); }
 
     const personaName = argv.persona || tempSettings.merged.selectedPersona;
     const personaToDescribe = tempPersonas.find(p => p.name === personaName);
