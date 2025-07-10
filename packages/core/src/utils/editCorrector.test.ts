@@ -214,6 +214,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
@@ -654,6 +656,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
