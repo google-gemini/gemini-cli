@@ -171,6 +171,49 @@ export async function main() {
       process.exit(1);
     }
   }
+  
+  // Configuration management commands
+  if (args[0] === 'config') {
+    const { handleConfigCommand } = await import('./commands/configCommands.js');
+    
+    const action = args[1];
+    const allFlags = args.slice(2);
+    
+    try {
+      const configArgs: any = {
+        action: action || 'show',
+        verbose: allFlags.includes('--verbose') || allFlags.includes('-v'),
+      };
+      
+      // Parse specific arguments based on action
+      switch (action) {
+        case 'get':
+        case 'set':
+          configArgs.key = args[2];
+          if (action === 'set') {
+            configArgs.value = args[3];
+          }
+          break;
+        case 'backend':
+          configArgs.backend = args[2];
+          break;
+        case 'fallback':
+          // Parse fallback order from remaining args
+          configArgs.order = args.slice(2).filter(arg => !arg.startsWith('--'));
+          break;
+        case 'export':
+        case 'import':
+          configArgs.file = args[2];
+          break;
+      }
+      
+      await handleConfigCommand(configArgs);
+      return;
+    } catch (error) {
+      console.error(`❌ Config command failed: ${error}`);
+      process.exit(1);
+    }
+  }
 
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
