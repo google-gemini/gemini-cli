@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   Config,
+  GEMINI_CONFIG_DIR,
   GitService,
   Logger,
   MCPDiscoveryState,
@@ -913,7 +914,7 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'prompts',
-        description: 'Select a predefined prompt',
+        description: 'Select a prompt file',
         action: async (_mainCommand, _subCommand, _args) => {
           const prompts = config?.getPromptsFromFiles() ?? [];
           if (prompts.length > 0) {
@@ -921,8 +922,7 @@ export const useSlashCommandProcessor = (
           } else {
             addMessage({
               type: MessageType.INFO,
-              content:
-                'No prompts found. Please add prompt files to ./.gemini/prompts or ~/.gemini/prompts.',
+              content: `No prompt files found. Please add prompt files to ${path.join(GEMINI_CONFIG_DIR, 'prompts')} or ${path.join('~', GEMINI_CONFIG_DIR, 'prompts')}.`,
               timestamp: new Date(),
             });
           }

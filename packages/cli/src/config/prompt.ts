@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PromptFromFile } from '@google/gemini-cli-core';
+import { GEMINI_CONFIG_DIR, PromptFromFile } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { parse as parseYaml } from 'yaml';
 
-export const PROMPTS_DIRECTORY_NAME = path.join('.gemini', 'prompts');
+export const PROMPTS_DIRECTORY_NAME = path.join(GEMINI_CONFIG_DIR, 'prompts');
 
 export function loadPrompts(workspaceDir: string): PromptFromFile[] {
   const allPrompts = [
