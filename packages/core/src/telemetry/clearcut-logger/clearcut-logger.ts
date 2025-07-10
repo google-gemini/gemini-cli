@@ -17,8 +17,10 @@ import {
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
-import { getInstallationId } from '../../utils/user_id.js';
-import { getGoogleAccountId } from '../../utils/user_id.js';
+import {
+  getInstallationId,
+  getGoogleAccountEmail,
+} from '../../utils/user_id.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -66,13 +68,23 @@ export class ClearcutLogger {
   }
 
   createLogEvent(name: string, data: object): object {
-    return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logEvent: any = {
       console_type: 'GEMINI_CLI',
       application: 102,
       event_name: name,
-      client_install_id: getInstallationId(),
       event_metadata: [data] as object[],
     };
+
+    const email = getGoogleAccountEmail();
+    // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
+    if (email) {
+      logEvent.client_email = email;
+    } else {
+      logEvent.client_install_id = getInstallationId();
+    }
+
+    return logEvent;
   }
 
   flushIfNeeded(): void {
@@ -80,20 +92,17 @@ export class ClearcutLogger {
       return;
     }
 
-    // Fire and forget - don't await
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  async flushToClearcut(): Promise<LogResponse> {
+  flushToClearcut(): Promise<LogResponse> {
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = [...this.events];
     this.events.length = 0;
-
-    const googleAccountId = await getGoogleAccountId();
 
     return new Promise<Buffer>((resolve, reject) => {
       const request = [
@@ -101,12 +110,6 @@ export class ClearcutLogger {
           log_source_name: 'CONCORD',
           request_time_ms: Date.now(),
           log_event: eventsToSend,
-          // Add UserInfo with the raw Gaia ID
-          user_info: googleAccountId
-            ? {
-                UserID: googleAccountId,
-              }
-            : undefined,
         },
       ];
       const body = JSON.stringify(request);
@@ -255,7 +258,7 @@ export class ClearcutLogger {
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     // Flush start event immediately
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing start session event to Clearcut:', error);
+      console.debug('Error flushing to Clearcut:', error);
     });
   }
 
