@@ -9,6 +9,18 @@ import path from 'path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
 
+/** 
+ *the single source of truth for
+ * overriding MIME types that are problematic in some environments or need to be
+ * normalized for the Gemini API. 
+*/
+const customMimeMap = new Map<string, string>([
+  ['.mp4', 'video/mp4'],
+  ['.mov', 'video/mp4'], // Normalize .mov to video/mp4 for Gemini
+  ['.mp3', 'audio/mpeg'],
+  ['.wav', 'audio/mpeg'], // Normalize .wav to audio/mpeg for Gemini
+]);
+
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
 const MAX_LINE_LENGTH_TEXT_FILE = 2000;
@@ -22,6 +34,11 @@ export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
  * @returns The specific MIME type string (e.g., 'text/python', 'application/javascript') or undefined if not found or ambiguous.
  */
 export function getSpecificMimeType(filePath: string): string | undefined {
+  const ext = path.extname(filePath).toLowerCase();
+  if (customMimeMap.has(ext)) {
+    return customMimeMap.get(ext)!; // The '!' is safe because we just checked .has()
+  }
+  //  Fall back to the mime-types library if no override exists.
   const lookedUpMime = mime.lookup(filePath);
   return typeof lookedUpMime === 'string' ? lookedUpMime : undefined;
 }
@@ -98,20 +115,15 @@ export function isBinaryFile(filePath: string): boolean {
  */
 export function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' {
+): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
-  // to assume these are typescript files instead.
   if (ext === '.ts') {
     return 'text';
   }
 
-  if (ext === '.svg') {
-    return 'svg';
-  }
+  const lookedUpMimeType = getSpecificMimeType(filePath); // Returns false if not found, or the mime type string
 
-  const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
   if (lookedUpMimeType) {
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
@@ -239,20 +251,6 @@ export async function processSingleFileContent(
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
         };
       }
-      case 'svg': {
-        const SVG_MAX_SIZE_BYTES = 1 * 1024 * 1024;
-        if (stats.size > SVG_MAX_SIZE_BYTES) {
-          return {
-            llmContent: `Cannot display content of SVG file larger than 1MB: ${relativePathForDisplay}`,
-            returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
-          };
-        }
-        const content = await fs.promises.readFile(filePath, 'utf8');
-        return {
-          llmContent: content,
-          returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
-        };
-      }
       case 'text': {
         const content = await fs.promises.readFile(filePath, 'utf8');
         const lines = content.split('\n');
@@ -307,7 +305,9 @@ export async function processSingleFileContent(
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.lookup(filePath) || 'application/octet-stream',
+              // Using the helper function to ensure problematic MIME types
+              // (e.g., 'application/mp4') are corrected and normalized for the API:
+              mimeType: getSpecificMimeType(filePath) || 'application/octet-stream',
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
