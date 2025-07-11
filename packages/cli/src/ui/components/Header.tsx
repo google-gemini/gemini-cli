@@ -15,12 +15,14 @@ interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
   terminalWidth: number; // For responsive logo
   version: string;
+  nightly: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   customAsciiArt,
   terminalWidth,
   version,
+  nightly,
 }) => {
   let displayTitle;
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
@@ -34,7 +36,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   const artWidth = getAsciiArtWidth(displayTitle);
   const versionString = `v${version}`;
-  const isNightly = version.includes('nightly');
 
   return (
     <Box
@@ -51,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
       ) : (
         <Text>{displayTitle}</Text>
       )}
-      {isNightly && (
+      {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           <Gradient colors={Colors.GradientColors}>
             <Text>{versionString}</Text>

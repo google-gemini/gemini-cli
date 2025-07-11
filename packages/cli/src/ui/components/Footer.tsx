@@ -24,7 +24,7 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
-  version: string;
+  nightly: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -38,16 +38,15 @@ export const Footer: React.FC<FooterProps> = ({
   showErrorDetails,
   showMemoryUsage,
   promptTokenCount,
-  version,
+  nightly,
 }) => {
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
-  const isNightly = version.includes('nightly');
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
       <Box>
-        {isNightly ? (
+        {nightly ? (
           <Gradient colors={Colors.GradientColors}>
             <Text>
               {shortenPath(tildeifyPath(targetDir), 70)}
