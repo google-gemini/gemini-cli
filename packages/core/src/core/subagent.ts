@@ -193,6 +193,7 @@ export class SubAgentScope {
     terminate_reason: SubagentTerminateMode.ERROR,
     emitted_vars: {},
   };
+  private readonly subagentId: string;
 
   /**
    * Constructs a new SubAgentScope instance.
@@ -206,7 +207,9 @@ export class SubAgentScope {
     private readonly promptConfig: PromptConfig,
     private readonly modelConfig: ModelConfig,
     private readonly runConfig: RunConfig,
-  ) {}
+  ) {
+    this.subagentId = Math.random().toString(36).slice(2);
+  }
 
   /**
    * Runs the subagent in a non-interactive mode.
@@ -251,6 +254,7 @@ export class SubAgentScope {
     ];
 
     const startTime = Date.now();
+    let promptCounter = 0;
     try {
       while (true) {
         // Check for timeout.
@@ -261,6 +265,7 @@ export class SubAgentScope {
           break;
         }
 
+        const promptId = `${this.runtimeContext.getSessionId()}#${this.subagentId}#${promptCounter++}`;
         const messageParams = {
           message: currentMessages[0]?.parts || [],
           config: {
@@ -270,7 +275,10 @@ export class SubAgentScope {
         };
 
         // Send the message to the GeminiChat object, which will manage its own history
-        const responseStream = await chat.sendMessageStream(messageParams);
+        const responseStream = await chat.sendMessageStream(
+          messageParams,
+          promptId,
+        );
 
         // Combine all chunks in stream for proper processing.
         const functionCalls: FunctionCall[] = [];
@@ -292,6 +300,7 @@ export class SubAgentScope {
             toolRegistry,
             abortController,
             currentMessages,
+            promptId,
           );
         } else {
           // The model has stopped calling tools, which signals completion.
@@ -336,6 +345,7 @@ export class SubAgentScope {
     toolRegistry: ToolRegistry,
     abortController: AbortController,
     currentMessages: Content[],
+    promptId: string,
   ) {
     const toolResponseParts: Part[] = [];
 
@@ -346,6 +356,7 @@ export class SubAgentScope {
         name: functionCall.name as string,
         args: (functionCall.args ?? {}) as Record<string, unknown>,
         isClientInitiated: true,
+        prompt_id: promptId,
       };
 
       let toolResponse;
