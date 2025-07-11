@@ -56,7 +56,7 @@ interface CliArgs {
   listExtensions: boolean | undefined;
 }
 
-async function parseArguments(): Promise<CliArgs> {
+export async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
@@ -224,8 +224,12 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
+  argv?: CliArgs,
 ): Promise<Config> {
-  const argv = await parseArguments();
+  // If argv is not provided, parse it (for backward compatibility)
+  if (!argv) {
+    argv = await parseArguments();
+  }
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
@@ -327,7 +331,6 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
-    interactive: !!argv.promptInteractive,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     listExtensions: argv.listExtensions || false,

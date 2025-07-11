@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig } from './config/config.js';
+import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -101,10 +101,13 @@ export async function main() {
     process.exit(1);
   }
 
+  // Parse command line arguments once
+  const argv = await parseArguments();
+  
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const config = await loadCliConfig(settings.merged, extensions, sessionId, argv);
 
-  if (config.getInteractive() && !process.stdin.isTTY) {
+  if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
       'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
     );
@@ -189,7 +192,7 @@ export async function main() {
   ];
 
   const shouldBeInteractive =
-    config.getInteractive() || (process.stdin.isTTY && input?.length === 0);
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (shouldBeInteractive) {
@@ -231,6 +234,7 @@ export async function main() {
     config,
     extensions,
     settings,
+    argv,
   );
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
@@ -271,6 +275,7 @@ async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
+  argv: any,
 ) {
   let finalConfig = config;
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
@@ -294,6 +299,7 @@ async function loadNonInteractiveConfig(
       nonInteractiveSettings,
       extensions,
       config.getSessionId(),
+      argv,
     );
     await finalConfig.initialize();
   }
