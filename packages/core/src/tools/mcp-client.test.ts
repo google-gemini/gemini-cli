@@ -855,6 +855,7 @@ describe('sanitizeParameters', () => {
   it('should do nothing for an undefined schema', () => {
     const schema = undefined;
     sanitizeParameters(schema);
+    expect(schema).toBeUndefined();
   });
 
   it('should remove default when anyOf is present', () => {

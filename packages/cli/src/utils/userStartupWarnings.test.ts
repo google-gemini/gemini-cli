@@ -65,10 +65,4 @@ describe('getUserStartupWarnings', () => {
       );
     });
   });
-
-  // // Example of how to add a new check:
-  // describe('node version check', () => {
-  //   // Tests for node version check would go here
-  //   // This shows how easy it is to add new test sections
-  // });
 });
