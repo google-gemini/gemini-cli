@@ -19,6 +19,8 @@ import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import { StreamingState } from '../types.js';
+import { CLEAR_QUEUE_SIGNAL } from '../constants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -34,6 +36,8 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  queuedInput?: string | null;
+  streamingState?: StreamingState;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -50,8 +54,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  queuedInput,
+  streamingState,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const isQueued =
+    streamingState !== StreamingState.Idle && streamingState !== undefined;
+  const hasQueuedInput = queuedInput !== null && queuedInput !== undefined;
 
   const completion = useCompletion(
     buffer.text,
@@ -204,6 +213,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.resetCompletionState();
           return;
         }
+
+        // Clear queued input on escape
+        if (hasQueuedInput) {
+          onSubmit(CLEAR_QUEUE_SIGNAL);
+          return;
+        }
       }
 
       if (key.ctrl && key.name === 'l') {
@@ -329,6 +344,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
+      hasQueuedInput,
+      onSubmit,
     ],
   );
 
@@ -343,7 +360,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          shellModeActive
+            ? Colors.AccentYellow
+            : hasQueuedInput
+              ? Colors.AccentPurple
+              : isQueued
+                ? Colors.Gray
+                : Colors.AccentBlue
+        }
         paddingX={1}
       >
         <Text

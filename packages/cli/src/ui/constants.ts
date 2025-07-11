@@ -13,3 +13,6 @@ export const UI_WIDTH =
   EstimatedArtWidth + BOX_PADDING_X * 2 + BoxBorderWidth * 2; // ~63
 
 export const STREAM_DEBOUNCE_MS = 100;
+
+// Constants for input queue management
+export const CLEAR_QUEUE_SIGNAL = '__CLEAR_QUEUE__';

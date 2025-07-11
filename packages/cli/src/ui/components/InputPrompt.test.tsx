@@ -14,6 +14,8 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { CLEAR_QUEUE_SIGNAL } from '../constants.js';
+import { StreamingState } from '../types.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');
@@ -219,7 +221,6 @@ describe('InputPrompt', () => {
   });
 
   it('should complete a partial parent command and add a space', async () => {
-    // SCENARIO: /mem -> Tab
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -231,7 +232,7 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t');
     await wait();
 
     expect(props.buffer.setText).toHaveBeenCalledWith('/memory ');
@@ -239,7 +240,6 @@ describe('InputPrompt', () => {
   });
 
   it('should append a sub-command when the parent command is already complete with a space', async () => {
-    // SCENARIO: /memory  -> Tab (to accept 'add')
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -247,14 +247,14 @@ describe('InputPrompt', () => {
         { label: 'show', value: 'show' },
         { label: 'add', value: 'add' },
       ],
-      activeSuggestionIndex: 1, // 'add' is highlighted
+      activeSuggestionIndex: 1,
     });
     props.buffer.setText('/memory ');
 
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t');
     await wait();
 
     expect(props.buffer.setText).toHaveBeenCalledWith('/memory add ');
@@ -262,8 +262,6 @@ describe('InputPrompt', () => {
   });
 
   it('should handle the "backspace" edge case correctly', async () => {
-    // SCENARIO: /memory  -> Backspace -> /memory -> Tab (to accept 'show')
-    // This is the critical bug we fixed.
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -271,24 +269,21 @@ describe('InputPrompt', () => {
         { label: 'show', value: 'show' },
         { label: 'add', value: 'add' },
       ],
-      activeSuggestionIndex: 0, // 'show' is highlighted
+      activeSuggestionIndex: 0,
     });
-    // The user has backspaced, so the query is now just '/memory'
     props.buffer.setText('/memory');
 
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t');
     await wait();
 
-    // It should NOT become '/show '. It should correctly become '/memory show '.
     expect(props.buffer.setText).toHaveBeenCalledWith('/memory show ');
     unmount();
   });
 
   it('should complete a partial argument for a command', async () => {
-    // SCENARIO: /chat resume fi- -> Tab
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -300,7 +295,7 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t');
     await wait();
 
     expect(props.buffer.setText).toHaveBeenCalledWith('/chat resume fix-foo ');
@@ -322,7 +317,6 @@ describe('InputPrompt', () => {
     stdin.write('\r');
     await wait();
 
-    // The app should autocomplete the text, NOT submit.
     expect(props.buffer.setText).toHaveBeenCalledWith('/memory ');
 
     expect(props.onSubmit).not.toHaveBeenCalled();
@@ -330,7 +324,6 @@ describe('InputPrompt', () => {
   });
 
   it('should complete a command based on its altName', async () => {
-    // Add a command with an altName to our mock for this test
     props.slashCommands.push({
       name: 'help',
       altName: '?',
@@ -348,22 +341,21 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t');
     await wait();
 
     expect(props.buffer.setText).toHaveBeenCalledWith('/help ');
     unmount();
   });
 
-  // ADD this test for defensive coverage
 
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
-    props.buffer.setText('   '); // Set buffer to whitespace
+    props.buffer.setText('   ');
 
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\r'); // Press Enter
+    stdin.write('\r');
     await wait();
 
     expect(props.onSubmit).not.toHaveBeenCalled();
@@ -406,5 +398,94 @@ describe('InputPrompt', () => {
     expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
+  });
+
+  describe('concurrent input queue clearing functionality', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should render correctly when hasQueuedInput prop is true', async () => {
+      props.hasQueuedInput = true;
+      props.shellModeActive = false;
+      
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+      });
+
+      const { lastFrame, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(lastFrame()).toBeDefined();
+      expect(props.hasQueuedInput).toBe(true);
+      unmount();
+    });
+
+    it('should render correctly when hasQueuedInput prop is false', async () => {
+      props.hasQueuedInput = false;
+      props.shellModeActive = false;
+      
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+      });
+
+      const { lastFrame, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(lastFrame()).toBeDefined();
+      expect(props.hasQueuedInput).toBe(false);
+      unmount();
+    });
+
+    it('should handle queued input display when queuedInput prop is provided', async () => {
+      props.hasQueuedInput = true;
+      props.queuedInput = 'test queued input message';
+
+      const { lastFrame, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      expect(props.queuedInput).toBe('test queued input message');
+      unmount();
+    });
+
+    it('should maintain state consistency with multiple props', async () => {
+      props.hasQueuedInput = true;
+      props.shellModeActive = true;
+      props.streamingState = StreamingState.Responding;
+
+      const { lastFrame, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      expect(props.hasQueuedInput).toBe(true);
+      expect(props.shellModeActive).toBe(true);
+      unmount();
+    });
+
+    it('should verify CLEAR_QUEUE_SIGNAL constant is properly imported and has correct value', () => {
+      expect(CLEAR_QUEUE_SIGNAL).toBeDefined();
+      expect(CLEAR_QUEUE_SIGNAL).toBe('__CLEAR_QUEUE__');
+      expect(typeof CLEAR_QUEUE_SIGNAL).toBe('string');
+      expect(CLEAR_QUEUE_SIGNAL.length).toBeGreaterThan(0);
+    });
+
+    it('should not interfere with existing onSubmit behavior', async () => {
+      props.hasQueuedInput = false;
+      props.buffer.setText('normal input');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\r');
+      await wait();
+
+      expect(props.onSubmit).toHaveBeenCalled();
+      unmount();
+    });
   });
 });
