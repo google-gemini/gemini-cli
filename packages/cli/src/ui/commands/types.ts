@@ -34,6 +34,8 @@ export interface CommandContext {
      * Sets the transient debug message displayed in the application footer in debug mode.
      */
     setDebugMessage: (message: string) => void;
+    /** Toggles vim mode on/off. */
+    toggleVimMode: () => void;
   };
   // Session-specific data
   session: {

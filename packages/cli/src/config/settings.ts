@@ -83,6 +83,9 @@ export interface Settings {
   // Setting for setting maximum number of user/model/tool turns in a session.
   maxSessionTurns?: number;
 
+  // UI setting. Enables vim mode.
+  vimMode?: boolean;
+
   // Add other settings here.
 }
 

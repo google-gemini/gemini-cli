@@ -74,6 +74,7 @@ export const useSlashCommandProcessor = (
   openAuthDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
+  toggleVimMode: () => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
@@ -169,6 +170,7 @@ export const useSlashCommandProcessor = (
           refreshStatic();
         },
         setDebugMessage: onDebugMessage,
+        toggleVimMode,
       },
       session: {
         stats: session.stats,
@@ -184,6 +186,7 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       onDebugMessage,
+      toggleVimMode,
     ],
   );
 

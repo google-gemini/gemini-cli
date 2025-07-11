@@ -143,6 +143,7 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
+  vimMode?: boolean;
   noBrowser?: boolean;
 }
 
@@ -189,6 +190,7 @@ export class Config {
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  private readonly vimMode: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -233,6 +235,7 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
+    this.vimMode = params.vimMode ?? false;
     this.noBrowser = params.noBrowser ?? false;
 
     if (params.contextFileName) {
@@ -469,6 +472,10 @@ export class Config {
 
   getBugCommand(): BugCommandSettings | undefined {
     return this.bugCommand;
+  }
+
+  getVimMode(): boolean {
+    return this.vimMode;
   }
 
   getFileService(): FileDiscoveryService {

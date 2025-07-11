@@ -91,6 +91,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** `"Default"`
   - **Example:** `"theme": "GitHub"`
 
+- **`vimMode`** (boolean):
+  - **Description:** Enables or disables vim mode for input editing. When enabled, the input area supports vim-style navigation and editing commands with NORMAL and INSERT modes. The vim mode status is displayed in the footer and persists between sessions.
+  - **Default:** `false`
+  - **Example:** `"vimMode": true`
+
 - **`sandbox`** (boolean or string):
   - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
   - **Default:** `false`
