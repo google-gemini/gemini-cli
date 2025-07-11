@@ -240,6 +240,8 @@ export class FlashFallbackEvent {
   auth_type: string;
 
   constructor(auth_type: string) {
+    this['event.name'] = 'flash_fallback';
+    this['event.timestamp'] = new Date().toISOString();
     this.auth_type = auth_type;
   }
 }
