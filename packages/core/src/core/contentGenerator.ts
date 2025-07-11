@@ -14,8 +14,10 @@ import {
   GoogleGenAI,
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_GROK_MODEL, GROK_MODELS } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
+import { GrokContentGenerator } from '../api/grokContentGenerator.js';
+import { Config } from '../config/config.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -39,6 +41,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_GROK = 'grok-api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -56,24 +59,34 @@ export async function createContentGeneratorConfig(
   const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+  const grokApiKey = process.env.GROK_API_KEY || undefined;
 
+  // Determine if this is a Grok model
+  const isGrokModel = model && (GROK_MODELS as readonly string[]).includes(model);
+  
+  // Auto-detect auth type based on model if not specified
+  let effectiveAuthType = authType;
+  if (!authType && isGrokModel) {
+    effectiveAuthType = AuthType.USE_GROK;
+  }
+  
   // Use runtime model from config if available, otherwise fallback to parameter or default
-  const effectiveModel = model || DEFAULT_GEMINI_MODEL;
+  const effectiveModel = model || (isGrokModel ? DEFAULT_GROK_MODEL : DEFAULT_GEMINI_MODEL);
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
-    authType,
+    authType: effectiveAuthType || authType,  // Ensure authType is always set
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
   if (
-    authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.CLOUD_SHELL
+    effectiveAuthType === AuthType.LOGIN_WITH_GOOGLE ||
+    effectiveAuthType === AuthType.CLOUD_SHELL
   ) {
     return contentGeneratorConfig;
   }
 
-  if (authType === AuthType.USE_GEMINI && geminiApiKey) {
+  if (effectiveAuthType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
     contentGeneratorConfig.vertexai = false;
     contentGeneratorConfig.model = await getEffectiveModel(
@@ -85,12 +98,18 @@ export async function createContentGeneratorConfig(
   }
 
   if (
-    authType === AuthType.USE_VERTEX_AI &&
+    effectiveAuthType === AuthType.USE_VERTEX_AI &&
     (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
+    return contentGeneratorConfig;
+  }
+
+  if (effectiveAuthType === AuthType.USE_GROK) {
+    contentGeneratorConfig.apiKey = grokApiKey;  // May be undefined, that's OK
+    contentGeneratorConfig.model = effectiveModel;
     return contentGeneratorConfig;
   }
 
@@ -129,6 +148,10 @@ export async function createContentGenerator(
     });
 
     return googleGenAI.models;
+  }
+
+  if (config.authType === AuthType.USE_GROK) {
+    return new GrokContentGenerator(config);
   }
 
   throw new Error(

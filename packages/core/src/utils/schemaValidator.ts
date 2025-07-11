@@ -5,9 +5,10 @@
  */
 
 import { Schema } from '@google/genai';
-import * as ajv from 'ajv';
+import AjvModule from 'ajv';
 
-const ajValidator = new ajv.Ajv();
+const Ajv = AjvModule.default || AjvModule;
+const ajValidator = new Ajv();
 
 /**
  * Simple utility to validate objects against JSON Schemas

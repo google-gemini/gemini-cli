@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/models.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -60,3 +61,7 @@ export * from './tools/mcp-tool.js';
 // Export telemetry functions
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
+
+// Export Grok API
+export * from './api/grokClient.js';
+export * from './api/grokContentGenerator.js';

@@ -35,6 +35,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  GROK_MODELS,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -125,6 +126,17 @@ export async function main() {
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
+  
+  // Auto-detect auth type for Grok models
+  const model = config.getModel();
+  if (model && (GROK_MODELS as readonly string[]).includes(model)) {
+    if (!settings.merged.selectedAuthType) {
+      settings.merged.selectedAuthType = AuthType.USE_GROK;
+    }
+    await config.refreshAuth(AuthType.USE_GROK);
+  } else if (settings.merged.selectedAuthType) {
+    await config.refreshAuth(settings.merged.selectedAuthType);
+  }
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -206,13 +218,7 @@ export async function main() {
   });
 
   // Non-interactive mode handled by runNonInteractive
-  const nonInteractiveConfig = await loadNonInteractiveConfig(
-    config,
-    extensions,
-    settings,
-  );
-
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  await runNonInteractive(config, input, prompt_id);
   process.exit(0);
 }
 
