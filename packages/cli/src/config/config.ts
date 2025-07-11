@@ -34,7 +34,7 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
-interface CliArgs {
+export interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
@@ -180,18 +180,20 @@ export async function parseArguments(): Promise<CliArgs> {
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
-    .strict();
+    .strict()
+    .check((argv) => {
+      // Validate that -p and -i are not used together
+      if (argv.prompt && argv.promptInteractive) {
+        throw new Error(
+          'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      return true;
+    });
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
 
   const argv = await yargsInstance.argv;
-
-  // Validate that -p and -i are not used together
-  if (argv.prompt && argv.promptInteractive) {
-    throw new Error(
-      'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-    );
-  }
 
   return argv;
 }
@@ -224,12 +226,8 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
-  argv?: CliArgs,
+  argv: CliArgs,
 ): Promise<Config> {
-  // If argv is not provided, parse it (for backward compatibility)
-  if (!argv) {
-    argv = await parseArguments();
-  }
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
