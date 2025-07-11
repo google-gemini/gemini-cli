@@ -78,28 +78,35 @@ export const generateComprehensiveMarkdown = (
   markdown += `| **Total Duration** | ${sessionStats.wallDuration} |\n`;
   // Calculate totals from all models
   const totalRequests = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.api.totalRequests, 0
+    (sum, model) => sum + model.api.totalRequests,
+    0,
   );
   const totalTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.total, 0
+    (sum, model) => sum + model.tokens.total,
+    0,
   );
   const totalPromptTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.prompt, 0
+    (sum, model) => sum + model.tokens.prompt,
+    0,
   );
-  const totalCandidateTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.candidates, 0
-  );
+  const totalCandidateTokens = Object.values(
+    sessionStats.metrics.models,
+  ).reduce((sum, model) => sum + model.tokens.candidates, 0);
   const totalCachedTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.cached, 0
+    (sum, model) => sum + model.tokens.cached,
+    0,
   );
   const totalThoughtsTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.thoughts, 0
+    (sum, model) => sum + model.tokens.thoughts,
+    0,
   );
   const totalToolTokens = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.tokens.tool, 0
+    (sum, model) => sum + model.tokens.tool,
+    0,
   );
   const totalApiTime = Object.values(sessionStats.metrics.models).reduce(
-    (sum, model) => sum + model.api.totalLatencyMs, 0
+    (sum, model) => sum + model.api.totalLatencyMs,
+    0,
   );
 
   markdown += `| **Total API Requests** | ${totalRequests.toLocaleString()} |\n`;
@@ -111,8 +118,15 @@ export const generateComprehensiveMarkdown = (
   markdown += `| **Thoughts Tokens** | ${totalThoughtsTokens.toLocaleString()} |\n`;
   markdown += `| **Total API Time** | ${totalApiTime.toLocaleString()} ms |\n`;
   markdown += `| **Tool Calls** | ${sessionStats.metrics.tools.totalCalls.toLocaleString()} |\n`;
-  markdown += `| **Tool Success Rate** | ${sessionStats.metrics.tools.totalCalls > 0 ? 
-    ((sessionStats.metrics.tools.totalSuccess / sessionStats.metrics.tools.totalCalls * 100).toFixed(1) + '%') : 'N/A'} |\n`;
+  markdown += `| **Tool Success Rate** | ${
+    sessionStats.metrics.tools.totalCalls > 0
+      ? (
+          (sessionStats.metrics.tools.totalSuccess /
+            sessionStats.metrics.tools.totalCalls) *
+          100
+        ).toFixed(1) + '%'
+      : 'N/A'
+  } |\n`;
   markdown += `| **UI History Items** | ${conversationLength} |\n`;
   markdown += `| **Core History Items** | ${coreHistoryLength} |\n`;
   markdown += `\n`;

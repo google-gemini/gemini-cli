@@ -1469,7 +1469,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should export conversation with custom filename', async () => {
@@ -1518,7 +1518,7 @@ describe('useSlashCommandProcessor', () => {
         expect.stringContaining('# Gemini CLI Conversation Export'),
         'utf-8',
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should handle different sandbox environments correctly', async () => {
@@ -1687,7 +1687,7 @@ describe('useSlashCommandProcessor', () => {
         );
       });
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
       expect(mockWriteFile).toHaveBeenCalled();
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2, // Second call should be the success message
@@ -1752,7 +1752,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should generate valid markdown export with correct filename', async () => {
@@ -1844,7 +1844,7 @@ describe('useSlashCommandProcessor', () => {
           expect.any(Number),
         );
 
-        expect(commandResult).toBe(true);
+        expect(commandResult).toEqual({ type: 'handled' });
       }
     });
 
@@ -1920,7 +1920,7 @@ describe('useSlashCommandProcessor', () => {
           expect.any(Number),
         );
 
-        expect(commandResult).toBe(true);
+        expect(commandResult).toEqual({ type: 'handled' });
 
         // Clear mocks for next iteration
         mockWriteFile.mockClear();
