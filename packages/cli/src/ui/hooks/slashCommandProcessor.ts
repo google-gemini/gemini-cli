@@ -892,9 +892,16 @@ export const useSlashCommandProcessor = (
                 coreHistory = await chat.getHistory();
               }
             } catch (error) {
+              const sessionId = config?.getSessionId() || 'unknown';
+              const errorMessage = error instanceof Error ? error.message : String(error);
               console.warn(
-                'Could not retrieve core conversation history:',
-                error,
+                `Could not retrieve core conversation history: ${errorMessage}`,
+                {
+                  sessionId,
+                  command: '/export',
+                  filename,
+                  error: error instanceof Error ? error.stack : error,
+                },
               );
             }
 
@@ -931,9 +938,32 @@ export const useSlashCommandProcessor = (
               return;
             }
 
-            // Create directory if it doesn't exist
+            // Create directory if it doesn't exist and validate against symlink attacks
             const outputDir = path.dirname(outputPath);
             await fs.mkdir(outputDir, { recursive: true });
+
+            // Additional security check: resolve real paths to prevent symlink attacks
+            try {
+              const realCwd = await fs.realpath(cwd);
+              const realOutputDir = await fs.realpath(outputDir);
+              
+              // Ensure the real output directory is still within the real current working directory
+              if (!realOutputDir.startsWith(realCwd + path.sep) && realOutputDir !== realCwd) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: `Security error: Cannot write outside current working directory (symlink detected).\nExample: /export exports/my-session.md`,
+                  timestamp: new Date(),
+                });
+                return;
+              }
+            } catch (realpathError) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Security error: Could not resolve real path for security validation.`,
+                timestamp: new Date(),
+              });
+              return;
+            }
 
             // Write the markdown content to file
             await fs.writeFile(outputPath, markdownContent, 'utf-8');
