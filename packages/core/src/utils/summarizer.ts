@@ -79,7 +79,7 @@ const toolOutputSummarizerConfig: GenerateContentConfig = {
   maxOutputTokens: 2000,
 };
 
-const SUMMARIZE_TOOL_OUTPUT_TEMPLATE = `Summarize the following tool output to be a maximum of {maxLength} characters. The summary should be concise and capture the main points of the tool output.
+const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxLength} characters. The summary should be concise and capture the main points of the tool output.
 
 The summarization should be done based on the content that is provided. Here are the basic rules to follow:
 1. If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
@@ -109,7 +109,7 @@ export async function summarizeToolOutput(
   if (!textToSummarize || textToSummarize.length < maxLength) {
     return textToSummarize;
   }
-  const prompt = SUMMARIZE_TOOL_OUTPUT_TEMPLATE.replace(
+  const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
     '{maxLength}',
     String(maxLength),
   ).replace('{textToSummarize}', textToSummarize);
