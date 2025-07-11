@@ -625,8 +625,8 @@ describe('useGeminiStream', () => {
     });
   });
 
-  it('should group multiple cancelled tool call responses into a single history entry', async () => {
-    const cancelledToolCall1: TrackedCancelledToolCall = {
+  it('should group multiple canceled tool call responses into a single history entry', async () => {
+    const canceledToolCall1: TrackedCanceledToolCall = {
       request: {
         callId: 'cancel-1',
         name: 'toolA',
@@ -639,7 +639,7 @@ describe('useGeminiStream', () => {
         description: 'descA',
         getDescription: vi.fn(),
       } as any,
-      status: 'cancelled',
+      status: 'canceled',
       response: {
         callId: 'cancel-1',
         responseParts: [
@@ -650,7 +650,7 @@ describe('useGeminiStream', () => {
       },
       responseSubmittedToGemini: false,
     };
-    const cancelledToolCall2: TrackedCancelledToolCall = {
+    const canceledToolCall2: TrackedCanceledToolCall = {
       request: {
         callId: 'cancel-2',
         name: 'toolB',
@@ -663,7 +663,7 @@ describe('useGeminiStream', () => {
         description: 'descB',
         getDescription: vi.fn(),
       } as any,
-      status: 'cancelled',
+      status: 'canceled',
       response: {
         callId: 'cancel-2',
         responseParts: [
@@ -674,7 +674,7 @@ describe('useGeminiStream', () => {
       },
       responseSubmittedToGemini: false,
     };
-    const allCancelledTools = [cancelledToolCall1, cancelledToolCall2];
+    const allCanceledTools = [canceledToolCall1, canceledToolCall2];
     const client = new MockedGeminiClientClass(mockConfig);
 
     let capturedOnComplete:
@@ -704,10 +704,10 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Trigger the onComplete callback with multiple cancelled tools
+    // Trigger the onComplete callback with multiple canceled tools
     await act(async () => {
       if (capturedOnComplete) {
-        await capturedOnComplete(allCancelledTools);
+        await capturedOnComplete(allCanceledTools);
       }
     });
 
@@ -725,8 +725,8 @@ describe('useGeminiStream', () => {
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: [
-          ...(cancelledToolCall1.response.responseParts as Part[]),
-          ...(cancelledToolCall2.response.responseParts as Part[]),
+          ...(canceledToolCall1.response.responseParts as Part[]),
+          ...(canceledToolCall2.response.responseParts as Part[]),
         ],
       });
 
