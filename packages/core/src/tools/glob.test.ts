@@ -181,8 +181,8 @@ describe('GlobTool', () => {
       // Need to correctly define this as an object without pattern
       const params = { path: '.' };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        `params must have required property 'pattern'`,
       );
     });
 
@@ -206,8 +206,8 @@ describe('GlobTool', () => {
         path: 123,
       };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        'params/path must be string',
       );
     });
 
@@ -217,8 +217,8 @@ describe('GlobTool', () => {
         case_sensitive: 'true',
       };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        'params/case_sensitive must be boolean',
       );
     });
 

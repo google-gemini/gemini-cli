@@ -103,7 +103,7 @@ export abstract class BaseTool<
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
   ) {}
@@ -115,7 +115,7 @@ export abstract class BaseTool<
     return {
       name: this.name,
       description: this.description,
-      parameters: this.parameterSchema as Schema,
+      parameters: this.parameterSchema,
     };
   }
 

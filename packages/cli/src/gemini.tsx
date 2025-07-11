@@ -17,8 +17,8 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  SettingScope,
   USER_SETTINGS_PATH,
+  SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -35,6 +35,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -103,15 +104,17 @@ export async function main() {
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // Set a default auth type if one isn't set for a couple of known cases.
+  if (config.getListExtensions()) {
+    console.log('Installed extensions:');
+    for (const extension of extensions) {
+      console.log(`- ${extension.config.name}`);
+    }
+    process.exit(0);
+  }
+
+  // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
-    if (process.env.GEMINI_API_KEY) {
-      settings.setValue(
-        SettingScope.User,
-        'selectedAuthType',
-        AuthType.USE_GEMINI,
-      );
-    } else if (process.env.CLOUD_SHELL === 'true') {
+    if (process.env.CLOUD_SHELL === 'true') {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
@@ -163,6 +166,15 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.getNoBrowser()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
@@ -194,10 +206,12 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
     prompt_length: input.length,
   });
 
@@ -208,13 +222,18 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+      // eslint-disable-next-line no-control-regex
+      /[\x00-\x1F\x7F]/g,
+      '',
+    );
+    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
@@ -265,6 +284,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
     );
+    await finalConfig.initialize();
   }
 
   return await validateNonInterActiveAuth(

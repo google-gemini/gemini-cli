@@ -18,7 +18,7 @@ export const validateAuthMethod = (authMethod: string): string | null => {
 
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env.GEMINI_API_KEY) {
-      return 'GEMINI_API_KEY environment variable not found. Add that to your .env and try again, no reload needed!';
+      return 'GEMINI_API_KEY environment variable not found. Add that to your environment and try again (no reload needed if using .env)!';
     }
     return null;
   }
@@ -29,10 +29,10 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     const hasGoogleApiKey = !!process.env.GOOGLE_API_KEY;
     if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {
       return (
-        'Must specify GOOGLE_GENAI_USE_VERTEXAI=true and either:\n' +
+        'When using Vertex AI, you must specify either:\n' +
         '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
-        'Update your .env and try again, no reload needed!'
+        'Update your environment and try again (no reload needed if using .env)!'
       );
     }
     return null;

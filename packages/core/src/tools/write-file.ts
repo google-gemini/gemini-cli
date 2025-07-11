@@ -16,6 +16,7 @@ import {
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
 } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -79,15 +80,15 @@ export class WriteFileTool
           file_path: {
             description:
               "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
-            type: 'string',
+            type: Type.STRING,
           },
           content: {
             description: 'The content to write to the file.',
-            type: 'string',
+            type: Type.STRING,
           },
         },
         required: ['file_path', 'content'],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
   }
@@ -112,15 +113,11 @@ export class WriteFileTool
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
+
     const filePath = params.file_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;

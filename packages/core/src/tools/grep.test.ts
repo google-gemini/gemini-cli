@@ -80,8 +80,8 @@ describe('GrepTool', () => {
 
     it('should return error if pattern is missing', () => {
       const params = { path: '.' } as unknown as GrepToolParams;
-      expect(grepTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(grepTool.validateToolParams(params)).toBe(
+        `params must have required property 'pattern'`,
       );
     });
 
@@ -204,11 +204,11 @@ describe('GrepTool', () => {
     it('should return an error if params are invalid', async () => {
       const params = { path: '.' } as unknown as GrepToolParams; // Invalid: pattern missing
       const result = await grepTool.execute(params, abortSignal);
-      expect(result.llmContent).toContain(
-        'Error: Invalid parameters provided. Reason: Parameters failed schema validation',
+      expect(result.llmContent).toBe(
+        "Error: Invalid parameters provided. Reason: params must have required property 'pattern'",
       );
-      expect(result.returnDisplay).toContain(
-        'Model provided invalid parameters. Error: Parameters failed schema validation',
+      expect(result.returnDisplay).toBe(
+        "Model provided invalid parameters. Error: params must have required property 'pattern'",
       );
     });
   });
@@ -234,7 +234,9 @@ describe('GrepTool', () => {
       };
       // The path will be relative to the tempRootDir, so we check for containment.
       expect(grepTool.getDescription(params)).toContain("'testPattern' within");
-      expect(grepTool.getDescription(params)).toContain('src/app');
+      expect(grepTool.getDescription(params)).toContain(
+        path.join('src', 'app'),
+      );
     });
 
     it('should generate correct description with pattern, include, and path', () => {

@@ -7,7 +7,7 @@ This document describes the `read_many_files` tool for the Gemini CLI.
 Use `read_many_files` to read content from multiple files specified by paths or glob patterns. The behavior of this tool depends on the provided files:
 
 - For text files, this tool concatenates their content into a single string.
-- For image (e.g., PNG, JPEG) and PDF files, it reads and returns them as base64-encoded data, provided they are explicitly requested by name or extension.
+- For image (e.g., PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, it reads and returns them as base64-encoded data, provided they are explicitly requested by name or extension.
 
 `read_many_files` can be used to perform tasks such as getting an overview of a codebase, finding where specific functionality is implemented, reviewing documentation, or gathering context from multiple configuration files.
 
@@ -59,7 +59,7 @@ read_many_files(paths=["**/*.js"], include=["**/*.test.js", "images/**/*.jpg"], 
 ## Important notes
 
 - **Binary file handling:**
-  - **Image/PDF files:** The tool can read common image types (PNG, JPEG, etc.) and PDF files, returning them as base64 encoded data. These files _must_ be explicitly targeted by the `paths` or `include` patterns (e.g., by specifying the exact filename like `image.png` or a pattern like `*.jpeg`).
+  - **Image/PDF/Audio/Video files:** The tool can read common image types (PNG, JPEG, etc.), PDF, audio (mp3, wav), and video (mp4, mov) files, returning them as base64 encoded data. These files _must_ be explicitly targeted by the `paths` or `include` patterns (e.g., by specifying the exact filename like `video.mp4` or a pattern like `*.mov`).
   - **Other binary files:** The tool attempts to detect and skip other types of binary files by examining their initial content for null bytes. The tool excludes these files from its output.
 - **Performance:** Reading a very large number of files or very large individual files can be resource-intensive.
 - **Path specificity:** Ensure paths and glob patterns are correctly specified relative to the tool's target directory. For image/PDF files, ensure the patterns are specific enough to include them.

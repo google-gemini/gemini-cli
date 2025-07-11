@@ -81,6 +81,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
 
+- **`/privacy`**
+  - **Description:** Display the Privacy Notice and allow users to select whether they consent to the collection of their data for service improvement purposes.
+
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
 
