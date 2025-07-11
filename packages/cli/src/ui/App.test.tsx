@@ -224,7 +224,6 @@ describe('App UI', () => {
   beforeEach(() => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
-      question: 'hello world',
       embeddingModel: 'test-embedding-model',
       sandbox: undefined,
       targetDir: '/test/dir',
@@ -515,11 +514,14 @@ describe('App UI', () => {
     });
   });
 
-  describe('with initial input', () => {
-    it('should call submitQuery with the initial input', async () => {
+  describe('with initial prompt from --prompt-interactive', () => {
+    it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();
-
-      // Mock the useGeminiStream hook to return our mock submitQuery
+      
+      // Override the default mock to include a question
+      mockConfig.getQuestion = vi.fn(() => 'hello from prompt-interactive');
+      
+      // Mock useGeminiStream to capture submitQuery calls
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQuery,
@@ -528,22 +530,34 @@ describe('App UI', () => {
         thought: null,
       });
 
+      // Ensure we have a valid gemini client
       mockConfig.getGeminiClient.mockReturnValue({
-        getChatSafe: vi.fn(() => ({}) as unknown as GeminiChat),
+        getChatSafe: vi.fn(() => ({})),
       } as unknown as GeminiClient);
 
-      const { unmount } = render(
+      const { unmount, rerender } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
+          version={mockVersion}
         />,
       );
       currentUnmount = unmount;
 
-      // Wait for useEffect to run
-      await Promise.resolve();
+      // Force a re-render to trigger useEffect
+      rerender(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
 
-      expect(mockSubmitQuery).toHaveBeenCalledWith('hello world');
+      // Wait for React to process effects
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith('hello from prompt-interactive');
     });
   });
+
 });
