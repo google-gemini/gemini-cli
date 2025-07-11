@@ -9,7 +9,6 @@ Use `read_many_files` to read content from multiple files specified by paths or 
 - For text files, this tool concatenates their content into a single string.
 - For image (e.g., PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, it reads and returns them as base64-encoded data, provided they are explicitly requested by name or extension.
 
-
 `read_many_files` can be used to perform tasks such as getting an overview of a codebase, finding where specific functionality is implemented, reviewing documentation, or gathering context from multiple configuration files.
 
 ### Arguments
