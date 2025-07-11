@@ -122,7 +122,7 @@ export function ThemeDialog({
   );
 
   const DIALOG_PADDING = 2;
-  const selectThemeHeight = themeItems.length + 1;
+  const selectThemeHeight = 10;
   const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
   const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
   const TAB_TO_SELECT_HEIGHT = 2;
@@ -196,6 +196,7 @@ export function ThemeDialog({
             onSelect={handleThemeSelect}
             onHighlight={onHighlight}
             isFocused={currenFocusedSection === 'theme'}
+            maxItemsToShow={8}
           />
 
           {/* Scope Selection */}
@@ -210,6 +211,7 @@ export function ThemeDialog({
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
                 isFocused={currenFocusedSection === 'scope'}
+                showScrollArrows={false}
               />
             </Box>
           )}
