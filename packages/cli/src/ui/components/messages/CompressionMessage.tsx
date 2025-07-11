@@ -15,7 +15,7 @@ export interface CompressionDisplayProps {
 }
 
 /*
- * Compression messages appear when the /compress command is ran, and show a loading spinner
+ * Compression messages appear when the /compress command is run, and show a loading spinner
  * while compression is in progress, followed up by some compression stats.
  */
 export const CompressionMessage: React.FC<CompressionDisplayProps> = ({

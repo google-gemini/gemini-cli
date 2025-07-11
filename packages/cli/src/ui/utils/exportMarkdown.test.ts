@@ -31,19 +31,36 @@ describe('exportMarkdown', () => {
         sessionStats: {
           sessionStartTime: '2025-01-01T11:00:00.000Z',
           wallDuration: '1h 0m 0s',
-          cumulative: {
-            turnCount: 2,
-            totalTokenCount: 1000,
-            promptTokenCount: 600,
-            candidatesTokenCount: 400,
-            cachedContentTokenCount: 50,
-            toolUsePromptTokenCount: 30,
-            thoughtsTokenCount: 20,
-            apiTimeMs: 5000,
-          },
-          currentTurn: {
-            promptTokenCount: 100,
-            candidatesTokenCount: 80,
+          metrics: {
+            models: {
+              'gemini-1.5-pro': {
+                api: {
+                  totalRequests: 2,
+                  totalErrors: 0,
+                  totalLatencyMs: 5000,
+                },
+                tokens: {
+                  prompt: 600,
+                  candidates: 400,
+                  total: 1000,
+                  cached: 50,
+                  thoughts: 20,
+                  tool: 30,
+                },
+              },
+            },
+            tools: {
+              totalCalls: 5,
+              totalSuccess: 4,
+              totalFail: 1,
+              totalDurationMs: 1500,
+              totalDecisions: {
+                accept: 3,
+                reject: 1,
+                modify: 1,
+              },
+              byName: {},
+            },
           },
         },
         conversationLength: 2,
@@ -119,11 +136,13 @@ describe('exportMarkdown', () => {
         '| **Session Start** | 2025-01-01T11:00:00.000Z |',
       );
       expect(result).toContain('| **Total Duration** | 1h 0m 0s |');
-      expect(result).toContain('| **Total Turns** | 2 |');
+      expect(result).toContain('| **Total API Requests** | 2 |');
       expect(result).toContain('| **Total Tokens** | 1,000 |');
       expect(result).toContain('| **Prompt Tokens** | 600 |');
       expect(result).toContain('| **Response Tokens** | 400 |');
       expect(result).toContain('| **Total API Time** | 5,000 ms |');
+      expect(result).toContain('| **Tool Calls** | 5 |');
+      expect(result).toContain('| **Tool Success Rate** | 80.0% |');
       expect(result).toContain('| **UI History Items** | 2 |');
       expect(result).toContain('| **Core History Items** | 2 |');
     });

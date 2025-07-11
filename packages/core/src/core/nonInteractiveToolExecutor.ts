@@ -40,6 +40,7 @@ export async function executeToolCall(
       duration_ms: durationMs,
       success: false,
       error: error.message,
+      prompt_id: toolCallRequest.prompt_id,
     });
     // Ensure the response structure matches what the API expects for an error
     return {
@@ -67,6 +68,18 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
+    const tool_output = tool.summarizer
+      ? await tool.summarizer(
+          toolResult,
+          config.getGeminiClient(),
+          effectiveAbortSignal,
+        )
+      : toolResult.llmContent;
+
+    const tool_display = tool.shouldSummarizeDisplay
+      ? (tool_output as string)
+      : toolResult.returnDisplay;
+
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -75,18 +88,19 @@ export async function executeToolCall(
       function_args: toolCallRequest.args,
       duration_ms: durationMs,
       success: true,
+      prompt_id: toolCallRequest.prompt_id,
     });
 
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,
-      toolResult.llmContent,
+      tool_output,
     );
 
     return {
       callId: toolCallRequest.callId,
       responseParts: response,
-      resultDisplay: toolResult.returnDisplay,
+      resultDisplay: tool_display,
       error: undefined,
     };
   } catch (e) {
@@ -100,6 +114,7 @@ export async function executeToolCall(
       duration_ms: durationMs,
       success: false,
       error: error.message,
+      prompt_id: toolCallRequest.prompt_id,
     });
     return {
       callId: toolCallRequest.callId,

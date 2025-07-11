@@ -5,8 +5,8 @@
  */
 
 import type { Content } from '@google/genai';
-import type { CumulativeStats } from '../contexts/SessionContext.js';
 import type { HistoryItem } from '../types.js';
+import type { SessionMetrics } from '../contexts/SessionContext.js';
 
 /**
  * Comprehensive export data interface for conversation export
@@ -28,8 +28,7 @@ export interface ExportData {
     sessionStats: {
       sessionStartTime: string;
       wallDuration: string;
-      cumulative: CumulativeStats;
-      currentTurn: CumulativeStats;
+      metrics: SessionMetrics;
     };
     conversationLength: number;
     coreHistoryLength: number;
@@ -77,14 +76,43 @@ export const generateComprehensiveMarkdown = (
   markdown += `|--------|-------|\n`;
   markdown += `| **Session Start** | ${sessionStats.sessionStartTime} |\n`;
   markdown += `| **Total Duration** | ${sessionStats.wallDuration} |\n`;
-  markdown += `| **Total Turns** | ${sessionStats.cumulative.turnCount} |\n`;
-  markdown += `| **Total Tokens** | ${sessionStats.cumulative.totalTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Prompt Tokens** | ${sessionStats.cumulative.promptTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Response Tokens** | ${sessionStats.cumulative.candidatesTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Cached Tokens** | ${sessionStats.cumulative.cachedContentTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Tool Use Tokens** | ${sessionStats.cumulative.toolUsePromptTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Thoughts Tokens** | ${sessionStats.cumulative.thoughtsTokenCount.toLocaleString()} |\n`;
-  markdown += `| **Total API Time** | ${sessionStats.cumulative.apiTimeMs.toLocaleString()} ms |\n`;
+  // Calculate totals from all models
+  const totalRequests = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.api.totalRequests, 0
+  );
+  const totalTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.total, 0
+  );
+  const totalPromptTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.prompt, 0
+  );
+  const totalCandidateTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.candidates, 0
+  );
+  const totalCachedTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.cached, 0
+  );
+  const totalThoughtsTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.thoughts, 0
+  );
+  const totalToolTokens = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.tokens.tool, 0
+  );
+  const totalApiTime = Object.values(sessionStats.metrics.models).reduce(
+    (sum, model) => sum + model.api.totalLatencyMs, 0
+  );
+
+  markdown += `| **Total API Requests** | ${totalRequests.toLocaleString()} |\n`;
+  markdown += `| **Total Tokens** | ${totalTokens.toLocaleString()} |\n`;
+  markdown += `| **Prompt Tokens** | ${totalPromptTokens.toLocaleString()} |\n`;
+  markdown += `| **Response Tokens** | ${totalCandidateTokens.toLocaleString()} |\n`;
+  markdown += `| **Cached Tokens** | ${totalCachedTokens.toLocaleString()} |\n`;
+  markdown += `| **Tool Tokens** | ${totalToolTokens.toLocaleString()} |\n`;
+  markdown += `| **Thoughts Tokens** | ${totalThoughtsTokens.toLocaleString()} |\n`;
+  markdown += `| **Total API Time** | ${totalApiTime.toLocaleString()} ms |\n`;
+  markdown += `| **Tool Calls** | ${sessionStats.metrics.tools.totalCalls.toLocaleString()} |\n`;
+  markdown += `| **Tool Success Rate** | ${sessionStats.metrics.tools.totalCalls > 0 ? 
+    ((sessionStats.metrics.tools.totalSuccess / sessionStats.metrics.tools.totalCalls * 100).toFixed(1) + '%') : 'N/A'} |\n`;
   markdown += `| **UI History Items** | ${conversationLength} |\n`;
   markdown += `| **Core History Items** | ${coreHistoryLength} |\n`;
   markdown += `\n`;
@@ -127,26 +155,6 @@ export const generateComprehensiveMarkdown = (
           markdown += `| **Description** | ${tool.description} |\n`;
           markdown += `| **Status** | ${tool.status} |\n`;
           markdown += `| **Render as Markdown** | ${tool.renderOutputAsMarkdown || false} |\n`;
-
-          /*
-          if (tool.confirmationDetails) {
-            markdown += `\n**Confirmation Details:**\n`;
-            markdown += `- Message: ${tool.confirmationDetails}\n`;
-            if (tool.confirmationDetails) {
-              markdown += `- Details:\n\`\`\`\n${tool.confirmationDetails}\n\`\`\`\n`;
-            }
-          }
-
-          if (tool.resultDisplay) {
-            markdown += `\n**Tool Result:**\n`;
-            if (tool.resultDisplay.output) {
-              markdown += `\`\`\`\n${tool.resultDisplay.output}\n\`\`\`\n`;
-            }
-            if (tool.resultDisplay.error) {
-              markdown += `**Error:** ${tool.resultDisplay.error}\n`;
-            }
-          }
-          */
 
           if (tool.confirmationDetails) {
             markdown += `\n**Confirmation Details:**\n`;
@@ -207,25 +215,12 @@ export const generateComprehensiveMarkdown = (
 
       case 'stats':
         markdown += `**📊 Session Statistics:**\n\n`;
-        markdown += `| Metric | Cumulative | Last Turn |\n`;
-        markdown += `|--------|------------|----------|\n`;
-        markdown += `| **Turns** | ${item.stats.turnCount} | ${item.lastTurnStats.turnCount} |\n`;
-        markdown += `| **Total Tokens** | ${item.stats.totalTokenCount.toLocaleString()} | ${item.lastTurnStats.totalTokenCount.toLocaleString()} |\n`;
-        markdown += `| **Prompt Tokens** | ${item.stats.promptTokenCount.toLocaleString()} | ${item.lastTurnStats.promptTokenCount.toLocaleString()} |\n`;
-        markdown += `| **Response Tokens** | ${item.stats.candidatesTokenCount.toLocaleString()} | ${item.lastTurnStats.candidatesTokenCount.toLocaleString()} |\n`;
-        markdown += `| **API Time (ms)** | ${item.stats.apiTimeMs.toLocaleString()} | ${item.lastTurnStats.apiTimeMs.toLocaleString()} |\n`;
-        markdown += `\n**Duration:** ${item.duration}\n\n`;
+        markdown += `**Duration:** ${item.duration}\n\n`;
         break;
 
       case 'quit':
         markdown += `**👋 Session End:**\n\n`;
-        markdown += `**Final Statistics:**\n`;
-        markdown += `| Metric | Value |\n`;
-        markdown += `|--------|-------|\n`;
-        markdown += `| **Total Turns** | ${item.stats.turnCount} |\n`;
-        markdown += `| **Total Tokens** | ${item.stats.totalTokenCount.toLocaleString()} |\n`;
-        markdown += `| **Session Duration** | ${item.duration} |\n`;
-        markdown += `\n`;
+        markdown += `**Session Duration:** ${item.duration}\n\n`;
         break;
 
       case 'compression':

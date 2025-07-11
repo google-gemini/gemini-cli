@@ -56,11 +56,8 @@ vi.mock('../../utils/version.js', () => ({
 import { act, renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import open from 'open';
-import {
-  useSlashCommandProcessor,
-  type SlashCommandActionReturn,
-} from './slashCommandProcessor.js';
-import { MessageType } from '../types.js';
+import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import { MessageType, SlashCommandProcessorResult } from '../types.js';
 import {
   Config,
   MCPDiscoveryState,
@@ -73,10 +70,14 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { CommandService } from '../../services/CommandService.js';
+import { SlashCommand } from '../commands/types.js';
 
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(),
 }));
+
+vi.mock('../../services/CommandService.js');
 
 vi.mock('./useShowMemoryCommand.js', () => ({
   SHOW_MEMORY_COMMAND_NAME: '/memory show',
@@ -86,6 +87,16 @@ vi.mock('./useShowMemoryCommand.js', () => ({
 vi.mock('open', () => ({
   default: vi.fn(),
 }));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    getMCPServerStatus: vi.fn(),
+    getMCPDiscoveryState: vi.fn(),
+  };
+});
 
 describe('useSlashCommandProcessor', () => {
   let mockAddItem: ReturnType<typeof vi.fn>;
@@ -97,7 +108,6 @@ describe('useSlashCommandProcessor', () => {
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
   let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
-  let mockPerformMemoryRefresh: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
   let mockGeminiClient: GeminiClient;
@@ -106,6 +116,20 @@ describe('useSlashCommandProcessor', () => {
   const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
+    // Reset all mocks to clear any previous state or calls.
+    vi.clearAllMocks();
+
+    // Default mock setup for CommandService for all the OLD tests.
+    // This makes them pass again by simulating the original behavior where
+    // the service is constructed but doesn't do much yet.
+    vi.mocked(CommandService).mockImplementation(
+      () =>
+        ({
+          loadCommands: vi.fn().mockResolvedValue(undefined),
+          getCommands: vi.fn().mockReturnValue([]), // Return an empty array by default
+        }) as unknown as CommandService,
+    );
+
     mockAddItem = vi.fn();
     mockClearItems = vi.fn();
     mockLoadHistory = vi.fn();
@@ -115,7 +139,6 @@ describe('useSlashCommandProcessor', () => {
     mockOpenThemeDialog = vi.fn();
     mockOpenAuthDialog = vi.fn();
     mockOpenEditorDialog = vi.fn();
-    mockPerformMemoryRefresh = vi.fn().mockResolvedValue(undefined);
     mockSetQuittingMessages = vi.fn();
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
@@ -129,27 +152,35 @@ describe('useSlashCommandProcessor', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
+      getSessionId: vi.fn(() => 'test-session-id'),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-        cumulative: {
-          turnCount: 0,
-          promptTokenCount: 0,
-          candidatesTokenCount: 0,
-          totalTokenCount: 0,
-          cachedContentTokenCount: 0,
-          toolUsePromptTokenCount: 0,
-          thoughtsTokenCount: 0,
+        metrics: {
+          models: {},
+          tools: {
+            totalCalls: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+            totalDurationMs: 0,
+            totalDecisions: {
+              accept: 0,
+              reject: 0,
+              modify: 0,
+            },
+            byName: {},
+          },
         },
+        lastPromptTokenCount: 0,
+        promptCount: 0,
       },
     });
 
     (open as Mock).mockClear();
     mockProcessExit.mockClear();
     (ShowMemoryCommandModule.createShowMemoryAction as Mock).mockClear();
-    mockPerformMemoryRefresh.mockClear();
     process.env = { ...globalThis.process.env };
   });
 
@@ -158,7 +189,7 @@ describe('useSlashCommandProcessor', () => {
       merged: {
         contextFileName: 'GEMINI.md',
       },
-    } as LoadedSettings;
+    } as unknown as LoadedSettings;
     return renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
@@ -173,10 +204,10 @@ describe('useSlashCommandProcessor', () => {
         mockOpenThemeDialog,
         mockOpenAuthDialog,
         mockOpenEditorDialog,
-        mockPerformMemoryRefresh,
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
+        vi.fn(), // mockOpenPrivacyNotice
       ),
     );
   };
@@ -184,131 +215,12 @@ describe('useSlashCommandProcessor', () => {
   const getProcessor = (showToolDescriptions: boolean = false) =>
     getProcessorHook(showToolDescriptions).result.current;
 
-  describe('/memory add', () => {
-    it('should return tool scheduling info on valid input', async () => {
-      const { handleSlashCommand } = getProcessor();
-      const fact = 'Remember this fact';
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand(`/memory add ${fact}`);
-      });
-
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        1, // User message
-        expect.objectContaining({
-          type: MessageType.USER,
-          text: `/memory add ${fact}`,
-        }),
-        expect.any(Number),
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Info message about attempting to save
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: `Attempting to save to memory: "${fact}"`,
-        }),
-        expect.any(Number),
-      );
-
-      expect(commandResult).toEqual({
-        shouldScheduleTool: true,
-        toolName: 'save_memory',
-        toolArgs: { fact },
-      });
-
-      // performMemoryRefresh is no longer called directly here
-      expect(mockPerformMemoryRefresh).not.toHaveBeenCalled();
-    });
-
-    it('should show usage error and return true if no text is provided', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/memory add ');
-      });
-
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // After user message
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Usage: /memory add <text to remember>',
-        }),
-        expect.any(Number),
-      );
-      expect(commandResult).toBe(true); // Command was handled (by showing an error)
-    });
-  });
-
-  describe('/memory show', () => {
-    it('should call the showMemoryAction and return true', async () => {
-      const mockReturnedShowAction = vi.fn();
-      vi.mocked(ShowMemoryCommandModule.createShowMemoryAction).mockReturnValue(
-        mockReturnedShowAction,
-      );
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/memory show');
-      });
-      expect(
-        ShowMemoryCommandModule.createShowMemoryAction,
-      ).toHaveBeenCalledWith(
-        mockConfig,
-        expect.any(Object),
-        expect.any(Function),
-      );
-      expect(mockReturnedShowAction).toHaveBeenCalled();
-      expect(commandResult).toBe(true);
-    });
-  });
-
-  describe('/memory refresh', () => {
-    it('should call performMemoryRefresh and return true', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/memory refresh');
-      });
-      expect(mockPerformMemoryRefresh).toHaveBeenCalled();
-      expect(commandResult).toBe(true);
-    });
-  });
-
-  describe('Unknown /memory subcommand', () => {
-    it('should show an error for unknown /memory subcommand and return true', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/memory foobar');
-      });
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Unknown /memory command: foobar. Available: show, refresh, add',
-        }),
-        expect.any(Number),
-      );
-      expect(commandResult).toBe(true);
-    });
-  });
-
   describe('/stats command', () => {
     it('should show detailed session statistics', async () => {
       // Arrange
-      const cumulativeStats = {
-        totalTokenCount: 900,
-        promptTokenCount: 200,
-        candidatesTokenCount: 400,
-        cachedContentTokenCount: 100,
-        turnCount: 1,
-        toolUsePromptTokenCount: 50,
-        thoughtsTokenCount: 150,
-      };
       mockUseSessionStats.mockReturnValue({
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-          cumulative: cumulativeStats,
         },
       });
 
@@ -326,13 +238,50 @@ describe('useSlashCommandProcessor', () => {
         2, // Called after the user message
         expect.objectContaining({
           type: MessageType.STATS,
-          stats: cumulativeStats,
           duration: '1h 2m 3s',
         }),
         expect.any(Number),
       );
 
       vi.useRealTimers();
+    });
+
+    it('should show model-specific statistics when using /stats model', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats model');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.MODEL_STATS,
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show tool-specific statistics when using /stats tools', async () => {
+      // Arrange
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        handleSlashCommand('/stats tools');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2, // Called after the user message
+        expect.objectContaining({
+          type: MessageType.TOOL_STATS,
+        }),
+        expect.any(Number),
+      );
     });
   });
 
@@ -349,7 +298,7 @@ describe('useSlashCommandProcessor', () => {
           selectedAuthType: 'test-auth-type',
           contextFileName: 'GEMINI.md',
         },
-      } as LoadedSettings;
+      } as unknown as LoadedSettings;
 
       const { result } = renderHook(() =>
         useSlashCommandProcessor(
@@ -365,10 +314,10 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
+          vi.fn(), // mockOpenPrivacyNotice
         ),
       );
 
@@ -420,45 +369,187 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Other commands', () => {
-    it('/help should open help and return true', async () => {
+    it('/editor should open editor dialog and return handled', async () => {
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/help');
-      });
-      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
-      expect(commandResult).toBe(true);
-    });
-
-    it('/clear should clear items, reset chat, and refresh static', async () => {
-      const mockResetChat = vi.fn();
-      mockConfig = {
-        ...mockConfig,
-        getGeminiClient: () => ({
-          resetChat: mockResetChat,
-        }),
-      } as unknown as Config;
-
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/clear');
-      });
-
-      expect(mockClearItems).toHaveBeenCalled();
-      expect(mockResetChat).toHaveBeenCalled();
-      expect(mockRefreshStatic).toHaveBeenCalled();
-      expect(commandResult).toBe(true);
-    });
-
-    it('/editor should open editor dialog and return true', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/editor');
       });
       expect(mockOpenEditorDialog).toHaveBeenCalled();
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+  });
+
+  describe('New command registry', () => {
+    let ActualCommandService: typeof CommandService;
+
+    beforeAll(async () => {
+      const actual = (await vi.importActual(
+        '../../services/CommandService.js',
+      )) as { CommandService: typeof CommandService };
+      ActualCommandService = actual.CommandService;
+    });
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should execute a command from the new registry', async () => {
+      const mockAction = vi.fn();
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+
+      // We create the instance outside the mock implementation.
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+
+      // This mock ensures the hook uses our pre-configured instance.
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+
+      await vi.waitFor(() => {
+        // We check that the `slashCommands` array, which is the public API
+        // of our hook, eventually contains the command we injected.
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await result.current.handleSlashCommand('/test');
+      });
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should return "schedule_tool" when a new command returns a tool action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'tool',
+        toolName: 'my_tool',
+        toolArgs: { arg1: 'value1' },
+      });
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/test');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(commandResult).toEqual({
+        type: 'schedule_tool',
+        toolName: 'my_tool',
+        toolArgs: { arg1: 'value1' },
+      });
+    });
+
+    it('should return "handled" when a new command returns a message action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'This is a message',
+      });
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/test');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: 'This is a message',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should return "handled" when a new command returns a dialog action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'dialog',
+        dialog: 'help',
+      });
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/test');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should show help for a parent command with no action', async () => {
+      const parentCommand: SlashCommand = {
+        name: 'parent',
+        subCommands: [
+          { name: 'child', description: 'A child.', action: vi.fn() },
+        ],
+      };
+
+      const mockLoader = async () => [parentCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'parent'),
+        ).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/parent');
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: expect.stringContaining(
+            "Command '/parent' requires a subcommand.",
+          ),
+        }),
+        expect.any(Number),
+      );
     });
   });
 
@@ -471,6 +562,7 @@ describe('useSlashCommandProcessor', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       process.env = originalEnv;
     });
 
@@ -520,14 +612,14 @@ describe('useSlashCommandProcessor', () => {
         process.env.SEATBELT_PROFILE,
         'test-version',
       );
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
       });
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
       expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should use the custom bug command URL from config if available', async () => {
@@ -558,14 +650,14 @@ describe('useSlashCommandProcessor', () => {
         .replace('{title}', encodeURIComponent(bugDescription))
         .replace('{info}', encodeURIComponent(info));
 
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
       });
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
       expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
@@ -598,7 +690,6 @@ describe('useSlashCommandProcessor', () => {
           },
           {
             type: 'quit',
-            stats: expect.any(Object),
             duration: '1h 2m 3s',
             id: expect.any(Number),
           },
@@ -614,9 +705,9 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Unknown command', () => {
-    it('should show an error and return true for a general unknown command', async () => {
+    it('should show an error and return handled for a general unknown command', async () => {
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/unknowncommand');
       });
@@ -628,7 +719,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
@@ -639,7 +730,7 @@ describe('useSlashCommandProcessor', () => {
         getToolRegistry: vi.fn().mockResolvedValue(undefined),
       } as unknown as Config;
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/tools');
       });
@@ -652,7 +743,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should show an error if getAllTools returns undefined', async () => {
@@ -663,7 +754,7 @@ describe('useSlashCommandProcessor', () => {
         }),
       } as unknown as Config;
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/tools');
       });
@@ -676,7 +767,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display only Gemini CLI tools (filtering out MCP tools)', async () => {
@@ -696,7 +787,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/tools');
       });
@@ -705,7 +796,7 @@ describe('useSlashCommandProcessor', () => {
       const message = mockAddItem.mock.calls[1][0].text;
       expect(message).toContain('Tool1');
       expect(message).toContain('Tool2');
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display a message when no Gemini CLI tools are available', async () => {
@@ -723,14 +814,14 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/tools');
       });
 
       const message = mockAddItem.mock.calls[1][0].text;
       expect(message).toContain('No tools available');
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display tool descriptions when /tools desc is used', async () => {
@@ -755,7 +846,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/tools desc');
       });
@@ -765,40 +856,18 @@ describe('useSlashCommandProcessor', () => {
       expect(message).toContain('Description for Tool1');
       expect(message).toContain('Tool2');
       expect(message).toContain('Description for Tool2');
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
   describe('/mcp command', () => {
-    beforeEach(() => {
-      // Mock the core module with getMCPServerStatus and getMCPDiscoveryState
-      vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-        const actual = await importOriginal();
-        return {
-          ...actual,
-          MCPServerStatus: {
-            CONNECTED: 'connected',
-            CONNECTING: 'connecting',
-            DISCONNECTED: 'disconnected',
-          },
-          MCPDiscoveryState: {
-            NOT_STARTED: 'not_started',
-            IN_PROGRESS: 'in_progress',
-            COMPLETED: 'completed',
-          },
-          getMCPServerStatus: vi.fn(),
-          getMCPDiscoveryState: vi.fn(),
-        };
-      });
-    });
-
     it('should show an error if tool registry is not available', async () => {
       mockConfig = {
         ...mockConfig,
         getToolRegistry: vi.fn().mockResolvedValue(undefined),
       } as unknown as Config;
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -811,7 +880,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display a message with a URL when no MCP servers are configured in a sandbox', async () => {
@@ -825,7 +894,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -838,7 +907,7 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
       delete process.env.SANDBOX;
     });
 
@@ -852,7 +921,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -866,7 +935,7 @@ describe('useSlashCommandProcessor', () => {
         expect.any(Number),
       );
       expect(open).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs-mcp');
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display configured MCP servers with status indicators and their tools', async () => {
@@ -915,7 +984,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -950,7 +1019,7 @@ describe('useSlashCommandProcessor', () => {
       );
       expect(message).toContain('\u001b[36mserver3_tool1\u001b[0m');
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should display tool descriptions when showToolDescriptions is true', async () => {
@@ -988,7 +1057,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor(true);
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -1020,7 +1089,7 @@ describe('useSlashCommandProcessor', () => {
         '\u001b[32mThis is tool 2 description\u001b[0m',
       );
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should indicate when a server has no tools', async () => {
@@ -1045,7 +1114,7 @@ describe('useSlashCommandProcessor', () => {
       // Mock tools from each server - server2 has no tools
       const mockServer1Tools = [{ name: 'server1_tool1' }];
 
-      const mockServer2Tools = [];
+      const mockServer2Tools: Array<{ name: string }> = [];
 
       const mockGetToolsByServer = vi.fn().mockImplementation((serverName) => {
         if (serverName === 'server1') return mockServer1Tools;
@@ -1062,7 +1131,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -1087,7 +1156,7 @@ describe('useSlashCommandProcessor', () => {
       );
       expect(message).toContain('No tools available');
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
 
     it('should show startup indicator when servers are connecting', async () => {
@@ -1128,7 +1197,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp');
       });
@@ -1151,7 +1220,7 @@ describe('useSlashCommandProcessor', () => {
         '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
       );
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
@@ -1203,7 +1272,7 @@ describe('useSlashCommandProcessor', () => {
       } as unknown as Config;
 
       const { handleSlashCommand } = getProcessor(true);
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await handleSlashCommand('/mcp schema');
       });
@@ -1231,30 +1300,16 @@ describe('useSlashCommandProcessor', () => {
       expect(message).toContain('param2');
       expect(message).toContain('number');
 
-      expect(commandResult).toBe(true);
+      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
   describe('/compress command', () => {
     it('should call tryCompressChat(true)', async () => {
       const hook = getProcessorHook();
-      mockTryCompressChat.mockImplementationOnce(async (force?: boolean) => {
-        expect(force).toBe(true);
-        await act(async () => {
-          hook.rerender();
-        });
-        expect(hook.result.current.pendingHistoryItems).toContainEqual({
-          type: MessageType.COMPRESSION,
-          compression: {
-            isPending: true,
-            originalTokenCount: null,
-            newTokenCount: null,
-          },
-        });
-        return {
-          originalTokenCount: 100,
-          newTokenCount: 50,
-        };
+      mockTryCompressChat.mockResolvedValue({
+        originalTokenCount: 100,
+        newTokenCount: 50,
       });
 
       await act(async () => {
@@ -1264,7 +1319,10 @@ describe('useSlashCommandProcessor', () => {
         hook.rerender();
       });
       expect(hook.result.current.pendingHistoryItems).toEqual([]);
-      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(
+        'Prompt Id not set',
+        true,
+      );
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
@@ -1318,20 +1376,39 @@ describe('useSlashCommandProcessor', () => {
       mockUseSessionStats.mockReturnValue({
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-          cumulative: {
-            turnCount: 5,
-            promptTokenCount: 1000,
-            candidatesTokenCount: 800,
-            totalTokenCount: 1800,
-            cachedContentTokenCount: 200,
-            toolUsePromptTokenCount: 150,
-            thoughtsTokenCount: 50,
-            apiTimeMs: 5000,
+          metrics: {
+            models: {
+              'gemini-1.5-pro': {
+                api: {
+                  totalRequests: 5,
+                  totalErrors: 0,
+                  totalLatencyMs: 5000,
+                },
+                tokens: {
+                  prompt: 1000,
+                  candidates: 800,
+                  total: 1800,
+                  cached: 200,
+                  thoughts: 50,
+                  tool: 150,
+                },
+              },
+            },
+            tools: {
+              totalCalls: 10,
+              totalSuccess: 8,
+              totalFail: 2,
+              totalDurationMs: 3000,
+              totalDecisions: {
+                accept: 6,
+                reject: 2,
+                modify: 2,
+              },
+              byName: {},
+            },
           },
-          currentTurn: {
-            promptTokenCount: 100,
-            candidatesTokenCount: 80,
-          },
+          lastPromptTokenCount: 100,
+          promptCount: 5,
         },
       });
     });
@@ -1365,14 +1442,14 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
         ),
       );
 
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await hook.result.current.handleSlashCommand('/export');
       });
@@ -1422,14 +1499,14 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
         ),
       );
 
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await hook.result.current.handleSlashCommand(
           '/export my-conversation.md',
@@ -1472,14 +1549,14 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
         ),
       );
 
-      let _commandResult: SlashCommandActionReturn | boolean = false;
+      let _commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         _commandResult =
           await hook.result.current.handleSlashCommand('/export test.md');
@@ -1536,7 +1613,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
@@ -1549,11 +1626,13 @@ describe('useSlashCommandProcessor', () => {
 
       const exportContent = mockWriteFile.mock.calls[0][1];
       expect(exportContent).toContain('## 📊 Session Statistics');
-      expect(exportContent).toContain('| **Total Turns** | 5 |');
+      expect(exportContent).toContain('| **Total API Requests** | 5 |');
       expect(exportContent).toContain('| **Total Tokens** | 1,800 |');
       expect(exportContent).toContain('| **Prompt Tokens** | 1,000 |');
       expect(exportContent).toContain('| **Response Tokens** | 800 |');
       expect(exportContent).toContain('| **Total API Time** | 5,000 ms |');
+      expect(exportContent).toContain('| **Tool Calls** | 10 |');
+      expect(exportContent).toContain('| **Tool Success Rate** | 80.0% |');
     });
 
     it('should handle core history retrieval failure gracefully', async () => {
@@ -1593,7 +1672,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
@@ -1601,7 +1680,7 @@ describe('useSlashCommandProcessor', () => {
       );
 
       // Should not throw error and still export successfully
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await hook.result.current.handleSlashCommand(
           '/export error-test.md',
@@ -1649,14 +1728,14 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
         ),
       );
 
-      let commandResult: SlashCommandActionReturn | boolean = false;
+      let commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         commandResult = await hook.result.current.handleSlashCommand(
           '/export fail-test.md',
@@ -1679,7 +1758,7 @@ describe('useSlashCommandProcessor', () => {
     it('should generate valid markdown export with correct filename', async () => {
       const { handleSlashCommand } = getProcessor();
 
-      let _commandResult: SlashCommandActionReturn | boolean = false;
+      let _commandResult: SlashCommandProcessorResult | false = false;
       await act(async () => {
         _commandResult = await handleSlashCommand('/export test-export.md');
       });
@@ -1724,7 +1803,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
@@ -1743,7 +1822,7 @@ describe('useSlashCommandProcessor', () => {
         mockWriteFile.mockClear();
         mockAddItem.mockClear();
 
-        let commandResult: SlashCommandActionReturn | boolean = false;
+        let commandResult: SlashCommandProcessorResult | false = false;
         await act(async () => {
           commandResult = await hook.result.current.handleSlashCommand(
             `/export ${maliciousPath}`,
@@ -1796,7 +1875,7 @@ describe('useSlashCommandProcessor', () => {
           mockOpenThemeDialog,
           mockOpenAuthDialog,
           mockOpenEditorDialog,
-          mockPerformMemoryRefresh,
+          mockCorgiMode,
           mockCorgiMode,
           false,
           mockSetQuittingMessages,
@@ -1812,7 +1891,7 @@ describe('useSlashCommandProcessor', () => {
       ];
 
       for (const legitimatePath of legitimatePaths) {
-        let commandResult: SlashCommandActionReturn | boolean = false;
+        let commandResult: SlashCommandProcessorResult | false = false;
         await act(async () => {
           commandResult = await hook.result.current.handleSlashCommand(
             `/export ${legitimatePath}`,
