@@ -23,6 +23,7 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
+import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -59,6 +60,8 @@ export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
+  private userTier: UserTierId | undefined = undefined;
+
   constructor(
     readonly client: OAuth2Client,
     readonly projectId?: string,
@@ -251,6 +254,40 @@ export class CodeAssistServer implements ContentGenerator {
         }
       }
     })();
+  }
+
+  async getTier(): Promise<UserTierId | undefined> {
+    if (this.userTier === undefined) {
+      await this.detectUserTier();
+    }
+    return this.userTier;
+  }
+
+  private async detectUserTier(): Promise<void> {
+    try {
+      // Reset user tier when detection runs
+      this.userTier = undefined;
+
+      // Only attempt tier detection if we have a project ID
+      if (this.projectId) {
+        const loadRes = await this.loadCodeAssist({
+          cloudaicompanionProject: this.projectId,
+          metadata: {
+            ideType: 'IDE_UNSPECIFIED',
+            platform: 'PLATFORM_UNSPECIFIED',
+            pluginType: 'GEMINI',
+            duetProject: this.projectId,
+          },
+        });
+        if (loadRes.currentTier) {
+          this.userTier = loadRes.currentTier.id;
+        }
+      }
+    } catch (error) {
+      // Silently fail - this is not critical functionality
+      // We'll default to FREE tier behavior if tier detection fails
+      console.debug('User tier detection failed:', error);
+    }
   }
 
   getMethodUrl(method: string): string {
