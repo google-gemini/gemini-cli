@@ -191,9 +191,7 @@ describe('executeToolCall', () => {
         // Simulate work that might happen if not aborted immediately
         const timeoutId = setTimeout(
           () =>
-            reject(
-              new Error('Should have been canceled if not aborted prior'),
-            ),
+            reject(new Error('Should have been canceled if not aborted prior')),
           100,
         );
         signal?.addEventListener('abort', () => clearTimeout(timeoutId));
