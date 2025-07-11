@@ -134,12 +134,8 @@ export class GeminiClient {
     return this.chat;
   }
 
-  getChatSafe(): GeminiChat | undefined {
-    return this.chat;
-  }
-
   isInitialized(): boolean {
-    return this.chat !== undefined;
+    return this.chat !== undefined && this.contentGenerator !== undefined;
   }
 
   getHistory(): Content[] {
