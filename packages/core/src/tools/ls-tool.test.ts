@@ -6,11 +6,11 @@
 
 import { LsTool } from './ls-tool.js';
 import { promises as fs } from 'fs';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    readdir: jest.fn(),
+    readdir: vi.fn(),
   },
 }));
 
@@ -21,7 +21,7 @@ describe('LsTool', () => {
       directory: '/test',
     };
 
-    (fs.readdir as jest.Mock).mockResolvedValue(['file1.txt', 'file2.txt']);
+    (fs.readdir as any).mockResolvedValue(['file1.txt', 'file2.txt']);
 
     const result = await tool.execute(params, new AbortController().signal);
 
@@ -52,8 +52,8 @@ describe('LsTool', () => {
       directory: '/test',
     };
 
-    (fs.readdir as jest.Mock).mockRejectedValue(
-      new Error('Directory not found'),
+    (fs.readdir as any).mockRejectedValue(
+      new Error('Directory not found') as any,
     );
 
     const result = await tool.execute(params, new AbortController().signal);

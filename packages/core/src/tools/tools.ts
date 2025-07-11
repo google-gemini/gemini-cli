@@ -50,7 +50,7 @@ export interface Tool<
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  validateToolParams(params: TParams): string | null;
+  validateToolParams(_params: TParams): string | null;
 
   /**
    * Gets a pre-execution description of the tool operation
@@ -127,7 +127,7 @@ export abstract class BaseTool<
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  validateToolParams(params: TParams): string | null {
+  validateToolParams(_params: TParams): string | null {
     // Implementation would typically use a JSON Schema validator
     // This is a placeholder that should be implemented by derived classes
     return null;

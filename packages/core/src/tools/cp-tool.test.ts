@@ -7,11 +7,11 @@
 import { CpTool } from './cp-tool.js';
 
 import { promises as fs } from 'fs';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   promises: {
-    copyFile: jest.fn(),
+    copyFile: vi.fn(),
   },
 }));
 
@@ -50,8 +50,8 @@ describe('CpTool', () => {
       destination: '/test2.txt',
     };
 
-    (fs.copyFile as jest.Mock).mockRejectedValue(
-      new Error('Permission denied'),
+    (fs.copyFile as any).mockRejectedValue(
+      new Error('Permission denied') as any,
     );
 
     const result = await tool.execute(params, new AbortController().signal);

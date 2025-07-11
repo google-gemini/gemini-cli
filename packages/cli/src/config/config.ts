@@ -22,13 +22,31 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  Settings,
+  Extension,
 } from '@google/gemini-cli-core';
 import { Logger } from '@google/gemini-cli-core';
 import { loadSandboxConfig } from '../config/sandboxConfig.js';
 import { getPackageJson } from '../utils/package.js';
 
-function parseArguments(version: string) {
-  const argv = yargs(hideBin(process.argv))
+interface CliArgs {
+  prompt?: string[];
+  debug: boolean;
+  all_files: boolean;
+  model: string;
+  yolo: boolean;
+  show_memory_usage: boolean;
+  telemetry?: boolean;
+  telemetryTarget?: string;
+  telemetryOtlpEndpoint?: string;
+  telemetryLogPrompts?: boolean;
+  checkpointing?: boolean;
+  version: boolean;
+  help: boolean;
+}
+
+async function parseArguments(version: string): Promise<CliArgs> {
+  const argv = await yargs(hideBin(process.argv))
     .command(
       '$0 [prompt...]',
       'Ask Gemini a question or ask it to perform a task.',
@@ -90,123 +108,7 @@ function parseArguments(version: string) {
     .alias('h', 'help')
     .strict().argv;
 
-  return argv;
-}
-
-// This function is now a thin wrapper around the server's implementation.
-// It's kept in the CLI for now as App.tsx directly calls it for memory refresh.
-// TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
-export async function loadHierarchicalGeminiMemory(
-  currentWorkingDirectory: string,
-  debugMode: boolean,
-  fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
-): Promise<{ memoryContent: string; fileCount: number }> {
-  if (debugMode) {
-    new Logger('cli-config').debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
-    );
-  }
-  // Directly call the server function.
-  // The server function will use its own homedir() for the global path.
-  return loadServerHierarchicalMemory(
-    currentWorkingDirectory,
-    debugMode,
-    fileService,
-    extensionContextFilePaths,
-  );
-}
-
-export async function loadCliConfig(
-  settings: Settings,
-  extensions: Extension[],
-  sessionId: string,
-): Promise<Config> {
-  loadEnvironment();
-
-  const packageJson = await getPackageJson();
-  const version = packageJson?.version || 'unknown';
-
-  const argv = parseArguments(version);
-  const debugMode = argv.debug || false;
-
-  // Set the context filename in the server's memoryTool module BEFORE loading memory
-  // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
-  // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
-  // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.contextFileName) {
-    setServerGeminiMdFilename(settings.contextFileName);
-  } else {
-    // Reset to default if not provided in settings.
-    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
-  }
-
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
-
-  const fileService = new FileDiscoveryService(process.cwd());
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
-    debugMode,
-    fileService,
-    extensionContextFilePaths,
-  );
-
-  const mcpServers = mergeMcpServers(settings, extensions);
-  const excludeTools = mergeExcludeTools(settings, extensions);
-
-  const sandboxConfig = await loadSandboxConfig(settings, argv);
-
-  return new Config({
-    sessionId,
-    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
-    sandbox: sandboxConfig,
-    targetDir: process.cwd(),
-    debugMode,
-    question: argv.prompt || '',
-    fullContext: argv.all_files || false,
-    coreTools: settings.coreTools || undefined,
-    excludeTools,
-    toolDiscoveryCommand: settings.toolDiscoveryCommand,
-    toolCallCommand: settings.toolCallCommand,
-    mcpServerCommand: settings.mcpServerCommand,
-    mcpServers,
-    userMemory: memoryContent,
-    geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
-    showMemoryUsage:
-      argv.show_memory_usage || settings.showMemoryUsage || false,
-    accessibility: settings.accessibility,
-    telemetry: {
-      enabled: argv.telemetry ?? settings.telemetry?.enabled,
-      target: (argv.telemetryTarget ??
-        settings.telemetry?.target) as TelemetryTarget,
-      otlpEndpoint:
-        argv.telemetryOtlpEndpoint ??
-        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
-        settings.telemetry?.otlpEndpoint,
-      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-    },
-    usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
-    // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
-    },
-    checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
-    proxy:
-      process.env.HTTPS_PROXY ||
-      process.env.https_proxy ||
-      process.env.HTTP_PROXY ||
-      process.env.http_proxy,
-    cwd: process.cwd(),
-    fileDiscoveryService: fileService,
-    bugCommand: settings.bugCommand,
-    model: argv.model!,
-    extensionContextFilePaths,
-    filePermissions: settings.filePermissions, // Pass the loaded rules
-  });
+  return argv as CliArgs;
 }
 
 async function mergeMcpServers(settings: Settings, extensions: Extension[]) {

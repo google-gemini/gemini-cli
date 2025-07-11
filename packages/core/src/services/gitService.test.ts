@@ -87,9 +87,8 @@ describe('GitService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoistedIsGitRepositoryMock.mockReturnValue(true);
-    // @ts-expect-error
-    hoistedMockExec.mockImplementation((command, callback) => {
-      if (command === 'git --version') {
+    hoistedMockExec.mockImplementation((_command, callback) => {
+      if (_command === 'git --version') {
         callback(null, 'git version 2.0.0');
       } else {
         callback(new Error('Command not mocked'));
@@ -145,8 +144,7 @@ describe('GitService', () => {
     });
 
     it('should resolve false if git --version command fails', async () => {
-      // @ts-expect-error
-      hoistedMockExec.mockImplementation((command, callback) => {
+      hoistedMockExec.mockImplementation((_command, callback) => {
         callback(new Error('git not found'));
         return {} as ChildProcess;
       });
@@ -165,7 +163,7 @@ describe('GitService', () => {
     });
 
     it('should throw an error if Git is not available', async () => {
-      hoistedMockExec.mockImplementation((command, callback) => {
+      hoistedMockExec.mockImplementation((_command, callback) => {
         callback(new Error('git not found'));
         return {} as ChildProcess;
       });

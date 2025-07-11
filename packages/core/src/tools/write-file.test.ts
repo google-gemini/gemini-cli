@@ -12,7 +12,6 @@ import {
   afterEach,
   vi,
   type Mocked,
-  MockProxy,
 } from 'vitest';
 import { WriteFileTool } from './write-file.js';
 import {
@@ -88,7 +87,7 @@ const mockConfig = mockConfigInternal as unknown as Config;
 describe('WriteFileTool', () => {
   let tool: WriteFileTool;
   let tempDir: string;
-  let mockFilePermissionService: MockProxy<FilePermissionService>;
+  let mockFilePermissionService: Mocked<FilePermissionService>;
 
   beforeEach(() => {
     // Create a unique temporary directory for files created outside the root

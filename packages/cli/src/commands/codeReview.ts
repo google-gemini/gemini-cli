@@ -2,11 +2,10 @@
 // Pyrmethus, the Termux Coding Wizard, conjures a spell to review code quality.
 
 import { Command } from '@oclif/core';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { join, extname } from 'path';
 import chalk from 'chalk';
-
-
+import { runShellCommand } from '@google/gemini-cli-core';
 
 // Chromatic constants for enchanted logging
 const NG = chalk.green.bold; // Success
@@ -23,13 +22,13 @@ export default class CodeReview extends Command {
     `${NG}<%= config.bin %> <%= command.id %> <filePath>${RST}`,
   ];
 
-  static args = [
-    {
+  static args = {
+    filePath: {
       name: 'filePath',
       required: true,
       description: 'Path to the file to review.',
     },
-  ];
+  };
 
   public async run(): Promise<void> {
     const { args } = await this.parse(CodeReview);
@@ -68,7 +67,7 @@ export default class CodeReview extends Command {
   private async reviewJavaScriptTypeScript(filePath: string): Promise<void> {
     this.log(NB + `Channeling ESLint for ${filePath}...` + RST);
     try {
-      const { stdout, stderr } = await run_shell_command({
+      const { stdout, stderr } = await runShellCommand({
         command: `npx eslint --format json ${filePath}`,
         description: `Running ESLint on ${filePath}`,
       });
@@ -113,7 +112,7 @@ Consider running: ${NG}npm run lint:fix${NY} to automatically resolve some issue
   private async reviewPython(filePath: string): Promise<void> {
     this.log(NB + `Channeling Ruff for ${filePath}...` + RST);
     try {
-      const { stdout, stderr } = await run_shell_command({
+      const { stdout, stderr } = await runShellCommand({
         command: `ruff check --output-format=json ${filePath}`,
         description: `Running Ruff on ${filePath}`,
       });

@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import fs from 'fs-extra';
+import { Logger } from '@google/gemini-cli-core';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
+
+const logger = new Logger('file-info-command');
 
 export async function fileInfo(filePath: string): Promise<void> {
   logger.info(

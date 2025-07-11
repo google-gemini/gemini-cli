@@ -206,7 +206,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         Date.now(),
       );
       if (config.getDebugMode()) {
-        new Logger().debug(
+        new Logger('app-component').debug(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,
         );
       }
@@ -219,7 +219,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
         },
         Date.now(),
       );
-      new Logger().error('Error refreshing memory:', error);
+      new Logger('app-component').error('Error refreshing memory:', error);
     }
   }, [config, addItem]);
 
@@ -480,7 +480,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const handleClearScreen = useCallback(() => {
     clearItems();
     clearConsoleMessagesState();
-    new Logger().clear();
+    new Logger('app-component').clear();
     refreshStatic();
   }, [clearItems, clearConsoleMessagesState, refreshStatic]);
 

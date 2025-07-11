@@ -140,12 +140,23 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     ) {
       return 'Parameters failed schema validation.';
     }
-    const filePath = params.absolute_path;
-    if (!path.isAbsolute(filePath)) {
-      return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
-    }
-    if (!isWithinRoot(filePath, this.rootDirectory)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
+    const filePaths = Array.isArray(params.absolute_path)
+      ? params.absolute_path
+      : [params.absolute_path];
+    for (const filePath of filePaths) {
+      if (!path.isAbsolute(filePath)) {
+        return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
+      }
+      if (!isWithinRoot(filePath, this.rootDirectory)) {
+        return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
+      }
+      const fileService = this.config.getFileService();
+      if (fileService.shouldGeminiIgnoreFile(filePath)) {
+        const relativePath = makeRelative(filePath, this.rootDirectory);
+        return `File path '${shortenPath(
+          relativePath,
+        )}' is ignored by .geminiignore pattern(s).`;
+      }
     }
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
@@ -153,29 +164,20 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     if (params.limit !== undefined && params.limit <= 0) {
       return 'Limit must be a positive number';
     }
-
-    const fileService = this.config.getFileService();
-    if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
-      const relativePath = makeRelative(
-        params.absolute_path,
-        this.rootDirectory,
-      );
-      return `File path '${shortenPath(relativePath)}' is ignored by .geminiignore pattern(s).`;
-    }
-
     return null;
   }
 
   getDescription(params: ReadFileToolParams): string {
-    if (
-      !params ||
-      typeof params.absolute_path !== 'string' ||
-      params.absolute_path.trim() === ''
-    ) {
+    if (!params || !params.absolute_path) {
       return `Path unavailable`;
     }
-    const relativePath = makeRelative(params.absolute_path, this.rootDirectory);
-    return shortenPath(relativePath);
+    const filePaths = Array.isArray(params.absolute_path)
+      ? params.absolute_path
+      : [params.absolute_path];
+    const relativePaths = filePaths.map((filePath) =>
+      makeRelative(filePath, this.rootDirectory),
+    );
+    return shortenPath(relativePaths.join(', '));
   }
 
   async execute(

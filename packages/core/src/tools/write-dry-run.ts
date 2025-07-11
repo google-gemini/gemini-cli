@@ -16,7 +16,7 @@ export async function writeDryRun(
   filePath: string,
   content: string,
   dryRun: boolean,
-  config: DryRunConfig,
+  _config: DryRunConfig,
 ): Promise<string> {
   if (!(await checkFilePermission())) {
     throw new Error(`Write access denied for ${filePath}`);

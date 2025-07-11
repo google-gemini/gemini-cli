@@ -646,7 +646,7 @@ export const useGeminiStream = (
               parts = [response];
             }
             geminiClient.addHistory({
-              role: 'user',
+              role: 'tool',
               parts,
             });
           }
@@ -659,15 +659,31 @@ export const useGeminiStream = (
         return;
       }
 
-      const responsesToSend: PartListUnion[] = geminiTools.map(
+      const responsesToSend = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+      for (const response of responsesToSend) {
+        let parts: Part[];
+        if (Array.isArray(response)) {
+          parts = response;
+        } else if (typeof response === 'string') {
+          parts = [{ text: response }];
+        } else {
+          parts = [response];
+        }
+        geminiClient.addHistory({
+          role: 'tool',
+          parts,
+        });
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-      submitQuery(mergePartListUnions(responsesToSend), {
+      // After tools have run, we need to kick off a new turn.
+      submitQuery('', {
         isContinuation: true,
       });
     },

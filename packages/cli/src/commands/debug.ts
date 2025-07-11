@@ -9,6 +9,8 @@ import chalk from 'chalk';
 import fs from 'fs-extra';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
+const logger = new Logger('debug-command');
+
 export async function debugCode(
   codeOrPath: string,
   errorMsg?: string,

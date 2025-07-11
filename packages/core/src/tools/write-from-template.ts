@@ -20,7 +20,7 @@ export async function writeFromTemplate(
   filePath: string,
   templateName: string,
   substitutions: { [key: string]: string },
-  config: unknown,
+  _config: unknown,
 ): Promise<string> {
   if (!(await checkFilePermission())) {
     throw new Error(`Write access denied for ${filePath}`);

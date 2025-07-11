@@ -3,8 +3,9 @@
 
 import { Command } from '@oclif/core';
 import { readFileSync, existsSync } from 'fs';
-import { join, extname } from 'path';
+import { join } from 'path';
 import chalk from 'chalk';
+import { runShellCommand, replace } from '@google/gemini-cli-core';
 
 import * as readline from 'readline';
 
@@ -25,25 +26,24 @@ export default class DebugAssist extends Command {
     `${NG}<%= config.bin %> <%= command.id %> <codeOrPath> [errorMsg]${RST}`,
   ];
 
-  static args = [
-    {
+  static args = {
+    codeOrPath: {
       name: 'codeOrPath',
       required: true,
       description: 'Code snippet or path to the file to debug.',
     },
-    {
+    errorMsg: {
       name: 'errorMsg',
       required: false,
       description: 'Optional error message to provide context.',
     },
-  ];
+  };
 
   private rl: readline.Interface | undefined;
 
   public async run(): Promise<void> {
     const { args } = await this.parse(DebugAssist);
-    const codeOrPath = args.codeOrPath as string;
-    const errorMsg = args.errorMsg as string | undefined;
+    const { codeOrPath, errorMsg } = args as { codeOrPath: string; errorMsg?: string; };
 
     this.log(NP + 'Summoning the debugging spirits...' + RST);
 
@@ -116,15 +116,15 @@ export default class DebugAssist extends Command {
         if (confirmFix.toLowerCase() === 'yes') {
           if (isFilePath) {
             try {
-              await replace({
-                file_path: join(
+              await replace(
+                join(
                   process.cwd(),
-                  this.parse(DebugAssist).args.codeOrPath as string,
+                  (await this.parse(DebugAssist)).args.codeOrPath as string,
                 ),
-                old_string: suggestion.oldCode || '',
-                new_string: suggestion.newCode || '',
-                expected_replacements: suggestion.expectedReplacements || 1,
-              });
+                suggestion.newCode || '',
+                suggestion.oldCode || '',
+                suggestion.expectedReplacements || 1,
+              );
               this.log(NG + 'Fix applied to file.' + RST);
               currentCode = suggestion.newCode || currentCode; // Update local code representation
             } catch (e: any) {
@@ -141,7 +141,7 @@ export default class DebugAssist extends Command {
         );
         if (confirmRun.toLowerCase() === 'yes') {
           try {
-            const { stdout, stderr } = await run_shell_command({
+            const { stdout, stderr } = await runShellCommand({
               command: suggestion.command || '',
               description: 'Executing suggested command',
             });

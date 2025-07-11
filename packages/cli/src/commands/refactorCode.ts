@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger, edit } from '@google/gemini-cli-core';
+import { Logger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
+
+const logger = new Logger('refactor-code-command');
 
 export async function refactorCodeCommand(
   filePath: string,
@@ -37,7 +39,7 @@ export async function refactorCodeCommand(
         `// Attempting to refactor '${oldName}' to '${newName}' in '${filePath}'...`,
       ),
     );
-    const diff = await refactorCode({
+    const diff = await default_api.refactorCode({
       filePath,
       refactoringType: 'rename-symbol',
       oldName,
@@ -53,7 +55,7 @@ export async function refactorCodeCommand(
     logger.info(chalk.white(diff)); // Display the diff
 
     // Automatically apply the diff for now. In a full interactive-edit, this would be a prompt.
-    await edit(filePath, diff);
+    await default_api.edit(filePath, diff);
     logger.info(chalk.green(`Success! Refactoring applied to '${filePath}'.`));
   } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred.';

@@ -5,7 +5,7 @@ import { Command } from '@oclif/core';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
-// The run_shell_command tool will be called via default_api.run_shell_command
+import { runShellCommand } from '@google/gemini-cli-core';
 
 
 
@@ -60,7 +60,7 @@ export default class DepCheck extends Command {
         ...packageJson.devDependencies,
       };
 
-      const { stdout: npmLsOutput } = await default_api.run_shell_command({
+      const { stdout: npmLsOutput } = await runShellCommand({
         command: 'npm list --json --depth=0',
         description: 'Listing installed Node.js packages',
         directory: projectRoot,
@@ -143,10 +143,10 @@ Found ${missingCount} missing Node.js dependencies. Consider running: ${NG}npm i
       const requirementsTxtPath = join(projectRoot, 'requirements.txt');
       const requiredPackages = readFileSync(requirementsTxtPath, 'utf8')
         .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#'));
+        .map((line: string) => line.trim())
+        .filter((line: string) => line && !line.startsWith('#'));
 
-      const { stdout: pipFreezeOutput } = await default_api.run_shell_command({
+      const { stdout: pipFreezeOutput } = await runShellCommand({
         command: 'pip freeze',
         description: 'Listing installed Python packages',
         directory: projectRoot,
@@ -157,7 +157,7 @@ Found ${missingCount} missing Node.js dependencies. Consider running: ${NG}npm i
         .map((line) => line.trim())
         .filter(Boolean);
       const installedPackageMap: { [key: string]: string } = {};
-      installedPackages.forEach((pkg) => {
+      installedPackages.forEach((pkg: string) => {
         const [name, version] = pkg.split('==');
         if (name && version) {
           installedPackageMap[name] = version;

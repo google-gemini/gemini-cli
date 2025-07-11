@@ -21,6 +21,8 @@ export interface EditToolParams {
   count?: number;
   commit_message?: string;
   branch_name?: string;
+  expected_replacements?: number;
+  modified_by_user?: boolean;
 }
 
 export class EditTool extends BaseTool implements ModifiableTool<EditToolParams> {
@@ -28,7 +30,7 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
   private readonly logger: Logger;
   private readonly fileCache: Map<string, string> = new Map();
 
-  constructor(config: any) { // TODO: Define a proper type for config
+  constructor(_config: any) { // TODO: Define a proper type for config
     const parameterSchema = {
       type: 'object',
       properties: {
@@ -43,7 +45,7 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
         commit_message: { type: 'string', description: 'Git commit message if changes should be committed.' },
         branch_name: { type: 'string', description: 'Git branch name to commit to.' },
       },
-      required: ['file_path'],
+      required: ['file_path', 'old_string', 'new_string'],
     };
     super(
       EditTool.Name,
@@ -60,8 +62,11 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
     if (!params.file_path) {
       return 'file_path is required.';
     }
-    if (params.old_string === undefined && params.new_string === undefined) {
-      return 'at least one of old_string or new_string is required.';
+    if (params.old_string === undefined) {
+      return 'old_string is required.';
+    }
+    if (params.new_string === undefined) {
+      return 'new_string is required.';
     }
     return null;
   }
@@ -101,7 +106,7 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
     signal: AbortSignal,
   ): Promise<ToolResult> {
     const context = this.getModifyContext(signal);
-    await this.modify(context);
+    await this.modify(context, params);
     return {
       llmContent: `Successfully edited ${params.file_path}`,
       returnDisplay: `Edited ${params.file_path}`,
@@ -112,10 +117,9 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
     return `Edits file: ${params.file_path}`;
   }
 
-  async modify(context: ModifyContext<EditToolParams>): Promise<void> {
+  async modify(context: ModifyContext<EditToolParams>, params: EditToolParams): Promise<void> {
     await this.logger.info('Starting edit operation');
     try {
-      const params = context.getParams();
       const content = await context.getCurrentContent(params);
       const { newContent, occurrences } = await this.applyReplacement(
         content,
@@ -358,9 +362,6 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
         old_string: oldContent,
         new_string: modifiedProposedContent,
       }),
-      getParams: () => {
-        throw new Error("Method not implemented.");
-      }
     };
   }
 

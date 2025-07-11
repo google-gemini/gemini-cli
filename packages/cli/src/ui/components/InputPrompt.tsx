@@ -171,7 +171,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (key.sequence === '!' && query === '' && !completion.showSuggestions) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
-        return true;
+        return;
       }
 
       if (completion.showSuggestions) {

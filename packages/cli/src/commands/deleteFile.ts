@@ -9,6 +9,8 @@ import chalk from 'chalk';
 import fs from 'fs-extra';
 import { MockGeminiAPI } from '../utils/mockGeminiAPI.js';
 
+const logger = new Logger('delete-file-command');
+
 export async function deleteFile(
   pathToDelete: string,
   confirm: string,
