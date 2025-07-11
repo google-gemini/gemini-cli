@@ -317,6 +317,7 @@ export async function loadCliConfig(
       name: e.config.name,
       version: e.config.version,
     })),
+    noBrowser: !!process.env.NO_BROWSER,
   });
 }
 
