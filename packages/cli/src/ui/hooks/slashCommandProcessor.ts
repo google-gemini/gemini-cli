@@ -247,13 +247,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'theme',
-        description: 'change the theme',
-        action: (_mainCommand, _subCommand, _args) => {
-          openThemeDialog();
-        },
-      },
-      {
         name: 'auth',
         description: 'change the auth method',
         action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
@@ -1278,7 +1271,6 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openThemeDialog,
     openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
@@ -1378,6 +1370,9 @@ export const useSlashCommandProcessor = (
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
+                  case 'theme':
+                    openThemeDialog();
+                    return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
                     throw new Error(
@@ -1459,6 +1454,7 @@ export const useSlashCommandProcessor = (
       legacyCommands,
       commandContext,
       addMessage,
+      openThemeDialog,
     ],
   );
 
