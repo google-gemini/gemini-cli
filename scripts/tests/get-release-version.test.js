@@ -17,7 +17,10 @@ vi.mock('fs', async (importOriginal) => {
   const mod = await importOriginal();
   return {
     ...mod,
-    readFileSync: vi.fn(),
+    default: {
+      ...mod.default,
+      readFileSync: vi.fn(),
+    },
   };
 });
 
@@ -40,13 +43,13 @@ describe('getReleaseVersion', () => {
     process.env.IS_NIGHTLY = 'true';
     const knownDate = new Date('2025-07-20T10:00:00.000Z');
     vi.setSystemTime(knownDate);
-    vi.mocked(fs.readFileSync).mockReturnValue(
+    vi.mocked(fs.default.readFileSync).mockReturnValue(
       JSON.stringify({ version: '0.1.0' }),
     );
     vi.mocked(execSync).mockReturnValue('abcdef');
     const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v0.1.9-nightly.250720.abcdef');
-    expect(releaseVersion).toBe('0.1.9-nightly.250720.abcdef');
+    expect(releaseTag).toBe('v0.1.0-nightly.250720.abcdef');
+    expect(releaseVersion).toBe('0.1.0-nightly.250720.abcdef');
     expect(npmTag).toBe('nightly');
   });
 

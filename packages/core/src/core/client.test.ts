@@ -178,6 +178,8 @@ describe('Gemini Client (client.ts)', () => {
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       };
       return mock as unknown as Config;
     });
@@ -351,7 +353,7 @@ describe('Gemini Client (client.ts)', () => {
       await client.generateJson(contents, schema, abortSignal);
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: DEFAULT_GEMINI_FLASH_MODEL,
+        model: 'test-model', // Should use current model from config
         config: {
           abortSignal,
           systemInstruction: getCoreSystemPrompt(''),
@@ -448,7 +450,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat();
+      const result = await client.tryCompressChat('prompt-id-2');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -474,7 +476,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat();
+      const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -505,7 +507,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat(true); // force = true
+      const result = await client.tryCompressChat('prompt-id-1', true); // force = true
       const newChat = client.getChat();
 
       expect(mockSendMessage).toHaveBeenCalled();
@@ -543,6 +545,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
+        'prompt-id-1',
       );
 
       // Consume the stream manually to get the final return value.
@@ -595,6 +598,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Start conversation' }],
         signal,
+        'prompt-id-2',
       );
 
       // Count how many stream events we get
@@ -695,6 +699,7 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Start conversation' }],
         signal,
+        'prompt-id-3',
         Number.MAX_SAFE_INTEGER, // Bypass the MAX_TURNS protection
       );
 
@@ -804,7 +809,7 @@ describe('Gemini Client (client.ts)', () => {
       client['contentGenerator'] = mockGenerator as ContentGenerator;
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);
 
-      const result = await client.tryCompressChat(true);
+      const result = await client.tryCompressChat('prompt-id-4', true);
 
       expect(mockCountTokens).toHaveBeenCalledTimes(2);
       expect(mockCountTokens).toHaveBeenNthCalledWith(1, {
@@ -845,6 +850,7 @@ describe('Gemini Client (client.ts)', () => {
       expect(mockFallbackHandler).toHaveBeenCalledWith(
         currentModel,
         fallbackModel,
+        undefined,
       );
     });
   });

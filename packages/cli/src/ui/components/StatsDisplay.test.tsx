@@ -27,7 +27,11 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
+      promptCount: 5,
     },
+
+    getPromptCount: () => 5,
+    startNewPrompt: vi.fn(),
   });
 
   return render(<StatsDisplay duration="1s" />);
@@ -288,7 +292,11 @@ describe('<StatsDisplay />', () => {
           sessionStartTime: new Date(),
           metrics: zeroMetrics,
           lastPromptTokenCount: 0,
+          promptCount: 5,
         },
+
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
       });
 
       const { lastFrame } = render(

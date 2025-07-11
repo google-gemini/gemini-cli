@@ -57,6 +57,7 @@ export function ThemeDialog({
   const scopeItems = [
     { label: 'User Settings', value: SettingScope.User },
     { label: 'Workspace Settings', value: SettingScope.Workspace },
+    { label: 'System Settings', value: SettingScope.System },
   ];
 
   const handleThemeSelect = (themeName: string) => {
@@ -86,16 +87,21 @@ export function ThemeDialog({
     }
   });
 
+  const otherScopes = Object.values(SettingScope).filter(
+    (scope) => scope !== selectedScope,
+  );
+
+  const modifiedInOtherScopes = otherScopes.filter(
+    (scope) => settings.forScope(scope).settings.theme !== undefined,
+  );
+
   let otherScopeModifiedMessage = '';
-  const otherScope =
-    selectedScope === SettingScope.User
-      ? SettingScope.Workspace
-      : SettingScope.User;
-  if (settings.forScope(otherScope).settings.theme !== undefined) {
+  if (modifiedInOtherScopes.length > 0) {
+    const modifiedScopesStr = modifiedInOtherScopes.join(', ');
     otherScopeModifiedMessage =
       settings.forScope(selectedScope).settings.theme !== undefined
-        ? `(Also modified in ${otherScope})`
-        : `(Modified in ${otherScope})`;
+        ? `(Also modified in ${modifiedScopesStr})`
+        : `(Modified in ${modifiedScopesStr})`;
   }
 
   // Constants for calculating preview pane layout.
@@ -115,7 +121,7 @@ export function ThemeDialog({
     1,
   );
 
-  const DAILOG_PADDING = 2;
+  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
   const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
   const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
@@ -125,7 +131,7 @@ export function ThemeDialog({
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
 
   let totalLeftHandSideHeight =
-    DAILOG_PADDING +
+    DIALOG_PADDING +
     selectThemeHeight +
     SCOPE_SELECTION_HEIGHT +
     SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
@@ -136,7 +142,7 @@ export function ThemeDialog({
   // Remove content from the LHS that can be omitted if it exceeds the available height.
   if (totalLeftHandSideHeight > availableTerminalHeight) {
     includePadding = false;
-    totalLeftHandSideHeight -= DAILOG_PADDING;
+    totalLeftHandSideHeight -= DIALOG_PADDING;
   }
 
   if (totalLeftHandSideHeight > availableTerminalHeight) {
