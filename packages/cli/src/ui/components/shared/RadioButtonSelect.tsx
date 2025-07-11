@@ -8,6 +8,10 @@ import React, { useEffect, useState } from 'react';
 import { Text, Box, useInput } from 'ink';
 import { Colors } from '../../colors.js';
 
+/**
+ * Represents a single option for the RadioButtonSelect.
+ * Requires a label for display and a value to be returned on selection.
+ */
 export interface RadioSelectItem<T> {
   label: string;
   value: T;
@@ -16,16 +20,33 @@ export interface RadioSelectItem<T> {
   themeTypeDisplay?: string;
 }
 
+/**
+ * Props for the RadioButtonSelect component.
+ * @template T The type of the value associated with each radio item.
+ */
 export interface RadioButtonSelectProps<T> {
+  /** An array of items to display as radio options. */
   items: Array<RadioSelectItem<T>>;
+  /** The initial index selected */
   initialIndex?: number;
+  /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
+  /** Function called when an item is highlighted. Receives the `value` of the selected item. */
   onHighlight?: (value: T) => void;
+  /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
+  /** Whether to show the scroll arrows. */
   showScrollArrows?: boolean;
+  /** The maximum number of items to show at once. */
   maxItemsToShow?: number;
 }
 
+/**
+ * A custom component that displays a list of items with radio buttons,
+ * supporting scrolling and keyboard navigation.
+ *
+ * @template T The type of the value associated with each radio item.
+ */
 export function RadioButtonSelect<T>({
   items,
   initialIndex = 0,
