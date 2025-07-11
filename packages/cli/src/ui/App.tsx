@@ -54,6 +54,8 @@ import {
   ApprovalMode,
   isEditorAvailable,
   EditorType,
+  FlashFallbackEvent,
+  logFlashFallback,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -316,6 +318,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       config.setQuotaErrorOccurred(true);
       // Switch model for future use but return false to stop current retry
       config.setModel(fallbackModel);
+      logFlashFallback(
+        config,
+        new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
+      );
       return false; // Don't continue with current prompt
     };
 

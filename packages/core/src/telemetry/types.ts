@@ -234,6 +234,16 @@ export class ApiResponseEvent {
   }
 }
 
+export class FlashFallbackEvent {
+  'event.name': 'flash_fallback';
+  'event.timestamp': string; // ISO 8601
+  auth_type: string;
+
+  constructor(auth_type: string) {
+    this.auth_type = auth_type;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -241,4 +251,5 @@ export type TelemetryEvent =
   | ToolCallEvent
   | ApiRequestEvent
   | ApiErrorEvent
-  | ApiResponseEvent;
+  | ApiResponseEvent
+  | FlashFallbackEvent;
