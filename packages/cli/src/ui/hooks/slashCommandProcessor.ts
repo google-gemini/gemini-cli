@@ -850,7 +850,40 @@ export const useSlashCommandProcessor = (
               .trim();
             const filename =
               userFilename || `gemini-conversation-${timestamp}.md`;
-
+      
+            // Validate filename
+            const basename = path.basename(filename);
+            if (basename.length > 255) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: 'Filename too long. Please use a shorter filename (max 255 characters).',
+                timestamp: new Date(),
+              });
+              return;
+            }
+      
+            // Allow alphanumeric, spaces, hyphens, underscores, and dots, must end with .md
+            if (!/^[\w\-. ]+\.md$/i.test(basename)) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: 'Invalid filename. Please use only letters, numbers, spaces, hyphens, underscores, and dots. File must end with .md',
+                timestamp: new Date(),
+              });
+              return;
+            }
+      
+            // Check for reserved filenames on Windows
+            const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+            const nameWithoutExt = basename.slice(0, -3).toUpperCase();
+            if (reservedNames.includes(nameWithoutExt)) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Invalid filename: "${basename}" is a reserved system name. Please choose a different name.`,
+                timestamp: new Date(),
+              });
+              return;
+            }
+      
             // Get sandbox environment info
             let sandboxEnv = 'no sandbox';
             if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
@@ -858,7 +891,7 @@ export const useSlashCommandProcessor = (
             } else if (process.env.SANDBOX === 'sandbox-exec') {
               sandboxEnv = `sandbox-exec (${process.env.SEATBELT_PROFILE || 'unknown'})`;
             }
-
+      
             // Get session information
             const sessionInfo = {
               exportTime: new Date().toISOString(),
@@ -872,18 +905,18 @@ export const useSlashCommandProcessor = (
               memoryUsage: formatMemoryUsage(process.memoryUsage().rss),
               sandboxEnv,
             };
-
+      
             // Get session statistics
             const { sessionStartTime, metrics } = session.stats;
             const wallDuration =
               new Date().getTime() - sessionStartTime.getTime();
-
+      
             const sessionStats = {
               sessionStartTime: sessionStartTime.toISOString(),
               wallDuration: formatDuration(wallDuration),
               metrics,
             };
-
+      
             // Get core conversation history if available
             let coreHistory: Content[] = [];
             try {
@@ -904,7 +937,7 @@ export const useSlashCommandProcessor = (
                 },
               );
             }
-
+      
             // Create comprehensive export data
             const exportData: ExportData = {
               metadata: {
@@ -916,29 +949,29 @@ export const useSlashCommandProcessor = (
               uiHistory: history,
               coreHistory,
             };
-
+      
             // Generate markdown content
             const markdownContent = generateComprehensiveMarkdown(exportData);
-
+      
             // Write to file with security validation using verify-then-write approach
             const fs = await import('fs/promises');
             const path = await import('path');
-
+      
             // Resolve the output path
             const cwd = process.cwd();
             const outputPath = path.resolve(cwd, filename);
-
+      
             // Security validation: verify path before writing
             let finalOutputPath: string;
             let realOutputDir: string;
+            const realCwd = await fs.realpath(cwd);
+            
             try {
-              const realCwd = await fs.realpath(cwd);
-
               // Create directory if it doesn't exist and get its real path
               const outputDir = path.dirname(outputPath);
               await fs.mkdir(outputDir, { recursive: true });
               realOutputDir = await fs.realpath(outputDir);
-
+      
               // Ensure the real output directory is within the real current working directory
               if (
                 !realOutputDir.startsWith(realCwd + path.sep) &&
@@ -951,7 +984,7 @@ export const useSlashCommandProcessor = (
                 });
                 return;
               }
-
+      
               // Additional validation: ensure the final file path would be safe
               finalOutputPath = path.join(
                 realOutputDir,
@@ -976,26 +1009,28 @@ export const useSlashCommandProcessor = (
               });
               return;
             }
-
+      
             // Use the validated path for writing the file
             await fs.writeFile(finalOutputPath, markdownContent, {
               encoding: 'utf-8',
               flag: 'wx',
             });
-
+      
             // Post-write security validation to mitigate TOCTOU race conditions.
             const realFinalPath = await fs.realpath(finalOutputPath);
-            const realCwd = await fs.realpath(cwd);
             if (
               !realFinalPath.startsWith(realCwd + path.sep) &&
               realFinalPath !== realCwd
             ) {
-              await fs.unlink(finalOutputPath); // Clean up the misplaced file.
-              throw new Error(
-                'Security error: file was created outside the working directory.',
-              );
+              await fs.unlink(realFinalPath); // Clean up the misplaced file.
+              addMessage({
+                type: MessageType.ERROR,
+                content: 'Security error: File was written outside the current working directory and has been removed.',
+                timestamp: new Date(),
+              });
+              return;
             }
-
+      
             addMessage({
               type: MessageType.INFO,
               content: `Conversation exported successfully!\nFile: ${finalOutputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(
@@ -1004,13 +1039,38 @@ export const useSlashCommandProcessor = (
               timestamp: new Date(),
             });
           } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            addMessage({
-              type: MessageType.ERROR,
-              content: `❌ Failed to export conversation: ${errorMessage}`,
-              timestamp: new Date(),
-            });
+            // Type guard for Node.js system errors
+            const isNodeError = (err: unknown): err is NodeJS.ErrnoException => {
+              return err instanceof Error && 'code' in err;
+            };
+      
+            if (isNodeError(error) && error.code === 'EEXIST') {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `File already exists: ${filename}\nPlease choose a different filename or delete the existing file first.`,
+                timestamp: new Date(),
+              });
+            } else if (isNodeError(error) && error.code === 'EACCES') {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Permission denied: Cannot write to ${filename}\nPlease check file permissions or choose a different location.`,
+                timestamp: new Date(),
+              });
+            } else if (isNodeError(error) && error.code === 'ENOSPC') {
+              addMessage({
+                type: MessageType.ERROR,
+                content: 'No space left on device. Please free up some disk space and try again.',
+                timestamp: new Date(),
+              });
+            } else {
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+              addMessage({
+                type: MessageType.ERROR,
+                content: `Failed to export conversation: ${errorMessage}`,
+                timestamp: new Date(),
+              });
+            }
           }
         },
       },
