@@ -26,6 +26,7 @@ import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
+import { getCliVersion } from './utils/version.js';
 import {
   ApprovalMode,
   Config,
@@ -35,6 +36,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -165,6 +167,15 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.getNoBrowser()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
@@ -173,6 +184,7 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
+    const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
     render(
       <React.StrictMode>
@@ -180,6 +192,7 @@ export async function main() {
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}
+          version={version}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
@@ -202,6 +215,7 @@ export async function main() {
     'event.timestamp': new Date().toISOString(),
     prompt: input,
     prompt_id,
+    auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });
 
