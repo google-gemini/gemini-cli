@@ -182,7 +182,6 @@ export async function parseArguments(): Promise<CliArgs> {
     .alias('h', 'help')
     .strict()
     .check((argv) => {
-      // Validate that -p and -i are not used together
       if (argv.prompt && argv.promptInteractive) {
         throw new Error(
           'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
