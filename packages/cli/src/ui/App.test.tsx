@@ -452,6 +452,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
