@@ -128,7 +128,7 @@ export function ThemeDialog({
   );
 
   const DIALOG_PADDING = 2;
-  const selectThemeHeight = 10;
+  const selectThemeHeight = themeItems.length + 1;
   const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
   const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
   const TAB_TO_SELECT_HEIGHT = 2;
