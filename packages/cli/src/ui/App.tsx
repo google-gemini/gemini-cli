@@ -89,7 +89,6 @@ export const AppWrapper = (props: AppProps) => (
 
 const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   useBracketedPaste();
-  const [turnCount, setTurnCount] = useState<number>(0);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
 
@@ -110,24 +109,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     stdout.write(ansiEscapes.clearTerminal);
     setStaticKey((prev) => prev + 1);
   }, [setStaticKey, stdout]);
-
-  const onToolCallCompleted = useCallback(() => {
-    setTurnCount((prevTurnCount) => {
-      const newTurnCount = prevTurnCount + 1;
-      const maxTurns = config.getMaxTurns();
-      if (maxTurns > 0 && newTurnCount >= maxTurns) {
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Maximum number of turns (${maxTurns}) reached. Exiting.`,
-          },
-          Date.now(),
-        );
-        setTimeout(() => process.exit(0), 100);
-      }
-      return newTurnCount;
-    });
-  }, [config, addItem]);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -442,7 +423,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
-    onToolCallCompleted,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
@@ -451,26 +431,12 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
-      const maxTurns = config.getMaxTurns();
-      if (maxTurns > 0 && turnCount >= maxTurns) {
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Maximum number of turns (${maxTurns}) reached. Exiting.`,
-          },
-          Date.now(),
-        );
-        setTimeout(() => process.exit(0), 100);
-        return;
-      }
-
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
-        setTurnCount((prev) => prev + 1);
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery, config, turnCount, addItem, setTurnCount],
+    [submitQuery],
   );
 
   const logger = useLogger();

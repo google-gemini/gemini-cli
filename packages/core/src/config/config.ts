@@ -138,7 +138,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
-  maxTurns?: number;
+  maxSessionTurns?: number;
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
 }
@@ -180,7 +180,7 @@ export class Config {
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
-  private readonly maxTurns: number;
+  private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
@@ -225,7 +225,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
-    this.maxTurns = params.maxTurns ?? 50;
+    this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
 
@@ -306,8 +306,8 @@ export class Config {
     this.flashFallbackHandler = handler;
   }
 
-  getMaxTurns(): number {
-    return this.maxTurns;
+  getMaxSessionTurns(): number {
+    return this.maxSessionTurns;
   }
 
   getEmbeddingModel(): string {

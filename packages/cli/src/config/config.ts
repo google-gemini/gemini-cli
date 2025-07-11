@@ -23,7 +23,6 @@ import { Settings } from './settings.js';
 import { Extension, filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
-import { MAX_TURNS } from '../ui/constants.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -51,7 +50,6 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
-  maxTurns: number | undefined;
   allowedMcpServerNames: string | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -156,11 +154,6 @@ async function parseArguments(): Promise<CliArgs> {
     .option('allowed-mcp-server-names', {
       type: 'string',
       description: 'Allowed MCP server names',
-    })
-    .option('max-turns', {
-      type: 'number',
-      description: 'Maximum number of turns to run for',
-      default: MAX_TURNS,
     })
     .option('extensions', {
       alias: 'e',
@@ -317,7 +310,7 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
-    maxTurns: argv.maxTurns ?? MAX_TURNS,
+    maxSessionTurns: settings.maxSessionTurns ?? -1,
     listExtensions: argv.listExtensions || false,
     activeExtensions: activeExtensions.map((e) => ({
       name: e.config.name,

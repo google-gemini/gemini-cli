@@ -130,6 +130,7 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
+  private sessionTurnCount = 0;
 
   constructor(
     private readonly config: Config,
@@ -343,7 +344,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
     this._logApiRequest(requestContents, this.config.getModel());
-
     const startTime = Date.now();
 
     try {
