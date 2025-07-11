@@ -273,6 +273,13 @@ describe('useGeminiStream', () => {
       return clientInstance;
     });
 
+    const contentGeneratorConfig = {
+      model: 'test-model',
+      apiKey: 'test-key',
+      vertexai: false,
+      authType: AuthType.USE_GEMINI,
+    };
+
     mockConfig = {
       apiKey: 'test-api-key',
       model: 'gemini-pro',
@@ -307,6 +314,9 @@ describe('useGeminiStream', () => {
       },
       setQuotaErrorOccurred: vi.fn(),
       getQuotaErrorOccurred: vi.fn(() => false),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue(contentGeneratorConfig),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);

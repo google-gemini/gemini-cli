@@ -96,13 +96,20 @@ export class UserPromptEvent {
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
   prompt_id: string;
+  auth_type: string;
   prompt?: string;
 
-  constructor(prompt_length: number, prompt_Id: string, prompt?: string) {
+  constructor(
+    prompt_length: number,
+    prompt_Id: string,
+    auth_type: string,
+    prompt?: string,
+  ) {
     this['event.name'] = 'user_prompt';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_length = prompt_length;
     this.prompt_id = prompt_Id;
+    this.auth_type = auth_type;
     this.prompt = prompt;
   }
 }
@@ -160,12 +167,14 @@ export class ApiErrorEvent {
   status_code?: number | string;
   duration_ms: number;
   prompt_id: string;
+  auth_type: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
     prompt_id: string,
+    auth_type: string,
     error_type?: string,
     status_code?: number | string,
   ) {
@@ -177,6 +186,7 @@ export class ApiErrorEvent {
     this.status_code = status_code;
     this.duration_ms = duration_ms;
     this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
   }
 }
 
@@ -195,11 +205,13 @@ export class ApiResponseEvent {
   total_token_count: number;
   response_text?: string;
   prompt_id: string;
+  auth_type: string;
 
   constructor(
     model: string,
     duration_ms: number,
     prompt_id: string,
+    auth_type: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
     error?: string,
@@ -218,6 +230,7 @@ export class ApiResponseEvent {
     this.response_text = response_text;
     this.error = error;
     this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
   }
 }
 

@@ -266,6 +266,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
@@ -377,6 +381,10 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.tool_token_count),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
@@ -406,6 +414,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_DURATION_MS,
         value: JSON.stringify(event.duration_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
       },
     ];
 

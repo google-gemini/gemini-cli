@@ -144,6 +144,9 @@ export enum EventMetadataKey {
 
   // Logs the Prompt Id
   GEMINI_CLI_PROMPT_ID = 35,
+
+  // Logs the Auth type for the prompt, api responses and errors.
+  GEMINI_CLI_AUTH_TYPE = 36,
 }
 
 export function getEventMetadataKey(
