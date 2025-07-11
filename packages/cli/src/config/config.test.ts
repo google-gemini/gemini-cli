@@ -63,19 +63,16 @@ describe('parseArguments', () => {
       'interactive prompt',
     ];
 
-    // Mock process.exit to prevent test from exiting
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
-    // Mock console.error to capture the error message
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
     await expect(parseArguments()).rejects.toThrow('process.exit called');
 
-    // Verify that the correct error message was logged
     expect(mockConsoleError).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
@@ -96,19 +93,16 @@ describe('parseArguments', () => {
       'interactive prompt',
     ];
 
-    // Mock process.exit to prevent test from exiting
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
-    // Mock console.error to capture the error message
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
     await expect(parseArguments()).rejects.toThrow('process.exit called');
 
-    // Verify that the correct error message was logged
     expect(mockConsoleError).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
