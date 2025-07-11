@@ -360,18 +360,6 @@ describe('useSlashCommandProcessor', () => {
     });
   });
 
-  describe('Other commands', () => {
-    it('/editor should open editor dialog and return handled', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/editor');
-      });
-      expect(mockOpenEditorDialog).toHaveBeenCalled();
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-  });
-
   describe('New command registry', () => {
     let ActualCommandService: typeof CommandService;
 
@@ -504,6 +492,35 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockAction).toHaveBeenCalledTimes(1);
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+    it('should open the editor dialog when a new command returns an editor dialog action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'dialog',
+        dialog: 'editor',
+      });
+      const newEditorCommand: SlashCommand = {
+        name: 'editor',
+        action: mockAction,
+      };
+
+      const mockLoader = async () => [newEditorCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'editor'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/editor');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockOpenEditorDialog).toHaveBeenCalledWith();
       expect(commandResult).toEqual({ type: 'handled' });
     });
 

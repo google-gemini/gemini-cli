@@ -10,10 +10,13 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
-
+import { editorCommand } from '../ui/commands/editorCommand.js';
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
   memoryCommand: { name: 'memory', description: 'Mock Memory' },
+}));
+vi.mock('../ui/commands/editorCommand.js', () => ({
+  editorCommand: { name: 'editor', description: 'Mock editor' },
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({
   helpCommand: { name: 'help', description: 'Mock Help' },
@@ -46,10 +49,11 @@ describe('CommandService', () => {
         const tree = commandService.getCommands();
 
         // Post-condition assertions
-        expect(tree.length).toBe(3);
+        expect(tree.length).toBe(4);
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('memory');
+        expect(commandNames).toContain('editor');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
       });
@@ -57,14 +61,14 @@ describe('CommandService', () => {
       it('should overwrite any existing commands when called again', async () => {
         // Load once
         await commandService.loadCommands();
-        expect(commandService.getCommands().length).toBe(3);
+        expect(commandService.getCommands().length).toBe(4);
 
         // Load again
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
         // Should not append, but overwrite
-        expect(tree.length).toBe(3);
+        expect(tree.length).toBe(4);
       });
     });
 
@@ -76,8 +80,13 @@ describe('CommandService', () => {
         await commandService.loadCommands();
 
         const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(3);
-        expect(loadedTree).toEqual([clearCommand, helpCommand, memoryCommand]);
+        expect(loadedTree.length).toBe(4);
+        expect(loadedTree).toEqual([
+          clearCommand,
+          editorCommand,
+          helpCommand,
+          memoryCommand,
+        ]);
       });
     });
   });

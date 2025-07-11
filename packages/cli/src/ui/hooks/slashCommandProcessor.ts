@@ -255,11 +255,6 @@ export const useSlashCommandProcessor = (
         action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
       },
       {
-        name: 'editor',
-        description: 'set external editor preference',
-        action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
-      },
-      {
         name: 'privacy',
         description: 'display the privacy notice',
         action: (_mainCommand, _subCommand, _args) => openPrivacyNotice(),
@@ -1036,7 +1031,6 @@ export const useSlashCommandProcessor = (
     addMessage,
     openThemeDialog,
     openAuthDialog,
-    openEditorDialog,
     openPrivacyNotice,
     toggleCorgiMode,
     savedChatTags,
@@ -1130,6 +1124,9 @@ export const useSlashCommandProcessor = (
                 return { type: 'handled' };
               case 'dialog':
                 switch (result.dialog) {
+                  case 'editor':
+                    openEditorDialog();
+                    return { type: 'handled' };
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
@@ -1214,6 +1211,7 @@ export const useSlashCommandProcessor = (
       legacyCommands,
       commandContext,
       addMessage,
+      openEditorDialog,
     ],
   );
 
