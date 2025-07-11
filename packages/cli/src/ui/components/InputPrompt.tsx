@@ -34,6 +34,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  setShowHelp: (value: boolean) => void;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -50,6 +51,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  setShowHelp,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
 
@@ -208,6 +210,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.ctrl && key.name === 'l') {
         onClearScreen();
+        setShowHelp(false);
         return;
       }
 
@@ -329,6 +332,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
+      setShowHelp,
     ],
   );
 
