@@ -191,10 +191,7 @@ export async function parseArguments(): Promise<CliArgs> {
     });
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-
-  const argv = await yargsInstance.argv;
-
-  return argv;
+  return yargsInstance.argv
 }
 
 // This function is now a thin wrapper around the server's implementation.
