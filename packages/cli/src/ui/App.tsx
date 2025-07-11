@@ -139,6 +139,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
+  const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -173,6 +174,29 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       }
     }
   }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+
+  // Sync user tier from config when authentication changes
+  useEffect(() => {
+    const syncUserTier = async () => {
+      try {
+        const configUserTier = await config.getUserTier();
+        if (configUserTier !== userTier) {
+          setUserTier(configUserTier);
+        }
+      } catch (error) {
+        // Silently fail - this is not critical functionality
+        // Only log in debug mode to avoid cluttering the console
+        if (config.getDebugMode()) {
+          console.debug('Failed to sync user tier:', error);
+        }
+      }
+    };
+
+    // Only sync when not currently authenticating
+    if (!isAuthenticating) {
+      syncUserTier();
+    }
+  }, [config, userTier, isAuthenticating]);
 
   const {
     isEditorDialogOpen,
@@ -254,9 +278,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     ): Promise<boolean> => {
       let message: string;
 
-      // For quota errors, assume FREE tier (safe default) - only show upgrade messaging to free tier users
-      // TODO: Get actual user tier from config when available
-      const userTier = undefined; // Defaults to FREE tier behavior
+      // Use actual user tier if available, otherwise default to FREE tier behavior (safe default)
       const isPaidTier =
         userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
 
@@ -320,7 +342,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
-  }, [config, addItem]);
+  }, [config, addItem, userTier]);
 
   const {
     handleSlashCommand,
