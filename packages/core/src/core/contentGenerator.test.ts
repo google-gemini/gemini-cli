@@ -82,6 +82,7 @@ describe('createContentGeneratorConfig', () => {
     const config = await createContentGeneratorConfig(
       undefined,
       AuthType.USE_GEMINI,
+      mockConfig,
     );
     expect(config.apiKey).toBe('env-gemini-key');
     expect(config.vertexai).toBe(false);
@@ -92,6 +93,7 @@ describe('createContentGeneratorConfig', () => {
     const config = await createContentGeneratorConfig(
       undefined,
       AuthType.USE_GEMINI,
+      mockConfig,
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
@@ -102,6 +104,7 @@ describe('createContentGeneratorConfig', () => {
     const config = await createContentGeneratorConfig(
       undefined,
       AuthType.USE_VERTEX_AI,
+      mockConfig,
     );
     expect(config.apiKey).toBe('env-google-key');
     expect(config.vertexai).toBe(true);
@@ -113,6 +116,7 @@ describe('createContentGeneratorConfig', () => {
     const config = await createContentGeneratorConfig(
       undefined,
       AuthType.USE_VERTEX_AI,
+      mockConfig,
     );
     expect(config.vertexai).toBe(true);
     expect(config.apiKey).toBeUndefined();
@@ -125,6 +129,7 @@ describe('createContentGeneratorConfig', () => {
     const config = await createContentGeneratorConfig(
       undefined,
       AuthType.USE_VERTEX_AI,
+      mockConfig,
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();

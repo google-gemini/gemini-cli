@@ -119,6 +119,9 @@ export async function getOauthClient(
   }
 
   if (config.getNoBrowser()) {
+    config.getSetAuthMessage()?.(
+      'Restart gemmini-cli to enter manual authorization code. (Press ESC to cancel)',
+    );
     let success = false;
     const maxRetries = 2;
     for (let i = 0; !success && i < maxRetries; i++) {
@@ -130,11 +133,14 @@ export async function getOauthClient(
         );
       }
     }
+    config.getSetAuthMessage()?.('Authentication complete.');
     if (!success) {
       process.exit(1);
     }
   } else {
     const webLogin = await authWithWeb(client);
+    const authMessage = 'Waiting for authentication from browser...';
+    config.getSetAuthMessage()?.(authMessage);
 
     // This does basically nothing, as it isn't show to the user.
     console.log(
@@ -143,7 +149,7 @@ export async function getOauthClient(
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
     );
     await open(webLogin.authUrl);
-    console.log('Waiting for authentication...');
+    console.log(authMessage);
 
     await webLogin.loginCompletePromise;
   }
