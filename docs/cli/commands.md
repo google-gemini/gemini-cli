@@ -104,11 +104,15 @@ At commands are used to include the content of files or directories as part of y
   - **Output:** The CLI will show a tool call message indicating that `read_many_files` was used, along with a message detailing the status and the path(s) that were processed.
 
   - **Note for Scripting and Non-Interactive Use:**
-    While the `@` command is convenient for interactive use, for scripting or non-interactive use with the `-p` flag, it is more robust to pipe file content directly. This method avoids potential ambiguity if your prompt text also contains the `@` symbol (e.g., for usernames) and is the recommended approach for automated workflows.
-    ```sh
-    cat path/to/file.txt | gemini -p "Summarize this file."
-    ```
+    While the `@` command is convenient for interactive use, for scripting it is more robust to pipe file content directly. This method avoids potential ambiguity if your prompt text also contains the `@` symbol (e.g., for usernames) and is the recommended approach for automated workflows.
 
+    **Important:** When piping content to `gemini`, the piped data becomes the entire prompt. If you provide a prompt on the command line (e.g., with `-p`), the piped data will be ignored.
+
+    ```sh
+    # The content of file.txt becomes the prompt.
+    # Instructions like "Summarize this file" should be inside file.txt.
+    cat path/to/file.txt | gemini
+    ```
 - **`@` (Lone at symbol)**
   - **Description:** If you type a lone `@` symbol without a path, the query is passed as-is to the Gemini model. This might be useful if you are specifically talking _about_ the `@` symbol in your prompt.
 
