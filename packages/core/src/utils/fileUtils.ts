@@ -115,11 +115,15 @@ export function isBinaryFile(filePath: string): boolean {
  */
 export function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
+): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'{
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === '.ts') {
     return 'text';
+  }
+
+  if (ext === '.svg') {
+    return 'svg';
   }
 
   const lookedUpMimeType = getSpecificMimeType(filePath); // Returns false if not found, or the mime type string

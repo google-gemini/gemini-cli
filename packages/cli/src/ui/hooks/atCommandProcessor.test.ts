@@ -109,6 +109,25 @@ describe('handleAtCommand', () => {
     abortController.abort();
   });
 
+  it('should pass through query if no @ command is present', async () => {
+    const query = 'regular user query';
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 123,
+      signal: abortController.signal,
+    });
+    expect(mockAddItem).toHaveBeenCalledWith(
+      { type: 'user', text: query },
+      123,
+    );
+    expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(result.shouldProceed).toBe(true);
+    expect(mockReadManyFilesExecute).not.toHaveBeenCalled();
+  });
+
   it('should try to read a file even if it is invalid, letting the tool handle the error', async () => {
     const query = 'Check @nonexistent.txt and @ also';
     vi.mocked(fsPromises.stat).mockRejectedValue(
