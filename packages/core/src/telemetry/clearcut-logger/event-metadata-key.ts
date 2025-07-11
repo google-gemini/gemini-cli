@@ -147,6 +147,9 @@ export enum EventMetadataKey {
 
   // Logs the Auth type for the prompt, api responses and errors.
   GEMINI_CLI_AUTH_TYPE = 36,
+
+  // Logs the total number of Google accounts ever used.
+  GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
 }
 
 export function getEventMetadataKey(

@@ -9,6 +9,7 @@ import os from 'os';
 import * as crypto from 'crypto';
 
 export const GEMINI_DIR = '.gemini';
+export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 const TMP_DIR_NAME = 'tmp';
 
 /**
