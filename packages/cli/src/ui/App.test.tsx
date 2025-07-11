@@ -516,9 +516,9 @@ describe('App UI', () => {
   describe('with initial prompt from --prompt-interactive', () => {
     it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();
-      
+
       mockConfig.getQuestion = vi.fn(() => 'hello from prompt-interactive');
-      
+
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQuery,
@@ -549,10 +549,11 @@ describe('App UI', () => {
         />,
       );
 
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(mockSubmitQuery).toHaveBeenCalledWith('hello from prompt-interactive');
+      expect(mockSubmitQuery).toHaveBeenCalledWith(
+        'hello from prompt-interactive',
+      );
     });
   });
-
 });
