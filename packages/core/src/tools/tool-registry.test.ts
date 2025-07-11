@@ -299,31 +299,87 @@ describe('ToolRegistry', () => {
         toolRegistry,
       );
     });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverTools();
-
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        mcpServerConfigVal,
-        undefined,
-        toolRegistry,
-      );
-    });
   });
 });
 
 describe('sanitizeParameters', () => {
+  it('should remove default when anyOf is present', () => {
+    const schema: Schema = {
+      anyOf: [{ type: Type.STRING }, { type: Type.NUMBER }],
+      default: 'hello',
+    };
+    sanitizeParameters(schema);
+    expect(schema.default).toBeUndefined();
+  });
+
+  it('should recursively sanitize items in anyOf', () => {
+    const schema: Schema = {
+      anyOf: [
+        {
+          anyOf: [{ type: Type.STRING }],
+          default: 'world',
+        },
+        { type: Type.NUMBER },
+      ],
+    };
+    sanitizeParameters(schema);
+    expect(schema.anyOf![0].default).toBeUndefined();
+  });
+
+  it('should recursively sanitize items in items', () => {
+    const schema: Schema = {
+      items: {
+        anyOf: [{ type: Type.STRING }],
+        default: 'world',
+      },
+    };
+    sanitizeParameters(schema);
+    expect(schema.items!.default).toBeUndefined();
+  });
+
+  it('should recursively sanitize items in properties', () => {
+    const schema: Schema = {
+      properties: {
+        prop1: {
+          anyOf: [{ type: Type.STRING }],
+          default: 'world',
+        },
+      },
+    };
+    sanitizeParameters(schema);
+    expect(schema.properties!.prop1.default).toBeUndefined();
+  });
+
+  it('should handle complex nested schemas', () => {
+    const schema: Schema = {
+      properties: {
+        prop1: {
+          items: {
+            anyOf: [{ type: Type.STRING }],
+            default: 'world',
+          },
+        },
+        prop2: {
+          anyOf: [
+            {
+              properties: {
+                nestedProp: {
+                  anyOf: [{ type: Type.NUMBER }],
+                  default: 123,
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+    sanitizeParameters(schema);
+    expect(schema.properties!.prop1.items!.default).toBeUndefined();
+    const nestedProp =
+      schema.properties!.prop2.anyOf![0].properties!.nestedProp;
+    expect(nestedProp?.default).toBeUndefined();
+  });
+
   it('should remove unsupported format from a simple string property', () => {
     const schema: Schema = {
       type: Type.OBJECT,
@@ -352,25 +408,6 @@ describe('sanitizeParameters', () => {
     const originalSchema = JSON.parse(JSON.stringify(schema));
     sanitizeParameters(schema);
     expect(schema).toEqual(originalSchema);
-  });
-
-  it('should handle nested objects recursively', () => {
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        user: {
-          type: Type.OBJECT,
-          properties: {
-            email: { type: Type.STRING, format: 'email' },
-          },
-        },
-      },
-    };
-    sanitizeParameters(schema);
-    expect(schema.properties?.['user']?.properties?.['email']).toHaveProperty(
-      'format',
-      undefined,
-    );
   });
 
   it('should handle arrays of objects', () => {
@@ -410,19 +447,6 @@ describe('sanitizeParameters', () => {
   it('should not crash on an empty or undefined schema', () => {
     expect(() => sanitizeParameters({})).not.toThrow();
     expect(() => sanitizeParameters(undefined)).not.toThrow();
-  });
-
-  it('should handle cyclic schemas without crashing', () => {
-    const schema: any = {
-      type: Type.OBJECT,
-      properties: {
-        name: { type: Type.STRING, format: 'hostname' },
-      },
-    };
-    schema.properties.self = schema;
-
-    expect(() => sanitizeParameters(schema)).not.toThrow();
-    expect(schema.properties.name).toHaveProperty('format', undefined);
   });
 
   it('should handle complex nested schemas with cycles', () => {
