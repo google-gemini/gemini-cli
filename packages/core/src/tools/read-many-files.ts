@@ -356,25 +356,23 @@ Use this tool when the user's query implies needing the content of several files
 
       const fileType = detectFileType(filePath);
 
-      // This block is to be deleted as it incorrectly filters out audio/video.
-      // if (fileType === 'image' || fileType === 'pdf') {
-      //   const fileExtension = path.extname(filePath).toLowerCase();
-      //   const fileNameWithoutExtension = path.basename(filePath, fileExtension);
-      //   const requestedExplicitly = inputPatterns.some(
-      //     (pattern: string) =>
-      //       pattern.toLowerCase().includes(fileExtension) ||
-      //       pattern.includes(fileNameWithoutExtension),
-      //   );
-      //
-      //   if (!requestedExplicitly) {
-      //     skippedFiles.push({
-      //       path: relativePathForDisplay,
-      //       reason:
-      //         'asset file (image/pdf) was not explicitly requested by name or extension',
-      //     });
-      //     continue;
-      //   }
-      // }
+      const assetTypes = ['image', 'pdf', 'audio', 'video'];
+      if (assetTypes.includes(fileType)) {
+        const fileExtension = path.extname(filePath).toLowerCase();
+        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
+        const requestedExplicitly = inputPatterns.some(
+          (pattern: string) =>
+            pattern.toLowerCase().includes(fileExtension) ||
+            pattern.includes(fileNameWithoutExtension),
+        );
+        if (!requestedExplicitly) {
+          skippedFiles.push({
+            path: relativePathForDisplay,
+            reason: `asset file (${fileType}) was not explicitly requested by name or extension`,
+          });
+          continue;
+        }
+      }
 
       // Use processSingleFileContent for all file types now
       const fileReadResult = await processSingleFileContent(
