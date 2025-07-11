@@ -15,6 +15,7 @@ import { ManifestParser } from './manifest-parser.js';
 import { VirtualShellTool } from './virtual-shell-tool.js';
 import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { defaultSummarizer } from '../utils/summarizer.js';
 import { parse } from 'shell-quote';
 
 type ToolParams = Record<string, unknown>;
@@ -51,6 +52,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
+      defaultSummarizer,
     );
   }
 

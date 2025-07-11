@@ -20,10 +20,10 @@ jobs:
         node-version: [20.x, 22.x, 24.x]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -46,7 +46,7 @@ jobs:
         run: npm run typecheck
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: build-artifacts-${{ matrix.node-version }}
           path: |
@@ -65,16 +65,16 @@ jobs:
         node-version: [20.x, 22.x, 24.x] # Should match the build job's matrix
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: build-artifacts-${{ matrix.node-version }}
           path: . # Download to the root, this will include package-lock.json and packages/*/dist
@@ -92,7 +92,7 @@ jobs:
 
       - name: Publish Test Report (for non-forks)
         if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@890a17cecf52a379fc869ab770a71657660be727 # v2
         with:
           name: Test Results (Node ${{ matrix.node-version }})
           path: packages/*/junit.xml
@@ -101,13 +101,13 @@ jobs:
 
       - name: Upload Test Results Artifact (for forks)
         if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results-fork-${{ matrix.node-version }}
           path: packages/*/junit.xml
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: coverage-reports-${{ matrix.node-version }}
@@ -124,13 +124,13 @@ jobs:
       pull-requests: write # For commenting
     strategy:
       matrix:
-        node-version: [20.x, 22.x, 24.x] # Should match the test job's matrix
+        node-version: [22.x] # Reduce noise by only posting the comment once
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Download coverage reports artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: coverage-reports-${{ matrix.node-version }}
           path: coverage_artifact # Download to a specific directory
@@ -144,3 +144,22 @@ jobs:
           core_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
           node_version: ${{ matrix.node-version }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@181d5eefc20863364f96762470ba6f862bdef56b # v3

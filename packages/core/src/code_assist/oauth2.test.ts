@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient, getCachedGoogleAccountId } from './oauth2.js';
+import { getOauthClient } from './oauth2.js';
+import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,6 +15,7 @@ import open from 'open';
 import crypto from 'crypto';
 import * as os from 'os';
 import { AuthType } from '../core/contentGenerator.js';
+import { Config } from '../config/config.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -27,6 +29,10 @@ vi.mock('google-auth-library');
 vi.mock('http');
 vi.mock('open');
 vi.mock('crypto');
+
+const mockConfig = {
+  getNoBrowser: () => false,
+} as unknown as Config;
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -61,30 +67,11 @@ describe('oauth2', () => {
     const mockGetAccessToken = vi
       .fn()
       .mockResolvedValue({ token: 'mock-access-token' });
-    const mockRefreshAccessToken = vi.fn().mockImplementation((callback) => {
-      // Mock the callback-style refreshAccessToken method
-      const mockTokensWithIdToken = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        id_token:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWdvb2dsZS1hY2NvdW50LWlkLTEyMyJ9.signature', // Mock JWT with sub: test-google-account-id-123
-      };
-      callback(null, mockTokensWithIdToken);
-    });
-    const mockVerifyIdToken = vi.fn().mockResolvedValue({
-      getPayload: () => ({
-        sub: 'test-google-account-id-123',
-        aud: 'test-audience',
-        iss: 'https://accounts.google.com',
-      }),
-    });
     const mockOAuth2Client = {
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
       setCredentials: mockSetCredentials,
       getAccessToken: mockGetAccessToken,
-      refreshAccessToken: mockRefreshAccessToken,
-      verifyIdToken: mockVerifyIdToken,
       credentials: mockTokens,
       on: vi.fn(),
     } as unknown as OAuth2Client;
@@ -98,7 +85,9 @@ describe('oauth2', () => {
     // Mock the UserInfo API response
     (global.fetch as Mock).mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue({ id: 'test-google-account-id-123' }),
+      json: vi
+        .fn()
+        .mockResolvedValue({ email: 'test-google-account@gmail.com' }),
     } as unknown as Response);
 
     let requestCallback!: http.RequestListener<
@@ -136,7 +125,10 @@ describe('oauth2', () => {
       return mockHttpServer as unknown as http.Server;
     });
 
-    const clientPromise = getOauthClient(AuthType.LOGIN_WITH_GOOGLE);
+    const clientPromise = getOauthClient(
+      AuthType.LOGIN_WITH_GOOGLE,
+      mockConfig,
+    );
 
     // wait for server to start listening.
     await serverListeningPromise;
@@ -161,18 +153,21 @@ describe('oauth2', () => {
     });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
-    // Verify Google Account ID was cached
-    const googleAccountIdPath = path.join(
+    // Verify Google Account was cached
+    const googleAccountPath = path.join(
       tempHomeDir,
       '.gemini',
-      'google_account_id',
+      'google_accounts.json',
     );
-    expect(fs.existsSync(googleAccountIdPath)).toBe(true);
-    const cachedGoogleAccountId = fs.readFileSync(googleAccountIdPath, 'utf-8');
-    expect(cachedGoogleAccountId).toBe('test-google-account-id-123');
+    expect(fs.existsSync(googleAccountPath)).toBe(true);
+    const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
+    expect(JSON.parse(cachedGoogleAccount)).toEqual({
+      active: 'test-google-account@gmail.com',
+      old: [],
+    });
 
-    // Verify the getCachedGoogleAccountId function works
-    expect(getCachedGoogleAccountId()).toBe('test-google-account-id-123');
+    // Verify the getCachedGoogleAccount function works
+    expect(getCachedGoogleAccount()).toBe('test-google-account@gmail.com');
   });
 
   describe('in Cloud Shell', () => {
@@ -214,7 +209,7 @@ describe('oauth2', () => {
         () => mockClient as unknown as OAuth2Client,
       );
 
-      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE);
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
         '/user/home/.gemini/oauth_creds.json',
@@ -227,7 +222,7 @@ describe('oauth2', () => {
     });
 
     it('should use Compute to get a client if no cached credentials exist', async () => {
-      await getOauthClient(AuthType.CLOUD_SHELL);
+      await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
 
       expect(Compute).toHaveBeenCalledWith({});
       expect(mockGetAccessToken).toHaveBeenCalled();
@@ -238,13 +233,13 @@ describe('oauth2', () => {
       mockComputeClient.credentials = newCredentials;
       mockGetAccessToken.mockResolvedValue({ token: 'new-adc-token' });
 
-      await getOauthClient(AuthType.CLOUD_SHELL);
+      await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
 
       expect(fs.promises.writeFile).not.toHaveBeenCalled();
     });
 
     it('should return the Compute client on successful ADC authentication', async () => {
-      const client = await getOauthClient(AuthType.CLOUD_SHELL);
+      const client = await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
       expect(client).toBe(mockComputeClient);
     });
 
@@ -252,7 +247,9 @@ describe('oauth2', () => {
       const testError = new Error('ADC Failed');
       mockGetAccessToken.mockRejectedValue(testError);
 
-      await expect(getOauthClient(AuthType.CLOUD_SHELL)).rejects.toThrow(
+      await expect(
+        getOauthClient(AuthType.CLOUD_SHELL, mockConfig),
+      ).rejects.toThrow(
         'Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
       );
     });
