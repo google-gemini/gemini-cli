@@ -966,12 +966,13 @@ export const useSlashCommandProcessor = (
               return;
             }
 
-            // Only write the file after all security checks have passed
-            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
+            // Use the validated path for writing the file
+            const finalOutputPath = path.join(realOutputDir, path.basename(outputPath));
+            await fs.writeFile(finalOutputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
 
             addMessage({
               type: MessageType.INFO,
-              content: `Conversation exported successfully!\nFile: ${outputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(markdownContent.length / 1024)} KB`,
+              content: `Conversation exported successfully!\nFile: ${finalOutputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(markdownContent.length / 1024)} KB`,
               timestamp: new Date(),
             });
           } catch (error) {
