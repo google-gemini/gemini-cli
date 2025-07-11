@@ -365,6 +365,7 @@ Use this tool when the user's query implies needing the content of several files
             pattern.toLowerCase().includes(fileExtension) ||
             pattern.includes(fileNameWithoutExtension),
         );
+        
         if (!requestedExplicitly) {
           skippedFiles.push({
             path: relativePathForDisplay,
