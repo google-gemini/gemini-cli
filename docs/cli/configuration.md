@@ -189,6 +189,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`hideBanner`** (boolean):
+  - **Description:** Enables or disables the startup banner (ASCII art logo) in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideBanner": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -213,7 +222,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false
+  "hideTips": false,
+  "hideBanner": false
 }
 ```
 
