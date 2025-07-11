@@ -6,7 +6,10 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
@@ -190,7 +193,16 @@ async function connectAndDiscover(
       transportOptions,
     );
   } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    const transportOptions: SSEClientTransportOptions = {};
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+    transport = new SSEClientTransport(
+      new URL(mcpServerConfig.url),
+      transportOptions,
+    );
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
