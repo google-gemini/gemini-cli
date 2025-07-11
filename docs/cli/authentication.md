@@ -45,12 +45,10 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         - You can temporarily set these environment variables in your current shell session using the following commands:
           ```bash
           export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-          export GOOGLE_GENAI_USE_VERTEXAI=true
           ```
         - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
           ```bash
           echo 'export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"' >> ~/.bashrc
-          echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
           source ~/.bashrc
           ```
     - To use Application Default Credentials (ADC), use the following command:
