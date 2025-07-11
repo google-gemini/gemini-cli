@@ -50,7 +50,7 @@ function renderHastNode(
     }
 
     // Determine the color to pass down: Use this element's specific color
-    // if found, otherwise, continue passing down the already inherited color.
+    // if found; otherwise, continue passing down the already inherited color.
     const colorToPassDown = elementColor || inheritedColor;
 
     // Recursively render children, passing the determined color down
@@ -70,7 +70,7 @@ function renderHastNode(
 
   // Handle Root Node: Start recursion with initial inherited color
   if (node.type === 'root') {
-    // Check if children array is empty - this happens when lowlight can't detect language – fallback to plain text
+    // Check if children array is empty - this happens when lowlight can't detect language – fall back to plain text
     if (!node.children || node.children.length === 0) {
       return null;
     }

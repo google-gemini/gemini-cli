@@ -29,7 +29,7 @@ body:
     id: info
     attributes:
       label: Client information
-      description: Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (MacOS, Windows, Linux).
+      description: Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (macOS, Windows, Linux).
       value: |
         <details>
 
