@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client, Credentials, Compute } from 'google-auth-library';
+import {
+  OAuth2Client,
+  Credentials,
+  Compute,
+  CodeChallengeMethod,
+} from 'google-auth-library';
 import * as http from 'http';
 import url from 'url';
 import crypto from 'crypto';
@@ -13,8 +18,10 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import * as os from 'os';
+import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { AuthType } from '../core/contentGenerator.js';
+import readline from 'node:readline';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -57,6 +64,7 @@ export interface OauthWebLogin {
 
 export async function getOauthClient(
   authType: AuthType,
+  config: Config,
 ): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
@@ -109,27 +117,93 @@ export async function getOauthClient(
     }
   }
 
-  // Otherwise, obtain creds using standard web flow
-  const webLogin = await authWithWeb(client);
+  if (config.getNoBrowser()) {
+    let success = false;
+    const maxRetries = 2;
+    for (let i = 0; !success && i < maxRetries; i++) {
+      success = await authWithUserCode(client);
+      if (!success) {
+        console.error(
+          '\nFailed to authenticate with user code.',
+          i === maxRetries - 1 ? '' : 'Retrying...\n',
+        );
+      }
+    }
+    if (!success) {
+      process.exit(1);
+    }
+  } else {
+    const webLogin = await authWithWeb(client);
 
-  console.log(
-    `\n\nCode Assist login required.\n` +
-      `Attempting to open authentication page in your browser.\n` +
-      `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
-  );
-  await open(webLogin.authUrl);
-  console.log('Waiting for authentication...');
+    // This does basically nothing, as it isn't show to the user.
+    console.log(
+      `\n\nCode Assist login required.\n` +
+        `Attempting to open authentication page in your browser.\n` +
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
+    );
+    await open(webLogin.authUrl);
+    console.log('Waiting for authentication...');
 
-  await webLogin.loginCompletePromise;
+    await webLogin.loginCompletePromise;
+  }
 
   return client;
+}
+
+async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
+  const redirectUri = 'https://sdk.cloud.google.com/authcode_cloudcode.html';
+  const codeVerifier = await client.generateCodeVerifierAsync();
+  const state = crypto.randomBytes(32).toString('hex');
+  const authUrl: string = client.generateAuthUrl({
+    redirect_uri: redirectUri,
+    access_type: 'offline',
+    scope: OAUTH_SCOPE,
+    code_challenge_method: CodeChallengeMethod.S256,
+    code_challenge: codeVerifier.codeChallenge,
+    state,
+  });
+  console.error('Please visit the following URL to authorize the application:');
+  console.error('');
+  console.error(authUrl);
+  console.error('');
+
+  const code = await new Promise<string>((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question('Enter the authorization code: ', (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+
+  if (!code) {
+    console.error('Authorization code is required.');
+    return false;
+  } else {
+    console.error(`Received authorization code: "${code}"`);
+  }
+
+  try {
+    const response = await client.getToken({
+      code,
+      codeVerifier: codeVerifier.codeVerifier,
+      redirect_uri: redirectUri,
+    });
+    client.setCredentials(response.tokens);
+  } catch (_error) {
+    // Consider logging the error.
+    return false;
+  }
+  return true;
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   const redirectUri = `http://localhost:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
-  const authUrl: string = client.generateAuthUrl({
+  const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
     access_type: 'offline',
     scope: OAUTH_SCOPE,
