@@ -983,6 +983,19 @@ export const useSlashCommandProcessor = (
               flag: 'wx',
             });
 
+            // Post-write security validation to mitigate TOCTOU race conditions.
+            const realFinalPath = await fs.realpath(finalOutputPath);
+            const realCwd = await fs.realpath(cwd);
+            if (
+              !realFinalPath.startsWith(realCwd + path.sep) &&
+              realFinalPath !== realCwd
+            ) {
+              await fs.unlink(finalOutputPath); // Clean up the misplaced file.
+              throw new Error(
+                'Security error: file was created outside the working directory.',
+              );
+            }
+
             addMessage({
               type: MessageType.INFO,
               content: `Conversation exported successfully!\nFile: ${finalOutputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(
