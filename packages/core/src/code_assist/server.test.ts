@@ -115,7 +115,14 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
-      // TODO: Add mock response
+      currentTier: {
+        id: 'free-tier',
+        name: 'Free',
+        description: 'free tier',
+      },
+      allowedTiers: [],
+      ineligibleTiers: [],
+      cloudaicompanionProject: 'projects/test',
     };
     vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
@@ -127,7 +134,7 @@ describe('CodeAssistServer', () => {
       'loadCodeAssist',
       expect.any(Object),
     );
-    expect(response).toBe(mockResponse);
+    expect(response).toEqual(mockResponse);
   });
 
   it('should return 0 for countTokens', async () => {
