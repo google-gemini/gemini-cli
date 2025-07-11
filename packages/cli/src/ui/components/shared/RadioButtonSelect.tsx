@@ -66,7 +66,7 @@ export function RadioButtonSelect<T>({
         onSelect(items[activeIndex]!.value);
       }
     },
-    { isActive: isFocused },
+    { isActive: isFocused && items.length > 0 },
   );
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
