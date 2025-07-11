@@ -127,14 +127,6 @@ export async function main() {
         'selectedAuthType',
         AuthType.CLOUD_SHELL,
       );
-    } else if (process.env.GEMINI_API_KEY) {
-      // set default fallback to gemini api key
-      // this has to go after load cli because thats where the env is set
-      settings.setValue(
-        SettingScope.User,
-        'selectedAuthType',
-        AuthType.USE_GEMINI,
-      );
     }
   }
 
