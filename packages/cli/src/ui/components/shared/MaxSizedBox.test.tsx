@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 describe('<MaxSizedBox />', () => {
   // Make sure MaxSizedBox logs errors on invalid configurations.
   // This is useful for debugging issues with the component.
-  // It should be set to false in production for perfornance and to avoid
+  // It should be set to false in production for performance and to avoid
   // cluttering the console if there are ignorable issues.
   setMaxSizedBoxDebugging(true);
 
