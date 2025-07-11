@@ -77,7 +77,8 @@ async function parseArguments(): Promise<CliArgs> {
     .option('prompt-interactive', {
       alias: 'i',
       type: 'string',
-      description: 'Execute the provided prompt and continue in interactive mode',
+      description:
+        'Execute the provided prompt and continue in interactive mode',
     })
     .option('sandbox', {
       alias: 's',
@@ -184,12 +185,14 @@ async function parseArguments(): Promise<CliArgs> {
   yargsInstance.wrap(yargsInstance.terminalWidth());
 
   const argv = await yargsInstance.argv;
-  
+
   // Validate that -p and -i are not used together
   if (argv.prompt && argv.promptInteractive) {
-    throw new Error('Cannot use both --prompt (-p) and --prompt-interactive (-i) together');
+    throw new Error(
+      'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+    );
   }
-  
+
   return argv;
 }
 
