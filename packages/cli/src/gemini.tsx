@@ -17,11 +17,12 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  SettingScope,
   USER_SETTINGS_PATH,
+  SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
+import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
@@ -34,6 +35,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -104,32 +106,41 @@ export async function main() {
 
   if (config.getInteractive() && !process.stdin.isTTY) {
     console.error(
-      'Error: The --interactive flag is not supported when piping input from stdin.',
+      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
     );
     process.exit(1);
   }
 
-  // set default fallback to gemini api key
-  // this has to go after load cli because thats where the env is set
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
-    settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.USE_GEMINI,
-    );
+  if (config.getListExtensions()) {
+    console.log('Installed extensions:');
+    for (const extension of extensions) {
+      console.log(`- ${extension.config.name}`);
+    }
+    process.exit(0);
+  }
+
+  // Set a default auth type if one isn't set.
+  if (!settings.merged.selectedAuthType) {
+    if (process.env.CLOUD_SHELL === 'true') {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.CLOUD_SHELL,
+      );
+    } else if (process.env.GEMINI_API_KEY) {
+      // set default fallback to gemini api key
+      // this has to go after load cli because thats where the env is set
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_GEMINI,
+      );
+    }
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  // Initialize centralized FileDiscoveryService
-  config.getFileService();
-  if (config.getCheckpointingEnabled()) {
-    try {
-      await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
-    }
-  }
+  await config.initialize();
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -139,12 +150,11 @@ export async function main() {
     }
   }
 
-  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
-    ? getNodeMemoryArgs(config)
-    : [];
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
+    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+      ? getNodeMemoryArgs(config)
+      : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (settings.merged.selectedAuthType) {
@@ -171,8 +181,20 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.getNoBrowser()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
   let input = config.getQuestion();
-  const startupWarnings = await getStartupWarnings();
+  const startupWarnings = [
+    ...(await getStartupWarnings()),
+    ...(await getUserStartupWarnings(workspaceRoot)),
+  ];
 
   const shouldBeInteractive =
     config.getInteractive() || (process.stdin.isTTY && input?.length === 0);
@@ -194,7 +216,7 @@ export async function main() {
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !input) {
     input += await readStdin();
   }
   if (!input) {
@@ -202,10 +224,13 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
+    auth_type: config.getContentGeneratorConfig().authType!,
     prompt_length: input.length,
   });
 
@@ -216,13 +241,18 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+      // eslint-disable-next-line no-control-regex
+      /[\x00-\x1F\x7F]/g,
+      '',
+    );
+    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
@@ -273,6 +303,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
     );
+    await finalConfig.initialize();
   }
 
   return await validateNonInterActiveAuth(
