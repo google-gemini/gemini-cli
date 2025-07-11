@@ -459,6 +459,9 @@ export async function main() {
     }
   }
 
+  // Initialize config before any authentication or UI operations
+  await config.initialize();
+
   if (
     settings.merged.security?.auth?.selectedType ===
       AuthType.LOGIN_WITH_GOOGLE &&
