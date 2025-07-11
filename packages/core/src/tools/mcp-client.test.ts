@@ -284,13 +284,85 @@ describe('discoverMcpTools', () => {
       mockToolRegistry as any,
     );
 
-    expect(SSEClientTransport).toHaveBeenCalledWith(new URL(serverConfig.url!));
+    expect(SSEClientTransport).toHaveBeenCalledWith(
+      new URL(serverConfig.url!),
+      {},
+    );
     expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
       .calls[0][0] as DiscoveredMCPTool;
     expect(registeredTool.name).toBe('tool-sse');
+  });
+
+  describe('SseClientTransport headers', () => {
+    const setupSseTest = async (headers?: Record<string, string>) => {
+      const serverConfig: MCPServerConfig = {
+        url: 'http://localhost:1234/sse',
+        ...(headers && { headers }),
+      };
+      const serverName = headers
+        ? 'sse-server-with-headers'
+        : 'sse-server-no-headers';
+      const toolName = headers ? 'tool-http-headers' : 'tool-http-no-headers';
+
+      mockConfig.getMcpServers.mockReturnValue({ [serverName]: serverConfig });
+
+      const mockTool = {
+        name: toolName,
+        description: `desc-${toolName}`,
+        inputSchema: { type: 'object' as const, properties: {} },
+      };
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({
+        tools: [mockTool],
+      });
+      mockToolRegistry.getToolsByServer.mockReturnValueOnce([
+        expect.any(DiscoveredMCPTool),
+      ]);
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+      );
+
+      return { serverConfig };
+    };
+
+    it('should pass headers when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+        'X-Custom-Header': 'custom-value',
+      };
+      const { serverConfig } = await setupSseTest(headers);
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        { requestInit: { headers } },
+      );
+    });
+
+    it('should work without headers (backwards compatibility)', async () => {
+      const { serverConfig } = await setupSseTest();
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        {},
+      );
+    });
+
+    it('should pass oauth token when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+      };
+      const { serverConfig } = await setupSseTest(headers);
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        { requestInit: { headers } },
+      );
+    });
   });
 
   it('should discover tools via mcpServers config (streamable http)', async () => {
