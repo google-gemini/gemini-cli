@@ -138,6 +138,10 @@ export class GeminiClient {
     return this.chat;
   }
 
+  isInitialized(): boolean {
+    return this.chat !== undefined;
+  }
+
   getHistory(): Content[] {
     return this.getChat().getHistory();
   }

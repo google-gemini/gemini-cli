@@ -529,6 +529,7 @@ describe('App UI', () => {
 
       mockConfig.getGeminiClient.mockReturnValue({
         getChatSafe: vi.fn(() => ({})),
+        isInitialized: vi.fn(() => true),
       } as unknown as GeminiClient);
 
       const { unmount, rerender } = render(

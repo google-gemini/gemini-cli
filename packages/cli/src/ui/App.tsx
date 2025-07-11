@@ -638,29 +638,32 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     return getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
 
+  const initialPrompt = useMemo(() => config.getQuestion(), [config]);
+  const geminiClient = config.getGeminiClient();
+
   useEffect(() => {
-    const prompt = config.getQuestion();
     if (
-      prompt &&
+      initialPrompt &&
       !initialPromptSubmitted.current &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
-      config.getGeminiClient()?.getChatSafe?.()
+      geminiClient?.isInitialized?.()
     ) {
-      submitQuery(prompt);
+      submitQuery(initialPrompt);
       initialPromptSubmitted.current = true;
     }
   }, [
+    initialPrompt,
     submitQuery,
     isAuthenticating,
     isAuthDialogOpen,
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
-    config,
+    geminiClient,
   ]);
 
   if (quittingMessages) {
