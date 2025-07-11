@@ -84,6 +84,77 @@ describe('loadExtensions', () => {
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
   });
+
+  it('should load context files using glob pattern', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+    createExtension(
+      workspaceExtensionsDir,
+      'ext1',
+      '1.0.0',
+      false,
+      '*.md', // Glob pattern for all markdown files
+    );
+
+    // Create some markdown files in the extension directory
+    const ext1Dir = path.join(workspaceExtensionsDir, 'ext1');
+    fs.writeFileSync(path.join(ext1Dir, 'file1.md'), 'context1');
+    fs.writeFileSync(path.join(ext1Dir, 'file2.md'), 'context2');
+    fs.writeFileSync(path.join(ext1Dir, 'file3.txt'), 'context3'); // Non-markdown file
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+
+    expect(extensions).toHaveLength(1);
+    const ext1 = extensions.find((e) => e.config.name === 'ext1');
+    expect(ext1?.contextFiles).toHaveLength(2);
+    expect(ext1?.contextFiles).toEqual(
+      expect.arrayContaining([
+        path.join(workspaceExtensionsDir, 'ext1', 'file1.md'),
+        path.join(workspaceExtensionsDir, 'ext1', 'file2.md'),
+      ]),
+    );
+  });
+
+  it('should load context files using array of glob patterns and normal paths', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+    createExtension(
+      workspaceExtensionsDir,
+      'ext1',
+      '1.0.0',
+      false,
+      ['specific.txt', '*.md'], // Array of patterns and normal paths
+    );
+
+    // Create some files in the extension directory
+    const ext1Dir = path.join(workspaceExtensionsDir, 'ext1');
+    fs.writeFileSync(path.join(ext1Dir, 'file1.md'), 'context1');
+    fs.writeFileSync(path.join(ext1Dir, 'file2.markdown'), 'context2'); // Different extension
+    fs.writeFileSync(path.join(ext1Dir, 'specific.txt'), 'context3');
+    fs.writeFileSync(path.join(ext1Dir, 'another.txt'), 'context4');
+
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    const ext1 = extensions.find((e) => e.config.name === 'ext1');
+
+    // Check that the correct files are loaded
+    // glob.sync in this test environment might return files in a different order
+    // so we check for the presence of each expected file.
+    expect(ext1?.contextFiles).toHaveLength(2);
+    expect(ext1?.contextFiles).toEqual(
+      expect.arrayContaining([
+        path.join(workspaceExtensionsDir, 'ext1', 'file1.md'),
+        path.join(workspaceExtensionsDir, 'ext1', 'specific.txt'),
+      ]),
+    );
+  });
 });
 
 describe('filterActiveExtensions', () => {
@@ -132,7 +203,7 @@ function createExtension(
   name: string,
   version: string,
   addContextFile = false,
-  contextFileName?: string,
+  contextFileName?: string | string[],
 ): void {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir);
@@ -146,6 +217,20 @@ function createExtension(
   }
 
   if (contextFileName) {
-    fs.writeFileSync(path.join(extDir, contextFileName), 'context');
+    if (Array.isArray(contextFileName)) {
+      contextFileName.forEach((fileName) => {
+        // For glob patterns, we can't just write a file with the pattern as its name.
+        // The tests that use glob patterns will create the files separately.
+        if (!fileName.includes('*') && !fileName.includes('?') && !fileName.includes('{')) {
+          fs.writeFileSync(path.join(extDir, fileName), 'context');
+        }
+      });
+    } else {
+      // For glob patterns, we can't just write a file with the pattern as its name.
+      // The tests that use glob patterns will create the files separately.
+      if (!contextFileName.includes('*') && !contextFileName.includes('?') && !contextFileName.includes('{')) {
+        fs.writeFileSync(path.join(extDir, contextFileName), 'context');
+      }
+    }
   }
 }
