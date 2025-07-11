@@ -436,6 +436,20 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleMaxSessionTurnsEvent = useCallback(
+    () =>
+      addItem(
+        {
+          type: 'info',
+          text:
+            `The session has reached the maximum number of turns: ${config.getMaxSessionTurns()}. ` +
+            `Please update this limit in your setting.json file.`,
+        },
+        Date.now(),
+      ),
+    [addItem, config],
+  );
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -472,6 +486,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ToolCallResponse:
             // do nothing
             break;
+          case ServerGeminiEventType.MaxSessionTurns:
+            handleMaxSessionTurnsEvent();
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -490,6 +507,7 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      handleMaxSessionTurnsEvent,
     ],
   );
 
