@@ -67,6 +67,8 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getUserTier: Mock<() => any>;
+  setUserTier: Mock<(userTier: any) => void>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -129,6 +131,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
         getSessionId: vi.fn(() => 'test-session-id'),
+        getUserTier: vi.fn(() => undefined),
+        setUserTier: vi.fn(),
       };
     });
   return {
@@ -155,6 +159,8 @@ vi.mock('./hooks/useAuthCommand', () => ({
     openAuthDialog: vi.fn(),
     handleAuthSelect: vi.fn(),
     handleAuthHighlight: vi.fn(),
+    isAuthenticating: false,
+    cancelAuthentication: vi.fn(),
   })),
 }));
 
