@@ -21,11 +21,13 @@ The following example pipes a command to Gemini CLI from your terminal:
 echo "Translate 'hello world' to French" | gemini
 ```
 
-This is particularly useful for scripting or for passing the contents of a file to the model. The `cat` command reads the file, and the `|` (pipe) operator sends its content as standard input to the `gemini` command.
+This is particularly useful for scripting or for passing the contents of a file to the model. The `cat` command reads the file, and the `|` (pipe) operator sends its content as standard input to the `gemini` command, where it is used as the prompt.
+
+**Note:** If you provide a prompt on the command line, the piped content will be ignored. Any instructions for the model should be included in the file being piped.
 
 ```sh
-cat report.txt | gemini "Extract the key financial figures from this report."
-```
+# The content of report.txt will be used as the prompt.
+cat report.txt | gemini
 
 Gemini CLI executes the command and prints the output to your terminal. Note that you can achieve the same behavior by using the `--prompt` or `-p` flag. For example:
 
