@@ -94,6 +94,11 @@ describe('InputPrompt', () => {
       addCommandToHistory: vi.fn(),
       getPreviousCommand: vi.fn().mockReturnValue(null),
       getNextCommand: vi.fn().mockReturnValue(null),
+      getMatchingCommand: vi.fn().mockReturnValue(null),
+      getNextMatchingCommand: vi.fn().mockReturnValue(null),
+      getPreviousMatchingCommand: vi.fn().mockReturnValue(null),
+      resetMatching: vi.fn(),
+
       resetHistoryPosition: vi.fn(),
     };
     mockedUseShellHistory.mockReturnValue(mockShellHistory);
@@ -193,6 +198,40 @@ describe('InputPrompt', () => {
 
     expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith('ls -l');
     expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
+    unmount();
+  });
+
+  it('should call reverse search methods on up key when reverse search is active', async () => {
+    props.shellModeActive = true;
+    vi.mocked(mockShellHistory.getPreviousMatchingCommand).mockReturnValue(
+      'ls -l',
+    );
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+    // Write Ctrl+R to activate reverse search
+    stdin.write('\u0012'); // Ctrl+R
+    await wait();
+    stdin.write('\u001B[A'); // Up arrow
+    await wait();
+
+    expect(mockShellHistory.getPreviousMatchingCommand).toHaveBeenCalled();
+    expect(props.buffer.setText).toHaveBeenCalledWith('ls -l');
+    unmount();
+  });
+
+  it('should call reverse search methods on down key when reverse search is active', async () => {
+    props.shellModeActive = true;
+    vi.mocked(mockShellHistory.getNextMatchingCommand).mockReturnValue('ls -l');
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+    // Write Ctrl+R to activate reverse search
+    stdin.write('\u0012'); // Ctrl+R
+    await wait();
+    stdin.write('\u001B[B'); // Down arrow
+    await wait();
+
+    expect(mockShellHistory.getNextMatchingCommand).toHaveBeenCalled();
+    expect(props.buffer.setText).toHaveBeenCalledWith('ls -l');
     unmount();
   });
 
