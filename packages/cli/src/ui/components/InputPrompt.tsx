@@ -308,6 +308,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Undo/Redo
+      if (key.ctrl && key.name === 'g') {
+        buffer.undo();
+        return;
+      }
+      if (key.ctrl && key.name === 'r') {
+        buffer.redo();
+        return;
+      }
+
       // External editor
       const isCtrlX = key.ctrl && (key.name === 'x' || key.sequence === '\x18');
       if (isCtrlX) {

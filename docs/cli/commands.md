@@ -87,6 +87,16 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
 
+## Input Prompt Shortcuts
+
+These shortcuts apply directly to the input prompt for text manipulation.
+
+- **Undo:**
+  - **Keyboard shortcut:** Press **Ctrl+G** to undo the last action in the input prompt.
+
+- **Redo:**
+  - **Keyboard shortcut:** Press **Ctrl+R** to redo the last undone action in the input prompt.
+
 ## At commands (`@`)
 
 At commands are used to include the content of files or directories as part of your prompt to Gemini. These commands include git-aware filtering.
