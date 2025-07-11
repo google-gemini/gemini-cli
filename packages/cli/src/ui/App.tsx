@@ -179,6 +179,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   // User tier detection effect
   useEffect(() => {
+    let isCancelled = false;
+
     const detectUserTier = async () => {
       try {
         // Reset user tier when authentication changes
@@ -210,6 +212,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                   duetProject: codeAssistServer.projectId,
                 },
               });
+
+              if (isCancelled) return;
+
               if (loadRes.currentTier) {
                 setUserTier(loadRes.currentTier.id);
               }
@@ -217,6 +222,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           }
         }
       } catch (error) {
+        if (isCancelled) return;
         // Silently fail - this is not critical functionality
         // We'll default to FREE tier behavior if tier detection fails
         console.debug('User tier detection failed:', error);
@@ -224,6 +230,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     };
 
     detectUserTier();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [config, isAuthenticating]);
 
   const {
