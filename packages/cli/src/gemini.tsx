@@ -185,6 +185,12 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
+    // Ensure settings reflect the correct auth type for Grok models in interactive mode
+    if (model && (GROK_MODELS as readonly string[]).includes(model) && 
+        settings.merged.selectedAuthType !== AuthType.USE_GROK) {
+      settings.setValue(SettingScope.User, 'selectedAuthType', AuthType.USE_GROK);
+    }
+    
     setWindowTitle(basename(workspaceRoot), settings);
     render(
       <React.StrictMode>
