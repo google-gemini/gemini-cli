@@ -71,6 +71,8 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
+  AuthType,
+  CodeAssistServer,
 } from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
@@ -139,6 +141,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
+  const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -173,6 +176,55 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       }
     }
   }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+
+  // User tier detection effect
+  useEffect(() => {
+    const detectUserTier = async () => {
+      try {
+        // Reset user tier when authentication changes
+        setUserTier(undefined);
+
+        // Skip tier detection if currently authenticating
+        if (isAuthenticating) {
+          return;
+        }
+
+        const contentGeneratorConfig = config.getContentGeneratorConfig();
+        // Only attempt tier detection for OAuth users and when contentGeneratorConfig is available
+        if (contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE) {
+          const server = config.getGeminiClient().getContentGenerator();
+          // Check if we have a CodeAssistServer (OAuth user)
+          if (
+            server &&
+            typeof server === 'object' &&
+            'loadCodeAssist' in server
+          ) {
+            const codeAssistServer = server as CodeAssistServer;
+            if (codeAssistServer.projectId) {
+              const loadRes = await codeAssistServer.loadCodeAssist({
+                cloudaicompanionProject: codeAssistServer.projectId,
+                metadata: {
+                  ideType: 'IDE_UNSPECIFIED',
+                  platform: 'PLATFORM_UNSPECIFIED',
+                  pluginType: 'GEMINI',
+                  duetProject: codeAssistServer.projectId,
+                },
+              });
+              if (loadRes.currentTier) {
+                setUserTier(loadRes.currentTier.id);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - this is not critical functionality
+        // We'll default to FREE tier behavior if tier detection fails
+        console.debug('User tier detection failed:', error);
+      }
+    };
+
+    detectUserTier();
+  }, [config, isAuthenticating]);
 
   const {
     isEditorDialogOpen,
@@ -254,9 +306,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     ): Promise<boolean> => {
       let message: string;
 
-      // For quota errors, assume FREE tier (safe default) - only show upgrade messaging to free tier users
-      // TODO: Get actual user tier from config when available
-      const userTier = undefined; // Defaults to FREE tier behavior
+      // Use actual user tier if available, otherwise default to FREE tier behavior (safe default)
       const isPaidTier =
         userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
 
@@ -320,7 +370,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
-  }, [config, addItem]);
+  }, [config, addItem, userTier]);
 
   const {
     handleSlashCommand,
