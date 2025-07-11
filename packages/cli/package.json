@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.10"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
@@ -42,7 +42,6 @@
     "ink-link": "^4.1.0",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
-    "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
     "mime-types": "^3.0.1",
     "open": "^10.1.2",

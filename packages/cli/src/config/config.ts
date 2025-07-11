@@ -312,11 +312,13 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    maxSessionTurns: settings.maxSessionTurns ?? -1,
     listExtensions: argv.listExtensions || false,
     activeExtensions: activeExtensions.map((e) => ({
       name: e.config.name,
       version: e.config.version,
     })),
+    noBrowser: !!process.env.NO_BROWSER,
   });
 }
 
