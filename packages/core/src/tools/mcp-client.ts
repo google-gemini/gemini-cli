@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { AuthProvider } from '../auth/authProvider.js';
+import { GoogleAuthClient } from '../auth/googleAuthClient.js';
+import { AuthClient } from '../auth/authClient.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
@@ -158,6 +164,23 @@ export async function discoverMcpTools(
 }
 
 /**
+ * Creates an authentication client based on the specified provider.
+ * This factory function simplifies the creation of different auth clients.
+ *
+ * @param provider The authentication provider to use (e.g., GOOGLE).
+ * @returns An instance of a class that implements the AuthClient interface.
+ * @throws An error if the provider is not supported.
+ */
+function createAuthClient(provider: AuthProvider): AuthClient {
+  switch (provider) {
+    case AuthProvider.GOOGLE:
+      return new GoogleAuthClient();
+    default:
+      throw new Error(`Unsupported auth provider: ${provider}`);
+  }
+}
+
+/**
  * Connects to an MCP server and discovers available tools, registering them with the tool registry.
  * This function handles the complete lifecycle of connecting to a server, discovering tools,
  * and cleaning up resources if no tools are found.
@@ -176,21 +199,47 @@ async function connectAndDiscover(
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
   let transport;
-  if (mcpServerConfig.httpUrl) {
-    const transportOptions: StreamableHTTPClientTransportOptions = {};
-
-    if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
-      };
+  let authClient: AuthClient | undefined;
+  let authHeaders: Record<string, string> | undefined;
+  if (
+    (mcpServerConfig.httpUrl || mcpServerConfig.url) &&
+    mcpServerConfig.oauth
+  ) {
+    try {
+      authClient = createAuthClient(mcpServerConfig.oauth);
+      authHeaders = await authClient.getHeaders();
+    } catch (error) {
+      console.error(
+        `Failed to get auth client or headers for MCP server '${mcpServerName}': ${error}`,
+      );
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+      return;
     }
+  }
 
+  const mergedHeaders = {
+    ...authHeaders,
+    ...mcpServerConfig.headers,
+  };
+
+  if (mcpServerConfig.httpUrl) {
+    const httpTransportOptions: StreamableHTTPClientTransportOptions = {};
+    if (Object.keys(mergedHeaders).length > 0) {
+      httpTransportOptions.requestInit = { headers: mergedHeaders };
+    }
     transport = new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.httpUrl),
-      transportOptions,
+      httpTransportOptions,
     );
   } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    const sseTransportOptions: SSEClientTransportOptions = {};
+    if (Object.keys(mergedHeaders).length > 0) {
+      sseTransportOptions.requestInit = { headers: mergedHeaders };
+    }
+    transport = new SSEClientTransport(
+      new URL(mcpServerConfig.url),
+      sseTransportOptions,
+    );
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
@@ -341,6 +390,8 @@ async function connectAndDiscover(
           funcDecl.name,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
+          authClient,
+          mergedHeaders,
         ),
       );
     }

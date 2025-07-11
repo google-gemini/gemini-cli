@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { AuthClient } from '../auth/authClient.js';
 import {
   BaseTool,
   ToolResult,
@@ -27,6 +28,8 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly serverToolName: string,
     readonly timeout?: number,
     readonly trust?: boolean,
+    private readonly authClient?: AuthClient,
+    private readonly headers: Record<string, string> = {},
   ) {
     super(
       name,
@@ -74,6 +77,13 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {
+    if (this.authClient) {
+      const newHeaders = await this.authClient.getHeaders();
+      for (const key in newHeaders) {
+        this.headers[key] = newHeaders[key];
+      }
+    }
+
     const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
