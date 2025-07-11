@@ -69,6 +69,10 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
           echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
           source ~/.bashrc
           ```
+4.  **Cloud Shell:**
+    - This option is only available when running in a Google Cloud Shell environment.
+    - It automatically uses the credentials of the logged-in user in the Cloud Shell environment.
+    - This is the default authentication method when running in Cloud Shell and no other method is configured.
 
 ### Persisting Environment Variables with `.env` Files
 
