@@ -139,9 +139,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
-  const [userTier, setUserTier] = useState<UserTierId | undefined>(
-    config.getUserTier(),
-  );
+  const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -179,9 +177,24 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
-    const configUserTier = config.getUserTier();
-    if (configUserTier !== userTier) {
-      setUserTier(configUserTier);
+    const syncUserTier = async () => {
+      try {
+        const configUserTier = await config.getUserTier();
+        if (configUserTier !== userTier) {
+          setUserTier(configUserTier);
+        }
+      } catch (error) {
+        // Silently fail - this is not critical functionality
+        // Only log in debug mode to avoid cluttering the console
+        if (config.getDebugMode()) {
+          console.debug('Failed to sync user tier:', error);
+        }
+      }
+    };
+
+    // Only sync when not currently authenticating
+    if (!isAuthenticating) {
+      syncUserTier();
     }
   }, [config, userTier, isAuthenticating]);
 
