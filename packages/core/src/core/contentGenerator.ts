@@ -15,6 +15,7 @@ import {
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { Config } from '../config/config.js';
 import { getEffectiveModel } from './modelCheck.js';
 
 /**
@@ -99,6 +100,7 @@ export async function createContentGeneratorConfig(
 
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
+  gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
@@ -114,6 +116,7 @@ export async function createContentGenerator(
     return createCodeAssistContentGenerator(
       httpOptions,
       config.authType,
+      gcConfig,
       sessionId,
     );
   }

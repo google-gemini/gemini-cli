@@ -728,13 +728,29 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               />
             </Box>
           ) : isAuthenticating ? (
-            <AuthInProgress
-              onTimeout={() => {
-                setAuthError('Authentication timed out. Please try again.');
-                cancelAuthentication();
-                openAuthDialog();
-              }}
-            />
+            <>
+              <AuthInProgress
+                onTimeout={() => {
+                  setAuthError('Authentication timed out. Please try again.');
+                  cancelAuthentication();
+                  openAuthDialog();
+                }}
+              />
+              {showErrorDetails && (
+                <OverflowProvider>
+                  <Box flexDirection="column">
+                    <DetailedMessagesDisplay
+                      messages={filteredConsoleMessages}
+                      maxHeight={
+                        constrainHeight ? debugConsoleMaxHeight : undefined
+                      }
+                      width={inputWidth}
+                    />
+                    <ShowMoreLines constrainHeight={constrainHeight} />
+                  </Box>
+                </OverflowProvider>
+              )}
+            </>
           ) : isAuthDialogOpen ? (
             <Box flexDirection="column">
               <AuthDialog

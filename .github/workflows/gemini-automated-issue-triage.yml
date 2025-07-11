@@ -61,9 +61,3 @@ jobs:
             - Do not add comments or modify the issue content.
             - Triage only the current issue.
             - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
-
-            Guidelines:
-            - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
-            - Triage only the current issue.
-            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
