@@ -12,7 +12,6 @@ import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 
-
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
   memoryCommand: { name: 'memory', description: 'Mock Memory' },
@@ -83,7 +82,12 @@ describe('CommandService', () => {
 
         const loadedTree = commandService.getCommands();
         expect(loadedTree.length).toBe(4);
-        expect(loadedTree).toEqual([clearCommand, helpCommand, memoryCommand, authCommand]);
+        expect(loadedTree).toEqual([
+          authCommand,
+          clearCommand,
+          helpCommand,
+          memoryCommand,
+        ]);
       });
     });
   });

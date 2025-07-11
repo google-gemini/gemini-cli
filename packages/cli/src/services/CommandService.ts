@@ -11,10 +11,10 @@ import { clearCommand } from '../ui/commands/clearCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
+  authCommand,
   clearCommand,
   helpCommand,
   memoryCommand,
-  authCommand,
 ];
 
 export class CommandService {

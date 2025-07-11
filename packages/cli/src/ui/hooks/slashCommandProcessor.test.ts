@@ -529,7 +529,7 @@ describe('useSlashCommandProcessor', () => {
 
       const commandResult = await result.current.handleSlashCommand('/auth');
 
-      expect(mockAction).toHaveBeenCalledTimes(1); 
+      expect(mockAction).toHaveBeenCalledTimes(1);
       expect(mockOpenAuthDialog).toHaveBeenCalledWith();
       expect(commandResult).toEqual({ type: 'handled' });
     });

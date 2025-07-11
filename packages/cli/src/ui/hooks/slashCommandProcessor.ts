@@ -1207,6 +1207,7 @@ export const useSlashCommandProcessor = (
     [
       addItem,
       setShowHelp,
+      openAuthDialog,
       commands,
       legacyCommands,
       commandContext,
