@@ -33,11 +33,16 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         ```bash
         export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
         ```
-      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files).
+
+      - Alternatively you can export the API key from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+
         ```bash
         echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
         source ~/.bashrc
         ```
+
+        :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
 
 3.  **Vertex AI:**
     - If not using express mode:
@@ -53,19 +58,30 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
           export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
           export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
           ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files)
+
+        - Alternatively you can export the environment variables from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+
           ```bash
           echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
           echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
           source ~/.bashrc
           ```
+
+          :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
+
     - If using express mode:
       - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key provided by express mode:
         - You can temporarily set these environment variables in your current shell session using the following commands:
+
           ```bash
           export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
           ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+
+        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files).
+
+        - Alternatively you can export the environment variables from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+
           ```bash
           echo 'export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"' >> ~/.bashrc
           source ~/.bashrc
@@ -74,6 +90,8 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
     - This option is only available when running in a Google Cloud Shell environment.
     - It automatically uses the credentials of the logged-in user in the Cloud Shell environment.
     - This is the default authentication method when running in Cloud Shell and no other method is configured.
+
+          :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
 
 ### Persisting Environment Variables with `.env` Files
 
