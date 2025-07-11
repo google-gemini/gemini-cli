@@ -14,6 +14,7 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
+  FlashFallbackEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -30,6 +31,7 @@ const api_request_event_name = 'api_request';
 const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
+const flash_fallback_event_name = 'flash_fallback';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -429,6 +431,20 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
     this.flushIfNeeded();
+  }
+
+  logFlashFallbackEvent(event: FlashFallbackEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
