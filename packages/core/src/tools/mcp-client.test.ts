@@ -28,6 +28,10 @@ import { parse, ParseEntry } from 'shell-quote';
 // Mock dependencies
 vi.mock('shell-quote');
 
+// Mock fetch globally
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   const MockedClient = vi.fn();
   MockedClient.prototype.connect = vi.fn();
@@ -667,6 +671,213 @@ describe('discoverMcpTools', () => {
     const lastClientInstance =
       clientInstances[clientInstances.length - 1]?.value;
     expect(lastClientInstance?.onerror).toEqual(expect.any(Function));
+  });
+
+  describe('OAuth Authentication Handling', () => {
+    beforeEach(() => {
+      // Mock MCPOAuthProvider and MCPOAuthTokenStorage
+      vi.mock('../mcp/oauth-provider.js', () => ({
+        MCPOAuthProvider: {
+          getValidToken: vi.fn(),
+          authenticate: vi.fn(),
+        },
+      }));
+
+      vi.mock('../mcp/oauth-token-storage.js', () => ({
+        MCPOAuthTokenStorage: {
+          getToken: vi.fn(),
+        },
+      }));
+    });
+
+    it('should handle 401 Unauthorized response with automatic OAuth discovery', async () => {
+      const serverConfig: MCPServerConfig = {
+        httpUrl: 'https://api.example.com/mcp',
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'oauth-server': serverConfig,
+      });
+
+      // Mock 401 response with www-authenticate header
+      const authError = new Error('401 Unauthorized');
+      authError.message = `401 Unauthorized
+www-authenticate: Bearer realm="MCP Server", resource_metadata_uri="https://auth.example.com/.well-known/oauth-protected-resource"`;
+
+      vi.mocked(Client.prototype.connect).mockRejectedValueOnce(authError);
+
+      // Mock OAuth discovery
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              authorization_endpoint: 'https://auth.example.com/authorize',
+              token_endpoint: 'https://auth.example.com/token',
+            }),
+        });
+
+      // Mock successful authentication
+      const { MCPOAuthProvider } = await import('../mcp/oauth-provider.js');
+      vi.mocked(MCPOAuthProvider.authenticate).mockResolvedValue({
+        accessToken: 'test_token',
+        tokenType: 'Bearer',
+      } as any);
+
+      // Mock successful connection with OAuth token
+      vi.mocked(Client.prototype.connect).mockResolvedValueOnce(undefined);
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({ tools: [] });
+
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        undefined,
+        mockToolRegistry as any,
+      );
+
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('Starting OAuth authentication'),
+      );
+    });
+
+    it('should use stored OAuth tokens for authenticated servers', async () => {
+      const serverConfig: MCPServerConfig = {
+        httpUrl: 'https://api.example.com/mcp',
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'oauth-server': serverConfig,
+      });
+
+      // Mock stored credentials
+      const { MCPOAuthTokenStorage } = await import(
+        '../mcp/oauth-token-storage.js'
+      );
+      const { MCPOAuthProvider } = await import('../mcp/oauth-provider.js');
+
+      vi.mocked(MCPOAuthTokenStorage.getToken).mockResolvedValue({
+        serverName: 'oauth-server',
+        token: {
+          accessToken: 'stored_token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      });
+
+      vi.mocked(MCPOAuthProvider.getValidToken).mockResolvedValue(
+        'stored_token',
+      );
+
+      vi.mocked(Client.prototype.connect).mockResolvedValue(undefined);
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({ tools: [] });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        undefined,
+        mockToolRegistry as any,
+      );
+
+      expect(MCPOAuthProvider.getValidToken).toHaveBeenCalledWith(
+        'oauth-server',
+        { clientId: 'test-client-id' },
+      );
+    });
+
+    it('should handle OAuth token refresh for expired tokens', async () => {
+      const serverConfig: MCPServerConfig = {
+        oauth: {
+          enabled: true,
+          clientId: 'test-client-id',
+        },
+        httpUrl: 'https://api.example.com/mcp',
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'oauth-server': serverConfig,
+      });
+
+      const { MCPOAuthProvider } = await import('../mcp/oauth-provider.js');
+
+      // First call returns null (expired), second call returns refreshed token
+      vi.mocked(MCPOAuthProvider.getValidToken)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce('refreshed_token');
+
+      vi.mocked(Client.prototype.connect).mockResolvedValue(undefined);
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({ tools: [] });
+
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        undefined,
+        mockToolRegistry as any,
+      );
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('requires OAuth authentication'),
+      );
+    });
+
+    it('should handle SSE servers with OAuth tokens in Authorization header', async () => {
+      const serverConfig: MCPServerConfig = {
+        url: 'https://api.example.com/sse',
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'sse-oauth-server': serverConfig,
+      });
+
+      const { MCPOAuthTokenStorage } = await import(
+        '../mcp/oauth-token-storage.js'
+      );
+      const { MCPOAuthProvider } = await import('../mcp/oauth-provider.js');
+
+      vi.mocked(MCPOAuthTokenStorage.getToken).mockResolvedValue({
+        serverName: 'sse-oauth-server',
+        token: {
+          accessToken: 'sse_token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+        },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      });
+
+      vi.mocked(MCPOAuthProvider.getValidToken).mockResolvedValue('sse_token');
+
+      // Mock HTTP transport to fail so it falls back to SSE
+      vi.mocked(Client.prototype.connect)
+        .mockRejectedValueOnce(new Error('HTTP connection failed'))
+        .mockResolvedValueOnce(undefined);
+
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({ tools: [] });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        undefined,
+        mockToolRegistry as any,
+      );
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL('https://api.example.com/sse'),
+        {
+          requestInit: {
+            headers: {
+              Authorization: 'Bearer sse_token',
+            },
+          },
+        },
+      );
+    });
   });
 
   describe('Tool Filtering', () => {

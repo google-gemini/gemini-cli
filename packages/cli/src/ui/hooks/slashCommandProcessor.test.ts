@@ -65,6 +65,7 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
   GeminiClient,
+  MCPOAuthToken,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -153,6 +154,7 @@ describe('useSlashCommandProcessor', () => {
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
       getSessionId: vi.fn(() => 'test-session-id'),
+      getMcpServers: vi.fn(() => ({})),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -354,6 +356,170 @@ describe('useSlashCommandProcessor', () => {
         2,
         expect.objectContaining({
           sandboxEnv: 'sandbox-exec (test-profile)',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('OAuth commands', () => {
+    beforeEach(() => {
+      // Mock the MCP OAuth modules
+      vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+        const actual =
+          await importOriginal<typeof import('@google/gemini-cli-core')>();
+        return {
+          ...actual,
+          MCPOAuthProvider: {
+            authenticate: vi.fn(),
+          },
+          getMCPServerStatus: vi.fn(),
+          getMCPDiscoveryState: vi.fn(),
+        };
+      });
+    });
+
+    it('/mcp auth should list OAuth-enabled servers when no server specified', async () => {
+      // Arrange
+      const mockMcpServers = {
+        'oauth-server': {
+          httpUrl: 'https://api.example.com/mcp',
+          oauth: { enabled: true },
+        },
+        'non-oauth-server': {
+          command: './mcp-server',
+        },
+      };
+
+      vi.mocked(mockConfig.getMcpServers).mockReturnValue(mockMcpServers);
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        await handleSlashCommand('/mcp auth');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            'MCP servers with OAuth authentication',
+          ),
+        }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('oauth-server'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('/mcp auth <server> should authenticate with specific server', async () => {
+      // Arrange
+      const mockMcpServers = {
+        'oauth-server': {
+          httpUrl: 'https://api.example.com/mcp',
+          oauth: { enabled: true },
+        },
+      };
+
+      vi.mocked(mockConfig.getMcpServers).mockReturnValue(mockMcpServers);
+      (
+        mockConfig as Config & {
+          getToolRegistry: Mock;
+          getGeminiClient: Mock;
+        }
+      ).getToolRegistry = vi
+        .fn()
+        .mockResolvedValue({ discoverToolsForServer: vi.fn() });
+      (
+        mockConfig as Config & {
+          getToolRegistry: Mock;
+          getGeminiClient: Mock;
+        }
+      ).getGeminiClient = vi.fn().mockReturnValue({
+        setTools: vi.fn(),
+      });
+
+      const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+      vi.mocked(MCPOAuthProvider.authenticate).mockResolvedValue({
+        accessToken: 'test_token',
+        tokenType: 'Bearer',
+      } as MCPOAuthToken);
+
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        await handleSlashCommand('/mcp auth oauth-server');
+      });
+
+      // Assert
+      expect(MCPOAuthProvider.authenticate).toHaveBeenCalledWith(
+        'oauth-server',
+        { enabled: true },
+        'https://api.example.com/mcp',
+      );
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Successfully authenticated'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('/mcp auth should handle authentication errors gracefully', async () => {
+      // Arrange
+      const mockMcpServers = {
+        'oauth-server': {
+          httpUrl: 'https://api.example.com/mcp',
+          oauth: { enabled: true },
+        },
+      };
+
+      vi.mocked(mockConfig.getMcpServers).mockReturnValue(mockMcpServers);
+
+      const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+      vi.mocked(MCPOAuthProvider.authenticate).mockRejectedValue(
+        new Error('Authentication failed'),
+      );
+
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        await handleSlashCommand('/mcp auth oauth-server');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining('Failed to authenticate'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('/mcp auth should handle non-existent server', async () => {
+      // Arrange
+      vi.mocked(mockConfig.getMcpServers).mockReturnValue({});
+      const { handleSlashCommand } = getProcessor();
+
+      // Act
+      await act(async () => {
+        await handleSlashCommand('/mcp auth non-existent-server');
+      });
+
+      // Assert
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining('not found'),
         }),
         expect.any(Number),
       );

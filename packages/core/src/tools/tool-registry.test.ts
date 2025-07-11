@@ -297,6 +297,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        true,
       );
     });
 
@@ -318,6 +319,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        true,
       );
     });
   });
@@ -459,5 +461,189 @@ describe('sanitizeParameters', () => {
     expect(
       schema.properties?.['ceo']?.properties?.['manager']?.properties?.['id'],
     ).toHaveProperty('format', undefined);
+  });
+
+  it('should convert numeric enum values to strings', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        status: {
+          type: Type.STRING,
+          enum: [-1, 0, 1] as any, // Numeric enum values
+        },
+        priority: {
+          type: Type.STRING,
+          enum: ['high', 'medium', 'low'], // Already string values
+        },
+        mixed: {
+          type: Type.STRING,
+          enum: [1, 'active', 0, 'inactive'] as any, // Mixed types
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    // Numeric enums should be converted to strings
+    expect(schema.properties?.['status']?.enum).toEqual(['-1', '0', '1']);
+
+    // String enums should remain unchanged
+    expect(schema.properties?.['priority']?.enum).toEqual([
+      'high',
+      'medium',
+      'low',
+    ]);
+
+    // Mixed enums should all be converted to strings
+    expect(schema.properties?.['mixed']?.enum).toEqual([
+      '1',
+      'active',
+      '0',
+      'inactive',
+    ]);
+  });
+
+  it('should handle enum values in nested structures', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        config: {
+          type: Type.OBJECT,
+          properties: {
+            level: {
+              type: Type.STRING,
+              enum: [0, 1, 2] as any, // Numeric enum in nested object
+            },
+          },
+        },
+        items: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              state: {
+                type: Type.STRING,
+                enum: [-1, 0, 1] as any, // Numeric enum in array items
+              },
+            },
+          },
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    // Nested enum should be converted
+    expect(schema.properties?.['config']?.properties?.['level']?.enum).toEqual([
+      '0',
+      '1',
+      '2',
+    ]);
+
+    // Array item enum should be converted
+    const arrayItemsSchema = schema.properties?.['items']?.items as Schema;
+    expect(arrayItemsSchema?.properties?.['state']?.enum).toEqual([
+      '-1',
+      '0',
+      '1',
+    ]);
+  });
+
+  it('should convert non-string types to string when enum is present', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        numericEnum: {
+          type: Type.NUMBER, // Non-string type with enum
+          enum: [1, 2, 3] as any,
+        },
+        integerEnum: {
+          type: Type.INTEGER, // Non-string type with enum
+          enum: [-1, 0, 1] as any,
+        },
+        stringEnum: {
+          type: Type.STRING, // Already string type
+          enum: ['a', 'b', 'c'],
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    // Non-string types should be converted to string
+    expect(schema.properties?.['numericEnum']?.type).toBe(Type.STRING);
+    expect(schema.properties?.['numericEnum']?.enum).toEqual(['1', '2', '3']);
+
+    expect(schema.properties?.['integerEnum']?.type).toBe(Type.STRING);
+    expect(schema.properties?.['integerEnum']?.enum).toEqual(['-1', '0', '1']);
+
+    // String type should remain unchanged
+    expect(schema.properties?.['stringEnum']?.type).toBe(Type.STRING);
+    expect(schema.properties?.['stringEnum']?.enum).toEqual(['a', 'b', 'c']);
+  });
+
+  it('should handle enum with boolean values', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        booleanEnum: {
+          type: Type.BOOLEAN,
+          enum: [true, false] as any,
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    expect(schema.properties?.['booleanEnum']?.type).toBe(Type.STRING);
+    expect(schema.properties?.['booleanEnum']?.enum).toEqual(['true', 'false']);
+  });
+
+  it('should handle enum with null and undefined values', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        mixedEnum: {
+          type: Type.STRING,
+          enum: [null, undefined, 'valid', 0] as any,
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    // null and undefined should be filtered out, remaining values converted to strings
+    expect(schema.properties?.['mixedEnum']?.enum).toEqual(['valid', '0']);
+  });
+
+  it('should handle enum in anyOf structures', () => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        complexEnum: {
+          anyOf: [
+            {
+              type: Type.INTEGER,
+              enum: [1, 2, 3] as any,
+            },
+            {
+              type: Type.STRING,
+              enum: ['a', 'b'],
+            },
+          ],
+        },
+      },
+    };
+
+    sanitizeParameters(schema);
+
+    const anyOfFirst = schema.properties?.['complexEnum']?.anyOf?.[0] as Schema;
+    const anyOfSecond = schema.properties?.['complexEnum']
+      ?.anyOf?.[1] as Schema;
+
+    expect(anyOfFirst?.type).toBe(Type.STRING);
+    expect(anyOfFirst?.enum).toEqual(['1', '2', '3']);
+    expect(anyOfSecond?.type).toBe(Type.STRING);
+    expect(anyOfSecond?.enum).toEqual(['a', 'b']);
   });
 });
