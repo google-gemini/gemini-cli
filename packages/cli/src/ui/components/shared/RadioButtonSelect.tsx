@@ -86,6 +86,17 @@ export function RadioButtonSelect<T>({
       if (key.return) {
         onSelect(items[activeIndex]!.value);
       }
+
+      // Enable selection directly from number keys.
+      if (/^[1-9]$/.test(input)) {
+        const targetIndex = Number.parseInt(input, 10) - 1;
+        if (targetIndex >= 0 && targetIndex < visibleItems.length) {
+          const selectedItem = visibleItems[targetIndex];
+          if (selectedItem) {
+            onSelect?.(selectedItem.value);
+          }
+        }
+      }
     },
     { isActive: isFocused && items.length > 0 },
   );
