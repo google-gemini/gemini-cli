@@ -79,9 +79,7 @@ export interface Settings {
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
   hideTips?: boolean;
-
-  // Setting for setting maximum number of user/model/tool turns in a session.
-  maxSessionTurns?: number;
+  showMcpToolResponse?: boolean;
 
   // Add other settings here.
 }

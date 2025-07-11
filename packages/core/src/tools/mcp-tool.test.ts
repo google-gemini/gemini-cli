@@ -29,6 +29,14 @@ const mockCallableToolInstance: Mocked<CallableTool> = {
   // Add other methods if DiscoveredMCPTool starts using them
 };
 
+// Mock Config class
+const mockConfig = {
+  showMcpToolResponse: true, // Default to true for most tests
+};
+vi.mock('../config/config.js', () => ({
+  Config: vi.fn(() => mockConfig),
+}));
+
 describe('DiscoveredMCPTool', () => {
   const serverName = 'mock-mcp-server';
   const toolNameForModel = 'test-mcp-tool-for-model';
@@ -60,6 +68,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
 
       expect(tool.name).toBe(toolNameForModel);
@@ -79,6 +90,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       expect(tool.schema.description).toBe(baseDescription);
     });
@@ -93,13 +107,16 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         serverToolName,
         customTimeout,
+        false, // trust
+        mockConfig as any,
       );
       expect(tool.timeout).toBe(customTimeout);
     });
   });
 
   describe('execute', () => {
-    it('should call mcpTool.callTool with correct parameters and format display output', async () => {
+    it('should call mcpTool.callTool with correct parameters and format display output when showMcpToolResponse is true', async () => {
+      mockConfig.showMcpToolResponse = true;
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -107,6 +124,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const params = { param: 'testValue' };
       const mockToolSuccessResultObject = {
@@ -139,7 +159,8 @@ describe('DiscoveredMCPTool', () => {
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
 
-    it('should handle empty result from getStringifiedResultForDisplay', async () => {
+    it('should return a "hidden" message when showMcpToolResponse is false', async () => {
+      mockConfig.showMcpToolResponse = false;
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -147,6 +168,44 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
+      );
+      const params = { param: 'testValue' };
+      const mockMcpToolResponseParts: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: { content: [{ text: 'some response' }] },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
+
+      const toolResult: ToolResult = await tool.execute(params);
+
+      expect(mockCallTool).toHaveBeenCalledWith([
+        { name: serverToolName, args: params },
+      ]);
+      expect(toolResult.llmContent).toEqual(mockMcpToolResponseParts);
+      expect(toolResult.returnDisplay).toBe(
+        'Tool response hidden by configuration.',
+      );
+    });
+
+    it('should handle empty result from getStringifiedResultForDisplay when showMcpToolResponse is true', async () => {
+      mockConfig.showMcpToolResponse = true;
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        toolNameForModel,
+        baseDescription,
+        inputSchema,
+        serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const params = { param: 'testValue' };
       const mockMcpToolResponsePartsEmpty: Part[] = [];
@@ -156,6 +215,7 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should propagate rejection if mcpTool.callTool rejects', async () => {
+      mockConfig.showMcpToolResponse = true; // Does not matter for this test
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
@@ -163,6 +223,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const params = { param: 'failCase' };
       const expectedError = new Error('MCP call failed');
@@ -183,8 +246,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
-        undefined,
-        true,
+        undefined, // timeout
+        true, // trust
+        mockConfig as any,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
@@ -200,6 +264,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
@@ -216,6 +283,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
@@ -230,6 +300,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -261,6 +334,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -292,6 +368,9 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         serverToolName,
+        undefined, // timeout
+        false, // trust
+        mockConfig as any,
       );
       const toolAllowlistKey = `${serverName}.${serverToolName}`;
       const confirmation = await tool.shouldConfirmExecute(

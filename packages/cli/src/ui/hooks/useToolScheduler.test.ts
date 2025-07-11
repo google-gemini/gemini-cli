@@ -128,7 +128,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'YOLO Formatted tool output',
-      summary: 'YOLO summary',
     } as ToolResult);
 
     const { result } = renderSchedulerInYoloMode();
@@ -281,7 +280,6 @@ describe('useReactToolScheduler', () => {
     (mockTool.execute as Mock).mockResolvedValue({
       llmContent: 'Tool output',
       returnDisplay: 'Formatted tool output',
-      summary: 'Formatted summary',
     } as ToolResult);
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
 
@@ -444,7 +442,6 @@ describe('useReactToolScheduler', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
-      summary: 'Confirmed summary',
     } as ToolResult);
 
     const { result } = renderScheduler();
@@ -611,7 +608,6 @@ describe('useReactToolScheduler', () => {
       resolveExecutePromise({
         llmContent: 'Final output',
         returnDisplay: 'Final display',
-        summary: 'Final summary',
       } as ToolResult);
     });
     await act(async () => {
@@ -648,7 +644,6 @@ describe('useReactToolScheduler', () => {
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 1',
         returnDisplay: 'Display 1',
-        summary: 'Summary 1',
       } as ToolResult),
       shouldConfirmExecute: vi.fn().mockResolvedValue(null),
     };
@@ -659,7 +654,6 @@ describe('useReactToolScheduler', () => {
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 2',
         returnDisplay: 'Display 2',
-        summary: 'Summary 2',
       } as ToolResult),
       shouldConfirmExecute: vi.fn().mockResolvedValue(null),
     };
@@ -739,12 +733,7 @@ describe('useReactToolScheduler', () => {
     mockToolRegistry.getTool.mockReturnValue(mockTool);
     const longExecutePromise = new Promise<ToolResult>((resolve) =>
       setTimeout(
-        () =>
-          resolve({
-            llmContent: 'done',
-            returnDisplay: 'done display',
-            summary: 'done summary',
-          }),
+        () => resolve({ llmContent: 'done', returnDisplay: 'done display' }),
         50,
       ),
     );
@@ -825,7 +814,6 @@ describe('mapToDisplay', () => {
       } as PartUnion,
     ],
     resultDisplay: 'Test display output',
-    summary: 'Test summary',
     error: undefined,
   };
 

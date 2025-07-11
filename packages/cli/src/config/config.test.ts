@@ -89,6 +89,35 @@ describe('loadCliConfig', () => {
     const config = await loadCliConfig(settings, [], 'test-session');
     expect(config.getShowMemoryUsage()).toBe(true);
   });
+
+  // Tests for showMcpToolResponse
+  it('should set showMcpToolResponse to true by default if not in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.showMcpToolResponse).toBe(true);
+  });
+
+  it('should set showMcpToolResponse to true from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { showMcpToolResponse: true };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.showMcpToolResponse).toBe(true);
+  });
+
+  it('should set showMcpToolResponse to false from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { showMcpToolResponse: false };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.showMcpToolResponse).toBe(false);
+  });
+
+  it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
+    process.argv = ['node', 'script.js', '--show-memory-usage'];
+    const settings: Settings = { showMemoryUsage: false };
+    const config = await loadCliConfig(settings, [], 'test-session');
+    expect(config.getShowMemoryUsage()).toBe(true);
+  });
 });
 
 describe('loadCliConfig telemetry', () => {

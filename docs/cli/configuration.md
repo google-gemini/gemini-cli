@@ -136,11 +136,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       },
       "myDockerServer": {
         "command": "docker",
-        "args": ["run", "-i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
+        "args": ["run", "i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
-      }
+      },
     }
     ```
 
@@ -189,12 +189,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
-- **`maxSessionTurns`** (number):
-  - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
-  - **Default:** `-1` (unlimited)
+- **`showMcpToolResponse`** (boolean):
+  - **Description:** Controls whether the response from an MCP tool is displayed in the CLI after execution. If set to `false`, a message indicating the response is hidden will be shown instead of the actual tool output. The response is still sent to the language model.
+  - **Default:** `true`
   - **Example:**
     ```json
-    "maxSessionTurns": 10
+    "showMcpToolResponse": false
     ```
 
 ### Example `settings.json`:
@@ -221,8 +221,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false,
-  "maxSessionTurns": 10
+  "hideTips": false
 }
 ```
 

@@ -6,10 +6,7 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  SSEClientTransport,
-  SSEClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/sse.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
@@ -127,6 +124,7 @@ export async function discoverMcpTools(
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
   toolRegistry: ToolRegistry,
+  config: Config,
 ): Promise<void> {
   // Set discovery state to in progress
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
@@ -147,7 +145,7 @@ export async function discoverMcpTools(
 
     const discoveryPromises = Object.entries(mcpServers).map(
       ([mcpServerName, mcpServerConfig]) =>
-        connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
+        connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry, config),
     );
     await Promise.all(discoveryPromises);
 
@@ -174,6 +172,7 @@ async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   toolRegistry: ToolRegistry,
+  config: Config,
 ): Promise<void> {
   // Initialize the server status as connecting
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
@@ -193,16 +192,7 @@ async function connectAndDiscover(
       transportOptions,
     );
   } else if (mcpServerConfig.url) {
-    const transportOptions: SSEClientTransportOptions = {};
-    if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
-      };
-    }
-    transport = new SSEClientTransport(
-      new URL(mcpServerConfig.url),
-      transportOptions,
-    );
+    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
@@ -275,6 +265,16 @@ async function connectAndDiscover(
     // Update status to disconnected on error
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   };
+
+  if (transport instanceof StdioClientTransport && transport.stderr) {
+    transport.stderr.on('data', (data) => {
+      const stderrStr = data.toString();
+      // Filter out verbose INFO logs from some MCP servers
+      if (!stderrStr.includes('] INFO')) {
+        console.debug(`MCP STDERR (${mcpServerName}):`, stderrStr);
+      }
+    });
+  }
 
   try {
     const mcpCallableTool = mcpToTool(mcpClient);
@@ -353,6 +353,7 @@ async function connectAndDiscover(
           funcDecl.name,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
+          config,
         ),
       );
     }

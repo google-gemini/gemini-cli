@@ -12,6 +12,7 @@ import {
   ToolMcpConfirmationDetails,
 } from './tools.js';
 import { CallableTool, Part, FunctionCall, Schema } from '@google/genai';
+import { Config } from '../config/config.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -27,6 +28,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly serverToolName: string,
     readonly timeout?: number,
     readonly trust?: boolean,
+    private readonly config: Config,
   ) {
     super(
       name,
@@ -83,9 +85,16 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
 
     const responseParts: Part[] = await this.mcpTool.callTool(functionCalls);
 
+    let returnDisplay;
+    if (this.config.showMcpToolResponse) {
+      returnDisplay = getStringifiedResultForDisplay(responseParts);
+    } else {
+      returnDisplay = 'Tool response hidden by configuration.';
+    }
+
     return {
       llmContent: responseParts,
-      returnDisplay: getStringifiedResultForDisplay(responseParts),
+      returnDisplay,
     };
   }
 }

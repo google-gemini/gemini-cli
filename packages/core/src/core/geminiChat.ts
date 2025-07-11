@@ -172,7 +172,6 @@ export class GeminiChat {
         this.config.getModel(),
         durationMs,
         prompt_id,
-        this.config.getContentGeneratorConfig().authType!,
         usageMetadata,
         responseText,
       ),
@@ -194,7 +193,6 @@ export class GeminiChat {
         errorMessage,
         durationMs,
         prompt_id,
-        this.config.getContentGeneratorConfig().authType!,
         errorType,
       ),
     );
