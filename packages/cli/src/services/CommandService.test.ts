@@ -82,7 +82,12 @@ describe('CommandService', () => {
 
         const loadedTree = commandService.getCommands();
         expect(loadedTree.length).toBe(4);
-        expect(loadedTree).toEqual([clearCommand, helpCommand, memoryCommand, themeCommand]);
+        expect(loadedTree).toEqual([
+          clearCommand,
+          helpCommand,
+          memoryCommand,
+          themeCommand,
+        ]);
       });
     });
   });

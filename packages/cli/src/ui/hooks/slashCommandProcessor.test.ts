@@ -526,8 +526,7 @@ describe('useSlashCommandProcessor', () => {
         ).toBe(true);
       });
 
-      const commandResult =
-        await result.current.handleSlashCommand('/test');
+      const commandResult = await result.current.handleSlashCommand('/test');
 
       expect(mockAction).toHaveBeenCalledTimes(1);
       expect(mockOpenThemeDialog).toHaveBeenCalledWith();

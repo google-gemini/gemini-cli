@@ -1209,6 +1209,7 @@ export const useSlashCommandProcessor = (
       legacyCommands,
       commandContext,
       addMessage,
+      openThemeDialog,
     ],
   );
 

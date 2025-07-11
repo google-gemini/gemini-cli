@@ -16,7 +16,7 @@ describe('themeCommand', () => {
     mockContext = createMockCommandContext();
   });
 
-  it("should return a dialog action to open the theme dialog", () => {
+  it('should return a dialog action to open the theme dialog', () => {
     // Ensure the command has an action to test.
     if (!themeCommand.action) {
       throw new Error('The theme command must have an action.');

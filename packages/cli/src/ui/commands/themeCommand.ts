@@ -9,10 +9,8 @@ import { OpenDialogActionReturn, SlashCommand } from './types.js';
 export const themeCommand: SlashCommand = {
   name: 'theme',
   description: 'change the theme',
-  action: (_context, _args): OpenDialogActionReturn => {
-    return {
-      type: 'dialog',
-      dialog: 'theme',
-    };
-  },
+  action: (_context, _args): OpenDialogActionReturn => ({
+    type: 'dialog',
+    dialog: 'theme',
+  }),
 };
