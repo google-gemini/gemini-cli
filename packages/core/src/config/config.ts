@@ -471,7 +471,6 @@ export class Config {
     return this.bugCommand;
   }
 
-
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
