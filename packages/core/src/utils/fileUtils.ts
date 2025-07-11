@@ -255,6 +255,7 @@ export async function processSingleFileContent(
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
         };
       }
+      case 'svg':
       case 'text': {
         const content = await fs.promises.readFile(filePath, 'utf8');
         const lines = content.split('\n');
