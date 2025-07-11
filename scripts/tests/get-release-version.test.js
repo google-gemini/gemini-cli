@@ -6,8 +6,8 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getReleaseVersion } from '../get-release-version';
-import { execSync } from 'child_process';
-import * as fs from 'fs';
+import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),

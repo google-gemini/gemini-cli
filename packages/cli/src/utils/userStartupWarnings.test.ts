@@ -6,8 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getUserStartupWarnings } from './userStartupWarnings.js';
-import * as os from 'os';
-import fs from 'fs/promises';
+import * as os from 'node:os';
+import fs from 'node:fs/promises';
 
 vi.mock('os', () => ({
   default: { homedir: vi.fn() },

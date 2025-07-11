@@ -6,10 +6,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import fsPromises from 'fs/promises';
-import * as fs from 'fs';
-import { Dirent as FSDirent } from 'fs';
-import * as nodePath from 'path';
+import fsPromises from 'node:fs/promises';
+import * as fs from 'node:fs';
+import { Dirent as FSDirent } from 'node:fs';
+import * as nodePath from 'node:path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -28,7 +28,7 @@ vi.mock('fs');
 vi.mock('./gitUtils.js');
 
 // Import 'path' again here, it will be the mocked version
-import * as path from 'path';
+import * as path from 'node:path';
 
 // Helper to create Dirent-like objects for mocking fs.readdir
 const createDirent = (name: string, type: 'file' | 'dir'): FSDirent => ({

@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from 'react';
-import util from 'util';
+import util from 'node:util';
 import { ConsoleMessageItem } from '../types.js';
 
 interface UseConsolePatcherParams {

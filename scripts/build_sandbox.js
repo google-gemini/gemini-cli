@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { chmodSync, readFileSync, rmSync } from 'fs';
-import { join } from 'path';
+import { execSync } from 'node:child_process';
+import { chmodSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import { StringDecoder } from 'string_decoder';
+import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import type { HistoryItemWithoutId } from '../types.js';
 import { useCallback } from 'react';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
@@ -13,10 +13,10 @@ import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import crypto from 'crypto';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import stripAnsi from 'strip-ansi';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;

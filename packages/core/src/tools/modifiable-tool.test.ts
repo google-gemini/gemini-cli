@@ -20,9 +20,9 @@ import {
   isModifiableTool,
 } from './modifiable-tool.js';
 import { EditorType } from '../utils/editor.js';
-import fs from 'fs';
-import os from 'os';
-import * as path from 'path';
+import fs from 'node:fs';
+import os from 'node:os';
+import * as path from 'node:path';
 
 // Mock dependencies
 const mockOpenDiff = vi.hoisted(() => vi.fn());

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import * as gitUtils from './gitUtils.js';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';

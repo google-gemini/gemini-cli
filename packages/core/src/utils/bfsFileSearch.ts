@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { Dirent } from 'fs';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { Dirent } from 'node:fs';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Simple console logger for now.

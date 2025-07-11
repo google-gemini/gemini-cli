@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Buffer } from 'buffer';
-import * as https from 'https';
+import { Buffer } from 'node:buffer';
+import * as https from 'node:https';
 import {
   StartSessionEvent,
   EndSessionEvent,
