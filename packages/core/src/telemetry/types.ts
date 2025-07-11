@@ -96,13 +96,13 @@ export class UserPromptEvent {
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
   prompt_id: string;
-  auth_type: string;
+  auth_type?: string;
   prompt?: string;
 
   constructor(
     prompt_length: number,
     prompt_Id: string,
-    auth_type: string,
+    auth_type?: string,
     prompt?: string,
   ) {
     this['event.name'] = 'user_prompt';
