@@ -24,6 +24,7 @@ import {
   ThoughtSummary,
   UnauthorizedError,
   UserPromptEvent,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
@@ -32,6 +33,7 @@ import {
   HistoryItemWithoutId,
   HistoryItemToolGroup,
   MessageType,
+  SlashCommandProcessorResult,
   ToolCallStatus,
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
@@ -51,6 +53,7 @@ import {
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -83,13 +86,13 @@ export const useGeminiStream = (
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
-  ) => Promise<
-    import('./slashCommandProcessor.js').SlashCommandActionReturn | boolean
-  >,
+  ) => Promise<SlashCommandProcessorResult | false>,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: () => void,
   performMemoryRefresh: () => Promise<void>,
+  modelSwitchedFromQuotaError: boolean,
+  setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -99,6 +102,7 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -201,6 +205,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
+      prompt_id: string,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -218,32 +223,28 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         logUserPrompt(
           config,
-          new UserPromptEvent(trimmedQuery.length, trimmedQuery),
+          new UserPromptEvent(trimmedQuery.length, prompt_id, trimmedQuery),
         );
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         // Handle UI-only commands first
         const slashCommandResult = await handleSlashCommand(trimmedQuery);
-        if (typeof slashCommandResult === 'boolean' && slashCommandResult) {
-          // Command was handled, and it doesn't require a tool call from here
-          return { queryToSend: null, shouldProceed: false };
-        } else if (
-          typeof slashCommandResult === 'object' &&
-          slashCommandResult.shouldScheduleTool
-        ) {
-          // Slash command wants to schedule a tool call (e.g., /memory add)
-          const { toolName, toolArgs } = slashCommandResult;
-          if (toolName && toolArgs) {
+
+        if (slashCommandResult) {
+          if (slashCommandResult.type === 'schedule_tool') {
+            const { toolName, toolArgs } = slashCommandResult;
             const toolCallRequest: ToolCallRequestInfo = {
               callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
+              prompt_id,
             };
             scheduleToolCalls([toolCallRequest], abortSignal);
           }
-          return { queryToSend: null, shouldProceed: false }; // Handled by scheduling the tool
+
+          return { queryToSend: null, shouldProceed: false };
         }
 
         if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
@@ -403,6 +404,9 @@ export const useGeminiStream = (
           text: parseAndFormatApiError(
             eventValue.error,
             config.getContentGeneratorConfig().authType,
+            undefined,
+            config.getModel(),
+            DEFAULT_GEMINI_FLASH_MODEL,
           ),
         },
         userMessageTimestamp,
@@ -485,7 +489,11 @@ export const useGeminiStream = (
   );
 
   const submitQuery = useCallback(
-    async (query: PartListUnion, options?: { isContinuation: boolean }) => {
+    async (
+      query: PartListUnion,
+      options?: { isContinuation: boolean },
+      prompt_id?: string,
+    ) => {
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
@@ -496,25 +504,44 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
       setShowHelp(false);
 
+      // Reset quota error flag when starting a new query (not a continuation)
+      if (!options?.isContinuation) {
+        setModelSwitchedFromQuotaError(false);
+        config.setQuotaErrorOccurred(false);
+      }
+
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
       turnCancelledRef.current = false;
+
+      if (!prompt_id) {
+        prompt_id = config.getSessionId() + '########' + getPromptCount();
+      }
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
         abortSignal,
+        prompt_id!,
       );
 
       if (!shouldProceed || queryToSend === null) {
         return;
       }
 
+      if (!options?.isContinuation) {
+        startNewPrompt();
+      }
+
       setIsResponding(true);
       setInitError(null);
 
       try {
-        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal);
+        const stream = geminiClient.sendMessageStream(
+          queryToSend,
+          abortSignal,
+          prompt_id!,
+        );
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -539,6 +566,9 @@ export const useGeminiStream = (
               text: parseAndFormatApiError(
                 getErrorMessage(error) || 'Unknown error',
                 config.getContentGeneratorConfig().authType,
+                undefined,
+                config.getModel(),
+                DEFAULT_GEMINI_FLASH_MODEL,
               ),
             },
             userMessageTimestamp,
@@ -551,6 +581,7 @@ export const useGeminiStream = (
     [
       streamingState,
       setShowHelp,
+      setModelSwitchedFromQuotaError,
       prepareQueryForGemini,
       processGeminiStreamEvents,
       pendingHistoryItemRef,
@@ -560,6 +591,8 @@ export const useGeminiStream = (
       geminiClient,
       onAuthError,
       config,
+      startNewPrompt,
+      getPromptCount,
     ],
   );
 
@@ -636,20 +669,20 @@ export const useGeminiStream = (
           const responsesToAdd = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
+          const combinedParts: Part[] = [];
           for (const response of responsesToAdd) {
-            let parts: Part[];
             if (Array.isArray(response)) {
-              parts = response;
+              combinedParts.push(...response);
             } else if (typeof response === 'string') {
-              parts = [{ text: response }];
+              combinedParts.push({ text: response });
             } else {
-              parts = [response];
+              combinedParts.push(response);
             }
-            geminiClient.addHistory({
-              role: 'user',
-              parts,
-            });
           }
+          geminiClient.addHistory({
+            role: 'user',
+            parts: combinedParts,
+          });
         }
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
@@ -666,10 +699,24 @@ export const useGeminiStream = (
         (toolCall) => toolCall.request.callId,
       );
 
+      const prompt_ids = geminiTools.map(
+        (toolCall) => toolCall.request.prompt_id,
+      );
+
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-      submitQuery(mergePartListUnions(responsesToSend), {
-        isContinuation: true,
-      });
+
+      // Don't continue if model was switched due to quota error
+      if (modelSwitchedFromQuotaError) {
+        return;
+      }
+
+      submitQuery(
+        mergePartListUnions(responsesToSend),
+        {
+          isContinuation: true,
+        },
+        prompt_ids[0],
+      );
     },
     [
       isResponding,
@@ -677,6 +724,7 @@ export const useGeminiStream = (
       markToolsAsSubmitted,
       geminiClient,
       performMemoryRefresh,
+      modelSwitchedFromQuotaError,
     ],
   );
 

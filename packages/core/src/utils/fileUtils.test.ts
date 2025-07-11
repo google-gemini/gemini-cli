@@ -211,6 +211,11 @@ describe('fileUtils', () => {
       expect(detectFileType('file.jpg')).toBe('image');
     });
 
+    it('should detect svg type by extension', () => {
+      expect(detectFileType('image.svg')).toBe('svg');
+      expect(detectFileType('image.icon.svg')).toBe('svg');
+    });
+
     it('should detect pdf type by extension', () => {
       mockMimeLookup.mockReturnValueOnce('application/pdf');
       expect(detectFileType('file.pdf')).toBe('pdf');
@@ -353,6 +358,26 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakePdfData.toString('base64'));
       expect(result.returnDisplay).toContain('Read pdf file: document.pdf');
+    });
+
+    it('should read an SVG file as text when under 1MB', async () => {
+      const svgContent = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <rect width="100" height="100" fill="blue" />
+    </svg>
+  `;
+      const testSvgFilePath = path.join(tempRootDir, 'test.svg');
+      actualNodeFs.writeFileSync(testSvgFilePath, svgContent, 'utf-8');
+
+      mockMimeLookup.mockReturnValue('image/svg+xml');
+
+      const result = await processSingleFileContent(
+        testSvgFilePath,
+        tempRootDir,
+      );
+
+      expect(result.llmContent).toBe(svgContent);
+      expect(result.returnDisplay).toContain('Read SVG as text');
     });
 
     it('should skip binary files', async () => {
