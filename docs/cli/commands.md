@@ -103,6 +103,12 @@ At commands are used to include the content of files or directories as part of y
     - **File types:** The command is intended for text-based files. While it might attempt to read any file, binary files or very large files might be skipped or truncated by the underlying `read_many_files` tool to ensure performance and relevance. The tool indicates if files were skipped.
   - **Output:** The CLI will show a tool call message indicating that `read_many_files` was used, along with a message detailing the status and the path(s) that were processed.
 
+  - **Note for Scripting and Non-Interactive Use:**
+    While the `@` command is convenient for interactive use, for scripting or non-interactive use with the `-p` flag, it is more robust to pipe file content directly. This method avoids potential ambiguity if your prompt text also contains the `@` symbol (e.g., for usernames) and is the recommended approach for automated workflows.
+    ```sh
+    cat path/to/file.txt | gemini -p "Summarize this file."
+    ```
+
 - **`@` (Lone at symbol)**
   - **Description:** If you type a lone `@` symbol without a path, the query is passed as-is to the Gemini model. This might be useful if you are specifically talking _about_ the `@` symbol in your prompt.
 
