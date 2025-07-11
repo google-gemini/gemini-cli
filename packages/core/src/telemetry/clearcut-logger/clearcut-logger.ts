@@ -89,9 +89,6 @@ export class ClearcutLogger {
   }
 
   async flushToClearcut(): Promise<LogResponse> {
-    if (this.config?.getDebugMode()) {
-      console.log('Flushing log events to Clearcut.');
-    }
     const eventsToSend = [...this.events];
     this.events.length = 0;
 
