@@ -73,10 +73,10 @@ import {
   UserTierId,
 } from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
+import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
-import ansiEscapes from 'ansi-escapes';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -465,7 +465,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     openAuthDialog();
   }, [openAuthDialog, setAuthError]);
 
-  const geminiClient = config.getGeminiClient();
   const {
     streamingState,
     submitQuery,
@@ -473,7 +472,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
   } = useGeminiStream(
-    geminiClient,
+    config.getGeminiClient(),
     history,
     addItem,
     setShowHelp,

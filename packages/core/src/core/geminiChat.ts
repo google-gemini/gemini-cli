@@ -130,7 +130,6 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
-  private sessionTurnCount = 0;
 
   constructor(
     private readonly config: Config,
