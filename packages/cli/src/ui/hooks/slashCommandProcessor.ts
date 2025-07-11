@@ -920,53 +920,52 @@ export const useSlashCommandProcessor = (
             // Generate markdown content
             const markdownContent = generateComprehensiveMarkdown(exportData);
 
-            // Write to file with security validation
+            // Write to file with security validation using write-then-verify approach
             const fs = await import('fs/promises');
             const path = await import('path');
 
-            // Resolve and validate the output path for security
+            // Resolve the output path
             const cwd = process.cwd();
             const outputPath = path.resolve(cwd, filename);
 
-            // Security check: ensure the resolved path is within the current working directory
-            if (!outputPath.startsWith(cwd + path.sep) && outputPath !== cwd) {
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
-                timestamp: new Date(),
-              });
-              return;
-            }
-
-            // Create directory if it doesn't exist and validate against symlink attacks
+            // Create directory if it doesn't exist
             const outputDir = path.dirname(outputPath);
             await fs.mkdir(outputDir, { recursive: true });
 
-            // Additional security check: resolve real paths to prevent symlink attacks
+            // Write the file first using wx flag to prevent overwrites
+            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
+
+            // After writing, verify the file location for security (write-then-verify approach)
             try {
               const realCwd = await fs.realpath(cwd);
-              const realOutputDir = await fs.realpath(outputDir);
+              const realOutputPath = await fs.realpath(outputPath);
               
-              // Ensure the real output directory is still within the real current working directory
-              if (!realOutputDir.startsWith(realCwd + path.sep) && realOutputDir !== realCwd) {
+              // Ensure the real output file is within the real current working directory
+              if (!realOutputPath.startsWith(realCwd + path.sep) && realOutputPath !== realCwd) {
+                // Security violation detected - remove the file and report error
+                await fs.unlink(outputPath);
                 addMessage({
                   type: MessageType.ERROR,
-                  content: `Security error: Cannot write outside current working directory (symlink detected).\nExample: /export exports/my-session.md`,
+                  content: `Security error: File was written outside current working directory and has been removed.\nExample: /export exports/my-session.md`,
                   timestamp: new Date(),
                 });
                 return;
               }
-            } catch (realpathError) {
+            } catch (verifyError) {
+              // If verification fails, attempt to remove the file and report error
+              try {
+                await fs.unlink(outputPath);
+              } catch (unlinkError) {
+                // Log but don't fail if we can't remove the file
+                console.warn('Failed to remove potentially misplaced file:', outputPath);
+              }
               addMessage({
                 type: MessageType.ERROR,
-                content: `Security error: Could not resolve real path for security validation.`,
+                content: `Security error: Could not verify file location after write - file removed for security.\nExample: /export exports/my-session.md`,
                 timestamp: new Date(),
               });
               return;
             }
-
-            // Write the markdown content to file with wx flag to prevent overwrites
-            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
 
             addMessage({
               type: MessageType.INFO,
