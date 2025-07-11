@@ -920,7 +920,7 @@ export const useSlashCommandProcessor = (
             // Generate markdown content
             const markdownContent = generateComprehensiveMarkdown(exportData);
 
-            // Write to file with security validation using write-then-verify approach
+            // Write to file with security validation using verify-then-write approach
             const fs = await import('fs/promises');
             const path = await import('path');
 
@@ -928,44 +928,46 @@ export const useSlashCommandProcessor = (
             const cwd = process.cwd();
             const outputPath = path.resolve(cwd, filename);
 
-            // Create directory if it doesn't exist
-            const outputDir = path.dirname(outputPath);
-            await fs.mkdir(outputDir, { recursive: true });
-
-            // Write the file first using wx flag to prevent overwrites
-            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
-
-            // After writing, verify the file location for security (write-then-verify approach)
+            // Security validation: verify path before writing
             try {
               const realCwd = await fs.realpath(cwd);
-              const realOutputPath = await fs.realpath(outputPath);
               
-              // Ensure the real output file is within the real current working directory
-              if (!realOutputPath.startsWith(realCwd + path.sep) && realOutputPath !== realCwd) {
-                // Security violation detected - remove the file and report error
-                await fs.unlink(outputPath);
+              // Create directory if it doesn't exist and get its real path
+              const outputDir = path.dirname(outputPath);
+              await fs.mkdir(outputDir, { recursive: true });
+              const realOutputDir = await fs.realpath(outputDir);
+              
+              // Ensure the real output directory is within the real current working directory
+              if (!realOutputDir.startsWith(realCwd + path.sep) && realOutputDir !== realCwd) {
                 addMessage({
                   type: MessageType.ERROR,
-                  content: `Security error: File was written outside current working directory and has been removed.\nExample: /export exports/my-session.md`,
+                  content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
+                  timestamp: new Date(),
+                });
+                return;
+              }
+
+              // Additional validation: ensure the final file path would be safe
+              const finalOutputPath = path.join(realOutputDir, path.basename(outputPath));
+              if (!finalOutputPath.startsWith(realCwd + path.sep) && finalOutputPath !== realCwd) {
+                addMessage({
+                  type: MessageType.ERROR,
+                  content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
                   timestamp: new Date(),
                 });
                 return;
               }
             } catch (verifyError) {
-              // If verification fails, attempt to remove the file and report error
-              try {
-                await fs.unlink(outputPath);
-              } catch (unlinkError) {
-                // Log but don't fail if we can't remove the file
-                console.warn('Failed to remove potentially misplaced file:', outputPath);
-              }
               addMessage({
                 type: MessageType.ERROR,
-                content: `Security error: Could not verify file location after write - file removed for security.\nExample: /export exports/my-session.md`,
+                content: `Security error: Could not verify path safety before writing.\nExample: /export exports/my-session.md`,
                 timestamp: new Date(),
               });
               return;
             }
+
+            // Only write the file after all security checks have passed
+            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
 
             addMessage({
               type: MessageType.INFO,
