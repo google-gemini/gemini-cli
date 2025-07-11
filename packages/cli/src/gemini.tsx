@@ -35,6 +35,7 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -165,6 +166,15 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.getNoBrowser()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
@@ -196,10 +206,12 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
     prompt_length: input.length,
   });
 
@@ -210,7 +222,7 @@ export async function main() {
     settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
@@ -272,6 +284,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
     );
+    await finalConfig.initialize();
   }
 
   return await validateNonInterActiveAuth(
