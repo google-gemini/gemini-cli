@@ -929,16 +929,21 @@ export const useSlashCommandProcessor = (
             const outputPath = path.resolve(cwd, filename);
 
             // Security validation: verify path before writing
+            let finalOutputPath: string;
+            let realOutputDir: string;
             try {
               const realCwd = await fs.realpath(cwd);
-              
+
               // Create directory if it doesn't exist and get its real path
               const outputDir = path.dirname(outputPath);
               await fs.mkdir(outputDir, { recursive: true });
-              const realOutputDir = await fs.realpath(outputDir);
-              
+              realOutputDir = await fs.realpath(outputDir);
+
               // Ensure the real output directory is within the real current working directory
-              if (!realOutputDir.startsWith(realCwd + path.sep) && realOutputDir !== realCwd) {
+              if (
+                !realOutputDir.startsWith(realCwd + path.sep) &&
+                realOutputDir !== realCwd
+              ) {
                 addMessage({
                   type: MessageType.ERROR,
                   content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
@@ -948,8 +953,14 @@ export const useSlashCommandProcessor = (
               }
 
               // Additional validation: ensure the final file path would be safe
-              const finalOutputPath = path.join(realOutputDir, path.basename(outputPath));
-              if (!finalOutputPath.startsWith(realCwd + path.sep) && finalOutputPath !== realCwd) {
+              finalOutputPath = path.join(
+                realOutputDir,
+                path.basename(outputPath),
+              );
+              if (
+                !finalOutputPath.startsWith(realCwd + path.sep) &&
+                finalOutputPath !== realCwd
+              ) {
                 addMessage({
                   type: MessageType.ERROR,
                   content: `Security error: Cannot write outside current working directory.\nExample: /export exports/my-session.md`,
@@ -967,12 +978,16 @@ export const useSlashCommandProcessor = (
             }
 
             // Use the validated path for writing the file
-            const finalOutputPath = path.join(realOutputDir, path.basename(outputPath));
-            await fs.writeFile(finalOutputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
+            await fs.writeFile(finalOutputPath, markdownContent, {
+              encoding: 'utf-8',
+              flag: 'wx',
+            });
 
             addMessage({
               type: MessageType.INFO,
-              content: `Conversation exported successfully!\nFile: ${finalOutputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(markdownContent.length / 1024)} KB`,
+              content: `Conversation exported successfully!\nFile: ${finalOutputPath}\nItems exported: ${history.length} UI items, ${coreHistory.length} core items\nFile size: ${Math.round(
+                markdownContent.length / 1024,
+              )} KB`,
               timestamp: new Date(),
             });
           } catch (error) {
