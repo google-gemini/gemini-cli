@@ -68,6 +68,18 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
+    const tool_output = tool.summarizer
+      ? await tool.summarizer(
+          toolResult,
+          config.getGeminiClient(),
+          effectiveAbortSignal,
+        )
+      : toolResult.llmContent;
+
+    const tool_display = tool.shouldSummarizeDisplay
+      ? (tool_output as string)
+      : toolResult.returnDisplay;
+
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -82,13 +94,13 @@ export async function executeToolCall(
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,
-      toolResult.llmContent,
+      tool_output,
     );
 
     return {
       callId: toolCallRequest.callId,
       responseParts: response,
-      resultDisplay: toolResult.returnDisplay,
+      resultDisplay: tool_display,
       error: undefined,
     };
   } catch (e) {
