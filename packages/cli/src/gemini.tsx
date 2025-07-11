@@ -102,9 +102,7 @@ export async function main() {
     process.exit(1);
   }
 
-  // Parse command line arguments once
   const argv = await parseArguments();
-
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
