@@ -234,7 +234,9 @@ describe('GrepTool', () => {
       };
       // The path will be relative to the tempRootDir, so we check for containment.
       expect(grepTool.getDescription(params)).toContain("'testPattern' within");
-      expect(grepTool.getDescription(params)).toContain('src/app');
+      expect(grepTool.getDescription(params)).toContain(
+        path.join('src', 'app'),
+      );
     });
 
     it('should generate correct description with pattern, include, and path', () => {
