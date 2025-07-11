@@ -73,12 +73,12 @@ export function RadioButtonSelect<T>({
 
   useInput(
     (input, key) => {
-      if (key.upArrow) {
+      if (input === 'k' || key.upArrow) {
         const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
       }
-      if (key.downArrow) {
+      if (input === 'j' || key.downArrow) {
         const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
