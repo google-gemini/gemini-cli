@@ -67,8 +67,8 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
-  getUserTier: Mock<() => any>;
-  setUserTier: Mock<(userTier: any) => void>;
+  getUserTier: Mock<() => string | undefined>;
+  setUserTier: Mock<(userTier: string | undefined) => void>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
