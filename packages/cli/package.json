@@ -66,10 +66,13 @@
     "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",
     "@types/yargs": "^17.0.32",
+    "@vitest/coverage-v8": "^3.2.4",
     "ink-testing-library": "^4.0.0",
     "jsdom": "^26.1.0",
+    "memfs": "^4.17.2",
     "pretty-format": "^30.0.2",
     "react-dom": "^19.1.0",
+    "semver": "^6.3.1",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },

@@ -8,6 +8,7 @@ import { MCPServerConfig } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { globSync } from 'glob';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
@@ -88,13 +89,26 @@ function loadExtension(extensionDir: string): Extension | null {
       return null;
     }
 
-    const contextFiles = getContextFileNames(config)
-      .map((contextFileName) => path.join(extensionDir, contextFileName))
-      .filter((contextFilePath) => fs.existsSync(contextFilePath));
+    const contextFilePatterns = getContextFileNames(config);
+    const resolvedContextFiles: string[] = [];
+
+    for (const pattern of contextFilePatterns) {
+      const fullPatternPath = path.join(extensionDir, pattern);
+      // Check if the pattern is a glob pattern
+      if (pattern.includes('*') || pattern.includes('?') || pattern.includes('{')) {
+        const files = globSync(fullPatternPath, { nodir: true });
+        resolvedContextFiles.push(...files);
+      } else {
+        // If not a glob pattern, treat it as a normal file path
+        if (fs.existsSync(fullPatternPath)) {
+          resolvedContextFiles.push(fullPatternPath);
+        }
+      }
+    }
 
     return {
       config,
-      contextFiles,
+      contextFiles: resolvedContextFiles.filter((filePath) => fs.existsSync(filePath)),
     };
   } catch (e) {
     console.error(
