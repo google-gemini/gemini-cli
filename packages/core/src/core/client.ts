@@ -419,8 +419,9 @@ export class GeminiClient {
     contents: Content[],
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
+    model?: string,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.config.getModel();
+    const modelToUse = model ?? this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,

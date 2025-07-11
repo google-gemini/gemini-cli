@@ -646,7 +646,7 @@ export class CoreToolScheduler {
 
         scheduledCall.tool
           .execute(scheduledCall.request.args, signal, liveOutputCallback)
-          .then((toolResult: ToolResult) => {
+          .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(
                 callId,
@@ -656,18 +656,42 @@ export class CoreToolScheduler {
               return;
             }
 
+            let resultForDisplay: ToolResult = toolResult;
+            let summary: string | undefined;
+            if (scheduledCall.tool.summarizer) {
+              try {
+                const toolSignal = new AbortController();
+                summary = await scheduledCall.tool.summarizer(
+                  toolResult,
+                  this.config.getGeminiClient(),
+                  toolSignal.signal,
+                );
+                if (toolSignal.signal.aborted) {
+                  console.debug('aborted summarizing tool result');
+                  return;
+                }
+                if (scheduledCall.tool?.shouldSummarizeDisplay) {
+                  resultForDisplay = {
+                    ...toolResult,
+                    returnDisplay: summary,
+                  };
+                }
+              } catch (e) {
+                console.error('Error summarizing tool result:', e);
+              }
+            }
             const response = convertToFunctionResponse(
               toolName,
               callId,
-              toolResult.llmContent,
+              summary ? [summary] : toolResult.llmContent,
             );
-
             const successResponse: ToolCallResponseInfo = {
               callId,
               responseParts: response,
-              resultDisplay: toolResult.returnDisplay,
+              resultDisplay: resultForDisplay.returnDisplay,
               error: undefined,
             };
+
             this.setStatusInternal(callId, 'success', successResponse);
           })
           .catch((executionError: Error) => {
