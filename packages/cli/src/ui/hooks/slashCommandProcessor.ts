@@ -831,6 +831,10 @@ export const useSlashCommandProcessor = (
           'Export conversation history to markdown file. Usage: /export [filename]',
         action: async (_mainCommand, _subCommand, args) => {
           try {
+            // Dynamic imports at the top to avoid runtime errors
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            
             const timestamp = new Date()
               .toISOString()
               .slice(0, 19)
@@ -937,13 +941,15 @@ export const useSlashCommandProcessor = (
       
             const markdownContent = generateComprehensiveMarkdown(exportData);
       
-            const fs = await import('fs/promises');
-            const path = await import('path');
-      
             const cwd = process.cwd();
             const outputPath = path.resolve(cwd, filename);
       
             // Path traversal prevention
+            // Note: This validation has a theoretical TOCTOU (Time-of-Check to Time-of-Use) race condition
+            // where an attacker could modify the filesystem between our check and the write operation.
+            // However, Node.js does not provide APIs to atomically validate and write to a path using
+            // file descriptors. Given the CLI context and the use of 'wx' flag to prevent overwrites,
+            // this represents an acceptable security trade-off. 
             let finalOutputPath: string;
             let realOutputDir: string;
             const realCwd = await fs.realpath(cwd);
