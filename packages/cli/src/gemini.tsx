@@ -257,6 +257,9 @@ export async function main() {
     }
   }
 
+  // Initialize config before any authentication or UI operations
+  await config.initialize();
+
   if (
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
     config.getNoBrowser()
