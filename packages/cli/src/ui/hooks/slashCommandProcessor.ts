@@ -965,8 +965,8 @@ export const useSlashCommandProcessor = (
               return;
             }
 
-            // Write the markdown content to file
-            await fs.writeFile(outputPath, markdownContent, 'utf-8');
+            // Write the markdown content to file with wx flag to prevent overwrites
+            await fs.writeFile(outputPath, markdownContent, { encoding: 'utf-8', flag: 'wx' });
 
             addMessage({
               type: MessageType.INFO,
