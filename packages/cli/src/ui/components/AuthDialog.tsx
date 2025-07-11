@@ -36,24 +36,46 @@ export function AuthDialog({
   onStatusMessage,
 }: AuthDialogProps): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    initialErrorMessage || null,
+    initialErrorMessage
+      ? initialErrorMessage
+      : process.env.GEMINI_API_KEY
+        ? 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.'
+        : null,
   );
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [selectedAuthMethod, setSelectedAuthMethod] = useState<AuthType | null>(null);
   
   const items = [
-    { label: 'Login with Google', value: AuthType.LOGIN_WITH_GOOGLE },
-    { label: 'Gemini API Key (AI Studio)', value: AuthType.USE_GEMINI },
+    {
+      label: 'Login with Google',
+      value: AuthType.LOGIN_WITH_GOOGLE,
+    },
+    ...(process.env.CLOUD_SHELL === 'true'
+      ? [
+          {
+            label: 'Use Cloud Shell user credentials',
+            value: AuthType.CLOUD_SHELL,
+          },
+        ]
+      : []),
+    {
+      label: 'Use Gemini API Key',
+      value: AuthType.USE_GEMINI,
+    },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
   ];
 
-  let initialAuthIndex = items.findIndex(
-    (item) => item.value === settings.merged.selectedAuthType,
-  );
+  const initialAuthIndex = items.findIndex((item) => {
+    if (settings.merged.selectedAuthType) {
+      return item.value === settings.merged.selectedAuthType;
+    }
 
-  if (initialAuthIndex === -1) {
-    initialAuthIndex = 0;
-  }
+    if (process.env.GEMINI_API_KEY) {
+      return item.value === AuthType.USE_GEMINI;
+    }
+
+    return item.value === AuthType.LOGIN_WITH_GOOGLE;
+  });
 
   const handleAuthSelect = (authMethod: AuthType) => {
     const error = validateAuthMethod(authMethod);
@@ -187,7 +209,11 @@ export function AuthDialog({
         handleApiKeyCancel();
         return;
       }
-      
+      // Prevent exit if there is an error message.
+      // This means they user is not authenticated yet.
+      if (errorMessage) {
+        return;
+      }
       if (settings.merged.selectedAuthType === undefined) {
         // Prevent exiting if no auth method is set
         setErrorMessage(
@@ -221,13 +247,18 @@ export function AuthDialog({
       padding={1}
       width="100%"
     >
-      <Text bold>Select Auth Method</Text>
-      <RadioButtonSelect
-        items={items}
-        initialIndex={initialAuthIndex}
-        onSelect={handleAuthSelect}
-        isFocused={true}
-      />
+      <Text bold>Get started</Text>
+      <Box marginTop={1}>
+        <Text>How would you like to authenticate for this project?</Text>
+      </Box>
+      <Box marginTop={1}>
+        <RadioButtonSelect
+          items={items}
+          initialIndex={initialAuthIndex}
+          onSelect={handleAuthSelect}
+          isFocused={true}
+        />
+      </Box>
       {errorMessage && (
         <Box marginTop={1}>
           <Text color={Colors.AccentRed}>{errorMessage}</Text>

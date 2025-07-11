@@ -6,9 +6,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { homedir } from 'os';
+import { homedir, platform } from 'os';
+import * as dotenv from 'dotenv';
 import {
   MCPServerConfig,
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
@@ -22,9 +24,22 @@ export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
+function getSystemSettingsPath(): string {
+  if (platform() === 'darwin') {
+    return '/Library/Application Support/GeminiCli/settings.json';
+  } else if (platform() === 'win32') {
+    return 'C:\\ProgramData\\gemini-cli\\settings.json';
+  } else {
+    return '/etc/gemini-cli/settings.json';
+  }
+}
+
+export const SYSTEM_SETTINGS_PATH = getSystemSettingsPath();
+
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
+  System = 'System',
 }
 
 export interface CheckpointingSettings {
@@ -79,16 +94,19 @@ export interface SettingsFile {
 }
 export class LoadedSettings {
   constructor(
+    system: SettingsFile,
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
   ) {
+    this.system = system;
     this.user = user;
     this.workspace = workspace;
     this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
+  readonly system: SettingsFile;
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
@@ -103,6 +121,7 @@ export class LoadedSettings {
     return {
       ...this.user.settings,
       ...this.workspace.settings,
+      ...this.system.settings,
     };
   }
 
@@ -112,6 +131,8 @@ export class LoadedSettings {
         return this.user;
       case SettingScope.Workspace:
         return this.workspace;
+      case SettingScope.System:
+        return this.system;
       default:
         throw new Error(`Invalid scope: ${scope}`);
     }
@@ -172,14 +193,95 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   return obj;
 }
 
+function findEnvFile(startDir: string): string | null {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    // prefer gemini-specific .env under GEMINI_DIR
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    if (fs.existsSync(geminiEnvPath)) {
+      return geminiEnvPath;
+    }
+    const envPath = path.join(currentDir, '.env');
+    if (fs.existsSync(envPath)) {
+      return envPath;
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir || !parentDir) {
+      // check .env under home as fallback, again preferring gemini-specific .env
+      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+      if (fs.existsSync(homeGeminiEnvPath)) {
+        return homeGeminiEnvPath;
+      }
+      const homeEnvPath = path.join(homedir(), '.env');
+      if (fs.existsSync(homeEnvPath)) {
+        return homeEnvPath;
+      }
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+  // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
+  // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
+  // set by the user using "gcloud config set project" we do not want to
+  // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
+  // one of the .env files, we set the Cloud Shell-specific default here.
+  if (envFilePath && fs.existsSync(envFilePath)) {
+    const envFileContent = fs.readFileSync(envFilePath);
+    const parsedEnv = dotenv.parse(envFileContent);
+    if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+      // .env file takes precedence in Cloud Shell
+      process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+    } else {
+      // If not in .env, set to default and override global
+      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    }
+  } else {
+    // If no .env file, set to default and override global
+    process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+  }
+}
+
+export function loadEnvironment(): void {
+  const envFilePath = findEnvFile(process.cwd());
+
+  if (process.env.CLOUD_SHELL === 'true') {
+    setUpCloudShellEnvironment(envFilePath);
+  }
+
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath, quiet: true });
+  }
+}
+
 /**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
+  loadEnvironment();
+  let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
+
+  // Load system settings
+  try {
+    if (fs.existsSync(SYSTEM_SETTINGS_PATH)) {
+      const systemContent = fs.readFileSync(SYSTEM_SETTINGS_PATH, 'utf-8');
+      const parsedSystemSettings = JSON.parse(
+        stripJsonComments(systemContent),
+      ) as Settings;
+      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+    }
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: SYSTEM_SETTINGS_PATH,
+    });
+  }
 
   // Load user settings
   try {
@@ -234,6 +336,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   return new LoadedSettings(
+    {
+      path: SYSTEM_SETTINGS_PATH,
+      settings: systemSettings,
+    },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
