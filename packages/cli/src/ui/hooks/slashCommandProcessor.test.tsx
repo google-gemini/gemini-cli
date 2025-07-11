@@ -54,7 +54,16 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  Mock,
+} from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { MessageType, SlashCommandProcessorResult } from '../types.js';
@@ -150,7 +159,7 @@ describe('useSlashCommandProcessor', () => {
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
         cumulative: {
-          promptCount: 0,
+          turnCount: 0,
           promptTokenCount: 0,
           candidatesTokenCount: 0,
           totalTokenCount: 0,
