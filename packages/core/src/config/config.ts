@@ -11,6 +11,8 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { UserTierId } from '../code_assist/types.js';
+import { CodeAssistServer } from '../code_assist/server.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -186,6 +188,7 @@ export class Config {
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  private userTier: UserTierId | undefined = undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -272,6 +275,51 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.modelSwitchedDuringSession = false;
+
+    // Detect user tier for OAuth users
+    await this.detectUserTier();
+  }
+
+  private async detectUserTier(): Promise<void> {
+    try {
+      // Reset user tier when authentication changes
+      this.userTier = undefined;
+
+      // Only attempt tier detection for OAuth users
+      if (
+        this.contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+      ) {
+        const server = this.geminiClient.getContentGenerator();
+        // Check if we have a CodeAssistServer (OAuth user)
+        if (
+          server &&
+          typeof server === 'object' &&
+          'loadCodeAssist' in server
+        ) {
+          const codeAssistServer = server as CodeAssistServer;
+          if (codeAssistServer.projectId) {
+            const loadRes = await codeAssistServer.loadCodeAssist({
+              cloudaicompanionProject: codeAssistServer.projectId,
+              metadata: {
+                ideType: 'IDE_UNSPECIFIED',
+                platform: 'PLATFORM_UNSPECIFIED',
+                pluginType: 'GEMINI',
+                duetProject: codeAssistServer.projectId,
+              },
+            });
+            if (loadRes.currentTier) {
+              this.userTier = loadRes.currentTier.id;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Silently fail - this is not critical functionality
+      // We'll default to FREE tier behavior if tier detection fails
+      if (this.debugMode) {
+        console.debug('User tier detection failed:', error);
+      }
+    }
   }
 
   getSessionId(): string {
@@ -314,6 +362,14 @@ export class Config {
 
   getQuotaErrorOccurred(): boolean {
     return this.quotaErrorOccurred;
+  }
+
+  setUserTier(userTier: UserTierId | undefined): void {
+    this.userTier = userTier;
+  }
+
+  getUserTier(): UserTierId | undefined {
+    return this.userTier;
   }
 
   getEmbeddingModel(): string {
