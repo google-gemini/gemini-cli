@@ -70,7 +70,18 @@ export async function processImports(
     const importPath = match[1];
 
     // Validate import path to prevent path traversal attacks
-    if (!validateImportPath(importPath, basePath, [basePath])) {
+    // Reject absolute paths as they are considered unsafe
+    if (path.isAbsolute(importPath)) {
+      processedContent = processedContent.replace(
+        match[0],
+        `<!-- Import failed: ${importPath} - Absolute paths not allowed -->`,
+      );
+      continue;
+    }
+    
+    // Allow imports from the current directory and reasonable parent directories
+    const allowedDirectories = getAllowedImportDirectories(basePath);
+    if (!validateImportPath(importPath, basePath, allowedDirectories)) {
       processedContent = processedContent.replace(
         match[0],
         `<!-- Import failed: ${importPath} - Path traversal attempt -->`,
@@ -185,6 +196,31 @@ export async function processImports(
   }
 
   return processedContent;
+}
+
+/**
+ * Gets allowed directories for imports based on the base path.
+ * Allows imports from the current directory and all parent directories up to the filesystem root.
+ *
+ * @param basePath - The base directory where the current file is located
+ * @returns Array of allowed directory paths for imports
+ */
+export function getAllowedImportDirectories(basePath: string): string[] {
+  const allowedDirs = [basePath];
+  
+  // Allow imports from all parent directories up to filesystem root
+  let currentDir = basePath;
+  while (true) {
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir || parentDir === '/') {
+      // Reached filesystem root, stop here (don't include root itself)
+      break;
+    }
+    allowedDirs.push(parentDir);
+    currentDir = parentDir;
+  }
+  
+  return allowedDirs;
 }
 
 /**
