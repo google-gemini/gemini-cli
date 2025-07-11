@@ -19,6 +19,7 @@ import {
   SubAgentScope,
   SubagentTerminateMode,
 } from './subagent.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
 
 describe('SubAgentScope', () => {
   let mockSendMessageStream: Mock;
@@ -95,7 +96,7 @@ describe('SubAgentScope', () => {
     const context = new ContextState();
     context.set('user_query', 'Tell me the capital of France.');
 
-    const orchestrator = new SubAgentScope(
+    const orchestrator = await SubAgentScope.create(
       config,
       promptConfig,
       modelConfig,
@@ -108,5 +109,63 @@ describe('SubAgentScope', () => {
       SubagentTerminateMode.GOAL,
     );
     expect(orchestrator.output.emitted_vars['capital']).toBe('Paris');
+  });
+
+  it('should throw an error if a tool requires confirmation', async () => {
+    const configParams: ConfigParameters = {
+      sessionId: 'test-session',
+      model: DEFAULT_GEMINI_MODEL,
+      targetDir: '.',
+      debugMode: false,
+      cwd: process.cwd(),
+    };
+
+    const config = new Config(configParams);
+    await config.initialize();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await config.refreshAuth('test-auth' as any);
+
+    // Mock the tool registry to return a tool that requires confirmation.
+    const mockTool = {
+      shouldConfirmExecute: vi.fn().mockResolvedValue({
+        type: 'exec',
+        title: 'Confirm',
+        command: 'test command',
+        rootCommand: 'test',
+        onConfirm: vi.fn(),
+      }),
+    };
+
+    const getToolRegistrySpy = vi
+      .spyOn(config, 'getToolRegistry')
+      .mockResolvedValue({
+        getTool: vi.fn().mockReturnValue(mockTool),
+        getFunctionDeclarationsFiltered: vi.fn().mockReturnValue([]),
+      } as unknown as ToolRegistry);
+
+    const promptConfig = {
+      plan: 'Test plan',
+      goals: 'Test goals',
+      outputs: {},
+      tools: ['confirmTool'],
+    };
+
+    const modelConfig = {
+      model: 'gemini-1.5-flash-latest',
+      temp: 0.7,
+      top_p: 1,
+    };
+
+    const runConfig = {
+      max_time_minutes: 1,
+    };
+
+    await expect(
+      SubAgentScope.create(config, promptConfig, modelConfig, runConfig),
+    ).rejects.toThrow(
+      'Tool "confirmTool" requires user confirmation and cannot be used in a non-interactive subagent.',
+    );
+
+    getToolRegistrySpy.mockRestore();
   });
 });

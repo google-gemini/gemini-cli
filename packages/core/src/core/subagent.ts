@@ -202,13 +202,61 @@ export class SubAgentScope {
    * @param modelConfig - Configuration for the generative model parameters.
    * @param runConfig - Configuration for the subagent's execution environment and constraints.
    */
-  constructor(
+  private constructor(
     readonly runtimeContext: Config,
     private readonly promptConfig: PromptConfig,
     private readonly modelConfig: ModelConfig,
     private readonly runConfig: RunConfig,
   ) {
     this.subagentId = Math.random().toString(36).slice(2);
+  }
+
+  /**
+   * Creates and validates a new SubAgentScope instance.
+   * This factory method ensures that all tools provided in the prompt configuration
+   * are valid for non-interactive use before creating the subagent instance.
+   * @param {Config} runtimeContext - The shared runtime configuration and services.
+   * @param {PromptConfig} promptConfig - Configuration for the subagent's prompt and behavior.
+   * @param {ModelConfig} modelConfig - Configuration for the generative model parameters.
+   * @param {RunConfig} runConfig - Configuration for the subagent's execution environment and constraints.
+   * @returns {Promise<SubAgentScope>} A promise that resolves to a valid SubAgentScope instance.
+   * @throws {Error} If any tool requires user confirmation.
+   */
+  static async create(
+    runtimeContext: Config,
+    promptConfig: PromptConfig,
+    modelConfig: ModelConfig,
+    runConfig: RunConfig,
+  ): Promise<SubAgentScope> {
+    const toolRegistry: ToolRegistry = await runtimeContext.getToolRegistry();
+    const toolsToLoad: string[] = [];
+    for (const tool of promptConfig.tools) {
+      if (typeof tool === 'string') {
+        toolsToLoad.push(tool);
+      }
+    }
+
+    for (const toolName of toolsToLoad) {
+      const tool = toolRegistry.getTool(toolName);
+      if (tool) {
+        const confirmationDetails = await tool.shouldConfirmExecute(
+          {},
+          new AbortController().signal,
+        );
+        if (confirmationDetails) {
+          throw new Error(
+            `Tool "${toolName}" requires user confirmation and cannot be used in a non-interactive subagent.`,
+          );
+        }
+      }
+    }
+
+    return new SubAgentScope(
+      runtimeContext,
+      promptConfig,
+      modelConfig,
+      runConfig,
+    );
   }
 
   /**
