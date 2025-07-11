@@ -117,7 +117,28 @@ export async function getOauthClient(
       `Attempting to open authentication page in your browser.\n` +
       `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
   );
-  await open(webLogin.authUrl);
+  try {
+    // Attempt to open the authentication URL in the default browser.
+    // We do not use the `wait` option here because the main script's execution
+    // is already paused by `loginCompletePromise`, which awaits the server callback.
+    const childProcess = await open(webLogin.authUrl);
+
+    // IMPORTANT: Attach an error handler to the returned child process.
+    // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
+    // in a minimal Docker container), it will emit an unhandled 'error' event,
+    // causing the entire Node.js process to crash.
+    childProcess.on('error', (_) => {
+      console.error(
+        'Failed to open browser automatically. Please open the URL manually:',
+      );
+      console.error(webLogin.authUrl);
+    });
+  } catch (err) {
+    console.error(
+      'An unexpected error occurred while trying to open the browser:',
+      err,
+    );
+  }
   console.log('Waiting for authentication...');
 
   await webLogin.loginCompletePromise;
@@ -127,6 +148,12 @@ export async function getOauthClient(
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
+  // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
+  const host = process.env.OAUTH_CALLBACK_HOST || 'localhost';
+  // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
+  // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
+  // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
+  // authorization code interception attacks.
   const redirectUri = `http://localhost:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl: string = client.generateAuthUrl({
@@ -187,7 +214,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         server.close();
       }
     });
-    server.listen(port);
+    server.listen(port, host);
   });
 
   return {
@@ -200,6 +227,16 @@ export function getAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     let port = 0;
     try {
+      const portStr = process.env.OAUTH_CALLBACK_PORT;
+      if (portStr) {
+        port = parseInt(portStr, 10);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          return reject(
+            new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
+          );
+        }
+        return resolve(port);
+      }
       const server = net.createServer();
       server.listen(0, () => {
         const address = server.address()! as net.AddressInfo;
