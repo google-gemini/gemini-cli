@@ -271,6 +271,15 @@ export async function handleAtCommand({
       pathSpecsToRead.push(currentPathSpec);
       atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
       contentLabelsForDisplay.push(pathName);
+    } else {
+      // If stat and glob failed, trust the user and pass the path to the tool anyway.
+      // The tool itself is robust enough to handle read errors.
+      onDebugMessage(
+        `Could not resolve path "${pathName}" directly, but will attempt to read it as-is.`,
+      );
+      pathSpecsToRead.push(pathName);
+      atPathToResolvedSpecMap.set(originalAtPath, pathName);
+      contentLabelsForDisplay.push(pathName);
     }
   }
 

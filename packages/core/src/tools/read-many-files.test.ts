@@ -399,5 +399,22 @@ describe('ReadManyFilesTool', () => {
       expect(result.returnDisplay).not.toContain('foo.quux');
       expect(result.returnDisplay).toContain('bar.ts');
     });
+
+    it('should include video files as inlineData parts', async () => {
+      createBinaryFile('clip.mp4', Buffer.from('VIDEO'));
+      const params = { paths: ['*.mp4'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from('VIDEO').toString('base64'),
+            mimeType: 'video/mp4',
+          },
+        },
+      ]);
+      expect(result.returnDisplay).toContain(
+        'Successfully read and concatenated content from **1 file(s)**',
+      );
+    });
   });
 });

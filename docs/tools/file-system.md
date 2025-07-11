@@ -24,7 +24,7 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
 
 ## 2. `read_file` (ReadFile)
 
-`read_file` reads and returns the content of a specified file. This tool handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges. Other binary file types are generally skipped.
+`read_file` reads and returns the content of a specified file. This tool handles text, image, PDF, audio, and video files. For text files, it can read specific line ranges.
 
 - **Tool name:** `read_file`
 - **Display name:** ReadFile

@@ -247,5 +247,29 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toContain('foo.bar');
       expect(result.returnDisplay).not.toContain('foo.baz');
     });
+
+    it('should return success result for a video file', async () => {
+      const filePath = path.join(tempRootDir, 'video.mp4');
+      const videoData = {
+        inlineData: { mimeType: 'video/mp4', data: 'base64...' },
+      };
+      const params: ReadFileToolParams = { absolute_path: filePath };
+      mockProcessSingleFileContent.mockResolvedValue({
+        llmContent: videoData,
+        returnDisplay: `Read video file: ${path.basename(filePath)}`,
+      });
+
+      const result = await tool.execute(params, abortSignal);
+      expect(mockProcessSingleFileContent).toHaveBeenCalledWith(
+        filePath,
+        tempRootDir,
+        undefined,
+        undefined,
+      );
+      expect(result.llmContent).toEqual(videoData);
+      expect(result.returnDisplay).toBe(
+        `Read video file: ${path.basename(filePath)}`,
+      );
+    });
   });
 });
