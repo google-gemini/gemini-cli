@@ -14,8 +14,8 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
+import type { LoadedSettings } from './config/settings.js';
 import {
-  LoadedSettings,
   loadSettings,
   USER_SETTINGS_PATH,
   SettingScope,
@@ -24,11 +24,12 @@ import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions, Extension } from './config/extension.js';
+import type { Extension } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints } from './utils/cleanup.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
-  Config,
   EditTool,
   ShellTool,
   WriteFileTool,

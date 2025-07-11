@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Box,
-  DOMElement,
   measureElement,
   Static,
   Text,
   useStdin,
   useStdout,
   useInput,
+  type DOMElement,
   type Key as InkKeyType,
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
@@ -39,7 +39,7 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
@@ -49,11 +49,11 @@ import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
   getErrorMessage,
-  type Config,
   getAllGeminiMdFilenames,
   ApprovalMode,
   isEditorAvailable,
-  EditorType,
+  type EditorType,
+  type Config,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';

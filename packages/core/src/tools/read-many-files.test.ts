@@ -12,7 +12,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 vi.mock('mime-types', () => {
   const lookup = (filename: string) => {

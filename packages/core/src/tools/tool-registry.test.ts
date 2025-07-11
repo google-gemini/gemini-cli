@@ -5,30 +5,17 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  Mocked,
-} from 'vitest';
-import {
-  ToolRegistry,
-  DiscoveredTool,
-  sanitizeParameters,
-} from './tool-registry.js';
+import type { Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { DiscoveredTool } from './tool-registry.js';
+import { ToolRegistry, sanitizeParameters } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
-import { BaseTool, ToolResult } from './tools.js';
-import {
-  FunctionDeclaration,
-  CallableTool,
-  mcpToTool,
-  Type,
-  Schema,
-} from '@google/genai';
+import type { ConfigParameters } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
+import type { FunctionDeclaration, CallableTool, Schema } from '@google/genai';
+import { mcpToTool, Type } from '@google/genai';
 import { spawn } from 'node:child_process';
 
 // Use vi.hoisted to define the mock function so it can be used in the vi.mock factory

@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GrepTool, GrepToolParams } from './grep.js';
+import type { GrepToolParams } from './grep.js';
+import { GrepTool } from './grep.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';

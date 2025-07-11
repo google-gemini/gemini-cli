@@ -6,8 +6,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Dirent } from 'fs';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { Dirent } from 'fs';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.

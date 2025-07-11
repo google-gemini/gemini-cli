@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import util from 'util';
-import { ConsoleMessageItem } from '../types.js';
+import type { ConsoleMessageItem } from '../types.js';
 
 interface UseConsolePatcherParams {
   onNewMessage: (message: Omit<ConsoleMessageItem, 'id'>) => void;

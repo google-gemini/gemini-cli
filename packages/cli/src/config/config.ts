@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -16,11 +17,11 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
-  TelemetryTarget,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
-import { Extension, filterActiveExtensions } from './extension.js';
+import type { Extension } from './extension.js';
+import { filterActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 

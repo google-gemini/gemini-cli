@@ -4,19 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  AuthType,
+import type {
   CompletedToolCall,
   ContentGeneratorConfig,
-  EditTool,
   ErroredToolCall,
+} from '../index.js';
+import {
+  AuthType,
+  EditTool,
   GeminiClient,
   ToolConfirmationOutcome,
   ToolRegistry,
 } from '../index.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
@@ -42,7 +44,7 @@ import {
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
-import { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
 
 describe('loggers', () => {

@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { AppWrapper as App } from './App.js';
-import {
-  Config as ServerConfig,
+import type {
   MCPServerConfig,
-  ApprovalMode,
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
 } from '@google/gemini-cli-core';
-import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
+import { Config as ServerConfig, ApprovalMode } from '@google/gemini-cli-core';
+import type { SettingsFile, Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import process from 'node:process';
 import { Tips } from './components/Tips.js';
 

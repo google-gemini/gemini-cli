@@ -6,7 +6,7 @@
 
 import { expect, describe, it } from 'vitest';
 import { ShellTool } from './shell.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 describe('ShellTool', () => {
   it('should allow a command if no restrictions are provided', async () => {

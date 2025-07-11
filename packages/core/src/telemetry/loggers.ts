@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logs, LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_REQUEST,
@@ -16,7 +17,7 @@ import {
   EVENT_USER_PROMPT,
   SERVICE_NAME,
 } from './constants.js';
-import {
+import type {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -31,7 +32,8 @@ import {
   recordToolCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
+import type { UiEvent } from './uiTelemetry.js';
+import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>

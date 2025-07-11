@@ -16,7 +16,7 @@ import {
 } from './extension.js';
 
 vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+  const os = await importOriginal<typeof os>();
   return {
     ...os,
     homedir: vi.fn(),

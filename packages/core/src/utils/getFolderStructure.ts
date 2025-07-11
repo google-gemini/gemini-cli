@@ -5,10 +5,10 @@
  */
 
 import * as fs from 'fs/promises';
-import { Dirent } from 'fs';
+import type { Dirent } from 'fs';
 import * as path from 'path';
 import { getErrorMessage, isNodeError } from './errors.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';

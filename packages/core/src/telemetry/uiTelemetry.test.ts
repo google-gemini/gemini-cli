@@ -6,23 +6,20 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import type { ApiErrorEvent, ApiResponseEvent } from './types.js';
+import { ToolCallEvent, ToolCallDecision } from './types.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
 } from './constants.js';
-import {
+import type {
   CompletedToolCall,
   ErroredToolCall,
   SuccessfulToolCall,
 } from '../core/coreToolScheduler.js';
-import { Tool, ToolConfirmationOutcome } from '../tools/tools.js';
+import type { Tool } from '../tools/tools.js';
+import { ToolConfirmationOutcome } from '../tools/tools.js';
 
 const createFakeCompletedToolCall = (
   name: string,

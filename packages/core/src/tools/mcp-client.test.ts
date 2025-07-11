@@ -5,25 +5,20 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  Mocked,
-} from 'vitest';
+import type { Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { discoverMcpTools } from './mcp-client.js';
 import { sanitizeParameters } from './tool-registry.js';
-import { Schema, Type } from '@google/genai';
-import { Config, MCPServerConfig } from '../config/config.js';
+import type { Schema } from '@google/genai';
+import { Type } from '@google/genai';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { parse, ParseEntry } from 'shell-quote';
+import type { ParseEntry } from 'shell-quote';
+import { parse } from 'shell-quote';
 
 // Mock dependencies
 vi.mock('shell-quote');

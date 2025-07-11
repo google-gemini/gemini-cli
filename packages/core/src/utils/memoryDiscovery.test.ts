@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mocked } from 'vitest';
+import type { Mocked } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as fsPromises from 'fs/promises';
-import * as fsSync from 'fs';
-import { Stats, Dirent } from 'fs';
+import type * as fsSync from 'fs';
+import type { Stats, Dirent } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { loadServerHierarchicalMemory } from './memoryDiscovery.js';

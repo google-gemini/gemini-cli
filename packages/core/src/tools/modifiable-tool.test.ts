@@ -13,13 +13,9 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import {
-  modifyWithEditor,
-  ModifyContext,
-  ModifiableTool,
-  isModifiableTool,
-} from './modifiable-tool.js';
-import { EditorType } from '../utils/editor.js';
+import type { ModifyContext, ModifiableTool } from './modifiable-tool.js';
+import { modifyWithEditor, isModifiableTool } from './modifiable-tool.js';
+import type { EditorType } from '../utils/editor.js';
 import fs from 'fs';
 import os from 'os';
 import * as path from 'path';

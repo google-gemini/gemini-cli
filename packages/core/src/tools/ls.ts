@@ -6,11 +6,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import { BaseTool, ToolResult } from './tools.js';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 /**
  * Parameters for the LS tool

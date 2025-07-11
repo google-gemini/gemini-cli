@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration, PartListUnion, Schema } from '@google/genai';
-import { Summarizer, defaultSummarizer } from '../utils/summarizer.js';
+import type { FunctionDeclaration, PartListUnion, Schema } from '@google/genai';
+import type { Summarizer } from '../utils/summarizer.js';
+import { defaultSummarizer } from '../utils/summarizer.js';
 
 /**
  * Interface representing the base Tool functionality

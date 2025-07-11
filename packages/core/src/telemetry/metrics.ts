@@ -4,14 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  metrics,
-  Attributes,
-  ValueType,
-  Meter,
-  Counter,
-  Histogram,
-} from '@opentelemetry/api';
+import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
+import { metrics, ValueType } from '@opentelemetry/api';
 import {
   SERVICE_NAME,
   METRIC_TOOL_CALL_COUNT,
@@ -22,7 +16,7 @@ import {
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
 } from './constants.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 export enum FileOperation {
   CREATE = 'create',
