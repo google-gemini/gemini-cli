@@ -191,6 +191,7 @@ vi.mock('./components/Tips.js', () => ({
 describe('App UI', () => {
   let mockConfig: MockServerConfig;
   let mockSettings: LoadedSettings;
+  let mockVersion: string;
   let currentUnmount: (() => void) | undefined;
 
   const createMockSettings = (
@@ -235,6 +236,7 @@ describe('App UI', () => {
       cwd: '/tmp',
       model: 'model',
     }) as unknown as MockServerConfig;
+    mockVersion = '0.0.0-test';
 
     // Ensure the getShowMemoryUsage mock function is specifically set up if not covered by constructor mock
     if (!mockConfig.getShowMemoryUsage) {
@@ -264,6 +266,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -280,6 +283,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -299,6 +303,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -321,6 +326,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -340,6 +346,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -359,6 +366,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -378,6 +386,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -398,6 +407,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -410,6 +420,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -428,6 +439,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -446,6 +458,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -475,6 +488,7 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
+          version={mockVersion}
         />,
       );
       currentUnmount = unmount;
@@ -489,6 +503,7 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
+          version={mockVersion}
         />,
       );
       currentUnmount = unmount;
