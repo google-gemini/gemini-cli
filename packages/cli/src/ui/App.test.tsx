@@ -15,7 +15,6 @@ import {
   AccessibilitySettings,
   SandboxConfig,
   GeminiClient,
-  GeminiChat,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
@@ -518,10 +517,8 @@ describe('App UI', () => {
     it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();
       
-      // Override the default mock to include a question
       mockConfig.getQuestion = vi.fn(() => 'hello from prompt-interactive');
       
-      // Mock useGeminiStream to capture submitQuery calls
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQuery,
@@ -530,7 +527,6 @@ describe('App UI', () => {
         thought: null,
       });
 
-      // Ensure we have a valid gemini client
       mockConfig.getGeminiClient.mockReturnValue({
         getChatSafe: vi.fn(() => ({})),
       } as unknown as GeminiClient);
@@ -553,7 +549,6 @@ describe('App UI', () => {
         />,
       );
 
-      // Wait for React to process effects
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(mockSubmitQuery).toHaveBeenCalledWith('hello from prompt-interactive');
