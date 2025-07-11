@@ -22,12 +22,12 @@ export function getCoreSystemPrompt(userMemory?: string): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
-  let systemMdPath = path.join(GEMINI_CONFIG_DIR, 'system.md');
+  let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
   const systemMdVar = process.env.GEMINI_SYSTEM_MD?.toLowerCase();
   if (systemMdVar && !['0', 'false'].includes(systemMdVar)) {
     systemMdEnabled = true; // enable system prompt override
     if (!['1', 'true'].includes(systemMdVar)) {
-      systemMdPath = systemMdVar; // use custom path from GEMINI_SYSTEM_MD
+      systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
     }
     // require file to exist when override is enabled
     if (!fs.existsSync(systemMdPath)) {
@@ -166,7 +166,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: ${LSTool.Name} for path '.']
+model: [tool_call: ${LSTool.Name} for path '/path/to/project']
 </example>
 
 <example>
@@ -211,7 +211,7 @@ ${(function () {
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
+model: I can run `rm -rf /path/to/project/temp`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -260,7 +260,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     if (['1', 'true'].includes(writeSystemMdVar)) {
       fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
     } else {
-      fs.writeFileSync(writeSystemMdVar, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+      fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
     }
   }
 
