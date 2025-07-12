@@ -10,9 +10,9 @@
     "incremental": true,
     "declaration": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["ES2023"],
+    "lib": ["ESNext"],
     "module": "NodeNext",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "target": "es2022",
     "types": ["node", "vitest/globals"]
   }
