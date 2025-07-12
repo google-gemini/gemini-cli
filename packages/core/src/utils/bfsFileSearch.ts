@@ -22,6 +22,8 @@ interface BfsFileSearchOptions {
   maxDirs?: number;
   debug?: boolean;
   fileService?: FileDiscoveryService;
+  respectGitIgnore?: boolean;
+  respectGeminiIgnore?: boolean;
 }
 
 /**
@@ -69,7 +71,12 @@ export async function bfsFileSearch(
 
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
-      if (fileService?.shouldGitIgnoreFile(fullPath)) {
+      if (
+        fileService?.shouldIgnoreFile(fullPath, {
+          respectGitIgnore: options.respectGitIgnore ?? false,
+          respectGeminiIgnore: options.respectGeminiIgnore ?? false,
+        })
+      ) {
         continue;
       }
 

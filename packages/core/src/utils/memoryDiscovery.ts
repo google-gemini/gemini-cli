@@ -85,6 +85,7 @@ async function getGeminiMdFilePathsInternal(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  options: { respectGitIgnore: boolean; respectGeminiIgnore: boolean },
 ): Promise<string[]> {
   const allPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
@@ -186,6 +187,8 @@ async function getGeminiMdFilePathsInternal(
       maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
       debug: debugMode,
       fileService,
+      respectGitIgnore: options?.respectGitIgnore ?? true,
+      respectGeminiIgnore: options?.respectGeminiIgnore ?? true,
     });
     downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
     if (debugMode && downwardPaths.length > 0)
@@ -282,6 +285,7 @@ export async function loadServerHierarchicalMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  options?: { respectGitIgnore: boolean; respectGeminiIgnore: boolean },
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
@@ -296,6 +300,10 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    {
+      respectGitIgnore: options?.respectGitIgnore ?? true,
+      respectGeminiIgnore: options?.respectGeminiIgnore ?? true,
+    },
   );
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');

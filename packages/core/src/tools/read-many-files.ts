@@ -65,6 +65,11 @@ export interface ReadManyFilesParams {
    * Optional. Whether to respect .gitignore patterns. Defaults to true.
    */
   respect_git_ignore?: boolean;
+
+  /**
+   * Optional. Whether to respect .gemini patterns. Defaults to true.
+   */
+  respect_gemini_ignore?: boolean;
 }
 
 /**
@@ -186,6 +191,12 @@ export class ReadManyFilesTool extends BaseTool<
             'Optional. Whether to respect .gitignore patterns when discovering files. Only available in git repositories. Defaults to true.',
           default: true,
         },
+        respect_gemini_ignore: {
+          type: Type.BOOLEAN,
+          description:
+            'Optional. Whether to respect .geminiignore patterns when discovering files. Defaults to true.',
+          default: true,
+        },
       },
       required: ['paths'],
     };
@@ -265,10 +276,15 @@ Use this tool when the user's query implies needing the content of several files
       exclude = [],
       useDefaultExcludes = true,
       respect_git_ignore = true,
+      respect_gemini_ignore = true,
     } = params;
 
     const respectGitIgnore =
       respect_git_ignore ?? this.config.getFileFilteringRespectGitIgnore();
+
+    const respectGeminiIgnore =
+      respect_gemini_ignore ??
+      this.config.getFileFilteringRespectGeminiIgnore();
 
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
@@ -302,7 +318,7 @@ Use this tool when the user's query implies needing the content of several files
         signal,
       });
 
-      const filteredEntries = respectGitIgnore
+      const gitFilteredEntries = respectGitIgnore
         ? fileDiscovery
             .filterFiles(
               entries.map((p) => path.relative(toolBaseDir, p)),
@@ -313,7 +329,21 @@ Use this tool when the user's query implies needing the content of several files
             .map((p) => path.resolve(toolBaseDir, p))
         : entries;
 
+      // Apply gemini ignore filtering if enabled
+      const finalFilteredEntries = respectGeminiIgnore
+        ? fileDiscovery
+            .filterFiles(
+              gitFilteredEntries.map((p) => path.relative(toolBaseDir, p)),
+              {
+                respectGeminiIgnore,
+              },
+            )
+            .map((p) => path.resolve(toolBaseDir, p))
+        : gitFilteredEntries;
+
       let gitIgnoredCount = 0;
+      let geminiIgnoredCount = 0;
+
       for (const absoluteFilePath of entries) {
         // Security check: ensure the glob library didn't return something outside targetDir.
         if (!absoluteFilePath.startsWith(toolBaseDir)) {
@@ -325,8 +355,20 @@ Use this tool when the user's query implies needing the content of several files
         }
 
         // Check if this file was filtered out by git ignore
-        if (respectGitIgnore && !filteredEntries.includes(absoluteFilePath)) {
+        if (
+          respectGitIgnore &&
+          !gitFilteredEntries.includes(absoluteFilePath)
+        ) {
           gitIgnoredCount++;
+          continue;
+        }
+
+        // Check if this file was filtered out by gemini ignore
+        if (
+          respectGeminiIgnore &&
+          !finalFilteredEntries.includes(absoluteFilePath)
+        ) {
+          geminiIgnoredCount++;
           continue;
         }
 
@@ -337,7 +379,15 @@ Use this tool when the user's query implies needing the content of several files
       if (gitIgnoredCount > 0) {
         skippedFiles.push({
           path: `${gitIgnoredCount} file(s)`,
-          reason: 'ignored',
+          reason: 'git ignored',
+        });
+      }
+
+      // Add info about gemini-ignored files if any were filtered
+      if (geminiIgnoredCount > 0) {
+        skippedFiles.push({
+          path: `${geminiIgnoredCount} file(s)`,
+          reason: 'gemini ignored',
         });
       }
     } catch (error) {

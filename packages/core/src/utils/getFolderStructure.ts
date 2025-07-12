@@ -28,6 +28,8 @@ interface FolderStructureOptions {
   fileService?: FileDiscoveryService;
   /** Whether to use .gitignore patterns. */
   respectGitIgnore?: boolean;
+  /** Whether to use .geminiignore patterns. */
+  respectGeminiIgnore?: boolean;
 }
 
 // Define a type for the merged options where fileIncludePattern remains optional
@@ -36,6 +38,7 @@ type MergedFolderStructureOptions = Required<
 > & {
   fileIncludePattern?: RegExp;
   fileService?: FileDiscoveryService;
+  respectGeminiIgnore: boolean;
 };
 
 /** Represents the full, unfiltered information about a folder and its contents. */
@@ -126,8 +129,13 @@ async function readFullStructure(
         }
         const fileName = entry.name;
         const filePath = path.join(currentPath, fileName);
-        if (options.respectGitIgnore && options.fileService) {
-          if (options.fileService.shouldGitIgnoreFile(filePath)) {
+        if (options.fileService) {
+          const shouldIgnore =
+            (options.respectGitIgnore &&
+              options.fileService.shouldGitIgnoreFile(filePath)) ||
+            (options.respectGeminiIgnore &&
+              options.fileService.shouldGeminiIgnoreFile(filePath));
+          if (shouldIgnore) {
             continue;
           }
         }
@@ -160,14 +168,16 @@ async function readFullStructure(
         const subFolderName = entry.name;
         const subFolderPath = path.join(currentPath, subFolderName);
 
-        let isIgnoredByGit = false;
-        if (options.respectGitIgnore && options.fileService) {
-          if (options.fileService.shouldGitIgnoreFile(subFolderPath)) {
-            isIgnoredByGit = true;
-          }
+        let isIgnored = false;
+        if (options.fileService) {
+          isIgnored =
+            (options.respectGitIgnore &&
+              options.fileService.shouldGitIgnoreFile(subFolderPath)) ||
+            (options.respectGeminiIgnore &&
+              options.fileService.shouldGeminiIgnoreFile(subFolderPath));
         }
 
-        if (options.ignoredFolders.has(subFolderName) || isIgnoredByGit) {
+        if (options.ignoredFolders.has(subFolderName) || isIgnored) {
           const ignoredSubFolder: FullFolderInfo = {
             name: subFolderName,
             path: subFolderPath,
@@ -296,6 +306,7 @@ export async function getFolderStructure(
     fileIncludePattern: options?.fileIncludePattern,
     fileService: options?.fileService,
     respectGitIgnore: options?.respectGitIgnore ?? true,
+    respectGeminiIgnore: options?.respectGeminiIgnore ?? true,
   };
 
   try {

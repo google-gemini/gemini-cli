@@ -137,11 +137,15 @@ export async function handleAtCommand({
   // Get centralized file discovery service
   const fileDiscovery = config.getFileService();
   const respectGitIgnore = config.getFileFilteringRespectGitIgnore();
+  const respectGeminiIgnore = config.getFileFilteringRespectGeminiIgnore();
 
   const pathSpecsToRead: string[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
-  const ignoredPaths: string[] = [];
+  const ignoredPaths: Array<{
+    path: string;
+    reason: 'git' | 'gemini' | 'both';
+  }> = [];
 
   const toolRegistry = await config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
@@ -182,10 +186,24 @@ export async function handleAtCommand({
     }
 
     // Check if path should be ignored based on filtering options
-    if (fileDiscovery.shouldIgnoreFile(pathName, { respectGitIgnore })) {
-      const reason = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
-      onDebugMessage(`Path ${pathName} is ${reason} and will be skipped.`);
-      ignoredPaths.push(pathName);
+    const gitIgnored =
+      respectGitIgnore &&
+      fileDiscovery.shouldIgnoreFile(pathName, { respectGitIgnore: true });
+    const geminiIgnored =
+      respectGeminiIgnore &&
+      fileDiscovery.shouldIgnoreFile(pathName, { respectGeminiIgnore: true });
+
+    if (gitIgnored || geminiIgnored) {
+      const reason =
+        gitIgnored && geminiIgnored ? 'both' : gitIgnored ? 'git' : 'gemini';
+      ignoredPaths.push({ path: pathName, reason });
+      const reasonText =
+        reason === 'both'
+          ? 'ignored by both git and gemini'
+          : reason === 'git'
+            ? 'git-ignored'
+            : 'gemini-ignored';
+      onDebugMessage(`Path ${pathName} is ${reasonText} and will be skipped.`);
       continue;
     }
 
@@ -320,10 +338,28 @@ export async function handleAtCommand({
 
   // Inform user about ignored paths
   if (ignoredPaths.length > 0) {
-    const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
-    onDebugMessage(
-      `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
-    );
+    const gitIgnored = ignoredPaths.filter((x) => x.reason === 'git');
+    const geminiIgnored = ignoredPaths.filter((x) => x.reason === 'gemini');
+    const bothIgnored = ignoredPaths.filter((x) => x.reason === 'both');
+
+    const messages = [];
+    if (gitIgnored.length > 0) {
+      messages.push(`Git-ignored: ${gitIgnored.map((x) => x.path).join(', ')}`);
+    }
+    if (geminiIgnored.length > 0) {
+      messages.push(
+        `Gemini-ignored: ${geminiIgnored.map((x) => x.path).join(', ')}`,
+      );
+    }
+    if (bothIgnored.length > 0) {
+      messages.push(
+        `Ignored by both: ${bothIgnored.map((x) => x.path).join(', ')}`,
+      );
+    }
+
+    const message = `Ignored ${ignoredPaths.length} files:\n${messages.join('\n')}`;
+    console.log(message);
+    onDebugMessage(message);
   }
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
@@ -347,7 +383,8 @@ export async function handleAtCommand({
 
   const toolArgs = {
     paths: pathSpecsToRead,
-    respect_git_ignore: respectGitIgnore, // Use configuration setting
+    respect_git_ignore: respectGitIgnore,
+    respect_gemini_ignore: respectGeminiIgnore, // Use configuration setting
   };
   let toolCallDisplay: IndividualToolCallDisplay;
 

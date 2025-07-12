@@ -394,7 +394,8 @@ export function useCompletion(
         config?.getEnableRecursiveFileSearch() ?? true;
       const filterOptions = {
         respectGitIgnore: config?.getFileFilteringRespectGitIgnore() ?? true,
-        respectGeminiIgnore: true,
+        respectGeminiIgnore:
+          config?.getFileFilteringRespectGeminiIgnore() ?? true,
       };
 
       try {
