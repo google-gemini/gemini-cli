@@ -163,38 +163,35 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     code_challenge: codeVerifier.codeChallenge,
     state,
   });
-  console.error('Please visit the following URL to authorize the application:');
-  console.error('');
-  console.error(authUrl);
-  console.error('');
+  console.log('Please visit the following URL to authorize the application:');
+  console.log('');
+  console.log(authUrl);
+  console.log('');
 
   const code = await new Promise<string>((resolve) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
-    rl.question('Enter the authorization code: ', (answer) => {
+    rl.question('Enter the authorization code: ', (code) => {
       rl.close();
-      resolve(answer.trim());
+      resolve(code.trim());
     });
   });
 
   if (!code) {
     console.error('Authorization code is required.');
     return false;
-  } else {
-    console.error(`Received authorization code: "${code}"`);
   }
 
   try {
-    const response = await client.getToken({
+    const { tokens } = await client.getToken({
       code,
       codeVerifier: codeVerifier.codeVerifier,
       redirect_uri: redirectUri,
     });
-    client.setCredentials(response.tokens);
+    client.setCredentials(tokens);
   } catch (_error) {
-    // Consider logging the error.
     return false;
   }
   return true;
