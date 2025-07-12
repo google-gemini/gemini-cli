@@ -1,0 +1,45 @@
+{
+  "name": "gemini-cli-vscode-ide-companion",
+  "displayName": "Gemini CLI VSCode IDE Companion",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "build": "npm run compile",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.101.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  }
+}
