@@ -12,6 +12,9 @@ import {
   MemoryMetricType,
   isPerformanceMonitoringActive,
 } from './metrics.js';
+import { isUserActive } from './activity-detector.js';
+import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+import { RateLimiter } from './rate-limiter.js';
 
 export interface MemorySnapshot {
   timestamp: number;
@@ -33,16 +36,21 @@ export class MemoryMonitor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private lastSnapshot: MemorySnapshot | null = null;
-  private monitoringInterval: number = 5000; // 5 seconds default
+  private monitoringInterval: number = 10000; // 10 seconds default (reduced from 5)
+  private highWaterMarkTracker: HighWaterMarkTracker;
+  private rateLimiter: RateLimiter;
+  private useEnhancedMonitoring: boolean = true;
 
   constructor() {
     // No config stored to avoid multi-session attribution issues
+    this.highWaterMarkTracker = new HighWaterMarkTracker(5, 3); // 5% threshold, 3-sample smoothing
+    this.rateLimiter = new RateLimiter(60000); // 1 minute minimum between recordings
   }
 
   /**
    * Start continuous memory monitoring
    */
-  start(config: Config, intervalMs: number = 5000): void {
+  start(config: Config, intervalMs: number = 10000): void {
     if (!isPerformanceMonitoringActive() || this.isRunning) {
       return;
     }
@@ -53,10 +61,55 @@ export class MemoryMonitor {
     // Take initial snapshot
     this.takeSnapshot('monitoring_start', config);
 
-    // Set up periodic monitoring
+    // Set up periodic monitoring with enhanced logic
     this.intervalId = setInterval(() => {
-      this.takeSnapshot('periodic', config);
+      this.checkAndRecordIfNeeded(config);
     }, this.monitoringInterval).unref();
+  }
+
+  /**
+   * Check if we should record memory metrics and do so if conditions are met
+   */
+  private checkAndRecordIfNeeded(config: Config): void {
+    if (!this.useEnhancedMonitoring) {
+      // Fall back to original behavior
+      this.takeSnapshot('periodic', config);
+      return;
+    }
+
+    // Only proceed if user is active
+    if (!isUserActive()) {
+      return;
+    }
+
+    // Get current memory usage
+    const currentMemory = this.getCurrentMemoryUsage();
+
+    // Check if RSS has grown significantly (5% threshold)
+    const shouldRecordRss = this.highWaterMarkTracker.shouldRecordMetric(
+      'rss',
+      currentMemory.rss,
+    );
+    const shouldRecordHeap = this.highWaterMarkTracker.shouldRecordMetric(
+      'heap_used',
+      currentMemory.heapUsed,
+    );
+
+    // Also check rate limiting
+    const canRecordPeriodic = this.rateLimiter.shouldRecord('periodic_memory');
+    const canRecordHighWater = this.rateLimiter.shouldRecord(
+      'high_water_memory',
+      true,
+    ); // High priority
+
+    // Record if we have significant growth and aren't rate limited
+    if ((shouldRecordRss || shouldRecordHeap) && canRecordHighWater) {
+      const context = shouldRecordRss ? 'rss_growth' : 'heap_growth';
+      this.takeSnapshot(context, config);
+    } else if (canRecordPeriodic) {
+      // Occasionally record even without growth for baseline tracking
+      this.takeSnapshotWithoutRecording('periodic_check', config);
+    }
   }
 
   /**
@@ -118,6 +171,37 @@ export class MemoryMonitor {
       );
       recordMemoryUsage(config, MemoryMetricType.RSS, snapshot.rss, context);
     }
+
+    this.lastSnapshot = snapshot;
+    return snapshot;
+  }
+
+  /**
+   * Take a memory snapshot without recording metrics (for internal tracking)
+   */
+  private takeSnapshotWithoutRecording(
+    _context: string,
+    _config: Config,
+  ): MemorySnapshot {
+    const memUsage = process.memoryUsage();
+    const heapStats = v8.getHeapStatistics();
+
+    const snapshot: MemorySnapshot = {
+      timestamp: Date.now(),
+      heapUsed: memUsage.heapUsed,
+      heapTotal: memUsage.heapTotal,
+      external: memUsage.external,
+      rss: memUsage.rss,
+      arrayBuffers: memUsage.arrayBuffers,
+      heapSizeLimit: heapStats.heap_size_limit,
+    };
+
+    // Update internal tracking but don't record metrics
+    this.highWaterMarkTracker.shouldRecordMetric('rss', snapshot.rss);
+    this.highWaterMarkTracker.shouldRecordMetric(
+      'heap_used',
+      snapshot.heapUsed,
+    );
 
     this.lastSnapshot = snapshot;
     return snapshot;
@@ -258,10 +342,56 @@ export class MemoryMonitor {
   }
 
   /**
+   * Enable or disable enhanced monitoring features
+   */
+  setEnhancedMonitoring(enabled: boolean): void {
+    this.useEnhancedMonitoring = enabled;
+  }
+
+  /**
+   * Get high-water mark statistics
+   */
+  getHighWaterMarkStats(): Record<string, number> {
+    return this.highWaterMarkTracker.getAllHighWaterMarks();
+  }
+
+  /**
+   * Get rate limiting statistics
+   */
+  getRateLimitingStats(): {
+    totalMetrics: number;
+    oldestRecord: number;
+    newestRecord: number;
+    averageInterval: number;
+  } {
+    return this.rateLimiter.getStats();
+  }
+
+  /**
+   * Force record memory metrics (bypasses rate limiting for critical events)
+   */
+  forceRecordMemory(
+    config: Config,
+    context: string = 'forced',
+  ): MemorySnapshot {
+    this.rateLimiter.forceRecord('forced_memory');
+    return this.takeSnapshot(context, config);
+  }
+
+  /**
+   * Reset high-water marks (useful after memory optimizations)
+   */
+  resetHighWaterMarks(): void {
+    this.highWaterMarkTracker.resetAllHighWaterMarks();
+  }
+
+  /**
    * Cleanup resources
    */
   destroy(): void {
     this.stop();
+    this.rateLimiter.reset();
+    this.highWaterMarkTracker.resetAllHighWaterMarks();
   }
 }
 
@@ -301,7 +431,7 @@ export function recordCurrentMemoryUsage(
  */
 export function startGlobalMemoryMonitoring(
   config: Config,
-  intervalMs: number = 5000,
+  intervalMs: number = 10000,
 ): void {
   const monitor = initializeMemoryMonitor();
   monitor.start(config, intervalMs);
