@@ -93,3 +93,20 @@ export {
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
+export {
+  ActivityDetector,
+  initializeActivityDetector,
+  getActivityDetector,
+  recordUserActivity,
+  isUserActive,
+} from './activity-detector.js';
+export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+export { RateLimiter } from './rate-limiter.js';
+export { ActivityType } from './activity-types.js';
+export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
