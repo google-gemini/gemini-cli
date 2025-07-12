@@ -14,7 +14,7 @@ import {
   recordUserActivity,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
-  ActivityEvent,
+  type ActivityEvent,
 } from './activity-monitor.js';
 import { Config } from '../config/config.js';
 

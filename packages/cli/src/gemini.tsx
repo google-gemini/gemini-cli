@@ -41,6 +41,7 @@ import {
   isPerformanceMonitoringActive,
   startGlobalMemoryMonitoring,
   recordCurrentMemoryUsage,
+  recordUserActivity,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -277,6 +278,7 @@ export async function main() {
   if (isPerformanceMonitoringActive()) {
     startGlobalMemoryMonitoring(config, 10000); // Monitor every 10 seconds
     recordCurrentMemoryUsage(config, 'startup_post_config');
+    recordUserActivity(); // Record initial activity
   }
 
   const wasRaw = process.stdin.isRaw;

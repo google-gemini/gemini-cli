@@ -178,7 +178,7 @@ describe('Global Activity Detector Functions', () => {
     });
 
     it('should return detector state when exists', () => {
-      const _detector = initializeActivityDetector(1000);
+      initializeActivityDetector(1000);
       expect(isUserActive()).toBe(true);
 
       vi.useFakeTimers();
