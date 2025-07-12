@@ -54,6 +54,10 @@ export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 // It defaults to DEFAULT_CONTEXT_FILENAME but can be overridden by setGeminiMdFilename.
 let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 
+/**
+ * this function set geminiMdFilename to newfilename.
+ * @param newFilename filename
+ */
 export function setGeminiMdFilename(newFilename: string | string[]): void {
   if (Array.isArray(newFilename)) {
     if (newFilename.length > 0) {
@@ -64,6 +68,10 @@ export function setGeminiMdFilename(newFilename: string | string[]): void {
   }
 }
 
+/**
+ *  this functioon get geminiMdFilename
+ * @returns GeminimdFilename
+ */
 export function getCurrentGeminiMdFilename(): string {
   if (Array.isArray(currentGeminiMdFilename)) {
     return currentGeminiMdFilename[0];
@@ -82,6 +90,10 @@ interface SaveMemoryParams {
   fact: string;
 }
 
+/**
+ *
+ * @returns File path that saves the memory
+ */
 function getGlobalMemoryFilePath(): string {
   return path.join(homedir(), GEMINI_CONFIG_DIR, getCurrentGeminiMdFilename());
 }
@@ -90,12 +102,18 @@ function getGlobalMemoryFilePath(): string {
  * Ensures proper newline separation before appending content.
  */
 function ensureNewlineSeparation(currentContent: string): string {
-  if (currentContent.length === 0) return '';
-  if (currentContent.endsWith('\n\n') || currentContent.endsWith('\r\n\r\n'))
-    return '';
-  if (currentContent.endsWith('\n') || currentContent.endsWith('\r\n'))
-    return '\n';
-  return '\n\n';
+  switch (true) {
+    case currentContent.length === 0:
+      return '';
+    case currentContent.endsWith('\n\n'):
+    case currentContent.endsWith('\r\n\r\n'):
+      return '';
+    case currentContent.endsWith('\n'):
+    case currentContent.endsWith('\r\n'):
+      return '\n';
+    default:
+      return '\n\n';
+  }
 }
 
 export class MemoryTool extends BaseTool<SaveMemoryParams, ToolResult> {
