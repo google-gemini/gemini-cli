@@ -36,6 +36,9 @@ export const useAuthCommand = (
       }
 
       try {
+        config.getSetAuthMessage()?.(
+          'Waiting for auth... (Press ESC to cancel)',
+        );
         setIsAuthenticating(true);
         await config.refreshAuth(authType);
         console.log(`Authenticated via "${authType}".`);

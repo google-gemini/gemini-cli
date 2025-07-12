@@ -144,6 +144,7 @@ export interface ConfigParameters {
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
   noBrowser?: boolean;
+  setAuthMessage?: (message: string | null) => void;
 }
 
 export class Config {
@@ -189,6 +190,7 @@ export class Config {
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  private setAuthMessage?: (message: string | null) => void;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -234,6 +236,7 @@ export class Config {
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
     this.noBrowser = params.noBrowser ?? false;
+    this.setAuthMessage = params.setAuthMessage;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -269,6 +272,7 @@ export class Config {
     this.contentGeneratorConfig = await createContentGeneratorConfig(
       this.model,
       authMethod,
+      this,
     );
 
     this.geminiClient = new GeminiClient(this);
@@ -496,6 +500,14 @@ export class Config {
 
   getNoBrowser(): boolean {
     return this.noBrowser;
+  }
+
+  setSetAuthMessage(setAuthMessage?: (message: string | null) => void) {
+    this.setAuthMessage = setAuthMessage;
+  }
+
+  getSetAuthMessage(): ((message: string | null) => void) | undefined {
+    return this.setAuthMessage;
   }
 
   async getGitService(): Promise<GitService> {
