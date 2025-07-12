@@ -513,6 +513,38 @@ describe('App UI', () => {
     });
   });
 
+  it('should render the initial UI correctly', () => {
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should render correctly with the prompt input box', () => {
+    vi.mocked(useGeminiStream).mockReturnValue({
+      streamingState: StreamingState.Idle,
+      submitQuery: vi.fn(),
+      initError: null,
+      pendingHistoryItems: [],
+      thought: null,
+    });
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   describe('with initial prompt from --prompt-interactive', () => {
     it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();

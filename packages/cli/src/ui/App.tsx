@@ -691,7 +691,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
   return (
     <StreamingContext.Provider value={streamingState}>
-      <Box flexDirection="column" marginBottom={1} width="90%">
+      <Box flexDirection="column" width="90%">
         {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
         {updateMessage && <UpdateNotification message={updateMessage} />}
 
@@ -856,12 +856,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-              <Box
-                marginTop={1}
-                display="flex"
-                justifyContent="space-between"
-                width="100%"
-              >
+              <Box display="flex" justifyContent="space-between" width="100%">
                 <Box>
                   {process.env.GEMINI_SYSTEM_MD && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
