@@ -6,6 +6,8 @@
 .gemini/
 !gemini/config.yaml
 
+# Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
+
 # Dependency directory
 node_modules
 bower_components
