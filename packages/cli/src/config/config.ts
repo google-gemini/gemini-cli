@@ -377,7 +377,6 @@ export async function loadCliConfig(
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     listExtensions: argv.listExtensions || false,
-    activeExtensions: allExtensions.filter((e) => e.isActive),
     allExtensions,
     blockedMcpServers,
     noBrowser: !!process.env.NO_BROWSER,
