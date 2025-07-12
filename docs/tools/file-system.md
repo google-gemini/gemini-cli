@@ -114,6 +114,7 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
 - **Display name:** Edit
 - **File:** `edit.ts`
 - **Parameters:**
+
   - `file_path` (string, required): The absolute path to the file to modify.
   - `old_string` (string, required): The exact literal text to replace.
 
