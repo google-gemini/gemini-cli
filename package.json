@@ -1,5 +1,5 @@
 {
-  "name": "@google/gemini-cli-pome",
+  "name": "@google/gemini-cli",
   "version": "0.1.11",
   "engines": {
     "node": ">=20.0.0"
@@ -46,7 +46,7 @@
     "clean": "node scripts/clean.js"
   },
   "bin": {
-    "gemini-pome": "bundle/gemini.js"
+    "gemini": "bundle/gemini.js"
   },
   "files": [
     "bundle/",
