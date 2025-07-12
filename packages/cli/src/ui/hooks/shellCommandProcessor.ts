@@ -22,6 +22,16 @@ import stripAnsi from 'strip-ansi';
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
 
+// Cache for system encoding to avoid repeated detection
+let cachedSystemEncoding: string | null = null;
+
+function getCachedSystemEncoding() {
+  if (cachedSystemEncoding === null) {
+    cachedSystemEncoding = getSystemEncoding();
+  }
+  return cachedSystemEncoding;
+}
+
 function getSystemEncoding() {
   // Windows
   if (os.platform() === 'win32') {
@@ -148,7 +158,7 @@ function executeShellCommand(
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const systemEncoding = getSystemEncoding();
+    const systemEncoding = getCachedSystemEncoding();
     const stdoutDecoder = new TextDecoder(systemEncoding);
     const stderrDecoder = new TextDecoder(systemEncoding);
 
