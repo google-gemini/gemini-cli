@@ -12,6 +12,7 @@ import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import stringWidth from 'string-width';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -71,6 +72,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           status={status}
           description={description}
           emphasis={emphasis}
+          terminalWidth={terminalWidth}
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
@@ -150,12 +152,14 @@ type ToolInfo = {
   description: string;
   status: ToolCallStatus;
   emphasis: TextEmphasis;
+  terminalWidth: number;
 };
 const ToolInfo: React.FC<ToolInfo> = ({
   name,
   description,
   status,
   emphasis,
+  terminalWidth,
 }) => {
   const nameColor = React.useMemo<string>(() => {
     switch (emphasis) {
@@ -171,17 +175,42 @@ const ToolInfo: React.FC<ToolInfo> = ({
       }
     }
   }, [emphasis]);
+
+  const namePrefix = `${name} `;
+  const namePrefixWidth = stringWidth(namePrefix);
+
+  // Calculate available width for description
+  const availableDescriptionWidth =
+    terminalWidth - 2 - STATUS_INDICATOR_WIDTH - namePrefixWidth - 2;
+
+  // preventing extreme cases that could cause flickering
+  const maxReasonableLength = availableDescriptionWidth * 8;
+  const shouldTruncate = stringWidth(description) > maxReasonableLength;
+
+  const displayDescription = shouldTruncate
+    ? description.slice(0, maxReasonableLength - 3) + '...'
+    : description;
+
   return (
-    <Box>
-      <Text
-        wrap="truncate-end"
-        strikethrough={status === ToolCallStatus.Canceled}
-      >
-        <Text color={nameColor} bold>
-          {name}
-        </Text>{' '}
-        <Text color={Colors.Gray}>{description}</Text>
-      </Text>
+    <Box flexDirection="row">
+      <Box width={namePrefixWidth} flexShrink={0}>
+        <Text
+          color={nameColor}
+          bold
+          strikethrough={status === ToolCallStatus.Canceled}
+        >
+          {namePrefix}
+        </Text>
+      </Box>
+      <Box flexGrow={1}>
+        <Text
+          wrap="wrap"
+          color={Colors.Gray}
+          strikethrough={status === ToolCallStatus.Canceled}
+        >
+          {displayDescription}
+        </Text>
+      </Box>
     </Box>
   );
 };
