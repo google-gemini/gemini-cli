@@ -51,10 +51,12 @@ export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export {
   uiTelemetryService,
+  UiTelemetryService,
+} from './uiTelemetry.js';
+export type {
   SessionMetrics,
   ModelMetrics,
   ToolCallStats,
-  UiTelemetryService,
   UiEvent,
 } from './uiTelemetry.js';
 export {
@@ -85,13 +87,15 @@ export {
 } from './metrics.js';
 export {
   MemoryMonitor,
-  MemorySnapshot,
-  ProcessMetrics,
   initializeMemoryMonitor,
   getMemoryMonitor,
   recordCurrentMemoryUsage,
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
+} from './memory-monitor.js';
+export type {
+  MemorySnapshot,
+  ProcessMetrics,
 } from './memory-monitor.js';
 export {
   ActivityDetector,

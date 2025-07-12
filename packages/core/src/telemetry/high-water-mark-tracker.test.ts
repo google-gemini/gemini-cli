@@ -140,8 +140,8 @@ describe('HighWaterMarkTracker', () => {
 
       const marks = tracker.getAllHighWaterMarks();
       expect(Object.keys(marks)).toHaveLength(2);
-      expect(marks.heap_used).toBeGreaterThan(0);
-      expect(marks.rss).toBeGreaterThan(0);
+      expect(marks['heap_used']).toBeGreaterThan(0);
+      expect(marks['rss']).toBeGreaterThan(0);
     });
   });
 

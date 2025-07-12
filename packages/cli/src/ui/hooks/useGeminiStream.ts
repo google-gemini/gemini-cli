@@ -33,6 +33,7 @@ import {
   parseAndFormatApiError,
   getCodeAssistServer,
   UserTierId,
+  recordUserActivity,
   promptIdContext,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
@@ -301,11 +302,13 @@ export const useGeminiStream = (
                 prompt_id,
               };
               scheduleToolCalls([toolCallRequest], abortSignal);
+
+              // Record activity: tool call scheduled
+              recordUserActivity();
               return { queryToSend: null, shouldProceed: false };
             }
             case 'submit_prompt': {
               localQueryToSendToGemini = slashCommandResult.content;
-
               return {
                 queryToSend: localQueryToSendToGemini,
                 shouldProceed: true,
@@ -354,6 +357,10 @@ export const useGeminiStream = (
             { type: MessageType.USER, text: trimmedQuery },
             userMessageTimestamp,
           );
+
+          // Record activity: user input received
+          recordUserActivity();
+
           localQueryToSendToGemini = trimmedQuery;
         }
       } else {
@@ -663,6 +670,9 @@ export const useGeminiStream = (
       }
       if (toolCallRequests.length > 0) {
         scheduleToolCalls(toolCallRequests, signal);
+
+        // Record activity: tool calls scheduled from stream
+        recordUserActivity();
       }
       return StreamProcessingStatus.Completed;
     },
@@ -726,6 +736,9 @@ export const useGeminiStream = (
         setIsResponding(true);
         setInitError(null);
 
+      // Record activity: stream starting
+      recordUserActivity();
+
         try {
           const stream = geminiClient.sendMessageStream(
             queryToSend,
@@ -770,6 +783,9 @@ export const useGeminiStream = (
           }
         } finally {
           setIsResponding(false);
+
+        // Record activity: stream ending
+        recordUserActivity();
         }
       });
     },

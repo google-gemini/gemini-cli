@@ -91,6 +91,8 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@lvce-editor/ripgrep": "^1.6.0",
+    "mime": "^4.0.7",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
