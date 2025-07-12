@@ -59,7 +59,11 @@ export const useAuthCommand = (
         if (authType === AuthType.LOGIN_WITH_GOOGLE && config.getNoBrowser()) {
           runExitCleanup();
           console.log(
-            'Logging in with Google... Please restart Gemini CLI to continue.',
+            `
+----------------------------------------------------------------
+Logging in with Google... Please restart Gemini CLI to continue.
+----------------------------------------------------------------
+            `,
           );
           process.exit(0);
         }
