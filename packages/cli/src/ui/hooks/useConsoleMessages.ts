@@ -25,9 +25,12 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
       return;
     }
 
+    const newMessagesToAdd = messageQueueRef.current;
+    messageQueueRef.current = [];
+
     setConsoleMessages((prevMessages) => {
       const newMessages = [...prevMessages];
-      messageQueueRef.current.forEach((queuedMessage) => {
+      newMessagesToAdd.forEach((queuedMessage) => {
         if (
           newMessages.length > 0 &&
           newMessages[newMessages.length - 1].type === queuedMessage.type &&
@@ -42,7 +45,6 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
       return newMessages;
     });
 
-    messageQueueRef.current = [];
     messageQueueTimeoutRef.current = null; // Allow next scheduling
   }, []);
 

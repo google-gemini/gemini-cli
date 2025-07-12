@@ -10,14 +10,8 @@ import {
   GeminiEventType,
   ServerGeminiToolCallRequestEvent,
   ServerGeminiErrorEvent,
-  ServerGeminiUsageMetadataEvent,
 } from './turn.js';
-import {
-  GenerateContentResponse,
-  Part,
-  Content,
-  GenerateContentResponseUsageMetadata,
-} from '@google/genai';
+import { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 
@@ -55,31 +49,13 @@ describe('Turn', () => {
   };
   let mockChatInstance: MockedChatInstance;
 
-  const mockMetadata1: GenerateContentResponseUsageMetadata = {
-    promptTokenCount: 10,
-    candidatesTokenCount: 20,
-    totalTokenCount: 30,
-    cachedContentTokenCount: 5,
-    toolUsePromptTokenCount: 2,
-    thoughtsTokenCount: 3,
-  };
-
-  const mockMetadata2: GenerateContentResponseUsageMetadata = {
-    promptTokenCount: 100,
-    candidatesTokenCount: 200,
-    totalTokenCount: 300,
-    cachedContentTokenCount: 50,
-    toolUsePromptTokenCount: 20,
-    thoughtsTokenCount: 30,
-  };
-
   beforeEach(() => {
     vi.resetAllMocks();
     mockChatInstance = {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
     };
-    turn = new Turn(mockChatInstance as unknown as GeminiChat);
+    turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);
     mockSendMessageStream.mockResolvedValue((async function* () {})());
   });
@@ -116,10 +92,13 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(mockSendMessageStream).toHaveBeenCalledWith({
-        message: reqParts,
-        config: { abortSignal: expect.any(AbortSignal) },
-      });
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        {
+          message: reqParts,
+          config: { abortSignal: expect.any(AbortSignal) },
+        },
+        'prompt-id-1',
+      );
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Hello' },
@@ -243,46 +222,6 @@ describe('Turn', () => {
         [...historyContent, reqParts],
         'Turn.run-sendMessageStream',
       );
-    });
-
-    it('should yield the last UsageMetadata event from the stream', async () => {
-      const mockResponseStream = (async function* () {
-        yield {
-          candidates: [{ content: { parts: [{ text: 'First response' }] } }],
-          usageMetadata: mockMetadata1,
-        } as unknown as GenerateContentResponse;
-        // Add a small delay to ensure apiTimeMs is > 0
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        yield {
-          functionCalls: [{ name: 'aTool' }],
-          usageMetadata: mockMetadata2,
-        } as unknown as GenerateContentResponse;
-      })();
-      mockSendMessageStream.mockResolvedValue(mockResponseStream);
-
-      const events = [];
-      const reqParts: Part[] = [{ text: 'Test metadata' }];
-      for await (const event of turn.run(
-        reqParts,
-        new AbortController().signal,
-      )) {
-        events.push(event);
-      }
-
-      // There should be a content event, a tool call, and our metadata event
-      expect(events.length).toBe(3);
-
-      const metadataEvent = events[2] as ServerGeminiUsageMetadataEvent;
-      expect(metadataEvent.type).toBe(GeminiEventType.UsageMetadata);
-
-      // The value should be the *last* metadata object received.
-      expect(metadataEvent.value).toEqual(
-        expect.objectContaining(mockMetadata2),
-      );
-      expect(metadataEvent.value.apiTimeMs).toBeGreaterThan(0);
-
-      // Also check the public getter
-      expect(turn.getUsageMetadata()).toEqual(mockMetadata2);
     });
 
     it('should handle function calls with undefined name or args', async () => {

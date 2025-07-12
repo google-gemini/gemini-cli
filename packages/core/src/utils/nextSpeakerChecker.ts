@@ -112,7 +112,7 @@ export async function checkNextSpeaker(
     };
   }
 
-  // Things checked out. Lets proceed to potentially making an LLM request.
+  // Things checked out. Let's proceed to potentially making an LLM request.
 
   const lastMessage = curatedHistory[curatedHistory.length - 1];
   if (!lastMessage || lastMessage.role !== 'model') {
