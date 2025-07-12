@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    // --- Compiler Options ---
+    "target": "es2022",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2023"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node", "vitest/globals"],
+    "jsx": "react-jsx"
+  }
+}
+{
+    // --- Type Checking ---
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    // "allowImportingTsExtensions": true, // Removed due to TS5096, ensure imports use .js
+    "noEmit": false
+}

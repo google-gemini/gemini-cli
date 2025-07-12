@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# API keys and secrets
+.env
+.env~
+# gemini-cli settings
+.gemini/
+!gemini/config.yaml
+# Dependency directory
+node_modules
+bower_components
+# Editors
+.idea
+*.iml
+# OS metadata
+.DS_Store
+Thumbs.db
+# TypeScript build info files
+*.tsbuildinfo
+# Ignore built ts files
+dist
+# Build artifacts
+build
+.next
+.nuxt
+.svelte-kit
+.vercel
+.output
+coverage
+# Docker folder to help skip auth refreshes
+.docker
+bundle
+# Test report files
+junit.xml
+packages/*/coverage/
+# Generated files
+packages/cli/src/generated/
+.integration-tests/
