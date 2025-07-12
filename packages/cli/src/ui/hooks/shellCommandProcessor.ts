@@ -18,6 +18,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import stripAnsi from 'strip-ansi';
+import { detect as chardetDetect } from 'chardet';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
@@ -25,9 +26,17 @@ const MAX_OUTPUT_LENGTH = 10000;
 // Cache for system encoding to avoid repeated detection
 let cachedSystemEncoding: string | null = null;
 
-function getCachedSystemEncoding() {
+/**
+ * Returns the cached system encoding it if not cached.
+ * This function is used to ensure we only detect the system encoding
+ * by calling `getSystemEncoding()` or `detectEncodingFromBuffer()` once,
+ * and then reuse the cached value for subsequent calls.
+ * @param buffer A buffer to use for detecting the system encoding.
+ */
+function getCachedSystemEncoding(buffer: Buffer) {
   if (cachedSystemEncoding === null) {
-    cachedSystemEncoding = getSystemEncoding();
+    // If the system encoding detection fails, we fallback to chardet.
+    cachedSystemEncoding = getSystemEncoding() || detectEncodingFromBuffer(buffer);
   }
   return cachedSystemEncoding;
 }
@@ -45,9 +54,9 @@ function getSystemEncoding() {
         }
       }
     } catch (_e) {
-      console.warn('Failed to get Windows code page. Falling back to utf-8.');
+      console.warn('Failed to get Windows code page.');
     }
-    return 'utf-8';
+    return null;
   }
 
   // Unix-like
@@ -62,8 +71,8 @@ function getSystemEncoding() {
     try {
       locale = execSync('locale charmap', { encoding: 'utf8' }).toString().trim();
     } catch (_e) {
-      console.warn('Failed to get locale charmap. Falling back to utf-8.');
-      return 'utf-8';
+      console.warn('Failed to get locale charmap.');
+      return null;
     }
   }
 
@@ -72,12 +81,12 @@ function getSystemEncoding() {
     return match[1].toLowerCase();
   }
 
-  // Handle cases where locale charmap returns just the encoding name
+  // Handle cases where locale charmap returns just the encoding name (e.g., "UTF-8")
   if (locale && !locale.includes('.')) {
     return locale.toLowerCase();
   }
 
-  return 'utf-8'; // fallback
+  return null;
 }
 
 function windowsCodePageToEncoding(cp: number) {
@@ -110,8 +119,25 @@ function windowsCodePageToEncoding(cp: number) {
     return map[cp];
   }
 
-  console.warn(`Unknown Windows code page: ${cp}. Falling back to utf-8.`);
-  return 'utf-8';
+  console.warn(`Unable to determine encoding for windows code page ${cp}.`);
+  return null; // Return null if no mapping found
+}
+
+/**
+ * Attempts to detect encoding from a buffer using chardet.
+ * This is useful when system encoding detection fails.
+ */
+function detectEncodingFromBuffer(buffer: Buffer): string | null {
+  try {
+    const detected = chardetDetect(buffer);
+    if (detected && typeof detected === 'string') {
+      return detected.toLowerCase();
+    }
+  } catch (error) {
+    console.warn('Failed to detect encoding with chardet:', error);
+  }
+  
+  return null;
 }
 
 /**
@@ -158,9 +184,8 @@ function executeShellCommand(
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const systemEncoding = getCachedSystemEncoding();
-    const stdoutDecoder = new TextDecoder(systemEncoding);
-    const stderrDecoder = new TextDecoder(systemEncoding);
+    let stdoutDecoder: TextDecoder | null = null;
+    let stderrDecoder: TextDecoder | null = null;
 
     let stdout = '';
     let stderr = '';
@@ -173,6 +198,13 @@ function executeShellCommand(
     let sniffedBytes = 0;
 
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+
+      if (!stdoutDecoder || !stderrDecoder) {
+        const encoding = getCachedSystemEncoding(data) || 'utf-8';
+        stdoutDecoder = new TextDecoder(encoding);
+        stderrDecoder = new TextDecoder(encoding);
+      }
+
       outputChunks.push(data);
 
       if (streamToUi && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -246,8 +278,8 @@ function executeShellCommand(
     child.on('exit', (code, signal) => {
       exited = true;
       abortSignal.removeEventListener('abort', abortHandler);
-
-// Handle any final bytes lingering in the decoders
+      
+      // Handle any final bytes lingering in the decoders
       if (stdoutDecoder) {
         stdoutDecoder.decode();
       }
