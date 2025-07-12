@@ -14,8 +14,6 @@ interface ChatDetail {
   mtime: Date;
 }
 
-// Helper function to get saved chat tags.
-// This logic was previously inside the useSlashCommandProcessor hook.
 const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
