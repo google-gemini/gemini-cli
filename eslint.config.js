@@ -1,7 +1,7 @@
 /**
  * @license
  * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-20
  */
 
 import eslint from '@eslint/js';
@@ -35,6 +35,8 @@ export default tseslint.config(
       'packages/server/dist/**',
       'eslint-rules/*',
       'bundle/**',
+      'mcp-server-example/server.js',
+      'packages/cli/src/generated/git-commit.ts',
     ],
   },
   eslint.configs.recommended,
@@ -148,7 +150,7 @@ export default tseslint.config(
           '/**',
           ' * @license',
           ' * Copyright 2025 Google LLC',
-          ' * SPDX-License-Identifier: Apache-2.0',
+          ' * SPDX-License-Identifier: Apache-20',
           ' */',
         ],
       ],

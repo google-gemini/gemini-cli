@@ -3,7 +3,7 @@
 /**
  * @license
  * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-20
  */
 
 // Example proxy server that listens on :::8877 and only allows HTTPS connections to example.com.

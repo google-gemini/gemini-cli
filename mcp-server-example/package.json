@@ -1,0 +1,12 @@
+{
+  "name": "mcp-server-example",
+  "version": "1.0.0",
+  "description": "A simple MCP-compliant server for Gemini CLI.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

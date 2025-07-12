@@ -1,7 +1,7 @@
 /**
  * @license
  * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-20
  */
 
 import { test, describe, before, after } from 'node:test';
@@ -37,6 +37,23 @@ server.registerTool(
   }),
 );
 
+server.registerTool(
+  'divide',
+  {
+    title: 'Division Tool',
+    description: 'Divide two numbers',
+    inputSchema: { a: z.number(), b: z.number() },
+  },
+  async ({ a, b }) => {
+    if (b === 0) {
+      return { toolError: 'Division by zero' };
+    }
+    return {
+      content: [{ type: 'text', text: String(a / b) }],
+    };
+  },
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 `;
@@ -66,5 +83,11 @@ describe('simple-mcp-server', () => {
     rig.setup('should add two numbers');
     const output = rig.run('add 5 and 10');
     assert.ok(output.includes('15'));
+  });
+
+  test('should return an error when dividing by zero', () => {
+    rig.setup('should return an error when dividing by zero');
+    const output = rig.run('divide 10 by 0');
+    assert.ok(output.includes('Division by zero'));
   });
 });
