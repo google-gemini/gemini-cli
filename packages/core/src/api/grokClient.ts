@@ -1,8 +1,29 @@
 const GROK_API_BASE_URL = 'https://api.x.ai';
 
 export interface GrokMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  name?: string; // For tool messages
+  tool_call_id?: string; // For tool response messages
+  tool_calls?: GrokToolCall[]; // For assistant messages with tool calls
+}
+
+export interface GrokToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string; // JSON string
+  };
+}
+
+export interface GrokTool {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, any>; // JSON Schema
+  };
 }
 
 export interface GrokChatCompletionRequest {
@@ -13,6 +34,8 @@ export interface GrokChatCompletionRequest {
   top_p?: number;
   stream?: boolean;
   reasoning_effort?: 'low' | 'medium' | 'high';
+  tools?: GrokTool[];
+  tool_choice?: 'none' | 'auto' | { type: 'function'; function: { name: string } };
 }
 
 export interface GrokChatCompletionResponse {
@@ -24,9 +47,10 @@ export interface GrokChatCompletionResponse {
     index: number;
     message: {
       role: string;
-      content: string;
+      content: string | null;
       reasoning_content?: string;
       refusal?: string | null;
+      tool_calls?: GrokToolCall[];
     };
     finish_reason: string;
   }>;
@@ -46,7 +70,16 @@ export interface GrokStreamChunk {
     index: number;
     delta: {
       role?: string;
-      content?: string;
+      content?: string | null;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: 'function';
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
     };
     finish_reason?: string | null;
   }>;
