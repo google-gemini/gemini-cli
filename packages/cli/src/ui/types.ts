@@ -163,6 +163,7 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  TOOL_GROUP = 'tool_group',
 }
 
 // Simplified message structure for internal feedback
