@@ -6,6 +6,7 @@
 
 import { Buffer } from 'buffer';
 import * as https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import {
   StartSessionEvent,
   EndSessionEvent,
@@ -42,6 +43,7 @@ export interface LogResponse {
 export class ClearcutLogger {
   private static instance: ClearcutLogger;
   private config?: Config;
+  private proxyAgent?: HttpsProxyAgent<string>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Clearcut expects this format.
   private readonly events: any = [];
   private last_flush_time: number = Date.now();
@@ -49,6 +51,10 @@ export class ClearcutLogger {
 
   private constructor(config?: Config) {
     this.config = config;
+    const proxy = config?.getProxy();
+    if (proxy) {
+      this.proxyAgent = new HttpsProxyAgent(proxy);
+    }
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -122,12 +128,17 @@ export class ClearcutLogger {
         },
       ];
       const body = JSON.stringify(request);
-      const options = {
+      const options: https.RequestOptions = {
         hostname: 'play.googleapis.com',
         path: '/log',
         method: 'POST',
         headers: { 'Content-Length': Buffer.byteLength(body) },
       };
+
+      if (this.proxyAgent) {
+        options.agent = this.proxyAgent;
+      }
+
       const bufs: Buffer[] = [];
       const req = https.request(options, (res) => {
         res.on('data', (buf) => bufs.push(buf));
