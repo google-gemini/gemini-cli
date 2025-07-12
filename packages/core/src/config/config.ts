@@ -72,6 +72,10 @@ export interface ActiveExtension {
   version: string;
 }
 
+export interface AnnotatedExtension extends ActiveExtension {
+  isActive: boolean;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -93,6 +97,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly extensionName?: string,
   ) {}
 }
 
@@ -142,7 +147,8 @@ export interface ConfigParameters {
   extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
   listExtensions?: boolean;
-  activeExtensions?: ActiveExtension[];
+  allExtensions?: AnnotatedExtension[];
+  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
 }
 
@@ -186,7 +192,11 @@ export class Config {
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _activeExtensions: ActiveExtension[];
+  private readonly _allExtensions: AnnotatedExtension[];
+  private readonly _blockedMcpServers: Array<{
+    name: string;
+    extensionName: string;
+  }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
 
@@ -232,7 +242,8 @@ export class Config {
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.listExtensions = params.listExtensions ?? false;
-    this._activeExtensions = params.activeExtensions ?? [];
+    this._allExtensions = params.allExtensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
 
     if (params.contextFileName) {
@@ -491,7 +502,15 @@ export class Config {
   }
 
   getActiveExtensions(): ActiveExtension[] {
-    return this._activeExtensions;
+    return this._allExtensions.filter((ext) => ext.isActive);
+  }
+
+  getAllExtensions(): AnnotatedExtension[] {
+    return this._allExtensions;
+  }
+
+  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
+    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {

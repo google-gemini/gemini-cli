@@ -41,6 +41,7 @@ import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
+import { ExtensionsSummary } from './components/ExtensionsSummary.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
@@ -715,6 +716,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 version={version}
                 nightly={nightly}
               />
+              <ExtensionsSummary config={config} />
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
