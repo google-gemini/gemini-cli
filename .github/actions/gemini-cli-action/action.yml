@@ -1,0 +1,9 @@
+name: 'Gemini CLI Action'
+description: 'A GitHub Action to run the Gemini CLI'
+inputs:
+  command:
+    description: 'The command to run in the Gemini CLI'
+    required: true
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
