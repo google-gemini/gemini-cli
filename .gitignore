@@ -38,3 +38,6 @@ packages/*/coverage/
 # Generated files
 packages/cli/src/generated/
 .integration-tests/
+
+# My Personal Notes
+my-notes/
