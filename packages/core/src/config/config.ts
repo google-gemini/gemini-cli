@@ -72,6 +72,10 @@ export interface ActiveExtension {
   version: string;
 }
 
+export interface AnnotatedExtension extends ActiveExtension {
+  isActive: boolean;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -93,6 +97,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly extensionName?: string,
   ) {}
 }
 
@@ -143,6 +148,8 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
+  allExtensions?: AnnotatedExtension[];
+  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   ideMode?: boolean;
 }
@@ -189,6 +196,11 @@ export class Config {
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
   private readonly _activeExtensions: ActiveExtension[];
+  private readonly _allExtensions: AnnotatedExtension[];
+  private readonly _blockedMcpServers: Array<{
+    name: string;
+    extensionName: string;
+  }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
 
@@ -235,6 +247,8 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
+    this._allExtensions = params.allExtensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.ideMode = params.ideMode ?? false;
 
@@ -491,6 +505,14 @@ export class Config {
 
   getActiveExtensions(): ActiveExtension[] {
     return this._activeExtensions;
+  }
+
+  getAllExtensions(): AnnotatedExtension[] {
+    return this._allExtensions;
+  }
+
+  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
+    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {
