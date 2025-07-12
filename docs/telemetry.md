@@ -158,12 +158,39 @@ Gemini CLI includes comprehensive performance monitoring capabilities that provi
 
 ### Memory Monitoring
 
-The integrated MemoryMonitor system provides real-time memory tracking with automatic snapshots at key lifecycle points:
+The integrated MemoryMonitor system provides intelligent, activity-driven memory tracking with automatic snapshots at key lifecycle points. The monitoring system has been enhanced to minimize overhead while maintaining data quality through smart triggering and rate limiting.
 
-- **Startup snapshots**: Captures memory state during CLI initialization phases
-- **Operation snapshots**: Monitors memory usage during tool execution and API calls
-- **Component-specific monitoring**: Tracks memory usage by different CLI components
-- **Growth analysis**: Identifies memory leaks and usage patterns over time
+#### Activity-Driven Monitoring
+
+Memory monitoring is now **activity-aware**, recording data only when the user is actively using the CLI:
+
+- **Idle Detection**: Monitoring pauses when the user has been inactive for 30 seconds
+- **Activity Triggers**: Memory snapshots are triggered by specific user activities:
+  - User input start/end events
+  - Stream operations (start/end)
+  - Tool call scheduling and completion
+  - Message additions to history
+- **Smart Frequency**: Base monitoring occurs every 10 seconds (reduced from 5 seconds), but actual recording depends on activity and growth patterns
+
+#### High Water Mark Tracking
+
+The system uses intelligent high water mark detection to reduce noise and focus on significant memory growth:
+
+- **Growth Threshold**: Only records memory snapshots when usage increases by 5% or more compared to the previous maximum
+- **Smoothing Algorithm**: Uses a 3-sample weighted average to filter out garbage collection noise
+- **Separate Tracking**: Maintains independent high water marks for different memory types (RSS, heap used, heap total)
+- **Growth Analysis**: Identifies genuine memory leaks while ignoring temporary spikes
+
+#### Rate Limiting
+
+To respect system resources and user experience, the monitoring system includes comprehensive rate limiting:
+
+- **Standard Interval**: Maximum one memory recording per minute for normal monitoring
+- **High-Priority Events**: Critical events (potential memory leaks) are limited to once every 30 seconds
+- **Per-Metric Limiting**: Each memory metric type has independent rate limiting
+- **Context-Aware**: Different monitoring contexts (startup, periodic, activity-triggered) have separate rate limits
+
+#### Memory Metrics Tracked
 
 The memory monitor automatically tracks:
 
@@ -171,6 +198,36 @@ The memory monitor automatically tracks:
 - **External Memory**: Memory used by C++ objects bound to JavaScript
 - **RSS (Resident Set Size)**: Physical memory currently used by the process
 - **Array Buffers**: Memory used by ArrayBuffer objects
+- **Heap Size Limit**: Maximum heap size allowed by V8
+
+#### Configuration Options
+
+The enhanced memory monitoring system supports configuration through the activity monitoring system:
+
+```json
+{
+  "activityMonitoring": {
+    "enabled": true,
+    "snapshotThrottleMs": 1000,
+    "maxEventBuffer": 100,
+    "triggerActivities": [
+      "user_input_start",
+      "message_added", 
+      "tool_call_scheduled",
+      "stream_start"
+    ]
+  }
+}
+```
+
+#### Performance Impact
+
+The enhanced monitoring system significantly reduces telemetry overhead:
+
+- **Frequency Reduction**: ~80-90% reduction in memory recordings compared to continuous monitoring
+- **Activity Gating**: Zero recordings during inactive periods
+- **Smart Triggering**: Only records when meaningful changes occur
+- **Resource Efficiency**: Minimal CPU and memory overhead for tracking logic
 
 ### Performance Scoring and Regression Detection
 
