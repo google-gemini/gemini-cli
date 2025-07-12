@@ -42,6 +42,7 @@ import {
   isPerformanceMonitoringActive,
   startGlobalMemoryMonitoring,
   recordCurrentMemoryUsage,
+  recordUserActivity,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -226,6 +227,7 @@ export async function main() {
   if (isPerformanceMonitoringActive()) {
     startGlobalMemoryMonitoring(config, 10000); // Monitor every 10 seconds
     recordCurrentMemoryUsage(config, 'startup_post_config');
+    recordUserActivity(); // Record initial activity
   }
 
   const consolePatcher = new ConsolePatcher({
