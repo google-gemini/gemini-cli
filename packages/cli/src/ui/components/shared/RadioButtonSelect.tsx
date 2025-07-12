@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Text, Box } from 'ink';
+import React, { useEffect, useRef } from 'react';
+import { Text, Box, useInput } from 'ink';
 import SelectInput, {
   type ItemProps as InkSelectItemProps,
-  type IndicatorProps as InkSelectIndicatorProps,
 } from 'ink-select-input';
 import { Colors } from '../../colors.js';
 
@@ -46,6 +45,9 @@ export interface RadioButtonSelectProps<T> {
 
   /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
+
+  /** Whether to show numbers next to the options. */
+  showNumbers?: boolean;
 }
 
 /**
@@ -60,7 +62,48 @@ export function RadioButtonSelect<T>({
   onSelect,
   onHighlight,
   isFocused, // This prop indicates if the current RadioButtonSelect group is focused
+  showNumbers = items.length < 10,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
+  const inputBuffer = useRef('');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    },
+    [],
+  );
+
+  useInput((input, key) => {
+    if (!isFocused || !showNumbers || key.meta || key.ctrl) {
+      return;
+    }
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    if (/\d/.test(input)) {
+      inputBuffer.current += input;
+
+      // Allows for multi-digit input i.e. '10' or greater
+      timerRef.current = setTimeout(() => {
+        const num = parseInt(inputBuffer.current, 10);
+        if (!isNaN(num) && num > 0 && num <= items.length) {
+          const selectedItem = items[num - 1];
+          if (selectedItem && !selectedItem.disabled) {
+            onSelect(selectedItem.value);
+          }
+        }
+        inputBuffer.current = '';
+      }, 350);
+    } else {
+      inputBuffer.current = '';
+    }
+  });
+
   const handleSelect = (item: RadioSelectItem<T>) => {
     onSelect(item.value);
   };
@@ -71,19 +114,10 @@ export function RadioButtonSelect<T>({
   };
 
   /**
-   * Custom indicator component displaying radio button style (◉/○).
-   * Color changes based on whether the item is selected and if its group is focused.
+   * Custom indicator component that is empty because the CustomThemeItemComponent will render the indicator.
    */
-  function DynamicRadioIndicator({
-    isSelected = false,
-  }: InkSelectIndicatorProps): React.JSX.Element {
-    return (
-      <Box minWidth={2} flexShrink={0}>
-        <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
-          {isSelected ? '●' : '○'}
-        </Text>
-      </Box>
-    );
+  function EmptyIndicator(): React.JSX.Element {
+    return <Box />;
   }
 
   /**
@@ -95,10 +129,18 @@ export function RadioButtonSelect<T>({
     props: InkSelectItemProps,
   ): React.JSX.Element {
     const { isSelected = false, label } = props;
-    const itemWithThemeProps = props as typeof props & {
+
+    const itemIndex = items.findIndex((item) => item.label === label);
+    const currentItem = itemIndex !== -1 ? items[itemIndex] : undefined;
+
+    // Fallback for safety, though should not happen in normal use.
+    if (!currentItem) {
+      return <Text>{label}</Text>;
+    }
+
+    const itemWithThemeProps = currentItem as typeof currentItem & {
       themeNameDisplay?: string;
       themeTypeDisplay?: string;
-      disabled?: boolean;
     };
 
     let textColor = Colors.Foreground;
@@ -108,29 +150,39 @@ export function RadioButtonSelect<T>({
       textColor = Colors.Gray;
     }
 
-    if (
-      itemWithThemeProps.themeNameDisplay &&
-      itemWithThemeProps.themeTypeDisplay
-    ) {
-      return (
-        <Text color={textColor} wrap="truncate">
-          {itemWithThemeProps.themeNameDisplay}{' '}
-          <Text color={Colors.Gray}>{itemWithThemeProps.themeTypeDisplay}</Text>
-        </Text>
-      );
-    }
+    const numberPrefix = showNumbers ? `[${itemIndex + 1}] ` : '';
+    const indicator = isSelected ? '●' : '○';
+
+    const content = itemWithThemeProps.themeNameDisplay ? (
+      <>
+        {itemWithThemeProps.themeNameDisplay}{' '}
+        <Text color={Colors.Gray}>{itemWithThemeProps.themeTypeDisplay}</Text>
+      </>
+    ) : (
+      label
+    );
 
     return (
-      <Text color={textColor} wrap="truncate">
-        {label}
-      </Text>
+      <Box>
+        <Box minWidth={showNumbers ? 4 : 0}>
+          <Text color={Colors.Gray}>{numberPrefix}</Text>
+        </Box>
+        <Box minWidth={2}>
+          <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+            {indicator}
+          </Text>
+        </Box>
+        <Text color={textColor} wrap="truncate">
+          {content}
+        </Text>
+      </Box>
     );
   }
 
   initialIndex = initialIndex ?? 0;
   return (
     <SelectInput
-      indicatorComponent={DynamicRadioIndicator}
+      indicatorComponent={EmptyIndicator}
       itemComponent={CustomThemeItemComponent}
       items={items}
       initialIndex={initialIndex}
