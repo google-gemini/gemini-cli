@@ -243,13 +243,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'theme',
-        description: 'change the theme',
-        action: (_mainCommand, _subCommand, _args) => {
-          openThemeDialog();
-        },
-      },
-      {
         name: 'auth',
         description: 'change the auth method',
         action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
@@ -483,6 +476,34 @@ export const useSlashCommandProcessor = (
             message += '\n';
           }
 
+          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
+          message += '\u001b[0m';
+
+          addMessage({
+            type: MessageType.INFO,
+            content: message,
+            timestamp: new Date(),
+          });
+        },
+      },
+      {
+        name: 'extensions',
+        description: 'list active extensions',
+        action: async () => {
+          const activeExtensions = config?.getActiveExtensions();
+          if (!activeExtensions || activeExtensions.length === 0) {
+            addMessage({
+              type: MessageType.INFO,
+              content: 'No active extensions.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          let message = 'Active extensions:\n\n';
+          for (const ext of activeExtensions) {
+            message += `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m\n`;
+          }
           // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
           message += '\u001b[0m';
 
@@ -852,7 +873,8 @@ export const useSlashCommandProcessor = (
           try {
             const compressed = await config!
               .getGeminiClient()!
-              .tryCompressChat(true);
+              // TODO: Set Prompt id for CompressChat from SlashCommandProcessor.
+              .tryCompressChat('Prompt Id not set', true);
             if (compressed) {
               addMessage({
                 type: MessageType.COMPRESSION,
@@ -1005,7 +1027,6 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openThemeDialog,
     openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
@@ -1104,6 +1125,9 @@ export const useSlashCommandProcessor = (
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
+                  case 'theme':
+                    openThemeDialog();
+                    return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
                     throw new Error(
@@ -1185,6 +1209,7 @@ export const useSlashCommandProcessor = (
       legacyCommands,
       commandContext,
       addMessage,
+      openThemeDialog,
     ],
   );
 

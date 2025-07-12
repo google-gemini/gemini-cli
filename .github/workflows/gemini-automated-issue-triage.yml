@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: generate_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
@@ -55,12 +55,6 @@ jobs:
             3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
             4. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
             5. If the issue has a "status/need-triage" label, remove it after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/need-triage"`
-
-            Guidelines:
-            - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
-            - Triage only the current issue.
-            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.
 
             Guidelines:
             - Only use labels that already exist in the repository.
