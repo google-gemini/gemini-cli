@@ -354,7 +354,7 @@ Use this tool when the user's query implies needing the content of several files
         .relative(toolBaseDir, filePath)
         .replace(/\\/g, '/');
 
-      const fileType = detectFileType(filePath);
+      const fileType = await detectFileType(filePath);
 
       if (fileType === 'image' || fileType === 'pdf') {
         const fileExtension = path.extname(filePath).toLowerCase();
