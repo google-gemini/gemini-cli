@@ -149,6 +149,7 @@ describe('useSlashCommandProcessor', () => {
       getGeminiClient: () => mockGeminiClient,
       getSandbox: vi.fn(() => 'test-sandbox'),
       getModel: vi.fn(() => 'test-model'),
+      setModel: vi.fn(),
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
@@ -568,6 +569,44 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
+    });
+
+    it('/model should change the model and return true', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      const newModel = 'new-model-name';
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/model ${newModel}`);
+      });
+      expect(mockConfig.setModel).toHaveBeenCalledWith(newModel);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Model changed to ${newModel}`,
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
+    });
+
+    it('/model should change the model with spaces in the name and return true', async () => {
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandActionReturn | boolean = false;
+      const newModel = 'my custom model';
+      await act(async () => {
+        commandResult = await handleSlashCommand(`/model ${newModel}`);
+      });
+      expect(mockConfig.setModel).toHaveBeenCalledWith(newModel);
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Model changed to ${newModel}`,
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toBe(true);
     });
   });
 
