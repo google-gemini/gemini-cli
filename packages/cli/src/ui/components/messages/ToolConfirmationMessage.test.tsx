@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
+import { SudoProvider } from '../../contexts/SudoContext.js';
 
 describe('ToolConfirmationMessage', () => {
   it('should not display urls if prompt and url are the same', () => {
@@ -20,11 +22,13 @@ describe('ToolConfirmationMessage', () => {
     };
 
     const { lastFrame } = render(
-      <ToolConfirmationMessage
-        confirmationDetails={confirmationDetails}
-        availableTerminalHeight={30}
-        terminalWidth={80}
-      />,
+      <SudoProvider>
+        <ToolConfirmationMessage
+          confirmationDetails={confirmationDetails}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />
+      </SudoProvider>,
     );
 
     expect(lastFrame()).not.toContain('URLs to fetch:');
@@ -43,11 +47,13 @@ describe('ToolConfirmationMessage', () => {
     };
 
     const { lastFrame } = render(
-      <ToolConfirmationMessage
-        confirmationDetails={confirmationDetails}
-        availableTerminalHeight={30}
-        terminalWidth={80}
-      />,
+      <SudoProvider>
+        <ToolConfirmationMessage
+          confirmationDetails={confirmationDetails}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />
+      </SudoProvider>,
     );
 
     expect(lastFrame()).toContain('URLs to fetch:');
