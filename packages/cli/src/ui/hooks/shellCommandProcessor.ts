@@ -278,7 +278,7 @@ function executeShellCommand(
     child.on('exit', (code, signal) => {
       exited = true;
       abortSignal.removeEventListener('abort', abortHandler);
-      
+
       // Handle any final bytes lingering in the decoders
       if (stdoutDecoder) {
         stdoutDecoder.decode();
