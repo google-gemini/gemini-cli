@@ -126,8 +126,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
-  const [corgiMode, setCorgiMode] = useState(false);
-  const [pomeMode, setPomeMode] = useState(false);
+  const [activeMode, setActiveMode] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -211,12 +210,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     exitEditorDialog,
   } = useEditorSettings(settings, setEditorError, addItem);
 
-  const toggleCorgiMode = useCallback(() => {
-    setCorgiMode((prev) => !prev);
-  }, []);
-
-  const togglePomeMode = useCallback(() => {
-    setPomeMode((prev) => !prev);
+  const toggleMode = useCallback((modeName: string) => {
+    setActiveMode((prev) => (prev === modeName ? null : modeName));
   }, []);
 
   const performMemoryRefresh = useCallback(async () => {
@@ -376,8 +371,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
-    toggleCorgiMode,
-    togglePomeMode,
+    toggleMode,
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
@@ -971,8 +965,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             debugMode={config.getDebugMode()}
             branchName={branchName}
             debugMessage={debugMessage}
-            corgiMode={corgiMode}
-            pomeMode={pomeMode}
+            activeMode={activeMode}
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}
             showMemoryUsage={

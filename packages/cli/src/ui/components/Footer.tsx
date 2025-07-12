@@ -19,8 +19,7 @@ interface FooterProps {
   branchName?: string;
   debugMode: boolean;
   debugMessage: string;
-  corgiMode: boolean;
-  pomeMode: boolean;
+  activeMode: string | null;
   errorCount: number;
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
@@ -34,8 +33,7 @@ export const Footer: React.FC<FooterProps> = ({
   branchName,
   debugMode,
   debugMessage,
-  corgiMode,
-  pomeMode,
+  activeMode,
   errorCount,
   showErrorDetails,
   showMemoryUsage,
@@ -43,6 +41,27 @@ export const Footer: React.FC<FooterProps> = ({
   nightly,
 }) => {
   const limit = tokenLimit(model);
+  const modeAsciiArt: Record<string, React.ReactNode> = {
+    corgi: (
+      <Text>
+        <Text color={Colors.Gray}>| </Text>
+        <Text color={Colors.AccentRed}>▼</Text>
+        <Text color={Colors.Foreground}>(´</Text>
+        <Text color={Colors.AccentRed}>ᴥ</Text>
+        <Text color={Colors.Foreground}>`)</Text>
+        <Text color={Colors.AccentRed}>▼ </Text>
+      </Text>
+    ),
+    pome: (
+      <Text>
+        <Text color={Colors.Gray}>| </Text>
+        <Text color={Colors.AccentRed}> </Text>
+        <Text color={Colors.Foreground}> ૮ ´• ﻌ •` ა </Text>
+        <Text color={Colors.AccentRed}> </Text>
+      </Text>
+    ),
+  };
+
   const percentage = promptTokenCount / limit;
 
   return (
@@ -100,24 +119,7 @@ export const Footer: React.FC<FooterProps> = ({
             ({((1 - percentage) * 100).toFixed(0)}% context left)
           </Text>
         </Text>
-        {corgiMode && (
-          <Text>
-            <Text color={Colors.Gray}>| </Text>
-            <Text color={Colors.AccentRed}>▼</Text>
-            <Text color={Colors.Foreground}>(´</Text>
-            <Text color={Colors.AccentRed}>ᴥ</Text>
-            <Text color={Colors.Foreground}>`)</Text>
-            <Text color={Colors.AccentRed}>▼ </Text>
-          </Text>
-        )}
-        {pomeMode && (
-          <Text>
-            <Text color={Colors.Gray}>| </Text>
-            <Text color={Colors.AccentRed}> </Text>
-            <Text color={Colors.Foreground}> ૮ ´• ﻌ •` ა </Text>
-            <Text color={Colors.AccentRed}> </Text>
-          </Text>
-        )}
+        {activeMode && modeAsciiArt[activeMode]}
         {!showErrorDetails && errorCount > 0 && (
           <Box>
             <Text color={Colors.Gray}>| </Text>

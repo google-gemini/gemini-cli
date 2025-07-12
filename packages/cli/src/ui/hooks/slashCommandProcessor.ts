@@ -73,8 +73,7 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
-  toggleCorgiMode: () => void,
-  togglePomeMode: () => void,
+  toggleMode: (modeName: string) => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
@@ -589,18 +588,7 @@ export const useSlashCommandProcessor = (
           });
         },
       },
-      {
-        name: 'corgi',
-        action: (_mainCommand, _subCommand, _args) => {
-          toggleCorgiMode();
-        },
-      },
-      {
-        name: 'pome',
-        action: (_mainCommand, _subCommand, _args) => {
-          togglePomeMode();
-        },
-      },
+
       {
         name: 'about',
         description: 'show version info',
@@ -1031,14 +1019,24 @@ export const useSlashCommandProcessor = (
         },
       });
     }
+
+    const modes = ['corgi', 'pome'];
+    modes.forEach((mode) => {
+      commands.push({
+        name: mode,
+        action: () => {
+          toggleMode(mode);
+        },
+      });
+    });
+
     return commands;
   }, [
     addMessage,
     openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
-    toggleCorgiMode,
-    togglePomeMode,
+    toggleMode,
     savedChatTags,
     config,
     settings,
