@@ -5,7 +5,7 @@
  */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
@@ -13,8 +13,26 @@ import { AuthType } from '@google/gemini-cli-core';
 describe('AuthDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  let originalEnv: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    process.env.GEMINI_API_KEY = '';
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   it('should show an error if the initial auth type is invalid', () => {
+    process.env.GEMINI_API_KEY = '';
+
     const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
       {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
@@ -41,9 +59,37 @@ describe('AuthDialog', () => {
     );
   });
 
+  it('should detect GEMINI_API_KEY environment variable', () => {
+    process.env.GEMINI_API_KEY = 'foobar';
+
+    const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {
+          selectedAuthType: undefined,
+        },
+        path: '',
+      },
+      {
+        settings: {},
+        path: '',
+      },
+      [],
+    );
+
+    const { lastFrame } = render(
+      <AuthDialog onSelect={() => {}} settings={settings} />,
+    );
+
+    expect(lastFrame()).toContain('Existing API key detected (GEMINI_API_KEY)');
+  });
+
   it('should prevent exiting when no auth method is selected and show error message', async () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
       {
         settings: {
           selectedAuthType: undefined,
@@ -74,9 +120,47 @@ describe('AuthDialog', () => {
     unmount();
   });
 
+  it('should not exit if there is already an error message', async () => {
+    const onSelect = vi.fn();
+    const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
+      {
+        settings: {},
+        path: '',
+      },
+      [],
+    );
+
+    const { lastFrame, stdin, unmount } = render(
+      <AuthDialog
+        onSelect={onSelect}
+        settings={settings}
+        initialErrorMessage="Initial error"
+      />,
+    );
+    await wait();
+
+    expect(lastFrame()).toContain('Initial error');
+
+    // Simulate pressing escape key
+    stdin.write('\u001b'); // ESC key
+    await wait();
+
+    // Should not call onSelect
+    expect(onSelect).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should allow exiting when auth method is already selected', async () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
+      {
+        settings: {},
+        path: '',
+      },
       {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
