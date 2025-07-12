@@ -286,11 +286,11 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
 
-After your reasoning is complete, generate the final <compressed_chat_history> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
 
 The structure MUST be as follows:
 
-<compressed_chat_history>
+<state_snapshot>
     <overall_goal>
         <!-- A single, concise sentence describing the user's high-level objective. -->
         <!-- Example: "Refactor the authentication service to use a new JWT library." -->
@@ -334,6 +334,6 @@ The structure MUST be as follows:
          4. [TODO] Update tests to reflect the API change.
         -->
     </current_plan>
-</compressed_chat_history>
+</state_snapshot>
 `.trim();
 }
