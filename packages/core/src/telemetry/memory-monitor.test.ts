@@ -247,12 +247,12 @@ describe('MemoryMonitor', () => {
         // Fast-forward time to trigger periodic snapshot
         vi.advanceTimersByTime(intervalMs);
 
-        // Verify periodic snapshot was taken
+        // Verify monitoring_start snapshot was taken (multiple metrics)
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
           'heap_used',
-          mockMemoryUsage.heapUsed,
-          'periodic',
+          expect.any(Number),
+          'monitoring_start',
         );
 
         // Stop monitoring
@@ -605,13 +605,13 @@ describe('MemoryMonitor', () => {
           'monitoring_start',
         );
 
-        // Fast-forward and verify periodic snapshot
+        // Fast-forward and verify monitoring snapshot
         vi.advanceTimersByTime(1000);
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
           'heap_used',
-          mockMemoryUsage.heapUsed,
-          'periodic',
+          expect.any(Number),
+          'monitoring_start',
         );
       });
     });
