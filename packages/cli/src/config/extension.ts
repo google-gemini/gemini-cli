@@ -34,9 +34,6 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
     if (!uniqueExtensions.has(extension.config.name)) {
-      console.log(
-        `Loading extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
       uniqueExtensions.set(extension.config.name, extension);
     }
   }
@@ -135,9 +132,6 @@ export function annotateActiveExtensions(
     lowerCaseEnabledExtensions.size === 1 &&
     lowerCaseEnabledExtensions.has('none')
   ) {
-    if (extensions.length > 0) {
-      console.log('All extensions are disabled.');
-    }
     return extensions.map((extension) => ({
       name: extension.config.name,
       version: extension.config.version,
@@ -152,12 +146,7 @@ export function annotateActiveExtensions(
     const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
 
     if (isActive) {
-      console.log(
-        `Activated extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
       notFoundNames.delete(lowerCaseName);
-    } else {
-      console.log(`Disabled extension: ${extension.config.name}`);
     }
 
     annotatedExtensions.push({
@@ -168,7 +157,7 @@ export function annotateActiveExtensions(
   }
 
   for (const requestedName of notFoundNames) {
-    console.log(`Extension not found: ${requestedName}`);
+    console.error(`Extension not found: ${requestedName}`);
   }
 
   return annotatedExtensions;
