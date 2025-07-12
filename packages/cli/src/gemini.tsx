@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig } from './config/config.js';
+import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -102,8 +102,21 @@ export async function main() {
     process.exit(1);
   }
 
+  const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    sessionId,
+    argv,
+  );
+
+  if (argv.promptInteractive && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
+    );
+    process.exit(1);
+  }
 
   if (config.getListExtensions()) {
     console.log('Installed extensions:');
@@ -182,8 +195,11 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
+  const shouldBeInteractive =
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
+
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (process.stdin.isTTY && input?.length === 0) {
+  if (shouldBeInteractive) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
     render(
@@ -224,6 +240,7 @@ export async function main() {
     config,
     extensions,
     settings,
+    argv,
   );
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
@@ -264,6 +281,7 @@ async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
+  argv: CliArgs,
 ) {
   let finalConfig = config;
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
@@ -287,6 +305,7 @@ async function loadNonInteractiveConfig(
       nonInteractiveSettings,
       extensions,
       config.getSessionId(),
+      argv,
     );
     await finalConfig.initialize();
   }
