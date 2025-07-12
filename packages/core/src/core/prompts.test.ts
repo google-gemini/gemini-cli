@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 
 // Mock tool names if they are dynamically generated or complex
@@ -26,6 +26,22 @@ vi.mock('../tools/write-file', () => ({
 vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
+
+describe('getCompressionPrompt', () => {
+  it('should include the character limit when it is greater than 0', () => {
+    const prompt = getCompressionPrompt(100);
+    expect(prompt).toContain(
+      'The <compressed_chat_history> XML object, MUST have a total character count of around 100.',
+    );
+  });
+
+  it('should not include the character limit when it is 0', () => {
+    const prompt = getCompressionPrompt(0);
+    expect(prompt).not.toContain(
+      'The <compressed_chat_history> XML object, MUST have a total character count of around 0.',
+    );
+  });
+});
 
 describe('Core System Prompt (prompts.ts)', () => {
   it('should return the base prompt when no userMemory is provided', () => {
