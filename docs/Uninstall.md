@@ -1,8 +1,8 @@
-## Uninstalling the CLI
+# Uninstalling the CLI
 
 Your uninstall method depends on how you ran the CLI. Follow the instructions for either npx or a global npm installation.
 
-### Method 1: Using npx
+## Method 1: Using npx
 
 npx runs packages from a temporary cache without a permanent installation. To "uninstall" the CLI, you must clear this cache, which will remove gemini-cli and any other packages previously executed with npx.
 
@@ -31,7 +31,7 @@ _PowerShell_
 Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
 ```
 
-### Method 2: Using npm (Global Install)
+## Method 2: Using npm (Global Install)
 
 If you installed the CLI globally (e.g., `npm install -g @google/gemini-cli`), use the `npm uninstall` command with the `-g` flag to remove it.
 
