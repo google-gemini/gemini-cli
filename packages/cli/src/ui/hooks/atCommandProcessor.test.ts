@@ -128,6 +128,46 @@ describe('handleAtCommand', () => {
     expect(mockReadManyFilesExecute).not.toHaveBeenCalled();
   });
 
+  it('should try to read a file even if it is invalid, letting the tool handle the error', async () => {
+    const query = 'Check @nonexistent.txt and @ also';
+    vi.mocked(fsPromises.stat).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
+    mockGlobExecute.mockResolvedValue({
+      llmContent: 'No files found',
+      returnDisplay: '',
+    });
+    // This time, read_many_files will be called, and it will fail internally
+    mockReadManyFilesExecute.mockResolvedValue({
+      llmContent: ['No files matching the criteria were found or all were skipped.'],
+      returnDisplay: 'No files were read and concatenated based on the criteria.',
+    });
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 133,
+      signal: abortController.signal,
+    });
+    
+    // It should now call the tool with the path the user provided.
+    expect(mockReadManyFilesExecute).toHaveBeenCalledWith(
+        { paths: ['nonexistent.txt'], respect_git_ignore: true },
+        abortController.signal,
+    );
+
+    // And the final query should reflect that it tried.
+    expect(result.processedQuery).toEqual([
+        { text: "Check @nonexistent.txt and @ also" },
+        { text: "\n--- Content from referenced files ---" },
+        { text: "No files matching the criteria were found or all were skipped." },
+        { text: "\n--- End of content ---" },
+    ]);
+    expect(result.shouldProceed).toBe(true);
+  });
+
   it('should pass through original query if only a lone @ symbol is present', async () => {
     const queryWithSpaces = '  @  ';
     const result = await handleAtCommand({

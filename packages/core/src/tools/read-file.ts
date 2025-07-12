@@ -53,7 +53,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     super(
       ReadFileTool.Name,
       'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
+      'Reads and returns the content of a specified file from the local filesystem. Handles text, image, PDF, audio, and video files. For text files, it can read specific line ranges.',
       {
         properties: {
           absolute_path: {
