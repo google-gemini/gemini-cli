@@ -62,6 +62,7 @@ describe('editor utils', () => {
       { editor: 'vim', command: 'vim', win32Command: 'vim' },
       { editor: 'neovim', command: 'nvim', win32Command: 'nvim' },
       { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'emacs', command: 'emacs', win32Command: 'emacs.exe' },
     ];
 
     for (const { editor, command, win32Command } of testCases) {
@@ -176,6 +177,14 @@ describe('editor utils', () => {
       });
     }
 
+    it('should return the correct command for emacs', () => {
+      const command = getDiffCommand('old.txt', 'new.txt', 'emacs');
+      expect(command).toEqual({
+        command: 'emacs',
+        args: ['--eval', '(ediff "old.txt" "new.txt")'],
+      });
+    });
+
     it('should return null for an unsupported editor', () => {
       // @ts-expect-error Testing unsupported editor
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
@@ -251,7 +260,7 @@ describe('editor utils', () => {
       });
     }
 
-    const execSyncEditors: EditorType[] = ['vim', 'neovim'];
+    const execSyncEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
     for (const editor of execSyncEditors) {
       it(`should call execSync for ${editor} on non-windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
@@ -302,6 +311,15 @@ describe('editor utils', () => {
 
     it('should allow vim when not in sandbox mode', () => {
       expect(allowEditorTypeInSandbox('vim')).toBe(true);
+    });
+
+    it('should allow emacs in sandbox mode', () => {
+      process.env.SANDBOX = 'sandbox';
+      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
+    });
+
+    it('should allow emacs when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
     });
 
     it('should allow neovim in sandbox mode', () => {
@@ -368,6 +386,11 @@ describe('editor utils', () => {
       process.env.SANDBOX = 'sandbox';
       expect(isEditorAvailable('vim')).toBe(true);
     });
+
+    it('should return true for emacs when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
+      process.env.SANDBOX = 'sandbox';
+      expect(isEditorAvailable('emacs')).toBe(true);
 
     it('should return true for neovim when installed and in sandbox mode', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
