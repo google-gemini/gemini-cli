@@ -54,7 +54,7 @@ export const useAuthCommand = (
     async (authType: AuthType | undefined, scope: SettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
-        settings.setValue(scope, 'selectedAuthType', authType);
+        settings.setValue(scope, 'selectedAuthType', authType as AuthType);
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
