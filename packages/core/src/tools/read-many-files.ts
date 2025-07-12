@@ -390,7 +390,7 @@ Use this tool when the user's query implies needing the content of several files
         if (typeof fileReadResult.llmContent === 'string') {
           const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
             '{filePath}',
-            relativePathForDisplay,
+            filePath,
           );
           contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
         } else {
