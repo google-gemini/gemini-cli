@@ -155,8 +155,13 @@ export async function handleAtCommand({
     return { processedQuery: null, shouldProceed: false };
   }
 
-  for (const atPathPart of atPathCommandParts) {
-    const originalAtPath = atPathPart.content; // e.g., "@file.txt" or "@"
+  for (
+    let atPathIndex = 0;
+    atPathIndex < atPathCommandParts.length;
+    atPathIndex++
+  ) {
+    const atPathPart = atPathCommandParts[atPathIndex];
+    const originalAtPath = atPathPart.content; // e.g., "@file.txt" or "@" or "@url"
 
     if (originalAtPath === '@') {
       onDebugMessage(
@@ -166,6 +171,33 @@ export async function handleAtCommand({
     }
 
     const pathName = originalAtPath.substring(1);
+
+    // Check if this is a @url command
+    if (pathName.toLowerCase() === 'url') {
+      // Check if the full query contains a URL
+      let urlFound = false;
+      const urls = query.match(/(https?:\/\/[^\s]+)/g);
+      if (urls && urls.length > 0) {
+        urlFound = true;
+      }
+
+      if (urlFound) {
+        // Let the original query pass through - Gemini will handle the URL fetching
+        onDebugMessage(
+          '@url command detected, passing through to Gemini for processing.',
+        );
+        continue;
+      } else {
+        addItem(
+          {
+            type: 'error',
+            text: `Error: @url command requires a URL. Usage: @url https://example.com`,
+          },
+          userMessageTimestamp,
+        );
+        return { processedQuery: null, shouldProceed: false };
+      }
+    }
     if (!pathName) {
       // This case should ideally not be hit if parseAllAtCommands ensures content after @
       // but as a safeguard:
