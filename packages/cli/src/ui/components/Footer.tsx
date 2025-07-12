@@ -20,6 +20,7 @@ interface FooterProps {
   debugMode: boolean;
   debugMessage: string;
   corgiMode: boolean;
+  pomeMode: boolean;
   errorCount: number;
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
@@ -34,6 +35,7 @@ export const Footer: React.FC<FooterProps> = ({
   debugMode,
   debugMessage,
   corgiMode,
+  pomeMode,
   errorCount,
   showErrorDetails,
   showMemoryUsage,
@@ -106,6 +108,14 @@ export const Footer: React.FC<FooterProps> = ({
             <Text color={Colors.AccentRed}>ᴥ</Text>
             <Text color={Colors.Foreground}>`)</Text>
             <Text color={Colors.AccentRed}>▼ </Text>
+          </Text>
+        )}
+        {pomeMode && (
+          <Text>
+            <Text color={Colors.Gray}>| </Text>
+            <Text color={Colors.AccentRed}> </Text>
+            <Text color={Colors.Foreground}> ૮ ´• ﻌ •` ა </Text>
+            <Text color={Colors.AccentRed}> </Text>
           </Text>
         )}
         {!showErrorDetails && errorCount > 0 && (

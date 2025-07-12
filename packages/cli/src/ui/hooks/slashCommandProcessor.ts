@@ -74,6 +74,7 @@ export const useSlashCommandProcessor = (
   openAuthDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
+  togglePomeMode: () => void,
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
@@ -595,6 +596,12 @@ export const useSlashCommandProcessor = (
         },
       },
       {
+        name: 'pome',
+        action: (_mainCommand, _subCommand, _args) => {
+          togglePomeMode();
+        },
+      },
+      {
         name: 'about',
         description: 'show version info',
         action: async (_mainCommand, _subCommand, _args) => {
@@ -1031,6 +1038,7 @@ export const useSlashCommandProcessor = (
     openEditorDialog,
     openPrivacyNotice,
     toggleCorgiMode,
+    togglePomeMode,
     savedChatTags,
     config,
     settings,
