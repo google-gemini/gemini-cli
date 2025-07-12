@@ -71,6 +71,10 @@ export interface OpenDialogActionReturn {
   dialog: 'help' | 'theme';
 }
 
+/**
+ * The return type for a command action that results in replacing
+ * the entire conversation history.
+ */
 export interface LoadHistoryActionReturn {
   type: 'load_history';
   history: HistoryItemWithoutId[];
