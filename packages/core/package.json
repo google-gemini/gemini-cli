@@ -37,6 +37,7 @@
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
+    "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
     "micromatch": "^4.0.8",
     "open": "^10.1.2",

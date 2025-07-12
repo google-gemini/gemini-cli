@@ -73,6 +73,9 @@ export async function getOauthClient(
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
+    transporterOptions: {
+      proxy: config.getProxy(),
+    },
   });
 
   client.on('tokens', async (tokens: Credentials) => {
