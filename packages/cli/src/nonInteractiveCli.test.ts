@@ -53,6 +53,7 @@ describe('runNonInteractive', () => {
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
+      getMaxSessionTurns: vi.fn().mockReturnValue(10),
       initialize: vi.fn(),
     } as unknown as Config;
 
@@ -293,5 +294,51 @@ describe('runNonInteractive', () => {
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
       'Unfortunately the tool does not exist.',
     );
+  });
+
+  it('should exit when max session turns are exceeded', async () => {
+    const functionCall: FunctionCall = {
+      id: 'fcLoop',
+      name: 'loopTool',
+      args: {},
+    };
+    const toolResponsePart: Part = {
+      functionResponse: {
+        name: 'loopTool',
+        id: 'fcLoop',
+        response: { result: 'still looping' },
+      },
+    };
+
+    // Config with a max turn of 1
+    vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(1);
+
+    const { executeToolCall: mockCoreExecuteToolCall } = await import(
+      '@google/gemini-cli-core'
+    );
+    vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
+      callId: 'fcLoop',
+      responseParts: [toolResponsePart],
+      resultDisplay: 'Still looping',
+      error: undefined,
+    });
+
+    const stream = (async function* () {
+      yield { functionCalls: [functionCall] } as GenerateContentResponse;
+    })();
+
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await runNonInteractive(mockConfig, 'Trigger loop');
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      `
+ Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.`,
+    );
+    expect(mockProcessExit).not.toHaveBeenCalled();
   });
 });
