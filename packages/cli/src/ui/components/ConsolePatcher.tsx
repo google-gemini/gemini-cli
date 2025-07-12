@@ -11,13 +11,18 @@ import { ConsoleMessageItem } from '../types.js';
 interface UseConsolePatcherParams {
   onNewMessage: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
+  enabled?: boolean;
 }
 
 export const useConsolePatcher = ({
   onNewMessage,
   debugMode,
+  enabled = true,
 }: UseConsolePatcherParams): void => {
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     const originalConsoleLog = console.log;
     const originalConsoleWarn = console.warn;
     const originalConsoleError = console.error;
@@ -56,5 +61,5 @@ export const useConsolePatcher = ({
       console.error = originalConsoleError;
       console.debug = originalConsoleDebug;
     };
-  }, [onNewMessage, debugMode]);
+  }, [onNewMessage, debugMode, enabled]);
 };

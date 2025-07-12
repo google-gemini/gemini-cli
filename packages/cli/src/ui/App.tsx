@@ -44,6 +44,7 @@ import { Tips } from './components/Tips.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
+import { earlyConsoleBuffer } from '../utils/earlyConsoleBuffer.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
@@ -144,6 +145,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [enableConsolePatcher, setEnableConsolePatcher] = useState(false);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -470,9 +472,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   });
 
+  useEffect(() => {
+    const bufferedMessages = earlyConsoleBuffer.getBufferedMessages();
+    bufferedMessages.forEach((message) => {
+      handleNewMessage(message);
+    });
+
+    earlyConsoleBuffer.stop();
+    earlyConsoleBuffer.clear();
+
+    // Enable the console patcher after stopping early buffer
+    setEnableConsolePatcher(true);
+  }, [handleNewMessage]);
+
   useConsolePatcher({
     onNewMessage: handleNewMessage,
     debugMode: config.getDebugMode(),
+    enabled: enableConsolePatcher,
   });
 
   useEffect(() => {

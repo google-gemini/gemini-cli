@@ -30,6 +30,16 @@ vi.mock('./config/settings.js', async (importOriginal) => {
   };
 });
 
+// Mock earlyConsoleBuffer to prevent it from interfering with console spies
+vi.mock('./utils/earlyConsoleBuffer.js', () => ({
+  earlyConsoleBuffer: {
+    start: vi.fn(),
+    stop: vi.fn(),
+    clear: vi.fn(),
+    getBufferedMessages: vi.fn(() => []),
+  },
+}));
+
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     config: {

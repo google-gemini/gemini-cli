@@ -276,6 +276,16 @@ async function connectAndDiscover(
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   };
 
+  if (transport instanceof StdioClientTransport && transport.stderr) {
+    transport.stderr.on('data', (data) => {
+      const stderrStr = data.toString();
+      // Filter out verbose INFO logs from some MCP servers
+      if (!stderrStr.includes('] INFO')) {
+        console.log(`MCP STDERR (${mcpServerName}):`, stderrStr);
+      }
+    });
+  }
+
   try {
     const mcpCallableTool = mcpToTool(mcpClient);
     const tool = await mcpCallableTool.tool();
