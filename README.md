@@ -88,6 +88,18 @@ gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
 
+### Work with local files
+
+You can pipe local file content directly into the Gemini CLI for analysis, summarization, and more. This is the recommended way to work with files in scripts or automated workflows.
+
+**Important:** When piping content to `gemini`, the piped data becomes the entire prompt. Any prompt provided as a command-line argument will cause the piped data to be ignored.
+
+```sh
+# The content of README.md will be used as the prompt.
+# For summarization, ensure instructions are inside README.md
+cat README.md | gemini
+
+
 ### Next steps
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
