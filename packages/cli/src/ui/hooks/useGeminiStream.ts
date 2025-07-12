@@ -54,6 +54,7 @@ import {
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { useLoopJudge } from './useLoopJudge.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -178,8 +179,8 @@ export const useGeminiStream = (
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
 
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
+  const cancelRequest = useCallback(
+    (reason: string) => {
       if (turnCancelledRef.current) {
         return;
       }
@@ -191,14 +192,23 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: 'Request cancelled.',
+          text: reason,
         },
         Date.now(),
       );
       setPendingHistoryItem(null);
       setIsResponding(false);
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  useInput((_input, key) => {
+    if (streamingState === StreamingState.Responding && key.escape) {
+      cancelRequest('Request cancelled.');
     }
   });
+
+  useLoopJudge(history, streamingState, cancelRequest);
 
   const prepareQueryForGemini = useCallback(
     async (
