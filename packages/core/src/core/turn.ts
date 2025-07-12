@@ -44,7 +44,7 @@ export enum GeminiEventType {
   ToolCallRequest = 'tool_call_request',
   ToolCallResponse = 'tool_call_response',
   ToolCallConfirmation = 'tool_call_confirmation',
-  UserCancelled = 'user_cancelled',
+  UserCanceled = 'user_canceled',
   Error = 'error',
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
@@ -110,8 +110,8 @@ export type ServerGeminiToolCallConfirmationEvent = {
   value: ServerToolCallConfirmationDetails;
 };
 
-export type ServerGeminiUserCancelledEvent = {
-  type: GeminiEventType.UserCancelled;
+export type ServerGeminiUserCanceledEvent = {
+  type: GeminiEventType.UserCanceled;
 };
 
 export type ServerGeminiErrorEvent = {
@@ -139,7 +139,7 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiToolCallRequestEvent
   | ServerGeminiToolCallResponseEvent
   | ServerGeminiToolCallConfirmationEvent
-  | ServerGeminiUserCancelledEvent
+  | ServerGeminiUserCanceledEvent
   | ServerGeminiErrorEvent
   | ServerGeminiChatCompressedEvent
   | ServerGeminiThoughtEvent
@@ -175,7 +175,7 @@ export class Turn {
 
       for await (const resp of responseStream) {
         if (signal?.aborted) {
-          yield { type: GeminiEventType.UserCancelled };
+          yield { type: GeminiEventType.UserCanceled };
           // Do not add resp to debugResponses if aborted before processing
           return;
         }
@@ -223,7 +223,7 @@ export class Turn {
         throw error;
       }
       if (signal.aborted) {
-        yield { type: GeminiEventType.UserCancelled };
+        yield { type: GeminiEventType.UserCanceled };
         // Regular cancellation error, fail gracefully.
         return;
       }

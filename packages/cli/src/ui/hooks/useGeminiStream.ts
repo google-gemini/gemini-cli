@@ -51,7 +51,7 @@ import {
   mapToDisplay as mapTrackedToolCallsToDisplay,
   TrackedToolCall,
   TrackedCompletedToolCall,
-  TrackedCancelledToolCall,
+  TrackedCanceledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 
@@ -69,7 +69,7 @@ export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
 
 enum StreamProcessingStatus {
   Completed,
-  UserCancelled,
+  UserCanceled,
   Error,
 }
 
@@ -96,7 +96,7 @@ export const useGeminiStream = (
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const turnCancelledRef = useRef(false);
+  const turnCanceledRef = useRef(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
@@ -168,8 +168,8 @@ export const useGeminiStream = (
           tc.status === 'validating' ||
           ((tc.status === 'success' ||
             tc.status === 'error' ||
-            tc.status === 'cancelled') &&
-            !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
+            tc.status === 'canceled') &&
+            !(tc as TrackedCompletedToolCall | TrackedCanceledToolCall)
               .responseSubmittedToGemini),
       )
     ) {
@@ -180,10 +180,10 @@ export const useGeminiStream = (
 
   useInput((_input, key) => {
     if (streamingState === StreamingState.Responding && key.escape) {
-      if (turnCancelledRef.current) {
+      if (turnCanceledRef.current) {
         return;
       }
-      turnCancelledRef.current = true;
+      turnCanceledRef.current = true;
       abortControllerRef.current?.abort();
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, Date.now());
@@ -191,7 +191,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: 'Request cancelled.',
+          text: 'Request canceled.',
         },
         Date.now(),
       );
@@ -210,7 +210,7 @@ export const useGeminiStream = (
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
     }> => {
-      if (turnCancelledRef.current) {
+      if (turnCanceledRef.current) {
         return { queryToSend: null, shouldProceed: false };
       }
       if (typeof query === 'string' && query.trim().length === 0) {
@@ -311,7 +311,7 @@ export const useGeminiStream = (
       currentGeminiMessageBuffer: string,
       userMessageTimestamp: number,
     ): string => {
-      if (turnCancelledRef.current) {
+      if (turnCanceledRef.current) {
         // Prevents additional output after a user initiated cancel.
         return '';
       }
@@ -363,9 +363,9 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
-  const handleUserCancelledEvent = useCallback(
+  const handleUserCanceledEvent = useCallback(
     (userMessageTimestamp: number) => {
-      if (turnCancelledRef.current) {
+      if (turnCanceledRef.current) {
         return;
       }
       if (pendingHistoryItemRef.current) {
@@ -389,7 +389,7 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
       addItem(
-        { type: MessageType.INFO, text: 'User cancelled the request.' },
+        { type: MessageType.INFO, text: 'User canceled the request.' },
         userMessageTimestamp,
       );
       setIsResponding(false);
@@ -473,8 +473,8 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ToolCallRequest:
             toolCallRequests.push(event.value);
             break;
-          case ServerGeminiEventType.UserCancelled:
-            handleUserCancelledEvent(userMessageTimestamp);
+          case ServerGeminiEventType.UserCanceled:
+            handleUserCanceledEvent(userMessageTimestamp);
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
@@ -503,7 +503,7 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
-      handleUserCancelledEvent,
+      handleUserCanceledEvent,
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
@@ -535,7 +535,7 @@ export const useGeminiStream = (
 
       abortControllerRef.current = new AbortController();
       const abortSignal = abortControllerRef.current.signal;
-      turnCancelledRef.current = false;
+      turnCanceledRef.current = false;
 
       if (!prompt_id) {
         prompt_id = config.getSessionId() + '########' + getPromptCount();
@@ -571,7 +571,7 @@ export const useGeminiStream = (
           abortSignal,
         );
 
-        if (processingStatus === StreamProcessingStatus.UserCancelled) {
+        if (processingStatus === StreamProcessingStatus.UserCanceled) {
           return;
         }
 
@@ -629,18 +629,18 @@ export const useGeminiStream = (
         completedToolCallsFromScheduler.filter(
           (
             tc: TrackedToolCall,
-          ): tc is TrackedCompletedToolCall | TrackedCancelledToolCall => {
+          ): tc is TrackedCompletedToolCall | TrackedCanceledToolCall => {
             const isTerminalState =
               tc.status === 'success' ||
               tc.status === 'error' ||
-              tc.status === 'cancelled';
+              tc.status === 'canceled';
 
             if (isTerminalState) {
-              const completedOrCancelledCall = tc as
+              const completedOrCanceledCall = tc as
                 | TrackedCompletedToolCall
-                | TrackedCancelledToolCall;
+                | TrackedCanceledToolCall;
               return (
-                completedOrCancelledCall.response?.responseParts !== undefined
+                completedOrCanceledCall.response?.responseParts !== undefined
               );
             }
             return false;
@@ -680,15 +680,15 @@ export const useGeminiStream = (
         return;
       }
 
-      // If all the tools were cancelled, don't submit a response to Gemini.
-      const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === 'cancelled',
+      // If all the tools were canceled, don't submit a response to Gemini.
+      const allToolsCanceled = geminiTools.every(
+        (tc) => tc.status === 'canceled',
       );
 
-      if (allToolsCancelled) {
+      if (allToolsCanceled) {
         if (geminiClient) {
           // We need to manually add the function responses to the history
-          // so the model knows the tools were cancelled.
+          // so the model knows the tools were canceled.
           const responsesToAdd = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
