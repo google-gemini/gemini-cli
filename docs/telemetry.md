@@ -154,6 +154,7 @@ Logs are timestamped records of specific events. The following events are logged
   - **Attributes**:
     - `prompt_length`
     - `prompt` (this attribute is excluded if `log_prompts_enabled` is configured to be `false`)
+    - `auth_type`
 
 - `gemini_cli.tool_call`: This event occurs for each function call.
   - **Attributes**:
@@ -177,6 +178,7 @@ Logs are timestamped records of specific events. The following events are logged
     - `error_type`
     - `status_code`
     - `duration_ms`
+    - `auth_type`
 
 - `gemini_cli.api_response`: This event occurs upon receiving a response from Gemini API.
   - **Attributes**:
@@ -190,6 +192,11 @@ Logs are timestamped records of specific events. The following events are logged
     - `thoughts_token_count`
     - `tool_token_count`
     - `response_text` (if applicable)
+    - `auth_type`
+
+- `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
+  - **Attributes**:
+    - `auth_type`
 
 ### Metrics
 
