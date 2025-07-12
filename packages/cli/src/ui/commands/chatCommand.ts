@@ -135,7 +135,7 @@ const resumeCommand: SlashCommand = {
       };
     }
 
-    const { logger, config } = context.services;
+    const { logger } = context.services;
     await logger.initialize();
     const conversation = await logger.loadCheckpoint(tag);
 
@@ -147,34 +147,17 @@ const resumeCommand: SlashCommand = {
       };
     }
 
-    const chat = await config?.getGeminiClient()?.getChat();
-    if (!chat) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No chat client available to resume conversation.',
-      };
-    }
-
-    // This part of the logic directly manipulates the UI and history state,
-    // which is not ideal for a command to do directly.
-    // For now, we will keep it, but a better approach would be to
-    // return a specific action type that the UI layer can handle.
-    // TODO: Refactor this to return a "load_history" action.
-    context.ui.clear();
-    chat.clearHistory();
-
     const rolemap: { [key: string]: MessageType } = {
       user: MessageType.USER,
       model: MessageType.GEMINI,
     };
 
+    const uiHistory: HistoryItemWithoutId[] = [];
     let hasSystemPrompt = false;
     let i = 0;
+
     for (const item of conversation) {
       i += 1;
-      chat.addHistory(item);
-
       const text =
         item.parts
           ?.filter((m) => !!m.text)
@@ -187,15 +170,17 @@ const resumeCommand: SlashCommand = {
         hasSystemPrompt = true;
       }
       if (i > 2 || !hasSystemPrompt) {
-        context.ui.addItem(
-          {
-            type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-            text,
-          } as HistoryItemWithoutId,
-          i,
-        );
+        uiHistory.push({
+          type: item.role && rolemap[item.role],
+          text,
+        } as HistoryItemWithoutId);
       }
     }
+    return {
+      type: 'load_history',
+      history: uiHistory,
+      clientHistory: conversation,
+    };
   },
   completion: async (context, partialArg) => {
     const chatDetails = await getSavedChatTags(context, true);
@@ -207,6 +192,6 @@ const resumeCommand: SlashCommand = {
 
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history',
+  description: 'Manage conversation history.',
   subCommands: [listCommand, saveCommand, resumeCommand],
 };

@@ -979,6 +979,16 @@ export const useSlashCommandProcessor = (
                     );
                   }
                 }
+              case 'load_history': {
+                await config
+                  ?.getGeminiClient()
+                  ?.setHistory(result.clientHistory);
+                commandContext.ui.clear();
+                result.history.forEach((item, index) => {
+                  commandContext.ui.addItem(item, index);
+                });
+                return { type: 'handled' };
+              }
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
@@ -1047,6 +1057,7 @@ export const useSlashCommandProcessor = (
       return { type: 'handled' };
     },
     [
+      config,
       addItem,
       setShowHelp,
       commands,

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Content } from '@google/genai'; // Or relevant history type
+import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -69,10 +71,17 @@ export interface OpenDialogActionReturn {
   dialog: 'help' | 'theme';
 }
 
+export interface LoadHistoryActionReturn {
+  type: 'load_history';
+  history: HistoryItemWithoutId[];
+  clientHistory: Content[]; // The history for the generative client
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
-  | OpenDialogActionReturn;
+  | OpenDialogActionReturn
+  | LoadHistoryActionReturn;
 
 // The standardized contract for any command in the system.
 export interface SlashCommand {

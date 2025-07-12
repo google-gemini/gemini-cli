@@ -87,7 +87,7 @@ describe('CommandService', () => {
         const loadedTree = commandService.getCommands();
         expect(loadedTree.length).toBe(5);
         expect(loadedTree).toEqual([
-            chatCommand,
+          chatCommand,
           clearCommand,
           helpCommand,
           memoryCommand,
