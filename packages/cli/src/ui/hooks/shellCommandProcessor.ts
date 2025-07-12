@@ -189,8 +189,8 @@ function executeShellCommand(
 
       const decodedChunk =
         stream === 'stdout'
-          ? stdoutDecoder.decode(data)
-          : stderrDecoder.decode(data);
+          ? stdoutDecoder.decode(data, { stream: true })
+          : stderrDecoder.decode(data, { stream: true });
       if (stream === 'stdout') {
         stdout += stripAnsi(decodedChunk);
       } else {
@@ -247,6 +247,13 @@ function executeShellCommand(
       exited = true;
       abortSignal.removeEventListener('abort', abortHandler);
 
+// Handle any final bytes lingering in the decoders
+      if (stdoutDecoder) {
+        stdoutDecoder.decode();
+      }
+      if (stderrDecoder) {
+        stderrDecoder.decode();
+      }
 
       const finalBuffer = Buffer.concat(outputChunks);
 
