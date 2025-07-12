@@ -5,6 +5,7 @@
  */
 
 import path from 'path';
+import process from 'node:process'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
@@ -45,7 +46,6 @@ export interface ReadFileToolParams {
  */
 export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
-
   constructor(
     private rootDirectory: string,
     private config: Config,
@@ -57,8 +57,9 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       {
         properties: {
           absolute_path: {
-            description:
-              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+            description: process.platform === 'win32' ?
+              "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path."
+              : "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
             type: Type.STRING,
           },
           offset: {
