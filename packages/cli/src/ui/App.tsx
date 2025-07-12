@@ -121,7 +121,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     consolePatcher.patch();
     registerCleanup(consolePatcher.cleanup);
   }, [handleNewMessage, config]);
-  
+
   const { stats: sessionStats } = useSessionStats();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
@@ -480,8 +480,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setConstrainHeight(false);
     }
   });
-
-  
 
   useEffect(() => {
     if (config) {
