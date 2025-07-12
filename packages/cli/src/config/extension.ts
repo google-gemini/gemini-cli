@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPServerConfig } from '@google/gemini-cli-core';
+import { MCPServerConfig, AnnotatedExtension } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -113,12 +113,18 @@ function getContextFileNames(config: ExtensionConfig): string[] {
   return config.contextFileName;
 }
 
-export function filterActiveExtensions(
+export function annotateActiveExtensions(
   extensions: Extension[],
   enabledExtensionNames: string[],
-): Extension[] {
+): AnnotatedExtension[] {
+  const annotatedExtensions: AnnotatedExtension[] = [];
+
   if (enabledExtensionNames.length === 0) {
-    return extensions;
+    return extensions.map((extension) => ({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive: true,
+    }));
   }
 
   const lowerCaseEnabledExtensions = new Set(
@@ -132,28 +138,38 @@ export function filterActiveExtensions(
     if (extensions.length > 0) {
       console.log('All extensions are disabled.');
     }
-    return [];
+    return extensions.map((extension) => ({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive: false,
+    }));
   }
 
-  const activeExtensions: Extension[] = [];
   const notFoundNames = new Set(lowerCaseEnabledExtensions);
 
   for (const extension of extensions) {
     const lowerCaseName = extension.config.name.toLowerCase();
-    if (lowerCaseEnabledExtensions.has(lowerCaseName)) {
+    const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
+
+    if (isActive) {
       console.log(
         `Activated extension: ${extension.config.name} (version: ${extension.config.version})`,
       );
-      activeExtensions.push(extension);
       notFoundNames.delete(lowerCaseName);
     } else {
       console.log(`Disabled extension: ${extension.config.name}`);
     }
+
+    annotatedExtensions.push({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive,
+    });
   }
 
   for (const requestedName of notFoundNames) {
     console.log(`Extension not found: ${requestedName}`);
   }
 
-  return activeExtensions;
+  return annotatedExtensions;
 }
