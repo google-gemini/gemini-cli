@@ -14,6 +14,7 @@ import {
   FunctionResponse,
 } from '@google/genai';
 import { GrokClient, GrokMessage, GrokTool, GrokToolCall } from './grokClient.js';
+import { GROK_TOOL_DELEGATION_MODEL, GROK_MODELS_WITH_DELEGATION } from '../config/models.js';
 
 interface GenerateContentRequest {
   contents: Content[];
@@ -166,9 +167,14 @@ export class GrokContentGenerator implements ContentGenerator {
       ? this.convertToGrokTools(request.config.tools[0].functionDeclarations)
       : undefined;
     
+    // Determine which model to use
+    let modelToUse = this.model;
+    if (tools && tools.length > 0 && (GROK_MODELS_WITH_DELEGATION as readonly string[]).includes(this.model)) {
+      modelToUse = GROK_TOOL_DELEGATION_MODEL;
+    }
     
     const grokResponse = await this.grokClient.createChatCompletion({
-      model: this.model,
+      model: modelToUse,
       messages,
       max_tokens: request.generationConfig?.maxOutputTokens,
       temperature: request.generationConfig?.temperature,
@@ -232,8 +238,14 @@ export class GrokContentGenerator implements ContentGenerator {
     const self = this;
     
     async function* generator(): AsyncGenerator<GenerateContentResponse> {
+      // Determine which model to use
+      let modelToUse = self.model;
+      if (tools && tools.length > 0 && (GROK_MODELS_WITH_DELEGATION as readonly string[]).includes(self.model)) {
+        modelToUse = GROK_TOOL_DELEGATION_MODEL;
+      }
+      
       const stream = self.grokClient.createChatCompletionStream({
-        model: self.model,
+        model: modelToUse,
         messages,
         max_tokens: request.generationConfig?.maxOutputTokens,
         temperature: request.generationConfig?.temperature,

@@ -9,5 +9,9 @@ export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 export const DEFAULT_GROK_MODEL = 'grok-4-0709';
-export const GROK_MODELS = ['grok-4-0709', 'grok-4'] as const;
+export const GROK_MODELS = ['grok-4-0709', 'grok-4', 'grok-3-mini'] as const;
 export type GrokModel = typeof GROK_MODELS[number];
+
+// Model delegation configuration
+export const GROK_TOOL_DELEGATION_MODEL = 'grok-3-mini'; // Smaller model for tool calls
+export const GROK_MODELS_WITH_DELEGATION = ['grok-4-0709', 'grok-4'] as const;
