@@ -341,6 +341,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (key.name === 'home') {
+        buffer.move('home');
+        return;
+      }
+
+      if (key.name === 'end') {
+        buffer.move('end');
+        return;
+      }
+
       // Ctrl+A (Home) / Ctrl+E (End)
       if (key.ctrl && key.name === 'a') {
         buffer.move('home');

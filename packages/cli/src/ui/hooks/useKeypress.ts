@@ -76,7 +76,7 @@ export function useKeypress(
           meta: false,
           shift: false,
           paste: true,
-          sequence: pasteBuffer.toString(),
+          sequence: pasteBuffer.toString().replace(/\n$/, ''),
         });
         pasteBuffer = Buffer.alloc(0);
       } else {
@@ -175,7 +175,7 @@ export function useKeypress(
           meta: false,
           shift: false,
           paste: true,
-          sequence: pasteBuffer.toString(),
+          sequence: pasteBuffer.toString().replace(/\n$/, ''),
         });
         pasteBuffer = Buffer.alloc(0);
       }
