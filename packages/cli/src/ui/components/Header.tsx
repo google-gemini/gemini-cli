@@ -8,24 +8,34 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
-import { shortAsciiLogo, longAsciiLogo } from './AsciiArt.js';
+import { shortAsciiLogo, longAsciiLogo, shortGrokLogo, longGrokLogo } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
   terminalWidth: number; // For responsive logo
+  model?: string; // Current model name
 }
 
 export const Header: React.FC<HeaderProps> = ({
   customAsciiArt,
   terminalWidth,
+  model,
 }) => {
   let displayTitle;
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
+  
+  // Check if using a Grok model
+  const isGrokModel = model && (model.startsWith('grok-') || model === 'grok');
 
   if (customAsciiArt) {
     displayTitle = customAsciiArt;
+  } else if (isGrokModel) {
+    // Use Grok banners for Grok models
+    displayTitle =
+      terminalWidth >= widthOfLongLogo ? longGrokLogo : shortGrokLogo;
   } else {
+    // Use Gemini banners for all other models
     displayTitle =
       terminalWidth >= widthOfLongLogo ? longAsciiLogo : shortAsciiLogo;
   }

@@ -25,6 +25,12 @@ export function tokenLimit(model: Model): TokenCount {
       return 1_048_576;
     case 'gemini-2.0-flash-preview-image-generation':
       return 32_000;
+    // Grok models
+    case 'grok-4-0709':
+    case 'grok-4':
+      return 256_000; // 256k context
+    case 'grok-3-mini':
+      return 128_000; // 128k context
     default:
       return DEFAULT_TOKEN_LIMIT;
   }

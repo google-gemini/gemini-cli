@@ -291,17 +291,21 @@ export class GrokContentGenerator implements ContentGenerator {
             }
           }
           
-          // Convert accumulated tool calls to function calls
-          for (const toolCall of accumulatedToolCalls.values()) {
-            if (toolCall.function.arguments) {
+          // Try to parse completed tool calls
+          for (const [index, toolCall] of accumulatedToolCalls.entries()) {
+            if (toolCall.function.arguments && toolCall.function.name && toolCall.id) {
               try {
+                // Try to parse the JSON to see if it's complete
+                const args = JSON.parse(toolCall.function.arguments);
                 functionCalls.push({
                   id: toolCall.id,
                   name: toolCall.function.name,
-                  args: JSON.parse(toolCall.function.arguments),
+                  args: args,
                 });
+                // Remove successfully parsed tool calls to avoid re-parsing
+                accumulatedToolCalls.delete(index);
               } catch (e) {
-                // Arguments not yet complete, skip for now
+                // Arguments not yet complete, keep accumulating
               }
             }
           }

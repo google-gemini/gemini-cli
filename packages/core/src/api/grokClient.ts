@@ -107,14 +107,22 @@ export class GrokClient {
     
     // Debug logging could be added here if needed
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -122,8 +130,15 @@ export class GrokClient {
       throw new Error(`Grok API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json();
-    return data as GrokChatCompletionResponse;
+      const data = await response.json();
+      return data as GrokChatCompletionResponse;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Grok API request timed out after 2 minutes');
+      }
+      throw error;
+    }
   }
 
   async *createChatCompletionStream(request: GrokChatCompletionRequest): AsyncGenerator<GrokStreamChunk> {
@@ -131,55 +146,72 @@ export class GrokClient {
     
     const streamRequest = { ...request, stream: true };
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(streamRequest),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      // Error logging could be added here
-      throw new Error(`Grok API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('Response body is not readable');
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(streamRequest),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+      if (!response.ok) {
+        const errorText = await response.text();
+        // Error logging could be added here
+        throw new Error(`Grok API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              return;
-            }
-            try {
-              const chunk = JSON.parse(data) as GrokStreamChunk;
-              yield chunk;
-            } catch (error) {
-              // Failed to parse SSE chunk
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                return;
+              }
+              try {
+                const chunk = JSON.parse(data) as GrokStreamChunk;
+                yield chunk;
+              } catch (error) {
+                // Failed to parse SSE chunk
+              }
             }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Grok API stream timed out after 2 minutes');
+      }
+      throw error;
     } finally {
-      reader.releaseLock();
+      clearTimeout(timeoutId);
     }
   }
 
