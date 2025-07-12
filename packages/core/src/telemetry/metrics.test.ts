@@ -412,17 +412,25 @@ describe('Telemetry Metrics', () => {
 
         // Test with realistic floating-point values that performance.now() would return
         const floatingPointDuration = 123.45678;
-        recordStartupPerformanceModule(mockConfig, 'total_startup', floatingPointDuration, {
-          is_tty: true,
-          has_question: false,
-        });
+        recordStartupPerformanceModule(
+          mockConfig,
+          'total_startup',
+          floatingPointDuration,
+          {
+            is_tty: true,
+            has_question: false,
+          },
+        );
 
-        expect(mockHistogramRecordFn).toHaveBeenCalledWith(floatingPointDuration, {
-          'session.id': 'test-session-id',
-          phase: 'total_startup',
-          is_tty: true,
-          has_question: false,
-        });
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(
+          floatingPointDuration,
+          {
+            'session.id': 'test-session-id',
+            phase: 'total_startup',
+            is_tty: true,
+            has_question: false,
+          },
+        );
       });
     });
 
