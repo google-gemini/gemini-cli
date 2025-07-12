@@ -258,9 +258,7 @@ describe('editor utils', () => {
         await openDiff('old.txt', 'new.txt', editor);
         expect(execSync).toHaveBeenCalledTimes(1);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        const expectedCommand = `${
-          diffCommand.command
-        } ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
+        const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(' ')}`;
         expect(execSync).toHaveBeenCalledWith(expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
@@ -272,9 +270,7 @@ describe('editor utils', () => {
         await openDiff('old.txt', 'new.txt', editor);
         expect(execSync).toHaveBeenCalledTimes(1);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(
-          ' ',
-        )}`;
+        const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(' ')}`;
         expect(execSync).toHaveBeenCalledWith(expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',

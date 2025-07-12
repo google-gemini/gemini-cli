@@ -98,10 +98,15 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.host === 'github.com' && url.includes('/blob/')) {
+        url = url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+      }
+    } catch (_error) {
+      throw new Error(`Invalid URL: ${url}`);
     }
 
     try {
@@ -138,8 +143,8 @@ ${textContent}
         llmContent: resultText,
         returnDisplay: `Content for ${url} processed using fallback fetch.`,
       };
-    } catch (e) {
-      const error = e as Error;
+    } catch (_e) {
+      const error = _e as Error;
       const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
       return {
         llmContent: `Error: ${errorMessage}`,
@@ -188,10 +193,16 @@ ${textContent}
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
     const urls = extractUrls(params.prompt).map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.hostname === 'github.com' && url.includes('/blob/')) {
+          return url
+            .replace('github.com', 'raw.githubusercontent.com')
+            .replace('/blob/', '/');
+        }
+      } catch (_e) {
+        // If URL parsing fails, ignore this URL
+        console.error(`Invalid URL encountered: ${url}`);
       }
       return url;
     });
