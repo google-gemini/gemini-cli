@@ -506,6 +506,11 @@ export class Config {
     return this.gitService;
   }
 
+  async reloadMcpServers(): Promise<void> {
+    const toolRegistry = await this.getToolRegistry();
+    await toolRegistry.discoverTools();
+  }
+
   async refreshMemory(): Promise<{ memoryContent: string; fileCount: number }> {
     const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
       this.getWorkingDir(),
