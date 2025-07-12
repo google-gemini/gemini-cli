@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import { StringDecoder } from 'string_decoder';
+import { spawn, execSync } from 'child_process';
+import { TextDecoder } from 'util';
 import type { HistoryItemWithoutId } from '../types.js';
 import { useCallback } from 'react';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
@@ -18,9 +18,127 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import stripAnsi from 'strip-ansi';
+import { detect as chardetDetect } from 'chardet';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
+
+// Cache for system encoding to avoid repeated detection
+let cachedSystemEncoding: string | null = null;
+
+/**
+ * Returns the cached system encoding it if not cached.
+ * This function is used to ensure we only detect the system encoding
+ * by calling `getSystemEncoding()` or `detectEncodingFromBuffer()` once,
+ * and then reuse the cached value for subsequent calls.
+ * @param buffer A buffer to use for detecting the system encoding.
+ */
+function getCachedSystemEncoding(buffer: Buffer) {
+  if (cachedSystemEncoding === null) {
+    // If the system encoding detection fails, we fallback to chardet.
+    cachedSystemEncoding = getSystemEncoding() || detectEncodingFromBuffer(buffer);
+  }
+  return cachedSystemEncoding;
+}
+
+function getSystemEncoding() {
+  // Windows
+  if (os.platform() === 'win32') {
+    try {
+      const output = execSync('chcp', { encoding: 'utf8' });
+      const match = output.match(/:\s*(\d+)/);
+      if (match) {
+        const codePage = parseInt(match[1], 10);
+        if (!isNaN(codePage)) {
+          return windowsCodePageToEncoding(codePage);
+        }
+      }
+    } catch (_e) {
+      console.warn('Failed to get Windows code page.');
+    }
+    return null;
+  }
+
+  // Unix-like
+  // Use environment variables LC_ALL, LC_CTYPE, and LANG to determine the
+  // system encoding. However, these environment variables might not always 
+  // be set or accurate. Handle cases where none of these variables are set.
+  const env = process.env;
+  let locale = env.LC_ALL || env.LC_CTYPE || env.LANG || '';
+
+  // Fallback to querying the system directly when environment variables are missing
+  if (!locale) {
+    try {
+      locale = execSync('locale charmap', { encoding: 'utf8' }).toString().trim();
+    } catch (_e) {
+      console.warn('Failed to get locale charmap.');
+      return null;
+    }
+  }
+
+  const match = locale.match(/\.(.+)/); // e.g., "en_US.UTF-8"
+  if (match && match[1]) {
+    return match[1].toLowerCase();
+  }
+
+  // Handle cases where locale charmap returns just the encoding name (e.g., "UTF-8")
+  if (locale && !locale.includes('.')) {
+    return locale.toLowerCase();
+  }
+
+  return null;
+}
+
+function windowsCodePageToEncoding(cp: number) {
+  // Most common mappings; extend as needed
+  const map: { [key: number]: string } = {
+    437: 'cp437',
+    850: 'cp850',
+    852: 'cp852',
+    866: 'cp866',
+    874: 'windows-874',
+    932: 'shift_jis',
+    936: 'gb2312',
+    949: 'euc-kr',
+    950: 'big5',
+    1200: 'utf-16le',
+    1201: 'utf-16be',
+    1250: 'windows-1250',
+    1251: 'windows-1251',
+    1252: 'windows-1252',
+    1253: 'windows-1253',
+    1254: 'windows-1254',
+    1255: 'windows-1255',
+    1256: 'windows-1256',
+    1257: 'windows-1257',
+    1258: 'windows-1258',
+    65001: 'utf-8'
+  };
+
+  if (map[cp]) {
+    return map[cp];
+  }
+
+  console.warn(`Unable to determine encoding for windows code page ${cp}.`);
+  return null; // Return null if no mapping found
+}
+
+/**
+ * Attempts to detect encoding from a buffer using chardet.
+ * This is useful when system encoding detection fails.
+ */
+function detectEncodingFromBuffer(buffer: Buffer): string | null {
+  try {
+    const detected = chardetDetect(buffer);
+    if (detected && typeof detected === 'string') {
+      return detected.toLowerCase();
+    }
+  } catch (error) {
+    console.warn('Failed to detect encoding with chardet:', error);
+  }
+  
+  return null;
+}
 
 /**
  * A structured result from a shell command execution.
@@ -66,8 +184,8 @@ function executeShellCommand(
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const stdoutDecoder = new StringDecoder('utf8');
-    const stderrDecoder = new StringDecoder('utf8');
+    let stdoutDecoder: TextDecoder | null = null;
+    let stderrDecoder: TextDecoder | null = null;
 
     let stdout = '';
     let stderr = '';
@@ -80,6 +198,13 @@ function executeShellCommand(
     let sniffedBytes = 0;
 
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+
+      if (!stdoutDecoder || !stderrDecoder) {
+        const encoding = getCachedSystemEncoding(data) || 'utf-8';
+        stdoutDecoder = new TextDecoder(encoding);
+        stderrDecoder = new TextDecoder(encoding);
+      }
+
       outputChunks.push(data);
 
       if (streamToUi && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -96,8 +221,8 @@ function executeShellCommand(
 
       const decodedChunk =
         stream === 'stdout'
-          ? stdoutDecoder.write(data)
-          : stderrDecoder.write(data);
+          ? stdoutDecoder.decode(data, { stream: true })
+          : stderrDecoder.decode(data, { stream: true });
       if (stream === 'stdout') {
         stdout += stripAnsi(decodedChunk);
       } else {
@@ -155,8 +280,12 @@ function executeShellCommand(
       abortSignal.removeEventListener('abort', abortHandler);
 
       // Handle any final bytes lingering in the decoders
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
+      if (stdoutDecoder) {
+        stdoutDecoder.decode();
+      }
+      if (stderrDecoder) {
+        stderrDecoder.decode();
+      }
 
       const finalBuffer = Buffer.concat(outputChunks);
 
