@@ -168,33 +168,42 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   console.error(authUrl);
   console.error('');
 
-  const code = await new Promise<string>((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    rl.question('Enter the authorization code: ', (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
+  const code = await new Promise<string>(resolve => {
+    console.error('Enter the authorization code: ');
+    let buffer = ''; // Buffer to accumulate input chunks
+
+    const onData = (chunk: Buffer) => {
+      buffer += chunk.toString(); // Append new data to the buffer
+
+      // If the buffer contains a newline, the input is complete
+      if (buffer.includes('\n')) {
+        // Clean up immediately to stop listening for more input
+        process.stdin.removeListener('data', onData);
+        process.stdin.pause();
+
+        // Resolve with the first line from the buffer
+        resolve(buffer.split('\n')[0].trim());
+      }
+    };
+
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', onData);
   });
 
   if (!code) {
     console.error('Authorization code is required.');
     return false;
-  } else {
-    console.error(`Received authorization code: "${code}"`);
   }
 
   try {
-    const response = await client.getToken({
+    const { tokens } = await client.getToken({
       code,
       codeVerifier: codeVerifier.codeVerifier,
       redirect_uri: redirectUri,
     });
-    client.setCredentials(response.tokens);
+    client.setCredentials(tokens);
   } catch (_error) {
-    // Consider logging the error.
     return false;
   }
   return true;

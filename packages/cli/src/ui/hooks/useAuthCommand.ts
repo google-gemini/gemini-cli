@@ -12,6 +12,7 @@ import {
   clearCachedCredentialFile,
   getErrorMessage,
 } from '@google/gemini-cli-core';
+import { relaunch } from '../../utils/relaunch.js';
 
 export const useAuthCommand = (
   settings: LoadedSettings,
@@ -55,11 +56,15 @@ export const useAuthCommand = (
       if (authType) {
         await clearCachedCredentialFile();
         settings.setValue(scope, 'selectedAuthType', authType);
+        if (authType === AuthType.LOGIN_WITH_GOOGLE && config.getNoBrowser()) {
+          relaunch();
+          return;
+        }
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
     },
-    [settings, setAuthError],
+    [settings, setAuthError, config],
   );
 
   const cancelAuthentication = useCallback(() => {

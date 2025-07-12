@@ -7,6 +7,17 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { getProjectTempDir } from '@google/gemini-cli-core';
+import type { Instance as InkInstance } from 'ink';
+
+let inkInstance: InkInstance | undefined;
+
+export function setInkInstance(instance: InkInstance) {
+  inkInstance = instance;
+}
+
+export function cleanupInk() {
+  inkInstance?.unmount();
+}
 
 export async function cleanupCheckpoints() {
   const tempDir = getProjectTempDir(process.cwd());
