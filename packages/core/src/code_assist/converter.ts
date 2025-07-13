@@ -170,6 +170,31 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
   return toContent(content);
 }
 
+import * as fs from 'fs';
+import * as path from 'path';
+
+const fileCache = new Map<string, { content: string; mtimeMs: number }>();
+
+function tryLoadFileContent(input: string): string {
+  const filePath = input.trim();
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    try {
+      const stat = fs.statSync(filePath);
+      const cached = fileCache.get(filePath);
+      if (!cached || cached.mtimeMs !== stat.mtimeMs) {
+        const code = fs.readFileSync(filePath, 'utf8');
+        fileCache.set(filePath, { content: code, mtimeMs: stat.mtimeMs });
+        return `Here is the current content of the file \`${path.basename(filePath)}\`:\n\n\`\`\`\n${code}\n\`\`\`\n`;
+      }
+      return `Here is the current content of the file \`${path.basename(filePath)}\`:\n\n\`\`\`\n${cached.content}\n\`\`\`\n`;
+    } catch {
+      return input;
+    }
+  }
+  return input;
+}
+
+
 function toContent(content: ContentUnion): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
@@ -180,9 +205,11 @@ function toContent(content: ContentUnion): Content {
   }
   if (typeof content === 'string') {
     // it's a string
+    const promptText = tryLoadFileContent(content);
+
     return {
       role: 'user',
-      parts: [{ text: content }],
+      parts: [{ text: promptText }],
     };
   }
   if ('parts' in content) {
