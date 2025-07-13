@@ -31,6 +31,25 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
 
+- **`/export`**
+  - **Description:** Export the current conversation history to a comprehensive markdown file. The exported file includes session metadata, statistics, and complete conversation history with proper formatting for different message types (user input, AI responses, tool executions, etc.).
+  - **Usage:** `/export [filename]`
+  - **Examples:**
+    - `/export` (creates a timestamped file like `gemini-conversation-2025-01-01T12-00-00.md`)
+    - `/export my-session.md` (creates `my-session.md`)
+    - `/export exports/my-session.md` (creates `my-session.md` in the `exports/` subdirectory)
+  - **Details:**
+    - The exported markdown includes:
+      - **Session Information:** CLI version, OS, sandbox environment, authentication type, and other metadata
+      - **Session Statistics:** Token usage, turn count, API time, and session duration
+      - **Conversation History:** All messages with proper formatting for different types
+      - **Raw Core History:** Complete API conversation data in a collapsible section
+    - Tool execution details include call IDs, parameters, confirmation details, and results
+    - The file is saved to the current working directory or specified subdirectory
+    - Subdirectories are created automatically if they don't exist
+    - For security, export paths are restricted to the current working directory and its subdirectories
+    - Export includes both UI-formatted history and raw API conversation data for comprehensive record-keeping
+
 - **`/help`** (or **`/?`**)
   - **Description:** Display help information about the Gemini CLI, including available commands and their usage.
 
