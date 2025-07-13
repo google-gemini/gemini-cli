@@ -81,6 +81,9 @@ export interface Settings {
   hideTips?: boolean;
   hideBanner?: boolean;
 
+  // Setting for setting maximum number of user/model/tool turns in a session.
+  maxSessionTurns?: number;
+
   // Add other settings here.
 }
 

@@ -17,7 +17,7 @@ import { findIndexAfterFraction, GeminiClient } from './client.js';
 import { AuthType, ContentGenerator } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
-import { Turn } from './turn.js';
+import { GeminiEventType, Turn } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -43,7 +43,13 @@ vi.mock('./turn', () => {
     }
   }
   // Export the mock class as 'Turn'
-  return { Turn: MockTurn };
+  return {
+    Turn: MockTurn,
+    GeminiEventType: {
+      MaxSessionTurns: 'MaxSessionTurns',
+      ChatCompressed: 'ChatCompressed',
+    },
+  };
 });
 
 vi.mock('../config/config.js');
@@ -68,12 +74,13 @@ vi.mock('../telemetry/index.js', () => ({
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
-    { role: 'user', parts: [{ text: 'This is the first message.' }] },
-    { role: 'model', parts: [{ text: 'This is the second message.' }] },
-    { role: 'user', parts: [{ text: 'This is the third message.' }] },
-    { role: 'model', parts: [{ text: 'This is the fourth message.' }] },
-    { role: 'user', parts: [{ text: 'This is the fifth message.' }] },
+    { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66
+    { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68
+    { role: 'user', parts: [{ text: 'This is the third message.' }] }, // JSON length: 66
+    { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68
+    { role: 'user', parts: [{ text: 'This is the fifth message.' }] }, // JSON length: 65
   ];
+  // Total length: 333
 
   it('should throw an error for non-positive numbers', () => {
     expect(() => findIndexAfterFraction(history, 0)).toThrow(
@@ -88,12 +95,21 @@ describe('findIndexAfterFraction', () => {
   });
 
   it('should handle a fraction in the middle', () => {
-    // Total length is 257. 257 * 0.5 = 128.5
-    // 0: 53
-    // 1: 53 + 54 = 107
-    // 2: 107 + 53 = 160
-    // 160 >= 128.5, so index is 2
+    // 333 * 0.5 = 166.5
+    // 0: 66
+    // 1: 66 + 68 = 134
+    // 2: 134 + 66 = 200
+    // 200 >= 166.5, so index is 2
     expect(findIndexAfterFraction(history, 0.5)).toBe(2);
+  });
+
+  it('should handle a fraction that results in the last index', () => {
+    // 333 * 0.9 = 299.7
+    // ...
+    // 3: 200 + 68 = 268
+    // 4: 268 + 65 = 333
+    // 333 >= 299.7, so index is 4
+    expect(findIndexAfterFraction(history, 0.9)).toBe(4);
   });
 
   it('should handle an empty history', () => {
@@ -178,8 +194,10 @@ describe('Gemini Client (client.ts)', () => {
         getProxy: vi.fn().mockReturnValue(undefined),
         getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
         getFileService: vi.fn().mockReturnValue(fileService),
+        getMaxSessionTurns: vi.fn().mockReturnValue(0),
         getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
         setQuotaErrorOccurred: vi.fn(),
+        getNoBrowser: vi.fn().mockReturnValue(false),
       };
       return mock as unknown as Config;
     });
@@ -359,6 +377,42 @@ describe('Gemini Client (client.ts)', () => {
           systemInstruction: getCoreSystemPrompt(''),
           temperature: 0,
           topP: 1,
+          responseSchema: schema,
+          responseMimeType: 'application/json',
+        },
+        contents,
+      });
+    });
+
+    it('should allow overriding model and config', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'string' };
+      const abortSignal = new AbortController().signal;
+      const customModel = 'custom-json-model';
+      const customConfig = { temperature: 0.9, topK: 20 };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      await client.generateJson(
+        contents,
+        schema,
+        abortSignal,
+        customModel,
+        customConfig,
+      );
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith({
+        model: customModel,
+        config: {
+          abortSignal,
+          systemInstruction: getCoreSystemPrompt(''),
+          temperature: 0.9,
+          topP: 1, // from default
+          topK: 20,
           responseSchema: schema,
           responseMimeType: 'application/json',
         },
@@ -657,6 +711,59 @@ describe('Gemini Client (client.ts)', () => {
       // The stream should produce events and eventually terminate
       expect(eventCount).toBeGreaterThanOrEqual(1);
       expect(eventCount).toBeLessThan(200); // Should not exceed our safety limit
+    });
+
+    it('should yield MaxSessionTurns and stop when session turn limit is reached', async () => {
+      // Arrange
+      const MAX_SESSION_TURNS = 5;
+      vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(
+        MAX_SESSION_TURNS,
+      );
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Act & Assert
+      // Run up to the limit
+      for (let i = 0; i < MAX_SESSION_TURNS; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-4',
+        );
+        // consume stream
+        for await (const _event of stream) {
+          // do nothing
+        }
+      }
+
+      // This call should exceed the limit
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-5',
+      );
+
+      const events = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([{ type: GeminiEventType.MaxSessionTurns }]);
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(MAX_SESSION_TURNS);
     });
 
     it('should respect MAX_TURNS limit even when turns parameter is set to a large value', async () => {

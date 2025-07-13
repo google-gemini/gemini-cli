@@ -198,6 +198,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideBanner": true
     ```
 
+- **`maxSessionTurns`** (number):
+  - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
+  - **Default:** `-1` (unlimited)
+  - **Example:**
+    ```json
+    "maxSessionTurns": 10
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -223,7 +231,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
-  "hideBanner": false
+  "hideBanner": false,
+  "maxSessionTurns": 10
 }
 ```
 

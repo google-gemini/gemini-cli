@@ -27,6 +27,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 import { spawn } from 'child_process';
+import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -488,6 +489,15 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     }
 
-    return { llmContent, returnDisplay: returnDisplayMessage };
+    const summary = await summarizeToolOutput(
+      llmContent,
+      this.config.getGeminiClient(),
+      abortSignal,
+    );
+
+    return {
+      llmContent: summary,
+      returnDisplay: returnDisplayMessage,
+    };
   }
 }
