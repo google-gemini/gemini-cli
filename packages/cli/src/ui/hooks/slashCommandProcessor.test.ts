@@ -159,7 +159,7 @@ describe('useSlashCommandProcessor', () => {
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
         cumulative: {
-          turnCount: 0,
+          promptCount: 0,
           promptTokenCount: 0,
           candidatesTokenCount: 0,
           totalTokenCount: 0,
@@ -504,6 +504,32 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockAction).toHaveBeenCalledTimes(1);
       expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should open the theme dialog when a new command returns a theme dialog action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'dialog',
+        dialog: 'theme',
+      });
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/test');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockOpenThemeDialog).toHaveBeenCalledWith();
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
@@ -1311,7 +1337,10 @@ describe('useSlashCommandProcessor', () => {
         hook.rerender();
       });
       expect(hook.result.current.pendingHistoryItems).toEqual([]);
-      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(true);
+      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(
+        'Prompt Id not set',
+        true,
+      );
       expect(mockAddItem).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({

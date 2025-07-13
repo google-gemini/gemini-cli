@@ -6,7 +6,10 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
@@ -14,7 +17,7 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { CallableTool, FunctionDeclaration, mcpToTool } from '@google/genai';
+import { Type, mcpToTool } from '@google/genai';
 import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
@@ -190,7 +193,16 @@ async function connectAndDiscover(
       transportOptions,
     );
   } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    const transportOptions: SSEClientTransportOptions = {};
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+    transport = new SSEClientTransport(
+      new URL(mcpServerConfig.url),
+      transportOptions,
+    );
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
@@ -264,24 +276,11 @@ async function connectAndDiscover(
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   };
 
-  if (transport instanceof StdioClientTransport && transport.stderr) {
-    transport.stderr.on('data', (data) => {
-      const stderrStr = data.toString();
-      // Filter out verbose INFO logs from some MCP servers
-      if (!stderrStr.includes('] INFO')) {
-        console.debug(`MCP STDERR (${mcpServerName}):`, stderrStr);
-      }
-    });
-  }
-
   try {
-    const mcpCallableTool: CallableTool = mcpToTool(mcpClient);
-    const discoveredToolFunctions = await mcpCallableTool.tool();
+    const mcpCallableTool = mcpToTool(mcpClient);
+    const tool = await mcpCallableTool.tool();
 
-    if (
-      !discoveredToolFunctions ||
-      !Array.isArray(discoveredToolFunctions.functionDeclarations)
-    ) {
+    if (!tool || !Array.isArray(tool.functionDeclarations)) {
       console.error(
         `MCP server '${mcpServerName}' did not return valid tool function declarations. Skipping.`,
       );
@@ -297,7 +296,7 @@ async function connectAndDiscover(
       return;
     }
 
-    for (const funcDecl of discoveredToolFunctions.functionDeclarations) {
+    for (const funcDecl of tool.functionDeclarations) {
       if (!funcDecl.name) {
         console.warn(
           `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
@@ -344,19 +343,13 @@ async function connectAndDiscover(
 
       sanitizeParameters(funcDecl.parameters);
 
-      // Ensure parameters is a valid JSON schema object, default to empty if not.
-      const parameterSchema: Record<string, unknown> =
-        funcDecl.parameters && typeof funcDecl.parameters === 'object'
-          ? { ...(funcDecl.parameters as FunctionDeclaration) }
-          : { type: 'object', properties: {} };
-
       toolRegistry.registerTool(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
           toolNameForModel,
           funcDecl.description ?? '',
-          parameterSchema,
+          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
           funcDecl.name,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,

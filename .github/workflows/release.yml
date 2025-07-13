@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -69,7 +69,7 @@ jobs:
           echo "is_dry_run=${is_dry_run}" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -130,7 +130,7 @@ jobs:
           npm run prepare:package
 
       - name: Configure npm for publishing
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           registry-url: 'https://wombat-dressing-room.appspot.com'
@@ -143,7 +143,7 @@ jobs:
 
       - name: Install latest core package
         if: steps.vars.outputs.is_dry_run == 'false'
-        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.NPM_TAG }} --workspace=@google/gemini-cli --save-exact
+        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.RELEASE_VERSION }} --workspace=@google/gemini-cli --save-exact
 
       - name: Publish @google/gemini-cli
         run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ steps.vars.outputs.is_dry_run == 'true' && '--dry-run' || '' }}

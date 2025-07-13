@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.9",
+  "version": "0.1.12",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,15 +25,15 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.12"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
-    "dotenv": "^16.6.1",
-    "gaxios": "^6.1.1",
+    "dotenv": "^17.1.0",
+    "gaxios": "^7.1.1",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
     "ink": "^6.0.1",
@@ -42,13 +42,12 @@
     "ink-link": "^4.1.0",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
-    "ink-text-input": "^6.0.0",
     "lowlight": "^3.3.0",
-    "mime-types": "^2.1.4",
+    "mime-types": "^3.0.1",
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
-    "shell-quote": "^1.8.2",
+    "shell-quote": "^1.8.3",
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",

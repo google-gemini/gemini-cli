@@ -23,6 +23,7 @@ import {
   EVENT_CLI_CONFIG,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
+  EVENT_FLASH_FALLBACK,
 } from './constants.js';
 import {
   logApiRequest,
@@ -30,6 +31,7 @@ import {
   logCliConfiguration,
   logUserPrompt,
   logToolCall,
+  logFlashFallback,
 } from './loggers.js';
 import {
   ApiRequestEvent,
@@ -38,6 +40,7 @@ import {
   ToolCallDecision,
   ToolCallEvent,
   UserPromptEvent,
+  FlashFallbackEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
@@ -127,7 +130,12 @@ describe('loggers', () => {
     } as unknown as Config;
 
     it('should log a user prompt', () => {
-      const event = new UserPromptEvent(11, 'test-prompt');
+      const event = new UserPromptEvent(
+        11,
+        'prompt-id-8',
+        AuthType.USE_VERTEX_AI,
+        'test-prompt',
+      );
 
       logUserPrompt(mockConfig, event);
 
@@ -151,7 +159,11 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
       } as unknown as Config;
-      const event = new UserPromptEvent(11, 'test-prompt');
+      const event = new UserPromptEvent(
+        11,
+        'test-prompt',
+        AuthType.CLOUD_SHELL,
+      );
 
       logUserPrompt(mockConfig, event);
 
@@ -201,6 +213,8 @@ describe('loggers', () => {
       const event = new ApiResponseEvent(
         'test-model',
         100,
+        'prompt-id-1',
+        AuthType.LOGIN_WITH_GOOGLE,
         usageData,
         'test-response',
       );
@@ -224,6 +238,8 @@ describe('loggers', () => {
           tool_token_count: 2,
           total_token_count: 0,
           response_text: 'test-response',
+          prompt_id: 'prompt-id-1',
+          auth_type: 'oauth-personal',
         },
       });
 
@@ -260,6 +276,8 @@ describe('loggers', () => {
       const event = new ApiResponseEvent(
         'test-model',
         100,
+        'prompt-id-1',
+        AuthType.USE_GEMINI,
         usageData,
         'test-response',
         'test-error',
@@ -296,7 +314,11 @@ describe('loggers', () => {
     } as Config;
 
     it('should log an API request with request_text', () => {
-      const event = new ApiRequestEvent('test-model', 'This is a test request');
+      const event = new ApiRequestEvent(
+        'test-model',
+        'prompt-id-7',
+        'This is a test request',
+      );
 
       logApiRequest(mockConfig, event);
 
@@ -308,12 +330,13 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
           request_text: 'This is a test request',
+          prompt_id: 'prompt-id-7',
         },
       });
     });
 
     it('should log an API request without request_text', () => {
-      const event = new ApiRequestEvent('test-model');
+      const event = new ApiRequestEvent('test-model', 'prompt-id-6');
 
       logApiRequest(mockConfig, event);
 
@@ -324,6 +347,30 @@ describe('loggers', () => {
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
+          prompt_id: 'prompt-id-6',
+        },
+      });
+    });
+  });
+
+  describe('logFlashFallback', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    it('should log flash fallback event', () => {
+      const event = new FlashFallbackEvent(AuthType.USE_VERTEX_AI);
+
+      logFlashFallback(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Switching to flash as Fallback.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_FLASH_FALLBACK,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          auth_type: 'vertex-ai',
         },
       });
     });
@@ -394,6 +441,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
         },
         response: {
           callId: 'test-call-id',
@@ -427,6 +475,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           decision: ToolCallDecision.ACCEPT,
+          prompt_id: 'prompt-id-1',
         },
       });
 
@@ -455,6 +504,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
+          prompt_id: 'prompt-id-2',
         },
         response: {
           callId: 'test-call-id',
@@ -487,6 +537,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: false,
           decision: ToolCallDecision.REJECT,
+          prompt_id: 'prompt-id-2',
         },
       });
 
@@ -516,6 +567,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
+          prompt_id: 'prompt-id-3',
         },
         response: {
           callId: 'test-call-id',
@@ -549,6 +601,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           decision: ToolCallDecision.MODIFY,
+          prompt_id: 'prompt-id-3',
         },
       });
 
@@ -578,6 +631,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
+          prompt_id: 'prompt-id-4',
         },
         response: {
           callId: 'test-call-id',
@@ -609,6 +663,7 @@ describe('loggers', () => {
           ),
           duration_ms: 100,
           success: true,
+          prompt_id: 'prompt-id-4',
         },
       });
 
@@ -638,6 +693,7 @@ describe('loggers', () => {
           },
           callId: 'test-call-id',
           isClientInitiated: true,
+          prompt_id: 'prompt-id-5',
         },
         response: {
           callId: 'test-call-id',
@@ -675,6 +731,7 @@ describe('loggers', () => {
           'error.message': 'test-error',
           error_type: 'test-error-type',
           'error.type': 'test-error-type',
+          prompt_id: 'prompt-id-5',
         },
       });
 

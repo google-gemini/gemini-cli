@@ -11,6 +11,7 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { UserTierId } from '../code_assist/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -66,6 +67,11 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
+export interface ActiveExtension {
+  name: string;
+  version: string;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -98,7 +104,8 @@ export interface SandboxConfig {
 export type FlashFallbackHandler = (
   currentModel: string,
   fallbackModel: string,
-) => Promise<boolean>;
+  error?: unknown,
+) => Promise<boolean | string | null>;
 
 export interface ConfigParameters {
   sessionId: string;
@@ -133,6 +140,10 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  maxSessionTurns?: number;
+  listExtensions?: boolean;
+  activeExtensions?: ActiveExtension[];
+  noBrowser?: boolean;
 }
 
 export class Config {
@@ -171,8 +182,13 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
+  private readonly noBrowser: boolean;
   private modelSwitchedDuringSession: boolean = false;
+  private readonly maxSessionTurns: number;
+  private readonly listExtensions: boolean;
+  private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
+  private quotaErrorOccurred: boolean = false;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -214,6 +230,10 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.listExtensions = params.listExtensions ?? false;
+    this._activeExtensions = params.activeExtensions ?? [];
+    this.noBrowser = params.noBrowser ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -290,6 +310,26 @@ export class Config {
 
   setFlashFallbackHandler(handler: FlashFallbackHandler): void {
     this.flashFallbackHandler = handler;
+  }
+
+  getMaxSessionTurns(): number {
+    return this.maxSessionTurns;
+  }
+
+  setQuotaErrorOccurred(value: boolean): void {
+    this.quotaErrorOccurred = value;
+  }
+
+  getQuotaErrorOccurred(): boolean {
+    return this.quotaErrorOccurred;
+  }
+
+  async getUserTier(): Promise<UserTierId | undefined> {
+    if (!this.geminiClient) {
+      return undefined;
+    }
+    const generator = this.geminiClient.getContentGenerator();
+    return await generator.getTier?.();
   }
 
   getEmbeddingModel(): string {
@@ -444,6 +484,18 @@ export class Config {
 
   getExtensionContextFilePaths(): string[] {
     return this.extensionContextFilePaths;
+  }
+
+  getListExtensions(): boolean {
+    return this.listExtensions;
+  }
+
+  getActiveExtensions(): ActiveExtension[] {
+    return this._activeExtensions;
+  }
+
+  getNoBrowser(): boolean {
+    return this.noBrowser;
   }
 
   async getGitService(): Promise<GitService> {

@@ -16,6 +16,7 @@ import {
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
@@ -26,6 +27,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 import { spawn } from 'child_process';
+import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -51,19 +53,19 @@ Signal: Signal number or \`(none)\` if no signal was received.
 Background PIDs: List of background processes started or \`(none)\`.
 Process Group PGID: Process group started or \`(none)\``,
       {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
           command: {
-            type: 'string',
+            type: Type.STRING,
             description: 'Exact bash command to execute as `bash -c <command>`',
           },
           description: {
-            type: 'string',
+            type: Type.STRING,
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
           directory: {
-            type: 'string',
+            type: Type.STRING,
             description:
               '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
           },
@@ -223,13 +225,9 @@ Process Group PGID: Process group started or \`(none)\``,
       }
       return commandCheck.reason;
     }
-    if (
-      !SchemaValidator.validate(
-        this.parameterSchema as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return `Parameters failed schema validation.`;
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
@@ -491,6 +489,15 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     }
 
-    return { llmContent, returnDisplay: returnDisplayMessage };
+    const summary = await summarizeToolOutput(
+      llmContent,
+      this.config.getGeminiClient(),
+      abortSignal,
+    );
+
+    return {
+      llmContent: summary,
+      returnDisplay: returnDisplayMessage,
+    };
   }
 }
