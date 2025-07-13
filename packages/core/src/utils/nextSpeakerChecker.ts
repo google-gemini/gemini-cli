@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
 import { Content, SchemaUnion, Type } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { GeminiChat } from '../core/geminiChat.js';
@@ -131,6 +132,7 @@ export async function checkNextSpeaker(
       contents,
       RESPONSE_SCHEMA,
       abortSignal,
+      DEFAULT_GEMINI_FLASH_MODEL,
     )) as unknown as NextSpeakerResponse;
 
     if (
