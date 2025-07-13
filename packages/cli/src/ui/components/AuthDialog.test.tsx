@@ -191,10 +191,7 @@ describe('AuthDialog', () => {
       expect(lastFrame()).toContain('● Login with Google');
     });
 
-    it('should warn and fall back to default if GEMINI_DEFAULT_AUTH_TYPE is invalid', () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+    it('should show an error and fall back to default if GEMINI_DEFAULT_AUTH_TYPE is invalid', () => {
       process.env.GEMINI_DEFAULT_AUTH_TYPE = 'invalid-auth-type';
 
       const settings: LoadedSettings = new LoadedSettings(
@@ -215,13 +212,12 @@ describe('AuthDialog', () => {
         <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "invalid-auth-type". Valid values are: oauth-personal, gemini-api-key, vertex-ai, cloud-shell.',
+      expect(lastFrame()).toContain(
+        'Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "invalid-auth-type"',
       );
 
       // Default is LOGIN_WITH_GOOGLE
       expect(lastFrame()).toContain('● Login with Google');
-      consoleWarnSpy.mockRestore();
     });
   });
 

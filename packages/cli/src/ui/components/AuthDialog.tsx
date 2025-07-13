@@ -18,6 +18,18 @@ interface AuthDialogProps {
   initialErrorMessage?: string | null;
 }
 
+function parseDefaultAuthType(
+  defaultAuthType: string | undefined,
+): AuthType | null {
+  if (
+    defaultAuthType &&
+    Object.values(AuthType).includes(defaultAuthType as AuthType)
+  ) {
+    return defaultAuthType as AuthType;
+  }
+  return null;
+}
+
 export function AuthDialog({
   onSelect,
   settings,
@@ -27,7 +39,18 @@ export function AuthDialog({
     if (initialErrorMessage) {
       return initialErrorMessage;
     }
-    const defaultAuthType = process.env.GEMINI_DEFAULT_AUTH_TYPE;
+
+    const defaultAuthType = parseDefaultAuthType(
+      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+    );
+
+    if (process.env.GEMINI_DEFAULT_AUTH_TYPE && defaultAuthType === null) {
+      return (
+        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env.GEMINI_DEFAULT_AUTH_TYPE}". ` +
+        `Valid values are: ${Object.values(AuthType).join(', ')}.`
+      );
+    }
+
     if (
       process.env.GEMINI_API_KEY &&
       (!defaultAuthType || defaultAuthType === AuthType.USE_GEMINI)
@@ -61,16 +84,11 @@ export function AuthDialog({
       return item.value === settings.merged.selectedAuthType;
     }
 
-    const defaultAuthType = process.env.GEMINI_DEFAULT_AUTH_TYPE;
+    const defaultAuthType = parseDefaultAuthType(
+      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+    );
     if (defaultAuthType) {
-      if (Object.values(AuthType).includes(defaultAuthType as AuthType)) {
-        return item.value === defaultAuthType;
-      } else {
-        console.warn(
-          `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${defaultAuthType}". ` +
-            `Valid values are: ${Object.values(AuthType).join(', ')}.`,
-        );
-      }
+      return item.value === defaultAuthType;
     }
 
     if (process.env.GEMINI_API_KEY) {
