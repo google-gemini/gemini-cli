@@ -230,7 +230,11 @@ async function connectAndDiscover(
     return;
   }
 
-  if (debugMode && transport instanceof StdioClientTransport && transport.stderr) {
+  if (
+    debugMode &&
+    transport instanceof StdioClientTransport &&
+    transport.stderr
+  ) {
     transport.stderr.on('data', (data) => {
       const stderrStr = data.toString();
       console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
