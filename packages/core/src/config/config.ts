@@ -11,6 +11,7 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { UserTierId } from '../code_assist/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -30,6 +31,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
@@ -65,6 +67,11 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
+export interface ActiveExtension {
+  name: string;
+  version: string;
+}
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -84,6 +91,8 @@ export class MCPServerConfig {
     readonly trust?: boolean,
     // Metadata
     readonly description?: string,
+    readonly includeTools?: string[],
+    readonly excludeTools?: string[],
   ) {}
 }
 
@@ -95,7 +104,8 @@ export interface SandboxConfig {
 export type FlashFallbackHandler = (
   currentModel: string,
   fallbackModel: string,
-) => Promise<boolean>;
+  error?: unknown,
+) => Promise<boolean | string | null>;
 
 export interface ConfigParameters {
   sessionId: string;
@@ -130,6 +140,10 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
+  maxSessionTurns?: number;
+  listExtensions?: boolean;
+  activeExtensions?: ActiveExtension[];
+  noBrowser?: boolean;
 }
 
 export class Config {
@@ -168,8 +182,13 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
+  private readonly noBrowser: boolean;
   private modelSwitchedDuringSession: boolean = false;
+  private readonly maxSessionTurns: number;
+  private readonly listExtensions: boolean;
+  private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
+  private quotaErrorOccurred: boolean = false;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -211,6 +230,10 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.listExtensions = params.listExtensions ?? false;
+    this._activeExtensions = params.activeExtensions ?? [];
+    this.noBrowser = params.noBrowser ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -229,32 +252,30 @@ export class Config {
     }
   }
 
+  async initialize(): Promise<void> {
+    // Initialize centralized FileDiscoveryService
+    this.getFileService();
+    if (this.getCheckpointingEnabled()) {
+      try {
+        await this.getGitService();
+      } catch {
+        // For now swallow the error, later log it.
+      }
+    }
+    this.toolRegistry = await this.createToolRegistry();
+  }
+
   async refreshAuth(authMethod: AuthType) {
-    // Always use the original default model when switching auth methods
-    // This ensures users don't stay on Flash after switching between auth types
-    // and allows API key users to get proper fallback behavior from getEffectiveModel
-    const modelToUse = this.model; // Use the original default model
-
-    // Temporarily clear contentGeneratorConfig to prevent getModel() from returning
-    // the previous session's model (which might be Flash)
-    this.contentGeneratorConfig = undefined!;
-
-    const contentConfig = await createContentGeneratorConfig(
-      modelToUse,
+    this.contentGeneratorConfig = await createContentGeneratorConfig(
+      this.model,
       authMethod,
-      this,
     );
 
-    const gc = new GeminiClient(this);
-    this.geminiClient = gc;
-    this.toolRegistry = await createToolRegistry(this);
-    await gc.initialize(contentConfig);
-    this.contentGeneratorConfig = contentConfig;
+    this.geminiClient = new GeminiClient(this);
+    await this.geminiClient.initialize(this.contentGeneratorConfig);
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.modelSwitchedDuringSession = false;
-
-    // Note: In the future, we may want to reset any cached state when switching auth methods
   }
 
   getSessionId(): string {
@@ -289,6 +310,26 @@ export class Config {
 
   setFlashFallbackHandler(handler: FlashFallbackHandler): void {
     this.flashFallbackHandler = handler;
+  }
+
+  getMaxSessionTurns(): number {
+    return this.maxSessionTurns;
+  }
+
+  setQuotaErrorOccurred(value: boolean): void {
+    this.quotaErrorOccurred = value;
+  }
+
+  getQuotaErrorOccurred(): boolean {
+    return this.quotaErrorOccurred;
+  }
+
+  async getUserTier(): Promise<UserTierId | undefined> {
+    if (!this.geminiClient) {
+      return undefined;
+    }
+    const generator = this.geminiClient.getContentGenerator();
+    return await generator.getTier?.();
   }
 
   getEmbeddingModel(): string {
@@ -445,6 +486,18 @@ export class Config {
     return this.extensionContextFilePaths;
   }
 
+  getListExtensions(): boolean {
+    return this.listExtensions;
+  }
+
+  getActiveExtensions(): ActiveExtension[] {
+    return this._activeExtensions;
+  }
+
+  getNoBrowser(): boolean {
+    return this.noBrowser;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);
@@ -452,58 +505,73 @@ export class Config {
     }
     return this.gitService;
   }
-}
 
-export function createToolRegistry(config: Config): Promise<ToolRegistry> {
-  const registry = new ToolRegistry(config);
-  const targetDir = config.getTargetDir();
+  async refreshMemory(): Promise<{ memoryContent: string; fileCount: number }> {
+    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
+      this.getWorkingDir(),
+      this.getDebugMode(),
+      this.getFileService(),
+      this.getExtensionContextFilePaths(),
+    );
 
-  // helper to create & register core tools that are enabled
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
-    const className = ToolClass.name;
-    const toolName = ToolClass.Name || className;
-    const coreTools = config.getCoreTools();
-    const excludeTools = config.getExcludeTools();
+    this.setUserMemory(memoryContent);
+    this.setGeminiMdFileCount(fileCount);
 
-    let isEnabled = false;
-    if (coreTools === undefined) {
-      isEnabled = true;
-    } else {
-      isEnabled = coreTools.some(
-        (tool) =>
-          tool === className ||
-          tool === toolName ||
-          tool.startsWith(`${className}(`) ||
-          tool.startsWith(`${toolName}(`),
-      );
-    }
+    return { memoryContent, fileCount };
+  }
 
-    if (excludeTools?.includes(className) || excludeTools?.includes(toolName)) {
-      isEnabled = false;
-    }
+  async createToolRegistry(): Promise<ToolRegistry> {
+    const registry = new ToolRegistry(this);
+    const targetDir = this.getTargetDir();
 
-    if (isEnabled) {
-      registry.registerTool(new ToolClass(...args));
-    }
-  };
+    // helper to create & register core tools that are enabled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
+      const className = ToolClass.name;
+      const toolName = ToolClass.Name || className;
+      const coreTools = this.getCoreTools();
+      const excludeTools = this.getExcludeTools();
 
-  registerCoreTool(LSTool, targetDir, config);
-  registerCoreTool(ReadFileTool, targetDir, config);
-  registerCoreTool(GrepTool, targetDir);
-  registerCoreTool(GlobTool, targetDir, config);
-  registerCoreTool(EditTool, config);
-  registerCoreTool(WriteFileTool, config);
-  registerCoreTool(WebFetchTool, config);
-  registerCoreTool(ReadManyFilesTool, targetDir, config);
-  registerCoreTool(ShellTool, config);
-  registerCoreTool(MemoryTool);
-  registerCoreTool(WebSearchTool, config);
-  return (async () => {
+      let isEnabled = false;
+      if (coreTools === undefined) {
+        isEnabled = true;
+      } else {
+        isEnabled = coreTools.some(
+          (tool) =>
+            tool === className ||
+            tool === toolName ||
+            tool.startsWith(`${className}(`) ||
+            tool.startsWith(`${toolName}(`),
+        );
+      }
+
+      if (
+        excludeTools?.includes(className) ||
+        excludeTools?.includes(toolName)
+      ) {
+        isEnabled = false;
+      }
+
+      if (isEnabled) {
+        registry.registerTool(new ToolClass(...args));
+      }
+    };
+
+    registerCoreTool(LSTool, targetDir, this);
+    registerCoreTool(ReadFileTool, targetDir, this);
+    registerCoreTool(GrepTool, targetDir);
+    registerCoreTool(GlobTool, targetDir, this);
+    registerCoreTool(EditTool, this);
+    registerCoreTool(WriteFileTool, this);
+    registerCoreTool(WebFetchTool, this);
+    registerCoreTool(ReadManyFilesTool, targetDir, this);
+    registerCoreTool(ShellTool, this);
+    registerCoreTool(MemoryTool);
+    registerCoreTool(WebSearchTool, this);
+
     await registry.discoverTools();
     return registry;
-  })();
+  }
 }
-
 // Export model constants for use in CLI
 export { DEFAULT_GEMINI_FLASH_MODEL };

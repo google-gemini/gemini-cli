@@ -103,7 +103,7 @@ export abstract class BaseTool<
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
   ) {}
@@ -115,7 +115,7 @@ export abstract class BaseTool<
     return {
       name: this.name,
       description: this.description,
-      parameters: this.parameterSchema as Schema,
+      parameters: this.parameterSchema,
     };
   }
 
@@ -174,6 +174,11 @@ export abstract class BaseTool<
 
 export interface ToolResult {
   /**
+   * A short, one-line summary of the tool's action and result.
+   * e.g., "Read 5 files", "Wrote 256 bytes to foo.txt"
+   */
+  summary?: string;
+  /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.
    */
@@ -199,10 +204,19 @@ export interface FileDiff {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   fileName: string;
   fileDiff: string;
   isModifying?: boolean;
+}
+
+export interface ToolConfirmationPayload {
+  // used to override `modifiedProposedContent` for modifiable tools in the
+  // inline modify flow
+  newContent: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
