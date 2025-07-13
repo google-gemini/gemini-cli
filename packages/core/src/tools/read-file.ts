@@ -187,7 +187,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        llmContent: [{ text: `Error: Invalid parameters provided. Reason: ${validationError}` }],
         returnDisplay: validationError,
       };
     }
@@ -207,7 +207,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           relativePath,
         )}' denied by file permission configuration.`;
         return {
-          llmContent: `Error: ${errorMessage}`,
+          llmContent: [{ text: `Error: ${errorMessage}` }],
           returnDisplay: `Error: ${errorMessage}`,
         };
       }
@@ -225,7 +225,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         const errorMsg =
           'The `lines`, `section`, and `offset`/`limit` parameters are mutually exclusive.';
         return {
-          llmContent: `Error: ${errorMsg}`,
+          llmContent: [{ text: `Error: ${errorMsg}` }],
           returnDisplay: `Error: ${errorMsg}`,
         };
       }
@@ -241,7 +241,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           const errorMsg =
             "Invalid line range format. Use 'start' or 'start-end'. Lines are 1-based.";
           return {
-            llmContent: `Error: ${errorMsg}`,
+            llmContent: [{ text: `Error: ${errorMsg}` }],
             returnDisplay: `Error: ${errorMsg}`,
           };
         }
@@ -260,8 +260,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           typeof fileContentResult.llmContent !== 'string'
         ) {
           return {
-            llmContent:
-              fileContentResult.error || 'Could not read file to find section.',
+            llmContent: [{ text: fileContentResult.error || 'Could not read file to find section.' }],
             returnDisplay:
               fileContentResult.returnDisplay || 'Could not read file.',
           };
@@ -284,7 +283,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         if (startLine === -1) {
           const errorMsg = `Section '${section}' not found in file.`;
           return {
-            llmContent: `Error: ${errorMsg}`,
+            llmContent: [{ text: `Error: ${errorMsg}` }],
             returnDisplay: `Error: ${errorMsg}`,
           };
         }
@@ -316,7 +315,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           } else {
             const errorMsg = `Could not find end of section '${section}'.`;
             return {
-              llmContent: `Error: ${errorMsg}`,
+              llmContent: [{ text: `Error: ${errorMsg}` }],
               returnDisplay: `Error: ${errorMsg}`,
             };
           }
@@ -348,56 +347,88 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
 
       if (result.error) {
         return {
-          llmContent: result.error, // The detailed error for LLM
-          returnDisplay: result.returnDisplay, // User-friendly error
+          llmContent: [{ text: result.error }], // Wrap in Part
+          returnDisplay: result.returnDisplay,
         };
       }
 
-      let content =
-        typeof result.llmContent === 'string' ? result.llmContent : '';
-      if (line_numbers) {
-        content = content
-          .split('\n')
-          .map((line, index) => `${index + 1}: ${line}`)
-          .join('\n');
-      }
-      if (nonblank_numbers) {
-        let blank_count = 0;
-        content = content
-          .split('\n')
-          .map((line, index) => {
-            if (line.trim() === '') {
-              blank_count++;
-              return '';
-            }
-            return `${index + 1 - blank_count}: ${line}`;
-          })
-          .join('\n');
-      }
-      if (show_ends) {
-        content = content.replace(/\n/g, '$\n');
+      let finalLlmContentPart;
+      if (typeof result.llmContent === 'string') {
+        let textContent = result.llmContent;
+        if (line_numbers) {
+          textContent = textContent
+            .split('\n')
+            .map((line, index) => `${index + 1}: ${line}`)
+            .join('\n');
+        }
+        if (nonblank_numbers) {
+          let blank_count = 0;
+          textContent = textContent
+            .split('\n')
+            .map((line, index) => {
+              if (line.trim() === '') {
+                blank_count++;
+                return '';
+              }
+              return `${index + 1 - blank_count}: ${line}`;
+            })
+            .join('\n');
+        }
+        if (show_ends) {
+          textContent = textContent.replace(/\n/g, '$\n');
+        }
+        finalLlmContentPart = { text: `Content of ${filePath}:\n${textContent}\n` };
+        combinedReturnDisplay += `Content of ${filePath}:\n${textContent}\n`;
+      } else { // It's an inlineData object
+        finalLlmContentPart = result.llmContent; // Already a Part
+        // For display, we might just show the filename for images/assets here or a placeholder
+        combinedReturnDisplay += `Content of ${filePath} (asset data)\n`;
       }
 
-      const resultLines =
-        typeof result.llmContent === 'string'
-          ? result.llmContent.split('\n').length
-          : undefined;
-      const mimetype = getSpecificMimeType(filePath);
-      recordFileOperationMetric(
-        this.config,
-        FileOperation.READ,
-        resultLines,
-        mimetype,
-        path.extname(filePath),
-      );
+      // This assumes combinedLlmContent should be a flat string for multiple files for now
+      // If ReadManyFilesTool needs to return multiple Parts, this logic would change.
+      // For a single ReadFileTool call, llmContent should be PartListUnion.
+      // The current loop for multiple files in ReadFileTool itself is problematic for ToolResult structure.
+      // Let's assume for now absolute_path is a single string for simplicity of this fix.
+      // If absolute_path is an array, the ToolResult structure needs rethinking for llmContent.
+      // The following logic will be incorrect if filePaths.length > 1
+      // The loop currently builds combinedLlmContent and combinedReturnDisplay for all files.
+      // For ToolResult.llmContent to be a valid PartListUnion representing individual files,
+      // we would need to store an array of Parts.
 
-      combinedLlmContent += `Content of ${filePath}:\n${content}\n`;
-      combinedReturnDisplay += `Content of ${filePath}:\n${content}\n`;
-    }
+      // Let's adjust for the single file case first, which is what read-file.test.ts seems to primarily test.
+      if (filePaths.length === 1) {
+        recordFileOperationMetric(
+          this.config,
+          FileOperation.READ,
+          typeof result.llmContent === 'string' ? result.llmContent.split('\n').length : 1, // Approx lines
+          getSpecificMimeType(filePath), // Get MIME type for this specific file
+          path.extname(filePath)
+        );
+        return {
+          llmContent: [finalLlmContentPart], // finalLlmContentPart is already a Part object
+          returnDisplay: combinedReturnDisplay.trim(),
+        };
+      }
+      // For multiple files, the current combinedLlmContent is a single string.
+      // This will be wrapped into a single TextPart.
+      // This part of the logic might need further refactoring if distinct parts for each file are required by consumers.
+      // For now, if it's not text, we just add a placeholder for multiple files.
+      if (typeof finalLlmContentPart === 'object' && 'text' in finalLlmContentPart && finalLlmContentPart.text) {
+        combinedLlmContent += finalLlmContentPart.text;
+      } else if (typeof finalLlmContentPart === 'string') { // Should not happen if processSingleFileContent always returns Part-like for llmContent
+        combinedLlmContent += finalLlmContentPart;
+      } else {
+        combinedLlmContent += `[content for ${filePath}]\n`; // Placeholder for non-text parts in multi-file scenario
+      }
 
+    } // End of for loop
+
+    // This return path is for multiple files.
+    // It correctly wraps the concatenated string into a PartListUnion.
     return {
-      llmContent: combinedLlmContent,
-      returnDisplay: combinedReturnDisplay,
+      llmContent: [{text: combinedLlmContent.trim()}],
+      returnDisplay: combinedReturnDisplay.trim(),
     };
   }
 }

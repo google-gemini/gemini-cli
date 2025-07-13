@@ -300,7 +300,7 @@ export class WriteFileTool
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        llmContent: [{ text: `Error: Invalid parameters provided. Reason: ${validationError}` }],
         returnDisplay: `Error: ${validationError}`,
       };
     }
@@ -314,7 +314,7 @@ export class WriteFileTool
       );
       const errorMessage = `Write operation on file '${shortenPath(relativePath)}' denied by file permission configuration.`;
       return {
-        llmContent: `Error: ${errorMessage}`,
+        llmContent: [{ text: `Error: ${errorMessage}` }],
         returnDisplay: `Error: ${errorMessage}`,
       };
     }
@@ -337,7 +337,7 @@ export class WriteFileTool
       const errDetails = correctedContentResult.error;
       const errorMsg = `Error checking existing file: ${errDetails?.message || 'Unknown error'}`;
       return {
-        llmContent: `Error checking existing file ${params.file_path}: ${errDetails?.message || 'Unknown error'}`,
+        llmContent: [{ text: `Error checking existing file ${params.file_path}: ${errDetails?.message || 'Unknown error'}` }],
         returnDisplay: errorMsg,
       };
     }
@@ -407,13 +407,13 @@ export class WriteFileTool
       }
 
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent: [{ text: llmSuccessMessageParts.join(' ') }],
         returnDisplay: displayResult,
       };
     } catch (error) {
       const errorMsg = `Error writing to file: ${getErrorMessage(error)}`;
       return {
-        llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
+        llmContent: [{ text: `Error writing to file ${params.file_path}: ${errorMsg}` }],
         returnDisplay: `Error: ${errorMsg}`,
       };
     }

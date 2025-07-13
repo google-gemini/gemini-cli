@@ -272,6 +272,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
       'utf-8',
     );
   } catch (error) {
-    new Logger().error('Error saving user settings file:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    new Logger('settings-save-error').error(`Error saving settings file ${settingsFile.path}: ${errorMsg}`);
   }
 }

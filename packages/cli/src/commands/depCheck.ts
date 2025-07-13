@@ -1,11 +1,21 @@
 // packages/cli/src/commands/depCheck.ts
 // Pyrmethus, the Termux Coding Wizard, conjures a spell to manage project dependencies.
 
-import { Command } from '@oclif/core';
+import { Command } from '@oclif/core'; // Args not used if static args = {}
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
-import { runShellCommand } from '@google/gemini-cli-core';
+// Import tools and Config
+import {
+  ShellTool,
+  Config,
+  // Logger, // Oclif's logger is used
+  ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  TelemetryTarget
+} from '@google/gemini-cli-core';
+// import os from 'os'; // No longer needed for Config construction here
 
 
 
@@ -21,6 +31,37 @@ export default class DepCheck extends Command {
   static description = `${NP}Verifies and manages project dependencies for Node.js and Python projects.${RST}`;
 
   static examples = [`${NG}<%= config.bin %> <%= command.id %>${RST}`];
+
+  // No arguments for this command
+  static args = {};
+
+  private shellTool: ShellTool;
+  private commandConfig: Config;
+
+  constructor(argv: string[], config: any) {
+    super(argv, config);
+    const configParams: import('@google/gemini-cli-core').ConfigParameters = {
+      sessionId: 'dep-check-session',
+      targetDir: process.cwd(),
+      approvalMode: ApprovalMode.DEFAULT,
+      model: DEFAULT_GEMINI_MODEL,
+      embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+      debugMode: false,
+      fullContext: false,
+      mcpServers: {},
+      excludeTools: [],
+      telemetry: {
+        enabled: false,
+        target: TelemetryTarget.LOCAL,
+        otlpEndpoint: undefined,
+        logPrompts: false,
+      },
+      checkpointing: false,
+      cwd: process.cwd(),
+    };
+    this.commandConfig = new Config(configParams);
+    this.shellTool = new ShellTool(this.commandConfig);
+  }
 
   public async run(): Promise<void> {
     this.log(NP + 'Summoning the dependency spirits...' + RST);
@@ -60,11 +101,50 @@ export default class DepCheck extends Command {
         ...packageJson.devDependencies,
       };
 
-      const { stdout: npmLsOutput } = await runShellCommand({
+      // Helper to extract text from PartListUnion
+      const getTextFromParts = (parts: import('@google/genai').PartListUnion | undefined): string => {
+        if (!parts) return "";
+        let textContent = "";
+        const partArray = Array.isArray(parts) ? parts : [parts];
+
+        for (const part of partArray) {
+          if (typeof part === 'string') {
+            textContent += part;
+          } else if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+            textContent += part.text;
+          }
+        }
+        return textContent;
+      };
+
+      const result = await this.shellTool.execute({
         command: 'npm list --json --depth=0',
         description: 'Listing installed Node.js packages',
         directory: projectRoot,
+      }, new AbortController().signal);
+
+      const llmTextOutput = getTextFromParts(result.llmContent);
+      let npmLsOutput = "";
+      // Assuming the primary output (stdout) is what we need from llmTextOutput
+      // This parsing is fragile and depends on ShellTool's llmContent format
+      const lines = llmTextOutput.split('\n');
+      lines.forEach(line => {
+        if (line.startsWith("Stdout: ")) npmLsOutput = line.substring("Stdout: ".length).trim();
       });
+      if (npmLsOutput === "(empty)") npmLsOutput = "";
+
+      if (!npmLsOutput) {
+        this.log(NR + "Failed to get npm list output." + RST);
+        // Check for Stderr if stdout is empty
+        let npmLsError = "";
+        lines.forEach(line => {
+            if (line.startsWith("Stderr: ")) npmLsError = line.substring("Stderr: ".length).trim();
+        });
+        if (npmLsError && npmLsError !== "(empty)") {
+            this.log(NR + "npm list error: " + npmLsError + RST);
+        }
+        return;
+      }
 
       const installedPackages = JSON.parse(npmLsOutput).dependencies || {};
 
@@ -146,11 +226,47 @@ Found ${missingCount} missing Node.js dependencies. Consider running: ${NG}npm i
         .map((line: string) => line.trim())
         .filter((line: string) => line && !line.startsWith('#'));
 
-      const { stdout: pipFreezeOutput } = await runShellCommand({
+      // Helper to extract text from PartListUnion (can be defined at class/module level)
+      const getTextFromParts = (parts: import('@google/genai').PartListUnion | undefined): string => {
+        if (!parts) return "";
+        let textContent = "";
+        const partArray = Array.isArray(parts) ? parts : [parts];
+
+        for (const part of partArray) {
+          if (typeof part === 'string') {
+            textContent += part;
+          } else if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+            textContent += part.text;
+          }
+        }
+        return textContent;
+      };
+
+      const resultPip = await this.shellTool.execute({
         command: 'pip freeze',
         description: 'Listing installed Python packages',
         directory: projectRoot,
+      }, new AbortController().signal);
+
+      const llmTextOutputPip = getTextFromParts(resultPip.llmContent);
+      let pipFreezeOutput = "";
+      const linesPip = llmTextOutputPip.split('\n');
+      linesPip.forEach(line => {
+        if (line.startsWith("Stdout: ")) pipFreezeOutput = line.substring("Stdout: ".length).trim();
       });
+      if (pipFreezeOutput === "(empty)") pipFreezeOutput = "";
+
+      if (!pipFreezeOutput && !resultPip.llmContent) { // Check if llmContent itself is empty if stdout parsing fails
+          this.log(NR + "Failed to get pip freeze output." + RST);
+           let pipFreezeError = "";
+            linesPip.forEach(line => {
+                if (line.startsWith("Stderr: ")) pipFreezeError = line.substring("Stderr: ".length).trim();
+            });
+            if (pipFreezeError && pipFreezeError !== "(empty)") {
+                this.log(NR + "pip freeze error: " + pipFreezeError + RST);
+            }
+          return;
+      }
 
       const installedPackages = pipFreezeOutput
         .split('\n')

@@ -47,14 +47,14 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
+        llmContent: [{ text: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}` }],
         returnDisplay: `## Parameter Error\n\n${validationError}`,
       };
     }
 
     if (signal.aborted) {
       return {
-        llmContent: 'Tool execution aborted.',
+        llmContent: [{ text: 'Tool execution aborted.' }],
         returnDisplay:
           '## Tool Aborted\n\nList directory operation was aborted.',
       };
@@ -63,14 +63,14 @@ export class LsTool extends BaseTool<LsToolParams, ToolResult> {
     try {
       const files = await fs.readdir(params.directory);
       return {
-        llmContent: files.join('\n'),
+        llmContent: [{ text: files.join('\n') }],
         returnDisplay: `## List Directory Result
 
 Successfully listed ${files.length} item(s) in **${params.directory}**.`,
       };
     } catch (error) {
       return {
-        llmContent: `Error reading directory ${params.directory}: ${getErrorMessage(error)}`,
+        llmContent: [{ text: `Error reading directory ${params.directory}: ${getErrorMessage(error)}` }],
         returnDisplay: `## Directory Read Error\n\nAn error occurred while reading directory ${params.directory}:\n\n${getErrorMessage(error)}\n\n`,
       };
     }

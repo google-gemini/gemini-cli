@@ -39,7 +39,7 @@ import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
-import { loadHierarchicalGeminiMemory } from '../config/config.js';
+// import { loadHierarchicalGeminiMemory } from '../config/config.js'; // Incorrect: Should be from core
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { useConsolePatcher } from './components/ConsolePatcher.js';
@@ -55,6 +55,7 @@ import {
   ApprovalMode,
   isEditorAvailable,
   EditorType,
+  loadServerHierarchicalMemory, // Added import
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -188,7 +189,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
+      const { memoryContent, fileCount } = await loadServerHierarchicalMemory( // Changed function name
         process.cwd(),
         config.getDebugMode(),
         config.getFileService(),

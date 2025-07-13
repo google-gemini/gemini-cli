@@ -14,7 +14,7 @@ const logger = new Logger('sandbox-config');
 
 // This is a stripped-down version of the CliArgs interface from config.ts
 // to avoid circular dependencies.
-interface SandboxCliArgs {
+export interface SandboxCliArgs { // Added export
   sandbox?: boolean | string;
   'sandbox-image'?: string;
 }

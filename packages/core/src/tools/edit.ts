@@ -9,6 +9,14 @@ import path from 'path';
 import * as Diff from 'diff';
 import { execSync } from 'child_process';
 
+// Define ModifyResult interface at module scope as per user instruction
+export interface ModifyResult {
+  success: boolean;
+  fileDiff?: string;
+  llmContent: string; // This might be the diff or a success/error message for the LLM
+  message?: string;  // This could be a user-facing message
+}
+
 /** Parameters for the Edit tool */
 export interface EditToolParams {
   file_path: string;
@@ -68,6 +76,26 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
     if (params.new_string === undefined) {
       return 'new_string is required.';
     }
+
+    // Add path validation logic
+    if (!path.isAbsolute(params.file_path)) {
+      return `File path must be absolute: ${params.file_path}`;
+    }
+    // isWithinRoot needs access to this.config.getTargetDir()
+    // The constructor takes _config: any. Let's assume it's stored as this.config.
+    // If EditTool doesn't have this.config properly, this will be an issue.
+    // For now, proceeding as if this.config is available and like other tools.
+    // This requires EditTool's constructor to properly receive and store a Config instance.
+    // The current constructor `constructor(_config: any)` does not store it on `this`.
+    // This is a deeper issue with EditTool's construction if it needs config for validation.
+    // For this fix, I'll assume _config is the Config object and use it directly if possible,
+    // or this part of validation needs to be rethought if config isn't available.
+    // Let's assume the constructor was meant to be: constructor(private readonly config: Config)
+    // Given the constructor `constructor(_config: any)`, I cannot reliably access `this.config.getTargetDir()`.
+    // This validation step needs to be re-evaluated based on EditTool's design.
+    // For now, I will only add the isAbsolute check. The isWithinRoot check cannot be added
+    // without a proper config instance.
+
     return null;
   }
 
@@ -106,23 +134,36 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
     signal: AbortSignal,
   ): Promise<ToolResult> {
     const context = this.getModifyContext(signal);
-    await this.modify(context, params);
-    return {
-      llmContent: `Successfully edited ${params.file_path}`,
-      returnDisplay: `Edited ${params.file_path}`,
-    };
+    const modifyResult = await this.modify(context, params);
+
+    // Adapt ModifyResult to ToolResult
+    // llmContent should be suitable for LLM history (e.g., the diff or a concise status)
+    // returnDisplay is for user display (can be more verbose or include the diff rendering)
+    if (modifyResult.success) {
+      return {
+        llmContent: [{ text: modifyResult.llmContent }], // Wrapped in PartListUnion
+        returnDisplay: modifyResult.fileDiff
+          ? { fileName: params.file_path, fileDiff: modifyResult.fileDiff }
+          : modifyResult.message || `Successfully edited ${params.file_path}`,
+      };
+    } else {
+      return {
+        llmContent: [{ text: modifyResult.llmContent }], // Wrapped in PartListUnion
+        returnDisplay: modifyResult.message || `Failed to edit ${params.file_path}`,
+      };
+    }
   }
 
   getDescription(params: EditToolParams): string {
     return `Edits file: ${params.file_path}`;
   }
 
-  async modify(context: ModifyContext<EditToolParams>, params: EditToolParams): Promise<void> {
+  async modify(context: ModifyContext<EditToolParams>, params: EditToolParams): Promise<ModifyResult> {
     await this.logger.info('Starting edit operation');
     try {
-      const content = await context.getCurrentContent(params);
+      const originalContent = await context.getCurrentContent(params);
       const { newContent, occurrences } = await this.applyReplacement(
-        content,
+        originalContent,
         params.old_string || '',
         params.new_string || '',
         params.use_regex ?? false,
@@ -131,9 +172,27 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
         params.case_insensitive ?? false,
         params.count,
       );
+
+      if (originalContent === newContent) {
+        return {
+          success: true, // Technically success, but no change
+          llmContent: `No changes applied to ${params.file_path} as content matched new content.`,
+          message: `No changes needed for ${params.file_path}.`,
+        };
+      }
+
       await this.createFile(params.file_path, newContent);
       await this.logger.info(
         `Applied ${occurrences} changes to ${params.file_path}`,
+      );
+
+      const fileDiff = Diff.createPatch(
+        params.file_path,
+        originalContent,
+        newContent,
+        '',
+        '',
+        { context: 3 }
       );
 
       if (params.commit_message) {
@@ -144,9 +203,32 @@ export class EditTool extends BaseTool implements ModifiableTool<EditToolParams>
           params.branch_name,
         );
       }
+
+      const isNewFileRealCreation = !originalContent && !!newContent;
+
+      if (isNewFileRealCreation) {
+        return {
+          success: true,
+          fileDiff: fileDiff,
+          llmContent: `Successfully created file ${params.file_path} with content.\nDiff:\n${fileDiff}`,
+          message: `Created file ${params.file_path}.`
+        };
+      } else {
+        return {
+          success: true,
+          fileDiff: fileDiff,
+          llmContent: `Successfully applied ${occurrences} changes to ${params.file_path}.\nDiff:\n${fileDiff}`,
+          message: `Applied ${occurrences} changes to ${params.file_path}.`
+        };
+      }
     } catch (e) {
-      await this.logger.error(`Failed to edit: ${(e as Error).message}`);
-      throw e;
+      const error = e as Error;
+      await this.logger.error(`Failed to edit: ${error.message}`);
+      return {
+        success: false,
+        llmContent: `Failed to edit ${params.file_path}: ${error.message}`,
+        message: `Error editing ${params.file_path}: ${error.message}`,
+      };
     }
   }
 

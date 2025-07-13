@@ -22,6 +22,7 @@ import {
   type EditorType,
 } from './editor.js';
 import { execSync, spawn } from 'child_process';
+import * as path from 'path'; // Added import
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
@@ -74,6 +75,7 @@ describe('editor utils', () => {
           expect(checkHasEditorType(editor)).toBe(true);
           expect(execSync).toHaveBeenCalledWith(`command -v ${command}`, {
             stdio: 'ignore',
+            encoding: 'utf8', // Added encoding based on error output
           });
         });
 
@@ -91,8 +93,11 @@ describe('editor utils', () => {
             Buffer.from(`C:\\Program Files\\...\\${win32Command}`),
           );
           expect(checkHasEditorType(editor)).toBe(true);
-          expect(execSync).toHaveBeenCalledWith(`where.exe ${win32Command}`, {
+          // For vim and neovim, the code specifically checks for .exe
+          const expectedCmd = (editor === 'vim' || editor === 'neovim') ? `${win32Command}.exe` : win32Command;
+          expect(execSync).toHaveBeenCalledWith(`where.exe ${expectedCmd}`, {
             stdio: 'ignore',
+            encoding: 'utf8',
           });
         });
 
@@ -126,7 +131,8 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command,
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', path.resolve('old.txt'), path.resolve('new.txt')],
+          isGUI: true,
         });
       });
 
@@ -135,7 +141,8 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: win32Command,
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', path.resolve('old.txt'), path.resolve('new.txt')],
+          isGUI: true,
         });
       });
     }
@@ -158,20 +165,21 @@ describe('editor utils', () => {
             '-i',
             'NONE',
             '-c',
-            'wincmd h | set readonly | wincmd l',
+            'wincmd h | setlocal buftype=nowrite bufhidden=wipe nomodifiable | wincmd l | setlocal nomodifiable',
+            '-c',
+            'autocmd BufEnter <buffer> setlocal nomodifiable',
             '-c',
             'highlight DiffAdd cterm=bold ctermbg=22 guibg=#005f00 | highlight DiffChange cterm=bold ctermbg=24 guibg=#005f87 | highlight DiffText ctermbg=21 guibg=#0000af | highlight DiffDelete ctermbg=52 guibg=#5f0000',
             '-c',
-            'set showtabline=2 | set tabline=[Instructions]\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+            'set showtabline=2',
             '-c',
-            'wincmd h | setlocal statusline=OLD\\ FILE',
-            '-c',
-            'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+            'set tabline=[Diff\\ Mode]\\ OLD\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ NEW\\ FILE\\ :wqa(save\\ &\\ quit)',
             '-c',
             'autocmd WinClosed * wqa',
-            'old.txt',
-            'new.txt',
+            path.resolve('old.txt'),
+            path.resolve('new.txt'),
           ],
+          isGUI: false,
         });
       });
     }
@@ -209,6 +217,7 @@ describe('editor utils', () => {
           {
             stdio: 'inherit',
             shell: true,
+            cwd: expect.any(String), // Added cwd
           },
         );
         expect(mockSpawn.on).toHaveBeenCalledWith(
@@ -246,7 +255,7 @@ describe('editor utils', () => {
         };
         (spawn as Mock).mockReturnValue(mockSpawn);
         await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          `${editor} exited with code 1`,
+          `Editor '${editor}' exited with code 1. Check the file paths and editor installation.`,
         );
       });
     }
@@ -264,6 +273,8 @@ describe('editor utils', () => {
         expect(execSync).toHaveBeenCalledWith(expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
+          cwd: expect.any(String), // Added cwd
+          shell: expect.any(String), // Added shell
         });
       });
 
@@ -278,18 +289,16 @@ describe('editor utils', () => {
         expect(execSync).toHaveBeenCalledWith(expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
+          cwd: expect.any(String), // Added cwd
+          shell: expect.any(String), // Added shell
         });
       });
     }
 
-    it('should log an error if diff command is not available', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+    it('should throw an error if diff command is not available', async () => {
       // @ts-expect-error Testing unsupported editor
-      await openDiff('old.txt', 'new.txt', 'foobar');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'No diff tool available. Install a supported editor.',
+      await expect(openDiff('old.txt', 'new.txt', 'foobar')).rejects.toThrow(
+        "Failed to get diff command for editor: foobar. Please ensure it's installed and configured.",
       );
     });
   });

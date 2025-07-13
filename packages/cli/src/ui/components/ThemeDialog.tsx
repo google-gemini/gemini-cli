@@ -77,7 +77,7 @@ export function ThemeDialog({
     'theme',
   );
 
-  useInput((input, key) => {
+  useInput((_input, key) => { // input prefixed with underscore
     if (key.tab) {
       setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
     }

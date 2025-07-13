@@ -11,7 +11,7 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
-  Logger,
+  Logger as CoreLogger, // Alias to avoid confusion if a local Logger is ever introduced
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -21,6 +21,8 @@ import {
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+
+const logger = new CoreLogger('gemini-non-interactive'); // Instantiate logger
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {

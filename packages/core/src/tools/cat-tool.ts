@@ -58,7 +58,7 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
+        llmContent: [{ text: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}` }],
         returnDisplay: `## Parameter Error\n\n${validationError}`,
       };
     }
@@ -67,7 +67,7 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
     for (const file of params.files) {
       if (signal.aborted) {
         return {
-          llmContent: 'Tool execution aborted.',
+          llmContent: [{ text: 'Tool execution aborted.' }],
           returnDisplay: '## Tool Aborted\n\nCat tool execution was aborted.',
         };
       }
@@ -76,14 +76,14 @@ export class CatTool extends BaseTool<CatToolParams, ToolResult> {
         contents.push(content);
       } catch (error) {
         return {
-          llmContent: `Error reading file ${file}: ${getErrorMessage(error)}`,
+          llmContent: [{ text: `Error reading file ${file}: ${getErrorMessage(error)}` }],
           returnDisplay: `## File Read Error\n\nAn error occurred while reading file ${file}:\n\n${getErrorMessage(error)}\n`,
         };
       }
     }
 
     return {
-      llmContent: contents.join('\n'),
+      llmContent: [{ text: contents.join('\n') }],
       returnDisplay: `## Cat Tool Result\n\nSuccessfully read ${params.files.length} file(s).`,
     };
   }

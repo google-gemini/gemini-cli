@@ -1,12 +1,23 @@
 // packages/cli/src/commands/debugAssist.ts
 // Pyrmethus, the Termux Coding Wizard, conjures a spell for interactive debugging assistance.
 
-import { Command } from '@oclif/core';
-import { readFileSync, existsSync } from 'fs';
+import { Command, Args } from '@oclif/core'; // Removed Flags
+import { readFileSync, existsSync } from 'fs'; // writeFileSync was unused
 import { join } from 'path';
 import chalk from 'chalk';
-import { runShellCommand, replace } from '@google/gemini-cli-core';
-
+// Import tools and Config
+import {
+  ShellTool,
+  EditTool,
+  Config,
+  // Logger, // Oclif's logger is used
+  ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  TelemetryTarget,
+  EditToolParams // For EditTool
+} from '@google/gemini-cli-core';
+// import os from 'os'; // No longer needed for Config construction here
 import * as readline from 'readline';
 
 
@@ -27,23 +38,54 @@ export default class DebugAssist extends Command {
   ];
 
   static args = {
-    codeOrPath: {
+    codeOrPath: Args.string({ // Changed from Flags.string
       name: 'codeOrPath',
       required: true,
       description: 'Code snippet or path to the file to debug.',
-    },
-    errorMsg: {
+    }),
+    errorMsg: Args.string({ // Changed from Flags.string
       name: 'errorMsg',
-      required: false,
+      required: false, // Optional arguments must have required: false (or not set, as it defaults to false for Args)
       description: 'Optional error message to provide context.',
-    },
+    }),
   };
 
   private rl: readline.Interface | undefined;
+  private shellTool: ShellTool;
+  private editTool: EditTool;
+  private commandConfig: Config;
+
+  constructor(argv: string[], config: any) {
+    super(argv, config);
+    const configParams: import('@google/gemini-cli-core').ConfigParameters = {
+      sessionId: 'debug-assist-session',
+      targetDir: process.cwd(),
+      approvalMode: ApprovalMode.DEFAULT,
+      model: DEFAULT_GEMINI_MODEL,
+      embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+      debugMode: false,
+      fullContext: false,
+      mcpServers: {},
+      excludeTools: [],
+      telemetry: {
+        enabled: false,
+        target: TelemetryTarget.LOCAL,
+        otlpEndpoint: undefined,
+        logPrompts: false,
+      },
+      checkpointing: false,
+      cwd: process.cwd(),
+    };
+    this.commandConfig = new Config(configParams);
+    this.shellTool = new ShellTool(this.commandConfig);
+    this.editTool = new EditTool(this.commandConfig);
+  }
 
   public async run(): Promise<void> {
     const { args } = await this.parse(DebugAssist);
-    const { codeOrPath, errorMsg } = args as { codeOrPath: string; errorMsg?: string; };
+    // Args are already correctly typed by oclif Flags
+    const codeOrPath = args.codeOrPath!;
+    const errorMsg = args.errorMsg;
 
     this.log(NP + 'Summoning the debugging spirits...' + RST);
 
@@ -114,23 +156,28 @@ export default class DebugAssist extends Command {
       if (suggestion.action === 'fix') {
         const confirmFix = await this.askQuestion('Apply this fix? (yes/no):');
         if (confirmFix.toLowerCase() === 'yes') {
+          const { args } = await this.parse(DebugAssist);
+          const targetFilePath = join(process.cwd(), args.codeOrPath!);
+
           if (isFilePath) {
             try {
-              await replace(
-                join(
-                  process.cwd(),
-                  (await this.parse(DebugAssist)).args.codeOrPath as string,
-                ),
-                suggestion.newCode || '',
-                suggestion.oldCode || '',
-                suggestion.expectedReplacements || 1,
-              );
+              const editParams: EditToolParams = {
+                file_path: targetFilePath,
+                old_string: suggestion.oldCode || '',
+                new_string: suggestion.newCode || '',
+                count: suggestion.expectedReplacements || 1,
+                // Add other EditToolParams as needed, e.g., use_regex if applicable
+              };
+              // We might need to handle confirmation for EditTool here or ensure ApprovalMode.AUTO works.
+              // For simplicity, assuming direct execution if user confirmed the high-level fix.
+              await this.editTool.execute(editParams, new AbortController().signal);
               this.log(NG + 'Fix applied to file.' + RST);
               currentCode = suggestion.newCode || currentCode; // Update local code representation
             } catch (e: any) {
               this.log(`${NR}Failed to apply fix to file: ${e.message}${RST}`);
             }
           } else {
+            // For snippets, the "fix" is just updating the string in memory
             currentCode = suggestion.newCode || currentCode;
             this.log(NG + 'Fix applied to snippet.' + RST);
           }
@@ -141,14 +188,42 @@ export default class DebugAssist extends Command {
         );
         if (confirmRun.toLowerCase() === 'yes') {
           try {
-            const { stdout, stderr } = await runShellCommand({
+            const result = await this.shellTool.execute({
               command: suggestion.command || '',
               description: 'Executing suggested command',
+            }, new AbortController().signal);
+
+            // Helper to extract text from PartListUnion
+            const getTextFromParts = (parts: import('@google/genai').PartListUnion | undefined): string => {
+              if (!parts) return "";
+              let textContent = "";
+              const partArray = Array.isArray(parts) ? parts : [parts];
+
+              for (const part of partArray) {
+                if (typeof part === 'string') {
+                  textContent += part;
+                } else if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+                  textContent += part.text;
+                }
+              }
+              return textContent;
+            };
+
+            const llmTextOutput = getTextFromParts(result.llmContent);
+            let cmdStdout = "";
+            let cmdStderr = "";
+            const lines = llmTextOutput.split('\n');
+            lines.forEach(line => {
+              if (line.startsWith("Stdout: ")) cmdStdout = line.substring("Stdout: ".length).trim();
+              if (line.startsWith("Stderr: ")) cmdStderr = line.substring("Stderr: ".length).trim();
             });
-            this.log(NB + 'Command Output (stdout):\n' + stdout + RST);
-            if (stderr) {
-              this.log(NY + 'Command Output (stderr):\n' + stderr + RST);
-              currentError = stderr; // Update error for next iteration
+            if (cmdStdout === "(empty)") cmdStdout = "";
+            if (cmdStderr === "(empty)") cmdStderr = "";
+
+            this.log(NB + 'Command Output (stdout):\n' + cmdStdout + RST);
+            if (cmdStderr) {
+              this.log(NY + 'Command Output (stderr):\n' + cmdStderr + RST);
+              currentError = cmdStderr; // Update error for next iteration
             } else {
               currentError = undefined; // Clear error if command ran without stderr
             }

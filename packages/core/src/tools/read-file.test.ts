@@ -15,6 +15,8 @@ import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { FilePermissionService } from '../services/filePermissionService.js';
 
+import type { PartListUnion } from '@google/genai'; // For getTextFromParts
+
 // Mock fileUtils.processSingleFileContent
 vi.mock('../utils/fileUtils', async () => {
   const actualFileUtils =
@@ -26,6 +28,16 @@ vi.mock('../utils/fileUtils', async () => {
 });
 
 const mockProcessSingleFileContent = fileUtils.processSingleFileContent as Mock;
+
+// Helper function
+const getTextFromParts = (parts: PartListUnion | undefined): string => {
+  if (!parts) return ""; let textContent = "";
+  const partArray = Array.isArray(parts) ? parts : [parts];
+  for (const part of partArray) {
+    if (typeof part === 'string') { textContent += part; }
+    else if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') { textContent += part.text; }
+  } return textContent;
+};
 
 describe('ReadFileTool', () => {
   let tempRootDir: string;
@@ -157,7 +169,7 @@ describe('ReadFileTool', () => {
     it('should return validation error if params are invalid', async () => {
       const params: ReadFileToolParams = { absolute_path: 'relative/path.txt' };
       const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
+      expect(getTextFromParts(result.llmContent)).toMatch(/Error: Invalid parameters provided/);
       expect(result.returnDisplay).toMatch(/File path must be absolute/);
     });
 
@@ -178,7 +190,7 @@ describe('ReadFileTool', () => {
         undefined,
         undefined,
       );
-      expect(result.llmContent).toContain(errorMessage);
+      expect(getTextFromParts(result.llmContent)).toContain(errorMessage);
       expect(result.returnDisplay).toContain(errorMessage);
     });
 
@@ -198,9 +210,12 @@ describe('ReadFileTool', () => {
         undefined,
         undefined,
       );
-      expect(result.llmContent).toBe(fileContent);
+      // result.llmContent will be [{ text: "Content of /path:\nActual file content.\n" }]
+      expect(result.llmContent).toEqual([{ text: `Content of ${filePath}:\n${fileContent}\n` }]);
       expect(result.returnDisplay).toBe(
-        `Read text file: ${path.basename(filePath)}`,
+        // returnDisplay in ReadFileTool for single file success is combinedLlmContent.trim()
+        // which will be `Content of ${filePath}:\n${fileContent}` if no line ops
+        `Content of ${filePath}:\n${fileContent}`,
       );
     });
 
@@ -222,9 +237,11 @@ describe('ReadFileTool', () => {
         undefined,
         undefined,
       );
-      expect(result.llmContent).toEqual(imageData);
+      expect(result.llmContent).toEqual([imageData]); // Expect array with the imageData object
       expect(result.returnDisplay).toBe(
-        `Read image file: ${path.basename(filePath)}`,
+        // returnDisplay in ReadFileTool for single file success is combinedLlmContent.trim()
+        // which will be `Content of ${filePath} (asset data)`
+        `Content of ${filePath} (asset data)`,
       );
     });
 
@@ -271,7 +288,7 @@ describe('ReadFileTool', () => {
 
       const result = await tool.execute(params, abortSignal);
 
-      expect(result.llmContent).toMatch(
+      expect(getTextFromParts(result.llmContent)).toMatch(
         /Error: Read operation on file 'protected.txt' denied by file permission configuration./,
       );
       expect(result.returnDisplay).toMatch(
@@ -322,7 +339,7 @@ describe('ReadFileTool', () => {
       );
 
       const result = await tool.execute(paramsForAnotherFile, abortSignal);
-      expect(result.llmContent).toMatch(
+      expect(getTextFromParts(result.llmContent)).toMatch(
         /Error: Read operation on file 'another.txt' denied by file permission configuration./,
       );
       expect(result.returnDisplay).toMatch(
