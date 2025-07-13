@@ -31,12 +31,27 @@ With the Gemini CLI you can:
    ```bash
    npm install -g @google/gemini-cli
    gemini
-   ```
+    ```
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
 You are now ready to use the Gemini CLI!
+
+## Using the -p flag
+
+You can start Gemini with a prompt directly from the command line by using the --prompt or -p flag. This allows you to get a response from Gemini without first entering the interactive shell.
+
+```bash
+gemini -p "Your prompt here"
+```
+
+For example:
+
+```bash
+gemini -p "What is the capital of France?"
+```
+
 
 ### Use a Gemini API key:
 
