@@ -7,6 +7,10 @@
 import { AyuDark } from './ayu.js';
 import { AyuLight } from './ayu-light.js';
 import { AtomOneDark } from './atom-one-dark.js';
+import { CatppuccinFrappe } from './catppuccin-frappe.js';
+import { CatppuccinLatte } from './catppuccin-latte.js';
+import { CatppuccinMacchiato } from './catppuccin-macchiato.js';
+import { CatppuccinMocha } from './catppuccin-mocha.js';
 import { Dracula } from './dracula.js';
 import { GitHubDark } from './github-dark.js';
 import { GitHubLight } from './github-light.js';
@@ -36,6 +40,10 @@ class ThemeManager {
       AyuDark,
       AyuLight,
       AtomOneDark,
+      CatppuccinFrappe,
+      CatppuccinLatte,
+      CatppuccinMacchiato,
+      CatppuccinMocha,
       Dracula,
       DefaultLight,
       DefaultDark,
