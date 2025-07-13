@@ -163,14 +163,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const addPastedContent = useCallback(
     (content: string) => {
       console.log('App: Adding pasted content.');
-      setPastedContent((prev) => [...prev, content]);
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Image data staged. It will be sent with your next prompt.',
-        },
-        Date.now(),
-      );
+      setPastedContent((prev) => {
+        const newPastedContent = [...prev, content];
+        const imageCount = newPastedContent.length;
+        const imageText = imageCount > 1 ? 'images' : 'image';
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `${imageCount} ${imageText} staged. It will be sent with your next prompt.`,
+          },
+          Date.now(),
+        );
+        return newPastedContent;
+      });
     },
     [addItem],
   );
@@ -556,11 +561,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
-      console.log(
-        'handleFinalSubmit called. Pasted content length:',
-        pastedContent.length,
-      );
       const trimmedValue = submittedValue.trim();
+
+      if (trimmedValue.startsWith('/')) {
+        submitQuery(trimmedValue);
+        return;
+      }
 
       if (pastedContent.length > 0) {
         const parts: Part[] = [];
@@ -585,11 +591,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         submitQuery(parts);
         setPastedContent([]); // Clear after submission
       } else {
-        // This is the special case from the spec reflection.
-        if (trimmedValue.startsWith('/')) {
-          console.log('Submitting command as raw string.');
-          submitQuery(trimmedValue);
-        } else if (trimmedValue.length > 0) {
+        if (trimmedValue.length > 0) {
           console.log('Submitting simple text query.');
           submitQuery(trimmedValue);
         }
