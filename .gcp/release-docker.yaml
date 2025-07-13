@@ -46,7 +46,7 @@ steps:
       - |
         export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
         echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
-        npm run build:sandbox:fast
+        npm run build:sandbox
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
@@ -58,13 +58,13 @@ steps:
       - -c
       - |
         set -e
-        IMAGE_TAG=$(cat /workspace/image_tag.txt)
-        BASE_IMAGE_URI=$(npm run -s config get sandboxImageUri)
-        IMAGE_URI_NO_TAG=${BASE_IMAGE_URI%:*}
-        FINAL_IMAGE_URI="${IMAGE_URI_NO_TAG}:${IMAGE_TAG}"
+        IMAGE_TAG=$$(cat /workspace/image_tag.txt)
+        BASE_IMAGE_URI=$$(npm run -s config get sandboxImageUri)
+        IMAGE_URI_NO_TAG=$${BASE_IMAGE_URI%:*}
+        FINAL_IMAGE_URI="$${IMAGE_URI_NO_TAG}:$${IMAGE_TAG}"
 
-        echo "Pushing sandbox image: ${FINAL_IMAGE_URI}"
-        $_CONTAINER_TOOL push "${FINAL_IMAGE_URI}"
+        echo "Pushing sandbox image: $${FINAL_IMAGE_URI}"
+        $_CONTAINER_TOOL push "$${FINAL_IMAGE_URI}"
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
