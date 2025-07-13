@@ -49,7 +49,7 @@ import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useSessionPersistence } from './hooks/useSessionPersistence.js';
 import process from 'node:process';
-import * as path from 'path';
+
 import {
   getErrorMessage,
   type Config,
