@@ -171,7 +171,7 @@ const resumeCommand: SlashCommand = {
       }
       if (i > 2 || !hasSystemPrompt) {
         uiHistory.push({
-          type: item.role && rolemap[item.role],
+          type: item.role && rolemap[item.role] || MessageType.GEMINI,
           text,
         } as HistoryItemWithoutId);
       }
