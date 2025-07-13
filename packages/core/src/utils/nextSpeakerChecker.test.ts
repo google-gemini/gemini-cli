@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, Mock, afterEach } from 'vitest';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
 import { Content, GoogleGenAI, Models } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
@@ -230,5 +231,23 @@ describe('checkNextSpeaker', () => {
       abortSignal,
     );
     expect(result).toBeNull();
+  });
+
+  it('should call generateJson with DEFAULT_GEMINI_FLASH_MODEL', async () => {
+    (chatInstance.getHistory as Mock).mockReturnValue([
+      { role: 'model', parts: [{ text: 'Some model output.' }] },
+    ] as Content[]);
+    const mockApiResponse: NextSpeakerResponse = {
+      reasoning: 'Model made a statement, awaiting user input.',
+      next_speaker: 'user',
+    };
+    (mockGeminiClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
+
+    await checkNextSpeaker(chatInstance, mockGeminiClient, abortSignal);
+
+    expect(mockGeminiClient.generateJson).toHaveBeenCalled();
+    const generateJsonCall = (mockGeminiClient.generateJson as Mock).mock
+      .calls[0];
+    expect(generateJsonCall[3]).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });
