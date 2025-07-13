@@ -183,3 +183,158 @@ Only write high-value comments if at all. Avoid talking to the user through comm
 ## General style requirements
 
 Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of `my_flag`).
+
+-                                                                                                   │
+  │ 220 + ## TODO │
+  │ 221 + │
+  │ 222 + - Reflect on the implementation of the `/paste` command. │
+  │ 223 + - **Specification**: │
+  │ 224 + - The `/paste` command was designed to provide a way for users to input multimodal │
+  │ data, specifically images, by pasting base64 data URIs directly into the terminal. │
+  │ 225 + - It includes a `--clear` flag to remove any images that have been staged for the next │
+  │ prompt. │
+  │ 226 + - **Implementation**: │
+  │ 227 + - The command's logic is centered around a state management system in the main │
+  │ `App.tsx` component. A new `inputMode` state (`'normal'` or `'paste'`) was introduced. │
+  │ 228 + - When a user types `/paste`, the `pasteCommand` action switches the `inputMode` to │
+  │ `'paste'`. │
+  │ 229 + - This change in state triggers the conditional rendering of a new component, │
+  │ `PasteHandler.tsx`. │
+  │ 230 + - The `PasteHandler` component is responsible for capturing the pasted input. It uses │
+  │ a `buffer` to accumulate the text and listens for the "Enter" key to signal completion. │
+  │ 231 + - **Bracketed Paste Patch**: │
+  │ 232 + - A significant challenge was handling "bracketed paste" mode, a terminal feature that │
+  │ wraps pasted text with special escape sequences (`\x1b[200~` and `\x1b[201~`) to prevent │
+  │ accidental code execution. │
+  │ 233 + - The initial implementation stripped these markers, but a bug was reported where │
+  │ valid base64 strings were being rejected. │
+  │ 234 + - The root cause was that terminals can also add leading or trailing newlines around │
+  │ the pasted content, which caused the validation to fail. │
+  │ 235 + - The fix was to `trim()` the input string _before_ stripping the bracketed paste │
+  │ markers. This ensures that any extraneous whitespace is removed, allowing for a reliable │
+  │ check of the paste markers and the `data:image/...` prefix. │
+  │ 236 + - **Performance Optimization**: │
+  │ 237 + - Rendering a potentially very large base64 string directly in the terminal would │
+  │ cause significant performance issues and UI lag. │
+  │ 238 + - To avoid this, the `PasteHandler` component does not display the content of its │
+  │ input buffer. Instead, it provides user feedback by rendering `**********` as soon as the │
+  │ buffer contains any data, confirming that input is being received without the performance │
+  │ overhead. │
+  │ 239 + - **Testing Challenges & Reflection**: │
+  │ 240 + - The initial tests for this feature were brittle. They failed because they were │
+  │ mocking `useInput` at a high level and didn't correctly simulate the sequence of events │
+  │ (paste followed by "Enter"). │
+  │ 241 + - Subsequent attempts to fix the tests by directly calling the mocked input handler │
+  │ also failed due to issues with how React's state updates were being handled in the test │
+  │ environment. │
+  │ 242 + - The final, correct solution was to use the `stdin.write()` method from the │
+  │ `ink-testing-library`. This more accurately simulates a user typing or pasting text and │
+  │ then pressing Enter, which triggers the component's state updates and event handlers in │
+  │ the way they would run in a real application. This experience highlighted the importance │
+  │ of writing tests that mimic real user interaction as closely as possible.
+
+## /paste Command Implementation Reflection
+
+The implementation of the `/paste` command introduced a new modality for providing input to the CLI, specifically for handling large, multi-line base64 data URIs for images. This section reflects on the design, challenges, and key learnings from its development.
+
+### Specification and Design
+
+- **Goal**: To allow users to paste base64 image data directly into the terminal as part of a prompt.
+- **Command**: A `/paste` command was introduced to switch the CLI into a special "paste" input mode. A `--clear` flag was added to allow users to discard any images they had staged.
+- **State Management**: The core of the implementation involved new state in the main `App.tsx` component:
+  - `inputMode`: A state to toggle between `'normal'` and `'paste'` modes.
+  - `pastedContent`: An array to store the base64 strings of the staged images.
+- **Component-based Handling**: When `inputMode` is switched to `'paste'`, a dedicated `PasteHandler.tsx` component is rendered. This component is responsible for:
+  - Capturing all subsequent keyboard input into a buffer.
+  - Listening for the "Enter" key to signal the end of the paste operation.
+  - Calling back to the main `App` component to add the processed base64 string to the `pastedContent` state.
+  - Switching the `inputMode` back to `'normal'`.
+
+### Key Challenges and Solutions
+
+1.  **Bracketed Paste Mode**:
+    - **Problem**: Modern terminals use "bracketed paste" mode to prevent accidental execution of pasted code. This wraps pasted text with special escape sequences (e.g., `\x1b[200~...~`). Additionally, terminals often add their own leading/trailing newlines around the pasted content. An initial naive implementation would fail to validate the `data:image/...` prefix because of this extra wrapping.
+    - **Solution**: The `PasteHandler` implements a two-step cleaning process. First, it calls `.trim()` on the raw input buffer to remove any extraneous whitespace added by the terminal. Second, it explicitly checks for and removes the standard bracketed paste start and end markers. This robust approach ensures that the core base64 string can be reliably validated and processed.
+
+2.  **Performance with Large Inputs**:
+    - **Problem**: Base64 strings for images can be extremely large. Attempting to render this entire string in the Ink-based UI on every keystroke during the paste operation would cause severe performance degradation and UI lag, making the application unusable.
+    - **Solution**: To provide user feedback without the performance hit, the `PasteHandler` does not render the content of its input buffer. Instead, as soon as the buffer is non-empty, it renders a simple placeholder (`**********`). This confirms to the user that their input is being captured without the expensive re-rendering of the large data string.
+
+3.  **Build and Test Failures (The Preflight Process)**:
+    - The `npm run preflight` command was instrumental in catching several issues before they could become bigger problems.
+    - **Type Errors**: A type error was caught because the `Part` type, needed for multimodal input, was not being exported from the `@google/gemini-cli-core` package. This was fixed by adding it to the export list in `packages/core/src/index.ts`.
+    - **Brittle Tests**: The tests for `CommandService.test.ts` failed because they contained hardcoded assertions about the number of commands. Adding the new `/paste` command broke these assertions. The fix was to update the expected number in the tests. This served as a reminder that tests should be made as resilient as possible to changes, for example, by dynamically checking for the presence of a command rather than asserting a fixed count.
+
+### Final Learnings
+
+The implementation of `/paste` was a valuable exercise in handling non-trivial user input in a terminal application. It highlighted the importance of understanding terminal-specific features like bracketed paste, the need for performance-conscious UI updates, and the critical role of a comprehensive preflight check in maintaining code quality and catching integration issues early.
+
+A final, subtle bug was discovered after the initial implementation. The logic for submitting a prompt was modified to always wrap the input in a `Part[]` array to support multimodal inputs (text and images). However, the slash command processing logic was only designed to check for commands when the input was a raw `string`. This meant that typing `/paste` would wrap it as `[{ text: '/paste' }]`, causing it to bypass the command handler and be sent directly to the model as a query. The model, in turn, would try to _help implement_ the command instead of executing it.
+
+The fix was to add a special case in the `handleFinalSubmit` function in `App.tsx`. If the input is a slash command and there is no other content (i.e., no pasted images), the input is sent as a raw string, ensuring it is correctly intercepted and executed by the slash command processor. This incident underscored the importance of considering all code paths when refactoring a critical flow like prompt submission.
+
+## TODO: Re-implement /paste Command
+
+The following is a detailed specification for re-implementing the `/paste` command from scratch.
+
+### 1. Command Definition (`pasteCommand.ts`)
+
+- Create a new file `packages/cli/src/ui/commands/pasteCommand.ts`.
+- Define a `pasteCommand` object of type `SlashCommand`.
+- The command should have the name `paste` and a description.
+- The `action` function should:
+  - Accept `context: CommandContext` and `args: string` as arguments.
+  - Log the received arguments for debugging purposes.
+  - If `args.trim() === '--clear'`, it should:
+    - Log that the `--clear` flag was detected.
+    - Call `context.ui.clearPastedContent()`.
+    - Return a message to the user confirming that the staged images have been cleared.
+  - If no arguments are provided, it should:
+    - Log that it is setting the input mode to "paste".
+    - Call `context.ui.setInputMode('paste')`.
+    - Log that the input mode has been set.
+    - Return a message to the user instructing them on how to paste the data.
+
+### 2. State Management (`App.tsx`)
+
+- Add a new state variable `inputMode` with the type `'normal' | 'paste'` and a default value of `'normal'`.
+- Add a new state variable `pastedContent` with the type `string[]` and a default value of `[]`.
+- Create a `addPastedContent` function that adds a new base64 string to the `pastedContent` array and adds a confirmation message to the history.
+- Create a `clearPastedContent` function that clears the `pastedContent` array.
+
+### 3. Paste Handler Component (`PasteHandler.tsx`)
+
+- Create a new file `packages/cli/src/ui/components/PasteHandler.tsx`.
+- The `PasteHandler` component should:
+  - Accept `onPaste`, `onCancel`, and `addItem` as props.
+  - Use the `useInput` hook to capture user input.
+  - When the "Enter" key is pressed:
+    - Log the raw buffer and the processed data for debugging.
+    - Trim the buffer and remove bracketed paste markers.
+    - Check if the processed data is a valid base64 string (either a data URI or raw JPEG data).
+    - If it is valid, call the `onPaste` and `addItem` functions.
+    - If it is not valid, log an error message.
+    - Call the `onCancel` function to return to normal input mode.
+  - When the "Escape" key is pressed, call the `onCancel` function.
+  - Render a placeholder (`**********`) to provide feedback to the user without lagging the UI.
+
+### 4. App Component (`App.tsx`)
+
+- Conditionally render the `PasteHandler` component when `inputMode` is `'paste'`.
+- Pass the `addPastedContent`, `setInputMode`, and `addItem` functions as props to the `PasteHandler`.
+- Modify the `handleFinalSubmit` function to:
+  - Check if there is any pasted content.
+  - If there is, create a `Part[]` array with the text and image data.
+  - If there is no pasted content and the input is a slash command, send it as a raw string.
+  - Clear the `pastedContent` array after submission.
+
+### 5. Testing
+
+- Create a new test file `packages/cli/src/ui/commands/pasteCommand.test.ts`.
+- Write tests to cover the following scenarios:
+  - Successfully switching to paste mode.
+  - Pasting a valid base64 data URI.
+  - Pasting raw base64 JPEG data that gets correctly prefixed.
+  - Displaying the immediate confirmation message upon a successful paste.
+  - Properly handling the `--clear` flag to remove staged images.
+- Ensure that all tests pass and that no existing functionality has been broken.

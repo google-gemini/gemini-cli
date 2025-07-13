@@ -77,6 +77,8 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  setInputMode: (mode: 'normal' | 'paste') => void,
+  clearPastedContent: () => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -169,6 +171,8 @@ export const useSlashCommandProcessor = (
           refreshStatic();
         },
         setDebugMessage: onDebugMessage,
+        setInputMode,
+        clearPastedContent,
       },
       session: {
         stats: session.stats,
@@ -184,6 +188,8 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       onDebugMessage,
+      setInputMode,
+      clearPastedContent,
     ],
   );
 

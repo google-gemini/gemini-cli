@@ -41,7 +41,7 @@
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
+    "preflight": "npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci && npm run clean",
     "prepare": "npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",

@@ -57,6 +57,7 @@ import {
   EditorType,
   FlashFallbackEvent,
   logFlashFallback,
+  type Part,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -80,6 +81,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { PasteHandler } from './components/PasteHandler.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -155,6 +157,28 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [inputMode, setInputMode] = useState<'normal' | 'paste'>('normal');
+  const [pastedContent, setPastedContent] = useState<string[]>([]);
+
+  const addPastedContent = useCallback(
+    (content: string) => {
+      console.log('App: Adding pasted content.');
+      setPastedContent((prev) => [...prev, content]);
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'Image data staged. It will be sent with your next prompt.',
+        },
+        Date.now(),
+      );
+    },
+    [addItem],
+  );
+
+  const clearPastedContent = useCallback(() => {
+    console.log('App: Clearing pasted content.');
+    setPastedContent([]);
+  }, []);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -386,6 +410,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
+    setInputMode,
+    clearPastedContent,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -530,12 +556,46 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      console.log(
+        'handleFinalSubmit called. Pasted content length:',
+        pastedContent.length,
+      );
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
+
+      if (pastedContent.length > 0) {
+        const parts: Part[] = [];
+        if (trimmedValue.length > 0) {
+          parts.push({ text: trimmedValue });
+        }
+
+        pastedContent.forEach((content) => {
+          // data:image/jpeg;base64,/9j/4AAQSkZJRg...
+          const match = content.match(/^data:(image\/\w+);base64,(.*)$/);
+          if (match) {
+            const [, mimeType, data] = match;
+            parts.push({
+              inlineData: {
+                mimeType,
+                data,
+              },
+            });
+          }
+        });
+        console.log(`Submitting with ${parts.length} parts.`);
+        submitQuery(parts);
+        setPastedContent([]); // Clear after submission
+      } else {
+        // This is the special case from the spec reflection.
+        if (trimmedValue.startsWith('/')) {
+          console.log('Submitting command as raw string.');
+          submitQuery(trimmedValue);
+        } else if (trimmedValue.length > 0) {
+          console.log('Submitting simple text query.');
+          submitQuery(trimmedValue);
+        }
       }
     },
-    [submitQuery],
+    [submitQuery, pastedContent],
   );
 
   const logger = useLogger();
@@ -886,6 +946,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}
                       showToolDescriptions={showToolDescriptions}
+                      pastedImageCount={pastedContent.length}
                     />
                   )}
                 </Box>
@@ -915,21 +976,28 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </OverflowProvider>
               )}
 
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  commandContext={commandContext}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                />
-              )}
+              {isInputActive &&
+                (inputMode === 'paste' ? (
+                  <PasteHandler
+                    onPaste={addPastedContent}
+                    onCancel={() => setInputMode('normal')}
+                    addItem={addItem}
+                  />
+                ) : (
+                  <InputPrompt
+                    buffer={buffer}
+                    inputWidth={inputWidth}
+                    suggestionsWidth={suggestionsWidth}
+                    onSubmit={handleFinalSubmit}
+                    userMessages={userMessages}
+                    onClearScreen={handleClearScreen}
+                    config={config}
+                    slashCommands={slashCommands}
+                    commandContext={commandContext}
+                    shellModeActive={shellModeActive}
+                    setShellModeActive={setShellModeActive}
+                  />
+                ))}
             </>
           )}
 

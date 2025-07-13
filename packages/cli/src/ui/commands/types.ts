@@ -34,6 +34,8 @@ export interface CommandContext {
      * Sets the transient debug message displayed in the application footer in debug mode.
      */
     setDebugMessage: (message: string) => void;
+    setInputMode: (mode: 'normal' | 'paste') => void;
+    clearPastedContent: () => void;
   };
   // Session-specific data
   session: {

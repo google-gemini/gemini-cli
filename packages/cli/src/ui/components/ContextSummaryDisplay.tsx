@@ -14,6 +14,7 @@ interface ContextSummaryDisplayProps {
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   showToolDescriptions?: boolean;
+  pastedImageCount?: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -21,12 +22,9 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   showToolDescriptions,
+  pastedImageCount = 0,
 }) => {
   const mcpServerCount = Object.keys(mcpServers || {}).length;
-
-  if (geminiMdFileCount === 0 && mcpServerCount === 0) {
-    return <Text> </Text>; // Render an empty space to reserve height
-  }
 
   const geminiMdText = (() => {
     if (geminiMdFileCount === 0) {
@@ -44,22 +42,25 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       ? `${mcpServerCount} MCP server${mcpServerCount > 1 ? 's' : ''}`
       : '';
 
-  let summaryText = 'Using ';
-  if (geminiMdText) {
-    summaryText += geminiMdText;
+  const pastedText =
+    pastedImageCount > 0
+      ? `${pastedImageCount} image${pastedImageCount > 1 ? 's' : ''} staged`
+      : '';
+
+  const allParts = [geminiMdText, mcpText, pastedText].filter(Boolean);
+
+  if (allParts.length === 0) {
+    return <Text> </Text>; // Render an empty space to reserve height
   }
-  if (geminiMdText && mcpText) {
-    summaryText += ' and ';
-  }
-  if (mcpText) {
-    summaryText += mcpText;
-    // Add ctrl+t hint when MCP servers are available
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      if (showToolDescriptions) {
-        summaryText += ' (ctrl+t to toggle)';
-      } else {
-        summaryText += ' (ctrl+t to view)';
-      }
+
+  let summaryText = 'Using ' + allParts.join(' and ');
+
+  // Add ctrl+t hint when MCP servers are available
+  if (mcpServerCount > 0) {
+    if (showToolDescriptions) {
+      summaryText += ' (ctrl+t to toggle)';
+    } else {
+      summaryText += ' (ctrl+t to view)';
     }
   }
 
