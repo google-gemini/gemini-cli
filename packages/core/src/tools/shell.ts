@@ -27,7 +27,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 import { spawn } from 'child_process';
-import { llmSummarizer } from '../utils/summarizer.js';
+import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -74,8 +74,6 @@ Process Group PGID: Process group started or \`(none)\``,
       },
       false, // output is not markdown
       true, // output can be updated
-      llmSummarizer,
-      true, // should summarize display output
     );
   }
 
@@ -490,6 +488,16 @@ Process Group PGID: Process group started or \`(none)\``,
         // returnDisplayMessage will remain empty, which is fine.
       }
     }
-    return { llmContent, returnDisplay: returnDisplayMessage };
+
+    const summary = await summarizeToolOutput(
+      llmContent,
+      this.config.getGeminiClient(),
+      abortSignal,
+    );
+
+    return {
+      llmContent: summary,
+      returnDisplay: returnDisplayMessage,
+    };
   }
 }
