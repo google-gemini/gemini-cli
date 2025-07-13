@@ -203,6 +203,7 @@ export function ThemeDialog({
             onHighlight={onHighlight}
             isFocused={currenFocusedSection === 'theme'}
             maxItemsToShow={8}
+            showScrollArrows={true}
           />
 
           {/* Scope Selection */}
@@ -217,7 +218,6 @@ export function ThemeDialog({
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
                 isFocused={currenFocusedSection === 'scope'}
-                showScrollArrows={false}
               />
             </Box>
           )}
