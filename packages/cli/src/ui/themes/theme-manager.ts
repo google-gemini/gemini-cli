@@ -17,6 +17,7 @@ import { GitHubLight } from './github-light.js';
 import { GoogleCode } from './googlecode.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
+import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
 import { Theme, ThemeType } from './theme.js';
 import { ANSI } from './ansi.js';
@@ -50,6 +51,7 @@ class ThemeManager {
       GitHubDark,
       GitHubLight,
       GoogleCode,
+      ShadesOfPurple,
       XCode,
       ANSI,
       ANSILight,
