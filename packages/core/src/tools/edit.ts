@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Diff from 'diff';
+import process from 'node:process';
 import {
   BaseTool,
   ToolCallConfirmationDetails,
@@ -97,7 +98,9 @@ Expectation for required parameters:
         properties: {
           file_path: {
             description:
-              "The absolute path to the file to modify. Must start with '/'.",
+              process.platform === 'win32' ?
+                "The absolute path to the file to modify (e.g., C:\\Users\\project\\file.txt). Must be an absolute path."
+                :"The absolute path to the file to modify. Must start with '/'.",
             type: Type.STRING,
           },
           old_string: {
