@@ -52,7 +52,6 @@ Signal: Signal number or \`(none)\` if no signal was received.
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
-      defaultSummarizer,
     );
   }
 
