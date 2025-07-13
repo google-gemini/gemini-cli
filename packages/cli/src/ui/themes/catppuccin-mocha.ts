@@ -12,12 +12,12 @@ const catppuccinMochaColors: ColorsTheme = {
   Foreground: '#cdd6f4',
   LightBlue: '#74c7ec',
   AccentBlue: '#89b4fa',
-  AccentPurple: '#b4befe',
+  AccentPurple: '#cba6f7',
   AccentCyan: '#89dceb',
   AccentGreen: '#a6e3a1',
   AccentYellow: '#f9e2af',
   AccentRed: '#f38ba8',
-  Comment: '#bac2de',
+  Comment: '#9399b2',
   Gray: '#6c7086',
   GradientColors: ['#f5c2e7', '#94e2d5'],
 };
@@ -33,76 +33,133 @@ export const CatppuccinMocha: Theme = new Theme(
       background: catppuccinMochaColors.Background,
       color: catppuccinMochaColors.Foreground,
     },
-    'hljs-keyword': {
+    'hljs-built_in': {
+      color: catppuccinMochaColors.AccentRed,
+    },
+    'hljs-class': {
       color: catppuccinMochaColors.AccentYellow,
     },
-    'hljs-literal': {
+    'hljs-keyword': {
       color: catppuccinMochaColors.AccentPurple,
     },
-    'hljs-symbol': {
-      color: catppuccinMochaColors.AccentCyan,
+    'hljs-link': {
+      color: catppuccinMochaColors.LightBlue,
+      textDecoration: 'underline',
+    },
+    'hljs-literal': {
+      color: catppuccinMochaColors.AccentYellow,
     },
     'hljs-name': {
-      color: catppuccinMochaColors.LightBlue,
-    },
-    'hljs-link': {
       color: catppuccinMochaColors.AccentBlue,
     },
-    'hljs-function .hljs-keyword': {
+    'hljs-number': {
       color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-symbol': {
+      color: catppuccinMochaColors.AccentRed,
+    },
+    'hljs-type': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+
+    'hljs-string': {
+      color: catppuccinMochaColors.AccentGreen,
+    },
+    'hljs-meta-string': {
+      color: catppuccinMochaColors.AccentGreen,
+    },
+    'hljs-regexp': {
+      color: catppuccinMochaColors.AccentRed,
+    },
+    'hljs-template-tag': {
+      color: catppuccinMochaColors.AccentRed,
     },
     'hljs-subst': {
       color: catppuccinMochaColors.Foreground,
     },
-    'hljs-string': {
-      color: catppuccinMochaColors.AccentGreen,
-    },
-    'hljs-title': {
-      color: catppuccinMochaColors.AccentYellow,
-    },
-    'hljs-type': {
+    'hljs-function': {
       color: catppuccinMochaColors.AccentBlue,
     },
-    'hljs-attribute': {
-      color: catppuccinMochaColors.AccentYellow,
-    },
-    'hljs-bullet': {
-      color: catppuccinMochaColors.AccentYellow,
-    },
-    'hljs-addition': {
-      color: catppuccinMochaColors.AccentGreen,
-    },
-    'hljs-variable': {
+    'hljs-title': {
       color: catppuccinMochaColors.Foreground,
     },
-    'hljs-template-tag': {
-      color: catppuccinMochaColors.AccentYellow,
+    'hljs-params': {
+      color: catppuccinMochaColors.Foreground,
     },
-    'hljs-template-variable': {
-      color: catppuccinMochaColors.AccentYellow,
+    'hljs-formula': {
+      color: catppuccinMochaColors.Foreground,
     },
     'hljs-comment': {
       color: catppuccinMochaColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: catppuccinMochaColors.AccentCyan,
+      color: catppuccinMochaColors.Comment,
       fontStyle: 'italic',
     },
-    'hljs-deletion': {
-      color: catppuccinMochaColors.AccentRed,
+    'hljs-doctag': {
+      color: catppuccinMochaColors.AccentYellow,
     },
     'hljs-meta': {
       color: catppuccinMochaColors.AccentYellow,
     },
-    'hljs-doctag': {
-      fontWeight: 'bold',
+    'hljs-meta-keyword': {
+      color: catppuccinMochaColors.AccentPurple,
+    },
+    'hljs-tag': {
+      color: catppuccinMochaColors.Gray,
+    },
+    'hljs-variable': {
+      color: catppuccinMochaColors.AccentPurple,
+    },
+    'hljs-template-variable': {
+      color: catppuccinMochaColors.AccentPurple,
+    },
+    'hljs-attr': {
+      color: catppuccinMochaColors.LightBlue,
+    },
+    'hljs-attribute': {
+      color: catppuccinMochaColors.LightBlue,
+    },
+    'hljs-builtin-name': {
+      color: catppuccinMochaColors.LightBlue,
+    },
+    'hljs-section': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-emphasis': {
+      fontStyle: 'italic',
     },
     'hljs-strong': {
       fontWeight: 'bold',
     },
-    'hljs-emphasis': {
-      fontStyle: 'italic',
+    'hljs-bullet': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-selector-tag': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-selector-id': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-selector-class': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-selector-attr': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-selector-pseudo': {
+      color: catppuccinMochaColors.AccentYellow,
+    },
+    'hljs-addition': {
+      backgroundColor: '#144212',
+      display: 'inline-block',
+      width: '100%',
+    },
+    'hljs-deletion': {
+      backgroundColor: '#600',
+      display: 'inline-block',
+      width: '100%',
     },
   },
   catppuccinMochaColors,

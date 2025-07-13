@@ -12,12 +12,12 @@ const catppuccinMacchiatoColors: ColorsTheme = {
   Foreground: '#cad3f5',
   LightBlue: '#7dc4e4',
   AccentBlue: '#8aadf4',
-  AccentPurple: '#b7bdf8',
+  AccentPurple: '#c6a0f6',
   AccentCyan: '#91d7e3',
   AccentGreen: '#a6da95',
   AccentYellow: '#eed49f',
   AccentRed: '#ed8796',
-  Comment: '#b8c0e0',
+  Comment: '#939ab7',
   Gray: '#6e738d',
   GradientColors: ['#f5bde6', '#8bd5ca'],
 };
@@ -33,76 +33,133 @@ export const CatppuccinMacchiato: Theme = new Theme(
       background: catppuccinMacchiatoColors.Background,
       color: catppuccinMacchiatoColors.Foreground,
     },
-    'hljs-keyword': {
+    'hljs-built_in': {
+      color: catppuccinMacchiatoColors.AccentRed,
+    },
+    'hljs-class': {
       color: catppuccinMacchiatoColors.AccentYellow,
     },
-    'hljs-literal': {
+    'hljs-keyword': {
       color: catppuccinMacchiatoColors.AccentPurple,
     },
-    'hljs-symbol': {
-      color: catppuccinMacchiatoColors.AccentCyan,
+    'hljs-link': {
+      color: catppuccinMacchiatoColors.LightBlue,
+      textDecoration: 'underline',
+    },
+    'hljs-literal': {
+      color: catppuccinMacchiatoColors.AccentYellow,
     },
     'hljs-name': {
-      color: catppuccinMacchiatoColors.LightBlue,
-    },
-    'hljs-link': {
       color: catppuccinMacchiatoColors.AccentBlue,
     },
-    'hljs-function .hljs-keyword': {
+    'hljs-number': {
       color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-symbol': {
+      color: catppuccinMacchiatoColors.AccentRed,
+    },
+    'hljs-type': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+
+    'hljs-string': {
+      color: catppuccinMacchiatoColors.AccentGreen,
+    },
+    'hljs-meta-string': {
+      color: catppuccinMacchiatoColors.AccentGreen,
+    },
+    'hljs-regexp': {
+      color: catppuccinMacchiatoColors.AccentRed,
+    },
+    'hljs-template-tag': {
+      color: catppuccinMacchiatoColors.AccentRed,
     },
     'hljs-subst': {
       color: catppuccinMacchiatoColors.Foreground,
     },
-    'hljs-string': {
-      color: catppuccinMacchiatoColors.AccentGreen,
-    },
-    'hljs-title': {
-      color: catppuccinMacchiatoColors.AccentYellow,
-    },
-    'hljs-type': {
+    'hljs-function': {
       color: catppuccinMacchiatoColors.AccentBlue,
     },
-    'hljs-attribute': {
-      color: catppuccinMacchiatoColors.AccentYellow,
-    },
-    'hljs-bullet': {
-      color: catppuccinMacchiatoColors.AccentYellow,
-    },
-    'hljs-addition': {
-      color: catppuccinMacchiatoColors.AccentGreen,
-    },
-    'hljs-variable': {
+    'hljs-title': {
       color: catppuccinMacchiatoColors.Foreground,
     },
-    'hljs-template-tag': {
-      color: catppuccinMacchiatoColors.AccentYellow,
+    'hljs-params': {
+      color: catppuccinMacchiatoColors.Foreground,
     },
-    'hljs-template-variable': {
-      color: catppuccinMacchiatoColors.AccentYellow,
+    'hljs-formula': {
+      color: catppuccinMacchiatoColors.Foreground,
     },
     'hljs-comment': {
       color: catppuccinMacchiatoColors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: catppuccinMacchiatoColors.AccentCyan,
+      color: catppuccinMacchiatoColors.Comment,
       fontStyle: 'italic',
     },
-    'hljs-deletion': {
-      color: catppuccinMacchiatoColors.AccentRed,
+    'hljs-doctag': {
+      color: catppuccinMacchiatoColors.AccentYellow,
     },
     'hljs-meta': {
       color: catppuccinMacchiatoColors.AccentYellow,
     },
-    'hljs-doctag': {
-      fontWeight: 'bold',
+    'hljs-meta-keyword': {
+      color: catppuccinMacchiatoColors.AccentPurple,
+    },
+    'hljs-tag': {
+      color: catppuccinMacchiatoColors.Gray,
+    },
+    'hljs-variable': {
+      color: catppuccinMacchiatoColors.AccentPurple,
+    },
+    'hljs-template-variable': {
+      color: catppuccinMacchiatoColors.AccentPurple,
+    },
+    'hljs-attr': {
+      color: catppuccinMacchiatoColors.LightBlue,
+    },
+    'hljs-attribute': {
+      color: catppuccinMacchiatoColors.LightBlue,
+    },
+    'hljs-builtin-name': {
+      color: catppuccinMacchiatoColors.LightBlue,
+    },
+    'hljs-section': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-emphasis': {
+      fontStyle: 'italic',
     },
     'hljs-strong': {
       fontWeight: 'bold',
     },
-    'hljs-emphasis': {
-      fontStyle: 'italic',
+    'hljs-bullet': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-selector-tag': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-selector-id': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-selector-class': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-selector-attr': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-selector-pseudo': {
+      color: catppuccinMacchiatoColors.AccentYellow,
+    },
+    'hljs-addition': {
+      backgroundColor: '#144212',
+      display: 'inline-block',
+      width: '100%',
+    },
+    'hljs-deletion': {
+      backgroundColor: '#600',
+      display: 'inline-block',
+      width: '100%',
     },
   },
   catppuccinMacchiatoColors,
