@@ -19,6 +19,12 @@ export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
 
+// Export Qwen integration
+export * from './qwen/qwenContentGenerator.js';
+export * from './qwen/qwenConfig.js';
+export * from './qwen/qwenErrors.js';
+export * from './qwen/qwenValidator.js';
+
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
