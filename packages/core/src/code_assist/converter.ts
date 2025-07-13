@@ -176,13 +176,13 @@ import * as path from 'path';
 
 function tryLoadFileContent(input: string): string {
   const filePath = input.trim();
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    try {
+  try {
+    if (fs.statSync(filePath).isFile()) {
       const code = fs.readFileSync(filePath, 'utf8');
       return `Here is the current content of the file \`${path.basename(filePath)}\`:\n\n\`\`\`\n${code}\n\`\`\`\n`;
-    } catch {
-      return input;
     }
+  } catch {
+    // If any error occurs (file does not exist, permission denied, etc.), simply return the original input
   }
   return input;
 }
