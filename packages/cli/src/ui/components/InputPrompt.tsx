@@ -183,7 +183,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [resetCompletionState, buffer, completionSuggestions, slashCommands],
   );
 
-  // Handle clipboard image pasting with Ctrl+V
+  // Handle clipboard image pasting with Ctrl+Alt+V
   const handleClipboardImage = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
@@ -368,8 +368,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+V for clipboard image paste
-      if (key.ctrl && key.name === 'v') {
+      // Alt+V for clipboard image paste
+      if (key.meta && key.name === 'v') {
+        console.error('=== Detected Alt+V key press ===');
         handleClipboardImage();
         return;
       }
