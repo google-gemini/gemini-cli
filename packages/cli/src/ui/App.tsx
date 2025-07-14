@@ -135,6 +135,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
@@ -180,6 +181,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
+
+  useEffect(() => {
+    if (config) {
+      config.setSetAuthMessage(setAuthMessage);
+    }
+  }, [config]);
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -801,6 +808,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           ) : isAuthenticating ? (
             <>
               <AuthInProgress
+                authMessage={authMessage}
                 onTimeout={() => {
                   setAuthError('Authentication timed out. Please try again.');
                   cancelAuthentication();

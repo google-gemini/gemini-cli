@@ -11,10 +11,12 @@ import { Colors } from '../colors.js';
 
 interface AuthInProgressProps {
   onTimeout: () => void;
+  authMessage: string | null;
 }
 
 export function AuthInProgress({
   onTimeout,
+  authMessage,
 }: AuthInProgressProps): React.JSX.Element {
   const [timedOut, setTimedOut] = useState(false);
 
@@ -48,7 +50,8 @@ export function AuthInProgress({
       ) : (
         <Box>
           <Text>
-            <Spinner type="dots" /> Waiting for auth... (Press ESC to cancel)
+            <Spinner type="dots" />{' '}
+            {authMessage || 'Waiting for auth... (Press ESC to cancel)'}
           </Text>
         </Box>
       )}
