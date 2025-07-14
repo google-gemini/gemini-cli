@@ -235,7 +235,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   "usageStatisticsEnabled": true,
   "hideTips": false,
   "maxSessionTurns": 10,
-  "summarizeToolOutput":{
+  "summarizeToolOutput": {
     "run_shell_command": {
       "tokenBudget": 100
     }
