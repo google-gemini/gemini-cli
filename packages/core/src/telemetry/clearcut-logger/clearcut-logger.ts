@@ -23,6 +23,7 @@ import {
   getCachedGoogleAccount,
   getLifetimeGoogleAccounts,
 } from '../../utils/user_account.js';
+import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -65,28 +66,11 @@ export class ClearcutLogger {
     this.events.push([
       {
         event_time_ms: Date.now(),
-        source_extension_json: this.safeJsonStringify(event),
+        source_extension_json: safeJsonStringify(event),
       },
     ]);
   }
 
-  private safeJsonStringify(obj: unknown): string {
-    try {
-      return JSON.stringify(obj);
-    } catch (_error) {
-      // Handle circular references by creating a safe replacer
-      const seen = new WeakSet();
-      return JSON.stringify(obj, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-          if (seen.has(value)) {
-            return '[Circular]';
-          }
-          seen.add(value);
-        }
-        return value;
-      });
-    }
-  }
 
   createLogEvent(name: string, data: object[]): object {
     const email = getCachedGoogleAccount();
@@ -139,7 +123,7 @@ export class ClearcutLogger {
           log_event: eventsToSend,
         },
       ];
-      const body = this.safeJsonStringify(request);
+      const body = safeJsonStringify(request);
       const options = {
         hostname: 'play.googleapis.com',
         path: '/log',
