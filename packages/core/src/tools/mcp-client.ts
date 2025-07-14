@@ -6,7 +6,10 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
@@ -14,13 +17,8 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import {
-  CallableTool,
-  FunctionDeclaration,
-  mcpToTool,
-  Schema,
-} from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
+import { Type, mcpToTool } from '@google/genai';
+import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -129,6 +127,7 @@ export async function discoverMcpTools(
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
   toolRegistry: ToolRegistry,
+  debugMode: boolean,
 ): Promise<void> {
   // Set discovery state to in progress
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
@@ -149,7 +148,12 @@ export async function discoverMcpTools(
 
     const discoveryPromises = Object.entries(mcpServers).map(
       ([mcpServerName, mcpServerConfig]) =>
-        connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
+        connectAndDiscover(
+          mcpServerName,
+          mcpServerConfig,
+          toolRegistry,
+          debugMode,
+        ),
     );
     await Promise.all(discoveryPromises);
 
@@ -162,10 +166,21 @@ export async function discoverMcpTools(
   }
 }
 
+/**
+ * Connects to an MCP server and discovers available tools, registering them with the tool registry.
+ * This function handles the complete lifecycle of connecting to a server, discovering tools,
+ * and cleaning up resources if no tools are found.
+ *
+ * @param mcpServerName The name identifier for this MCP server
+ * @param mcpServerConfig Configuration object containing connection details
+ * @param toolRegistry The registry to register discovered tools with
+ * @returns Promise that resolves when discovery is complete
+ */
 async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   toolRegistry: ToolRegistry,
+  debugMode: boolean,
 ): Promise<void> {
   // Initialize the server status as connecting
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
@@ -185,7 +200,16 @@ async function connectAndDiscover(
       transportOptions,
     );
   } else if (mcpServerConfig.url) {
-    transport = new SSEClientTransport(new URL(mcpServerConfig.url));
+    const transportOptions: SSEClientTransportOptions = {};
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+    transport = new SSEClientTransport(
+      new URL(mcpServerConfig.url),
+      transportOptions,
+    );
   } else if (mcpServerConfig.command) {
     transport = new StdioClientTransport({
       command: mcpServerConfig.command,
@@ -204,6 +228,17 @@ async function connectAndDiscover(
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     return;
+  }
+
+  if (
+    debugMode &&
+    transport instanceof StdioClientTransport &&
+    transport.stderr
+  ) {
+    transport.stderr.on('data', (data) => {
+      const stderrStr = data.toString().trim();
+      console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
+    });
   }
 
   const mcpClient = new Client({
@@ -259,24 +294,11 @@ async function connectAndDiscover(
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   };
 
-  if (transport instanceof StdioClientTransport && transport.stderr) {
-    transport.stderr.on('data', (data) => {
-      const stderrStr = data.toString();
-      // Filter out verbose INFO logs from some MCP servers
-      if (!stderrStr.includes('] INFO')) {
-        console.debug(`MCP STDERR (${mcpServerName}):`, stderrStr);
-      }
-    });
-  }
-
   try {
-    const mcpCallableTool: CallableTool = mcpToTool(mcpClient);
-    const discoveredToolFunctions = await mcpCallableTool.tool();
+    const mcpCallableTool = mcpToTool(mcpClient);
+    const tool = await mcpCallableTool.tool();
 
-    if (
-      !discoveredToolFunctions ||
-      !Array.isArray(discoveredToolFunctions.functionDeclarations)
-    ) {
+    if (!tool || !Array.isArray(tool.functionDeclarations)) {
       console.error(
         `MCP server '${mcpServerName}' did not return valid tool function declarations. Skipping.`,
       );
@@ -292,11 +314,31 @@ async function connectAndDiscover(
       return;
     }
 
-    for (const funcDecl of discoveredToolFunctions.functionDeclarations) {
+    for (const funcDecl of tool.functionDeclarations) {
       if (!funcDecl.name) {
         console.warn(
           `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
         );
+        continue;
+      }
+
+      const { includeTools, excludeTools } = mcpServerConfig;
+      const toolName = funcDecl.name;
+
+      let isEnabled = false;
+      if (includeTools === undefined) {
+        isEnabled = true;
+      } else {
+        isEnabled = includeTools.some(
+          (tool) => tool === toolName || tool.startsWith(`${toolName}(`),
+        );
+      }
+
+      if (excludeTools?.includes(toolName)) {
+        isEnabled = false;
+      }
+
+      if (!isEnabled) {
         continue;
       }
 
@@ -319,19 +361,13 @@ async function connectAndDiscover(
 
       sanitizeParameters(funcDecl.parameters);
 
-      // Ensure parameters is a valid JSON schema object, default to empty if not.
-      const parameterSchema: Record<string, unknown> =
-        funcDecl.parameters && typeof funcDecl.parameters === 'object'
-          ? { ...(funcDecl.parameters as FunctionDeclaration) }
-          : { type: 'object', properties: {} };
-
       toolRegistry.registerTool(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
           toolNameForModel,
           funcDecl.description ?? '',
-          parameterSchema,
+          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
           funcDecl.name,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
@@ -371,27 +407,6 @@ async function connectAndDiscover(
       await transport.close();
       // Update status to disconnected
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-    }
-  }
-}
-
-export function sanitizeParameters(schema?: Schema) {
-  if (!schema) {
-    return;
-  }
-  if (schema.anyOf) {
-    // Vertex AI gets confused if both anyOf and default are set.
-    schema.default = undefined;
-    for (const item of schema.anyOf) {
-      sanitizeParameters(item);
-    }
-  }
-  if (schema.items) {
-    sanitizeParameters(schema.items);
-  }
-  if (schema.properties) {
-    for (const item of Object.values(schema.properties)) {
-      sanitizeParameters(item);
     }
   }
 }

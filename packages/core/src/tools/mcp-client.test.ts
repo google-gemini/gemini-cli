@@ -14,7 +14,8 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import { discoverMcpTools, sanitizeParameters } from './mcp-client.js';
+import { discoverMcpTools } from './mcp-client.js';
+import { sanitizeParameters } from './tool-registry.js';
 import { Schema, Type } from '@google/genai';
 import { Config, MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -85,9 +86,14 @@ const mockToolRegistryInstance = {
   getFunctionDeclarations: vi.fn().mockReturnValue([]),
   discoverTools: vi.fn().mockResolvedValue(undefined),
 };
-vi.mock('./tool-registry.js', () => ({
-  ToolRegistry: vi.fn(() => mockToolRegistryInstance),
-}));
+vi.mock('./tool-registry.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    ToolRegistry: vi.fn(() => mockToolRegistryInstance),
+    sanitizeParameters: (actual as any).sanitizeParameters,
+  };
+});
 
 describe('discoverMcpTools', () => {
   let mockConfig: Mocked<Config>;
@@ -160,6 +166,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
     expect(mockConfig.getMcpServers).toHaveBeenCalledTimes(1);
     expect(mockConfig.getMcpServerCommand).toHaveBeenCalledTimes(1);
@@ -190,6 +197,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(parse).toHaveBeenCalledWith(commandString, process.env);
@@ -237,6 +245,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -276,15 +285,89 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
-    expect(SSEClientTransport).toHaveBeenCalledWith(new URL(serverConfig.url!));
+    expect(SSEClientTransport).toHaveBeenCalledWith(
+      new URL(serverConfig.url!),
+      {},
+    );
     expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
       expect.any(DiscoveredMCPTool),
     );
     const registeredTool = mockToolRegistry.registerTool.mock
       .calls[0][0] as DiscoveredMCPTool;
     expect(registeredTool.name).toBe('tool-sse');
+  });
+
+  describe('SseClientTransport headers', () => {
+    const setupSseTest = async (headers?: Record<string, string>) => {
+      const serverConfig: MCPServerConfig = {
+        url: 'http://localhost:1234/sse',
+        ...(headers && { headers }),
+      };
+      const serverName = headers
+        ? 'sse-server-with-headers'
+        : 'sse-server-no-headers';
+      const toolName = headers ? 'tool-http-headers' : 'tool-http-no-headers';
+
+      mockConfig.getMcpServers.mockReturnValue({ [serverName]: serverConfig });
+
+      const mockTool = {
+        name: toolName,
+        description: `desc-${toolName}`,
+        inputSchema: { type: 'object' as const, properties: {} },
+      };
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({
+        tools: [mockTool],
+      });
+      mockToolRegistry.getToolsByServer.mockReturnValueOnce([
+        expect.any(DiscoveredMCPTool),
+      ]);
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+        false,
+      );
+
+      return { serverConfig };
+    };
+
+    it('should pass headers when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+        'X-Custom-Header': 'custom-value',
+      };
+      const { serverConfig } = await setupSseTest(headers);
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        { requestInit: { headers } },
+      );
+    });
+
+    it('should work without headers (backwards compatibility)', async () => {
+      const { serverConfig } = await setupSseTest();
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        {},
+      );
+    });
+
+    it('should pass oauth token when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+      };
+      const { serverConfig } = await setupSseTest(headers);
+
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.url!),
+        { requestInit: { headers } },
+      );
+    });
   });
 
   it('should discover tools via mcpServers config (streamable http)', async () => {
@@ -310,6 +393,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
@@ -353,6 +437,7 @@ describe('discoverMcpTools', () => {
         mockConfig.getMcpServers() ?? {},
         mockConfig.getMcpServerCommand(),
         mockToolRegistry as any,
+        false,
       );
 
       return { serverConfig };
@@ -377,6 +462,18 @@ describe('discoverMcpTools', () => {
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
         new URL(serverConfig.httpUrl!),
         {},
+      );
+    });
+
+    it('should pass oauth token when provided', async () => {
+      const headers = {
+        Authorization: 'Bearer test-token',
+      };
+      const { serverConfig } = await setupHttpTest(headers);
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL(serverConfig.httpUrl!),
+        { requestInit: { headers } },
       );
     });
   });
@@ -452,6 +549,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(3);
@@ -520,6 +618,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
@@ -554,6 +653,7 @@ describe('discoverMcpTools', () => {
         mockConfig.getMcpServers() ?? {},
         mockConfig.getMcpServerCommand(),
         mockToolRegistry as any,
+        false,
       ),
     ).rejects.toThrow('Parsing failed');
     expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
@@ -568,6 +668,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -593,6 +694,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -618,6 +720,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     expect(console.error).toHaveBeenCalledWith(
@@ -642,6 +745,7 @@ describe('discoverMcpTools', () => {
       mockConfig.getMcpServers() ?? {},
       mockConfig.getMcpServerCommand(),
       mockToolRegistry as any,
+      false,
     );
 
     const clientInstances = vi.mocked(Client).mock.results;
@@ -649,6 +753,118 @@ describe('discoverMcpTools', () => {
     const lastClientInstance =
       clientInstances[clientInstances.length - 1]?.value;
     expect(lastClientInstance?.onerror).toEqual(expect.any(Function));
+  });
+
+  describe('Tool Filtering', () => {
+    const mockTools = [
+      {
+        name: 'toolA',
+        description: 'descA',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+      {
+        name: 'toolB',
+        description: 'descB',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+      {
+        name: 'toolC',
+        description: 'descC',
+        inputSchema: { type: 'object' as const, properties: {} },
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(Client.prototype.listTools).mockResolvedValue({
+        tools: mockTools,
+      });
+      mockToolRegistry.getToolsByServer.mockReturnValue([
+        expect.any(DiscoveredMCPTool),
+      ]);
+    });
+
+    it('should only include specified tools with includeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-include',
+        includeTools: ['toolA', 'toolC'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'include-server': serverConfig,
+      });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+        false,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+    });
+
+    it('should exclude specified tools with excludeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-exclude',
+        excludeTools: ['toolB'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({
+        'exclude-server': serverConfig,
+      });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+        false,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+    });
+
+    it('should handle both includeTools and excludeTools', async () => {
+      const serverConfig: MCPServerConfig = {
+        command: './mcp-both',
+        includeTools: ['toolA', 'toolB'],
+        excludeTools: ['toolB'],
+      };
+      mockConfig.getMcpServers.mockReturnValue({ 'both-server': serverConfig });
+
+      await discoverMcpTools(
+        mockConfig.getMcpServers() ?? {},
+        mockConfig.getMcpServerCommand(),
+        mockToolRegistry as any,
+        false,
+      );
+
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+      expect(mockToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolA' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolB' }),
+      );
+      expect(mockToolRegistry.registerTool).not.toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'toolC' }),
+      );
+    });
   });
 });
 

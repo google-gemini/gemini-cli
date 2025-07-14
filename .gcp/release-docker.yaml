@@ -1,0 +1,75 @@
+steps:
+  # Step 1: Install root dependencies (includes workspaces)
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Install Dependencies'
+    entrypoint: 'npm'
+    args: ['install']
+
+  # Step 4: Authenticate for Docker (so we can push images to the artifact registry)
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Authenticate docker'
+    entrypoint: 'npm'
+    args: ['run', 'auth']
+
+  # Step 5: Build workspace packages
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Build packages'
+    entrypoint: 'npm'
+    args: ['run', 'build:packages']
+
+  # Step 6: Determine Docker Image Tag
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Determine Docker Image Tag'
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        SHELL_TAG_NAME="$TAG_NAME"
+        FINAL_TAG="$SHORT_SHA" # Default to SHA
+        if [[ "$$SHELL_TAG_NAME" == *"-nightly"* ]]; then
+          echo "Nightly release detected."
+          FINAL_TAG="$${SHELL_TAG_NAME#v}"
+        # Also escape the variable in the regex match
+        elif [[ "$$SHELL_TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Official release detected."
+          FINAL_TAG="$${SHELL_TAG_NAME#v}"
+        else
+          echo "Development/RC release detected. Using commit SHA as tag."
+        fi
+        echo "Determined image tag: $$FINAL_TAG"
+        echo "$$FINAL_TAG" > /workspace/image_tag.txt
+
+  # Step 7: Build sandbox container image
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Build sandbox Docker image'
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
+        echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
+        npm run build:sandbox
+    env:
+      - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
+
+  # Step 8: Publish sandbox container image
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Publish sandbox Docker image'
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        set -e
+        FINAL_IMAGE_URI=$$(cat /workspace/final_image_uri.txt)
+
+        echo "Pushing sandbox image: $${FINAL_IMAGE_URI}"
+        $_CONTAINER_TOOL push "$${FINAL_IMAGE_URI}"
+    env:
+      - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
+
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+  dynamicSubstitutions: true
+
+substitutions:
+  _CONTAINER_TOOL: 'docker'
