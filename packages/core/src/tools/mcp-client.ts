@@ -236,7 +236,7 @@ async function connectAndDiscover(
     transport.stderr
   ) {
     transport.stderr.on('data', (data) => {
-      const stderrStr = data.toString();
+      const stderrStr = data.toString().trim();
       console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
     });
   }
