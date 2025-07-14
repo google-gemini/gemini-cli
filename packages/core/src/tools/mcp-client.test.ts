@@ -731,6 +731,43 @@ describe('discoverMcpTools', () => {
     expect(mockToolRegistry.registerTool).not.toHaveBeenCalled();
   });
 
+  it('should throw a detailed error if registering a tool fails', async () => {
+    const serverConfig: MCPServerConfig = { command: './mcp-fail-register' };
+    mockConfig.getMcpServers.mockReturnValue({
+      'fail-register-server': serverConfig,
+    });
+
+    const mockBadTool = {
+      name: 'badTool',
+      description: 'A tool that will fail to register',
+      inputSchema: { type: 'object' as const, properties: {} },
+    };
+
+    vi.mocked(Client.prototype.listTools).mockResolvedValue({
+      tools: [mockBadTool],
+    });
+
+    const registrationError = new Error('Invalid tool definition');
+    mockToolRegistry.registerTool.mockImplementation(() => {
+      throw registrationError;
+    });
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await discoverMcpTools(
+      mockConfig.getMcpServers() ?? {},
+      mockConfig.getMcpServerCommand(),
+      mockToolRegistry as any,
+      false,
+    );
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `Failed to list or register tools for MCP server 'fail-register-server': Error: Failed to register tool 'badTool' from MCP server 'fail-register-server': Error: Invalid tool definition`,
+      ),
+    );
+  });
+
   it('should assign mcpClient.onerror handler', async () => {
     const serverConfig: MCPServerConfig = { command: './mcp-onerror' };
     mockConfig.getMcpServers.mockReturnValue({

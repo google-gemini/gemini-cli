@@ -314,65 +314,74 @@ async function connectAndDiscover(
       return;
     }
 
+    let toolNameForModel: string;
     for (const funcDecl of tool.functionDeclarations) {
-      if (!funcDecl.name) {
-        console.warn(
-          `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
+      try {
+        if (!funcDecl.name) {
+          console.warn(
+            `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
+          );
+          continue;
+        }
+
+        const { includeTools, excludeTools } = mcpServerConfig;
+        const toolName = funcDecl.name;
+
+        let isEnabled = false;
+        if (includeTools === undefined) {
+          isEnabled = true;
+        } else {
+          isEnabled = includeTools.some(
+            (tool) => tool === toolName || tool.startsWith(`${toolName}(`),
+          );
+        }
+
+        if (excludeTools?.includes(toolName)) {
+          isEnabled = false;
+        }
+
+        if (!isEnabled) {
+          continue;
+        }
+
+        toolNameForModel = funcDecl.name;
+
+        // Replace invalid characters (based on 400 error message from Gemini API) with underscores
+        toolNameForModel = toolNameForModel.replace(/[^a-zA-Z0-9_.-]/g, '_');
+
+        const existingTool = toolRegistry.getTool(toolNameForModel);
+        if (existingTool) {
+          toolNameForModel = mcpServerName + '__' + toolNameForModel;
+        }
+
+        // If longer than 63 characters, replace middle with '___'
+        // (Gemini API says max length 64, but actual limit seems to be 63)
+        if (toolNameForModel.length > 63) {
+          toolNameForModel =
+            toolNameForModel.slice(0, 28) + '___' + toolNameForModel.slice(-32);
+        }
+
+        sanitizeParameters(funcDecl.parameters);
+
+        toolRegistry.registerTool(
+          new DiscoveredMCPTool(
+            mcpCallableTool,
+            mcpServerName,
+            toolNameForModel,
+            funcDecl.description ?? '',
+            funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
+            funcDecl.name,
+            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+            mcpServerConfig.trust,
+          ),
         );
-        continue;
-      }
-
-      const { includeTools, excludeTools } = mcpServerConfig;
-      const toolName = funcDecl.name;
-
-      let isEnabled = false;
-      if (includeTools === undefined) {
-        isEnabled = true;
-      } else {
-        isEnabled = includeTools.some(
-          (tool) => tool === toolName || tool.startsWith(`${toolName}(`),
+      } catch (error) {
+        throw new Error(
+          `Failed to register tool '${
+            funcDecl.name || 'unknown'
+          }' from MCP server '${mcpServerName}': ${error}`,
         );
       }
-
-      if (excludeTools?.includes(toolName)) {
-        isEnabled = false;
-      }
-
-      if (!isEnabled) {
-        continue;
-      }
-
-      let toolNameForModel = funcDecl.name;
-
-      // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-      toolNameForModel = toolNameForModel.replace(/[^a-zA-Z0-9_.-]/g, '_');
-
-      const existingTool = toolRegistry.getTool(toolNameForModel);
-      if (existingTool) {
-        toolNameForModel = mcpServerName + '__' + toolNameForModel;
-      }
-
-      // If longer than 63 characters, replace middle with '___'
-      // (Gemini API says max length 64, but actual limit seems to be 63)
-      if (toolNameForModel.length > 63) {
-        toolNameForModel =
-          toolNameForModel.slice(0, 28) + '___' + toolNameForModel.slice(-32);
-      }
-
-      sanitizeParameters(funcDecl.parameters);
-
-      toolRegistry.registerTool(
-        new DiscoveredMCPTool(
-          mcpCallableTool,
-          mcpServerName,
-          toolNameForModel,
-          funcDecl.description ?? '',
-          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
-          funcDecl.name,
-          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-          mcpServerConfig.trust,
-        ),
-      );
     }
   } catch (error) {
     console.error(
