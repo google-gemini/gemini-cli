@@ -54,6 +54,13 @@ export const Footer: React.FC<FooterProps> = ({
   );
 
   useEffect(() => {
+    const updateActiveFile = () => {
+      const currentActiveFile = ideContext.getActiveFileContext();
+      setActiveFile(currentActiveFile);
+    };
+
+    updateActiveFile();
+
     const unsubscribe = ideContext.subscribeToActiveFile(setActiveFile);
     return () => {
       unsubscribe();
@@ -83,10 +90,10 @@ export const Footer: React.FC<FooterProps> = ({
               {shortenPath(tildeifyPath(activeFile.filePath), 70)}
             </Text>
             {activeFile.cursor && (
-                <Text color={Colors.Gray}>
-                  :{activeFile.cursor.line}:{activeFile.cursor.character}
-                </Text>
-              )}
+              <Text color={Colors.Gray}>
+                :{activeFile.cursor.line}:{activeFile.cursor.character}
+              </Text>
+            )}
           </Text>
         )}
         {debugMode && (
