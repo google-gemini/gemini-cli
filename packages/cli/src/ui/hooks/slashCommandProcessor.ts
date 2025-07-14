@@ -243,11 +243,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'auth',
-        description: 'change the auth method',
-        action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
-      },
-      {
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
@@ -1027,7 +1022,6 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openAuthDialog,
     openEditorDialog,
     openPrivacyNotice,
     toggleCorgiMode,
@@ -1125,6 +1119,9 @@ export const useSlashCommandProcessor = (
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
+                  case 'auth':
+                    openAuthDialog();
+                    return { type: 'handled' };
                   case 'theme':
                     openThemeDialog();
                     return { type: 'handled' };
@@ -1205,6 +1202,7 @@ export const useSlashCommandProcessor = (
     [
       addItem,
       setShowHelp,
+      openAuthDialog,
       commands,
       legacyCommands,
       commandContext,
