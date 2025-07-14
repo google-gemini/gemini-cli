@@ -459,6 +459,7 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
       getProxy: () => 'http://test.proxy.com:8080',
+      getUseEnvProxy: () => false,
       getContentGeneratorConfig: () =>
         ({ model: 'test-model' }) as ContentGeneratorConfig,
       getModel: () => 'test-model',
