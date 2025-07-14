@@ -6,6 +6,7 @@
 
 import { useEffect } from 'react';
 import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 import * as path from 'path';
 import process from 'node:process';
 import { HistoryItem, MessageType } from '../types.js';
@@ -22,17 +23,23 @@ export const useSessionPersistence = ({
   loadHistory,
 }: UseSessionPersistenceProps) => {
   useEffect(() => {
-    if (sessionPersistence) {
-      const sessionPath = path.join(process.cwd(), '.gemini', 'session.json');
-      if (fs.existsSync(sessionPath)) {
+    const loadSession = async () => {
+      if (sessionPersistence) {
+        const sessionPath = path.join(process.cwd(), '.gemini', 'session.json');
         try {
-          const sessionData = fs.readFileSync(sessionPath, 'utf-8');
+          const sessionData = await fsp.readFile(sessionPath, 'utf-8');
           loadHistory(JSON.parse(sessionData));
         } catch (error) {
+          // Silently ignore if file doesn't exist.
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return;
+          }
           console.error('Error loading session history:', error);
         }
       }
-    }
+    };
+
+    void loadSession();
   }, [sessionPersistence, loadHistory]);
 
   useEffect(() => {
