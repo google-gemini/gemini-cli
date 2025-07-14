@@ -243,13 +243,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'theme',
-        description: 'change the theme',
-        action: (_mainCommand, _subCommand, _args) => {
-          openThemeDialog();
-        },
-      },
-      {
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
@@ -1029,7 +1022,6 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openThemeDialog,
     openEditorDialog,
     openPrivacyNotice,
     toggleCorgiMode,
@@ -1130,6 +1122,9 @@ export const useSlashCommandProcessor = (
                   case 'auth':
                     openAuthDialog();
                     return { type: 'handled' };
+                  case 'theme':
+                    openThemeDialog();
+                    return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
                     throw new Error(
@@ -1212,6 +1207,7 @@ export const useSlashCommandProcessor = (
       legacyCommands,
       commandContext,
       addMessage,
+      openThemeDialog,
     ],
   );
 

@@ -41,7 +41,8 @@ import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
-import { useConsolePatcher } from './components/ConsolePatcher.js';
+import { ConsolePatcher } from './utils/ConsolePatcher.js';
+import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
@@ -54,6 +55,8 @@ import {
   ApprovalMode,
   isEditorAvailable,
   EditorType,
+  FlashFallbackEvent,
+  logFlashFallback,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -84,6 +87,7 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
+  version: string;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -92,10 +96,11 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
+const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
+  const nightly = version.includes('nightly');
 
   useEffect(() => {
     checkForUpdates().then(setUpdateMessage);
@@ -107,6 +112,16 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     handleNewMessage,
     clearConsoleMessages: clearConsoleMessagesState,
   } = useConsoleMessages();
+
+  useEffect(() => {
+    const consolePatcher = new ConsolePatcher({
+      onNewMessage: handleNewMessage,
+      debugMode: config.getDebugMode(),
+    });
+    consolePatcher.patch();
+    registerCleanup(consolePatcher.cleanup);
+  }, [handleNewMessage, config]);
+
   const { stats: sessionStats } = useSessionStats();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
@@ -144,6 +159,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+  const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -315,7 +331,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
 ⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
         } else {
           // Default fallback message for other cases (like consecutive 429s)
-          message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.  
+          message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
 ⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
 ⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
 ⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
@@ -338,6 +354,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       config.setQuotaErrorOccurred(true);
       // Switch model for future use but return false to stop current retry
       config.setModel(fallbackModel);
+      logFlashFallback(
+        config,
+        new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
+      );
       return false; // Don't continue with current prompt
     };
 
@@ -459,11 +479,6 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
-  });
-
-  useConsolePatcher({
-    onNewMessage: handleNewMessage,
-    debugMode: config.getDebugMode(),
   });
 
   useEffect(() => {
@@ -629,6 +644,34 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     return getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
 
+  const initialPrompt = useMemo(() => config.getQuestion(), [config]);
+  const geminiClient = config.getGeminiClient();
+
+  useEffect(() => {
+    if (
+      initialPrompt &&
+      !initialPromptSubmitted.current &&
+      !isAuthenticating &&
+      !isAuthDialogOpen &&
+      !isThemeDialogOpen &&
+      !isEditorDialogOpen &&
+      !showPrivacyNotice &&
+      geminiClient?.isInitialized?.()
+    ) {
+      submitQuery(initialPrompt);
+      initialPromptSubmitted.current = true;
+    }
+  }, [
+    initialPrompt,
+    submitQuery,
+    isAuthenticating,
+    isAuthDialogOpen,
+    isThemeDialogOpen,
+    isEditorDialogOpen,
+    showPrivacyNotice,
+    geminiClient,
+  ]);
+
   if (quittingMessages) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -673,7 +716,13 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header terminalWidth={terminalWidth} />
+              {!settings.merged.hideBanner && (
+                <Header
+                  terminalWidth={terminalWidth}
+                  version={version}
+                  nightly={nightly}
+                />
+              )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
@@ -931,6 +980,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
               config.getDebugMode() || config.getShowMemoryUsage()
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
+            nightly={nightly}
           />
         </Box>
       </Box>
