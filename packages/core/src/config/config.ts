@@ -46,6 +46,10 @@ import {
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
+import { ListCRITool } from '../tools/ListCRI.js';
+
+
+
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
@@ -568,6 +572,7 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(ListCRITool, this);
 
     await registry.discoverTools();
     return registry;
