@@ -14,6 +14,7 @@ import {
   ServerGeminiContentEvent as ContentEvent,
   ServerGeminiErrorEvent as ErrorEvent,
   ServerGeminiChatCompressedEvent,
+  ServerGeminiFinishedEvent,
   getErrorMessage,
   isNodeError,
   MessageSenderType,
@@ -26,7 +27,7 @@ import {
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion } from '@google/genai';
+import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -420,6 +421,34 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
+  const handleFinishedEvent = useCallback(
+    (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
+      const finishReason = event.value;
+      
+      const finishReasonMessages: Record<FinishReason, string | undefined> = {
+        [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
+        [FinishReason.STOP]: undefined,
+        [FinishReason.MAX_TOKENS]: '\n\n⚠️  Response truncated due to token limits.',
+        [FinishReason.SAFETY]: '\n\n⚠️  Response stopped due to safety reasons.',
+        [FinishReason.RECITATION]: '\n\n⚠️  Response stopped due to recitation policy.',
+        [FinishReason.LANGUAGE]: '\n\n⚠️  Response stopped due to unsupported language.',
+        [FinishReason.BLOCKLIST]: '\n\n⚠️  Response stopped due to forbidden terms.',
+        [FinishReason.PROHIBITED_CONTENT]: '\n\n⚠️  Response stopped due to prohibited content.',
+        [FinishReason.SPII]: '\n\n⚠️  Response stopped due to sensitive personally identifiable information.',
+        [FinishReason.OTHER]: '\n\n⚠️  Response stopped for other reasons.',
+        [FinishReason.MALFORMED_FUNCTION_CALL]: '\n\n⚠️  Response stopped due to malformed function call.',
+        [FinishReason.IMAGE_SAFETY]: '\n\n⚠️  Response stopped due to image safety violations.',
+        [FinishReason.UNEXPECTED_TOOL_CALL]: '\n\n⚠️  Response stopped due to unexpected tool call.',
+      };
+      
+      const message = finishReasonMessages[finishReason];
+      if (message) {
+        handleContentEvent(message, '', userMessageTimestamp);
+      }
+    },
+    [handleContentEvent],
+  );
+
   const handleChatCompressionEvent = useCallback(
     (eventValue: ServerGeminiChatCompressedEvent['value']) =>
       addItem(
@@ -489,6 +518,12 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.Finished:
+            handleFinishedEvent(event as ServerGeminiFinishedEvent, userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.UsageMetadata:
+            // Handle UsageMetadata event if needed in the future
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -507,6 +542,7 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      handleFinishedEvent,
       handleMaxSessionTurnsEvent,
     ],
   );

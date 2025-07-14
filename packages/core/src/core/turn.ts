@@ -9,6 +9,8 @@ import {
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
+  FinishReason,
+  GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import {
   ToolCallConfirmationDetails,
@@ -49,6 +51,8 @@ export enum GeminiEventType {
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
   MaxSessionTurns = 'max_session_turns',
+  UsageMetadata = 'usage_metadata',
+  Finished = 'finished',
 }
 
 export interface StructuredError {
@@ -133,6 +137,16 @@ export type ServerGeminiMaxSessionTurnsEvent = {
   type: GeminiEventType.MaxSessionTurns;
 };
 
+export type ServerGeminiFinishedEvent = {
+  type: GeminiEventType.Finished;
+  value: FinishReason;
+};
+
+export type ServerGeminiUsageMetadataEvent = {
+  type: GeminiEventType.UsageMetadata;
+  value: GenerateContentResponseUsageMetadata & { apiTimeMs?: number };
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -143,12 +157,15 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiErrorEvent
   | ServerGeminiChatCompressedEvent
   | ServerGeminiThoughtEvent
-  | ServerGeminiMaxSessionTurnsEvent;
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiUsageMetadataEvent
+  | ServerGeminiFinishedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
+  private lastUsageMetadata: GenerateContentResponseUsageMetadata | null = null;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -162,6 +179,7 @@ export class Turn {
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    const startTime = Date.now();
     try {
       const responseStream = await this.chat.sendMessageStream(
         {
@@ -225,21 +243,10 @@ export class Turn {
         // Check if response was truncated or stopped for various reasons
         const finishReason = resp.candidates?.[0]?.finishReason;
         
-        const finishReasonMessages: Record<string, string> = {
-          'MAX_TOKENS': '\n\n⚠️  Response truncated due to token limits.',
-          'SAFETY': '\n\n⚠️  Response stopped due to safety reasons.',
-          'RECITATION': '\n\n⚠️  Response stopped due to recitation policy.',
-          'LANGUAGE': '\n\n⚠️  Response stopped due to unsupported language.',
-          'BLOCKLIST': '\n\n⚠️  Response stopped due to forbidden terms.',
-          'PROHIBITED_CONTENT': '\n\n⚠️  Response stopped due to prohibited content.',
-          'SPII': '\n\n⚠️  Response stopped due to sensitive personally identifiable information.',
-          'OTHER': '\n\n⚠️  Response stopped for other reasons.',
-        };
-        
-        if (finishReason && finishReasonMessages[finishReason]) {
+        if (finishReason && finishReason !== FinishReason.STOP && finishReason !== FinishReason.FINISH_REASON_UNSPECIFIED) {
           yield {
-            type: GeminiEventType.Content,
-            value: finishReasonMessages[finishReason],
+            type: GeminiEventType.Finished,
+            value: finishReason as FinishReason,
           };
         }
       }
@@ -250,7 +257,6 @@ export class Turn {
           type: GeminiEventType.UsageMetadata,
           value: { ...this.lastUsageMetadata, apiTimeMs: durationMs },
         };
-      }
       }
     } catch (e) {
       const error = toFriendlyError(e);
@@ -311,5 +317,9 @@ export class Turn {
 
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
+  }
+
+  getUsageMetadata(): GenerateContentResponseUsageMetadata | null {
+    return this.lastUsageMetadata;
   }
 }
