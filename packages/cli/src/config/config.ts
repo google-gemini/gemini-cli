@@ -262,21 +262,23 @@ export async function loadCliConfig(
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
-  if (settings.allowMCPServers) {
-    const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
-    if (allowedNames.size > 0) {
-      mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
-      );
+  if (!argv.allowedMcpServerNames) {
+    if (settings.allowMCPServers) {
+      const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
+      if (allowedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        );
+      }
     }
-  }
 
-  if (settings.excludeMCPServers) {
-    const excludedNames = new Set(settings.excludeMCPServers.filter(Boolean));
-    if (excludedNames.size > 0) {
-      mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
-      );
+    if (settings.excludeMCPServers) {
+      const excludedNames = new Set(settings.excludeMCPServers.filter(Boolean));
+      if (excludedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
+        );
+      }
     }
   }
 
