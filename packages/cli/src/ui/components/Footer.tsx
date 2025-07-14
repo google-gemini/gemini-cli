@@ -11,7 +11,7 @@ import {
   shortenPath,
   tildeifyPath,
   tokenLimit,
-  subscribeToActiveFile,
+  ideContext,
   ActiveFile,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
@@ -54,7 +54,7 @@ export const Footer: React.FC<FooterProps> = ({
   );
 
   useEffect(() => {
-    const unsubscribe = subscribeToActiveFile(setActiveFile);
+    const unsubscribe = ideContext.subscribeToActiveFile(setActiveFile);
     return () => {
       unsubscribe();
     };

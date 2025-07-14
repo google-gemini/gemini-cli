@@ -5,20 +5,18 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  setActiveFileContext,
-  getActiveFileContext,
-  resetActiveFileContext,
-  subscribeToActiveFile,
-} from './ideContext.js';
+import { createIdeContextStore } from './ideContext.js';
 
 describe('ideContext - Active File', () => {
+  let ideContext: ReturnType<typeof createIdeContextStore>;
+
   beforeEach(() => {
-    resetActiveFileContext(); // Ensure a clean slate for each test
+    // Create a fresh, isolated instance for each test
+    ideContext = createIdeContextStore();
   });
 
   it('should return undefined initially for active file context', () => {
-    expect(getActiveFileContext()).toBeUndefined();
+    expect(ideContext.getActiveFileContext()).toBeUndefined();
   });
 
   it('should set and retrieve the active file context', () => {
@@ -27,9 +25,9 @@ describe('ideContext - Active File', () => {
       cursor: { line: 5, character: 10 },
     };
 
-    setActiveFileContext(testFile);
+    ideContext.setActiveFileContext(testFile);
 
-    const activeFile = getActiveFileContext();
+    const activeFile = ideContext.getActiveFileContext();
     expect(activeFile).toEqual(testFile);
   });
 
@@ -38,15 +36,15 @@ describe('ideContext - Active File', () => {
       filePath: '/path/to/first.js',
       cursor: { line: 1, character: 1 },
     };
-    setActiveFileContext(firstFile);
+    ideContext.setActiveFileContext(firstFile);
 
     const secondFile = {
       filePath: '/path/to/second.py',
       cursor: { line: 20, character: 30 },
     };
-    setActiveFileContext(secondFile);
+    ideContext.setActiveFileContext(secondFile);
 
-    const activeFile = getActiveFileContext();
+    const activeFile = ideContext.getActiveFileContext();
     expect(activeFile).toEqual(secondFile);
   });
 
@@ -55,22 +53,22 @@ describe('ideContext - Active File', () => {
       filePath: '',
       cursor: { line: 0, character: 0 },
     };
-    setActiveFileContext(testFile);
-    expect(getActiveFileContext()).toEqual(testFile);
+    ideContext.setActiveFileContext(testFile);
+    expect(ideContext.getActiveFileContext()).toEqual(testFile);
   });
 
   it('should notify subscribers when active file context changes', () => {
     const subscriber1 = vi.fn();
     const subscriber2 = vi.fn();
 
-    subscribeToActiveFile(subscriber1);
-    subscribeToActiveFile(subscriber2);
+    ideContext.subscribeToActiveFile(subscriber1);
+    ideContext.subscribeToActiveFile(subscriber2);
 
     const testFile = {
       filePath: '/path/to/subscribed.ts',
       cursor: { line: 15, character: 25 },
     };
-    setActiveFileContext(testFile);
+    ideContext.setActiveFileContext(testFile);
 
     expect(subscriber1).toHaveBeenCalledTimes(1);
     expect(subscriber1).toHaveBeenCalledWith(testFile);
@@ -82,7 +80,7 @@ describe('ideContext - Active File', () => {
       filePath: '/path/to/new.js',
       cursor: { line: 1, character: 1 },
     };
-    setActiveFileContext(newFile);
+    ideContext.setActiveFileContext(newFile);
 
     expect(subscriber1).toHaveBeenCalledTimes(2);
     expect(subscriber1).toHaveBeenCalledWith(newFile);
@@ -94,10 +92,10 @@ describe('ideContext - Active File', () => {
     const subscriber1 = vi.fn();
     const subscriber2 = vi.fn();
 
-    const unsubscribe1 = subscribeToActiveFile(subscriber1);
-    subscribeToActiveFile(subscriber2);
+    const unsubscribe1 = ideContext.subscribeToActiveFile(subscriber1);
+    ideContext.subscribeToActiveFile(subscriber2);
 
-    setActiveFileContext({
+    ideContext.setActiveFileContext({
       filePath: '/path/to/file1.txt',
       cursor: { line: 1, character: 1 },
     });
@@ -106,35 +104,11 @@ describe('ideContext - Active File', () => {
 
     unsubscribe1();
 
-    setActiveFileContext({
+    ideContext.setActiveFileContext({
       filePath: '/path/to/file2.txt',
       cursor: { line: 2, character: 2 },
     });
     expect(subscriber1).toHaveBeenCalledTimes(1); // Should not be called again
     expect(subscriber2).toHaveBeenCalledTimes(2);
-  });
-
-  it('should clear all subscribers on resetActiveFileContext', () => {
-    const subscriber1 = vi.fn();
-    const subscriber2 = vi.fn();
-
-    subscribeToActiveFile(subscriber1);
-    subscribeToActiveFile(subscriber2);
-
-    setActiveFileContext({
-      filePath: '/path/to/file1.txt',
-      cursor: { line: 1, character: 1 },
-    });
-    expect(subscriber1).toHaveBeenCalledTimes(1);
-    expect(subscriber2).toHaveBeenCalledTimes(1);
-
-    resetActiveFileContext();
-
-    setActiveFileContext({
-      filePath: '/path/to/file2.txt',
-      cursor: { line: 2, character: 2 },
-    });
-    expect(subscriber1).toHaveBeenCalledTimes(1); // Should not be called again
-    expect(subscriber2).toHaveBeenCalledTimes(1); // Should not be called again
   });
 });

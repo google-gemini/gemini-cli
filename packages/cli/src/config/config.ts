@@ -292,7 +292,7 @@ export async function loadCliConfig(
       undefined, // env
       undefined, // cwd
       undefined, // url
-      'http://localhost:52232/mcp', // httpUrl
+      'http://localhost:3000/mcp', // httpUrl
       undefined, // headers
       undefined, // tcp
       undefined, // timeout
