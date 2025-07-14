@@ -329,7 +329,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
           if (buffer.text.trim()) {
-            handleSubmitAndClear(buffer.text);
+            const [row, col] = buffer.cursor;
+            const line = buffer.lines[row];
+            const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+            if (charBefore === '\\') {
+              buffer.backspace();
+              buffer.newline();
+            } else {
+              handleSubmitAndClear(buffer.text);
+            }
           }
           return;
         }

@@ -90,6 +90,7 @@ describe('InputPrompt', () => {
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
       newline: vi.fn(),
+      backspace: vi.fn(),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -525,6 +526,21 @@ describe('InputPrompt', () => {
 
     expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should add a newline on enter when the line ends with a backslash', async () => {
+    props.buffer.setText('first line\\');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.backspace).toHaveBeenCalled();
+    expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
 });
