@@ -113,7 +113,7 @@ export async function summarizeToolOutput(
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
   const toolOutputSummarizerConfig: GenerateContentConfig = {
-    maxOutputTokens: maxOutputTokens,
+    maxOutputTokens,
   };
   try {
     const parsedResponse = (await geminiClient.generateContent(

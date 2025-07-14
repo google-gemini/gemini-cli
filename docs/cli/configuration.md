@@ -207,13 +207,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     ```
 
 - **`summarizeToolOutput`** (object):
-  - **Description:** Enables or disables the summarization of tool output. You can specify a token budget for the summarization using the `summarizeToolOutputTokenBudget` setting.
-  - **Default:** `{}`
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
+  - Note: Currently only the `run_shell_command` tool is supported.
+  - **Default:** `{}` (Disabled by default)
   - **Example:**
     ```json
     "summarizeToolOutput": {
       "run_shell_command": {
-        "tokenBudget": 100
+        "tokenBudget": 2000
       }
     }
     ```
