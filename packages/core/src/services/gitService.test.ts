@@ -161,7 +161,7 @@ describe('GitService', () => {
       });
       const service = new GitService(mockProjectRoot);
       await expect(service.initialize()).rejects.toThrow(
-        'GitService requires Git to be installed',
+        'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     });
 

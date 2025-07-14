@@ -27,7 +27,9 @@ export class GitService {
   async initialize(): Promise<void> {
     const gitAvailable = await this.verifyGitAvailability();
     if (!gitAvailable) {
-      throw new Error('GitService requires Git to be installed');
+      throw new Error(
+        'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
+      );
     }
     this.setupShadowGitRepository();
   }
