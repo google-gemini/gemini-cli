@@ -14,9 +14,12 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
+  GeminiClient,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -67,6 +70,7 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
 }
 
@@ -124,7 +128,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
-        getProjectRoot: vi.fn(() => opts.projectRoot),
+        getProjectRoot: vi.fn(() => opts.targetDir),
         getGeminiClient: vi.fn(() => ({})),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
@@ -181,6 +185,10 @@ vi.mock('../config/config.js', async (importOriginal) => {
 
 vi.mock('./components/Tips.js', () => ({
   Tips: vi.fn(() => null),
+}));
+
+vi.mock('./components/Header.js', () => ({
+  Header: vi.fn(() => null),
 }));
 
 describe('App UI', () => {
@@ -441,6 +449,38 @@ describe('App UI', () => {
     expect(vi.mocked(Tips)).not.toHaveBeenCalled();
   });
 
+  it('should display Header component by default', async () => {
+    const { Header } = await import('./components/Header.js');
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).toHaveBeenCalled();
+  });
+
+  it('should not display Header component when hideBanner is true', async () => {
+    const { Header } = await import('./components/Header.js');
+    mockSettings = createMockSettings({
+      user: { hideBanner: true },
+    });
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).not.toHaveBeenCalled();
+  });
+
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
     mockSettings = createMockSettings({
       system: { hideTips: false },
@@ -506,6 +546,50 @@ describe('App UI', () => {
         'Theme configuration unavailable due to NO_COLOR env variable.',
       );
       expect(lastFrame()).not.toContain('Select Theme');
+    });
+  });
+
+  describe('with initial prompt from --prompt-interactive', () => {
+    it('should submit the initial prompt automatically', async () => {
+      const mockSubmitQuery = vi.fn();
+
+      mockConfig.getQuestion = vi.fn(() => 'hello from prompt-interactive');
+
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: mockSubmitQuery,
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      mockConfig.getGeminiClient.mockReturnValue({
+        isInitialized: vi.fn(() => true),
+      } as unknown as GeminiClient);
+
+      const { unmount, rerender } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Force a re-render to trigger useEffect
+      rerender(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith(
+        'hello from prompt-interactive',
+      );
     });
   });
 });
