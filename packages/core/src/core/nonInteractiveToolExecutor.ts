@@ -68,17 +68,9 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
-    const tool_output = tool.summarizer
-      ? await tool.summarizer(
-          toolResult,
-          config.getGeminiClient(),
-          effectiveAbortSignal,
-        )
-      : toolResult.llmContent;
+    const tool_output = toolResult.llmContent;
 
-    const tool_display = tool.shouldSummarizeDisplay
-      ? (tool_output as string)
-      : toolResult.returnDisplay;
+    const tool_display = toolResult.returnDisplay;
 
     const durationMs = Date.now() - startTime;
     logToolCall(config, {

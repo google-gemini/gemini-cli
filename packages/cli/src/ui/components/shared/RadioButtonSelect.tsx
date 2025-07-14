@@ -53,7 +53,7 @@ export function RadioButtonSelect<T>({
   onSelect,
   onHighlight,
   isFocused,
-  showScrollArrows = true,
+  showScrollArrows = false,
   maxItemsToShow = 10,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
