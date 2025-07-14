@@ -504,7 +504,7 @@ Process Group PGID: Process group started or \`(none)\``,
     }
 
     return {
-      llmContent,
+      llmContent: llmContent,
       returnDisplay: returnDisplayMessage,
     };
   }
