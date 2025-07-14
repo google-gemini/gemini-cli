@@ -35,6 +35,7 @@ import {
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
@@ -115,7 +116,7 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
-    function_args: JSON.stringify(event.function_args, null, 2),
+    function_args: safeJsonStringify(event.function_args, 2),
   };
   if (event.error) {
     attributes['error.message'] = event.error;
