@@ -111,4 +111,15 @@ describe('ideContext - Active File', () => {
     expect(subscriber1).toHaveBeenCalledTimes(1); // Should not be called again
     expect(subscriber2).toHaveBeenCalledTimes(2);
   });
+
+  it('should allow the cursor to be optional', () => {
+    const testFile = {
+      filePath: '/path/to/test/file.ts',
+    };
+
+    ideContext.setActiveFileContext(testFile);
+
+    const activeFile = ideContext.getActiveFileContext();
+    expect(activeFile).toEqual(testFile);
+  });
 });

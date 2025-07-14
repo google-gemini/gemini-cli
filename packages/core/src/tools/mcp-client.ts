@@ -216,7 +216,7 @@ export async function connectAndDiscover(
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
       };
 
-      if (mcpServerName == IDE_SERVER_NAME) {
+      if (mcpServerName === IDE_SERVER_NAME) {
         mcpClient.setNotificationHandler(
           ActiveFileNotificationSchema,
           (notification) => {

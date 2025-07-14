@@ -25,7 +25,7 @@ export type Cursor = z.infer<typeof CursorSchema>;
  */
 export const ActiveFileSchema = z.object({
   filePath: z.string(),
-  cursor: CursorSchema,
+  cursor: CursorSchema.optional(),
 });
 export type ActiveFile = z.infer<typeof ActiveFileSchema>;
 
@@ -85,9 +85,7 @@ export function createIdeContextStore() {
    * @param subscriber The function to be called when the active file context changes.
    * @returns A function that, when called, will unsubscribe the provided subscriber.
    */
-  function subscribeToActiveFile(
-    subscriber: ActiveFileSubscriber,
-  ): () => void {
+  function subscribeToActiveFile(subscriber: ActiveFileSubscriber): () => void {
     subscribers.add(subscriber);
     return () => {
       subscribers.delete(subscriber);
