@@ -37,7 +37,7 @@ import {
   ContentGeneratorConfig,
   createContentGenerator,
 } from './contentGenerator.js';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { EnvHttpProxyAgent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 function isThinkingSupported(model: string) {
@@ -100,7 +100,9 @@ export class GeminiClient {
   private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
   constructor(private config: Config) {
-    if (config.getProxy()) {
+    if (config.getUseEnvProxy()) {
+      setGlobalDispatcher(new EnvHttpProxyAgent());
+    } else if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
