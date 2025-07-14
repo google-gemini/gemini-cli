@@ -146,10 +146,8 @@ export async function main() {
   }
 
   if (config.getListExtensions()) {
-    console.log('Installed extensions:');
-    for (const extension of extensions) {
-      console.log(`- ${extension.config.name}`);
-    }
+    const extensionNames = extensions.map((extension) => extension.config.name);
+    console.log(JSON.stringify(extensionNames, null, 2));
     process.exit(0);
   }
 
