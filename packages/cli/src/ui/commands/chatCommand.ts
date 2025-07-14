@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
+import * as fsPromises from 'fs/promises';
 import { CommandContext, SlashCommand, MessageActionReturn } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
@@ -25,13 +25,13 @@ const getSavedChatTags = async (
   try {
     const file_head = 'checkpoint-';
     const file_tail = '.json';
-    const files = await fs.readdir(geminiDir);
+    const files = await fsPromises.readdir(geminiDir);
     const chatDetails: Array<{ name: string; mtime: Date }> = [];
 
     for (const file of files) {
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         const filePath = path.join(geminiDir, file);
-        const stats = await fs.stat(filePath);
+        const stats = await fsPromises.stat(filePath);
         chatDetails.push({
           name: file.slice(file_head.length, -file_tail.length),
           mtime: stats.mtime,
@@ -171,7 +171,7 @@ const resumeCommand: SlashCommand = {
       }
       if (i > 2 || !hasSystemPrompt) {
         uiHistory.push({
-          type: item.role && rolemap[item.role] || MessageType.GEMINI,
+          type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
           text,
         } as HistoryItemWithoutId);
       }
