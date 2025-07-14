@@ -17,6 +17,7 @@ import {
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
+import { GitService } from '../services/gitService.js';
 import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 
 // Mock dependencies that might be called during Config construction or createServerConfig
@@ -75,6 +76,12 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../services/gitService.js', () => {
+  const GitServiceMock = vi.fn();
+  GitServiceMock.prototype.initialize = vi.fn();
+  return { GitService: GitServiceMock };
+});
+
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
@@ -106,6 +113,32 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+  });
+
+  describe('initialize', () => {
+    it('should throw an error if checkpointing is enabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: true,
+      });
+
+      await expect(config.initialize()).rejects.toThrow(gitError);
+    });
+
+    it('should not throw an error if checkpointing is disabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+    });
   });
 
   describe('refreshAuth', () => {
