@@ -25,6 +25,7 @@ vi.mock('../ui/commands/clearCommand.js', () => ({
 }));
 vi.mock('../ui/commands/authCommand.js', () => ({
   authCommand: { name: 'auth', description: 'Mock Auth' },
+}));
 vi.mock('../ui/commands/themeCommand.js', () => ({
   themeCommand: { name: 'theme', description: 'Mock Theme' },
 }));

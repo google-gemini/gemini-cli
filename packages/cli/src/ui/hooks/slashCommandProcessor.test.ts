@@ -534,7 +534,6 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-
     it('should open the theme dialog when a new command returns a theme dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
