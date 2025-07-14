@@ -96,13 +96,13 @@ export class UserPromptEvent {
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
   prompt_id: string;
-  auth_type: string;
+  auth_type?: string;
   prompt?: string;
 
   constructor(
     prompt_length: number,
     prompt_Id: string,
-    auth_type: string,
+    auth_type?: string,
     prompt?: string,
   ) {
     this['event.name'] = 'user_prompt';
@@ -167,14 +167,14 @@ export class ApiErrorEvent {
   status_code?: number | string;
   duration_ms: number;
   prompt_id: string;
-  auth_type: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
     prompt_id: string,
-    auth_type: string,
+    auth_type?: string,
     error_type?: string,
     status_code?: number | string,
   ) {
@@ -205,13 +205,13 @@ export class ApiResponseEvent {
   total_token_count: number;
   response_text?: string;
   prompt_id: string;
-  auth_type: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     duration_ms: number,
     prompt_id: string,
-    auth_type: string,
+    auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
     error?: string,
@@ -234,6 +234,18 @@ export class ApiResponseEvent {
   }
 }
 
+export class FlashFallbackEvent {
+  'event.name': 'flash_fallback';
+  'event.timestamp': string; // ISO 8601
+  auth_type: string;
+
+  constructor(auth_type: string) {
+    this['event.name'] = 'flash_fallback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.auth_type = auth_type;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -241,4 +253,5 @@ export type TelemetryEvent =
   | ToolCallEvent
   | ApiRequestEvent
   | ApiErrorEvent
-  | ApiResponseEvent;
+  | ApiResponseEvent
+  | FlashFallbackEvent;
