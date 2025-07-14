@@ -8,7 +8,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { isNodeError } from '../utils/errors.js';
-import { isGitRepository } from '../utils/gitUtils.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
 import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
@@ -26,12 +25,11 @@ export class GitService {
   }
 
   async initialize(): Promise<void> {
-    if (!isGitRepository(this.projectRoot)) {
-      throw new Error('GitService requires a Git repository');
-    }
     const gitAvailable = await this.verifyGitAvailability();
     if (!gitAvailable) {
-      throw new Error('GitService requires Git to be installed');
+      throw new Error(
+        'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
+      );
     }
     this.setupShadowGitRepository();
   }
