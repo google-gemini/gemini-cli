@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'child_process';
-import { chmodSync, readFileSync, rmSync } from 'fs';
+import { chmodSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -134,6 +134,7 @@ function buildImage(imageName, dockerfile) {
     { stdio: buildStdout, shell: '/bin/bash' },
   );
   console.log(`built ${finalImageName}`);
+  writeFileSync('/workspace/final_image_uri.txt', finalImageName);
 }
 
 if (baseImage && baseDockerfile) {
