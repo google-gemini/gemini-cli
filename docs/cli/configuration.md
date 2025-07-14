@@ -189,6 +189,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`hideBanner`** (boolean):
+  - **Description:** Enables or disables the startup banner (ASCII art logo) in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideBanner": true
+    ```
+
 - **`maxSessionTurns`** (number):
   - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
   - **Default:** `-1` (unlimited)
@@ -222,6 +231,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
+  "hideBanner": false,
   "maxSessionTurns": 10
 }
 ```
