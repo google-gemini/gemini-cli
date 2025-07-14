@@ -41,7 +41,8 @@ import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
-import { useConsolePatcher } from './components/ConsolePatcher.js';
+import { ConsolePatcher } from './utils/ConsolePatcher.js';
+import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
@@ -111,6 +112,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleNewMessage,
     clearConsoleMessages: clearConsoleMessagesState,
   } = useConsoleMessages();
+
+  useEffect(() => {
+    const consolePatcher = new ConsolePatcher({
+      onNewMessage: handleNewMessage,
+      debugMode: config.getDebugMode(),
+    });
+    consolePatcher.patch();
+    registerCleanup(consolePatcher.cleanup);
+  }, [handleNewMessage, config]);
+
   const { stats: sessionStats } = useSessionStats();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
@@ -148,6 +159,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+  const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -469,11 +481,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   });
 
-  useConsolePatcher({
-    onNewMessage: handleNewMessage,
-    debugMode: config.getDebugMode(),
-  });
-
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
@@ -637,6 +644,34 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     return getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
 
+  const initialPrompt = useMemo(() => config.getQuestion(), [config]);
+  const geminiClient = config.getGeminiClient();
+
+  useEffect(() => {
+    if (
+      initialPrompt &&
+      !initialPromptSubmitted.current &&
+      !isAuthenticating &&
+      !isAuthDialogOpen &&
+      !isThemeDialogOpen &&
+      !isEditorDialogOpen &&
+      !showPrivacyNotice &&
+      geminiClient?.isInitialized?.()
+    ) {
+      submitQuery(initialPrompt);
+      initialPromptSubmitted.current = true;
+    }
+  }, [
+    initialPrompt,
+    submitQuery,
+    isAuthenticating,
+    isAuthDialogOpen,
+    isThemeDialogOpen,
+    isEditorDialogOpen,
+    showPrivacyNotice,
+    geminiClient,
+  ]);
+
   if (quittingMessages) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -681,11 +716,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header
-                terminalWidth={terminalWidth}
-                version={version}
-                nightly={nightly}
-              />
+              {!settings.merged.hideBanner && (
+                <Header
+                  terminalWidth={terminalWidth}
+                  version={version}
+                  nightly={nightly}
+                />
+              )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
