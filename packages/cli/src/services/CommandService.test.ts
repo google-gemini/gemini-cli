@@ -11,6 +11,7 @@ import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
+import { themeCommand } from '../ui/commands/themeCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -24,6 +25,9 @@ vi.mock('../ui/commands/clearCommand.js', () => ({
 }));
 vi.mock('../ui/commands/docsCommand.js', () => ({
   docsCommand: { name: 'docs', description: 'Mock Docs' },
+}));
+vi.mock('../ui/commands/themeCommand.js', () => ({
+  themeCommand: { name: 'theme', description: 'Mock Theme' },
 }));
 
 describe('CommandService', () => {
@@ -57,6 +61,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
         expect(commandNames).toContain('docs');
+        expect(commandNames).toContain('theme');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -84,9 +89,10 @@ describe('CommandService', () => {
         expect(loadedTree.length).toBe(4);
         expect(loadedTree).toEqual([
           clearCommand,
+          docsCommand,
           helpCommand,
           memoryCommand,
-          docsCommand,
+          themeCommand,
         ]);
       });
     });
