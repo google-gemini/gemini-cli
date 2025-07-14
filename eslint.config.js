@@ -33,6 +33,7 @@ export default tseslint.config(
       'packages/cli/dist/**',
       'packages/core/dist/**',
       'packages/server/dist/**',
+      'packages/vscode-ide-companion/dist/**',
       'eslint-rules/*',
       'bundle/**',
     ],
@@ -173,6 +174,20 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+    },
+  },
+  {
+    files: ['packages/vscode-ide-companion/esbuild.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
   // Prettier config must be last
