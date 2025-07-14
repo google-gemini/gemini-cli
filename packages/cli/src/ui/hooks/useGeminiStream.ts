@@ -456,7 +456,7 @@ export const useGeminiStream = (
     addItem(
       {
         type: 'info',
-        text: `A potential loop was detected, which may be due to repetitive tool calls or other model behavior. The request has been cancelled. Please try again with a more specific prompt.`,
+        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
       },
       Date.now(),
     );
