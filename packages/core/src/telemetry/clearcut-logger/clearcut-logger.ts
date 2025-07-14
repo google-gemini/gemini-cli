@@ -14,11 +14,15 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
+  FlashFallbackEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
 import { getInstallationId } from '../../utils/user_id.js';
-import { getGoogleAccountId } from '../../utils/user_id.js';
+import {
+  getCachedGoogleAccount,
+  getLifetimeGoogleAccounts,
+} from '../../utils/user_account.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -27,6 +31,7 @@ const api_request_event_name = 'api_request';
 const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
+const flash_fallback_event_name = 'flash_fallback';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -65,14 +70,30 @@ export class ClearcutLogger {
     ]);
   }
 
-  createLogEvent(name: string, data: object): object {
-    return {
+  createLogEvent(name: string, data: object[]): object {
+    const email = getCachedGoogleAccount();
+    const totalAccounts = getLifetimeGoogleAccounts();
+    data.push({
+      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+      value: totalAccounts.toString(),
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logEvent: any = {
       console_type: 'GEMINI_CLI',
       application: 102,
       event_name: name,
-      client_install_id: getInstallationId(),
       event_metadata: [data] as object[],
     };
+
+    // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
+    if (email) {
+      logEvent.client_email = email;
+    } else {
+      logEvent.client_install_id = getInstallationId();
+    }
+
+    return logEvent;
   }
 
   flushIfNeeded(): void {
@@ -80,20 +101,17 @@ export class ClearcutLogger {
       return;
     }
 
-    // Fire and forget - don't await
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  async flushToClearcut(): Promise<LogResponse> {
+  flushToClearcut(): Promise<LogResponse> {
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = [...this.events];
     this.events.length = 0;
-
-    const googleAccountId = await getGoogleAccountId();
 
     return new Promise<Buffer>((resolve, reject) => {
       const request = [
@@ -101,12 +119,6 @@ export class ClearcutLogger {
           log_source_name: 'CONCORD',
           request_time_ms: Date.now(),
           log_event: eventsToSend,
-          // Add UserInfo with the raw Gaia ID
-          user_info: googleAccountId
-            ? {
-                UserID: googleAccountId,
-              }
-            : undefined,
         },
       ];
       const body = JSON.stringify(request);
@@ -252,10 +264,10 @@ export class ClearcutLogger {
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
     ];
-    this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     // Flush start event immediately
+    this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing start session event to Clearcut:', error);
+      console.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -265,12 +277,18 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
-    this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
-    });
+    this.flushIfNeeded();
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
@@ -278,6 +296,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
         value: JSON.stringify(event.function_name),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_DECISION,
@@ -301,10 +323,9 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(tool_call_event_name, data));
-    this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
-    });
+    const logEvent = this.createLogEvent(tool_call_event_name, data);
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
@@ -313,12 +334,14 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
         value: JSON.stringify(event.model),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
-    this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
-    });
+    this.flushIfNeeded();
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
@@ -326,6 +349,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
         value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_STATUS_CODE,
@@ -364,12 +391,14 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.tool_token_count),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
-    this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
-    });
+    this.flushIfNeeded();
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
@@ -377,6 +406,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
         value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_TYPE,
@@ -390,9 +423,25 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_DURATION_MS,
         value: JSON.stringify(event.duration_ms),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logFlashFallbackEvent(event: FlashFallbackEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(event.auth_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
@@ -406,8 +455,8 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
     // Flush immediately on session end.
+    this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });

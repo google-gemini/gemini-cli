@@ -103,7 +103,7 @@ export abstract class BaseTool<
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
   ) {}
@@ -115,7 +115,7 @@ export abstract class BaseTool<
     return {
       name: this.name,
       description: this.description,
-      parameters: this.parameterSchema as Schema,
+      parameters: this.parameterSchema,
     };
   }
 
@@ -173,6 +173,11 @@ export abstract class BaseTool<
 }
 
 export interface ToolResult {
+  /**
+   * A short, one-line summary of the tool's action and result.
+   * e.g., "Read 5 files", "Wrote 256 bytes to foo.txt"
+   */
+  summary?: string;
   /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.

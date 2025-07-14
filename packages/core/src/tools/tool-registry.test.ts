@@ -106,9 +106,9 @@ const createMockCallableTool = (
 class MockTool extends BaseTool<{ param: string }, ToolResult> {
   constructor(name = 'mock-tool', description = 'A mock tool') {
     super(name, name, description, {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
-        param: { type: 'string' },
+        param: { type: Type.STRING },
       },
       required: ['param'],
     });
@@ -297,6 +297,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        false,
       );
     });
 
@@ -318,6 +319,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        false,
       );
     });
   });
