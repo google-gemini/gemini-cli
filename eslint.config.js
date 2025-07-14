@@ -33,9 +33,6 @@ export default tseslint.config(
       'packages/cli/dist/**',
       'packages/core/dist/**',
       'packages/server/dist/**',
-      'packages/a2alib/dist/**',
-      'packages/vscode-ide-companion/dist/**',
-      'packages/screenreader-accessible-cli/dist/**',
       'eslint-rules/*',
       'bundle/**',
     ],
@@ -159,7 +156,7 @@ export default tseslint.config(
   },
   // extra settings for scripts that we run directly with node
   {
-    files: ['./scripts/**/*.js', 'esbuild.config.js', 'packages/**/esbuild.js'],
+    files: ['./scripts/**/*.js', 'esbuild.config.js'],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -168,7 +165,6 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
