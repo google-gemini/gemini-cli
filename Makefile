@@ -1,6 +1,6 @@
 # Makefile for gemini-cli
 
-.PHONY: help install build build-sandbox build-all test lint format preflight clean clean-all start debug release run-npx create-alias
+.PHONY: help install build build-sandbox build-all test lint format preflight clean start debug release run-npx create-alias
 
 help:
 	@echo "Makefile for gemini-cli"
