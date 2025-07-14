@@ -233,6 +233,7 @@ export async function main() {
     'event.timestamp': new Date().toISOString(),
     prompt: input,
     prompt_id,
+    user_tier: config.cachedUserTierId,
     auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });

@@ -96,12 +96,14 @@ export class UserPromptEvent {
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
   prompt_id: string;
+  user_tier?: string;
   auth_type?: string;
   prompt?: string;
 
   constructor(
     prompt_length: number,
     prompt_Id: string,
+    user_tier?: string,
     auth_type?: string,
     prompt?: string,
   ) {
@@ -111,6 +113,7 @@ export class UserPromptEvent {
     this.prompt_id = prompt_Id;
     this.auth_type = auth_type;
     this.prompt = prompt;
+    this.user_tier = user_tier;
   }
 }
 
@@ -163,6 +166,7 @@ export class ApiErrorEvent {
   'event.timestamp': string; // ISO 8601
   model: string;
   error: string;
+  user_tier?: string;
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
@@ -174,6 +178,7 @@ export class ApiErrorEvent {
     error: string,
     duration_ms: number,
     prompt_id: string,
+    user_tier?: string,
     auth_type?: string,
     error_type?: string,
     status_code?: number | string,
@@ -187,6 +192,7 @@ export class ApiErrorEvent {
     this.duration_ms = duration_ms;
     this.prompt_id = prompt_id;
     this.auth_type = auth_type;
+    this.user_tier = user_tier;
   }
 }
 
@@ -196,6 +202,7 @@ export class ApiResponseEvent {
   model: string;
   status_code?: number | string;
   duration_ms: number;
+  user_tier?: string;
   error?: string;
   input_token_count: number;
   output_token_count: number;
@@ -211,6 +218,7 @@ export class ApiResponseEvent {
     model: string,
     duration_ms: number,
     prompt_id: string,
+    user_tier?: string,
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
@@ -231,6 +239,7 @@ export class ApiResponseEvent {
     this.error = error;
     this.prompt_id = prompt_id;
     this.auth_type = auth_type;
+    this.user_tier = user_tier;
   }
 }
 

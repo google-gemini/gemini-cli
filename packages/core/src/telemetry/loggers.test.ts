@@ -47,6 +47,7 @@ import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
+import { UserTierId } from '../code_assist/types.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -133,6 +134,7 @@ describe('loggers', () => {
       const event = new UserPromptEvent(
         11,
         'prompt-id-8',
+        UserTierId.LEGACY,
         AuthType.USE_VERTEX_AI,
         'test-prompt',
       );
@@ -214,6 +216,7 @@ describe('loggers', () => {
         'test-model',
         100,
         'prompt-id-1',
+        UserTierId.FREE,
         AuthType.LOGIN_WITH_GOOGLE,
         usageData,
         'test-response',
@@ -240,6 +243,7 @@ describe('loggers', () => {
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
           auth_type: 'oauth-personal',
+          user_tier: 'free-tier',
         },
       });
 
@@ -277,6 +281,7 @@ describe('loggers', () => {
         'test-model',
         100,
         'prompt-id-1',
+        UserTierId.STANDARD,
         AuthType.USE_GEMINI,
         usageData,
         'test-response',

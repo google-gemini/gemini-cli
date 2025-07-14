@@ -285,6 +285,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_TIER,
+        value: JSON.stringify(event.user_tier),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
@@ -395,6 +399,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_TIER,
+        value: JSON.stringify(event.user_tier),
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
@@ -426,6 +434,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_TIER,
+        value: JSON.stringify(event.user_tier),
       },
     ];
 

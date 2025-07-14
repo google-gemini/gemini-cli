@@ -226,6 +226,7 @@ export const useGeminiStream = (
           new UserPromptEvent(
             trimmedQuery.length,
             prompt_id,
+            config.cachedUserTierId,
             config.getContentGeneratorConfig()?.authType,
             trimmedQuery,
           ),

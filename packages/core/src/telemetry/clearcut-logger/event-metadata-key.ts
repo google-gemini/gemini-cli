@@ -150,6 +150,9 @@ export enum EventMetadataKey {
 
   // Logs the total number of Google accounts ever used.
   GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
+
+  // Logs the User tier
+  GEMINI_CLI_USER_TIER = 38,
 }
 
 export function getEventMetadataKey(

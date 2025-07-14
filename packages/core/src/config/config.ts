@@ -189,6 +189,7 @@ export class Config {
   private readonly _activeExtensions: ActiveExtension[];
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  cachedUserTierId: UserTierId | undefined = undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -329,7 +330,8 @@ export class Config {
       return undefined;
     }
     const generator = this.geminiClient.getContentGenerator();
-    return await generator.getTier?.();
+    this.cachedUserTierId = await generator.getTier?.();
+    return this.cachedUserTierId;
   }
 
   getEmbeddingModel(): string {
