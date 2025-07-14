@@ -9,11 +9,11 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
-const MAX_LOOPBACK_WINDOW = 1000;
 
 export class LoopDetectionService {
   private toolCallCounts = new Map<string, number>();
-  private accumulatedContent = '';
+  private adjacentRepeatingSentences: string[] = [];
+  private partialContent = '';
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
     // Stringify args for a consistent key.
@@ -31,43 +31,56 @@ export class LoopDetectionService {
         return count >= TOOL_CALL_LOOP_THRESHOLD;
       }
       case GeminiEventType.Content: {
-        const newContent = event.value;
-        this.accumulatedContent += newContent;
-
-        // Limit the accumulated content length.
-        if (this.accumulatedContent.length > MAX_LOOPBACK_WINDOW) {
-          const trimLength =
-            this.accumulatedContent.length - MAX_LOOPBACK_WINDOW;
-          this.accumulatedContent = this.accumulatedContent.slice(trimLength);
-        }
+        this.partialContent += event.value;
 
         // We only check for repetition when a sentence is likely to be complete,
         // which we detect by the presence of sentence-ending punctuation.
-        if (!/[.!?]/.test(newContent)) {
+        if (!/[.!?]/.test(this.partialContent)) {
           return false;
         }
 
-        // Extract all sentences from accumulated content for counting
-        const allSentences =
-          this.accumulatedContent.match(/[^.!?]+[.!?]/g) || [];
+        // Extract complete sentences from the accumulated partial content
+        const completeSentences =
+          this.partialContent.match(/[^.!?]+[.!?]/g) || [];
 
-        // We need at least two sentences to check for a loop.
-        if (allSentences.length < 2) {
+        if (completeSentences.length === 0) {
           return false;
         }
 
-        const lastSentence = allSentences[allSentences.length - 1].trim();
+        // Keep any remaining partial content after the last complete sentence
+        const lastCompleteIndex = this.partialContent.lastIndexOf(
+          completeSentences[completeSentences.length - 1],
+        );
+        const endOfLastSentence =
+          lastCompleteIndex +
+          completeSentences[completeSentences.length - 1].length;
+        this.partialContent = this.partialContent.slice(endOfLastSentence);
 
-        if (lastSentence === '') {
-          return false;
-        }
-        let count = 0;
-        for (const sentence of allSentences) {
-          if (sentence.trim() === lastSentence) {
-            count++;
-            if (count >= CONTENT_LOOP_THRESHOLD) {
+        for (const sentence of completeSentences) {
+          const trimmedSentence = sentence.trim();
+          if (trimmedSentence === '') {
+            continue;
+          }
+
+          // Check if this sentence continues the adjacent repetition
+          if (
+            this.adjacentRepeatingSentences.length === 0 ||
+            this.adjacentRepeatingSentences[
+              this.adjacentRepeatingSentences.length - 1
+            ] === trimmedSentence
+          ) {
+            // Add to adjacent repeating sentences
+            this.adjacentRepeatingSentences.push(trimmedSentence);
+
+            // Check if we've hit the loop threshold
+            if (
+              this.adjacentRepeatingSentences.length >= CONTENT_LOOP_THRESHOLD
+            ) {
               return true;
             }
+          } else {
+            // Different sentence breaks the adjacent repetition, reset and start new
+            this.adjacentRepeatingSentences = [trimmedSentence];
           }
         }
 
@@ -80,6 +93,7 @@ export class LoopDetectionService {
 
   reset() {
     this.toolCallCounts.clear();
-    this.accumulatedContent = '';
+    this.adjacentRepeatingSentences = [];
+    this.partialContent = '';
   }
 }

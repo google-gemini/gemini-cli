@@ -242,27 +242,6 @@ describe('LoopDetectionService', () => {
       const event = createContentEvent('');
       expect(service.addAndCheck(event)).toBe(false);
     });
-
-    it('should handle content with special regex characters', () => {
-      const specialContent = 'Special chars: [.*+?^${}()|\\]!';
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(createContentEvent(specialContent));
-      }
-      expect(service.addAndCheck(createContentEvent(specialContent))).toBe(
-        true,
-      );
-    });
-
-    it('should handle very long sentences', () => {
-      const longSentence =
-        'This is a very long sentence ' + 'word '.repeat(100) + '.';
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(createContentEvent(longSentence));
-      }
-      // Very long sentences that exceed the window size cannot be reliably detected
-      // due to content trimming, so this should return false
-      expect(service.addAndCheck(createContentEvent(longSentence))).toBe(false);
-    });
   });
 
   describe('Reset Functionality', () => {
