@@ -841,6 +841,55 @@ describe('useCompletion', () => {
     });
   });
 
+  describe('File sorting behavior', () => {
+    it('should prioritize source files over test files with same base name', async () => {
+      // Mock glob to return files with same base name but different extensions
+      vi.mocked(glob).mockResolvedValue([
+        `${testCwd}/component.test.ts`,
+        `${testCwd}/component.ts`,
+        `${testCwd}/utils.spec.js`,
+        `${testCwd}/utils.js`,
+        `${testCwd}/api.test.tsx`,
+        `${testCwd}/api.tsx`,
+      ]);
+
+      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
+
+      const { result } = renderHook(() =>
+        useCompletion(
+          '@comp',
+          testCwd,
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      expect(result.current.suggestions).toHaveLength(6);
+
+      // Extract labels for easier testing
+      const labels = result.current.suggestions.map((s) => s.label);
+
+      // Find indices of source files and their corresponding test files
+      const componentIndex = labels.indexOf('component.ts');
+      const componentTestIndex = labels.indexOf('component.test.ts');
+      const utilsIndex = labels.indexOf('utils.js');
+      const utilsTestIndex = labels.indexOf('utils.spec.js');
+      const apiIndex = labels.indexOf('api.tsx');
+      const apiTestIndex = labels.indexOf('api.test.tsx');
+
+      // Source files should appear before their test counterparts
+      expect(componentIndex).toBeLessThan(componentTestIndex);
+      expect(utilsIndex).toBeLessThan(utilsTestIndex);
+      expect(apiIndex).toBeLessThan(apiTestIndex);
+    });
+  });
+
   describe('Config and FileDiscoveryService integration', () => {
     it('should work without config', async () => {
       vi.mocked(fs.readdir).mockResolvedValue([
