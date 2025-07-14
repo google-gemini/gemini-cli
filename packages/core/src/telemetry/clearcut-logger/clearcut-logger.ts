@@ -71,7 +71,6 @@ export class ClearcutLogger {
     ]);
   }
 
-
   createLogEvent(name: string, data: object[]): object {
     const email = getCachedGoogleAccount();
     const totalAccounts = getLifetimeGoogleAccounts();

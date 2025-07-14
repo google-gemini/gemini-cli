@@ -6,12 +6,15 @@
 
 /**
  * Safely stringifies an object to JSON, handling circular references by replacing them with [Circular].
- * 
+ *
  * @param obj - The object to stringify
  * @param space - Optional space parameter for formatting (defaults to no formatting)
  * @returns JSON string with circular references replaced by [Circular]
  */
-export function safeJsonStringify(obj: unknown, space?: string | number): string {
+export function safeJsonStringify(
+  obj: unknown,
+  space?: string | number,
+): string {
   const seen = new WeakSet();
   return JSON.stringify(
     obj,
@@ -24,6 +27,6 @@ export function safeJsonStringify(obj: unknown, space?: string | number): string
       }
       return value;
     },
-    space
+    space,
   );
 }
