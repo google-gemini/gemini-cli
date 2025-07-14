@@ -641,7 +641,7 @@ describe('mergeExcludeTools', () => {
   });
 });
 
-describe('loadCliConfig with MCP server filtering', () => {
+describe('loadCliConfig with allowed-mcp-server-names', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
