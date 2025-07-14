@@ -223,7 +223,12 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         logUserPrompt(
           config,
-          new UserPromptEvent(trimmedQuery.length, prompt_id, trimmedQuery),
+          new UserPromptEvent(
+            trimmedQuery.length,
+            prompt_id,
+            config.getContentGeneratorConfig()?.authType,
+            trimmedQuery,
+          ),
         );
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
@@ -403,7 +408,7 @@ export const useGeminiStream = (
           type: MessageType.ERROR,
           text: parseAndFormatApiError(
             eventValue.error,
-            config.getContentGeneratorConfig().authType,
+            config.getContentGeneratorConfig()?.authType,
             undefined,
             config.getModel(),
             DEFAULT_GEMINI_FLASH_MODEL,
@@ -425,6 +430,20 @@ export const useGeminiStream = (
             `A compressed context will be sent for future messages (compressed from: ` +
             `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
+        },
+        Date.now(),
+      ),
+    [addItem, config],
+  );
+
+  const handleMaxSessionTurnsEvent = useCallback(
+    () =>
+      addItem(
+        {
+          type: 'info',
+          text:
+            `The session has reached the maximum number of turns: ${config.getMaxSessionTurns()}. ` +
+            `Please update this limit in your setting.json file.`,
         },
         Date.now(),
       ),
@@ -467,6 +486,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ToolCallResponse:
             // do nothing
             break;
+          case ServerGeminiEventType.MaxSessionTurns:
+            handleMaxSessionTurnsEvent();
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -485,6 +507,7 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      handleMaxSessionTurnsEvent,
     ],
   );
 
@@ -565,7 +588,7 @@ export const useGeminiStream = (
               type: MessageType.ERROR,
               text: parseAndFormatApiError(
                 getErrorMessage(error) || 'Unknown error',
-                config.getContentGeneratorConfig().authType,
+                config.getContentGeneratorConfig()?.authType,
                 undefined,
                 config.getModel(),
                 DEFAULT_GEMINI_FLASH_MODEL,
