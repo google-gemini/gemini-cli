@@ -716,11 +716,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header
-                terminalWidth={terminalWidth}
-                version={version}
-                nightly={nightly}
-              />
+              {!settings.merged.hideBanner && (
+                <Header
+                  terminalWidth={terminalWidth}
+                  version={version}
+                  nightly={nightly}
+                />
+              )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
