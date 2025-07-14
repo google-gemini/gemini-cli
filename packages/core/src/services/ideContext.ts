@@ -9,7 +9,7 @@ import { z } from 'zod';
 /**
  * The reserved server name for the IDE's MCP server.
  */
-export const IDE_SERVER_NAME = '__ide_server';
+export const IDE_SERVER_NAME = '_ide_server';
 
 /**
  * Zod schema for validating a cursor position.

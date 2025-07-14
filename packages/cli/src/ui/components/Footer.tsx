@@ -82,9 +82,7 @@ export const Footer: React.FC<FooterProps> = ({
             <Text color={Colors.LightBlue}>
               {shortenPath(tildeifyPath(activeFile.filePath), 70)}
             </Text>
-            {activeFile.cursor &&
-              activeFile.cursor.line > 0 &&
-              activeFile.cursor.character > 0 && (
+            {activeFile.cursor && (
                 <Text color={Colors.Gray}>
                   :{activeFile.cursor.line}:{activeFile.cursor.character}
                 </Text>
