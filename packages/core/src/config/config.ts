@@ -135,6 +135,7 @@ export interface ConfigParameters {
   };
   checkpointing?: boolean;
   proxy?: string;
+  useEnvProxy?: boolean;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
@@ -178,6 +179,7 @@ export class Config {
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
+  private readonly useEnvProxy: boolean = false;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
@@ -225,6 +227,7 @@ export class Config {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
+    this.useEnvProxy = params.useEnvProxy ?? false;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
@@ -461,6 +464,10 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getUseEnvProxy(): boolean {
+    return this.useEnvProxy;
   }
 
   getWorkingDir(): string {
