@@ -41,7 +41,8 @@ import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
-import { useConsolePatcher } from './components/ConsolePatcher.js';
+import { ConsolePatcher } from './utils/ConsolePatcher.js';
+import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
@@ -111,6 +112,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleNewMessage,
     clearConsoleMessages: clearConsoleMessagesState,
   } = useConsoleMessages();
+
+  useEffect(() => {
+    const consolePatcher = new ConsolePatcher({
+      onNewMessage: handleNewMessage,
+      debugMode: config.getDebugMode(),
+    });
+    consolePatcher.patch();
+    registerCleanup(consolePatcher.cleanup);
+  }, [handleNewMessage, config]);
+
   const { stats: sessionStats } = useSessionStats();
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
@@ -470,11 +481,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   });
 
-  useConsolePatcher({
-    onNewMessage: handleNewMessage,
-    debugMode: config.getDebugMode(),
-  });
-
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
@@ -710,11 +716,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              <Header
-                terminalWidth={terminalWidth}
-                version={version}
-                nightly={nightly}
-              />
+              {!settings.merged.hideBanner && (
+                <Header
+                  terminalWidth={terminalWidth}
+                  version={version}
+                  nightly={nightly}
+                />
+              )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (

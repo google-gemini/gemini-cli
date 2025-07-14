@@ -65,14 +65,12 @@ describe('CommandService', () => {
         // Load once
         await commandService.loadCommands();
         expect(commandService.getCommands().length).toBe(5);
-        expect(commandService.getCommands().length).toBe(5);
 
         // Load again
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
         // Should not append, but overwrite
-        expect(tree.length).toBe(5);
         expect(tree.length).toBe(5);
       });
     });
