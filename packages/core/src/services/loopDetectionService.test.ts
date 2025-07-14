@@ -15,7 +15,6 @@ import { ServerGeminiStreamEvent } from '../core/turn.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
-const MAX_LOOPBACK_WINDOW = 1000;
 
 describe('LoopDetectionService', () => {
   let service: LoopDetectionService;
@@ -84,16 +83,6 @@ describe('LoopDetectionService', () => {
         expect(service.addAndCheck(event3)).toBe(false);
       }
     });
-
-    it('should distinguish between tools with same name but different args', () => {
-      const event1 = createToolCallRequestEvent('testTool', { param: 'A' });
-      const event2 = createToolCallRequestEvent('testTool', { param: 'B' });
-      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(event1);
-      }
-      expect(service.addAndCheck(event2)).toBe(false);
-      expect(service.addAndCheck(event1)).toBe(true);
-    });
   });
 
   describe('Content Loop Detection', () => {
@@ -119,40 +108,6 @@ describe('LoopDetectionService', () => {
         expect(service.addAndCheck(event1)).toBe(false);
         expect(service.addAndCheck(event2)).toBe(false);
       }
-    });
-  });
-
-  describe('Content Window Management', () => {
-    it('should trim content when it exceeds MAX_LOOPBACK_WINDOW', () => {
-      // Fill content to exceed window
-      const longContent = 'A'.repeat(MAX_LOOPBACK_WINDOW + 100);
-      const event = createContentEvent(longContent + '.');
-      service.addAndCheck(event);
-
-      // Add more content to trigger another check
-      const nextEvent = createContentEvent('Next sentence.');
-      service.addAndCheck(nextEvent);
-
-      // The service should still function after trimming
-      expect(service.addAndCheck(createContentEvent('Another test.'))).toBe(
-        false,
-      );
-    });
-
-    it('should reset cache when content is trimmed', () => {
-      // Build up some cached sentences
-      service.addAndCheck(createContentEvent('First sentence.'));
-      service.addAndCheck(createContentEvent('Second sentence.'));
-
-      // Exceed the window to trigger trimming
-      const longContent = 'B'.repeat(MAX_LOOPBACK_WINDOW);
-      service.addAndCheck(createContentEvent(longContent + '.'));
-
-      // Cache should be reset, so this shouldn't immediately trigger loop detection
-      service.addAndCheck(createContentEvent('Test sentence.'));
-      expect(service.addAndCheck(createContentEvent('Test sentence.'))).toBe(
-        false,
-      );
     });
   });
 
@@ -245,23 +200,18 @@ describe('LoopDetectionService', () => {
   });
 
   describe('Reset Functionality', () => {
-    it('should reset all internal state', () => {
-      // Build up some state
+    it('tool call should reset content count', () => {
+      const contentEvent = createContentEvent('Some content.');
       const toolEvent = createToolCallRequestEvent('testTool', {
         param: 'value',
       });
-      for (let i = 0; i < 3; i++) {
-        service.addAndCheck(toolEvent);
+      for (let i = 0; i < 9; i++) {
+        service.addAndCheck(contentEvent);
       }
 
-      service.addAndCheck(createContentEvent('Some content.'));
-      service.addAndCheck(createContentEvent('More content.'));
-
-      // Reset everything
-      service.reset();
+      service.addAndCheck(toolEvent);
 
       // Should start fresh
-      expect(service.addAndCheck(toolEvent)).toBe(false);
       expect(service.addAndCheck(createContentEvent('Fresh content.'))).toBe(
         false,
       );

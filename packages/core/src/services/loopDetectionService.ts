@@ -9,91 +9,110 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
+const SENTENCE_ENDING_PUNCTUATION = /[.!?]/;
 
+/**
+ * Service for detecting and preventing infinite loops in AI responses.
+ * Monitors tool call repetitions and content sentence repetitions.
+ */
 export class LoopDetectionService {
-  private toolCallCounts = new Map<string, number>();
-  private adjacentRepeatingSentences: string[] = [];
-  private partialContent = '';
+  // Tool call tracking
+  private lastToolCallKey: string | null = null;
+  private toolCallRepetitionCount: number = 0;
+
+  // Content streaming tracking
+  private lastRepeatedSentence: string = '';
+  private sentenceRepetitionCount: number = 0;
+  private partialContent: string = '';
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
-    // Stringify args for a consistent key.
     const argsString = JSON.stringify(toolCall.args);
     const keyString = `${toolCall.name}:${argsString}`;
     return createHash('sha256').update(keyString).digest('hex');
   }
 
+  /**
+   * Processes a stream event and checks for loop conditions.
+   * @param event - The stream event to process
+   * @returns true if a loop is detected, false otherwise
+   */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
     switch (event.type) {
-      case GeminiEventType.ToolCallRequest: {
-        const key = this.getToolCallKey(event.value);
-        const count = (this.toolCallCounts.get(key) ?? 0) + 1;
-        this.toolCallCounts.set(key, count);
-        return count >= TOOL_CALL_LOOP_THRESHOLD;
-      }
-      case GeminiEventType.Content: {
-        this.partialContent += event.value;
-
-        // We only check for repetition when a sentence is likely to be complete,
-        // which we detect by the presence of sentence-ending punctuation.
-        if (!/[.!?]/.test(this.partialContent)) {
-          return false;
-        }
-
-        // Extract complete sentences from the accumulated partial content
-        const completeSentences =
-          this.partialContent.match(/[^.!?]+[.!?]/g) || [];
-
-        if (completeSentences.length === 0) {
-          return false;
-        }
-
-        // Keep any remaining partial content after the last complete sentence
-        const lastCompleteIndex = this.partialContent.lastIndexOf(
-          completeSentences[completeSentences.length - 1],
-        );
-        const endOfLastSentence =
-          lastCompleteIndex +
-          completeSentences[completeSentences.length - 1].length;
-        this.partialContent = this.partialContent.slice(endOfLastSentence);
-
-        for (const sentence of completeSentences) {
-          const trimmedSentence = sentence.trim();
-          if (trimmedSentence === '') {
-            continue;
-          }
-
-          // Check if this sentence continues the adjacent repetition
-          if (
-            this.adjacentRepeatingSentences.length === 0 ||
-            this.adjacentRepeatingSentences[
-              this.adjacentRepeatingSentences.length - 1
-            ] === trimmedSentence
-          ) {
-            // Add to adjacent repeating sentences
-            this.adjacentRepeatingSentences.push(trimmedSentence);
-
-            // Check if we've hit the loop threshold
-            if (
-              this.adjacentRepeatingSentences.length >= CONTENT_LOOP_THRESHOLD
-            ) {
-              return true;
-            }
-          } else {
-            // Different sentence breaks the adjacent repetition, reset and start new
-            this.adjacentRepeatingSentences = [trimmedSentence];
-          }
-        }
-
-        return false;
-      }
+      case GeminiEventType.ToolCallRequest:
+        this.resetSentenceCount();
+        return this.checkToolCallLoop(event.value);
+      case GeminiEventType.Content:
+        return this.checkContentLoop(event.value);
       default:
+        this.reset();
         return false;
     }
   }
 
-  reset() {
-    this.toolCallCounts.clear();
-    this.adjacentRepeatingSentences = [];
+  private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
+    const key = this.getToolCallKey(toolCall);
+    if (this.lastToolCallKey === key) {
+      this.toolCallRepetitionCount++;
+    } else {
+      this.lastToolCallKey = key;
+      this.toolCallRepetitionCount = 1;
+    }
+    return this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD;
+  }
+
+  private checkContentLoop(content: string): boolean {
+    this.partialContent += content;
+
+    if (!SENTENCE_ENDING_PUNCTUATION.test(this.partialContent)) {
+      return false;
+    }
+
+    const completeSentences = this.partialContent.match(/[^.!?]+[.!?]/g) || [];
+    if (completeSentences.length === 0) {
+      return false;
+    }
+
+    const lastSentence = completeSentences[completeSentences.length - 1];
+    const lastCompleteIndex = this.partialContent.lastIndexOf(lastSentence);
+    const endOfLastSentence = lastCompleteIndex + lastSentence.length;
+    this.partialContent = this.partialContent.slice(endOfLastSentence);
+
+    for (const sentence of completeSentences) {
+      const trimmedSentence = sentence.trim();
+      if (trimmedSentence === '') {
+        continue;
+      }
+
+      if (this.lastRepeatedSentence === trimmedSentence) {
+        this.sentenceRepetitionCount++;
+      } else {
+        this.lastRepeatedSentence = trimmedSentence;
+        this.sentenceRepetitionCount = 1;
+      }
+
+      if (this.sentenceRepetitionCount >= CONTENT_LOOP_THRESHOLD) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Resets all loop detection state.
+   */
+  reset(): void {
+    this.resetToolCallCount();
+    this.resetSentenceCount();
+  }
+
+  private resetToolCallCount(): void {
+    this.lastToolCallKey = null;
+    this.toolCallRepetitionCount = 0;
+  }
+
+  private resetSentenceCount(): void {
+    this.lastRepeatedSentence = '';
+    this.sentenceRepetitionCount = 0;
     this.partialContent = '';
   }
 }
