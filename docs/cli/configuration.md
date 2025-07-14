@@ -81,6 +81,16 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
     that can be executed.
 
+- **`allowMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be made available to the model. This can be used to restrict the set of MCP servers to connect to. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default:** All MCP servers are available for use by the Gemini model.
+  - **Example:** `"allowMCPServers": ["myPythonServer"]`.
+
+- **`excludeMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be excluded from the model. A server listed in both `excludeMCPServers` and `allowMCPServers` is excluded. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default**: No MCP servers excluded.
+  - **Example:** `"excludeMCPServers": ["myNodeServer"]`.
+
 - **`autoAccept`** (boolean):
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
   - **Default:** `false`
