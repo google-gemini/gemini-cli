@@ -875,18 +875,15 @@ describe('useCompletion', () => {
       // Extract labels for easier testing
       const labels = result.current.suggestions.map((s) => s.label);
 
-      // Find indices of source files and their corresponding test files
-      const componentIndex = labels.indexOf('component.ts');
-      const componentTestIndex = labels.indexOf('component.test.ts');
-      const utilsIndex = labels.indexOf('utils.js');
-      const utilsTestIndex = labels.indexOf('utils.spec.js');
-      const apiIndex = labels.indexOf('api.tsx');
-      const apiTestIndex = labels.indexOf('api.test.tsx');
-
-      // Source files should appear before their test counterparts
-      expect(componentIndex).toBeLessThan(componentTestIndex);
-      expect(utilsIndex).toBeLessThan(utilsTestIndex);
-      expect(apiIndex).toBeLessThan(apiTestIndex);
+      // Verify the exact sorted order: source files should come before their test counterparts
+      expect(labels).toEqual([
+        'api.tsx',
+        'api.test.tsx',
+        'component.ts',
+        'component.test.ts',
+        'utils.js',
+        'utils.spec.js',
+      ]);
     });
   });
 
