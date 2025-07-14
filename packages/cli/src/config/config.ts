@@ -281,7 +281,7 @@ export async function loadCliConfig(
       undefined, // headers
       undefined, // tcp
       undefined, // timeout
-      true, // trust
+      false, // trust
       'IDE connection', // description
       undefined, // includeTools
       undefined, // excludeTools

@@ -698,6 +698,6 @@ describe('loadCliConfig ideMode', () => {
     expect(mcpServers['_ide_server']).toBeDefined();
     expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
     expect(mcpServers['_ide_server'].description).toBe('IDE connection');
-    expect(mcpServers['_ide_server'].trust).toBe(true);
+    expect(mcpServers['_ide_server'].trust).toBe(false);
   });
 });
