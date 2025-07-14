@@ -31,6 +31,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
 
+- **`/extensions`**
+  - **Description:** Lists all active extensions in the current Gemini CLI session. See [Gemini CLI Extensions](../extension.md).
+
 - **`/help`** (or **`/?`**)
   - **Description:** Display help information about the Gemini CLI, including available commands and their usage.
 
