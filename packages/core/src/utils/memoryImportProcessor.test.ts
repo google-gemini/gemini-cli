@@ -262,7 +262,7 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(innerContent);
     });
 
-    it('should handle absolute paths in imports', async () => {
+    it('should reject absolute paths outside the base path to prevent path traversal', async () => {
       const content = 'Content @/absolute/path/file.md more content';
       const basePath = testPath('test', 'path');
       const importedContent = 'Absolute path content';
@@ -275,6 +275,27 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(
         '<!-- Import failed: /absolute/path/file.md - Path traversal attempt -->',
       );
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+    });
+
+    it('should allow absolute paths that resolve within the base path', async () => {
+      const importPath = '/test/path/absolute/path/file.md';
+      const content = `Content @${importPath} more content`;
+      const basePath = '/test/path';
+      const importedContent = 'Absolute path content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      // This test works because the resolved absolute path of the import
+      // starts with the basePath, which is the default and only allowed
+      // directory for imports in the current implementation.
+      const result = await processImports(content, basePath, true);
+
+      expect(result).toContain(`<!-- Imported from: ${importPath} -->`);
+      expect(result).toContain(importedContent);
+      expect(result).toContain(`<!-- End of import from: ${importPath} -->`);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(importPath, 'utf-8');
     });
 
     it('should handle multiple imports in same content', async () => {
