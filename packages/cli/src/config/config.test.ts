@@ -781,7 +781,6 @@ describe('loadCliConfig with MCP server filtering', () => {
       server1: { url: 'http://localhost:8080' },
     });
   });
-
 });
 
 describe('loadCliConfig extensions', () => {
