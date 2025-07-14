@@ -491,6 +491,7 @@ Process Group PGID: Process group started or \`(none)\``,
 
     const summarizeConfig = this.config.getSummarizeToolOutputConfig();
     if (summarizeConfig && summarizeConfig[this.name]) {
+      console.log("SUMMARIZING SHELL")
       const summary = await summarizeToolOutput(
         llmContent,
         this.config.getGeminiClient(),

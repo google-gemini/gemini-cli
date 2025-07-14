@@ -197,6 +197,18 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "maxSessionTurns": 10
     ```
 
+- **`summarizeToolOutput`** (object):
+  - **Description:** Enables or disables the summarization of tool output. You can specify a token budget for the summarization using the `summarizeToolOutputTokenBudget` setting.
+  - **Default:** `{}`
+  - **Example:**
+    ```json
+    "summarizeToolOutput": {
+      "run_shell_command": {
+        "tokenBudget": 100
+      }
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -222,7 +234,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
-  "maxSessionTurns": 10
+  "maxSessionTurns": 10,
+  "summarizeToolOutput":{
+    "run_shell_command": {
+      "tokenBudget": 100
+    }
+  }
 }
 ```
 

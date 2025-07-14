@@ -333,6 +333,7 @@ export async function loadCliConfig(
       version: e.config.version,
     })),
     noBrowser: !!process.env.NO_BROWSER,
+    summarizeToolOutput: settings.summarizeToolOutput,
   });
 }
 
