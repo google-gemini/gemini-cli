@@ -18,6 +18,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   MCPServerConfig,
+  IDE_SERVER_NAME,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -285,13 +286,13 @@ export async function loadCliConfig(
   }
 
   if (ideMode) {
-    mcpServers['_ide_server'] = new MCPServerConfig(
+    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
       undefined, // command
       undefined, // args
       undefined, // env
       undefined, // cwd
       undefined, // url
-      'http://localhost:3000/mcp', // httpUrl
+      'http://localhost:52232/mcp', // httpUrl
       undefined, // headers
       undefined, // tcp
       undefined, // timeout
