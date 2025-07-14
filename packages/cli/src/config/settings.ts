@@ -85,6 +85,7 @@ export interface Settings {
   maxSessionTurns?: number;
 
   // Add other settings here.
+  ideMode?: boolean;
 }
 
 export interface SettingsError {

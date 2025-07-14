@@ -768,3 +768,117 @@ describe('loadCliConfig extensions', () => {
     expect(config.getExtensionContextFilePaths()).toEqual(['/path/to/ext1.md']);
   });
 });
+
+describe('loadCliConfig ideMode', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    // Explicitly delete TERM_PROGRAM and SANDBOX before each test
+    delete process.env.TERM_PROGRAM;
+    delete process.env.SANDBOX;
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const argv = await parseArguments();
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should be false if --ide-mode is true but TERM_PROGRAM is not vscode', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const settings: Settings = {};
+    const argv = await parseArguments();
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should be false if settings.ideMode is true but TERM_PROGRAM is not vscode', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { ideMode: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should be true when --ide-mode is set and TERM_PROGRAM is vscode', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(true);
+  });
+
+  it('should be true when settings.ideMode is true and TERM_PROGRAM is vscode', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = { ideMode: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(true);
+  });
+
+  it('should prioritize --ide-mode (true) over settings (false) when TERM_PROGRAM is vscode', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = { ideMode: false };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(true);
+  });
+
+  it('should prioritize --no-ide-mode (false) over settings (true) even when TERM_PROGRAM is vscode', async () => {
+    process.argv = ['node', 'script.js', '--no-ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = { ideMode: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should be false when --ide-mode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    process.env.SANDBOX = 'true';
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should be false when settings.ideMode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    process.env.SANDBOX = 'true';
+    const settings: Settings = { ideMode: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(false);
+  });
+
+  it('should add __ide_server when ideMode is true', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getIdeMode()).toBe(true);
+    const mcpServers = config.getMcpServers();
+    expect(mcpServers['_ide_server']).toBeDefined();
+    expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
+    expect(mcpServers['_ide_server'].description).toBe('IDE connection');
+    expect(mcpServers['_ide_server'].trust).toBe(false);
+  });
+});

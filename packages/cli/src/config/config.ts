@@ -17,6 +17,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -54,6 +55,7 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  ideMode: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -175,6 +177,10 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
+    .option('ide-mode', {
+      type: 'boolean',
+      description: 'Run in IDE mode?',
+    })
 
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -230,6 +236,11 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     );
 
+  const ideMode =
+    (argv.ideMode ?? settings.ideMode ?? false) &&
+    process.env.TERM_PROGRAM === 'vscode' &&
+    !process.env.SANDBOX;
+
   const activeExtensions = filterActiveExtensions(
     extensions,
     argv.extensions || [],
@@ -271,6 +282,24 @@ export async function loadCliConfig(
     } else {
       mcpServers = {};
     }
+  }
+
+  if (ideMode) {
+    mcpServers['_ide_server'] = new MCPServerConfig(
+      undefined, // command
+      undefined, // args
+      undefined, // env
+      undefined, // cwd
+      undefined, // url
+      'http://localhost:3000/mcp', // httpUrl
+      undefined, // headers
+      undefined, // tcp
+      undefined, // timeout
+      false, // trust
+      'IDE connection', // description
+      undefined, // includeTools
+      undefined, // excludeTools
+    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -333,6 +362,7 @@ export async function loadCliConfig(
       version: e.config.version,
     })),
     noBrowser: !!process.env.NO_BROWSER,
+    ideMode,
   });
 }
 
