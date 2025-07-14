@@ -65,9 +65,27 @@ export class ClearcutLogger {
     this.events.push([
       {
         event_time_ms: Date.now(),
-        source_extension_json: JSON.stringify(event),
+        source_extension_json: this.safeJsonStringify(event),
       },
     ]);
+  }
+
+  private safeJsonStringify(obj: unknown): string {
+    try {
+      return JSON.stringify(obj);
+    } catch (_error) {
+      // Handle circular references by creating a safe replacer
+      const seen = new WeakSet();
+      return JSON.stringify(obj, (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) {
+            return '[Circular]';
+          }
+          seen.add(value);
+        }
+        return value;
+      });
+    }
   }
 
   createLogEvent(name: string, data: object[]): object {
@@ -121,7 +139,7 @@ export class ClearcutLogger {
           log_event: eventsToSend,
         },
       ];
-      const body = JSON.stringify(request);
+      const body = this.safeJsonStringify(request);
       const options = {
         hostname: 'play.googleapis.com',
         path: '/log',

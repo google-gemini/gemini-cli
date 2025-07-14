@@ -36,6 +36,28 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 
+function safeJsonStringify(obj: unknown): string {
+  try {
+    return JSON.stringify(obj, null, 2);
+  } catch (_error) {
+    // Handle circular references by creating a safe replacer
+    const seen = new WeakSet();
+    return JSON.stringify(
+      obj,
+      (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) {
+            return '[Circular]';
+          }
+          seen.add(value);
+        }
+        return value;
+      },
+      2,
+    );
+  }
+}
+
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
@@ -115,7 +137,7 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
-    function_args: JSON.stringify(event.function_args, null, 2),
+    function_args: safeJsonStringify(event.function_args),
   };
   if (event.error) {
     attributes['error.message'] = event.error;
