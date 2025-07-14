@@ -30,6 +30,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   AuthType,
@@ -547,7 +548,8 @@ export class GeminiClient {
     // Find the first user message after the index. This is the start of the next turn.
     while (
       compressBeforeIndex < curatedHistory.length &&
-      curatedHistory[compressBeforeIndex]?.role !== 'user'
+      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
+        isFunctionResponse(curatedHistory[compressBeforeIndex]))
     ) {
       compressBeforeIndex++;
     }
