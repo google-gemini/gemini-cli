@@ -5,7 +5,6 @@
  */
 
 import { FunctionDeclaration, PartListUnion, Schema } from '@google/genai';
-import { Summarizer, defaultSummarizer } from '../utils/summarizer.js';
 
 /**
  * Interface representing the base Tool functionality
@@ -43,16 +42,6 @@ export interface Tool<
    * Whether the tool supports live (streaming) output
    */
   canUpdateOutput: boolean;
-
-  /**
-   * A function that summarizes the result of the tool execution.
-   */
-  summarizer?: Summarizer;
-
-  /**
-   * Whether the tool's display output should be summarized
-   */
-  shouldSummarizeDisplay?: boolean;
 
   /**
    * Validates the parameters for the tool
@@ -109,8 +98,6 @@ export abstract class BaseTool<
    * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
    * @param canUpdateOutput Whether the tool supports live (streaming) output
    * @param parameterSchema JSON Schema defining the parameters
-   * @param summarizer Function to summarize the tool's output
-   * @param shouldSummarizeDisplay Whether the tool's display output should be summarized
    */
   constructor(
     readonly name: string,
@@ -119,8 +106,6 @@ export abstract class BaseTool<
     readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-    readonly summarizer: Summarizer = defaultSummarizer,
-    readonly shouldSummarizeDisplay: boolean = false,
   ) {}
 
   /**
