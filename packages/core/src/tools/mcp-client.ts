@@ -127,6 +127,7 @@ export async function discoverMcpTools(
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
   toolRegistry: ToolRegistry,
+  debugMode: boolean,
 ): Promise<void> {
   // Set discovery state to in progress
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
@@ -147,7 +148,12 @@ export async function discoverMcpTools(
 
     const discoveryPromises = Object.entries(mcpServers).map(
       ([mcpServerName, mcpServerConfig]) =>
-        connectAndDiscover(mcpServerName, mcpServerConfig, toolRegistry),
+        connectAndDiscover(
+          mcpServerName,
+          mcpServerConfig,
+          toolRegistry,
+          debugMode,
+        ),
     );
     await Promise.all(discoveryPromises);
 
@@ -174,6 +180,7 @@ async function connectAndDiscover(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   toolRegistry: ToolRegistry,
+  debugMode: boolean,
 ): Promise<void> {
   // Initialize the server status as connecting
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
@@ -221,6 +228,17 @@ async function connectAndDiscover(
     // Update status to disconnected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     return;
+  }
+
+  if (
+    debugMode &&
+    transport instanceof StdioClientTransport &&
+    transport.stderr
+  ) {
+    transport.stderr.on('data', (data) => {
+      const stderrStr = data.toString().trim();
+      console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
+    });
   }
 
   const mcpClient = new Client({
