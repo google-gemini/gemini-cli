@@ -54,6 +54,7 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  useEnvProxy: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -174,6 +175,11 @@ export async function parseArguments(): Promise<CliArgs> {
       alias: 'l',
       type: 'boolean',
       description: 'List all available extensions and exit.',
+    })
+    .option('use-env-proxy', {
+      type: 'boolean',
+      description: 'Enables the http_proxy, https_proxy and no_proxy settings in the environment.',
+      default: false,
     })
 
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -321,6 +327,7 @@ export async function loadCliConfig(
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
       process.env.http_proxy,
+    useEnvProxy: argv.useEnvProxy,
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
