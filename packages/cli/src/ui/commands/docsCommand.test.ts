@@ -18,20 +18,16 @@ vi.mock('open', () => ({
 
 describe('docsCommand', () => {
   let mockContext: CommandContext;
-  const originalEnv = process.env;
-
   beforeEach(() => {
     // Create a fresh mock context before each test
     mockContext = createMockCommandContext();
     // Reset the `open` mock
     vi.mocked(open).mockClear();
-    // Backup and clear process.env
-    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
-    // Restore original process.env
-    process.env = originalEnv;
+    // Restore any stubbed environment variables
+    vi.unstubAllEnvs();
   });
 
   it("should add an info message and call 'open' in a non-sandbox environment", async () => {
