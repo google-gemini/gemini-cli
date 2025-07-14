@@ -15,6 +15,16 @@ export const statsCommand: SlashCommand = {
   action: (context: CommandContext) => {
     const now = new Date();
     const { sessionStartTime } = context.session.stats;
+    if (!sessionStartTime) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: 'Session start time is unavailable, cannot calculate stats.',
+        },
+        Date.now(),
+      );
+      return;
+    }
     const wallDuration = now.getTime() - sessionStartTime.getTime();
 
     const statsItem: HistoryItemStats = {
