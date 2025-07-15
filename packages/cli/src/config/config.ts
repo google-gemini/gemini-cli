@@ -306,13 +306,20 @@ export async function loadCliConfig(
   }
 
   if (ideMode) {
+    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
+    if (!companionPort) {
+      throw new Error(
+        "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+      );
+    }
+    const httpUrl = `http://localhost:${companionPort}/mcp`;
     mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
       undefined, // command
       undefined, // args
       undefined, // env
       undefined, // cwd
       undefined, // url
-      'http://localhost:3000/mcp', // httpUrl
+      httpUrl, // httpUrl
       undefined, // headers
       undefined, // tcp
       undefined, // timeout

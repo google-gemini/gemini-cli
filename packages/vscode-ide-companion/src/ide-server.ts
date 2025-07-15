@@ -14,21 +14,31 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { Server } from 'node:http';
+
+function sendActiveFileChangedNotification(
+  transport: StreamableHTTPServerTransport,
+) {
+  const editor = vscode.window.activeTextEditor;
+  const filePath = editor ? editor.document.uri.fsPath : '';
+  const notification: JSONRPCNotification = {
+    jsonrpc: '2.0',
+    method: 'ide/activeFileChanged',
+    params: { filePath },
+  };
+  transport.send(notification);
+}
+
 export async function startIDEServer(context: vscode.ExtensionContext) {
   const app = express();
   app.use(express.json());
 
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+  const sessionsWithInitialNotification = new Set<string>();
 
-  const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    const filePath = editor ? editor.document.uri.fsPath : null;
-    const notification: JSONRPCNotification = {
-      jsonrpc: '2.0',
-      method: 'ide/activeFileChanged',
-      params: { filePath },
-    };
+  const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
     for (const transport of Object.values(transports)) {
-      transport.send(notification);
+      sendActiveFileChangedNotification(transport);
     }
   });
   context.subscriptions.push(disposable);
@@ -44,19 +54,12 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (newSessionId) => {
           transports[newSessionId] = transport;
-          const editor = vscode.window.activeTextEditor;
-          const filePath = editor ? editor.document.uri.fsPath : null;
-          const notification: JSONRPCNotification = {
-            jsonrpc: '2.0',
-            method: 'ide/activeFileChanged',
-            params: { filePath },
-          };
-          transport.send(notification);
         },
       });
 
       transport.onclose = () => {
         if (transport.sessionId) {
+          sessionsWithInitialNotification.delete(transport.sessionId);
           delete transports[transport.sessionId];
         }
       };
@@ -101,6 +104,7 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
     }
 
     const transport = transports[sessionId];
+
     try {
       await transport.handleRequest(req, res);
     } catch (error) {
@@ -109,20 +113,31 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
         res.status(400).send('Bad Request');
       }
     }
+
+    if (!sessionsWithInitialNotification.has(sessionId)) {
+      sendActiveFileChangedNotification(transport);
+      sessionsWithInitialNotification.add(sessionId);
+    }
   };
 
   app.get('/mcp', handleSessionRequest);
 
-  // TODO(#3918): Generate dynamically and write to env variable
-  const PORT = 3000;
-  app.listen(PORT, (error?: Error) => {
-    if (error) {
-      console.error('Failed to start server:', error);
+  const server = app.listen(0, () => {
+    const address = (server as Server).address();
+    if (address && typeof address !== 'string') {
+      const port = address.port;
+      context.environmentVariableCollection.replace(
+        'GEMINI_CLI_IDE_SERVER_PORT',
+        port.toString(),
+      );
+      console.log(`MCP Streamable HTTP Server listening on port ${port}`);
+    } else {
+      const port = 0;
+      console.error('Failed to start server:', 'Unknown error');
       vscode.window.showErrorMessage(
-        `Companion server failed to start on port ${PORT}: ${error.message}`,
+        `Companion server failed to start on port ${port}: Unknown error`,
       );
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
   });
 }
 
@@ -144,9 +159,7 @@ const createMcpServer = () => {
     async () => {
       try {
         const activeEditor = vscode.window.activeTextEditor;
-        const filePath = activeEditor
-          ? activeEditor.document.uri.fsPath
-          : undefined;
+        const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
         if (filePath) {
           return {
             content: [{ type: 'text', text: `Active file: ${filePath}` }],
