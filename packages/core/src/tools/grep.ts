@@ -16,6 +16,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import { Config } from '../config/config.js';
 
 // --- Interfaces ---
 
@@ -56,11 +57,7 @@ interface GrepMatch {
 export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   static readonly Name = 'search_file_content'; // Keep static name
 
-  /**
-   * Creates a new instance of the GrepLogic
-   * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
-   */
-  constructor(private rootDirectory: string) {
+  constructor(private readonly config: Config) {
     super(
       GrepTool.Name,
       'SearchText',
@@ -87,8 +84,6 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         type: Type.OBJECT,
       },
     );
-    // Ensure rootDirectory is absolute and normalized
-    this.rootDirectory = path.resolve(rootDirectory);
   }
 
   // --- Validation Methods ---
@@ -100,15 +95,18 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
    */
   private resolveAndValidatePath(relativePath?: string): string {
-    const targetPath = path.resolve(this.rootDirectory, relativePath || '.');
+    const targetPath = path.resolve(
+      this.config.getTargetDir(),
+      relativePath || '.',
+    );
 
     // Security Check: Ensure the resolved path is still within the root directory.
     if (
-      !targetPath.startsWith(this.rootDirectory) &&
-      targetPath !== this.rootDirectory
+      !targetPath.startsWith(this.config.getTargetDir()) &&
+      targetPath !== this.config.getTargetDir()
     ) {
       throw new Error(
-        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.rootDirectory}".`,
+        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.config.getTargetDir()}".`,
       );
     }
 
@@ -322,11 +320,17 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       description += ` in ${params.include}`;
     }
     if (params.path) {
-      const resolvedPath = path.resolve(this.rootDirectory, params.path);
-      if (resolvedPath === this.rootDirectory || params.path === '.') {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.path,
+      );
+      if (resolvedPath === this.config.getTargetDir() || params.path === '.') {
         description += ` within ./`;
       } else {
-        const relativePath = makeRelative(resolvedPath, this.rootDirectory);
+        const relativePath = makeRelative(
+          resolvedPath,
+          this.config.getTargetDir(),
+        );
         description += ` within ${shortenPath(relativePath)}`;
       }
     }

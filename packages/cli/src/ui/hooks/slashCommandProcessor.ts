@@ -243,26 +243,9 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'theme',
-        description: 'change the theme',
-        action: (_mainCommand, _subCommand, _args) => {
-          openThemeDialog();
-        },
-      },
-      {
-        name: 'auth',
-        description: 'change the auth method',
-        action: (_mainCommand, _subCommand, _args) => openAuthDialog(),
-      },
-      {
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
-      },
-      {
-        name: 'privacy',
-        description: 'display the privacy notice',
-        action: (_mainCommand, _subCommand, _args) => openPrivacyNotice(),
       },
       {
         name: 'stats',
@@ -602,35 +585,6 @@ export const useSlashCommandProcessor = (
         },
       },
       {
-        name: 'about',
-        description: 'show version info',
-        action: async (_mainCommand, _subCommand, _args) => {
-          const osVersion = process.platform;
-          let sandboxEnv = 'no sandbox';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            sandboxEnv = process.env.SANDBOX;
-          } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
-          }
-          const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = await getCliVersion();
-          const selectedAuthType = settings.merged.selectedAuthType || '';
-          const gcpProject = process.env.GOOGLE_CLOUD_PROJECT || '';
-          addMessage({
-            type: MessageType.ABOUT,
-            timestamp: new Date(),
-            cliVersion,
-            osVersion,
-            sandboxEnv,
-            modelVersion,
-            selectedAuthType,
-            gcpProject,
-          });
-        },
-      },
-      {
         name: 'bug',
         description: 'submit a bug report',
         action: async (_mainCommand, _subCommand, args) => {
@@ -880,7 +834,8 @@ export const useSlashCommandProcessor = (
           try {
             const compressed = await config!
               .getGeminiClient()!
-              .tryCompressChat(true);
+              // TODO: Set Prompt id for CompressChat from SlashCommandProcessor.
+              .tryCompressChat('Prompt Id not set', true);
             if (compressed) {
               addMessage({
                 type: MessageType.COMPRESSION,
@@ -1033,14 +988,10 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openThemeDialog,
-    openAuthDialog,
     openEditorDialog,
-    openPrivacyNotice,
     toggleCorgiMode,
     savedChatTags,
     config,
-    settings,
     showToolDescriptions,
     session,
     gitService,
@@ -1132,6 +1083,15 @@ export const useSlashCommandProcessor = (
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
+                  case 'auth':
+                    openAuthDialog();
+                    return { type: 'handled' };
+                  case 'theme':
+                    openThemeDialog();
+                    return { type: 'handled' };
+                  case 'privacy':
+                    openPrivacyNotice();
+                    return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
                     throw new Error(
@@ -1209,10 +1169,13 @@ export const useSlashCommandProcessor = (
     [
       addItem,
       setShowHelp,
+      openAuthDialog,
       commands,
       legacyCommands,
       commandContext,
       addMessage,
+      openThemeDialog,
+      openPrivacyNotice,
     ],
   );
 
