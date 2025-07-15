@@ -12,6 +12,7 @@ import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
@@ -34,6 +35,9 @@ vi.mock('../ui/commands/themeCommand.js', () => ({
 }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({
   privacyCommand: { name: 'privacy', description: 'Mock Privacy' },
+}));
+vi.mock('../ui/commands/statsCommand.js', () => ({
+  statsCommand: { name: 'stats', description: 'Mock Stats' },
 }));
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
@@ -74,6 +78,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
         expect(commandNames).toContain('theme');
+        expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
         expect(commandNames).toContain('about');
         expect(commandNames).toContain('extensions');
@@ -110,6 +115,7 @@ describe('CommandService', () => {
           helpCommand,
           memoryCommand,
           privacyCommand,
+          statsCommand,
           themeCommand,
         ]);
       });
