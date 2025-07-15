@@ -9,7 +9,7 @@ import { themeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, HistoryItemInfo, MessageType } from '../types.js';
 import process from 'node:process';
-import { textInfoPart } from '../utils/infoParts.js';
+import { textInfoPart } from '../utils/historyItemInfo.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;

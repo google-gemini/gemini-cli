@@ -39,7 +39,11 @@ import {
   type SlashCommand,
 } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
-import { linkInfoPart, textInfoPart } from '../utils/infoParts.js';
+import {
+  historyItemInfo,
+  linkInfoPart,
+  textInfoPart,
+} from '../utils/historyItemInfo.js';
 
 // This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -144,13 +148,7 @@ export const useSlashCommandProcessor = (
           compression: message.compression,
         };
       } else if (message.type === MessageType.INFO) {
-        historyItemContent = {
-          type: 'info',
-          parts: message.parts,
-          text: message.parts
-            .map((part) => (part.type === 'text' ? part.text : part.value))
-            .join(''),
-        };
+        historyItemContent = historyItemInfo(...message.parts);
       } else {
         historyItemContent = {
           type: message.type,

@@ -54,6 +54,7 @@ import {
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -425,14 +426,14 @@ export const useGeminiStream = (
   const handleChatCompressionEvent = useCallback(
     (eventValue: ServerGeminiChatCompressedEvent['value']) =>
       addItem(
-        {
-          type: 'info',
-          text:
+        historyItemInfo(
+          textInfoPart(
             `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
-            `A compressed context will be sent for future messages (compressed from: ` +
-            `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-            `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
-        },
+              `A compressed context will be sent for future messages (compressed from: ` +
+              `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
+              `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
+          ),
+        ),
         Date.now(),
       ),
     [addItem, config],
@@ -441,12 +442,12 @@ export const useGeminiStream = (
   const handleMaxSessionTurnsEvent = useCallback(
     () =>
       addItem(
-        {
-          type: 'info',
-          text:
+        historyItemInfo(
+          textInfoPart(
             `The session has reached the maximum number of turns: ${config.getMaxSessionTurns()}. ` +
-            `Please update this limit in your setting.json file.`,
-        },
+              `Please update this limit in your setting.json file.`,
+          ),
+        ),
         Date.now(),
       ),
     [addItem, config],
@@ -454,10 +455,11 @@ export const useGeminiStream = (
 
   const handleLoopDetectedEvent = useCallback(() => {
     addItem(
-      {
-        type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-      },
+      historyItemInfo(
+        textInfoPart(
+          `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+        ),
+      ),
       Date.now(),
     );
   }, [addItem]);

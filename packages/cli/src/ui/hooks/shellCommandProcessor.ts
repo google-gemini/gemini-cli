@@ -18,6 +18,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import stripAnsi from 'strip-ansi';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
@@ -254,10 +255,9 @@ export const useShellCommandProcessor = (
           (streamedOutput) => {
             // Throttle pending UI updates to avoid excessive re-renders.
             if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-              setPendingHistoryItem({
-                type: 'info',
-                parts: [{ type: 'text', text: streamedOutput }],
-              });
+              setPendingHistoryItem(
+                historyItemInfo(textInfoPart(streamedOutput)),
+              );
               lastUpdateTime = Date.now();
             }
           },
@@ -307,7 +307,9 @@ export const useShellCommandProcessor = (
 
             // Add the complete, contextual result to the local UI history.
             addItemToHistory(
-              { type: historyItemType, text: finalOutput },
+              historyItemType === 'info'
+                ? historyItemInfo(textInfoPart(finalOutput))
+                : { type: historyItemType, text: finalOutput },
               userMessageTimestamp,
             );
 

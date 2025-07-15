@@ -106,6 +106,7 @@ describe('useShellCommandProcessor', () => {
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
       type: 'info',
       text: 'file1.txt\nfile2.txt',
+      parts: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
     });
     expect(geminiClientMock.addHistory).toHaveBeenCalledTimes(1);
   });
@@ -142,6 +143,12 @@ describe('useShellCommandProcessor', () => {
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
       type: 'info',
       text: '[Command produced binary output, which is not shown.]',
+      parts: [
+        {
+          type: 'text',
+          text: '[Command produced binary output, which is not shown.]',
+        },
+      ],
     });
   });
 
