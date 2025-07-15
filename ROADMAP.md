@@ -6,7 +6,7 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly i
 This document outlines our approach to the Gemini CLI roadmap. Here, you'll find our guiding principles and a breakdown of the key areas we are 
 focused on for development. Our roadmap is not a static list but a dynamic set of priorities that are tracked live in our GitHub Issues.
 
-As an [Apache 2.0 open source project](https://github.com/google-gemini/gemini-cli?tab=Apache-2.0-1-ov-file#readme), we appreciate and welcome [public contributions](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md), and will give first priority to those contributions aligned with our roadmap. If you want to propose a new feature or change to our roadmap, please start by [opening an issue for discussion.](https://github.com/google-gemini/gemini-cli/issues/new/choose)
+As an [Apache 2.0 open source project](https://github.com/google-gemini/gemini-cli?tab=Apache-2.0-1-ov-file#readme), we appreciate and welcome [public contributions](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md), and will give first priority to those contributions aligned with our roadmap. If you want to propose a new feature or change to our roadmap, please start by [opening an issue for discussion](https://github.com/google-gemini/gemini-cli/issues/new/choose).
 
 ## Disclaimer
 This roadmap represents our current thinking and is for informational purposes only. It is not a commitment or a guarantee of future delivery. The development, release, and timing of any features are subject to change, and we may update the roadmap based on community discussions as well as when our priorities evolve.
