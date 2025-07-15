@@ -770,7 +770,7 @@ describe('useCompletion git-aware filtering integration', () => {
 
     expect(result.current.suggestions.length).toBe(mockSlashCommands.length);
     expect(result.current.suggestions.map((s) => s.label)).toEqual(
-      expect.arrayContaining(['help', 'clear', 'memory', 'chat']),
+      expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
     );
   });
 

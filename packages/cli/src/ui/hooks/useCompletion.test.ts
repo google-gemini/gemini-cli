@@ -380,7 +380,7 @@ describe('useCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(5);
       expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['help', 'clear', 'memory', 'chat']),
+        expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
       );
       expect(result.current.showSuggestions).toBe(true);
       expect(result.current.activeSuggestionIndex).toBe(0);
