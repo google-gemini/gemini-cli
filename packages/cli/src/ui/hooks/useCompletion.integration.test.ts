@@ -517,11 +517,12 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.showSuggestions).toBe(true);
   });
 
-  it('should not suggest commands when altName is fully typed', async () => {
-    {
+  it.each([['/?'], ['/usage']])(
+    'should not suggest commands when altName is fully typed',
+    async (altName) => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/?',
+          altName,
           '/test/cwd',
           true,
           mockSlashCommands,
@@ -530,21 +531,8 @@ describe('useCompletion git-aware filtering integration', () => {
       );
 
       expect(result.current.suggestions).toHaveLength(0);
-    }
-    {
-      const { result } = renderHook(() =>
-        useCompletion(
-          '/usage',
-          '/test/cwd',
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      expect(result.current.suggestions).toHaveLength(0);
-    }
-  });
+    },
+  );
 
   it('should suggest commands based on partial altName matches', async () => {
     const { result } = renderHook(() =>

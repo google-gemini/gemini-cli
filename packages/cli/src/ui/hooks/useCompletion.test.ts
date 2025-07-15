@@ -403,11 +403,12 @@ describe('useCompletion', () => {
       expect(result.current.suggestions[0].description).toBe('Show help');
     });
 
-    it('should not suggest commands by altName written in full', () => {
-      {
+    it.each([['/?'], ['/usage']])(
+      'should not suggest commands when altName is fully typed',
+      (altName) => {
         const { result } = renderHook(() =>
           useCompletion(
-            '/?',
+            altName,
             testCwd,
             true,
             mockSlashCommands,
@@ -417,25 +418,10 @@ describe('useCompletion', () => {
         );
 
         expect(result.current.suggestions).toHaveLength(0);
-      }
+      },
+    );
 
-      {
-        const { result } = renderHook(() =>
-          useCompletion(
-            '/usage',
-            testCwd,
-            true,
-            mockSlashCommands,
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        expect(result.current.suggestions).toHaveLength(0);
-      }
-    });
-
-    it('should suggest commands by altName when partial matches', () => {
+    it('should suggest commands based on partial altName matches', () => {
       const { result } = renderHook(() =>
         useCompletion(
           '/usag', // part of usage
