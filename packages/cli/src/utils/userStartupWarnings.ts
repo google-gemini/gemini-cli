@@ -6,7 +6,6 @@
 
 import fs from 'fs/promises';
 import * as os from 'os';
-import semver from 'semver';
 
 type WarningCheck = {
   id: string;
@@ -33,23 +32,8 @@ const homeDirectoryCheck: WarningCheck = {
   },
 };
 
-const nodeVersionCheck: WarningCheck = {
-  id: 'node-version',
-  check: async (_workspaceRoot: string) => {
-    const minMajor = 20;
-    const major = semver.major(process.versions.node);
-    if (major < minMajor) {
-      return `You are using Node.js v${process.versions.node}. Gemini CLI requires Node.js ${minMajor} or higher for best results.`;
-    }
-    return null;
-  },
-};
-
 // All warning checks
-const WARNING_CHECKS: readonly WarningCheck[] = [
-  homeDirectoryCheck,
-  nodeVersionCheck,
-];
+const WARNING_CHECKS: readonly WarningCheck[] = [homeDirectoryCheck];
 
 export async function getUserStartupWarnings(
   workspaceRoot: string,
