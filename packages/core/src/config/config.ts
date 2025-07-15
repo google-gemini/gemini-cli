@@ -55,6 +55,7 @@ import { ListRepositoryGroupsTool } from '../tools/ListGroups.js';
 import { GetRepositoryGroupTool } from '../tools/GetGroups.js';
 import { CreateRepositoryGroupTool } from '../tools/CreateGroups.js';
 import { DeleteRepositoryGroupTool } from '../tools/DeleteGroups.js';
+import { UpdateRepositoryGroupTool } from '../tools/UpdateGroups.js';
 
 
 
@@ -589,6 +590,7 @@ export class Config {
     registerCoreTool(GetRepositoryGroupTool, this);
     registerCoreTool(CreateRepositoryGroupTool, this);
     registerCoreTool(DeleteRepositoryGroupTool, this);
+    registerCoreTool(UpdateRepositoryGroupTool, this);
 
     await registry.discoverTools();
     return registry;
