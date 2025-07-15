@@ -48,6 +48,7 @@ describe('aboutCommand', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
     });
