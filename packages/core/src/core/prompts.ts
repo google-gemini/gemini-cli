@@ -158,7 +158,6 @@ ${(function () {
   }
   return '';
 })()}
-
 ${(function () {
   if (config.getIdeMode()) {
     const activeFile = ideContext.getActiveFileContext();
@@ -171,13 +170,6 @@ You are running in IDE mode. The user has the following file open:
         prompt += `
 - Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
       }
-      if (activeFile.selection) {
-        prompt += `
-- Selection:
-\`\`\`
-${activeFile.selection}
-\`\`\``;
-      }
       prompt += `
 Focus on providing contextually relevant assistance for this file.`;
       return prompt;
@@ -185,7 +177,6 @@ Focus on providing contextually relevant assistance for this file.`;
   }
   return '';
 })()}
-
 # Examples (Illustrating Tone and Workflow)
 <example>
 user: 1 + 2
