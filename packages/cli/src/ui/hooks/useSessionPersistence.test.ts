@@ -122,7 +122,25 @@ describe('useSessionPersistence - Integration Test', () => {
 
     // The hook loads asynchronously, so we wait for the loadHistory mock to be called
     await waitFor(() => {
-      expect(mockLoadHistory).toHaveBeenCalledWith(savedHistory);
+      expect(mockLoadHistory).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: MessageType.USER,
+            text: 'Loaded user message',
+            id: expect.any(Number),
+          }),
+          expect.objectContaining({
+            type: MessageType.GEMINI,
+            text: 'Loaded gemini response',
+            id: expect.any(Number),
+          }),
+        ]),
+      );
+
+      const loadedItems = mockLoadHistory.mock.calls[0][0];
+      loadedItems.forEach((item: HistoryItem) => {
+        expect(item.id).toBeLessThan(0);
+      });
     });
   });
 
