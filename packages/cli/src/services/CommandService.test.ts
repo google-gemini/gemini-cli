@@ -13,7 +13,9 @@ import { clearCommand } from '../ui/commands/clearCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
+import { aboutCommand } from '../ui/commands/aboutCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -36,6 +38,12 @@ vi.mock('../ui/commands/copyCommand.js', () => ({
 }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({
   privacyCommand: { name: 'privacy', description: 'Mock Privacy' },
+}));
+vi.mock('../ui/commands/statsCommand.js', () => ({
+  statsCommand: { name: 'stats', description: 'Mock Stats' },
+}));
+vi.mock('../ui/commands/aboutCommand.js', () => ({
+  aboutCommand: { name: 'about', description: 'Mock About' },
 }));
 
 describe('CommandService', () => {
@@ -62,7 +70,7 @@ describe('CommandService', () => {
         const tree = commandService.getCommands();
 
         // Post-condition assertions
-        expect(tree.length).toBe(6);
+        expect(tree.length).toBe(8);
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('auth');
@@ -71,20 +79,22 @@ describe('CommandService', () => {
         expect(commandNames).toContain('clear');
         expect(commandNames).toContain('copy');
         expect(commandNames).toContain('theme');
+        expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
+        expect(commandNames).toContain('about');
       });
 
       it('should overwrite any existing commands when called again', async () => {
         // Load once
         await commandService.loadCommands();
-        expect(commandService.getCommands().length).toBe(6);
+        expect(commandService.getCommands().length).toBe(8);
 
         // Load again
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
         // Should not append, but overwrite
-        expect(tree.length).toBe(6);
+        expect(tree.length).toBe(8);
       });
     });
 
@@ -96,14 +106,16 @@ describe('CommandService', () => {
         await commandService.loadCommands();
 
         const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(6);
+        expect(loadedTree.length).toBe(8);
         expect(loadedTree).toEqual([
+          aboutCommand,
           authCommand,
           clearCommand,
           copyCommand,
           helpCommand,
           memoryCommand,
           privacyCommand,
+          statsCommand,
           themeCommand,
         ]);
       });
