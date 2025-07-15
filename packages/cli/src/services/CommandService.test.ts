@@ -93,6 +93,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
         expect(commandNames).toContain('about');
+        expect(commandNames).toContain('extensions');
         expect(commandNames).not.toContain('ide');
       });
 
@@ -105,10 +106,9 @@ describe('CommandService', () => {
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
-        expect(tree.length).toBe(8);
+        expect(tree.length).toBe(10);
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('ide');
-        expect(commandNames).toContain('extensions');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -133,18 +133,6 @@ describe('CommandService', () => {
         await commandService.loadCommands();
 
         const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(7);
-        expect(loadedTree).toEqual(
-          expect.arrayContaining([
-            aboutCommand,
-            authCommand,
-            clearCommand,
-            helpCommand,
-            memoryCommand,
-            privacyCommand,
-            themeCommand,
-          ]),
-        );
         expect(loadedTree.length).toBe(9);
         expect(loadedTree).toEqual([
           aboutCommand,
