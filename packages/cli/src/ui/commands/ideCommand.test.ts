@@ -14,6 +14,10 @@ import { glob } from 'glob';
 vi.mock('child_process');
 vi.mock('glob');
 
+interface ExecError extends Error {
+  stderr: Buffer;
+}
+
 describe('ideCommand', () => {
   let mockContext: CommandContext;
   let mockConfig: Config;
@@ -50,8 +54,9 @@ describe('ideCommand', () => {
     const command = ideCommand(mockConfig);
     expect(command).not.toBeNull();
     expect(command?.name).toBe('ide');
-    expect(command?.subCommands).toHaveLength(1);
-    expect(command?.subCommands?.[0].name).toBe('install');
+    expect(command?.subCommands).toHaveLength(2);
+    expect(command?.subCommands?.[0].name).toBe('status');
+    expect(command?.subCommands?.[1].name).toBe('install');
   });
 
   describe('install subcommand', () => {
@@ -65,7 +70,7 @@ describe('ideCommand', () => {
       });
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[0].action(mockContext, '');
+      await command?.subCommands?.[1].action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -83,7 +88,7 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValue([]); // No .vsix file found
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[0].action(mockContext, '');
+      await command?.subCommands?.[1].action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -100,9 +105,11 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValue([vsixPath]); // Found .vsix file
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[0].action(mockContext, '');
+      await command?.subCommands?.[1].action(mockContext, '');
 
-      expect(globSyncSpy).toHaveBeenCalledWith(expect.stringContaining('.vsix'));
+      expect(globSyncSpy).toHaveBeenCalledWith(
+        expect.stringContaining('.vsix'),
+      );
       expect(execSyncSpy).toHaveBeenCalledWith(
         `code --install-extension ${vsixPath} --force`,
         { stdio: 'pipe' },
@@ -127,12 +134,10 @@ describe('ideCommand', () => {
       const vsixPath = '/path/to/dev/gemini.vsix';
       execSyncSpy.mockReturnValue(''); // VSCode is installed
       // First glob call for bundle returns nothing, second for dev returns path.
-      globSyncSpy
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce([vsixPath]);
+      globSyncSpy.mockReturnValueOnce([]).mockReturnValueOnce([vsixPath]);
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[0].action(mockContext, '');
+      await command?.subCommands?.[1].action(mockContext, '');
 
       expect(globSyncSpy).toHaveBeenCalledTimes(2);
       expect(execSyncSpy).toHaveBeenCalledWith(
@@ -153,15 +158,16 @@ describe('ideCommand', () => {
       const errorMessage = 'Installation failed';
       execSyncSpy
         .mockReturnValueOnce('') // VSCode is installed check
-        .mockImplementation(() => { // Installation command
-          const error = new Error('Command failed') as any;
+        .mockImplementation(() => {
+          // Installation command
+          const error = new Error('Command failed') as ExecError;
           error.stderr = Buffer.from(errorMessage);
           throw error;
         });
       globSyncSpy.mockReturnValue([vsixPath]);
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[0].action(mockContext, '');
+      await command?.subCommands?.[1].action(mockContext, '');
 
       const expectedCommand = `code --install-extension ${vsixPath} --force`;
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(

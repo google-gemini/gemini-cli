@@ -5,8 +5,19 @@
  */
 
 import { fileURLToPath } from 'url';
-import { Config } from '@google/gemini-cli-core';
-import { SlashCommand } from './types.js';
+import {
+  Config,
+  getMCPDiscoveryState,
+  getMCPServerStatus,
+  IDE_SERVER_NAME,
+  MCPDiscoveryState,
+  MCPServerStatus,
+} from '@google/gemini-cli-core';
+import {
+  CommandContext,
+  SlashCommand,
+  SlashCommandActionReturn,
+} from './types.js';
 import * as child_process from 'child_process';
 import * as process from 'process';
 import { glob } from 'glob';
@@ -42,6 +53,45 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     description: 'Commands for interacting with the IDE.',
     subCommands: [
       {
+        name: 'status',
+        description: 'Show status of IDE integration',
+        action: (context: CommandContext): SlashCommandActionReturn => {
+          const { config } = context.services;
+
+          const status = getMCPServerStatus(IDE_SERVER_NAME);
+          const discoveryState = getMCPDiscoveryState();
+          switch (status) {
+            case MCPServerStatus.CONNECTED:
+              return {
+                type: 'message',
+                messageType: 'info',
+                content: `🟢 IDE integration enabled.`,
+              };
+            case MCPServerStatus.CONNECTING:
+              return {
+                type: 'message',
+                messageType: 'info',
+                content: `🔄 Initializing IDE integration...`,
+              };
+            case MCPServerStatus.DISCONNECTED:
+            default:
+              if (discoveryState === MCPDiscoveryState.IN_PROGRESS) {
+                return {
+                  type: 'message',
+                  messageType: 'info',
+                  content: `🔄 Initializing IDE integration...`,
+                };
+              } else {
+                return {
+                  type: 'message',
+                  messageType: 'error',
+                  content: `🔴 Could not initialize IDE integration.`,
+                };
+              }
+          }
+        },
+      },
+      {
         name: 'install',
         description: 'Install IDE extension.',
         action: async (context) => {
@@ -74,7 +124,6 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
               'vscode-ide-companion',
               '*.vsix',
             );
-            console.log(devPath)
             vsixFiles = glob.sync(devPath);
           }
 
