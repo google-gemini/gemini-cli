@@ -415,24 +415,24 @@ describe('useCompletion', () => {
             mockConfig,
           ),
         );
-  
+
         expect(result.current.suggestions).toHaveLength(0);
       }
 
       {
-      const { result } = renderHook(() =>
-        useCompletion(
-          '/usage',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
+        const { result } = renderHook(() =>
+          useCompletion(
+            '/usage',
+            testCwd,
+            true,
+            mockSlashCommands,
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
 
-      expect(result.current.suggestions).toHaveLength(0);
-    }
+        expect(result.current.suggestions).toHaveLength(0);
+      }
     });
 
     it('should suggest commands by altName when partial matches', () => {
@@ -450,7 +450,6 @@ describe('useCompletion', () => {
       expect(result.current.suggestions).toHaveLength(1);
       expect(result.current.suggestions[0].label).toBe('stats');
     });
-
 
     it('should not show suggestions for exact leaf command match', () => {
       const { result } = renderHook(() =>

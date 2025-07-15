@@ -558,10 +558,13 @@ describe('useCompletion git-aware filtering integration', () => {
     );
 
     expect(result.current.suggestions).toEqual([
-      { label: 'stats', value: 'stats', description: 'check session stats. Usage: /stats [model|tools]' },
+      {
+        label: 'stats',
+        value: 'stats',
+        description: 'check session stats. Usage: /stats [model|tools]',
+      },
     ]);
   });
-
 
   it('should suggest sub-command names for a parent command', async () => {
     const { result } = renderHook(() =>
