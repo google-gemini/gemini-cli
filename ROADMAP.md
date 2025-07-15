@@ -32,7 +32,7 @@ Issues are organized to provide key information at a glance:
 - **Feature Area:** Labels such as `area/model` or `area/tooling` categorizes the work.
 - **Issue Type:** _Workstream_ => _Epics_ => _Features_ => _Tasks|Bugs_
 
-To see what we're working on, you can filter our issues by dimensions.
+To see what we're working on, you can filter our issues by these dimensions. See all our items [here](https://github.com/orgs/google-gemini/projects/11/views/19)
 
 ## Focus Areas
 
