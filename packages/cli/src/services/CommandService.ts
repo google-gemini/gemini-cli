@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '@google/gemini-cli-core';
 import { SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
@@ -12,22 +13,35 @@ import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { ideCommand } from '../ui/commands/ideCommand.js';
 
-const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
-  aboutCommand,
-  authCommand,
-  clearCommand,
-  helpCommand,
-  memoryCommand,
-  privacyCommand,
-  themeCommand,
-];
+const loadBuiltInCommands = async (
+  config: Config | null,
+): Promise<SlashCommand[]> => {
+  const allCommands = [
+    aboutCommand,
+    authCommand,
+    clearCommand,
+    helpCommand,
+    ideCommand(config),
+    memoryCommand,
+    privacyCommand,
+    themeCommand,
+  ];
+
+  return allCommands.filter(
+    (command): command is SlashCommand => command !== null,
+  );
+};
 
 export class CommandService {
   private commands: SlashCommand[] = [];
 
   constructor(
-    private commandLoader: () => Promise<SlashCommand[]> = loadBuiltInCommands,
+    private config: Config | null,
+    private commandLoader: (
+      config: Config | null,
+    ) => Promise<SlashCommand[]> = loadBuiltInCommands,
   ) {
     // The constructor can be used for dependency injection in the future.
   }
@@ -35,7 +49,7 @@ export class CommandService {
   async loadCommands(): Promise<void> {
     // For now, we only load the built-in commands.
     // File-based and remote commands will be added later.
-    this.commands = await this.commandLoader();
+    this.commands = await this.commandLoader(this.config);
   }
 
   getCommands(): SlashCommand[] {
