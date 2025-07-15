@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
@@ -27,6 +27,11 @@ export const useSessionPersistence = ({
   history,
   loadHistory,
 }: UseSessionPersistenceProps) => {
+  const historyRef = useRef(history);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
   useEffect(() => {
     const loadSession = async () => {
       if (sessionPersistence) {
@@ -82,7 +87,7 @@ export const useSessionPersistence = ({
         const sessionPath = path.join(geminiDir, 'session.json');
 
         // Create a serializable version of the history
-        const serializableHistory = history
+        const serializableHistory = historyRef.current
           .filter(
             (item) =>
               item.type === MessageType.USER ||
@@ -106,5 +111,5 @@ export const useSessionPersistence = ({
     return () => {
       process.off('exit', saveSession);
     };
-  }, [history, sessionPersistence]);
+  }, [sessionPersistence]);
 };
