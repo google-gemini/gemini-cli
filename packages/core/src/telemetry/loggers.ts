@@ -25,6 +25,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  LoopDetectedEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -287,4 +288,24 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     'thought',
   );
   recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
+}
+
+export function logLoopDetected(
+  config: Config,
+  event: LoopDetectedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLoopDetectedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Loop detected. Type: ${event.loop_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }
