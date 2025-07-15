@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.9",
+  "version": "0.1.12",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "^1.8.0",
+    "@google/genai": "1.8.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
@@ -30,9 +30,10 @@
     "@opentelemetry/sdk-node": "^0.52.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
+    "ajv": "^8.17.1",
     "diff": "^7.0.0",
-    "dotenv": "^16.6.1",
-    "gaxios": "^6.1.1",
+    "dotenv": "^17.1.0",
+    "gaxios": "^7.1.1",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
