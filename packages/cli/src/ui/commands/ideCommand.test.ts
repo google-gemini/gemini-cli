@@ -95,7 +95,7 @@ describe('ideCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: '🟢 Enabled',
+        content: '🟢 Connected',
       });
     });
 
@@ -130,7 +130,7 @@ describe('ideCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: '🔴 Disabled',
+        content: '🔴 Disconnected',
       });
     });
   });
