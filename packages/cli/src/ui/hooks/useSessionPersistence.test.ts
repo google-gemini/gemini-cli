@@ -77,9 +77,9 @@ describe('useSessionPersistence - Integration Test', () => {
 
     // Add items to history
     mockHistory.push(
-      { type: MessageType.USER, text: 'User message 1' },
-      { type: MessageType.GEMINI, text: 'Gemini response 1' },
-      { type: MessageType.INFO, text: 'Info message' }, // Should be filtered
+      { id: 1, type: MessageType.USER, text: 'User message 1' },
+      { id: 2, type: MessageType.GEMINI, text: 'Gemini response 1' },
+      { id: 3, type: MessageType.INFO, text: 'Info message' }, // Should be filtered
     );
 
     // Manually trigger the exit handler to save the session
