@@ -22,12 +22,13 @@ describe('GlobTool', () => {
   const mockConfig = {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
-  } as Partial<Config> as Config;
+    getTargetDir: () => tempRootDir,
+  } as unknown as Config;
 
   beforeEach(async () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
-    globTool = new GlobTool(tempRootDir, mockConfig);
+    globTool = new GlobTool(mockConfig);
 
     // Create some test files and directories within this root
     // Top-level files
@@ -224,8 +225,8 @@ describe('GlobTool', () => {
 
     it("should return error if search path resolves outside the tool's root directory", () => {
       // Create a globTool instance specifically for this test, with a deeper root
-      const deeperRootDir = path.join(tempRootDir, 'sub');
-      const specificGlobTool = new GlobTool(deeperRootDir, mockConfig);
+      tempRootDir = path.join(tempRootDir, 'sub');
+      const specificGlobTool = new GlobTool(mockConfig);
       // const params: GlobToolParams = { pattern: '*.txt', path: '..' }; // This line is unused and will be removed.
       // This should be fine as tempRootDir is still within the original tempRootDir (the parent of deeperRootDir)
       // Let's try to go further up.
