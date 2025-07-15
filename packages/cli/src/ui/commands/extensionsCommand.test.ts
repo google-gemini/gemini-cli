@@ -50,10 +50,10 @@ describe('extensionsCommand', () => {
     if (!extensionsCommand.action) throw new Error('Action not defined');
     await extensionsCommand.action(mockContext, '');
 
-    let expectedMessage = 'Active extensions:\n\n';
-    expectedMessage += `  - \u001b[36mext-one (v1.0.0)\u001b[0m\n`;
-    expectedMessage += `  - \u001b[36mext-two (v2.1.0)\u001b[0m\n`;
-    expectedMessage += '\u001b[0m';
+const expectedMessage =
+  'Active extensions:\n\n' +
+  `  - \u001b[36mext-one (v1.0.0)\u001b[0m\n` +
+  `  - \u001b[36mext-two (v2.1.0)\u001b[0m\n`;
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       {
