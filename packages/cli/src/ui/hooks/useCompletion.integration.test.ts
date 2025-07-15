@@ -537,7 +537,7 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest commands based on partial altName matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/usag', // part of usage
+        '/usag', // part of the word "usage"
         '/test/cwd',
         true,
         mockSlashCommands,

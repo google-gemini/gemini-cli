@@ -424,7 +424,7 @@ describe('useCompletion', () => {
     it('should suggest commands based on partial altName matches', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/usag', // part of usage
+          '/usag', // part of the word "usage"
           testCwd,
           true,
           mockSlashCommands,
