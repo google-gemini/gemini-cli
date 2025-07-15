@@ -8,10 +8,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { createRequire } from 'module';
 import { GEMINI_DIR } from './paths.js';
-
-const require = createRequire(import.meta.url);
 
 const homeDir = os.homedir() ?? '';
 const geminiDir = path.join(homeDir, GEMINI_DIR);
@@ -58,27 +55,4 @@ export function getInstallationId(): string {
     );
     return '123456789';
   }
-}
-
-/**
- * Retrieves the email for the currently authenticated user.
- * When OAuth is available, returns the user's cached email. Otherwise, returns an empty string.
- * @returns A string email for the user (Google Account email if available, otherwise empty string).
- */
-export function getGoogleAccountEmail(): string {
-  // Try to get cached Google Account email first
-  try {
-    // Dynamically import to avoid circular dependencies
-    // eslint-disable-next-line no-restricted-syntax
-    const { getCachedGoogleAccountEmail } = require('../code_assist/oauth2.js');
-    const googleAccountEmail = getCachedGoogleAccountEmail();
-    if (googleAccountEmail) {
-      return googleAccountEmail;
-    }
-  } catch (error) {
-    // If there's any error accessing Google Account email, just return empty string
-    console.debug('Could not get cached Google Account email:', error);
-  }
-
-  return '';
 }
