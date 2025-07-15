@@ -471,7 +471,19 @@ export function useCompletion(
           if (aIsDir && !bIsDir) return -1;
           if (!aIsDir && bIsDir) return 1;
 
-          return a.label.localeCompare(b.label);
+          // exclude extension when comparing
+          const filenameA = a.label.substring(
+            0,
+            a.label.length - path.extname(a.label).length,
+          );
+          const filenameB = b.label.substring(
+            0,
+            b.label.length - path.extname(b.label).length,
+          );
+
+          return (
+            filenameA.localeCompare(filenameB) || a.label.localeCompare(b.label)
+          );
         });
 
         if (isMounted) {
