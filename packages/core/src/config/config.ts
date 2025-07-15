@@ -525,7 +525,6 @@ export class Config {
 
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this);
-    const targetDir = this.getTargetDir();
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -560,14 +559,14 @@ export class Config {
       }
     };
 
-    registerCoreTool(LSTool, targetDir, this);
-    registerCoreTool(ReadFileTool, targetDir, this);
-    registerCoreTool(GrepTool, targetDir);
-    registerCoreTool(GlobTool, targetDir, this);
+    registerCoreTool(LSTool, this);
+    registerCoreTool(ReadFileTool, this);
+    registerCoreTool(GrepTool, this);
+    registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, targetDir, this);
+    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);

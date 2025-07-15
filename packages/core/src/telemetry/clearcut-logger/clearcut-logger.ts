@@ -15,6 +15,7 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
   FlashFallbackEvent,
+  LoopDetectedEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -33,6 +34,7 @@ const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
+const loop_detected_event_name = 'loop_detected';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -446,6 +448,18 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  logLoopDetectedEvent(event: LoopDetectedEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
+        value: JSON.stringify(event.loop_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.flushIfNeeded();
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
