@@ -39,6 +39,9 @@ jobs:
       - name: Run linter
         run: npm run lint:ci
 
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
       - name: Build project
         run: npm run build
 
