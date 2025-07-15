@@ -62,6 +62,7 @@ export * from './tools/CreateCRI.js';
 export * from './tools/DeleteCRI.js';
 export * from './tools/UpdateCRI.js';
 export * from './tools/ListGroups.js'
+export * from './tools/GetGroups.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
