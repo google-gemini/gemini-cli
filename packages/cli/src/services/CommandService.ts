@@ -13,6 +13,7 @@ import { themeCommand } from '../ui/commands/themeCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
+import { toolsCommand } from '../ui/commands/toolsCommand.js';
 
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   aboutCommand,
@@ -23,6 +24,7 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   memoryCommand,
   privacyCommand,
   themeCommand,
+  toolsCommand,
 ];
 
 export class CommandService {
