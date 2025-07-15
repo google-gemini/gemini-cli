@@ -79,11 +79,13 @@ export interface Settings {
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
   hideTips?: boolean;
+  hideBanner?: boolean;
 
   // Setting for setting maximum number of user/model/tool turns in a session.
   maxSessionTurns?: number;
 
   // Add other settings here.
+  ideMode?: boolean;
 }
 
 export interface SettingsError {
