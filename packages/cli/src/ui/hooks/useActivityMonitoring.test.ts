@@ -166,7 +166,7 @@ describe('useActivityRecorder', () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
 
     await act(() => {
-      result.current.recordUserInput('test-input');
+      result.current.recordUserInput();
     });
 
     const { recordUserActivity } = await import('@google/gemini-cli-core');
@@ -175,10 +175,10 @@ describe('useActivityRecorder', () => {
 
   it('should record message added activity with metadata', async () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
-    const metadata = { messageType: 'user', length: 10 };
+    const _metadata = { messageType: 'user', length: 10 };
 
     await act(() => {
-      result.current.recordMessageAdded('new-message', metadata);
+      result.current.recordMessageAdded();
     });
 
     const { recordUserActivity } = await import('@google/gemini-cli-core');
@@ -225,7 +225,7 @@ describe('useActivityRecorder', () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig, false));
 
     await act(() => {
-      result.current.recordUserInput('test');
+      result.current.recordUserInput();
     });
 
     const { recordUserActivity } = await import('@google/gemini-cli-core');
