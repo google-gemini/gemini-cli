@@ -40,7 +40,6 @@ import {
   isPerformanceMonitoringActive,
   startGlobalMemoryMonitoring,
   recordCurrentMemoryUsage,
-  recordUserActivity,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -205,6 +204,37 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 }
 
+/**
+ * Utility function to track startup performance with less verbose syntax
+ */
+async function trackStartupPerformance<T>(
+  operation: () => Promise<T>,
+  phase: string,
+  config?: Config,
+  attributes?: Record<string, string | number | boolean>,
+): Promise<T> {
+  if (!isPerformanceMonitoringActive()) {
+    return operation();
+  }
+
+  const start = performance.now();
+  const result = await operation();
+  const duration = performance.now() - start;
+
+  if (config) {
+    recordStartupPerformance(config, phase, duration, attributes);
+  }
+
+  // Add Chrome DevTools integration for debug builds
+  if (process.env['NODE_ENV'] === 'development') {
+    performance.mark(`${phase}-start`);
+    performance.mark(`${phase}-end`);
+    performance.measure(phase, `${phase}-start`, `${phase}-end`);
+  }
+
+  return result;
+}
+
 export async function main() {
   setupUnhandledRejectionHandler();
   const startupStart = performance.now();
@@ -245,7 +275,6 @@ export async function main() {
   if (isPerformanceMonitoringActive()) {
     startGlobalMemoryMonitoring(config, 10000); // Monitor every 10 seconds
     recordCurrentMemoryUsage(config, 'startup_post_config');
-    recordUserActivity(); // Record initial activity
   }
 
   const wasRaw = process.stdin.isRaw;
@@ -438,17 +467,14 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      const sandboxStart = performance.now();
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
-      const sandboxEnd = performance.now();
-      const sandboxDuration = sandboxEnd - sandboxStart;
-
-      // Record sandbox performance if monitoring is active
-      if (isPerformanceMonitoringActive()) {
-        recordStartupPerformance(config, 'sandbox_setup', sandboxDuration, {
+      await trackStartupPerformance(
+        () => start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+        'sandbox_setup',
+        config,
+        {
           sandbox_command: sandboxConfig.command,
-        });
-      }
+        },
+      );
 
       process.exit(0);
     } else {
@@ -516,6 +542,7 @@ export async function main() {
       has_question: (input?.length ?? 0) > 0,
     });
   }
+
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
     // Need kitty detection to be complete before we can start the interactive UI.
