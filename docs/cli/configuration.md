@@ -189,12 +189,34 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`hideBanner`** (boolean):
+  - **Description:** Enables or disables the startup banner (ASCII art logo) in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideBanner": true
+    ```
+
 - **`maxSessionTurns`** (number):
   - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
   - **Default:** `-1` (unlimited)
   - **Example:**
     ```json
     "maxSessionTurns": 10
+    ```
+
+- **`summarizeToolOutput`** (object):
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
+  - Note: Currently only the `run_shell_command` tool is supported.
+  - **Default:** `{}` (Disabled by default)
+  - **Example:**
+    ```json
+    "summarizeToolOutput": {
+      "run_shell_command": {
+        "tokenBudget": 2000
+      }
+    }
     ```
 
 ### Example `settings.json`:
@@ -222,7 +244,13 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
-  "maxSessionTurns": 10
+  "hideBanner": false,
+  "maxSessionTurns": 10,
+  "summarizeToolOutput": {
+    "run_shell_command": {
+      "tokenBudget": 100
+    }
+  }
 }
 ```
 
