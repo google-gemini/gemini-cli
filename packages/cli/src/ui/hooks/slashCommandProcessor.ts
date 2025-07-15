@@ -202,33 +202,6 @@ export const useSlashCommandProcessor = (
           toggleCorgiMode();
         },
       },
-      {
-        name: 'quit',
-        altName: 'exit',
-        description: 'exit the cli',
-        action: async (mainCommand, _subCommand, _args) => {
-          const now = new Date();
-          const { sessionStartTime } = session.stats;
-          const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-          setQuittingMessages([
-            {
-              type: 'user',
-              text: `/${mainCommand}`,
-              id: now.getTime() - 1,
-            },
-            {
-              type: 'quit',
-              duration: formatDuration(wallDuration),
-              id: now.getTime(),
-            },
-          ]);
-
-          setTimeout(() => {
-            process.exit(0);
-          }, 100);
-        },
-      },
     ];
 
     if (config?.getCheckpointingEnabled()) {
@@ -359,7 +332,6 @@ export const useSlashCommandProcessor = (
     session,
     gitService,
     loadHistory,
-    setQuittingMessages,
   ]);
 
   const handleSlashCommand = useCallback(
@@ -470,6 +442,12 @@ export const useSlashCommandProcessor = (
                 });
                 return { type: 'handled' };
               }
+              case 'quit':
+                setQuittingMessages(result.messages);
+                setTimeout(() => {
+                  process.exit(0);
+                }, 100);
+                return { type: 'handled' };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
@@ -549,6 +527,7 @@ export const useSlashCommandProcessor = (
       openThemeDialog,
       openPrivacyNotice,
       openEditorDialog,
+      setQuittingMessages,
     ],
   );
 

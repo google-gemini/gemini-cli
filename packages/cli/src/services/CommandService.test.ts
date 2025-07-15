@@ -25,6 +25,7 @@ import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
+import { quitCommand } from '../ui/commands/quitCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -74,6 +75,9 @@ vi.mock('../ui/commands/editorCommand.js', () => ({
 }));
 vi.mock('../ui/commands/bugCommand.js', () => ({
   bugCommand: { name: 'bug', description: 'Mock Bug' },
+}));
+vi.mock('../ui/commands/quitCommand.js', () => ({
+  quitCommand: { name: 'quit', description: 'Mock Quit' },
 }));
 
 describe('CommandService', () => {
@@ -144,6 +148,7 @@ describe('CommandService', () => {
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('ide');
         expect(commandNames).toContain('editor');
+        expect(commandNames).toContain('quit');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -184,6 +189,7 @@ describe('CommandService', () => {
           memoryCommand,
           privacyCommand,
           statsCommand,
+          quitCommand,
           themeCommand,
           toolsCommand,
         ]);

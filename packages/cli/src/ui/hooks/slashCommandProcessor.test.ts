@@ -451,47 +451,4 @@ describe('useSlashCommandProcessor', () => {
       );
     });
   });
-
-  describe('/quit and /exit commands', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it.each([['/quit'], ['/exit']])(
-      'should handle %s, set quitting messages, and exit the process',
-      async (command) => {
-        const { handleSlashCommand } = getProcessor();
-        const mockDate = new Date('2025-01-01T01:02:03.000Z');
-        vi.setSystemTime(mockDate);
-
-        await act(async () => {
-          handleSlashCommand(command);
-        });
-
-        expect(mockAddItem).not.toHaveBeenCalled();
-        expect(mockSetQuittingMessages).toHaveBeenCalledWith([
-          {
-            type: 'user',
-            text: command,
-            id: expect.any(Number),
-          },
-          {
-            type: 'quit',
-            duration: '1h 2m 3s',
-            id: expect.any(Number),
-          },
-        ]);
-
-        // Fast-forward timers to trigger process.exit
-        await act(async () => {
-          vi.advanceTimersByTime(100);
-        });
-        expect(mockProcessExit).toHaveBeenCalledWith(0);
-      },
-    );
-  });
 });

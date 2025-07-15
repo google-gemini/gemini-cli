@@ -23,6 +23,7 @@ import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
+import { quitCommand } from '../ui/commands/quitCommand.js';
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -43,6 +44,7 @@ const loadBuiltInCommands = async (
     memoryCommand,
     privacyCommand,
     statsCommand,
+    quitCommand,
     themeCommand,
     toolsCommand,
   ];
