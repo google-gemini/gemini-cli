@@ -18,6 +18,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   MCPServerConfig,
+  IDE_SERVER_NAME,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -285,7 +286,7 @@ export async function loadCliConfig(
   }
 
   if (ideMode) {
-    mcpServers['_ide_server'] = new MCPServerConfig(
+    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
       undefined, // command
       undefined, // args
       undefined, // env
@@ -362,6 +363,7 @@ export async function loadCliConfig(
       version: e.config.version,
     })),
     noBrowser: !!process.env.NO_BROWSER,
+    summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
   });
 }
