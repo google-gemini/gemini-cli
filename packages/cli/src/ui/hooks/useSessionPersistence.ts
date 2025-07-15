@@ -9,7 +9,12 @@ import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import process from 'node:process';
-import { HistoryItem, MessageType } from '../types.js';
+import {
+  HistoryItem,
+  MessageType,
+  HistoryItemUser,
+  HistoryItemGemini,
+} from '../types.js';
 
 interface UseSessionPersistenceProps {
   sessionPersistence: boolean | undefined;
@@ -31,7 +36,7 @@ export const useSessionPersistence = ({
           const parsedHistory = JSON.parse(sessionData);
           if (Array.isArray(parsedHistory)) {
             const historyWithIds: HistoryItem[] = parsedHistory.map(
-              (item: any, index: number) => ({
+              (item: HistoryItemUser | HistoryItemGemini, index: number) => ({
                 type: item.type,
                 text: item.text,
                 // Use negative IDs for loaded items to avoid conflicts with new items
