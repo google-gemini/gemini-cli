@@ -13,23 +13,27 @@ import {
 import { Config } from '@google/gemini-cli-core';
 
 // Mock the core package
+const mockRecordActivity = vi.fn();
+const mockMonitor = {
+  recordActivity: mockRecordActivity,
+  isMonitoringActive: () => true,
+  getActivityStats: () => ({
+    totalEvents: 5,
+    eventTypes: {
+      ['user_input_start']: 2,
+      ['message_added']: 3,
+    },
+    timeRange: { start: Date.now() - 1000, end: Date.now() },
+  }),
+};
+
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
     startGlobalActivityMonitoring: vi.fn(),
     stopGlobalActivityMonitoring: vi.fn(),
-    getActivityMonitor: vi.fn(() => ({
-      isMonitoringActive: () => true,
-      getActivityStats: () => ({
-        totalEvents: 5,
-        eventTypes: {
-          ['user_input_start']: 2,
-          ['message_added']: 3,
-        },
-        timeRange: { start: Date.now() - 1000, end: Date.now() },
-      }),
-    })),
+    getActivityMonitor: vi.fn(() => mockMonitor),
     recordUserActivity: vi.fn(),
     ActivityType: {
       USER_INPUT_START: 'user_input_start',
@@ -50,6 +54,7 @@ describe('useActivityMonitoring', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordActivity.mockClear();
     mockConfig = {
       getSessionId: () => 'test-session',
     } as Config;
@@ -97,8 +102,11 @@ describe('useActivityMonitoring', () => {
       result.current.recordActivity('user_input_start', 'test-context');
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledWith();
+    expect(mockRecordActivity).toHaveBeenCalledWith(
+      'user_input_start',
+      'test-context',
+      undefined,
+    );
   });
 
   it('should get activity statistics', async () => {
@@ -145,6 +153,7 @@ describe('useActivityRecorder', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordActivity.mockClear();
     mockConfig = {
       getSessionId: () => 'test-session',
     } as Config;
@@ -169,8 +178,7 @@ describe('useActivityRecorder', () => {
       result.current.recordUserInput();
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledWith();
+    expect(mockRecordActivity).toHaveBeenCalled();
   });
 
   it('should record message added activity with metadata', async () => {
@@ -181,8 +189,7 @@ describe('useActivityRecorder', () => {
       result.current.recordMessageAdded();
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledWith();
+    expect(mockRecordActivity).toHaveBeenCalled();
   });
 
   it('should record tool call activity', async () => {
@@ -193,8 +200,7 @@ describe('useActivityRecorder', () => {
       result.current.recordToolCall('tool-execution', metadata);
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledWith();
+    expect(mockRecordActivity).toHaveBeenCalled();
   });
 
   it('should record stream events', async () => {
@@ -205,8 +211,7 @@ describe('useActivityRecorder', () => {
       result.current.recordStreamEnd('gemini-stream-complete');
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledTimes(2);
+    expect(mockRecordActivity).toHaveBeenCalledTimes(2);
   });
 
   it('should record history updates', async () => {
@@ -217,8 +222,7 @@ describe('useActivityRecorder', () => {
       result.current.recordHistoryUpdate('history-cleared', metadata);
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).toHaveBeenCalledWith();
+    expect(mockRecordActivity).toHaveBeenCalled();
   });
 
   it('should not record activities when disabled', async () => {
@@ -228,7 +232,6 @@ describe('useActivityRecorder', () => {
       result.current.recordUserInput();
     });
 
-    const { recordUserActivity } = await import('@google/gemini-cli-core');
-    expect(recordUserActivity).not.toHaveBeenCalled();
+    expect(mockRecordActivity).not.toHaveBeenCalled();
   });
 });
