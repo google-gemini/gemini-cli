@@ -725,6 +725,66 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
     expect(config.getMcpServers()).toEqual({});
   });
+
+  it('should read allowMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should read excludeMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
+
+  it('should override allowMCPServers with excludeMCPServers if overlapping ', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should prioritize mcp server flag if set ', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
 });
 
 describe('loadCliConfig extensions', () => {
