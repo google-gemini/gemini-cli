@@ -246,6 +246,23 @@ export class FlashFallbackEvent {
   }
 }
 
+export enum LoopType {
+  TOOL_CALL = 'tool_call',
+  CONTENT = 'content',
+}
+
+export class LoopDetectedEvent {
+  'event.name': 'loop_detected';
+  'event.timestamp': string; // ISO 8601
+  loop_type: LoopType;
+
+  constructor(loop_type: LoopType) {
+    this['event.name'] = 'loop_detected';
+    this['event.timestamp'] = new Date().toISOString();
+    this.loop_type = loop_type;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -254,4 +271,5 @@ export type TelemetryEvent =
   | ApiRequestEvent
   | ApiErrorEvent
   | ApiResponseEvent
-  | FlashFallbackEvent;
+  | FlashFallbackEvent
+  | LoopDetectedEvent;

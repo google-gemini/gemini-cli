@@ -6,6 +6,9 @@
 
 import { createHash } from 'crypto';
 import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
+import { logLoopDetected } from '../telemetry/loggers.js';
+import { LoopType } from '../telemetry/types.js';
+import { Config } from '../config/config.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -24,6 +27,11 @@ export class LoopDetectionService {
   private lastRepeatedSentence: string = '';
   private sentenceRepetitionCount: number = 0;
   private partialContent: string = '';
+  private config: Config;
+
+  constructor(config: Config) {
+    this.config = config;
+  }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
     const argsString = JSON.stringify(toolCall.args);
@@ -59,7 +67,15 @@ export class LoopDetectionService {
       this.lastToolCallKey = key;
       this.toolCallRepetitionCount = 1;
     }
-    return this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD;
+    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+      logLoopDetected(this.config, {
+        'event.name': 'loop_detected',
+        'event.timestamp': new Date().toISOString(),
+        loop_type: LoopType.TOOL_CALL,
+      });
+      return true;
+    }
+    return false;
   }
 
   private checkContentLoop(content: string): boolean {
@@ -94,6 +110,11 @@ export class LoopDetectionService {
       }
 
       if (this.sentenceRepetitionCount >= CONTENT_LOOP_THRESHOLD) {
+        logLoopDetected(this.config, {
+          'event.name': 'loop_detected',
+          'event.timestamp': new Date().toISOString(),
+          loop_type: LoopType.CONTENT,
+        });
         return true;
       }
     }
