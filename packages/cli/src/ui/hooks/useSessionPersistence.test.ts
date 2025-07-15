@@ -200,6 +200,26 @@ describe('useSessionPersistence - Integration Test', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('should not call loadHistory if session file contains malformed history items', async () => {
+    const geminiDir = path.join(tempDir, '.gemini');
+    fs.mkdirSync(geminiDir, { recursive: true });
+    const sessionPath = path.join(geminiDir, 'session.json');
+    fs.writeFileSync(sessionPath, '[null, {"foo": "bar"}]'); // Malformed history items
+
+    renderHook(() =>
+      useSessionPersistence({
+        sessionPersistence: true,
+        history: mockHistory,
+        loadHistory: mockLoadHistory,
+      }),
+    );
+
+    // Give async operations a chance to run
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mockLoadHistory).not.toHaveBeenCalled();
+  });
+
   it('should not throw or call loadHistory if session file does not exist', async () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
