@@ -59,6 +59,7 @@ export * from './tools/mcp-tool.js';
 export * from './tools/ListCRI.js';
 export * from './tools/GetCRI.js';
 export * from './tools/CreateCRI.js';
+export * from './tools/DeleteCRI.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
