@@ -289,7 +289,7 @@ export async function loadCliConfig(
     const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
     if (!companionPort) {
       throw new Error(
-        'The GEMINI_CLI_IDE_SERVER_PORT environment variable must be set when running in IDE mode. Try running in a fresh terminal.',
+        "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
       );
     }
     const httpUrl = `http://localhost:${companionPort}/mcp`;

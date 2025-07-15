@@ -14,6 +14,8 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { Server } from 'node:http';
+
 function sendActiveFileChangedNotification(
   transport: StreamableHTTPServerTransport,
 ) {
@@ -103,10 +105,6 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
     }
 
     const transport = transports[sessionId];
-    if (!sessionsWithInitialNotification.has(sessionId)) {
-      sendActiveFileChangedNotification(transport);
-      sessionsWithInitialNotification.add(sessionId);
-    }
 
     try {
       await transport.handleRequest(req, res);
@@ -116,26 +114,31 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
         res.status(400).send('Bad Request');
       }
     }
+
+    if (!sessionsWithInitialNotification.has(sessionId)) {
+      sendActiveFileChangedNotification(transport);
+      sessionsWithInitialNotification.add(sessionId);
+    }
   };
 
   app.get('/mcp', handleSessionRequest);
 
-  // Dynamically import 'get-port' as it is an ESM-only package.
-  const { default: getPort } = await import('get-port');
-  const port = await getPort();
-  context.environmentVariableCollection.replace(
-    'GEMINI_CLI_IDE_SERVER_PORT',
-    port.toString(),
-  );
-
-  app.listen(port, (error?: Error) => {
-    if (error) {
-      console.error('Failed to start server:', error);
+  const server = app.listen(0, () => {
+    const address = (server as Server).address();
+    if (address && typeof address !== 'string') {
+      const port = address.port;
+      context.environmentVariableCollection.replace(
+        'GEMINI_CLI_IDE_SERVER_PORT',
+        port.toString(),
+      );
+      console.log(`MCP Streamable HTTP Server listening on port ${port}`);
+    } else {
+      const port = 0;
+      console.error('Failed to start server:', 'Unknown error');
       vscode.window.showErrorMessage(
-        `Companion server failed to start on port ${port}: ${error.message}`,
+        `Companion server failed to start on port ${port}: Unknown error`,
       );
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${port}`);
   });
 }
 
