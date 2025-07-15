@@ -298,7 +298,13 @@ export async function loadCliConfig(
     const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        Object.entries(mcpServers).filter(([key]) => {
+          if (allowedNames.has(key)) {
+            return true;
+          }
+          logger.warn(`Ignoring non-allowed MCP server: ${key}`);
+          return false;
+        }),
       );
     } else {
       mcpServers = {};
