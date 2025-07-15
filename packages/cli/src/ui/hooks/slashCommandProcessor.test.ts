@@ -310,7 +310,10 @@ describe('useSlashCommandProcessor', () => {
       const mockLoader = async () => [newCommand];
 
       // We create the instance outside the mock implementation.
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
 
       // This mock ensures the hook uses our pre-configured instance.
       vi.mocked(CommandService).mockImplementation(
@@ -344,7 +347,10 @@ describe('useSlashCommandProcessor', () => {
       });
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );
@@ -374,7 +380,10 @@ describe('useSlashCommandProcessor', () => {
       });
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );
@@ -406,7 +415,10 @@ describe('useSlashCommandProcessor', () => {
       });
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );
@@ -433,7 +445,10 @@ describe('useSlashCommandProcessor', () => {
       const newAuthCommand: SlashCommand = { name: 'auth', action: mockAction };
 
       const mockLoader = async () => [newAuthCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );
@@ -459,7 +474,10 @@ describe('useSlashCommandProcessor', () => {
       });
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );
@@ -487,7 +505,10 @@ describe('useSlashCommandProcessor', () => {
       };
 
       const mockLoader = async () => [parentCommand];
-      const commandServiceInstance = new ActualCommandService(mockLoader);
+      const commandServiceInstance = new ActualCommandService(
+        mockConfig,
+        mockLoader,
+      );
       vi.mocked(CommandService).mockImplementation(
         () => commandServiceInstance,
       );

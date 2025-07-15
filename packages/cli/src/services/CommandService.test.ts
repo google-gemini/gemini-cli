@@ -14,6 +14,8 @@ import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { ideCommand } from '../ui/commands/ideCommand.js';
+import { type Config } from '@google/gemini-cli-core';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -37,16 +39,23 @@ vi.mock('../ui/commands/privacyCommand.js', () => ({
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
-vi.mock('../ui/commands/ideCommand.js', () => ({
-  ideCommand: () => ({ name: 'ide', description: 'Mock IDE' }),
-}));
+vi.mock('../ui/commands/ideCommand.js');
 
 describe('CommandService', () => {
+  let mockConfig: vi.Mocked<Config>;
+
+  beforeEach(() => {
+    mockConfig = {
+      getIdeMode: vi.fn(),
+    } as unknown as vi.Mocked<Config>;
+    vi.mocked(ideCommand).mockReturnValue(null);
+  });
+
   describe('when using default production loader', () => {
     let commandService: CommandService;
 
     beforeEach(() => {
-      commandService = new CommandService();
+      commandService = new CommandService(mockConfig);
     });
 
     it('should initialize with an empty command tree', () => {
@@ -75,6 +84,21 @@ describe('CommandService', () => {
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('privacy');
         expect(commandNames).toContain('about');
+        expect(commandNames).not.toContain('ide');
+      });
+
+      it('should include ide command when ideMode is on', async () => {
+        mockConfig.getIdeMode.mockReturnValue(true);
+        vi.mocked(ideCommand).mockReturnValue({
+          name: 'ide',
+          description: 'Mock IDE',
+        });
+        await commandService.loadCommands();
+        const tree = commandService.getCommands();
+
+        expect(tree.length).toBe(8);
+        const commandNames = tree.map((cmd) => cmd.name);
+        expect(commandNames).toContain('ide');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -100,15 +124,17 @@ describe('CommandService', () => {
 
         const loadedTree = commandService.getCommands();
         expect(loadedTree.length).toBe(7);
-        expect(loadedTree).toEqual([
-          aboutCommand,
-          authCommand,
-          clearCommand,
-          helpCommand,
-          memoryCommand,
-          privacyCommand,
-          themeCommand,
-        ]);
+        expect(loadedTree).toEqual(
+          expect.arrayContaining([
+            aboutCommand,
+            authCommand,
+            clearCommand,
+            helpCommand,
+            memoryCommand,
+            privacyCommand,
+            themeCommand,
+          ]),
+        );
       });
     });
   });
@@ -125,7 +151,7 @@ describe('CommandService', () => {
       const mockLoader = vi.fn().mockResolvedValue(mockCommands);
 
       // Act: Instantiate the service WITH the injected loader function.
-      const commandService = new CommandService(mockLoader);
+      const commandService = new CommandService(mockConfig, mockLoader);
       await commandService.loadCommands();
       const tree = commandService.getCommands();
 
@@ -139,3 +165,4 @@ describe('CommandService', () => {
     });
   });
 });
+
