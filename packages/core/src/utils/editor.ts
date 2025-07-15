@@ -5,6 +5,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import * as shellQuote from 'shell-quote';
 
 export type EditorType =
   | 'vscode'
@@ -126,8 +127,8 @@ export function getDiffCommand(
           // Auto close all windows when one is closed
           '-c',
           'autocmd WinClosed * wqa',
-          oldPath,
-          newPath,
+          shellQuote.quote([oldPath]),
+          shellQuote.quote([newPath]),
         ],
       };
     default:
