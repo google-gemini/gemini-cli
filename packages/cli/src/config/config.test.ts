@@ -868,7 +868,7 @@ describe('loadCliConfig ideMode', () => {
     expect(config.getIdeMode()).toBe(false);
   });
 
-  it('should add __ide_server when ideMode is true', async () => {
+  it('should add _ide_server when ideMode is true', async () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
