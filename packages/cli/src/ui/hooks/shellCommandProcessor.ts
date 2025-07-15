@@ -254,7 +254,10 @@ export const useShellCommandProcessor = (
           (streamedOutput) => {
             // Throttle pending UI updates to avoid excessive re-renders.
             if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-              setPendingHistoryItem({ type: 'info', text: streamedOutput });
+              setPendingHistoryItem({
+                type: 'info',
+                parts: [{ type: 'text', text: streamedOutput }],
+              });
               lastUpdateTime = Date.now();
             }
           },

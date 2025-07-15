@@ -77,9 +77,21 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
   text: string;
 };
 
+export interface LinkInfoPart {
+  type: 'link';
+  value: string;
+}
+
+export interface TextInfoPart {
+  type: 'text';
+  text: string;
+}
+
+export type InfoPart = LinkInfoPart | TextInfoPart;
+
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
-  text: string;
+  parts: InfoPart[];
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -167,8 +179,9 @@ export enum MessageType {
 
 // Simplified message structure for internal feedback
 export type Message =
+  | { type: MessageType.INFO; parts: InfoPart[]; timestamp: Date }
   | {
-      type: MessageType.INFO | MessageType.ERROR | MessageType.USER;
+      type: MessageType.ERROR | MessageType.USER;
       content: string; // Renamed from text for clarity in this context
       timestamp: Date;
     }

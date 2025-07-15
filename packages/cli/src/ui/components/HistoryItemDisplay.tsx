@@ -59,7 +59,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         terminalWidth={terminalWidth}
       />
     )}
-    {item.type === 'info' && <InfoMessage text={item.text} />}
+    {item.type === 'info' && <InfoMessage parts={item.parts} />}
     {item.type === 'error' && <ErrorMessage text={item.text} />}
     {item.type === 'about' && (
       <AboutBox

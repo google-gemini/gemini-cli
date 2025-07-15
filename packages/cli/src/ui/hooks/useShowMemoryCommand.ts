@@ -7,6 +7,7 @@
 import { Message, MessageType } from '../types.js';
 import { Config } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
+import { textInfoPart } from '../utils/infoParts.js';
 
 export function createShowMemoryAction(
   config: Config | null,
@@ -48,9 +49,13 @@ export function createShowMemoryAction(
       const name = allNamesTheSame ? contextFileNames[0] : 'context';
       addMessage({
         type: MessageType.INFO,
-        content: `Loaded memory from ${fileCount} ${name} file${
-          fileCount > 1 ? 's' : ''
-        }.`,
+        parts: [
+          textInfoPart(
+            `Loaded memory from ${fileCount} ${name} file${
+              fileCount > 1 ? 's' : ''
+            }.`,
+          ),
+        ],
         timestamp: new Date(),
       });
     }
@@ -58,16 +63,23 @@ export function createShowMemoryAction(
     if (currentMemory && currentMemory.trim().length > 0) {
       addMessage({
         type: MessageType.INFO,
-        content: `Current combined memory content:\n\`\`\`markdown\n${currentMemory}\n\`\`\``,
+        parts: [
+          textInfoPart(
+            `Current combined memory content:\n\`\`\`markdown\n${currentMemory}\n\`\`\``,
+          ),
+        ],
         timestamp: new Date(),
       });
     } else {
       addMessage({
         type: MessageType.INFO,
-        content:
-          fileCount > 0
-            ? 'Hierarchical memory (GEMINI.md or other context files) is loaded but content is empty.'
-            : 'No hierarchical memory (GEMINI.md or other context files) is currently loaded.',
+        parts: [
+          textInfoPart(
+            fileCount > 0
+              ? 'Hierarchical memory (GEMINI.md or other context files) is loaded but content is empty.'
+              : 'No hierarchical memory (GEMINI.md or other context files) is currently loaded.',
+          ),
+        ],
         timestamp: new Date(),
       });
     }

@@ -39,6 +39,7 @@ import {
   type SlashCommand,
 } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
+import { linkInfoPart, textInfoPart } from '../utils/infoParts.js';
 
 // This interface is for the old, inline command definitions.
 // It will be removed once all commands are migrated to the new system.
@@ -142,6 +143,12 @@ export const useSlashCommandProcessor = (
           type: 'compression',
           compression: message.compression,
         };
+      } else if (message.type === MessageType.INFO) {
+        historyItemContent = {
+          type: 'info',
+          parts: message.parts,
+          text: message.parts.join('\n'),
+        };
       } else {
         historyItemContent = {
           type: message.type,
@@ -229,13 +236,21 @@ export const useSlashCommandProcessor = (
           if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
             addMessage({
               type: MessageType.INFO,
-              content: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,
+              parts: [
+                textInfoPart(
+                  'Please open the following URL in your browser to view the documentation:\n',
+                ),
+                linkInfoPart(docsUrl),
+              ],
               timestamp: new Date(),
             });
           } else {
             addMessage({
               type: MessageType.INFO,
-              content: `Opening documentation in your browser: ${docsUrl}`,
+              parts: [
+                textInfoPart(`Opening documentation in your browser: `),
+                linkInfoPart(docsUrl),
+              ],
               timestamp: new Date(),
             });
             await open(docsUrl);
@@ -319,13 +334,23 @@ export const useSlashCommandProcessor = (
             if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
               addMessage({
                 type: MessageType.INFO,
-                content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
+                parts: [
+                  textInfoPart(
+                    'No MCP servers configured. Please open the following URL in your browser to view documentation:\n',
+                  ),
+                  linkInfoPart(docsUrl),
+                ],
                 timestamp: new Date(),
               });
             } else {
               addMessage({
                 type: MessageType.INFO,
-                content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
+                parts: [
+                  textInfoPart(
+                    'No MCP servers configured. Opening documentation in your browser: ',
+                  ),
+                  linkInfoPart(docsUrl),
+                ],
                 timestamp: new Date(),
               });
               await open(docsUrl);
@@ -471,7 +496,7 @@ export const useSlashCommandProcessor = (
 
           addMessage({
             type: MessageType.INFO,
-            content: message,
+            parts: [textInfoPart(message)],
             timestamp: new Date(),
           });
         },
@@ -484,7 +509,7 @@ export const useSlashCommandProcessor = (
           if (!activeExtensions || activeExtensions.length === 0) {
             addMessage({
               type: MessageType.INFO,
-              content: 'No active extensions.',
+              parts: [textInfoPart('No active extensions.')],
               timestamp: new Date(),
             });
             return;
@@ -499,7 +524,7 @@ export const useSlashCommandProcessor = (
 
           addMessage({
             type: MessageType.INFO,
-            content: message,
+            parts: [textInfoPart(message)],
             timestamp: new Date(),
           });
         },
@@ -573,7 +598,7 @@ export const useSlashCommandProcessor = (
 
           addMessage({
             type: MessageType.INFO,
-            content: message,
+            parts: [textInfoPart(message)],
             timestamp: new Date(),
           });
         },
@@ -628,7 +653,12 @@ export const useSlashCommandProcessor = (
 
           addMessage({
             type: MessageType.INFO,
-            content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
+            parts: [
+              textInfoPart(
+                'To submit your bug report, please open the following URL in your browser: ',
+              ),
+              linkInfoPart(bugReportUrl),
+            ],
             timestamp: new Date(),
           });
           (async () => {
@@ -686,13 +716,17 @@ export const useSlashCommandProcessor = (
                 await logger.saveCheckpoint(chat?.getHistory() || [], tag);
                 addMessage({
                   type: MessageType.INFO,
-                  content: `Conversation checkpoint saved with tag: ${tag}.`,
+                  parts: [
+                    textInfoPart(
+                      `Conversation checkpoint saved with tag: ${tag}.`,
+                    ),
+                  ],
                   timestamp: new Date(),
                 });
               } else {
                 addMessage({
                   type: MessageType.INFO,
-                  content: 'No conversation found to save.',
+                  parts: [textInfoPart('No conversation found to save.')],
                   timestamp: new Date(),
                 });
               }
@@ -713,7 +747,9 @@ export const useSlashCommandProcessor = (
               if (conversation.length === 0) {
                 addMessage({
                   type: MessageType.INFO,
-                  content: `No saved checkpoint found with tag: ${tag}.`,
+                  parts: [
+                    textInfoPart(`No saved checkpoint found with tag: ${tag}.`),
+                  ],
                   timestamp: new Date(),
                 });
                 return;
@@ -764,9 +800,12 @@ export const useSlashCommandProcessor = (
             case 'list':
               addMessage({
                 type: MessageType.INFO,
-                content:
-                  'list of saved conversations: ' +
-                  (await savedChatTags()).join(', '),
+                parts: [
+                  textInfoPart(
+                    'list of saved conversations: ' +
+                      (await savedChatTags()).join(', '),
+                  ),
+                ],
                 timestamp: new Date(),
               });
               return;
@@ -910,7 +949,7 @@ export const useSlashCommandProcessor = (
               if (jsonFiles.length === 0) {
                 addMessage({
                   type: MessageType.INFO,
-                  content: 'No restorable tool calls found.',
+                  parts: [textInfoPart('No restorable tool calls found.')],
                   timestamp: new Date(),
                 });
                 return;
@@ -926,7 +965,11 @@ export const useSlashCommandProcessor = (
               const fileList = truncatedFiles.join('\n');
               addMessage({
                 type: MessageType.INFO,
-                content: `Available tool calls to restore:\n\n${fileList}`,
+                parts: [
+                  textInfoPart(
+                    `Available tool calls to restore:\n\n${fileList}`,
+                  ),
+                ],
                 timestamp: new Date(),
               });
               return;
@@ -965,7 +1008,11 @@ export const useSlashCommandProcessor = (
               );
               addMessage({
                 type: MessageType.INFO,
-                content: `Restored project to the state before the tool call.`,
+                parts: [
+                  textInfoPart(
+                    `Restored project to the state before the tool call.`,
+                  ),
+                ],
                 timestamp: new Date(),
               });
             }
@@ -1113,7 +1160,7 @@ export const useSlashCommandProcessor = (
             .join('\n')}`;
           addMessage({
             type: MessageType.INFO,
-            content: helpText,
+            parts: [textInfoPart(helpText)],
             timestamp: new Date(),
           });
           return { type: 'handled' };
