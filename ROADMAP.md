@@ -21,7 +21,7 @@ Our development is guided by the following principles:
 
 ## How the Roadmap Works
 
-Our roadmap is managed directly through [GitHub Issues](https://github.com/google-gemini/gemini-cli/issues). This approach allows for transparency and gives you a direct way to learn more or get involved with any specific initiative. All our roadmap items will be tagged as Type:`Feature` and Label:`maintainer` for features we are actively working on, or ``maintainer/roadmap`` for a more detailed list of tasks. 
+Our roadmap is managed directly through Github Issues. See our entry point Roadmap Issue [here](https://github.com/google-gemini/gemini-cli/issues/4191). This approach allows for transparency and gives you a direct way to learn more or get involved with any specific initiative. All our roadmap items will be tagged as Type:`Feature` and Label:`maintainer` for features we are actively working on, or Type:`Task` and Label:`maintainer` for a more detailed list of tasks. 
 
 Issues are organized to provide key information at a glance:
 - **Target Quarter:** `Milestone` denotes the anticipated delivery timeline.
