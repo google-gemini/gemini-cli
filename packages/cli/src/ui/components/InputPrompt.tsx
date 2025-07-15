@@ -229,7 +229,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      // Ignore clipboard image errors
     }
   }, [buffer, config]);
 
@@ -377,8 +377,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Alt+V for clipboard image paste(Windows)
-      if (key.meta && key.name === 'v') {
-        console.error('=== Detected Alt+V key press ===');
+      if (process.platform === 'win32' && key.meta && key.name === 'v') {
         handleClipboardImage();
         return;
       }

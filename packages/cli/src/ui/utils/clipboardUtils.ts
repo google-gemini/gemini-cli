@@ -17,35 +17,26 @@ const execAsync = promisify(exec);
  */
 export async function clipboardHasImage(): Promise<boolean> {
   try {
-    console.error('=== clipboardHasImage function called ===');
-    console.error('Checking clipboard for image');
     if (process.platform === 'darwin') {
-      console.error('macOS platform: Checking clipboard for image');
       // macOS: Use osascript to check clipboard type
       const { stdout } = await execAsync(
         `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
         { shell: '/bin/bash' },
       );
       const result = stdout.trim() === 'true';
-      console.error('macOS platform: Clipboard check result:', result);
       return result;
     } else if (process.platform === 'win32') {
-      console.error('Windows platform: Checking clipboard for image');
       // Windows: Use PowerShell to check clipboard for image
       const { stdout } = await execAsync(
         `powershell -command "Add-Type -AssemblyName System.Windows.Forms; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { Write-Output 'true' } else { Write-Output 'false' }"`,
       );
       const result = stdout.trim() === 'true';
-      console.error('Windows platform: Clipboard check result:', result);
       return result;
     } else {
-      console.error('Other platform: Checking clipboard for image');
       // Other platforms not supported yet
       return false;
     }
   } catch (error) {
-    console.error('=== clipboardHasImage error occurred ===');
-    console.error('Failed to check clipboard for image:', error);
     return false;
   }
 }
@@ -59,7 +50,6 @@ export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
   try {
-    console.error('Saving clipboard image');
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
     const baseDir = targetDir || process.cwd();
@@ -122,10 +112,8 @@ export async function saveClipboardImage(
         }
       }
     } else if (process.platform === 'win32') {
-      console.error('Windows platform: Starting to save clipboard image');
       // Windows: Use PowerShell to save clipboard image
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-      console.error('Windows platform: Temporary file path:', tempFilePath);
       
       // Use a different approach to avoid quote escaping issues
       const escapedPath = tempFilePath.replace(/\\/g, '\\\\').replace(/"/g, '`"');
@@ -134,32 +122,22 @@ export async function saveClipboardImage(
         `powershell -command "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { $image = [System.Windows.Forms.Clipboard]::GetImage(); $image.Save('${escapedPath}', [System.Drawing.Imaging.ImageFormat]::Png); Write-Output 'success' } else { Write-Output 'error' }"`,
       );
 
-      console.error('Windows platform: PowerShell output:', stdout.trim());
-
       if (stdout.trim() === 'success') {
-        console.error('Windows platform: PowerShell executed successfully, verifying file');
         // Verify the file was created and has content
         try {
           const stats = await fs.stat(tempFilePath);
-          console.error('Windows platform: File size:', stats.size);
           if (stats.size > 0) {
-            console.error('Windows platform: File saved successfully, returning path:', tempFilePath);
             return tempFilePath;
           }
         } catch (statError) {
-          console.error('Windows platform: File status check failed:', statError);
           // File doesn't exist
         }
-      } else {
-        console.error('Windows platform: PowerShell execution failed');
       }
 
       // Clean up failed attempt
       try {
         await fs.unlink(tempFilePath);
-        console.error('Windows platform: Cleaned up failed temporary file');
       } catch (unlinkError) {
-        console.error('Windows platform: Failed to clean up temporary file:', unlinkError);
         // Ignore cleanup errors
       }
     } else {
@@ -168,10 +146,8 @@ export async function saveClipboardImage(
     }
 
     // No format worked
-    console.error('All formats failed');
     return null;
   } catch (error) {
-    console.error('Error saving clipboard image:', error);
     return null;
   }
 }
