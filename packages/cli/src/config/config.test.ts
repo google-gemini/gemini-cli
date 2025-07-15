@@ -780,6 +780,7 @@ describe('loadCliConfig ideMode', () => {
     // Explicitly delete TERM_PROGRAM and SANDBOX before each test
     delete process.env.TERM_PROGRAM;
     delete process.env.SANDBOX;
+    delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
 
   afterEach(() => {
@@ -816,6 +817,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -825,6 +827,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -834,6 +837,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: false };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -872,6 +876,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -880,5 +885,17 @@ describe('loadCliConfig ideMode', () => {
     expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
     expect(mcpServers['_ide_server'].description).toBe('IDE connection');
     expect(mcpServers['_ide_server'].trust).toBe(false);
+  });
+
+  it('should throw an error if ideMode is true and no port is set', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = {};
+    await expect(
+      loadCliConfig(settings, [], 'test-session', argv),
+    ).rejects.toThrow(
+      "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+    );
   });
 });
