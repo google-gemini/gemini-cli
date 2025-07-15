@@ -10,7 +10,6 @@ import {
   FunctionCall,
   FunctionDeclaration,
   FinishReason,
-  GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import {
   ToolCallConfirmationDetails,
@@ -51,7 +50,6 @@ export enum GeminiEventType {
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
   MaxSessionTurns = 'max_session_turns',
-  UsageMetadata = 'usage_metadata',
   Finished = 'finished',
   LoopDetected = 'loop_detected',
 }
@@ -143,11 +141,6 @@ export type ServerGeminiFinishedEvent = {
   value: FinishReason;
 };
 
-export type ServerGeminiUsageMetadataEvent = {
-  type: GeminiEventType.UsageMetadata;
-  value: GenerateContentResponseUsageMetadata & { apiTimeMs?: number };
-};
-
 export type ServerGeminiLoopDetectedEvent = {
   type: GeminiEventType.LoopDetected;
 };
@@ -163,7 +156,6 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiChatCompressedEvent
   | ServerGeminiThoughtEvent
   | ServerGeminiMaxSessionTurnsEvent
-  | ServerGeminiUsageMetadataEvent
   | ServerGeminiFinishedEvent
   | ServerGeminiLoopDetectedEvent;
 
@@ -171,7 +163,6 @@ export type ServerGeminiStreamEvent =
 export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
-  private lastUsageMetadata: GenerateContentResponseUsageMetadata | null = null;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -185,7 +176,6 @@ export class Turn {
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
-    const startTime = Date.now();
     try {
       const responseStream = await this.chat.sendMessageStream(
         {
@@ -241,28 +231,15 @@ export class Turn {
           }
         }
 
-        if (resp.usageMetadata) {
-          this.lastUsageMetadata =
-            resp.usageMetadata as GenerateContentResponseUsageMetadata;
-        }
-
         // Check if response was truncated or stopped for various reasons
         const finishReason = resp.candidates?.[0]?.finishReason;
         
-        if (finishReason && finishReason !== FinishReason.STOP && finishReason !== FinishReason.FINISH_REASON_UNSPECIFIED) {
+        if (finishReason) {
           yield {
             type: GeminiEventType.Finished,
             value: finishReason as FinishReason,
           };
         }
-      }
-
-      if (this.lastUsageMetadata) {
-        const durationMs = Date.now() - startTime;
-        yield {
-          type: GeminiEventType.UsageMetadata,
-          value: { ...this.lastUsageMetadata, apiTimeMs: durationMs },
-        };
       }
     } catch (e) {
       const error = toFriendlyError(e);
@@ -323,9 +300,5 @@ export class Turn {
 
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
-  }
-
-  getUsageMetadata(): GenerateContentResponseUsageMetadata | null {
-    return this.lastUsageMetadata;
   }
 }

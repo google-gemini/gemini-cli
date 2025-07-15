@@ -430,25 +430,31 @@ export const useGeminiStream = (
       const finishReasonMessages: Record<FinishReason, string | undefined> = {
         [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
         [FinishReason.STOP]: undefined,
-        [FinishReason.MAX_TOKENS]: '\n\n⚠️  Response truncated due to token limits.',
-        [FinishReason.SAFETY]: '\n\n⚠️  Response stopped due to safety reasons.',
-        [FinishReason.RECITATION]: '\n\n⚠️  Response stopped due to recitation policy.',
-        [FinishReason.LANGUAGE]: '\n\n⚠️  Response stopped due to unsupported language.',
-        [FinishReason.BLOCKLIST]: '\n\n⚠️  Response stopped due to forbidden terms.',
-        [FinishReason.PROHIBITED_CONTENT]: '\n\n⚠️  Response stopped due to prohibited content.',
-        [FinishReason.SPII]: '\n\n⚠️  Response stopped due to sensitive personally identifiable information.',
-        [FinishReason.OTHER]: '\n\n⚠️  Response stopped for other reasons.',
-        [FinishReason.MALFORMED_FUNCTION_CALL]: '\n\n⚠️  Response stopped due to malformed function call.',
-        [FinishReason.IMAGE_SAFETY]: '\n\n⚠️  Response stopped due to image safety violations.',
-        [FinishReason.UNEXPECTED_TOOL_CALL]: '\n\n⚠️  Response stopped due to unexpected tool call.',
+        [FinishReason.MAX_TOKENS]: 'Response truncated due to token limits.',
+        [FinishReason.SAFETY]: 'Response stopped due to safety reasons.',
+        [FinishReason.RECITATION]: 'Response stopped due to recitation policy.',
+        [FinishReason.LANGUAGE]: 'Response stopped due to unsupported language.',
+        [FinishReason.BLOCKLIST]: 'Response stopped due to forbidden terms.',
+        [FinishReason.PROHIBITED_CONTENT]: 'Response stopped due to prohibited content.',
+        [FinishReason.SPII]: 'Response stopped due to sensitive personally identifiable information.',
+        [FinishReason.OTHER]: 'Response stopped for other reasons.',
+        [FinishReason.MALFORMED_FUNCTION_CALL]: 'Response stopped due to malformed function call.',
+        [FinishReason.IMAGE_SAFETY]: 'Response stopped due to image safety violations.',
+        [FinishReason.UNEXPECTED_TOOL_CALL]: 'Response stopped due to unexpected tool call.',
       };
       
       const message = finishReasonMessages[finishReason];
       if (message) {
-        handleContentEvent(message, '', userMessageTimestamp);
+        addItem(
+          {
+            type: 'info',
+            text: `⚠️  ${message}`,
+          },
+          userMessageTimestamp,
+        );
       }
     },
-    [handleContentEvent],
+    [addItem],
   );
 
   const handleChatCompressionEvent = useCallback(
@@ -532,9 +538,6 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Finished:
             handleFinishedEvent(event as ServerGeminiFinishedEvent, userMessageTimestamp);
-            break;
-          case ServerGeminiEventType.UsageMetadata:
-            // Handle UsageMetadata event if needed in the future
             break;
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
