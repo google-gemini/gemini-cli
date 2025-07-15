@@ -147,7 +147,7 @@ export const useSlashCommandProcessor = (
         historyItemContent = {
           type: 'info',
           parts: message.parts,
-          text: message.parts.join('\n'),
+          text: message.parts.join(""),
         };
       } else {
         historyItemContent = {
