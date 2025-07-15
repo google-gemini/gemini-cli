@@ -54,11 +54,6 @@ export const useSessionPersistence = ({
             if (historyWithIds.length > 0) {
               loadHistory(historyWithIds);
             }
-          } else if (parsedHistory.length > 0) {
-            console.error(
-              'Error loading session history: Malformed history items found.',
-              parsedHistory,
-            );
           }
         } catch (error) {
           // Silently ignore if file doesn't exist.
