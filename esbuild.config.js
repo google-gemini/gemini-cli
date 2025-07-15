@@ -25,7 +25,7 @@ esbuild
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },
     banner: {
-      js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+      js: `import { createRequire as _gcliCreateRequire } from 'module'; const require = _gcliCreateRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },
   })
   .catch(() => process.exit(1));
