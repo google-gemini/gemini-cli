@@ -346,7 +346,7 @@ describe('Gemini Client (client.ts)', () => {
         model: 'test-model',
         config: {
           abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
+          systemInstruction: getCoreSystemPrompt(client['config'], ''),
           temperature: 0.5,
           topP: 1,
         },
@@ -374,7 +374,7 @@ describe('Gemini Client (client.ts)', () => {
         model: 'test-model', // Should use current model from config
         config: {
           abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
+          systemInstruction: getCoreSystemPrompt(client['config'], ''),
           temperature: 0,
           topP: 1,
           responseSchema: schema,
@@ -409,7 +409,7 @@ describe('Gemini Client (client.ts)', () => {
         model: customModel,
         config: {
           abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
+          systemInstruction: getCoreSystemPrompt(client['config'], ''),
           temperature: 0.9,
           topP: 1, // from default
           topK: 20,
